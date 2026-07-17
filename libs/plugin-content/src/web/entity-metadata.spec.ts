@@ -20,7 +20,6 @@ import { EntityMetadata } from './entity-metadata';
  */
 const GRID_FIELD: Field = {
   id: 'test.grid',
-  key: 'grid',
   label: 'Grid',
   dataType: { kind: 'test.grid' },
   required: false,
@@ -31,7 +30,7 @@ const GRID_FIELD: Field = {
 const NOTE_TYPE: TypeDefinition = {
   id: CORE_NOTE,
   icon: 'label',
-  views: [{ field: CONTENT_FIELD.key }],
+  views: [{ field: CONTENT_FIELD.id }],
   fieldRefs: [CONTENT_FIELD.id],
   graphColorToken: '--color-ink-muted',
   labels: {
@@ -118,7 +117,7 @@ describe('EntityMetadata', () => {
     // The grid lives at a EntityDocument key like every other Field value, but it is a document with
     // its own View: dumping it here as a line of JSON would tell the reader nothing. A type carrying
     // nothing but Fields of a Structured Data Type therefore shows no disclosure at all.
-    session.loadDetail(noteWith(['core.hexmap'], { grid: { hexes: {} } }));
+    session.loadDetail(noteWith(['core.hexmap'], { 'test.grid': { hexes: {} } }));
     const fixture = TestBed.createComponent(EntityMetadata);
     fixture.detectChanges();
 
@@ -140,7 +139,9 @@ describe('EntityMetadata without the Hex Map plugin', () => {
   });
 
   it('shows a Hex Map’s grid as plain EntityDocument — an unrendered value, never a lost one', () => {
-    TestBed.inject(FakeEntitySession).loadDetail(noteWith(['core.hexmap'], { grid: { hexes: {} }, status: 'canon' }));
+    TestBed.inject(FakeEntitySession).loadDetail(
+      noteWith(['core.hexmap'], { 'test.grid': { hexes: {} }, status: 'canon' }),
+    );
     const fixture = TestBed.createComponent(EntityMetadata);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;

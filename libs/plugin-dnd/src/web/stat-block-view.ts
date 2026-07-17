@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { TranslocoPipe } from '@jsverse/transloco';
 import {
   EntityDocument,
-  FieldSchema,
+  Field,
   NO_STRUCTURED_DATA_TYPES,
   readField,
   validateFields,
@@ -24,7 +24,7 @@ import { StatSlot } from './stat-slot';
 
 /** One rendered slot of the stat block: the stat descriptor to edit through, plus its live value. */
 interface Slot {
-  readonly field: FieldSchema;
+  readonly field: Field;
   readonly value: unknown;
 }
 
@@ -57,9 +57,9 @@ interface Slot {
 
       <!-- Identity (size, creature type, alignment) and defences (AC, HP, speed): one labelled row each. -->
       <dl class="grid grid-cols-[minmax(6rem,9rem)_1fr] items-center gap-x-4 gap-y-2 m-0 py-3">
-        @for (slot of rows(); track slot.field.key) {
+        @for (slot of rows(); track slot.field.id) {
           <dt class="text-sm font-semibold text-astra">{{ slot.field.label }}</dt>
-          <dd class="m-0 text-sm text-ink" [attr.data-testid]="'stat-' + slot.field.key">
+          <dd class="m-0 text-sm text-ink" [attr.data-testid]="'stat-' + slot.field.id">
             <dnd-stat-slot
               [field]="slot.field"
               [value]="slot.value"
@@ -73,10 +73,10 @@ interface Slot {
 
       <!-- The six ability scores, each printing the modifier a player rolls with. -->
       <div class="grid grid-cols-6 gap-2 border-y border-line py-3 text-center">
-        @for (slot of abilities(); track slot.field.key) {
+        @for (slot of abilities(); track slot.field.id) {
           <div class="flex flex-col items-center gap-1">
             <span class="text-2xs font-semibold uppercase tracking-wider text-astra">{{ slot.field.label }}</span>
-            <span class="text-sm text-ink" [attr.data-testid]="'stat-' + slot.field.key">
+            <span class="text-sm text-ink" [attr.data-testid]="'stat-' + slot.field.id">
               <dnd-stat-slot
                 [field]="slot.field"
                 [value]="slot.value"
@@ -85,7 +85,7 @@ interface Slot {
                 (valueChange)="set(slot.field, $event)"
               />
             </span>
-            <span class="text-xs text-ink-muted" [attr.data-testid]="'stat-mod-' + slot.field.key">{{
+            <span class="text-xs text-ink-muted" [attr.data-testid]="'stat-mod-' + slot.field.id">{{
               modifier(slot.value)
             }}</span>
           </div>
@@ -96,7 +96,7 @@ interface Slot {
       @if (challenge(); as cr) {
         <dl class="grid grid-cols-[minmax(6rem,9rem)_1fr] items-center gap-x-4 gap-y-2 m-0 pt-3">
           <dt class="text-sm font-semibold text-astra">{{ cr.field.label }}</dt>
-          <dd class="m-0 text-sm text-ink" [attr.data-testid]="'stat-' + cr.field.key">
+          <dd class="m-0 text-sm text-ink" [attr.data-testid]="'stat-' + cr.field.id">
             <dnd-stat-slot
               [field]="cr.field"
               [value]="cr.value"
@@ -123,7 +123,7 @@ export class StatBlockView {
    * so it lenses whichever document key the placing Field named (a monster's `stat_block`, or an
    * attachment's own key). The whole block is one value at that key (ADR-0055).
    */
-  private readonly field: FieldSchema = { ...DND_STAT_BLOCK_FIELD, key: inject(VIEW_FIELD_KEY) };
+  private readonly field: Field = { ...DND_STAT_BLOCK_FIELD, id: inject(VIEW_FIELD_KEY) };
 
   /** The live stat-block value — a lens over the one EntityDocument map, coerced to a bare record to read stats off. */
   private readonly block = computed<Record<string, unknown>>(() => asBlock(readField(this.session.doc(), this.field)));
@@ -152,8 +152,8 @@ export class StatBlockView {
     return modifier === null ? '—' : formatModifier(modifier);
   }
 
-  protected isInvalid(field: FieldSchema): boolean {
-    return this.invalidKeys().has(field.key);
+  protected isInvalid(field: Field): boolean {
+    return this.invalidKeys().has(field.id);
   }
 
   /**
@@ -161,12 +161,12 @@ export class StatBlockView {
    * key — through the central store, the channel every View uses (ADR-0055). An emptied stat drops from
    * the block; the block itself stays (an empty object is not a cleared key), so the Field's slice persists.
    */
-  protected set(stat: FieldSchema, value: unknown): void {
+  protected set(stat: Field, value: unknown): void {
     if (!this.session.writable()) return;
     this.session.mutate((draft: EntityDocument) => {
       const next = { ...asBlock(readField(draft, this.field)) };
-      if (value === undefined || value === null || value === '') delete next[stat.key];
-      else next[stat.key] = value;
+      if (value === undefined || value === null || value === '') delete next[stat.id];
+      else next[stat.id] = value;
       writeFieldInPlace(draft, this.field, next);
     });
   }

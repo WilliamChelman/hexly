@@ -4,7 +4,6 @@ import {
   CreateWorldFieldRequest,
   EntityErrorCode,
   Field,
-  FieldSchema,
   UpdateWorldFieldRequest,
   unresolvedDataTypeErrors,
   worldFieldIdFromSegment,
@@ -40,8 +39,9 @@ export class WorldFieldsService {
   }
 
   /**
-   * Author a new World-defined Field (Owner-only). The `world.<segment>` id/key is slugged from the
-   * editable segment and frozen, with `key === id` (ADR-0056). `conflict` if the derived slug collides.
+   * Author a new World-defined Field (Owner-only). The `world.<segment>` id — which *is* the document key
+   * it lenses (ADR-0056) — is slugged from the editable segment and frozen. `conflict` if the derived
+   * slug collides. The stored `definition` is the id-less body; the row's `fieldId` carries the id.
    */
   create(userId: string, worldId: string, req: CreateWorldFieldRequest): TypeResult<Field> {
     const gate = this.gateOwner(userId, worldId);
@@ -49,23 +49,23 @@ export class WorldFieldsService {
     const { segment, ...body } = req;
     const id = worldFieldIdFromSegment(segment);
     if (this.fields.list(worldId).some((field) => field.id === id)) return { status: 'conflict' };
-    const definition: FieldSchema = { ...body, key: id };
-    this.assertDataTypeResolves(definition);
-    this.writes.createField(worldId, id, definition);
-    return { status: 'ok', value: { id, ...definition } };
+    const field: Field = { id, ...body };
+    this.assertDataTypeResolves(field);
+    this.writes.createField(worldId, id, body);
+    return { status: 'ok', value: field };
   }
 
   /**
    * Re-body a World-defined Field (Owner-only). `not-found` if the World is unreachable or the id is not
-   * defined. The id/key is immutable (ADR-0056): a path param, re-pinned as `key` here, never the body.
+   * defined. The id is immutable (ADR-0056): a path param, never the body — so renaming is label-only.
    */
   update(userId: string, worldId: string, fieldId: string, patch: UpdateWorldFieldRequest): TypeResult<Field> {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
-    const definition: FieldSchema = { ...patch, key: fieldId };
-    this.assertDataTypeResolves(definition);
-    if (!this.writes.updateField(worldId, fieldId, definition)) return { status: 'not-found' };
-    return { status: 'ok', value: { id: fieldId, ...definition } };
+    const field: Field = { id: fieldId, ...patch };
+    this.assertDataTypeResolves(field);
+    if (!this.writes.updateField(worldId, fieldId, patch)) return { status: 'not-found' };
+    return { status: 'ok', value: field };
   }
 
   /**
@@ -83,7 +83,7 @@ export class WorldFieldsService {
    * unregistered kind is rejected (ADR-0050/0054) — against the composed set, since no schema could
    * enumerate a kind a plugin registers at module load.
    */
-  private assertDataTypeResolves(field: FieldSchema): void {
+  private assertDataTypeResolves(field: Field): void {
     const errors = unresolvedDataTypeErrors([field], this.plugins.structuredDataTypes);
     if (errors.length > 0)
       throw new BadRequestException({

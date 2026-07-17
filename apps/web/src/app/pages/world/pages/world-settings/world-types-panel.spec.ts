@@ -25,14 +25,12 @@ describe('WorldTypesPanel', () => {
   // The World's registered Fields the picker offers, resolved by id through the registry.
   const domainField = defineField({
     id: 'world.domain',
-    key: 'domain',
     label: 'Domain',
     dataType: { kind: 'string' },
     facetable: true,
   });
   const battlemapField = defineField({
     id: 'world.battlemap',
-    key: 'battlemap',
     label: 'Battlemap',
     dataType: { kind: CORE_HEX_GRID },
   });
@@ -127,7 +125,7 @@ describe('WorldTypesPanel', () => {
       label: 'Deity',
       fieldRefs: ['world.battlemap'],
       // "Show as a view" defaults on, and the grid's View sits *after* the generic Field view.
-      views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
+      views: [CORE_VIEW_FIELDS, { field: 'world.battlemap' }],
     });
   });
 
@@ -148,7 +146,6 @@ describe('WorldTypesPanel', () => {
   it('mints a new World Field from the inline modal, then references it', () => {
     const element = defineField({
       id: 'world.element',
-      key: 'world.element',
       label: 'Element',
       dataType: { kind: 'string' },
     });

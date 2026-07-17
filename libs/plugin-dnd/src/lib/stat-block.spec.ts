@@ -92,7 +92,7 @@ describe('dnd.stat-block data type', () => {
 
   it('renders a descriptor for every stat the block prints, and prints every descriptor it declares', () => {
     const printed = [...DND_IDENTITY_KEYS, ...DND_DEFENCE_KEYS, ...DND_ABILITY_KEYS, DND_CHALLENGE_KEY];
-    const declared = DND_STAT_FIELDS.map((field) => field.key);
+    const declared = DND_STAT_FIELDS.map((field) => field.id);
     // Two-way pin: a stat schema/descriptor gained without a rendered slot — or a slot without a stat —
     // would silently drop from the only surface that edits it.
     expect([...declared].sort()).toEqual([...printed].sort());

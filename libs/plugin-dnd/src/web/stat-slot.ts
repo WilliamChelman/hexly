@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { FieldSchema } from '@hexly/domain';
+import { Field } from '@hexly/domain';
 import { FieldControl } from '@hexly/web-entity/controls';
 
 /**
@@ -26,7 +26,7 @@ import { FieldControl } from '@hexly/web-entity/controls';
   `,
 })
 export class StatSlot {
-  readonly field = input.required<FieldSchema>();
+  readonly field = input.required<Field>();
   /** The Field's raw value straight off the EntityDocument map — the lens, never a copy. */
   readonly value = input<unknown>();
   readonly writable = input(false);

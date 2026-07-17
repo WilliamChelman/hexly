@@ -16,7 +16,6 @@ import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 /** The required Field the monster type references by id (ADR-0054); set on the registry where it registers. */
 const lairField = defineField({
   id: 'test.lair',
-  key: 'lair',
   label: 'Lair',
   dataType: { kind: 'string' },
   required: true,
@@ -189,7 +188,7 @@ describe('CreateEntityDialog', () => {
         seq: 1,
         createdAt: 1,
         updatedAt: 1,
-        document: { content: emptyContent(), lair: 'Sunken keep' },
+        document: { 'core.content': emptyContent(), 'test.lair': 'Sunken keep' },
       } as EntityDetail),
     );
 
@@ -210,7 +209,7 @@ describe('CreateEntityDialog', () => {
     expect(entitiesClient.create).not.toHaveBeenCalled();
 
     // Fill the required Field, rendered inline in the dialog.
-    const lair = (q(fixture, 'create-field-lair') as HTMLElement).querySelector('input') as HTMLInputElement;
+    const lair = (q(fixture, 'create-field-test.lair') as HTMLElement).querySelector('input') as HTMLInputElement;
     lair.value = 'Sunken keep';
     lair.dispatchEvent(new Event('input'));
     fixture.detectChanges();
@@ -219,7 +218,9 @@ describe('CreateEntityDialog', () => {
     submit.click();
     fixture.detectChanges();
     // The collected value rides the create as initial EntityDocument.
-    expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['test.monster'], 'w1', { lair: 'Sunken keep' });
+    expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['test.monster'], 'w1', {
+      'test.lair': 'Sunken keep',
+    });
   });
 
   it('closes without creating anything on cancel', () => {

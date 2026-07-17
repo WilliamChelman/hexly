@@ -13,10 +13,10 @@ import {
   EntitySummary,
   EntityType,
   FacetCount,
+  Field,
   FieldError,
   FieldFacet,
   FieldFilter,
-  FieldSchema,
   InboundReference,
   OutboundReference,
   typesSchema,
@@ -593,7 +593,7 @@ export class EntitiesService {
    * a *resolvable* Entity whose types miss the constraint. Resolution runs through the caller's
    * read filter, so a deleted or inaccessible target resolves to no row and stays inert.
    */
-  private linkTargetTypeErrors(userId: string, fields: readonly FieldSchema[], metadata: EntityDocument): FieldError[] {
+  private linkTargetTypeErrors(userId: string, fields: readonly Field[], metadata: EntityDocument): FieldError[] {
     const constraints = entityLinkConstraints(fields, metadata);
     if (constraints.length === 0) return [];
     const { filter } = entityAccess(this.db, userId);

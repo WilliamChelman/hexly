@@ -12,7 +12,6 @@ import { GenericFieldView } from './generic-field-view';
 const beastFields = [
   defineField({
     id: 'test.name',
-    key: 'name',
     label: 'Name',
     dataType: { kind: 'string' },
     required: true,
@@ -20,7 +19,6 @@ const beastFields = [
   }),
   defineField({
     id: 'test.size',
-    key: 'size',
     label: 'Size',
     dataType: { kind: 'enum', options: ['small', 'large'] },
     required: false,
@@ -28,7 +26,6 @@ const beastFields = [
   }),
   defineField({
     id: 'test.cr',
-    key: 'cr',
     label: 'CR',
     dataType: { kind: 'number' },
     required: false,
@@ -85,12 +82,12 @@ describe('GenericFieldView', () => {
   it('renders a type’s declared Fields off EntityDocument, labelled and typed', () => {
     registry.setWorldFields(beastFields);
     registry.register(definitionWithFields('test.beast', beastFieldRefs));
-    const { el } = render(detail(['test.beast'], { name: 'Aboleth', size: 'large' }, ['edit']));
+    const { el } = render(detail(['test.beast'], { 'test.name': 'Aboleth', 'test.size': 'large' }, ['edit']));
 
     // The string Field shows its EntityDocument value; the enum Field renders its options as a <select>.
-    const name = el.querySelector('[data-testid=field-name] input') as HTMLInputElement;
+    const name = el.querySelector('[data-testid="field-test.name"] input') as HTMLInputElement;
     expect(name.value).toBe('Aboleth');
-    const size = el.querySelector('[data-testid=field-size] select') as HTMLSelectElement;
+    const size = el.querySelector('[data-testid="field-test.size"] select') as HTMLSelectElement;
     expect(size.value).toBe('large');
     expect(Array.from(size.options).map((o) => o.value)).toEqual(['', 'small', 'large']);
   });
@@ -98,29 +95,28 @@ describe('GenericFieldView', () => {
   it('writes an edited Field value back into the EntityDocument map', () => {
     registry.setWorldFields(beastFields);
     registry.register(definitionWithFields('test.beast', beastFieldRefs));
-    const { fixture, el } = render(detail(['test.beast'], { name: 'Aboleth' }, ['edit']));
+    const { fixture, el } = render(detail(['test.beast'], { 'test.name': 'Aboleth' }, ['edit']));
 
-    const name = el.querySelector('[data-testid=field-name] input') as HTMLInputElement;
+    const name = el.querySelector('[data-testid="field-test.name"] input') as HTMLInputElement;
     name.value = 'Kraken';
     name.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
     // The value lands in the one EntityDocument map — no separate store (CONTEXT.md → Field).
-    expect(session.doc()).toMatchObject({ name: 'Kraken' });
+    expect(session.doc()).toMatchObject({ 'test.name': 'Kraken' });
   });
 
   it('renders a read-only opener’s controls disabled', () => {
     registry.setWorldFields(beastFields);
     registry.register(definitionWithFields('test.beast', beastFieldRefs));
-    const { el } = render(detail(['test.beast'], { name: 'Aboleth' }, ['read']));
+    const { el } = render(detail(['test.beast'], { 'test.name': 'Aboleth' }, ['read']));
 
-    expect((el.querySelector('[data-testid=field-name] input') as HTMLInputElement).disabled).toBe(true);
+    expect((el.querySelector('[data-testid="field-test.name"] input') as HTMLInputElement).disabled).toBe(true);
   });
 
   it('renders an Entity-Link Field by its last-known name, with a picker toggle when editable (#190)', () => {
     const lair = defineField({
       id: 'test.lair',
-      key: 'lair',
       label: 'Lair',
       dataType: { kind: 'entityLink', targetTypes: ['world.place'] },
       required: false,
@@ -128,7 +124,7 @@ describe('GenericFieldView', () => {
     });
     registry.setWorldFields([lair]);
     registry.register(definitionWithFields('test.monster', [lair.id]));
-    const value = { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } };
+    const value = { 'test.lair': { entityId: 'whisperwood', label: 'The Whisperwood' } };
 
     // Editable: the link shows its last-known name and offers a "change entity" toggle + a clear.
     const editable = render(detail(['test.monster'], value, ['edit']));
@@ -142,7 +138,6 @@ describe('GenericFieldView', () => {
   it('renders an Entity-Link Field inert (name only, no controls) for a read-only opener (#190)', () => {
     const lair = defineField({
       id: 'test.lair',
-      key: 'lair',
       label: 'Lair',
       dataType: { kind: 'entityLink' },
       required: false,
@@ -151,7 +146,7 @@ describe('GenericFieldView', () => {
     registry.setWorldFields([lair]);
     registry.register(definitionWithFields('test.monster', [lair.id]));
     const { el } = render(
-      detail(['test.monster'], { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } }, ['read']),
+      detail(['test.monster'], { 'test.lair': { entityId: 'whisperwood', label: 'The Whisperwood' } }, ['read']),
     );
 
     expect(el.querySelector('[data-testid=entity-link-value]')?.textContent).toContain('The Whisperwood');
@@ -179,7 +174,6 @@ describe('GenericFieldView', () => {
     // and being *declared* it does not fall through to the plain-EntityDocument display either.
     const grid = defineField({
       id: 'test.grid',
-      key: 'grid',
       label: 'Grid',
       dataType: { kind: 'core.hex-grid' },
       required: false,
@@ -189,12 +183,14 @@ describe('GenericFieldView', () => {
     registry.register(definitionWithFields('world.realm', [...beastFieldRefs, grid.id]));
 
     const { el } = render(
-      detail(['world.realm'], { name: 'Aldermoor', grid: { hexes: {}, regions: [], labels: [] } }, ['edit']),
+      detail(['world.realm'], { 'test.name': 'Aldermoor', 'test.grid': { hexes: {}, regions: [], labels: [] } }, [
+        'edit',
+      ]),
     );
 
     // The type's ordinary Fields still render.
-    expect((el.querySelector('[data-testid=field-name] input') as HTMLInputElement).value).toBe('Aldermoor');
-    expect(el.querySelector('[data-testid=field-grid]')).toBeNull();
+    expect((el.querySelector('[data-testid="field-test.name"] input') as HTMLInputElement).value).toBe('Aldermoor');
+    expect(el.querySelector('[data-testid="field-test.grid"]')).toBeNull();
     expect(el.querySelector('[data-testid=field-plain-metadata]')).toBeNull();
   });
 });
@@ -236,14 +232,14 @@ describe('GenericFieldView over the effective Field set', () => {
       createdAt: 1,
       updatedAt: 1,
       rights: ['edit'],
-      document: { size: 'large' },
+      document: { 'test.size': 'large' },
     });
     const fixture = TestBed.createComponent(GenericFieldView);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 
     // The attached enum Field renders as a typed control off the document, not a plain-value row.
-    const size = el.querySelector('[data-testid=field-size] select') as HTMLSelectElement;
+    const size = el.querySelector('[data-testid="field-test.size"] select') as HTMLSelectElement;
     expect(size.value).toBe('large');
     expect(el.querySelector('[data-testid=field-plain-metadata]')).toBeNull();
   });

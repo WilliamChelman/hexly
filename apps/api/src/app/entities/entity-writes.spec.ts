@@ -564,7 +564,6 @@ describe('EntityWrites', () => {
         typeFields.registerField(
           defineField({
             id: 'test.lair',
-            key: 'lair',
             label: 'Lair',
             dataType: { kind: 'entityLink' },
             facetable: true,
@@ -580,13 +579,16 @@ describe('EntityWrites', () => {
           name: 'Aboleth',
           types: ['test.monster'],
           tags: [],
-          document: { 'core.content': emptyContent(), lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
+          document: {
+            'core.content': emptyContent(),
+            'test.lair': { entityId: 'whisperwood', label: 'The Whisperwood' },
+          },
         });
 
         expect(edgesOf('Aboleth')).toEqual([
           { worldId: WORLD, targetKind: 'entity', targetId: 'whisperwood', descriptor: null },
         ]);
-        expect(facetsOf('Aboleth')).toEqual([{ key: 'lair', value: 'whisperwood', num: null }]);
+        expect(facetsOf('Aboleth')).toEqual([{ key: 'test.lair', value: 'whisperwood', num: null }]);
       });
 
       it('re-pointing the link replaces both the edge and the facet (self-pruning)', () => {
@@ -596,20 +598,23 @@ describe('EntityWrites', () => {
           name: 'Aboleth',
           types: ['test.monster'],
           tags: [],
-          document: { 'core.content': emptyContent(), lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
+          document: {
+            'core.content': emptyContent(),
+            'test.lair': { entityId: 'whisperwood', label: 'The Whisperwood' },
+          },
         });
 
         writes.mutate(ADA, row.id, {
           kind: 'edit',
           version: row.version,
           types: ['test.monster'],
-          document: { 'core.content': emptyContent(), lair: { entityId: 'sunken-keep', label: 'Sunken Keep' } },
+          document: { 'core.content': emptyContent(), 'test.lair': { entityId: 'sunken-keep', label: 'Sunken Keep' } },
         });
 
         expect(edgesOf('Aboleth')).toEqual([
           { worldId: WORLD, targetKind: 'entity', targetId: 'sunken-keep', descriptor: null },
         ]);
-        expect(facetsOf('Aboleth')).toEqual([{ key: 'lair', value: 'sunken-keep', num: null }]);
+        expect(facetsOf('Aboleth')).toEqual([{ key: 'test.lair', value: 'sunken-keep', num: null }]);
       });
     });
 
@@ -624,7 +629,6 @@ describe('EntityWrites', () => {
       // (the only type below) declares nothing but its prose, so `ally` rides the Entity alone.
       const ALLY = defineField({
         id: 'test.ally',
-        key: 'ally',
         label: 'Ally',
         dataType: { kind: 'entityLink' },
         facetable: true,
@@ -642,13 +646,13 @@ describe('EntityWrites', () => {
           types: ['core.note'],
           fields: ['test.ally'],
           tags: [],
-          document: { 'core.content': emptyContent(), ally: { entityId: 'mira', label: 'Mira' } },
+          document: { 'core.content': emptyContent(), 'test.ally': { entityId: 'mira', label: 'Mira' } },
         });
 
         expect(edgesOf('Ealdred')).toEqual([
           { worldId: WORLD, targetKind: 'entity', targetId: 'mira', descriptor: null },
         ]);
-        expect(facetsOf('Ealdred')).toEqual([{ key: 'ally', value: 'mira', num: null }]);
+        expect(facetsOf('Ealdred')).toEqual([{ key: 'test.ally', value: 'mira', num: null }]);
       });
 
       it('round-trips the attached `fields[]` set through the row', () => {
@@ -659,7 +663,7 @@ describe('EntityWrites', () => {
           types: ['core.note'],
           fields: ['test.ally'],
           tags: [],
-          document: { 'core.content': emptyContent(), ally: { entityId: 'mira', label: 'Mira' } },
+          document: { 'core.content': emptyContent(), 'test.ally': { entityId: 'mira', label: 'Mira' } },
         });
 
         expect(rowOf(row.id).fields).toEqual(['test.ally']);
@@ -670,7 +674,7 @@ describe('EntityWrites', () => {
         // independently of `insert` — the reindex must resolve the effective set from `types` + `fields`.
         seedAttachedRaw('ealdred', WORLD, ['core.note'], ['test.ally'], {
           'core.content': emptyContent(),
-          ally: { entityId: 'mira', label: 'Mira' },
+          'test.ally': { entityId: 'mira', label: 'Mira' },
         });
 
         expect(writes.reindexChunk(null, 100)).toMatchObject({ walked: expect.any(Number), reindexed: 2 });
@@ -678,7 +682,7 @@ describe('EntityWrites', () => {
         expect(edgesFrom('ealdred')).toEqual([
           { worldId: WORLD, targetKind: 'entity', targetId: 'mira', descriptor: null },
         ]);
-        expect(facetsOf('ealdred')).toEqual([{ key: 'ally', value: 'mira', num: null }]);
+        expect(facetsOf('ealdred')).toEqual([{ key: 'test.ally', value: 'mira', num: null }]);
       });
 
       /** An Entity seeded raw with its `fields[]` column and no derived rows, for a reindex to rebuild. */

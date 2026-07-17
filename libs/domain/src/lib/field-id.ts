@@ -8,10 +8,9 @@
 import { z } from 'zod';
 
 /**
- * A first-class Field `id`: a `namespace.id` reuse handle — the Field's single source of truth —
- * deliberately distinct from the document `key` it lenses, so renaming a label once updates every
- * follower while imported frontmatter at the bare key is still recognized (ADR-0033/0054). Same
- * keyspace shape as an Entity Type id.
+ * A first-class Field `id`: a `namespace.id` key that *is* the Entity Document slot the Field lenses —
+ * one identifier, the Field's single source of truth (ADR-0056). A rename touches only the `label`,
+ * never this key, and no two Fields share it. Same keyspace shape as an Entity Type id.
  */
 export const fieldIdSchema = z
   .string()

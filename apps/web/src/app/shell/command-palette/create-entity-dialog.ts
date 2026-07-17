@@ -13,7 +13,7 @@ import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import {
   EntityType,
-  FieldSchema,
+  Field as FieldDef,
   isStructuredDataType,
   EntityDocument,
   NO_STRUCTURED_DATA_TYPES,
@@ -89,15 +89,15 @@ import { FieldControl } from '@hexly/web-entity/controls';
               'entityTypes.requiredFieldsHeading' | transloco
             }}</span>
             <dl class="grid grid-cols-[minmax(6rem,10rem)_1fr] items-center gap-x-4 gap-y-2 m-0">
-              @for (field of requiredFields(); track field.key) {
+              @for (field of requiredFields(); track field.id) {
                 <dt class="text-sm text-ink-muted">
                   {{ field.label }}<span class="text-danger" aria-hidden="true">&nbsp;*</span>
                 </dt>
-                <dd class="m-0" [attr.data-testid]="'create-field-' + field.key">
+                <dd class="m-0" [attr.data-testid]="'create-field-' + field.id">
                   <app-field-control
                     [field]="field"
-                    [value]="metadata()[field.key]"
-                    [invalid]="invalidKeys().has(field.key)"
+                    [value]="metadata()[field.id]"
+                    [invalid]="invalidKeys().has(field.id)"
                     (valueChange)="setField(field, $event)"
                   />
                 </dd>
@@ -198,7 +198,7 @@ export class CreateEntityDialog {
   }
 
   /** Collect a required Field's value into the initial EntityDocument, clearing an emptied key (#189). */
-  protected setField(field: FieldSchema, value: unknown): void {
+  protected setField(field: FieldDef, value: unknown): void {
     this.metadata.update((meta) => writeField(meta, field, value));
   }
 

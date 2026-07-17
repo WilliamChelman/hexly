@@ -1,5 +1,5 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
-import { FieldSchema, readField } from '@hexly/domain';
+import { Field, readField } from '@hexly/domain';
 import {
   addPoint,
   Axial,
@@ -124,13 +124,13 @@ export class HexMapStore {
   private readonly session = inject(ENTITY_SESSION);
 
   /**
-   * The Field this store's grid lives at — the grid data-type's Field schema, re-keyed to whichever
-   * Field the active map View renders. Only the key varies.
+   * The Field this store's grid lives at — the grid data-type's Field, re-keyed to whichever Field the
+   * active map View renders. Only the `id` (== the document key it lenses, ADR-0056) varies.
    *
    * Required, with no default: falling back to `core.hexmap`'s `grid` would make a mis-wired host
    * *paint the wrong map* rather than fail.
    */
-  private readonly field: FieldSchema = { ...HEX_GRID_FIELD, key: inject(VIEW_FIELD_KEY) };
+  private readonly field: Field = { ...HEX_GRID_FIELD, id: inject(VIEW_FIELD_KEY) };
 
   /**
    * Grids this store produced, by reference — well-formed by construction, so {@link grid} takes
@@ -887,14 +887,14 @@ export class HexMapStore {
     const { redo, undo } = this.session.mutate((body) => {
       // The body IS the EntityDocument map now (ADR-0051), so the grid sits at its own key on the draft.
       if (stored) {
-        recipe(body[this.field.key] as HexMap);
+        recipe(body[this.field.id] as HexMap);
         return;
       }
       // Cloned first: an assigned value is not a draft, so a recipe run over `map` would mutate the
       // object {@link grid} is still holding.
       const fresh = structuredClone(map);
       recipe(fresh);
-      body[this.field.key] = fresh;
+      body[this.field.id] = fresh;
     });
     // No patches → the recipe changed nothing; recording it would leave empty undo
     // steps and discard the redo branch.

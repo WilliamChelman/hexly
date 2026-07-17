@@ -60,7 +60,7 @@ export function worldFieldIdFromSegment(segment: string): string {
  * POST /worlds/:id/fields (ADR-0056): the Field body plus an editable `segment`, never a client-chosen
  * id/key — the server derives `world.<segment>` and returns the resolved Field.
  */
-export const createWorldFieldRequestSchema = fieldSchemaSchema.omit({ key: true }).extend({
+export const createWorldFieldRequestSchema = fieldSchemaSchema.extend({
   segment: z
     .string()
     .trim()
@@ -74,6 +74,6 @@ export type CreateWorldFieldRequest = z.infer<typeof createWorldFieldRequestSche
  * PATCH /worlds/:id/fields/:fieldId. The id/key is immutable (a path param, ADR-0056): the body carries
  * the editable attributes without a key or id, so renaming is label-only.
  */
-export const updateWorldFieldRequestSchema = fieldSchemaSchema.omit({ key: true });
+export const updateWorldFieldRequestSchema = fieldSchemaSchema;
 
 export type UpdateWorldFieldRequest = z.infer<typeof updateWorldFieldRequestSchema>;

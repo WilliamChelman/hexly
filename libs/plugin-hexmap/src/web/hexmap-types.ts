@@ -19,7 +19,7 @@ export const HEXMAP_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     // References the prose and grid Fields by id (ADR-0054); `fields` kept for the World Types editor.
     fieldRefs: CORE_HEXMAP_TYPE.fieldRefs,
     icon: 'terrain',
-    views: [{ field: HEX_GRID_FIELD.key }, CORE_VIEW_CONTENT],
+    views: [{ field: HEX_GRID_FIELD.id }, CORE_VIEW_CONTENT],
     graphColorToken: '--color-gold',
     // A plugin ships translated copy, so its chrome is transloco keys (ADR-0049) — unlike a
     // user-defined type, whose every label is its one authored name (#191).

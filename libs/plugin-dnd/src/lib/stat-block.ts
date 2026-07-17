@@ -12,14 +12,7 @@
  * The framework-free half, which the API reads. The Angular half is `@hexly/plugin-dnd/web`.
  */
 
-import {
-  defineField,
-  defineStructuredDataType,
-  Field,
-  FieldSchema,
-  HarvestedFacet,
-  StructuredDataTypeId,
-} from '@hexly/domain';
+import { defineField, defineStructuredDataType, Field, HarvestedFacet, StructuredDataTypeId } from '@hexly/domain';
 import { z } from 'zod';
 
 /** The `namespace.id` kind naming the stat-block data-type — what marks the `dnd.stat_block` Field structured. */
@@ -161,7 +154,6 @@ export const STAT_BLOCK_DATA_TYPE = defineStructuredDataType({
  */
 export const DND_STAT_BLOCK_FIELD: Field = defineField({
   id: DND_STAT_BLOCK_FIELD_ID,
-  key: DND_STAT_BLOCK_KEY,
   // The untranslated fallback the API's available-fields list reports; the web resolves `labelKey`.
   label: 'Stat block',
   labelKey: 'dnd.monster.view.statBlock',
@@ -171,13 +163,14 @@ export const DND_STAT_BLOCK_FIELD: Field = defineField({
 });
 
 /**
- * The per-stat rendering descriptors the {@link StatBlockView} edits through — a {@link FieldSchema} per
- * inner key, giving each stat its control type and label. Not registered Fields (the block's keys are not
- * top-level document keys), only a lens the View builds its slots and its type-check from. No stat is
+ * The per-stat rendering descriptors the {@link StatBlockView} edits through — a {@link Field} per inner
+ * key, giving each stat its control type and label. Not registered Fields (the block's inner keys are not
+ * top-level document keys), only a lens the View builds its slots and its type-check from over the block
+ * as its own mini-document — so each descriptor's `id` is the inner block key it lenses. No stat is
  * `required`: requiredness is a consumer's concern, not a shape the reusable block imposes on a deity that
  * borrows it for its size facet alone (ADR-0055) — so the View flags only an at-rest ill-typed value.
  */
-export const DND_STAT_FIELDS: readonly FieldSchema[] = [
+export const DND_STAT_FIELDS: readonly Field[] = [
   stat('size', 'Size', { kind: 'enum', options: [...DND_SIZE_OPTIONS] }),
   stat('creature_type', 'Creature type', { kind: 'enum', options: [...DND_CREATURE_TYPE_OPTIONS] }),
   stat('alignment', 'Alignment', { kind: 'string' }),
@@ -188,14 +181,14 @@ export const DND_STAT_FIELDS: readonly FieldSchema[] = [
   stat(DND_CHALLENGE_KEY, 'Challenge Rating', { kind: 'number' }),
 ];
 
-/** The stat descriptors by inner key, for the View to look one up as it walks a group's keys. */
-export const DND_STAT_FIELDS_BY_KEY: ReadonlyMap<string, FieldSchema> = new Map(
-  DND_STAT_FIELDS.map((field) => [field.key, field]),
+/** The stat descriptors by inner block key, for the View to look one up as it walks a group's keys. */
+export const DND_STAT_FIELDS_BY_KEY: ReadonlyMap<string, Field> = new Map(
+  DND_STAT_FIELDS.map((field) => [field.id, field]),
 );
 
-/** One stat descriptor — a plain {@link FieldSchema}, never `facetable` (the harvest owns faceting, ADR-0055). */
-function stat(key: string, label: string, dataType: FieldSchema['dataType'], required = false): FieldSchema {
-  return { key, label, dataType, required, facetable: false };
+/** One stat descriptor — a plain {@link Field} lensing an inner block key, never `facetable` (the harvest owns faceting, ADR-0055). */
+function stat(id: string, label: string, dataType: Field['dataType'], required = false): Field {
+  return { id, label, dataType, required, facetable: false };
 }
 
 /**

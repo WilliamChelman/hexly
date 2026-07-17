@@ -1,5 +1,5 @@
 import { InjectionToken, Signal } from '@angular/core';
-import { FieldSchema } from '@hexly/domain';
+import { Field } from '@hexly/domain';
 import { TypeDefinition, TypeLabels } from './type-definition';
 
 /**
@@ -18,19 +18,16 @@ export interface EntityTypes {
   /** One of a type's **chrome** labels — its create heading, the default name a blank create takes. */
   chromeLabel(type: string | null | undefined, key: keyof TypeLabels): string;
   /**
-   * The union of Field schemas an Entity carrying `types` affords — primary type first, deduped by
-   * EntityDocument key. The type-only projection of {@link effectiveFields}, for the create and
-   * type-authoring surfaces (no attachments in play).
+   * The union of Fields an Entity carrying `types` affords — primary type first, deduped by id. The
+   * type-only projection of {@link effectiveFields}, for the create and type-authoring surfaces (no
+   * attachments in play).
    */
-  resolveFields(types: readonly string[] | null | undefined): FieldSchema[];
+  resolveFields(types: readonly string[] | null | undefined): Field[];
   /**
-   * An Entity's **effective Field set** (CONTEXT.md → Entity, ADR-0054): its attached Fields (`fieldIds`)
-   * unioned with its types' defaults, deduped by `key` with precedence instance > primary type > later types.
+   * An Entity's **effective Field set** (CONTEXT.md → Entity, ADR-0054/ADR-0056): its attached Fields
+   * (`fieldIds`) unioned with its types' defaults, deduped by `id`.
    */
-  effectiveFields(
-    types: readonly string[] | null | undefined,
-    fieldIds: readonly string[] | null | undefined,
-  ): FieldSchema[];
+  effectiveFields(types: readonly string[] | null | undefined, fieldIds: readonly string[] | null | undefined): Field[];
 }
 
 /** DI token for the {@link EntityTypes}; the composition root binds the concrete registry to it. */

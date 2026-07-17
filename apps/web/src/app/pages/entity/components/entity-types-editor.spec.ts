@@ -27,7 +27,6 @@ function definition(id: string, fieldRefs?: readonly string[]): TypeDefinition {
 
 const lairField = defineField({
   id: 'test.lair',
-  key: 'lair',
   label: 'Lair',
   dataType: { kind: 'string' },
   required: true,
@@ -119,20 +118,20 @@ describe('EntityTypesEditor', () => {
     expect((q('type-add-confirm') as HTMLElement).getAttribute('aria-disabled')).toBe('true');
 
     // Fill the required Field, then confirm: the EntityDocument rides metadataChange and the type is added.
-    const input = q('pending-field-lair').querySelector('input') as HTMLInputElement;
+    const input = q('pending-field-test.lair').querySelector('input') as HTMLInputElement;
     input.value = 'Sunken keep';
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
     expect((q('type-add-confirm') as HTMLElement).getAttribute('aria-disabled')).toBeNull();
 
     q('type-add-confirm').click();
-    expect(emittedMetadata.at(-1)).toEqual({ lair: 'Sunken keep' });
+    expect(emittedMetadata.at(-1)).toEqual({ 'test.lair': 'Sunken keep' });
     expect(emittedTypes.at(-1)).toEqual(['core.note', 'test.monster']);
   });
 
   it('skips the prompt when the required Field is already satisfied by existing EntityDocument (#189)', () => {
     // A re-added type whose values persist as free EntityDocument (CONTEXT.md → Field) needs no prompt.
-    render(['core.note'], { lair: 'Sunken keep' });
+    render(['core.note'], { 'test.lair': 'Sunken keep' });
     const add = q('type-add') as HTMLSelectElement;
     add.value = 'test.monster';
     add.dispatchEvent(new Event('change'));

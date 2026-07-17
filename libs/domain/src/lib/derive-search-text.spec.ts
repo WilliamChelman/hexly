@@ -28,9 +28,11 @@ const SEAL = defineStructuredDataType({
   empty: () => ({ colour: 'red' }),
 });
 const DATA_TYPES = structuredDataTypeSet([PROSE, BOARD, SEAL]);
-const proseField = fieldSchemaSchema.parse({ key: 'prose', label: 'Prose', dataType: { kind: 'test.prose' } });
-const boardField = fieldSchemaSchema.parse({ key: 'board', label: 'Board', dataType: { kind: 'test.board' } });
-const sealField = fieldSchemaSchema.parse({ key: 'seal', label: 'Seal', dataType: { kind: 'test.seal' } });
+/** A terse {@link Field} builder — `id` *is* the document key it lenses (ADR-0056), bare for the specs. */
+const field = (id: string, kind: string) => ({ id, ...fieldSchemaSchema.parse({ label: id, dataType: { kind } }) });
+const proseField = field('prose', 'test.prose');
+const boardField = field('board', 'test.board');
+const sealField = field('seal', 'test.seal');
 
 /** A doc whose `board` Field holds two named tiles. */
 const board = (extra: EntityDocument = {}): EntityDocument => ({
@@ -59,7 +61,7 @@ describe('deriveSearchText (#205, ADR-0051)', () => {
   });
 
   it('takes no text when the kind is unregistered, or the set is empty', () => {
-    const typo = fieldSchemaSchema.parse({ key: 'board', label: 'Board', dataType: { kind: 'test.bord' } });
+    const typo = field('board', 'test.bord');
 
     expect(deriveSearchText(board(), [boardField], NO_STRUCTURED_DATA_TYPES)).toBe('');
     expect(deriveSearchText(board(), [typo], DATA_TYPES)).toBe('');

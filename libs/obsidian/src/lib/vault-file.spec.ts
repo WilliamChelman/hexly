@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import {
   defineStructuredDataType,
-  FieldSchema,
-  fieldSchemaSchema,
+  Field,
+  fieldSchema,
   structuredDataTypeSet,
   VaultExportContext,
   VaultImportContext,
@@ -45,14 +45,14 @@ const SECRET_NOTE = defineStructuredDataType({
 
 const DATA_TYPES = structuredDataTypeSet([PROSE, GRID, SECRET_NOTE]);
 
-function field(partial: Partial<FieldSchema> & Pick<FieldSchema, 'key' | 'dataType'>): FieldSchema {
-  return fieldSchemaSchema.parse({ label: partial.key, ...partial });
+function field(partial: Partial<Field> & Pick<Field, 'id' | 'dataType'>): Field {
+  return fieldSchema.parse({ label: partial.id, ...partial });
 }
 
-const CONTENT = field({ key: 'content', dataType: { kind: 'test.prose' } });
-const SECRETS = field({ key: 'secrets', dataType: { kind: 'test.prose' } });
-const GRID_FIELD = field({ key: 'grid', dataType: { kind: 'test.grid' } });
-const OMITTED = field({ key: 'draft', dataType: { kind: 'test.omit' } });
+const CONTENT = field({ id: 'test.content', dataType: { kind: 'test.prose' } });
+const SECRETS = field({ id: 'test.secrets', dataType: { kind: 'test.prose' } });
+const GRID_FIELD = field({ id: 'test.grid', dataType: { kind: 'test.grid' } });
+const OMITTED = field({ id: 'test.draft', dataType: { kind: 'test.omit' } });
 
 const exportCtx: VaultExportContext = { entityName: () => undefined, assetPath: () => undefined };
 const importCtx: VaultImportContext = { resolveLink: () => null, storeAsset: () => null, degrade: () => undefined };
@@ -61,7 +61,7 @@ describe('vault-file — the projection round-trip (ADR-0051)', () => {
   describe('one body Field → a plain file, no marker', () => {
     it('writes the body with no marker comment', () => {
       const md = entityToMarkdown({
-        doc: { content: { text: 'A ranger of the north.' } },
+        doc: { 'test.content': { text: 'A ranger of the north.' } },
         fields: [CONTENT],
         dataTypes: DATA_TYPES,
         frontmatter: {},
@@ -78,12 +78,12 @@ describe('vault-file — the projection round-trip (ADR-0051)', () => {
         dataTypes: DATA_TYPES,
         context: importCtx,
       });
-      expect(values).toEqual({ content: { text: 'A ranger of the north.' } });
+      expect(values).toEqual({ 'test.content': { text: 'A ranger of the north.' } });
     });
   });
 
   describe('two body Fields → markers in Field order, lossless round trip', () => {
-    const doc = { content: { text: 'Public lore.' }, secrets: { text: 'Hidden truth.' } };
+    const doc = { 'test.content': { text: 'Public lore.' }, 'test.secrets': { text: 'Hidden truth.' } };
 
     it('precedes each block with its marker, in Field order', () => {
       const md = entityToMarkdown({
@@ -93,7 +93,9 @@ describe('vault-file — the projection round-trip (ADR-0051)', () => {
         frontmatter: {},
         context: exportCtx,
       });
-      expect(md).toBe('<!-- hexly:field content -->\nPublic lore.\n\n<!-- hexly:field secrets -->\nHidden truth.');
+      expect(md).toBe(
+        '<!-- hexly:field test.content -->\nPublic lore.\n\n<!-- hexly:field test.secrets -->\nHidden truth.',
+      );
     });
 
     it('lands each block back in the Field it came from', () => {
@@ -112,24 +114,24 @@ describe('vault-file — the projection round-trip (ADR-0051)', () => {
       // Only `secrets` has a value: unmarked, it would land in the first body Field (content), so it
       // must carry a marker.
       const md = entityToMarkdown({
-        doc: { secrets: { text: 'Hidden truth.' } },
+        doc: { 'test.secrets': { text: 'Hidden truth.' } },
         fields: [CONTENT, SECRETS],
         dataTypes: DATA_TYPES,
         frontmatter: {},
         context: exportCtx,
       });
-      expect(md).toContain('<!-- hexly:field secrets -->');
+      expect(md).toContain('<!-- hexly:field test.secrets -->');
       const values = bodyToFields({ body: md, fields: [CONTENT, SECRETS], dataTypes: DATA_TYPES, context: importCtx });
-      expect(values).toEqual({ secrets: { text: 'Hidden truth.' } });
+      expect(values).toEqual({ 'test.secrets': { text: 'Hidden truth.' } });
     });
   });
 
   describe('a marked block whose Field this build does not resolve is preserved, not dropped', () => {
     it('stores an unresolved marked key via the first body Field’s converter', () => {
       // A vault exported from a World that declared `secrets`; here only `content` resolves.
-      const md = '<!-- hexly:field content -->\nPublic.\n\n<!-- hexly:field secrets -->\nHidden.';
+      const md = '<!-- hexly:field test.content -->\nPublic.\n\n<!-- hexly:field test.secrets -->\nHidden.';
       const values = bodyToFields({ body: md, fields: [CONTENT], dataTypes: DATA_TYPES, context: importCtx });
-      expect(values).toEqual({ content: { text: 'Public.' }, secrets: { text: 'Hidden.' } });
+      expect(values).toEqual({ 'test.content': { text: 'Public.' }, 'test.secrets': { text: 'Hidden.' } });
     });
   });
 
@@ -141,7 +143,7 @@ describe('vault-file — the projection round-trip (ADR-0051)', () => {
         dataTypes: DATA_TYPES,
         context: importCtx,
       });
-      expect(values).toEqual({ content: { text: 'Just some prose a stranger wrote.' } });
+      expect(values).toEqual({ 'test.content': { text: 'Just some prose a stranger wrote.' } });
     });
   });
 
@@ -150,14 +152,14 @@ describe('vault-file — the projection round-trip (ADR-0051)', () => {
 
     it('serializes the grid as nested frontmatter and keeps the body prose separate', () => {
       const md = entityToMarkdown({
-        doc: { content: { text: 'The frontier.' }, grid },
+        doc: { 'test.content': { text: 'The frontier.' }, 'test.grid': grid },
         fields: [CONTENT, GRID_FIELD],
         dataTypes: DATA_TYPES,
         frontmatter: {},
         context: exportCtx,
       });
       const { frontmatter, body } = splitFrontmatter(md);
-      expect(frontmatter).toEqual({ grid });
+      expect(frontmatter).toEqual({ 'test.grid': grid });
       expect(body.trim()).toBe('The frontier.');
       // The grid is not a body Field, so no marker even though a second Field exists.
       expect(md).not.toContain('hexly:field');
@@ -167,7 +169,7 @@ describe('vault-file — the projection round-trip (ADR-0051)', () => {
   describe('an omit Field is written nowhere', () => {
     it('leaves the omitted value out of both body and frontmatter', () => {
       const md = entityToMarkdown({
-        doc: { content: { text: 'Visible.' }, draft: { anything: true } },
+        doc: { 'test.content': { text: 'Visible.' }, 'test.draft': { anything: true } },
         fields: [CONTENT, OMITTED],
         dataTypes: DATA_TYPES,
         frontmatter: {},
@@ -182,7 +184,7 @@ describe('vault-file — the projection round-trip (ADR-0051)', () => {
   describe('frontmatter split and Entity-level additions', () => {
     it('emits non-reserved EntityDocument keys and merged additions, dropping hexly.*', () => {
       const md = entityToMarkdown({
-        doc: { content: { text: 'x' }, status: 'alive', 'hexly.sourcePath': 'a/b.md' },
+        doc: { 'test.content': { text: 'x' }, status: 'alive', 'hexly.sourcePath': 'a/b.md' },
         fields: [CONTENT],
         dataTypes: DATA_TYPES,
         frontmatter: { tags: ['deity'], 'hexly.type': ['core.note', 'dnd.monster'] },

@@ -65,7 +65,7 @@ describe('EntitySession', () => {
         { provide: ENTITY_SESSION, useExisting: EntitySession },
         HexMapStore,
         // Which grid the store edits is the page's to say; here, `core.hexmap`'s own.
-        { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.key },
+        { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.id },
         { provide: EntitiesClient, useValue: entities },
         { provide: NudgeBusClient, useValue: bus },
       ],

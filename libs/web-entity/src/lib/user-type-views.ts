@@ -1,4 +1,4 @@
-import { FieldSchema, isFieldViewPlacement, isStructuredDataType, ViewPlacement } from '@hexly/domain';
+import { Field, isFieldViewPlacement, isStructuredDataType, ViewPlacement } from '@hexly/domain';
 import { CORE_VIEW_FIELDS } from './view-definition';
 
 /**
@@ -12,14 +12,14 @@ import { CORE_VIEW_FIELDS } from './view-definition';
  * places its grid first, and opens on its map.
  */
 export function userTypeViews(
-  fields: readonly FieldSchema[],
-  isShownAsView: (field: FieldSchema) => boolean = () => true,
+  fields: readonly Field[],
+  isShownAsView: (field: Field) => boolean = () => true,
 ): ViewPlacement[] {
   return [
     CORE_VIEW_FIELDS,
     ...fields
       .filter((field) => isStructuredDataType(field.dataType) && isShownAsView(field))
-      .map((field) => ({ field: field.key })),
+      .map((field) => ({ field: field.id })),
   ];
 }
 
@@ -27,7 +27,7 @@ export function userTypeViews(
  * Whether a type's stored `views` show `field`'s View — what the "Show as a view" toggle reads back.
  * An **absent** list is not an empty one: the author named no order, so every structured Field shows.
  */
-export function isShownAsView(views: readonly ViewPlacement[] | undefined, field: FieldSchema): boolean {
+export function isShownAsView(views: readonly ViewPlacement[] | undefined, field: Field): boolean {
   if (!views) return true;
-  return views.some((view) => isFieldViewPlacement(view) && view.field === field.key);
+  return views.some((view) => isFieldViewPlacement(view) && view.field === field.id);
 }

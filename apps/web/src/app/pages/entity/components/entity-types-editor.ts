@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { FieldSchema, EntityDocument, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
+import { Field, EntityDocument, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
 import { Button, Chip } from '@hexly/web-ui';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { FieldControl } from '@hexly/web-entity/controls';
@@ -91,15 +91,15 @@ import { FieldControl } from '@hexly/web-entity/controls';
             {{ 'entityTypes.requiredHeading' | transloco: { type: typeLabel(pending) } }}
           </p>
           <dl class="grid grid-cols-[minmax(6rem,10rem)_1fr] items-center gap-x-4 gap-y-2 m-0">
-            @for (field of pendingFields(); track field.key) {
+            @for (field of pendingFields(); track field.id) {
               <dt class="text-sm text-ink-muted">
                 {{ field.label }}<span class="text-danger" aria-hidden="true">&nbsp;*</span>
               </dt>
-              <dd class="m-0" [attr.data-testid]="'pending-field-' + field.key">
+              <dd class="m-0" [attr.data-testid]="'pending-field-' + field.id">
                 <app-field-control
                   [field]="field"
-                  [value]="pendingMetadata()[field.key]"
-                  [invalid]="!!invalidPendingKeys().has(field.key)"
+                  [value]="pendingMetadata()[field.id]"
+                  [invalid]="!!invalidPendingKeys().has(field.id)"
                   (valueChange)="setPending(field, $event)"
                 />
               </dd>
@@ -147,7 +147,7 @@ export class EntityTypesEditor {
 
   /** The type awaiting its required Fields before it is added, or `null` when none is pending. */
   protected readonly pendingType = signal<string | null>(null);
-  protected readonly pendingFields = signal<readonly FieldSchema[]>([]);
+  protected readonly pendingFields = signal<readonly Field[]>([]);
   protected readonly pendingMetadata = signal<EntityDocument>({});
 
   /** The registered types not already carried — the add picker's options. */
@@ -215,7 +215,7 @@ export class EntityTypesEditor {
     this.pendingMetadata.set({ ...this.metadata() });
   }
 
-  protected setPending(field: FieldSchema, value: unknown): void {
+  protected setPending(field: Field, value: unknown): void {
     this.pendingMetadata.update((meta) => writeField(meta, field, value));
   }
 

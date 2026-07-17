@@ -1,6 +1,6 @@
 import { inject, Provider, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { Field, FieldSchema } from '@hexly/domain';
+import { Field } from '@hexly/domain';
 import { ENTITY_TYPES, EntityTypes } from '../lib/entity-types';
 import { TypeDefinition, TypeLabels } from '../lib/type-definition';
 
@@ -45,26 +45,26 @@ export class FakeEntityTypes implements EntityTypes {
     return def.labels ? this.translate(def.labels[key]) : this.name(type);
   }
 
-  resolveFields(types: readonly string[] | null | undefined): FieldSchema[] {
+  resolveFields(types: readonly string[] | null | undefined): Field[] {
     return this.effectiveFields(types, []);
   }
 
   effectiveFields(
     types: readonly string[] | null | undefined,
     fieldIds: readonly string[] | null | undefined,
-  ): FieldSchema[] {
-    const byKey = new Map<string, FieldSchema>();
+  ): Field[] {
+    const byId = new Map<string, Field>();
     const consider = (id: string) => {
       const field = this.fieldsById.get(id);
-      if (field && !byKey.has(field.key)) byKey.set(field.key, field);
+      if (field && !byId.has(field.id)) byId.set(field.id, field);
     };
-    // Attached Fields first (instance precedence), then each type's `fieldRefs` primary-first (ADR-0054).
+    // Attached Fields first, then each type's `fieldRefs` primary-first (ADR-0054); deduped by id (ADR-0056).
     for (const id of fieldIds ?? []) consider(id);
     for (const type of types ?? []) {
       const def = this.get(type);
       for (const id of def?.fieldRefs ?? []) consider(id);
     }
-    return [...byKey.values()];
+    return [...byId.values()];
   }
 
   private get(type: string | null | undefined): TypeDefinition | undefined {

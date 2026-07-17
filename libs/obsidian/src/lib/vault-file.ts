@@ -9,7 +9,7 @@
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import {
   EntityDocument,
-  FieldSchema,
+  Field,
   HEXLY_METADATA_PREFIX,
   resolvedStructuredDataTypeFields,
   StructuredDataType,
@@ -32,7 +32,7 @@ const FRONTMATTER_BLOCK = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /** One body Field paired with the data-type whose projection converts it. */
 interface BodyField {
-  readonly field: FieldSchema;
+  readonly field: Field;
   readonly dataType: StructuredDataType;
 }
 
@@ -65,7 +65,7 @@ function hasValue(doc: EntityDocument, key: string): boolean {
  */
 export function entityToMarkdown(input: {
   doc: EntityDocument;
-  fields: readonly FieldSchema[];
+  fields: readonly Field[];
   dataTypes: StructuredDataTypeSet;
   frontmatter: Record<string, unknown>;
   context: VaultExportContext;
@@ -73,16 +73,16 @@ export function entityToMarkdown(input: {
   const { doc, fields, dataTypes, context } = input;
   const resolved = resolvedStructuredDataTypeFields(fields, dataTypes) as BodyField[];
   const bodyFields = bodyFieldsOf(resolved);
-  const present = bodyFields.filter(({ field }) => hasValue(doc, field.key));
+  const present = bodyFields.filter(({ field }) => hasValue(doc, field.id));
   // A marker is needed unless the only present body block is the first body Field — then the file is a
   // plain Note. Splitting an unmarked body always lands it in the first body Field, so a lone non-first
   // value must be marked too, or it would re-import into the wrong Field.
-  const marked = present.length > 1 || (present.length === 1 && present[0].field.key !== bodyFields[0]?.field.key);
+  const marked = present.length > 1 || (present.length === 1 && present[0].field.id !== bodyFields[0]?.field.id);
 
   const blocks = present.map(({ field, dataType }) => {
     // `bodyFieldsOf` has already narrowed to a body slot with a `toMarkdown` converter.
-    const block = dataType.vault?.toMarkdown?.(doc[field.key], context) ?? '';
-    return marked ? `${fieldMarker(field.key)}\n${block.trimEnd()}` : block;
+    const block = dataType.vault?.toMarkdown?.(doc[field.id], context) ?? '';
+    return marked ? `${fieldMarker(field.id)}\n${block.trimEnd()}` : block;
   });
   const body = marked ? blocks.join('\n\n') : (blocks[0] ?? '');
 
@@ -90,8 +90,8 @@ export function entityToMarkdown(input: {
   // else stays: a frontmatter-slot Field (a grid) rides the YAML, and so does a body-slot Field with no
   // converter — kept rather than lost. `resolved` is walked once; these are cheap filters over it.
   const excluded = new Set<string>([
-    ...bodyFields.map(({ field }) => field.key),
-    ...resolved.filter(({ field, dataType }) => vaultSlotOf(field, dataType) === 'omit').map(({ field }) => field.key),
+    ...bodyFields.map(({ field }) => field.id),
+    ...resolved.filter(({ field, dataType }) => vaultSlotOf(field, dataType) === 'omit').map(({ field }) => field.id),
   ]);
   const frontmatter = buildFrontmatter(doc, excluded, input.frontmatter);
 
@@ -170,7 +170,7 @@ export function splitFrontmatter(markdown: string): SplitFile {
  */
 export function bodyToFields(input: {
   body: string;
-  fields: readonly FieldSchema[];
+  fields: readonly Field[];
   dataTypes: StructuredDataTypeSet;
   context: VaultImportContext;
 }): Record<string, unknown> {
@@ -180,7 +180,7 @@ export function bodyToFields(input: {
   if (bodyFields.length === 0) return {};
 
   const convert = (key: string, markdown: string, out: Record<string, unknown>) => {
-    const bodyField = bodyFields.find(({ field }) => field.key === key) ?? bodyFields[0];
+    const bodyField = bodyFields.find(({ field }) => field.id === key) ?? bodyFields[0];
     // `bodyFields` is filtered to converters that exist; the guard just keeps the linter honest.
     const fromMarkdown = bodyField.dataType.vault?.fromMarkdown;
     if (fromMarkdown) out[key] = fromMarkdown(markdown, context);
@@ -191,11 +191,11 @@ export function bodyToFields(input: {
   if (segments.length === 0) {
     // No markers: the whole body is the first body Field's — always populated (even when blank), so an
     // imported note always carries its prose Field.
-    convert(bodyFields[0].field.key, body, out);
+    convert(bodyFields[0].field.id, body, out);
     return out;
   }
   // A stray preamble before the first marker belongs to the first body Field (a hand-edited export).
-  if (preamble.trim()) convert(bodyFields[0].field.key, preamble, out);
+  if (preamble.trim()) convert(bodyFields[0].field.id, preamble, out);
   for (const { key, markdown } of segments) convert(key, markdown, out);
   return out;
 }

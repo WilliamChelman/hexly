@@ -3,7 +3,7 @@
  * The write path derives it on every save, and Reindex rebuilds it from the stored document.
  */
 
-import { FieldSchema, EntityDocument, readField, resolvedStructuredDataTypeFields } from './field';
+import { Field, EntityDocument, readField, resolvedStructuredDataTypeFields } from './field';
 import { joinSearchText } from './join-search-text';
 import type { StructuredDataTypeSet } from './structured-data-type';
 
@@ -19,7 +19,7 @@ import type { StructuredDataTypeSet } from './structured-data-type';
  */
 export function deriveSearchText(
   doc: EntityDocument,
-  fields: readonly FieldSchema[],
+  fields: readonly Field[],
   dataTypes: StructuredDataTypeSet,
 ): string {
   const parts: (string | undefined)[] = [];

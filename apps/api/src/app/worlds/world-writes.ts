@@ -230,8 +230,8 @@ export class WorldWrites {
 
   /**
    * Re-body a World-defined Field. Returns whether a row matched — an unknown id leaves the World
-   * untouched, so the bump and nudge are skipped and the caller can 404. The id/key is immutable
-   * (ADR-0056): the service re-pins `key` to the id, so no re-key path can orphan stored values.
+   * untouched, so the bump and nudge are skipped and the caller can 404. The id is immutable (ADR-0056):
+   * a path param, never in the body, so no re-key path can orphan stored values.
    */
   updateField(worldId: string, fieldId: string, definition: FieldSchema): boolean {
     return this.transact(() => {
