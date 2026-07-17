@@ -2,7 +2,7 @@ import { Extension } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
 import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { EntitySummary } from '@hexly/domain';
-import { EntityPicker } from './entity-picker';
+import { EntityPicker } from './entity-picker.component';
 
 /**
  * The `@` trigger for inserting a Content Entity Link (ADR-0023). A non-schema extension

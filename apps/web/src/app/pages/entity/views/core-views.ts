@@ -1,5 +1,5 @@
 import { CORE_VIEW_FIELDS, ViewDefinition } from '@hexly/web-entity';
-import { GenericFieldView } from './generic-field-view';
+import { GenericFieldView } from './generic-field-view.component';
 
 /**
  * The app's own View registration (ADR-0048, ADR-0051): the **generic Field view** alone — the content

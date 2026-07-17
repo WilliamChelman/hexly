@@ -1,7 +1,7 @@
 import { Extension } from '@tiptap/core';
 import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { SLASH_ITEMS, SlashItem, filterSlashItems } from './slash-menu-items';
-import { SlashMenu } from './slash-menu';
+import { SlashMenu } from './slash-menu.component';
 
 /**
  * The `/` trigger for the Content editor's slash menu. Drives the {@link SlashMenu} chrome

@@ -1,7 +1,7 @@
 import { Extension } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
 import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
-import { LinkTextPicker } from './link-text-picker';
+import { LinkTextPicker } from './link-text-picker.component';
 import { entityLinkPosBefore, linkTextRows, setLinkAttr } from './descriptors';
 import { VocabItem } from '@hexly/plugin-content';
 

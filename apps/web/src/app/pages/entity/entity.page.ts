@@ -7,7 +7,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Observable, concat, distinctUntilChanged, ignoreElements, map, of } from 'rxjs';
 import { EntitySession } from './services/entity-session';
 import { EntityViewStore } from './services/entity-view-store';
-import { EntityHeader } from './components/entity-header';
+import { EntityHeader } from './components/entity-header.component';
 import { ViewRegistry } from '../../entity-types/view-registry';
 import { CORE_VIEW_DEFINITIONS } from './views/core-views';
 
