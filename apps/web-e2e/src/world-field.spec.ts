@@ -63,8 +63,8 @@ test('authors world.element, attaches it to one deity but not another, and reuse
 
   const saved = await flushSave(page);
   const body = await saved.json();
+  // The `world.element` key's presence in the document *is* the attachment (ADR-0057) — no `fields[]`.
   expect(body.document).toMatchObject({ 'world.element': 'fire' });
-  expect(body.fields).toEqual(['world.element']);
 
   await page.reload();
   await showFieldsView(page);

@@ -48,10 +48,10 @@ test('attaches dnd.stat-block to a note, affords its View, and browses its stats
 
   await flushSave(page);
 
-  // The whole block round-trips as one grouped value at the `dnd.stat_block` key, and the attachment persists.
+  // The whole block round-trips as one grouped value at the `dnd.stat_block` key — that key's presence
+  // in the document *is* the attachment (ADR-0057), so there is no separate `fields[]` to check.
   const res = await request.get(`/api/entities/${id}`);
   const detail = await res.json();
-  expect(detail.fields).toEqual(['dnd.stat_block']);
   expect(detail.document['dnd.stat_block']).toMatchObject({
     size: 'Large',
     creature_type: 'aberration',

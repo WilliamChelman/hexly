@@ -43,16 +43,16 @@ test('attaches a reused World Field to a note, persists its value, and detaches 
   await size.selectOption('Huge');
 
   const saved = await flushSave(page);
-  // The value lands in the one EntityDocument map; the attachment persists in `fields[]`.
+  // The value lands in the one EntityDocument map; the attachment *is* that namespaced key (ADR-0057),
+  // so its presence in the document is the whole record — there is no separate `fields[]`.
   const body = await saved.json();
   expect(body.document).toMatchObject({ 'world.size': 'Huge' });
-  expect(body.fields).toEqual(['world.size']);
 
   await page.reload();
   await page.getByTestId(FIELDS_VIEW).click();
   await expect(page.getByTestId('field-world.size').locator('select')).toHaveValue('Huge');
 
-  // Detach it: the Field drops from `fields[]` and its value is cleared from the document.
+  // Detach it: discarding the Field deletes its key from the document entirely (ADR-0057).
   await openEntityActions(page);
   await page.getByTestId('edit-fields').click();
   await page.getByTestId('field-detach-world.size').click();
@@ -66,6 +66,6 @@ test('attaches a reused World Field to a note, persists its value, and detaches 
   const res = await request.get(`/api/entities/${id}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
+  // Discard deletes the key entirely — no attachment, no value (ADR-0057).
   expect(detail.document['world.size']).toBeUndefined();
-  expect(detail.fields ?? []).toEqual([]);
 });
