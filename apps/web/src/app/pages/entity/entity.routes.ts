@@ -1,8 +1,12 @@
-import { Routes } from '@angular/router';
+import { CanDeactivateFn, Routes } from '@angular/router';
 import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { ENTITY_SESSION } from '@hexly/web-entity';
-import { flushOnLeave } from './flush-on-leave.guard';
+import { Observable } from 'rxjs';
 import { EntitySession } from './services/entity-session';
+
+const flushOnLeave: CanDeactivateFn<{
+  canDeactivate(): Observable<boolean>;
+}> = (page) => page.canDeactivate();
 
 /**
  * Lazy route config for `/w/:worldId/entities/:id`. Kept out of app.routes so the editor's

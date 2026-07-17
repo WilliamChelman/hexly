@@ -4,7 +4,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { App } from './app.component';
+import { AppComponent } from './app.component';
 import { AppShellStore } from '@hexly/web-core';
 
 @Component({ template: 'page' })
@@ -13,7 +13,7 @@ class Blank {}
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [App, provideTranslocoTesting()],
+      imports: [AppComponent, provideTranslocoTesting()],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -27,14 +27,14 @@ describe('App', () => {
   });
 
   it('boots and renders a router outlet', () => {
-    const fixture = TestBed.createComponent(App);
+    const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('router-outlet')).not.toBeNull();
   });
 
   it('renders the persistent nav rail beside the outlet, not a shell header', async () => {
-    const fixture = TestBed.createComponent(App);
+    const fixture = TestBed.createComponent(AppComponent);
     await TestBed.inject(Router).navigateByUrl('/entities');
     fixture.detectChanges();
 
@@ -44,14 +44,14 @@ describe('App', () => {
   });
 
   it('stays chrome-free before the first navigation resolves (no rail flash on a cold login load)', () => {
-    const fixture = TestBed.createComponent(App);
+    const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges(); // no navigation has resolved yet
 
     expect(fixture.nativeElement.querySelector('app-nav-rail')).toBeNull();
   });
 
   it('hides the rail when a page marks the shell standalone (e.g. login)', async () => {
-    const fixture = TestBed.createComponent(App);
+    const fixture = TestBed.createComponent(AppComponent);
     TestBed.inject(AppShellStore).standalone.set(true);
     await TestBed.inject(Router).navigateByUrl('/login');
     fixture.detectChanges();
@@ -60,7 +60,7 @@ describe('App', () => {
   });
 
   it('applies a theme to the document on boot', () => {
-    TestBed.createComponent(App);
+    TestBed.createComponent(AppComponent);
     expect(document.documentElement.dataset['theme']).toMatch(/^(light|dark)$/);
   });
 });

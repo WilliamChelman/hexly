@@ -1,6 +1,6 @@
 import { WorldGraph } from '@hexly/domain';
 import { graphPayload } from './graph-payload';
-import { selectLabels } from './label-selection';
+import { selectLabels } from './select-labels';
 
 /** A World of `nodes`, linked by `edges` given as `'source>target'` or `'source-descriptor>target'`. */
 function world(nodes: string[], edges: string[] = []): WorldGraph {

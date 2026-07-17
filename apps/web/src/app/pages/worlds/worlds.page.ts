@@ -31,7 +31,7 @@ import {
  * World create. Zero Worlds shows an empty state with a Create affordance, never an auto-redirect.
  */
 @Component({
-  selector: 'app-world-index',
+  selector: 'app-worlds',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Button, Eyebrow, Panel, Icon, TranslocoPipe, Autofocus, Input, Dialog, RouterLink, NgTemplateOutlet],
   host: { class: 'block min-h-full bg-surface-sunken' },
@@ -349,7 +349,7 @@ import {
     }
   `,
 })
-export class WorldIndex {
+export class WorldsPage {
   private readonly store = inject(WorldStore);
   private readonly worldsClient = inject(WorldsClient);
   private readonly auth = inject(AuthClient);

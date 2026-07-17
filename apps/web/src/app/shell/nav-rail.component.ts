@@ -13,7 +13,7 @@ import { NavEntry, NavRailStore } from './nav-rail.store';
 
 const STATIC_ENTRIES: readonly NavEntry[] = [
   {
-    link: '/',
+    link: '/worlds',
     testid: 'nav-worlds',
     icon: 'globe',
     labelKey: 'nav.worlds',

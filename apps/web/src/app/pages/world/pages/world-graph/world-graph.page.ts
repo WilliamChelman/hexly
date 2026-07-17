@@ -4,7 +4,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { WorldGraph as WorldGraphPayload } from '@hexly/domain';
 import { ActiveWorld, entityRoute, ToasterService, WorldsClient } from '@hexly/web-core';
 import { Eyebrow, PageHeader, Panel } from '@hexly/web-ui';
-import { GraphCanvas, GraphOpen } from './graph-canvas.component';
+import { GraphCanvas, GraphOpen } from './components/graph-canvas.component';
 
 /**
  * The World Graph page at `/w/:worldId/graph`: the World's readable Entities as nodes, their Entity

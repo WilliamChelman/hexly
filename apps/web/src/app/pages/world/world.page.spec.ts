@@ -1,10 +1,10 @@
-import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { ActiveWorld, worldDashboardRoute, worldGraphRoute } from '@hexly/web-core';
 import { WorldDetail, WorldVerb } from '@hexly/domain';
+import { ActiveWorld, worldDashboardRoute, worldGraphRoute } from '@hexly/web-core';
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { NavRailStore } from '../../shell/nav-rail.store';
-import { WorldLayout } from './world-layout.page';
+import { WorldPage } from './world.page';
 
 function world(rights: WorldVerb[]): WorldDetail {
   return {
@@ -23,7 +23,7 @@ function world(rights: WorldVerb[]): WorldDetail {
 describe('WorldLayout', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [WorldLayout, provideTranslocoTesting()],
+      imports: [WorldPage, provideTranslocoTesting()],
       providers: [provideRouter([])],
     }).compileComponents();
   });
@@ -31,7 +31,7 @@ describe('WorldLayout', () => {
   /** Pin the World, mount the layout (running its effect), return the filled rail slot. */
   function railFor(detail: WorldDetail) {
     TestBed.inject(ActiveWorld).set(detail);
-    TestBed.createComponent(WorldLayout).detectChanges();
+    TestBed.createComponent(WorldPage).detectChanges();
     return TestBed.inject(NavRailStore).entries();
   }
 
@@ -62,7 +62,7 @@ describe('WorldLayout', () => {
 
   it('clears the rail slot when the World scope is left', () => {
     TestBed.inject(ActiveWorld).set(world(['manage']));
-    const fixture = TestBed.createComponent(WorldLayout);
+    const fixture = TestBed.createComponent(WorldPage);
     fixture.detectChanges();
     expect(TestBed.inject(NavRailStore).entries().length).toBeGreaterThan(0);
 
