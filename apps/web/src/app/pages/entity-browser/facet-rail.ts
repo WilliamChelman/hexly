@@ -224,19 +224,22 @@ export class FacetRail {
   });
 
   /**
-   * The contextual Field facets as render rows (ADR-0048, #188). Each Field's data-type picks its
+   * The contextual Field facets as render rows (ADR-0048, #188, #235). Each Field's data-type picks its
    * control: number/date render a range bounded by the live min/max of its values; everything else
    * renders toggle rows. A Field with no live values and no active selection is dropped, so the rail
-   * shows no empty section.
+   * shows no empty section. A harvested-dimension facet carries a `labelKey` the active Locale
+   * translates; a scalar Field's authored `label` is shown as-is (ADR-0055).
    */
   protected readonly fieldFacets = computed(() => {
-    this.transloco.activeLang(); // reactive dependency: re-translate the range aria-labels on switch
+    this.transloco.activeLang(); // reactive dependency: re-translate labels/aria-labels on switch
     const activeFields = this.active().fields;
     return this.facetCounts()
       .fields.map((field) => {
         const selection = activeFields[field.key] ?? {};
         const numeric = field.dataType.kind === 'number';
         const range = numeric || field.dataType.kind === 'date';
+        // A dimension's labelKey translates; a scalar Field's label is authored, with no key (ADR-0055).
+        const label = field.labelKey ? this.transloco.translate(field.labelKey) : field.label;
         const rows = field.values.map((v) => ({
           value: v.value,
           count: v.count,
@@ -246,15 +249,15 @@ export class FacetRail {
         }));
         return {
           key: field.key,
-          label: field.label,
+          label,
           kind: range ? ('range' as const) : ('values' as const),
           // A date range wants a date picker; every other range is numeric.
           inputType: field.dataType.kind === 'date' ? 'date' : 'number',
           minLabel: this.transloco.translate('entityBrowser.facets.rangeMin', {
-            field: field.label,
+            field: label,
           }),
           maxLabel: this.transloco.translate('entityBrowser.facets.rangeMax', {
-            field: field.label,
+            field: label,
           }),
           gte: selection.gte ?? '',
           lte: selection.lte ?? '',
