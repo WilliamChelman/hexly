@@ -21,7 +21,7 @@ describe('EntitySession', () => {
 
   const content = emptyContent();
   /** Wrap a hex grid into the hexmap body the store carries end to end: its `grid` Field value. */
-  const bodyOf = (grid: HexMap) => ({ content, grid });
+  const bodyOf = (grid: HexMap) => ({ 'core.content': content, 'core.grid': grid });
 
   const forestAt00: HexMap = {
     hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
@@ -87,7 +87,7 @@ describe('EntitySession', () => {
       flushPendingCommit: () => {
         if (!pending()) return;
         session.mutate((body) => {
-          body['content'] = tiptapContent(doc);
+          body['core.content'] = tiptapContent(doc);
         });
         pending.set(false);
       },
@@ -180,7 +180,7 @@ describe('EntitySession', () => {
   });
 
   it('mints the grid Field’s empty plane when core.hexmap is added to a note (#189)', () => {
-    const noteBody = { content };
+    const noteBody = { 'core.content': content };
     const note: EntityDetail = { ...aldermoor, id: 'n1', types: [CORE_NOTE], document: noteBody };
     entities.load.mockReturnValue(of(note));
     session.open('n1').subscribe();
@@ -189,12 +189,12 @@ describe('EntitySession', () => {
     session.setTypes([CORE_NOTE, CORE_HEXMAP]);
 
     // The body gained an empty grid so the map View has a plane to render; Content is preserved.
-    expect(session.doc()).toEqual({ ...noteBody, grid: emptyHexMap() });
+    expect(session.doc()).toEqual({ ...noteBody, 'core.grid': emptyHexMap() });
     expect(session.dirty()).toBe(true);
   });
 
   it('attaches a Field, minting its default, and sends the authored fields[] on save (ADR-0054, #229)', () => {
-    const noteBody = { content };
+    const noteBody = { 'core.content': content };
     const note: EntityDetail = { ...aldermoor, id: 'n1', types: [CORE_NOTE], document: noteBody };
     entities.load.mockReturnValue(of(note));
     session.open('n1').subscribe();
@@ -204,7 +204,7 @@ describe('EntitySession', () => {
     // Attach the grid Field a note's type never named — of a Structured Data Type, so its empty plane is minted.
     session.attachField(HEX_GRID_FIELD.id);
     expect(session.fields()).toEqual([HEX_GRID_FIELD.id]);
-    expect(session.doc()).toEqual({ ...noteBody, grid: emptyHexMap() });
+    expect(session.doc()).toEqual({ ...noteBody, 'core.grid': emptyHexMap() });
     expect(session.dirty()).toBe(true);
 
     const saved: EntityDetail = { ...note, version: 4, fields: [HEX_GRID_FIELD.id], document: session.doc() };
@@ -248,14 +248,14 @@ describe('EntitySession', () => {
     session.detachField(HEX_GRID_FIELD.id);
     expect(session.fields()).toEqual([]);
     // Unlike removing a type (which leaves its values behind), a detach clears the attached Field's key.
-    expect(session.doc()).toEqual({ content });
+    expect(session.doc()).toEqual({ 'core.content': content });
     expect(session.dirty()).toBe(true);
 
-    const saved: EntityDetail = { ...note, version: 4, fields: [], document: { content } };
+    const saved: EntityDetail = { ...note, version: 4, fields: [], document: { 'core.content': content } };
     entities.save.mockReturnValue(of({ status: 'saved', entity: saved }));
     session.save().subscribe();
 
-    expect(entities.save).toHaveBeenCalledWith('n1', { content }, 3, [], undefined, []);
+    expect(entities.save).toHaveBeenCalledWith('n1', { 'core.content': content }, 3, [], undefined, []);
     expect(session.current()?.fields).toEqual([]);
   });
 
@@ -401,7 +401,7 @@ describe('EntitySession', () => {
 
     // The PUT body carries the flushed prose: the debounce window could not eat the last keystrokes.
     const sentBody = entities.save.mock.calls[0][1] as EntityDocument;
-    expect((sentBody['content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
+    expect((sentBody['core.content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
   });
 
   it('keeps a mid-flight Content edit dirty across a clean save (linchpin, ADR-0026)', () => {
@@ -796,7 +796,7 @@ describe('EntitySession', () => {
   it('saves a non-hexmap entity without coercing it into a hexmap (no data loss)', () => {
     // A note must save back as a note; the editor's empty grid must not
     // overwrite it with a blank hexmap body.
-    const noteBody = { content };
+    const noteBody = { 'core.content': content };
     const note: EntityDetail = {
       ...aldermoor,
       id: 'n1',
@@ -813,7 +813,7 @@ describe('EntitySession', () => {
   });
 
   it('saves a note’s edited Content opaquely, round-tripping the snapshot untouched', () => {
-    const noteBody = { content };
+    const noteBody = { 'core.content': content };
     const note: EntityDetail = {
       ...aldermoor,
       id: 'n1',
@@ -839,7 +839,7 @@ describe('EntitySession', () => {
 
     // Snapshot wrapped in format envelope, never parsed (ADR-0019): the editor commits it into the
     // body on flush, and the body rides the save as-is.
-    expect(entities.save).toHaveBeenCalledWith('n1', { content: { format: CONTENT_FORMAT, snapshot } }, 3, []);
+    expect(entities.save).toHaveBeenCalledWith('n1', { 'core.content': { format: CONTENT_FORMAT, snapshot } }, 3, []);
   });
 
   it('rides a hexmap’s edited Content alongside its grid on save (#75)', () => {
@@ -865,8 +865,8 @@ describe('EntitySession', () => {
     expect(entities.save).toHaveBeenCalledWith(
       'm1',
       {
-        content: { format: CONTENT_FORMAT, snapshot },
-        grid: editor.document(),
+        'core.content': { format: CONTENT_FORMAT, snapshot },
+        'core.grid': editor.document(),
       },
       3,
       [],
@@ -926,7 +926,7 @@ describe('EntitySession', () => {
 
     // The guard folds the pending doc into the body and warns — the last keystrokes aren't stranded
     // in the editor's debounce window.
-    expect((session.doc()['content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
+    expect((session.doc()['core.content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
     expect(event.defaultPrevented).toBe(true);
   });
 
@@ -968,7 +968,7 @@ describe('EntitySession', () => {
 
     // Cmd/Ctrl+S goes through save(), which flushes the editor first: the debounced prose rides the PUT.
     const sentBody = entities.save.mock.calls[0][1] as EntityDocument;
-    expect((sentBody['content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
+    expect((sentBody['core.content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
   });
 
   it('is a safe no-op with no entity open (no request, no throw)', () => {

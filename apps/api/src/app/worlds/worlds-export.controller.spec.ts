@@ -132,7 +132,7 @@ describe('Vault export endpoint', () => {
       tags: [],
       descriptors: [],
       document: {
-        content: tiptapContent({ type: 'doc', content: [paragraph('Public lore.')] }),
+        'core.content': tiptapContent({ type: 'doc', content: [paragraph('Public lore.')] }),
         secrets: tiptapContent({ type: 'doc', content: [paragraph('Hidden truth.')] }),
       },
     });
@@ -141,8 +141,8 @@ describe('Vault export endpoint', () => {
     const md = text(files, 'Vela.md');
 
     // Both blocks are marked, content before secrets (resolved Field order), each rendering its prose.
-    expect(md).toContain('<!-- hexly:field content -->');
-    expect(md.indexOf('<!-- hexly:field content -->')).toBeLessThan(md.indexOf('<!-- hexly:field secrets -->'));
+    expect(md).toContain('<!-- hexly:field core.content -->');
+    expect(md.indexOf('<!-- hexly:field core.content -->')).toBeLessThan(md.indexOf('<!-- hexly:field secrets -->'));
     expect(md).toContain('Public lore.');
     expect(md).toContain('Hidden truth.');
 
@@ -153,7 +153,7 @@ describe('Vault export endpoint', () => {
       .attach('file', Buffer.from(res.body), 'Aldermoor.zip')
       .expect(201);
     const reimported = entities.listByWorld(adaId, reimport.body.worldId).find((e) => e.name === 'Vela');
-    expect(JSON.stringify(reimported?.document['content'])).toContain('Public lore.');
+    expect(JSON.stringify(reimported?.document['core.content'])).toContain('Public lore.');
     expect(JSON.stringify(reimported?.document['secrets'])).toContain('Hidden truth.');
   });
 
@@ -250,7 +250,7 @@ describe('Vault export endpoint', () => {
       tags: [],
       descriptors: [],
       document: {
-        content: tiptapContent({
+        'core.content': tiptapContent({
           type: 'doc',
           content: [
             {
@@ -264,7 +264,7 @@ describe('Vault export endpoint', () => {
             },
           ],
         }),
-        grid: { hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } }, regions: [], labels: [] },
+        'core.grid': { hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } }, regions: [], labels: [] },
       },
     });
 
@@ -279,7 +279,7 @@ describe('Vault export endpoint', () => {
     // The grid rides the frontmatter as a nested Field value, so the map survives the round-trip
     // (ADR-0050 amends ADR-0033's lossy export) — and it does so through the generic EntityDocument path,
     // which knows nothing of hexes.
-    expect(fm['grid']).toEqual({
+    expect(fm['core.grid']).toEqual({
       hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } },
       regions: [],
       labels: [],
@@ -298,7 +298,7 @@ describe('Vault export endpoint', () => {
       tags: [],
       descriptors: [],
       // The whole stat block is one grouped value at `stat_block` (ADR-0055), beside the prose.
-      document: { content: tiptapContent({ type: 'doc', content: [] }), stat_block: statBlock },
+      document: { 'core.content': tiptapContent({ type: 'doc', content: [] }), 'dnd.stat_block': statBlock },
     });
 
     const { files } = await exportZip(ada, worldId);
@@ -306,7 +306,7 @@ describe('Vault export endpoint', () => {
 
     // The stat block projects to frontmatter (`vault: { slot: 'frontmatter' }`) as one nested value the
     // generic EntityDocument path serializes and re-reads — no custom converter, mirroring the grid.
-    expect(fm['stat_block']).toEqual(statBlock);
+    expect(fm['dnd.stat_block']).toEqual(statBlock);
   });
 
   it('round-trips a fixture vault: import → export reproduces the folder layout and content', async () => {
@@ -377,7 +377,7 @@ describe('Vault export endpoint', () => {
       tags: [],
       descriptors: [],
       document: {
-        content: tiptapContent({ type: 'doc', content: [] }),
+        'core.content': tiptapContent({ type: 'doc', content: [] }),
         challenge_rating: 3,
         size: 'Large',
       },
@@ -389,7 +389,7 @@ describe('Vault export endpoint', () => {
       version: vela.version,
       tags: [],
       descriptors: [],
-      document: { content: tiptapContent({ type: 'doc', content: [] }), domain: 'dusk' },
+      document: { 'core.content': tiptapContent({ type: 'doc', content: [] }), domain: 'dusk' },
     });
 
     // A Hex Map (plugin type, a Structured Data Type) — terrain, a feature, a region, and a label.
@@ -406,7 +406,7 @@ describe('Vault export endpoint', () => {
       version: map.version,
       tags: [],
       descriptors: [],
-      document: { content: tiptapContent({ type: 'doc', content: [] }), grid },
+      document: { 'core.content': tiptapContent({ type: 'doc', content: [] }), grid },
     });
 
     // Export the World, then import the export back as a fresh World.

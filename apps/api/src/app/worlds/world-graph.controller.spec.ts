@@ -283,7 +283,7 @@ describe('World Graph', () => {
     await owner
       .put(`/entities/${id}`)
       .send({
-        document: { content: tiptapContent({ type: 'doc', content: [] }), lair: link },
+        document: { 'core.content': tiptapContent({ type: 'doc', content: [] }), lair: link },
         version: current.version,
         tags: [],
         types: ['test.monster'],
@@ -294,7 +294,7 @@ describe('World Graph', () => {
   async function save(owner: Agent, id: string, inline: unknown[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityDocument = {
-      content: tiptapContent({
+      'core.content': tiptapContent({
         type: 'doc',
         content: [{ type: 'paragraph', content: inline }],
       }),

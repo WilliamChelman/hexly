@@ -43,7 +43,7 @@ async function linksOf(agent: request.Agent, worldId: string, name: string) {
   const detail = await agent.get(`/entities/${summary.id}`).expect(200);
   return {
     id: summary.id,
-    links: entityLinks(detail.body.document.content.snapshot),
+    links: entityLinks(detail.body.document['core.content'].snapshot),
   };
 }
 
@@ -86,7 +86,7 @@ async function imagesOf(agent: request.Agent, worldId: string, name: string): Pr
   const list = await agent.get(`/entities?worldId=${worldId}`).expect(200);
   const summary = list.body.items.find((e: { name: string }) => e.name === name);
   const detail = await agent.get(`/entities/${summary.id}`).expect(200);
-  return imageSrcs(detail.body.document.content.snapshot);
+  return imageSrcs(detail.body.document['core.content'].snapshot);
 }
 
 describe('Vault import endpoint', () => {
@@ -201,8 +201,8 @@ describe('Vault import endpoint', () => {
 
     const mara = await ada.get(`/entities/${summary.id}`).expect(200);
     // Body converted to the opaque tiptap-v3 snapshot (ADR-0019).
-    expect(mara.body.document.content.format).toBe('tiptap-v3');
-    expect(mara.body.document.content.snapshot.type).toBe('doc');
+    expect(mara.body.document['core.content'].format).toBe('tiptap-v3');
+    expect(mara.body.document['core.content'].snapshot.type).toBe('doc');
 
     // Folder path preserved under the reserved namespace; frontmatter (incl. aliases)
     // passes through as EntityDocument; `tags` moved out to Hexly Tags (not left in EntityDocument). The body IS
@@ -295,7 +295,7 @@ describe('Vault import endpoint', () => {
         '---',
         'hexly.type: [core.note, world.deity]',
         '---',
-        '<!-- hexly:field content -->',
+        '<!-- hexly:field core.content -->',
         'Public lore.',
         '',
         '<!-- hexly:field secrets -->',
@@ -307,7 +307,7 @@ describe('Vault import endpoint', () => {
     const { detail } = await entityNamed(ada, res.body.worldId, 'Vela');
 
     // Each marked block lands at its own key, converted to prose; the marker comment itself is gone.
-    expect(JSON.stringify(detail.document.content.snapshot)).toContain('Public lore.');
+    expect(JSON.stringify(detail.document['core.content'].snapshot)).toContain('Public lore.');
     expect(JSON.stringify(detail.document.secrets.snapshot)).toContain('Hidden truth.');
     expect(JSON.stringify(detail.document)).not.toContain('hexly:field');
   });
@@ -320,8 +320,8 @@ describe('Vault import endpoint', () => {
     const { detail } = await entityNamed(ada, res.body.worldId, 'Keep');
 
     // No markers → the whole body converts into the canonical `content` Field.
-    expect(detail.document.content.format).toBe('tiptap-v3');
-    expect(JSON.stringify(detail.document.content.snapshot)).toContain('The northern keep guards the pass.');
+    expect(detail.document['core.content'].format).toBe('tiptap-v3');
+    expect(JSON.stringify(detail.document['core.content'].snapshot)).toContain('The northern keep guards the pass.');
   });
 
   it('reports dangling links, degraded constructs, and zero assets in the summary', async () => {
@@ -626,7 +626,7 @@ describe('Vault import endpoint', () => {
     const aldermoor = list.body.items.find((e: { name: string }) => e.name === 'Aldermoor');
     const note = await ada.get(`/entities/${aldermoor.id}`).expect(200);
     // It carries its lore, and the reserved `hexly.*` key isn't persisted as author EntityDocument.
-    expect(JSON.stringify(note.body.document.content.snapshot)).toContain('The frontier realm.');
+    expect(JSON.stringify(note.body.document['core.content'].snapshot)).toContain('The frontier realm.');
     expect(note.body.document).not.toHaveProperty('hexly.isHome');
   });
 

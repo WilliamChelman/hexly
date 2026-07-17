@@ -118,11 +118,11 @@ describe('TypeRegistry', () => {
   });
 
   it('unions the ordered Views a type set affords — primary first, deduped', () => {
-    expect(viewKeys(registry.viewsFor(['core.hexmap']))).toEqual([`${CORE_VIEW_MAP}:grid`, CORE_VIEW_CONTENT]);
+    expect(viewKeys(registry.viewsFor(['core.hexmap']))).toEqual([`${CORE_VIEW_MAP}:core.grid`, CORE_VIEW_CONTENT]);
     expect(viewKeys(registry.viewsFor(['core.note']))).toEqual([CORE_VIEW_CONTENT]);
     // A multi-type set unions in `types` order, deduping the shared content view.
     expect(viewKeys(registry.viewsFor(['core.hexmap', 'core.note']))).toEqual([
-      `${CORE_VIEW_MAP}:grid`,
+      `${CORE_VIEW_MAP}:core.grid`,
       CORE_VIEW_CONTENT,
     ]);
     expect(registry.viewsFor([])).toEqual([]);
@@ -130,10 +130,10 @@ describe('TypeRegistry', () => {
   });
 
   it('binds the View of a Field of a Structured Data Type to the Field it renders, and a Type’s View to nothing', () => {
-    // `core.hexmap` places its `grid` Field's View first, so the Map opens by default — and the
+    // `core.hexmap` places its `core.grid` Field's View first, so the Map opens by default — and the
     // instance names the Field, which is what lets a second grid afford a second map View.
     expect(registry.viewsFor(['core.hexmap'])).toEqual([
-      { viewId: CORE_VIEW_MAP, fieldKey: 'grid' },
+      { viewId: CORE_VIEW_MAP, fieldKey: 'core.grid' },
       { viewId: CORE_VIEW_CONTENT },
     ]);
   });
@@ -147,22 +147,22 @@ describe('TypeRegistry', () => {
     it('offers the stat block and the Note view, defaulting to the plugin’s own', () => {
       // The stat block is placed by its `{ field }` now (ADR-0055), so it keys to its Field like the Map does.
       expect(viewKeys(registry.viewsFor([DND_MONSTER]))).toEqual([
-        `${DND_VIEW_STAT_BLOCK}:stat_block`,
+        `${DND_VIEW_STAT_BLOCK}:dnd.stat_block`,
         CORE_VIEW_CONTENT,
       ]);
     });
 
     it('offers the stat block, Note, and Map when the monster also carries core.hexmap', () => {
       expect(viewKeys(registry.viewsFor([DND_MONSTER, 'core.hexmap']))).toEqual([
-        `${DND_VIEW_STAT_BLOCK}:stat_block`,
+        `${DND_VIEW_STAT_BLOCK}:dnd.stat_block`,
         CORE_VIEW_CONTENT,
-        `${CORE_VIEW_MAP}:grid`,
+        `${CORE_VIEW_MAP}:core.grid`,
       ]);
       // Re-primarying the hexmap re-orders the union, so the Map becomes the default View.
       expect(viewKeys(registry.viewsFor(['core.hexmap', DND_MONSTER]))).toEqual([
-        `${CORE_VIEW_MAP}:grid`,
+        `${CORE_VIEW_MAP}:core.grid`,
         CORE_VIEW_CONTENT,
-        `${DND_VIEW_STAT_BLOCK}:stat_block`,
+        `${DND_VIEW_STAT_BLOCK}:dnd.stat_block`,
       ]);
     });
 
@@ -213,7 +213,7 @@ describe('TypeRegistry', () => {
 
       // Two Views of one Entity, each bound to its own Field — why a View is an instance (#200).
       expect(viewKeys(registry.viewsFor(['core.hexmap', 'world.deity']))).toEqual([
-        `${CORE_VIEW_MAP}:grid`,
+        `${CORE_VIEW_MAP}:core.grid`,
         CORE_VIEW_CONTENT,
         CORE_VIEW_FIELDS,
         `${CORE_VIEW_MAP}:battlemap`,
@@ -264,9 +264,9 @@ describe('TypeRegistry', () => {
     expect(registry.resolveFields(['dnd.beast']).map((f) => f.key)).toEqual(['cr']);
     // The bundled plugin's schema resolves through the same path — the web twin of what the API's
     // write gate and facet build read (#192).
-    expect(registry.resolveFields([DND_MONSTER]).map((f) => f.key)).toContain('stat_block');
+    expect(registry.resolveFields([DND_MONSTER]).map((f) => f.key)).toContain('dnd.stat_block');
     // `core.note` declares exactly the canonical prose Field now (ADR-0051).
-    expect(registry.resolveFields(['core.note']).map((f) => f.key)).toEqual(['content']);
+    expect(registry.resolveFields(['core.note']).map((f) => f.key)).toEqual(['core.content']);
     // No types at all resolves to no Fields.
     expect(registry.resolveFields(undefined)).toEqual([]);
   });
@@ -283,24 +283,26 @@ describe('TypeRegistry', () => {
   describe('effective Field set', () => {
     it('resolves a plugin type’s defaults through fieldRefs → the composed Plugin-Field resolver', () => {
       // Not from the inline `fields` mirror: the reuse handles drive resolution now, like the server.
-      expect(registry.effectiveFields([DND_MONSTER], []).map((f) => f.key)).toContain('stat_block');
-      expect(registry.effectiveFields(['core.note'], []).map((f) => f.key)).toEqual(['content']);
+      expect(registry.effectiveFields([DND_MONSTER], []).map((f) => f.key)).toContain('dnd.stat_block');
+      expect(registry.effectiveFields(['core.note'], []).map((f) => f.key)).toEqual(['core.content']);
     });
 
     it('unions an Entity’s attached Fields with its types’ defaults, deduped by key', () => {
       // A `core.note` carrying one attached stat-block Field — a Field its type never named (CONTEXT.md → Entity).
       const keys = registry.effectiveFields(['core.note'], ['dnd.stat_block']).map((f) => f.key);
-      expect(keys).toEqual(['stat_block', 'content']); // attachment first (instance precedence), then the type default
+      expect(keys).toEqual(['dnd.stat_block', 'core.content']); // attachment first (instance precedence), then the type default
     });
 
     it('drops an attached id that resolves to nothing — an absent plugin’s Field left as plain document', () => {
-      expect(registry.effectiveFields(['core.note'], ['pathfinder.nonesuch']).map((f) => f.key)).toEqual(['content']);
+      expect(registry.effectiveFields(['core.note'], ['pathfinder.nonesuch']).map((f) => f.key)).toEqual([
+        'core.content',
+      ]);
     });
 
     it('lets an attachment win the key over a type default — instance precedence', () => {
-      // Both resolve to the `content` key; the attached one is considered first, so it wins the set.
+      // Both resolve to the `core.content` key; the attached one is considered first, so it wins the set.
       const resolved = registry.effectiveFields(['core.note'], [CONTENT_FIELD.id]);
-      expect(resolved.map((f) => f.key)).toEqual(['content']);
+      expect(resolved.map((f) => f.key)).toEqual(['core.content']);
     });
   });
 
@@ -312,9 +314,9 @@ describe('TypeRegistry', () => {
     });
 
     it('never offers a Field whose key the effective set already covers (a default or an attachment)', () => {
-      // `content` is a note default, so its Field is never offered; an already-attached `dnd.stat_block` drops too.
+      // `core.content` is a note default, so its Field is never offered; an already-attached `dnd.stat_block` drops too.
       const offered = registry.attachableFields(['core.note'], ['dnd.stat_block']);
-      expect(offered.map((f) => f.key)).not.toContain('content');
+      expect(offered.map((f) => f.key)).not.toContain('core.content');
       expect(offered.map((f) => f.id)).not.toContain('dnd.stat_block');
     });
   });
@@ -333,7 +335,7 @@ describe('TypeRegistry', () => {
       expect(registry.field('world.element')?.label).toBe('Element');
       expect(registry.effectiveFields(['core.note'], ['world.element']).map((f) => f.key)).toEqual([
         'element',
-        'content',
+        'core.content',
       ]);
     });
 
@@ -349,7 +351,7 @@ describe('TypeRegistry', () => {
       registry.setWorldFields([]); // deleted (or re-keyed under a new id) — its old id stops resolving
       expect(registry.field('world.element')).toBeUndefined();
       // The attached id resolves to nothing, so it drops from the set (its value left as plain document).
-      expect(registry.effectiveFields(['core.note'], ['world.element']).map((f) => f.key)).toEqual(['content']);
+      expect(registry.effectiveFields(['core.note'], ['world.element']).map((f) => f.key)).toEqual(['core.content']);
     });
 
     it('reuses one World Field across two unrelated types via instance attachment', () => {
@@ -366,7 +368,7 @@ describe('TypeRegistry', () => {
       // A note with a grid Field attached affords its Content View, then the attached grid’s Map View.
       expect(viewKeys(registry.viewsFor(['core.note'], [HEX_GRID_FIELD.id]))).toEqual([
         CORE_VIEW_CONTENT,
-        `${CORE_VIEW_MAP}:grid`,
+        `${CORE_VIEW_MAP}:core.grid`,
       ]);
     });
 
@@ -388,7 +390,7 @@ describe('TypeRegistry', () => {
       // The type affords the generic Field view alone; the attached grid still surfaces its Map View.
       expect(viewKeys(registry.viewsFor(['pathfinder.monster'], [HEX_GRID_FIELD.id]))).toEqual([
         CORE_VIEW_FIELDS,
-        `${CORE_VIEW_MAP}:grid`,
+        `${CORE_VIEW_MAP}:core.grid`,
       ]);
     });
   });
@@ -555,7 +557,7 @@ describe('TypeRegistry filtering by the enabled-Plugin set', () => {
     enabled.set(new Set([CONTENT_PLUGIN_ID, HEXMAP_PLUGIN_ID, DND_PLUGIN_ID]));
     expect(registry.all().map((d) => d.id)).toContain(DND_MONSTER);
     expect(viewKeys(registry.viewsFor([DND_MONSTER]))).toEqual([
-      `${DND_VIEW_STAT_BLOCK}:stat_block`,
+      `${DND_VIEW_STAT_BLOCK}:dnd.stat_block`,
       CORE_VIEW_CONTENT,
     ]);
     // …and turning content off drops core.note, the once-privileged Type, like any other.

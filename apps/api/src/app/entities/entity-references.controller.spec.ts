@@ -126,8 +126,8 @@ describe('Entity references', () => {
           version: map.version,
           tags: [],
           document: {
-            content: emptyContent(),
-            grid: {
+            'core.content': emptyContent(),
+            'core.grid': {
               hexes: {
                 '0,0': { terrain: 'grass', entityId: harbour },
                 '1,0': { terrain: 'grass', feature: { ref: 'settlement', entityId: riverbend } },
@@ -309,7 +309,7 @@ describe('Entity references', () => {
   async function link(owner: Agent, id: string, links: Record<string, unknown>[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityDocument = {
-      content: tiptapContent({
+      'core.content': tiptapContent({
         type: 'doc',
         content: [
           {

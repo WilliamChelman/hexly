@@ -53,10 +53,14 @@ interface SavedGrid {
 /**
  * The grid a Hex Map has actually persisted, fetched from the API. The one place a test knows *where*
  * the grid is stored: a **Field of a Structured Data Type**'s value in the Entity's body, which **is** the EntityDocument
- * map (ADR-0050, ADR-0051). `core.hexmap` declares its grid at `grid`; a user-defined type declares
- * its at whatever key its author chose — that is `fieldKey`.
+ * map (ADR-0050, ADR-0051). `core.hexmap` declares its grid at `core.grid` (ADR-0056); a user-defined
+ * type declares its at whatever key its author chose — that is `fieldKey`.
  */
-export async function savedGrid(request: APIRequestContext, entityId: string, fieldKey = 'grid'): Promise<SavedGrid> {
+export async function savedGrid(
+  request: APIRequestContext,
+  entityId: string,
+  fieldKey = 'core.grid',
+): Promise<SavedGrid> {
   const res = await request.get(`/api/entities/${entityId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
@@ -67,7 +71,7 @@ export async function savedGrid(request: APIRequestContext, entityId: string, fi
  * A map View toggle's testid — the View id plus the **Field of a Structured Data Type** it renders (ADR-0050),
  * composed through the app's own {@link viewInstanceKey}.
  */
-export function mapViewToggle(fieldKey = 'grid'): string {
+export function mapViewToggle(fieldKey = 'core.grid'): string {
   return viewInstanceKey({ viewId: 'core.view.map', fieldKey });
 }
 
@@ -84,9 +88,9 @@ export function contentViewToggle(fieldKey?: string): string {
 /**
  * The stat-block View toggle's testid (ADR-0055). The stat block is a **Structured Data Type**'s View
  * now, bound to the `dnd.stat-block` Field that placed it, so it keys `viewId:fieldKey` like the map —
- * `dnd.monster` places it at `stat_block`, an attachment at whatever key the Field carries.
+ * `dnd.monster` places it at `dnd.stat_block`, an attachment at whatever key the Field carries.
  */
-export function statBlockViewToggle(fieldKey = 'stat_block'): string {
+export function statBlockViewToggle(fieldKey = 'dnd.stat_block'): string {
   return viewInstanceKey({ viewId: 'dnd.view.stat-block', fieldKey });
 }
 

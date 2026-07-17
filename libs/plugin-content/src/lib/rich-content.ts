@@ -71,13 +71,16 @@ export const RICH_CONTENT_DATA_TYPE = defineStructuredDataType({
   vault: { slot: 'body' },
 });
 
-/** The prose Field's reuse handle (ADR-0054) — its `id`, distinct from the `content` key it lenses. */
+/** The prose Field's namespaced identifier — its `id`, and (ADR-0056) the EntityDocument key it lenses. */
 export const CONTENT_FIELD_ID = 'core.content';
 
 /**
  * The canonical prose Field every Type that carries prose references by id (ADR-0051, ADR-0054):
  * `core.note`, `core.hexmap` beside its grid, `dnd.monster` beside its stats. The effective-set
  * resolver dedupes by `key`, so a multi-type Entity resolves exactly one.
+ *
+ * Its document `key` equals its `id` (`core.content`): a Field has one namespaced identifier that is the
+ * slot it lenses (ADR-0056). The `key` property survives only until it retires from the Field schema.
  *
  * The header's View toggle reads its `labelKey` (a Structured Data Type's View being bound to the Field it
  * renders); the toggle moving onto the Field is the next ticket. Not `required`: an absent value opens
@@ -86,7 +89,7 @@ export const CONTENT_FIELD_ID = 'core.content';
  */
 export const CONTENT_FIELD: Field = defineField({
   id: CONTENT_FIELD_ID,
-  key: 'content',
+  key: CONTENT_FIELD_ID,
   // The untranslated fallback; the web resolves `labelKey` through transloco.
   label: 'Content',
   labelKey: 'editor.view.content',

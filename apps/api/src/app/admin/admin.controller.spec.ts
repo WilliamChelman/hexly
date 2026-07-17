@@ -138,7 +138,7 @@ describe('Superadmin repair surface', () => {
   async function link(owner: Agent, id: string, targetId: string): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityDocument = {
-      content: tiptapContent({
+      'core.content': tiptapContent({
         type: 'doc',
         content: [
           {

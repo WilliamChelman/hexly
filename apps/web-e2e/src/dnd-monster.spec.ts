@@ -12,7 +12,7 @@ import {
 
 /** The Hex Map's map View toggle: bound to the `grid` Field `core.hexmap` declares. */
 const MAP_VIEW = mapViewToggle();
-/** The monster's stat-block View toggle: bound to the `stat_block` Field `dnd.monster` places (ADR-0055). */
+/** The monster's stat-block View toggle: bound to the `dnd.stat_block` Field `dnd.monster` places (ADR-0055). */
 const STAT_BLOCK_VIEW = statBlockViewToggle();
 /** The Note View toggle: `dnd.monster` places the content View by id, so it keys plain. */
 const NOTE_VIEW = contentViewToggle();
@@ -52,13 +52,13 @@ test('creates a dnd.monster, fills its stat block, and reads it back', async ({ 
   await expect(page.getByTestId('stat-strength').locator('input')).toHaveValue('30');
   await expect(page.getByTestId('stat-size').locator('select')).toHaveValue('Huge');
 
-  // The stat block is one grouped value at the `stat_block` key of the one EntityDocument map (ADR-0055),
-  // so an instance without the plugin keeps it intact as plain document.
+  // The stat block is one grouped value at the `dnd.stat_block` key of the one EntityDocument map
+  // (ADR-0055/0056), so an instance without the plugin keeps it intact as plain document.
   const res = await request.get(`/api/entities/${id}`);
   expect(res.ok()).toBeTruthy();
   const body = await res.json();
   expect(body.types).toEqual(['dnd.monster']);
-  expect(body.document.stat_block).toMatchObject({ challenge_rating: 24, strength: 30, size: 'Huge' });
+  expect(body.document['dnd.stat_block']).toMatchObject({ challenge_rating: 24, strength: 30, size: 'Huge' });
 });
 
 test('a monster’s harvested dimensions surface in the browser rail by presence, no active Type filter (#231/#236)', async ({

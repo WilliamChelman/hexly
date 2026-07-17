@@ -40,14 +40,14 @@ const hexmapWithContent = (text: string): EntityDetail => ({
   // Owner opener (ADR-0039): the `edit` Right keeps the map/editor writable.
   rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
   document: {
-    content: {
+    'core.content': {
       format: CONTENT_FORMAT,
       snapshot: {
         type: 'doc',
         content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
       },
     },
-    grid: { hexes: {}, regions: [], labels: [] },
+    'core.grid': { hexes: {}, regions: [], labels: [] },
   },
 });
 
@@ -390,7 +390,7 @@ describe('EntityPage layout', () => {
     TestBed.inject(EntitySession).adopt({
       ...noteDetail('Lady Mara'),
       document: {
-        content: {
+        'core.content': {
           format: 'tiptap-v1',
           snapshot: {
             type: 'doc',

@@ -59,7 +59,7 @@ const noteWith = (types: readonly string[], metadata?: Record<string, unknown>):
   createdAt: 1,
   updatedAt: 1,
   document: {
-    content: { format: 'tiptap-v1', snapshot: {} },
+    'core.content': { format: 'tiptap-v1', snapshot: {} },
     ...metadata,
   },
 });

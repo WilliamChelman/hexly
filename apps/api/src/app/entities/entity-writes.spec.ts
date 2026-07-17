@@ -172,7 +172,7 @@ describe('EntityWrites', () => {
         name: 'Ealdred',
         types: ['core.note'],
         tags: [],
-        document: { content: CONTENT },
+        document: { 'core.content': CONTENT },
       });
 
       expect(descriptorsOf('Ealdred')).toEqual(['spouse']);
@@ -187,7 +187,7 @@ describe('EntityWrites', () => {
         name: 'The Reach',
         types: ['core.hexmap'],
         tags: [],
-        document: { content: CONTENT, grid: GRID },
+        document: { 'core.content': CONTENT, 'core.grid': GRID },
       });
 
       expect(contentTextOf('The Reach')).toBe('Married to Ashford The Kingdom of Avalon The Whisperwood');
@@ -205,7 +205,7 @@ describe('EntityWrites', () => {
         name: 'Ealdred',
         types: ['core.note'],
         tags: [],
-        document: { content: CONTENT },
+        document: { 'core.content': CONTENT },
       });
 
       expect(edgesOf('Ealdred')).toEqual([
@@ -230,7 +230,7 @@ describe('EntityWrites', () => {
         types: ['core.note'],
         tags: [],
         document: {
-          content: tiptapContent({
+          'core.content': tiptapContent({
             type: 'doc',
             content: [
               {
@@ -265,13 +265,13 @@ describe('EntityWrites', () => {
         name: 'Ealdred',
         types: ['core.note'],
         tags: [],
-        document: { content: CONTENT },
+        document: { 'core.content': CONTENT },
       });
 
       writes.mutate(ADA, row.id, {
         kind: 'edit',
         version: row.version,
-        document: { content: emptyContent() },
+        document: { 'core.content': emptyContent() },
       });
 
       expect(descriptorsOf('Ealdred')).toEqual([]);
@@ -285,13 +285,13 @@ describe('EntityWrites', () => {
         name: 'Ealdred',
         types: ['core.note'],
         tags: [],
-        document: { content: CONTENT },
+        document: { 'core.content': CONTENT },
       });
 
       writes.mutate(ADA, row.id, {
         kind: 'edit',
         version: row.version,
-        document: { content: emptyContent() },
+        document: { 'core.content': emptyContent() },
       });
 
       expect(edgesOf('Ealdred')).toEqual([]);
@@ -308,7 +308,7 @@ describe('EntityWrites', () => {
         name: 'Ealdred',
         types: ['core.note'],
         tags: [],
-        document: { content: CONTENT },
+        document: { 'core.content': CONTENT },
       });
       writes.mutate(ADA, row.id, {
         kind: 'edit',
@@ -319,7 +319,7 @@ describe('EntityWrites', () => {
       const result = writes.mutate(ADA, row.id, {
         kind: 'edit',
         version: row.version, // stale
-        document: { content: emptyContent() },
+        document: { 'core.content': emptyContent() },
       });
 
       expect(result.status).toBe('conflict');
@@ -359,7 +359,7 @@ describe('EntityWrites', () => {
       }
 
       it('rebuilds an unindexed Entity’s edges, descriptors, and search text from its document', () => {
-        seedUnindexed('ealdred', WORLD, { content: CONTENT });
+        seedUnindexed('ealdred', WORLD, { 'core.content': CONTENT });
 
         reindexAll();
 
@@ -384,7 +384,7 @@ describe('EntityWrites', () => {
         seedRaw(
           'the-reach',
           WORLD,
-          JSON.stringify({ content: CONTENT, grid: GRID }),
+          JSON.stringify({ 'core.content': CONTENT, 'core.grid': GRID }),
           'hexmap',
           'Married to', // What the old, Content-only derivation left behind.
         );
@@ -400,7 +400,7 @@ describe('EntityWrites', () => {
        * does it yield new state, and that stale window closes on the reader's next navigation.
        */
       it('rewrites the indexes silently: no seq bump, no nudge', () => {
-        seedUnindexed('ealdred', WORLD, { content: CONTENT });
+        seedUnindexed('ealdred', WORLD, { 'core.content': CONTENT });
 
         reindexAll();
 
@@ -411,7 +411,7 @@ describe('EntityWrites', () => {
 
       /** Safe to re-run: the document is authoritative and the write is a wholesale replace. */
       it('is idempotent: a second run leaves the same rows and reports the same count', () => {
-        seedUnindexed('ealdred', WORLD, { content: CONTENT });
+        seedUnindexed('ealdred', WORLD, { 'core.content': CONTENT });
 
         const first = reindexAll();
         const afterFirst = {
@@ -434,8 +434,8 @@ describe('EntityWrites', () => {
         const OTHER = 'world-2';
         seedUser(BOB);
         seedWorld(OTHER, BOB); // A World the reindex has no membership in, and reaches anyway.
-        seedUnindexed('ealdred', WORLD, { content: CONTENT });
-        seedUnindexed('elsewhere', OTHER, { content: CONTENT });
+        seedUnindexed('ealdred', WORLD, { 'core.content': CONTENT });
+        seedUnindexed('elsewhere', OTHER, { 'core.content': CONTENT });
 
         expect(reindexAll()).toMatchObject({
           walked: 3,
@@ -458,8 +458,8 @@ describe('EntityWrites', () => {
        * transaction would serve no other request while it ran.
        */
       it('pages through the instance, reaching every Entity exactly once', () => {
-        seedUnindexed('ealdred', WORLD, { content: CONTENT });
-        seedUnindexed('elsewhere', WORLD, { content: CONTENT });
+        seedUnindexed('ealdred', WORLD, { 'core.content': CONTENT });
+        seedUnindexed('elsewhere', WORLD, { 'core.content': CONTENT });
 
         // 3 Entities at a page apiece, plus the empty page that settles the exhausted cursor.
         expect(reindexAll(1)).toMatchObject({
@@ -495,7 +495,7 @@ describe('EntityWrites', () => {
        * Entities around it: one corrupt row must not deny every other Entity its derivation.
        */
       it('skips a document it cannot parse, reports it, and reindexes the rest', () => {
-        seedUnindexed('ealdred', WORLD, { content: CONTENT });
+        seedUnindexed('ealdred', WORLD, { 'core.content': CONTENT });
         seedCorrupt('broken', WORLD);
 
         const walk = reindexAll();
@@ -580,7 +580,7 @@ describe('EntityWrites', () => {
           name: 'Aboleth',
           types: ['test.monster'],
           tags: [],
-          document: { content: emptyContent(), lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
+          document: { 'core.content': emptyContent(), lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
         });
 
         expect(edgesOf('Aboleth')).toEqual([
@@ -596,14 +596,14 @@ describe('EntityWrites', () => {
           name: 'Aboleth',
           types: ['test.monster'],
           tags: [],
-          document: { content: emptyContent(), lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
+          document: { 'core.content': emptyContent(), lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
         });
 
         writes.mutate(ADA, row.id, {
           kind: 'edit',
           version: row.version,
           types: ['test.monster'],
-          document: { content: emptyContent(), lair: { entityId: 'sunken-keep', label: 'Sunken Keep' } },
+          document: { 'core.content': emptyContent(), lair: { entityId: 'sunken-keep', label: 'Sunken Keep' } },
         });
 
         expect(edgesOf('Aboleth')).toEqual([
@@ -642,7 +642,7 @@ describe('EntityWrites', () => {
           types: ['core.note'],
           fields: ['test.ally'],
           tags: [],
-          document: { content: emptyContent(), ally: { entityId: 'mira', label: 'Mira' } },
+          document: { 'core.content': emptyContent(), ally: { entityId: 'mira', label: 'Mira' } },
         });
 
         expect(edgesOf('Ealdred')).toEqual([
@@ -659,7 +659,7 @@ describe('EntityWrites', () => {
           types: ['core.note'],
           fields: ['test.ally'],
           tags: [],
-          document: { content: emptyContent(), ally: { entityId: 'mira', label: 'Mira' } },
+          document: { 'core.content': emptyContent(), ally: { entityId: 'mira', label: 'Mira' } },
         });
 
         expect(rowOf(row.id).fields).toEqual(['test.ally']);
@@ -669,7 +669,7 @@ describe('EntityWrites', () => {
         // Seeded raw with the `fields[]` column set and no derived rows, so the rebuild is observed
         // independently of `insert` — the reindex must resolve the effective set from `types` + `fields`.
         seedAttachedRaw('ealdred', WORLD, ['core.note'], ['test.ally'], {
-          content: emptyContent(),
+          'core.content': emptyContent(),
           ally: { entityId: 'mira', label: 'Mira' },
         });
 
@@ -752,7 +752,7 @@ describe('EntityWrites', () => {
         name: 'Ealdred',
         types: ['core.note'],
         tags: [],
-        document: { content: CONTENT }, // Ealdred → e2
+        document: { 'core.content': CONTENT }, // Ealdred → e2
       });
       const mira = writes.insert({
         ownerId: ADA,
@@ -760,7 +760,7 @@ describe('EntityWrites', () => {
         name: 'Mira',
         types: ['core.note'],
         tags: [],
-        document: { content: linkTo(ealdred.id) }, // Mira → Ealdred
+        document: { 'core.content': linkTo(ealdred.id) }, // Mira → Ealdred
       });
 
       writes.mutate(ADA, ealdred.id, { kind: 'delete' });
@@ -792,7 +792,7 @@ describe('EntityWrites', () => {
         name: 'The Reach',
         types: ['core.hexmap'],
         tags: [],
-        document: { content: emptyContent(), grid: { hexes, regions: [], labels: [] } },
+        document: { 'core.content': emptyContent(), 'core.grid': { hexes, regions: [], labels: [] } },
       });
 
       expect(edgesFrom(row.id)).toHaveLength(7000);
