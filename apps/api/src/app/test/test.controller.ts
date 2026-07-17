@@ -32,7 +32,9 @@ export class TestController {
     // A fixture reset, not a domain write: no EntityWrites nudge is needed (ADR-0045).
     // eslint-disable-next-line hexly-writes/no-direct-entity-writes
     this.db.delete(entities).run();
+    // eslint-disable-next-line hexly-writes/no-direct-world-writes
     this.db.delete(worldTypes).run();
+    // eslint-disable-next-line hexly-writes/no-direct-world-writes
     this.db.delete(worldFields).run();
     this.db.update(users).set({ preferences: '{}' }).run();
   }
