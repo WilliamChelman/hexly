@@ -212,7 +212,8 @@
     "home": "Hexly home",
     "users": "Users",
     "admin": "Admin",
-    "worldSettings": "World Settings"
+    "worldSettings": "World Settings",
+    "settingsSections": "Settings sections"
   },
   "commandPalette": {
     "searchLabel": "Search or run a command",
@@ -303,11 +304,22 @@
     "hint": "The page or entity you're looking for doesn't exist, or you don't have access to it.",
     "backToWorlds": "Back to your worlds"
   },
+  "picker": {
+    "searchFields": "Search fields…",
+    "searchTypes": "Search data types…",
+    "allSources": "All sources",
+    "sourceWorld": "This world",
+    "sourceBuiltIn": "Built-in",
+    "selectedEmpty": "No fields selected yet.",
+    "noMatch": "Nothing matches your search."
+  },
   "worldTypes": {
     "heading": "Custom types",
     "subhead": "Define your own kinds of entity for this world, each with typed fields you can filter on.",
     "empty": "No custom types yet.",
     "add": "New type",
+    "createTitle": "New type",
+    "editTitle": "Edit type",
     "edit": "Edit",
     "remove": "Delete",
     "idLabel": "Id",
@@ -350,6 +362,8 @@
     "subhead": "Define reusable fields once, then attach them to any entity or type in this world.",
     "empty": "No custom fields yet.",
     "add": "New field",
+    "createTitle": "New field",
+    "editTitle": "Edit field",
     "edit": "Edit",
     "remove": "Delete",
     "idPrefix": "world.",
