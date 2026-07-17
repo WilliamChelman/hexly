@@ -183,56 +183,54 @@ describe('Entities endpoints', () => {
   });
 
   /**
-   * A directly-attached Field (`fields[]`, ADR-0054) round-trips through create → load → save. A
-   * World-authored `size` enum Field rides a plain Note the note type never names (story 2). (The dnd
-   * scalar Fields retired, ADR-0055, so a World Field is the scalar-attach fixture now.)
+   * A directly-attached Field is now a namespaced document key its types never default (ADR-0057): it
+   * rides create → load → save through the document itself, with no separate `fields[]` wire. A
+   * World-authored `size` enum Field rides a plain Note the note type never names (story 2).
    */
-  it('round-trips an Entity’s directly-attached fields[] through create, load, and save', async () => {
+  it('attaches a Field via a namespaced document key and round-trips it (ADR-0057)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const worldId = (await ada.get('/worlds').expect(200)).body[0].id;
     await ada.post(`/worlds/${worldId}/fields`).send(SIZE_FIELD).expect(201);
 
+    // Attach `world.size` empty: its `null` key persists the attachment before a value is chosen.
     const created = await ada
       .post('/entities')
-      .send({ name: 'Ealdred', types: ['core.note'], fields: ['world.size'], worldId })
+      .send({ name: 'Ealdred', types: ['core.note'], document: { 'world.size': null }, worldId })
       .expect(201);
-    // `size` is a plain enum Field, so it mints no default — the note still opens as Content-only.
-    expect(created.body.fields).toEqual(['world.size']);
-    expect(created.body.document).toEqual({ 'core.content': emptyContent() });
+    expect(created.body.document).toEqual({ 'core.content': emptyContent(), 'world.size': null });
 
     const loaded = await ada.get(`/entities/${created.body.id}`).expect(200);
-    expect(loaded.body.fields).toEqual(['world.size']);
+    expect(loaded.body.document['world.size']).toBeNull();
 
-    // A save replaces the attached-Field set and fills the Field's value; validation runs over the
-    // effective set, so the enum value is checked though no type declares `size`.
-    const saved = await ada
+    // A typed save (carrying `types`) fills the value; validation runs over the effective set, so the
+    // enum is checked though no type declares `size` (story 15).
+    await ada
       .put(`/entities/${created.body.id}`)
       .send({
         document: { 'core.content': emptyContent(), 'world.size': 'Large' },
         version: created.body.version,
         tags: [],
-        fields: ['world.size'],
+        types: ['core.note'],
       })
       .expect(200);
-    expect(saved.body.fields).toEqual(['world.size']);
 
     const reloaded = await ada.get(`/entities/${created.body.id}`).expect(200);
-    expect(reloaded.body.fields).toEqual(['world.size']);
     expect(reloaded.body.document['world.size']).toBe('Large');
   });
 
   /**
-   * The forward-only Field gate runs over the *effective* set (ADR-0054): an ill-typed value for a
-   * directly-attached Field is rejected on an active typed save, even when no type names it (story 15).
+   * The forward-only Field gate runs over the *effective* set (ADR-0054/ADR-0057): on an active typed
+   * save (one carrying `types`), an ill-typed value for a Field the document attaches is rejected, even
+   * when no type names it (story 15).
    */
-  it('rejects a save whose attached Field value is ill-typed, though no type declares it', async () => {
+  it('rejects a typed save whose attached Field value is ill-typed, though no type declares it', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const worldId = (await ada.get('/worlds').expect(200)).body[0].id;
     await ada.post(`/worlds/${worldId}/fields`).send(SIZE_FIELD).expect(201);
 
     const created = await ada
       .post('/entities')
-      .send({ name: 'Ealdred', types: ['core.note'], fields: ['world.size'], worldId })
+      .send({ name: 'Ealdred', types: ['core.note'], document: { 'world.size': null }, worldId })
       .expect(201);
 
     // `size` is an enum; a value outside its options fails the effective-set validation.
@@ -242,7 +240,7 @@ describe('Entities endpoints', () => {
         document: { 'core.content': emptyContent(), 'world.size': 'Colossal' },
         version: created.body.version,
         tags: [],
-        fields: ['world.size'],
+        types: ['core.note'],
       })
       .expect(400);
   });

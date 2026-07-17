@@ -59,7 +59,7 @@ describe('plugin enablement — uniform absence on the server', () => {
   const fieldsFor = (registry: TypeFieldRegistry, types: readonly string[]) =>
     resolveEffectiveFields({
       types,
-      fieldIds: [],
+      doc: {},
       fieldResolver: registry.fieldResolver,
       typeFieldRefs: registry.typeFieldRefs,
     });

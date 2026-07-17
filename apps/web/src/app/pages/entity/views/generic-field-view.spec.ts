@@ -106,6 +106,21 @@ describe('GenericFieldView', () => {
     expect(session.doc()).toMatchObject({ 'test.name': 'Kraken' });
   });
 
+  it('clearing a value keeps the Field attached — the key stays as null, not deleted (ADR-0057)', () => {
+    registry.setWorldFields(beastFields);
+    registry.register(definitionWithFields('test.beast', beastFieldRefs));
+    const { fixture, el } = render(detail(['test.beast'], { 'test.name': 'Aboleth' }, ['edit']));
+
+    const name = el.querySelector('[data-testid="field-test.name"] input') as HTMLInputElement;
+    name.value = '';
+    name.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    // Emptying the control leaves a `null` key (attached-but-empty), not a deleted one — clearing a value
+    // is not discarding the Field. The key's presence is what keeps it in the effective set.
+    expect(session.doc()).toHaveProperty('test.name', null);
+  });
+
   it('renders a read-only opener’s controls disabled', () => {
     registry.setWorldFields(beastFields);
     registry.register(definitionWithFields('test.beast', beastFieldRefs));
@@ -218,13 +233,13 @@ describe('GenericFieldView over the effective Field set', () => {
   });
 
   it('renders an attached Field a Field its types never named', () => {
-    // A typeless Entity carrying one attached `test.size` (enum) Field — the attach case (CONTEXT.md → Entity).
+    // A typeless Entity whose document carries one `test.size` (enum) key — the attach case, derived from
+    // the document (CONTEXT.md → Entity, ADR-0057).
     session.adopt({
       id: 'e1',
       worldId: 'w1',
       name: 'Aboleth',
       types: [],
-      fields: ['test.size'],
       tags: [],
       visibility: 'private',
       version: 1,

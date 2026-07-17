@@ -20,7 +20,7 @@ describe('the core.hex-grid Structured Data Type (ADR-0050)', () => {
     const byId = new Map([CONTENT_FIELD, HEX_GRID_FIELD].map((field) => [field.id, field]));
     const fields = resolveEffectiveFields({
       types: [CORE_HEXMAP_TYPE.id],
-      fieldIds: [],
+      doc: {},
       fieldResolver: (id) => byId.get(id),
       typeFieldRefs: () => CORE_HEXMAP_TYPE.fieldRefs,
     });

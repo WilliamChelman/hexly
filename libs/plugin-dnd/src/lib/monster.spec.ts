@@ -23,7 +23,7 @@ describe('dnd.monster', () => {
     const byId = new Map([DND_STAT_BLOCK_FIELD, CONTENT_FIELD].map((field) => [field.id, field]));
     const fields = resolveEffectiveFields({
       types: [DND_MONSTER],
-      fieldIds: [],
+      doc: {},
       fieldResolver: (id) => byId.get(id),
       typeFieldRefs: () => DND_MONSTER_TYPE.fieldRefs,
     });

@@ -73,8 +73,6 @@ export interface InsertEntityInput {
   name: string;
   /** The ordered Entity Type set; `types[0]` is primary. Carried alongside `tags`, not in the document. */
   types: readonly string[];
-  /** The ids of Fields attached directly to this Entity (ADR-0054), beside its types' defaults. Omitted → none. */
-  fields?: readonly string[];
   tags: readonly string[];
   document: EntityDocument;
 }
@@ -123,8 +121,6 @@ export type EntityChange =
       tags?: readonly string[];
       /** Present → the type set fully replaces the stored one; omitted → left untouched (ADR-0048). */
       types?: readonly string[];
-      /** Present → the attached-Field id set fully replaces the stored one; omitted → left untouched (ADR-0054). */
-      fields?: readonly string[];
       document?: EntityDocument;
       /** Present → the base version rides the atomic WHERE and is bumped. */
       version?: number;
@@ -178,14 +174,12 @@ export class EntityWrites {
    */
   insert(input: InsertEntityInput): EntityRow {
     const now = Date.now();
-    const fields = [...(input.fields ?? [])];
-    const derived = this.derive(input.document, input.types, fields, input.worldId);
+    const derived = this.derive(input.document, input.types, input.worldId);
     const row: EntityRow = {
       id: input.id ?? randomUUID(),
       worldId: input.worldId,
       name: input.name,
       types: [...input.types],
-      fields,
       tags: [...input.tags],
       visibility: 'private',
       version: INITIAL_VERSION,
@@ -295,10 +289,9 @@ export class EntityWrites {
       .select({
         id: entities.id,
         worldId: entities.worldId,
-        // Facets and link edges derive from the effective set — `types` *and* attached `fields[]`
-        // (ADR-0048, ADR-0054, #188) — so the projection carries both beside the `document`.
+        // Facets and link edges derive from the effective set — `types` plus the attachments derived from
+        // the `document` (ADR-0048, ADR-0054, ADR-0057, #188).
         types: entities.types,
-        fields: entities.fields,
         document: entities.document,
       })
       .from(entities)
@@ -315,7 +308,7 @@ export class EntityWrites {
       try {
         derived.push({
           row,
-          derived: this.derive(JSON.parse(row.document) as EntityDocument, row.types, row.fields, row.worldId),
+          derived: this.derive(JSON.parse(row.document) as EntityDocument, row.types, row.worldId),
         });
       } catch (err) {
         failures.push({
@@ -356,10 +349,11 @@ export class EntityWrites {
    * `content → entity` edge carries a descriptor, so the non-null ones are exactly the descriptors
    * the Content uses.
    */
-  private derive(doc: EntityDocument, types: readonly string[], fieldIds: readonly string[], worldId: string): Derived {
-    // The effective Field set (ADR-0054), scoped to the Entity's World: an attached link Field harvests
-    // its edge and an attached facetable Field its facet, like a type default.
-    const fields = this.worldTypeFields.effectiveFields(worldId, types, fieldIds);
+  private derive(doc: EntityDocument, types: readonly string[], worldId: string): Derived {
+    // The effective Field set (ADR-0054/ADR-0057), scoped to the Entity's World and derived from the
+    // document itself: an attached link Field harvests its edge and an attached facetable Field its facet,
+    // like a type default.
+    const fields = this.worldTypeFields.effectiveFields(worldId, types, doc);
     const dataTypes = this.typeFields.structuredDataTypes;
     const edges = harvestEdges(doc, fields, dataTypes);
     return {
@@ -494,16 +488,14 @@ export class EntityWrites {
     }
 
     // `edit`: substance. Set only the columns the caller owns, so a concurrent rename isn't
-    // clobbered by a save that never touched the name. The derivation runs over the effective set —
-    // the save's type/attached-Field sets when it carries them, else the stored ones (ADR-0048, ADR-0054).
-    const derived =
-      change.document &&
-      this.derive(change.document, change.types ?? row.types, change.fields ?? row.fields, row.worldId);
+    // clobbered by a save that never touched the name. The derivation runs over the effective set — the
+    // save's type set when it carries it, else the stored one, with attachments derived from the document
+    // itself (ADR-0048, ADR-0054, ADR-0057).
+    const derived = change.document && this.derive(change.document, change.types ?? row.types, row.worldId);
     const set = {
       ...(change.name !== undefined && { name: change.name }),
       ...(change.tags !== undefined && { tags: [...change.tags] }),
       ...(change.types !== undefined && { types: [...change.types] }),
-      ...(change.fields !== undefined && { fields: [...change.fields] }),
       ...(change.document !== undefined && {
         document: JSON.stringify(change.document),
         contentText: derived?.searchText,
