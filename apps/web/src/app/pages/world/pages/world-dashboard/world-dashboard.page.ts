@@ -1,24 +1,24 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
-import { EntitiesClient, ActiveWorld, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
+import { ActiveWorld, EntitiesClient, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
+import { CORE_VIEW_MAP } from '@hexly/web-entity';
 import {
+  ACCENT_BAR,
   Button,
+  EntitySearchPicker,
   Eyebrow,
-  Panel,
-  PageHeader,
   Icon,
   IconName,
-  EntitySearchPicker,
-  ACCENT_BAR,
+  PageHeader,
+  Panel,
   accentFor,
 } from '@hexly/web-ui';
-import { TypeRegistry } from '../../entity-types/type-registry';
-import { TypeNamePipe } from '../../entity-types/type-name.pipe';
-import { NewEntityButton } from '../../entity-types/new-entity-button.component';
-import { CORE_VIEW_MAP } from '@hexly/web-entity';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { NewEntityButton } from '../../../../entity-types/new-entity-button.component';
+import { TypeNamePipe } from '../../../../entity-types/type-name.pipe';
+import { TypeRegistry } from '../../../../entity-types/type-registry';
 
 const RECENTS_LIMIT = 8;
 const MAPS_LIMIT = 8;

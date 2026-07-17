@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { EntityFacets } from '@hexly/domain';
-import { provideTranslocoTesting } from '../../../testing/transloco-testing';
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { FacetRail } from './facet-rail.component';
 
 /**

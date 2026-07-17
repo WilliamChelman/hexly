@@ -66,7 +66,7 @@ const FULL_CURTAIN_DELAY_MS = 150;
     <app-create-entity-dialog />
   `,
 })
-export class App {
+export class AppComponent {
   protected readonly shell = inject(AppShellStore);
 
   // Debounce so a cached (instant) language switch never flashes the curtain;

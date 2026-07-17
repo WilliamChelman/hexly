@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityFacets } from '@hexly/domain';
-import { TypeRegistry } from '../../entity-types/type-registry';
+import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /** One type's Field selection (ADR-0048, #188): eq membership for enum/list/string, or a
  * `gte`/`lte` range for number/date. Absent parts mean "unconstrained on that axis". */

@@ -6,7 +6,7 @@ import { Subject, of, throwError } from 'rxjs';
 import { ImportSummary, WorldSummary } from '@hexly/domain';
 import { AuthClient, WorldsClient, ToasterService } from '@hexly/web-core';
 import { MockAuthClient, MockWorldsClient } from '@hexly/web-core/testing';
-import { WorldIndex } from './world-index.page';
+import { WorldsPage } from './worlds.page';
 
 function world(id: string, name = id, ownerId = 'u1'): WorldSummary {
   // Rights drive the owned/member distinction now (ADR-0039): the caller (u1) owning it
@@ -31,7 +31,7 @@ describe('WorldIndex', () => {
     auth = new MockAuthClient();
     worldsClient = new MockWorldsClient();
     await TestBed.configureTestingModule({
-      imports: [WorldIndex, provideTranslocoTesting()],
+      imports: [WorldsPage, provideTranslocoTesting()],
       providers: [
         provideRouter([]),
         { provide: AuthClient, useValue: auth },
@@ -61,7 +61,7 @@ describe('WorldIndex', () => {
   function render(worlds: WorldSummary[]) {
     const list$ = new Subject<WorldSummary[]>();
     worldsClient.list.mockReturnValue(list$);
-    const fixture = TestBed.createComponent(WorldIndex);
+    const fixture = TestBed.createComponent(WorldsPage);
     fixture.detectChanges(); // load() -> WorldStore.load()
     list$.next(worlds);
     list$.complete();
@@ -397,7 +397,7 @@ describe('WorldIndex', () => {
   it('shows an error state (not the empty state) when the World list fails to load', () => {
     const list$ = new Subject<WorldSummary[]>();
     worldsClient.list.mockReturnValue(list$);
-    const fixture = TestBed.createComponent(WorldIndex);
+    const fixture = TestBed.createComponent(WorldsPage);
     fixture.detectChanges(); // load() → WorldStore.load()
     list$.error(new Error('server error'));
     fixture.detectChanges();

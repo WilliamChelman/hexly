@@ -8,7 +8,7 @@ import { PublicClient, PublicEntityMode, AppShellStore, EVICTED } from '@hexly/w
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { EntitySession } from '../entity/services/entity-session';
 import { EntityNameResolver, RIGHT_DOCK_PANELS } from '@hexly/plugin-content/web';
-import { PublicEntityNameResolver } from './public-entity-name-resolver';
+import { PublicEntityNameResolver } from './services/public-entity-name-resolver';
 import { EntityPage } from '../entity/entity.page';
 
 interface Followed {

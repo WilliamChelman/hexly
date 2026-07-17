@@ -19,11 +19,16 @@ export const appRoutes: Route[] = [
     title: 'auth.tabTitle',
   },
   {
-    // The World Index: the chooser — no auto-redirect into a World.
     path: '',
     pathMatch: 'full',
+    redirectTo: 'worlds',
+  },
+  {
+    // The World Index: the chooser — no auto-redirect into a World.
+    path: 'worlds',
+    pathMatch: 'full',
     canActivate: [authGuard],
-    loadComponent: () => import('./pages/world-index/world-index.page').then((m) => m.WorldIndex),
+    loadComponent: () => import('./pages/worlds/worlds.page').then((m) => m.WorldsPage),
     title: 'worldIndex.tabTitle',
   },
   {
@@ -55,12 +60,13 @@ export const appRoutes: Route[] = [
     path: 'w/:worldId',
     canActivate: [authGuard, activeWorldGuard],
     canDeactivate: [clearActiveWorld],
-    loadComponent: () => import('./pages/world/world-layout.page').then((m) => m.WorldLayout),
+    loadComponent: () => import('./pages/world/world.page').then((m) => m.WorldPage),
     children: [
       {
         path: '',
         pathMatch: 'full',
-        loadComponent: () => import('./pages/world/world-dashboard.page').then((m) => m.WorldDashboard),
+        loadComponent: () =>
+          import('./pages/world/pages/world-dashboard/world-dashboard.page').then((m) => m.WorldDashboard),
         title: 'worldDashboard.tabTitle',
       },
       {
@@ -82,7 +88,7 @@ export const appRoutes: Route[] = [
         // of WebGL that nothing outside this page needs.
         path: 'graph',
         pathMatch: 'full',
-        loadComponent: () => import('./pages/world/world-graph/world-graph.page').then((m) => m.WorldGraph),
+        loadComponent: () => import('./pages/world/pages/world-graph/world-graph.page').then((m) => m.WorldGraph),
         title: 'worldGraph.tabTitle',
       },
       {

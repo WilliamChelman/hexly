@@ -4,7 +4,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityType, EntityVerb } from '@hexly/domain';
 import { HexlyDatePipe } from '@hexly/web-core';
 import { Autofocus, Button, Panel, Icon, IconName, ACCENT_BAR, ACCENT_SIGIL, accentFor } from '@hexly/web-ui';
-import { TypeRegistry } from '../../entity-types/type-registry';
+import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /** A row of the Entity browser grid — the parent owns list/order, the card owns
  * the tile. The last-edited instant stays raw; the template formats it via

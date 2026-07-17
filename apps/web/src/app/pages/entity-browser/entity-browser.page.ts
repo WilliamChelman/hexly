@@ -7,9 +7,9 @@ import { EntityFacets, EntityPage, EntitySummary, EntityType, parseFieldFilters,
 import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, AppShellStore } from '@hexly/web-core';
 import { Button, Eyebrow, PageHeader } from '@hexly/web-ui';
 import { NewEntityButton } from '../../entity-types/new-entity-button.component';
-import { EntityCard } from './entity-card.component';
-import { EntitySearch } from './entity-search.component';
-import { EmptyState } from './empty-state.component';
+import { EntityCard } from './components/entity-card.component';
+import { EntitySearch } from './components/entity-search.component';
+import { EmptyState } from './components/empty-state.component';
 import {
   ActiveFacets,
   FacetRail,
@@ -18,7 +18,7 @@ import {
   FieldSelection,
   FieldValueToggle,
   isFieldSelectionEmpty,
-} from './facet-rail.component';
+} from './components/facet-rail.component';
 
 const NO_FACETS: ActiveFacets = {
   type: [],

@@ -13,9 +13,9 @@ import type { Graph } from '@cosmos.gl/graph';
 import { LinkedEntity, WorldGraph } from '@hexly/domain';
 import { CORE_NOTE } from '@hexly/plugin-content';
 import { Logger, ThemeService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
-import { GraphPayload, graphPayload } from './graph-payload';
-import { LabelGrid, selectLabels } from './label-selection';
-import { TypeRegistry } from '../../../entity-types/type-registry';
+import { GraphPayload, graphPayload } from '../utils/graph-payload';
+import { LabelGrid, selectLabels } from '../utils/select-labels';
+import { TypeRegistry } from '../../../../../entity-types/type-registry';
 import { TypeDefinition } from '@hexly/web-entity';
 
 /**

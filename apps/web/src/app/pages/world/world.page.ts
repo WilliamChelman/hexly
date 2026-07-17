@@ -17,7 +17,7 @@ import { WorldFieldsLoader } from '../../entity-types/world-fields-loader';
   imports: [RouterOutlet],
   template: `<router-outlet />`,
 })
-export class WorldLayout {
+export class WorldPage {
   constructor() {
     const activeWorld = inject(ActiveWorld);
     const rail = inject(NavRailStore);
