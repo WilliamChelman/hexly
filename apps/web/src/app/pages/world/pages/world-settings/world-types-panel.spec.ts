@@ -148,7 +148,7 @@ describe('WorldTypesPanel', () => {
   it('mints a new World Field from the inline modal, then references it', () => {
     const element = defineField({
       id: 'world.element',
-      key: 'element',
+      key: 'world.element',
       label: 'Element',
       dataType: { kind: 'string' },
     });
@@ -158,13 +158,13 @@ describe('WorldTypesPanel', () => {
     type('type-id-input', 'deity');
     type('type-name-input', 'Deity');
     click('new-field');
-    type('newfield-key', 'element');
     type('newfield-name', 'Element');
     click('newfield-save');
 
+    // No client-chosen id/key: the label drives the `element` segment, and the server derives
+    // `world.element` (ADR-0056).
     expect(worlds.createField).toHaveBeenCalledWith('w1', {
-      id: 'world.element',
-      key: 'element',
+      segment: 'element',
       label: 'Element',
       dataType: { kind: 'string' },
       required: false,

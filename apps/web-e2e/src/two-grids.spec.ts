@@ -14,7 +14,7 @@ import {
 /** The Hex Map's own grid, at the `grid` key `core.hexmap` declares. */
 const MAP_VIEW = mapViewToggle();
 /** The deity's grid — a Field a World Owner authored, at the key and under the name they chose. */
-const BATTLEMAP_VIEW = mapViewToggle('battlemap');
+const BATTLEMAP_VIEW = mapViewToggle('world.battlemap');
 
 /**
  * An Entity carrying `core.hexmap` *and* a user-defined type with its own grid Field affords two map
@@ -26,7 +26,7 @@ test('an Entity with two grids affords two map Views, each with its own paint an
   await authorWorldType(page, worldId, {
     id: 'deity',
     name: 'Deity',
-    fields: [{ key: 'battlemap', label: 'Battlemap', kind: 'core.hex-grid' }],
+    fields: [{ segment: 'battlemap', label: 'Battlemap', kind: 'core.hex-grid' }],
   });
 
   await enterLibrary(page);
@@ -86,7 +86,7 @@ test('an Entity with two grids affords two map Views, each with its own paint an
 
   // Two Fields of the one EntityDocument map, each holding the terrain painted on its own View (ADR-0050).
   const worldMap = await savedGrid(request, entityId);
-  const battlemap = await savedGrid(request, entityId, 'battlemap');
+  const battlemap = await savedGrid(request, entityId, 'world.battlemap');
   expect(Object.values(worldMap.hexes)).toEqual([{ terrain: 'ocean' }, { terrain: 'ocean' }, { terrain: 'ocean' }]);
   expect(Object.values(battlemap.hexes)).toEqual([{ terrain: 'mountain' }, { terrain: 'mountain' }]);
 });

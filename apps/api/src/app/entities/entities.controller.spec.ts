@@ -43,10 +43,12 @@ function hexmapBody(hexes: Record<string, unknown> = {}) {
 /** The empty plane a fresh Hex Map is minted with (and the editor round-trips). */
 const emptyHexmapBody = hexmapBody();
 
-/** A World-authored scalar enum Field — the attach fixture the retired `dnd.size` used to be (ADR-0055). */
+/**
+ * A World-authored scalar enum Field — the attach fixture the retired `dnd.size` used to be (ADR-0055).
+ * The server slugs `world.size` from the segment and pins the document key to it (ADR-0056).
+ */
 const SIZE_FIELD = {
-  id: 'world.size',
-  key: 'size',
+  segment: 'size',
   label: 'Size',
   dataType: { kind: 'enum', options: ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'] },
   facetable: true,
@@ -206,7 +208,7 @@ describe('Entities endpoints', () => {
     const saved = await ada
       .put(`/entities/${created.body.id}`)
       .send({
-        document: { 'core.content': emptyContent(), size: 'Large' },
+        document: { 'core.content': emptyContent(), 'world.size': 'Large' },
         version: created.body.version,
         tags: [],
         fields: ['world.size'],
@@ -216,7 +218,7 @@ describe('Entities endpoints', () => {
 
     const reloaded = await ada.get(`/entities/${created.body.id}`).expect(200);
     expect(reloaded.body.fields).toEqual(['world.size']);
-    expect(reloaded.body.document.size).toBe('Large');
+    expect(reloaded.body.document['world.size']).toBe('Large');
   });
 
   /**
@@ -237,7 +239,7 @@ describe('Entities endpoints', () => {
     await ada
       .put(`/entities/${created.body.id}`)
       .send({
-        document: { 'core.content': emptyContent(), size: 'Colossal' },
+        document: { 'core.content': emptyContent(), 'world.size': 'Colossal' },
         version: created.body.version,
         tags: [],
         fields: ['world.size'],

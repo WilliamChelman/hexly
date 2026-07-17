@@ -38,14 +38,17 @@ test('authors world.element, attaches it to one deity but not another, and reuse
   // Author `world.element` (fire/ice/water) in the World Fields editor, and a `world.deity` type beside
   // it. The Fields list shows each Field's Data Type — a "Choice" for the enum.
   await authorWorldField(page, worldId, {
-    id: 'element',
-    key: 'element',
+    segment: 'element',
     label: 'Element',
     kind: 'enum',
     options: 'fire, ice, water',
   });
   await expect(page.getByTestId('field-type-world.element')).toHaveText('Choice');
-  await authorWorldType(page, worldId, { id: 'deity', name: 'Deity', fields: [{ key: 'domain', label: 'Domain' }] });
+  await authorWorldType(page, worldId, {
+    id: 'deity',
+    name: 'Deity',
+    fields: [{ segment: 'domain', label: 'Domain' }],
+  });
 
   // Deity A: attach `world.element` — a Field its type never named — fill it, and persist.
   await enterLibrary(page);
@@ -54,18 +57,18 @@ test('authors world.element, attaches it to one deity but not another, and reuse
   await attachField(page, 'world.element');
 
   await showFieldsView(page);
-  const element = page.getByTestId('field-element').locator('select');
+  const element = page.getByTestId('field-world.element').locator('select');
   await expect(element).toBeVisible();
   await element.selectOption('fire');
 
   const saved = await flushSave(page);
   const body = await saved.json();
-  expect(body.document).toMatchObject({ element: 'fire' });
+  expect(body.document).toMatchObject({ 'world.element': 'fire' });
   expect(body.fields).toEqual(['world.element']);
 
   await page.reload();
   await showFieldsView(page);
-  await expect(page.getByTestId('field-element').locator('select')).toHaveValue('fire');
+  await expect(page.getByTestId('field-world.element').locator('select')).toHaveValue('fire');
 
   // Deity B: no attachment. One deity carries an element, its neighbour does not — and the Field is
   // still on offer, proving deity A's choice consumed nothing.
@@ -82,9 +85,9 @@ test('authors world.element, attaches it to one deity but not another, and reuse
   const note = await createEntity(page, 'core.note');
   await attachField(page, 'world.element');
   await showFieldsView(page);
-  await page.getByTestId('field-element').locator('select').selectOption('ice');
+  await page.getByTestId('field-world.element').locator('select').selectOption('ice');
 
   const savedNote = await flushSave(page);
-  expect((await savedNote.json()).document).toMatchObject({ element: 'ice' });
+  expect((await savedNote.json()).document).toMatchObject({ 'world.element': 'ice' });
   expect(pelor).not.toEqual(note); // two distinct Entities of two unrelated types, one shared Field
 });

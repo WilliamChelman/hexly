@@ -114,10 +114,11 @@ describe('Vault export endpoint', () => {
     const worldId = await importVault(ada, { 'Note.md': '# Note' });
     const entities = app.get(EntitiesService);
 
-    // A World-defined SECOND prose Field beside the canonical `content`, referenced by a World type.
+    // A World-defined SECOND prose Field beside the canonical `content`, referenced by a World type. The
+    // server slugs `world.secrets` and pins the document key to it (ADR-0056).
     await ada
       .post(`/worlds/${worldId}/fields`)
-      .send({ id: 'world.secrets', key: 'secrets', label: 'Secrets', dataType: { kind: 'core.rich-content' } })
+      .send({ segment: 'secrets', label: 'Secrets', dataType: { kind: 'core.rich-content' } })
       .expect(201);
     await ada
       .post(`/worlds/${worldId}/types`)
@@ -133,7 +134,7 @@ describe('Vault export endpoint', () => {
       descriptors: [],
       document: {
         'core.content': tiptapContent({ type: 'doc', content: [paragraph('Public lore.')] }),
-        secrets: tiptapContent({ type: 'doc', content: [paragraph('Hidden truth.')] }),
+        'world.secrets': tiptapContent({ type: 'doc', content: [paragraph('Hidden truth.')] }),
       },
     });
 
@@ -142,7 +143,9 @@ describe('Vault export endpoint', () => {
 
     // Both blocks are marked, content before secrets (resolved Field order), each rendering its prose.
     expect(md).toContain('<!-- hexly:field core.content -->');
-    expect(md.indexOf('<!-- hexly:field core.content -->')).toBeLessThan(md.indexOf('<!-- hexly:field secrets -->'));
+    expect(md.indexOf('<!-- hexly:field core.content -->')).toBeLessThan(
+      md.indexOf('<!-- hexly:field world.secrets -->'),
+    );
     expect(md).toContain('Public lore.');
     expect(md).toContain('Hidden truth.');
 
@@ -154,7 +157,7 @@ describe('Vault export endpoint', () => {
       .expect(201);
     const reimported = entities.listByWorld(adaId, reimport.body.worldId).find((e) => e.name === 'Vela');
     expect(JSON.stringify(reimported?.document['core.content'])).toContain('Public lore.');
-    expect(JSON.stringify(reimported?.document['secrets'])).toContain('Hidden truth.');
+    expect(JSON.stringify(reimported?.document['world.secrets'])).toContain('Hidden truth.');
   });
 
   it('rebuilds the folder tree from hexly.sourcePath and never emits hexly.* as frontmatter', async () => {

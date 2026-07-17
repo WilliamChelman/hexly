@@ -10,7 +10,7 @@ import {
 } from './fixtures';
 
 /** The deity's own grid: its `battlemap` Field, not the Hex Map's `grid` — one View per Field. */
-const BATTLEMAP_VIEW = mapViewToggle('battlemap');
+const BATTLEMAP_VIEW = mapViewToggle('world.battlemap');
 
 /**
  * A World Owner gives a type they authored in the World's settings a map, code-lessly: the map
@@ -26,8 +26,8 @@ test('a World Owner gives a user-defined type a map, and painting it persists', 
     id: 'deity',
     name: 'Deity',
     fields: [
-      { key: 'domain', label: 'Domain' },
-      { key: 'battlemap', label: 'Battlemap', kind: 'core.hex-grid' },
+      { segment: 'domain', label: 'Domain' },
+      { segment: 'battlemap', label: 'Battlemap', kind: 'core.hex-grid' },
     ],
   });
 
@@ -48,8 +48,8 @@ test('a World Owner gives a user-defined type a map, and painting it persists', 
   await expect(page.getByTestId('core.view.fields')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId(BATTLEMAP_VIEW)).toHaveAttribute('aria-pressed', 'false');
   // A grid is a document, not a form row: it is edited on its View, never in the Fields form.
-  await expect(page.getByTestId('field-domain')).toBeVisible();
-  await expect(page.getByTestId('field-battlemap')).toHaveCount(0);
+  await expect(page.getByTestId('field-world.domain')).toBeVisible();
+  await expect(page.getByTestId('field-world.battlemap')).toHaveCount(0);
 
   // Its toggle is labelled by the Field, which is what tells one grid from another.
   await expect(page.getByTestId(BATTLEMAP_VIEW)).toHaveText('Battlemap');
@@ -70,6 +70,6 @@ test('a World Owner gives a user-defined type a map, and painting it persists', 
   await expect(page.getByTestId(BATTLEMAP_VIEW)).toHaveAttribute('aria-pressed', 'true');
 
   // And it persisted where a Field's value lives: the Entity's EntityDocument, at the key its author chose.
-  const grid = await savedGrid(request, deityId, 'battlemap');
+  const grid = await savedGrid(request, deityId, 'world.battlemap');
   expect(Object.values(grid.hexes)).toEqual([{ terrain: 'ocean' }]);
 });

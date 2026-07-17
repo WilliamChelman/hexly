@@ -298,7 +298,7 @@ describe('Vault import endpoint', () => {
         '<!-- hexly:field core.content -->',
         'Public lore.',
         '',
-        '<!-- hexly:field secrets -->',
+        '<!-- hexly:field world.secrets -->',
         'Hidden truth.',
       ].join('\n'),
     });
@@ -308,7 +308,7 @@ describe('Vault import endpoint', () => {
 
     // Each marked block lands at its own key, converted to prose; the marker comment itself is gone.
     expect(JSON.stringify(detail.document['core.content'].snapshot)).toContain('Public lore.');
-    expect(JSON.stringify(detail.document.secrets.snapshot)).toContain('Hidden truth.');
+    expect(JSON.stringify(detail.document['world.secrets'].snapshot)).toContain('Hidden truth.');
     expect(JSON.stringify(detail.document)).not.toContain('hexly:field');
   });
 
