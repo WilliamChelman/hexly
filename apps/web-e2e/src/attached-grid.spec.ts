@@ -14,7 +14,7 @@ import {
 /** The Hex Map's own grid, at the `grid` key `core.hexmap` declares. */
 const MAP_VIEW = mapViewToggle();
 /** The attached grid — a World Field a worldbuilder authored and hung on this one Entity (ADR-0054). */
-const BATTLEMAP_VIEW = mapViewToggle('battlemap');
+const BATTLEMAP_VIEW = mapViewToggle('world.battlemap');
 
 /**
  * A Field of a Structured Data Type attached *directly* to an Entity auto-affords its View (#232,
@@ -28,8 +28,7 @@ test('an attached grid Field affords its own map View, with its own paint and un
   const worldId = await enterLibrary(page);
   // A reusable World Field of the grid Data Type — no type declares it; it exists to be attached.
   await authorWorldField(page, worldId, {
-    id: 'battlemap',
-    key: 'battlemap',
+    segment: 'battlemap',
     label: 'Battlemap',
     kind: 'core.hex-grid',
   });
@@ -94,7 +93,7 @@ test('an attached grid Field affords its own map View, with its own paint and un
   // Two Fields of the one EntityDocument map, each holding the terrain painted on its own View
   // (ADR-0050) — and the attachment persists in `fields[]`.
   const worldMap = await savedGrid(request, entityId);
-  const battlemap = await savedGrid(request, entityId, 'battlemap');
+  const battlemap = await savedGrid(request, entityId, 'world.battlemap');
   expect(Object.values(worldMap.hexes)).toEqual([{ terrain: 'ocean' }, { terrain: 'ocean' }, { terrain: 'ocean' }]);
   expect(Object.values(battlemap.hexes)).toEqual([{ terrain: 'mountain' }, { terrain: 'mountain' }]);
 

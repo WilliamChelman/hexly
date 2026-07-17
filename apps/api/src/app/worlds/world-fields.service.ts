@@ -7,6 +7,7 @@ import {
   FieldSchema,
   UpdateWorldFieldRequest,
   unresolvedDataTypeErrors,
+  worldFieldIdFromSegment,
 } from '@hexly/domain';
 import { worldAccess } from '../acl/world-access';
 import { DB, Db } from '../db/db';
@@ -19,9 +20,9 @@ import { TypeResult } from './world-types.service';
  * A World's user-defined **Field** CRUD (CONTEXT.md → Field, ADR-0054), the Field peer of
  * {@link WorldTypesService}: list (reachable-gated, any member — the resolver and attach picker read
  * it), and create/patch/delete (World-Owner-gated). Mutations route through {@link WorldWrites}, so a
- * Field change bumps the World's `seq` and nudges its followers. Delete/re-key degrade forward-only —
- * a Field that stops resolving leaves its document values as plain values (handled by the resolver, not
- * a cascade here).
+ * Field change bumps the World's `seq` and nudges its followers. A deleted Field degrades forward-only —
+ * it stops resolving, leaving its document values as plain values (handled by the resolver, not a
+ * cascade here). The id/key is frozen at create (ADR-0056), so there is no re-key path to degrade.
  */
 @Injectable()
 export class WorldFieldsService {
@@ -38,27 +39,33 @@ export class WorldFieldsService {
     return this.fields.list(worldId);
   }
 
-  /** Author a new World-defined Field (Owner-only). `conflict` if the id is already defined in the World. */
+  /**
+   * Author a new World-defined Field (Owner-only). The `world.<segment>` id/key is slugged from the
+   * editable segment and frozen, with `key === id` (ADR-0056). `conflict` if the derived slug collides.
+   */
   create(userId: string, worldId: string, req: CreateWorldFieldRequest): TypeResult<Field> {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
-    if (this.fields.list(worldId).some((field) => field.id === req.id)) return { status: 'conflict' };
-    const { id, ...definition } = req;
+    const { segment, ...body } = req;
+    const id = worldFieldIdFromSegment(segment);
+    if (this.fields.list(worldId).some((field) => field.id === id)) return { status: 'conflict' };
+    const definition: FieldSchema = { ...body, key: id };
     this.assertDataTypeResolves(definition);
     this.writes.createField(worldId, id, definition);
-    return { status: 'ok', value: req };
+    return { status: 'ok', value: { id, ...definition } };
   }
 
   /**
    * Re-body a World-defined Field (Owner-only). `not-found` if the World is unreachable or the id is not
-   * defined. The id is immutable — followers key off it, so it is a path param, not in the body.
+   * defined. The id/key is immutable (ADR-0056): a path param, re-pinned as `key` here, never the body.
    */
   update(userId: string, worldId: string, fieldId: string, patch: UpdateWorldFieldRequest): TypeResult<Field> {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
-    this.assertDataTypeResolves(patch);
-    if (!this.writes.updateField(worldId, fieldId, patch)) return { status: 'not-found' };
-    return { status: 'ok', value: { id: fieldId, ...patch } };
+    const definition: FieldSchema = { ...patch, key: fieldId };
+    this.assertDataTypeResolves(definition);
+    if (!this.writes.updateField(worldId, fieldId, definition)) return { status: 'not-found' };
+    return { status: 'ok', value: { id: fieldId, ...definition } };
   }
 
   /**

@@ -4,8 +4,9 @@ import {
   CreateWorldFieldRequest,
   Field,
   FieldDataType,
-  FieldSchema,
   isStructuredKind,
+  slugifyFieldSegment,
+  UpdateWorldFieldRequest,
   USER_FIELD_NAMESPACE,
 } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
@@ -18,9 +19,13 @@ import { BUILT_IN_KINDS, dataTypeLabel, toFieldDataType } from './field-data-typ
 /** The open editor: creating (`editingId === null`) or editing an existing Field by id. */
 interface Draft {
   editingId: string | null;
-  /** The `world.`-less id slug (creating only; immutable when editing). */
-  slug: string;
-  key: string;
+  /**
+   * The `world.`-less key slug (ADR-0056): auto-slugged from the label, editable before the first save,
+   * and frozen after (an editing draft never touches it — it shows `editingId` read-only).
+   */
+  segment: string;
+  /** Once the owner hand-edits the segment, the label stops overwriting it (creating only). */
+  segmentEdited: boolean;
   label: string;
   /** The picked data-type's kind: a built-in, or a plugin's Structured Data Type by its `namespace.id`. */
   kind: string;
@@ -66,39 +71,34 @@ interface Draft {
 
     @if (draft(); as d) {
       <form class="field-editor" data-testid="field-editor" (submit)="save($event)">
-        @if (d.editingId === null) {
-          <label class="field-label" for="field-id">{{ 'worldFields.idLabel' | transloco }}</label>
-          <div class="field-id-row">
-            <span class="field-id-prefix">{{ 'worldFields.idPrefix' | transloco }}</span>
-            <input
-              appInput
-              id="field-id"
-              data-testid="field-id-input"
-              [value]="d.slug"
-              (input)="patch({ slug: value($event) })"
-            />
-          </div>
-          <p class="field-hint">{{ 'worldFields.idHint' | transloco }}</p>
-        }
-
-        <label class="field-label" for="field-key">{{ 'worldFields.keyLabel' | transloco }}</label>
-        <input
-          appInput
-          id="field-key"
-          data-testid="field-key-input"
-          [value]="d.key"
-          (input)="patch({ key: value($event) })"
-        />
-        <p class="field-hint">{{ 'worldFields.keyHint' | transloco }}</p>
-
         <label class="field-label" for="field-name">{{ 'worldFields.nameLabel' | transloco }}</label>
         <input
           appInput
           id="field-name"
           data-testid="field-name-input"
           [value]="d.label"
-          (input)="patch({ label: value($event) })"
+          (input)="editLabel(value($event))"
         />
+
+        <!-- One label-driven key (ADR-0056): the id and document key are one world. slug, auto-filled
+             from the label, editable before the first save and frozen after. -->
+        <label class="field-label" for="field-key">{{ 'worldFields.keyLabel' | transloco }}</label>
+        @if (d.editingId === null) {
+          <div class="field-id-row">
+            <span class="field-id-prefix">{{ 'worldFields.idPrefix' | transloco }}</span>
+            <input
+              appInput
+              id="field-key"
+              data-testid="field-key-input"
+              [value]="d.segment"
+              (input)="editSegment(value($event))"
+            />
+          </div>
+          <p class="field-hint">{{ 'worldFields.keyHint' | transloco }}</p>
+        } @else {
+          <p class="field-id" data-testid="field-key-frozen">{{ d.editingId }}</p>
+          <p class="field-hint">{{ 'worldFields.keyFrozenHint' | transloco }}</p>
+        }
 
         <label class="field-label" for="field-type">{{ 'worldFields.typeLabel' | transloco }}</label>
         <!-- The kind is marked on the option, not bound as the select's [value]: the options are
@@ -242,12 +242,10 @@ export class WorldFieldsPanel implements OnInit {
     }));
   });
 
-  /** Save is enabled once the Field has a key, a label, and (when creating) an id slug. */
+  /** Save is enabled once the Field has a label and (when creating) a derived key slug. */
   protected readonly canSave = computed(() => {
     const d = this.draft();
-    return (
-      !!d && d.key.trim().length > 0 && d.label.trim().length > 0 && (d.editingId !== null || d.slug.trim().length > 0)
-    );
+    return !!d && d.label.trim().length > 0 && (d.editingId !== null || d.segment.trim().length > 0);
   });
 
   ngOnInit(): void {
@@ -264,8 +262,8 @@ export class WorldFieldsPanel implements OnInit {
   protected startCreate(): void {
     this.draft.set({
       editingId: null,
-      slug: '',
-      key: '',
+      segment: '',
+      segmentEdited: false,
       label: '',
       kind: 'string',
       options: '',
@@ -277,14 +275,30 @@ export class WorldFieldsPanel implements OnInit {
   protected startEdit(field: Field): void {
     this.draft.set({
       editingId: field.id,
-      slug: field.id.slice(`${USER_FIELD_NAMESPACE}.`.length),
-      key: field.key,
+      segment: field.id.slice(`${USER_FIELD_NAMESPACE}.`.length),
+      segmentEdited: true,
       label: field.label,
       kind: field.dataType.kind,
       options: field.dataType.kind === 'enum' ? field.dataType.options.join(', ') : '',
       required: field.required,
       facetable: field.facetable,
       stored: field.dataType,
+    });
+  }
+
+  /** Edit the label; while creating, keep the key slug in sync until the owner hand-edits it (ADR-0056). */
+  protected editLabel(label: string): void {
+    this.mutate((d) => {
+      d.label = label;
+      if (d.editingId === null && !d.segmentEdited) d.segment = slugifyFieldSegment(label);
+    });
+  }
+
+  /** Hand-edit the key slug (creating only); slug it live so the shown key is the derived one. */
+  protected editSegment(segment: string): void {
+    this.mutate((d) => {
+      d.segment = slugifyFieldSegment(segment);
+      d.segmentEdited = true;
     });
   }
 
@@ -314,13 +328,10 @@ export class WorldFieldsPanel implements OnInit {
     event.preventDefault();
     const d = this.draft();
     if (!d || !this.canSave()) return;
-    const body = toFieldSchema(d);
+    const body = toFieldBody(d);
     const op$ =
       d.editingId === null
-        ? this.worlds.createField(this.id(), {
-            id: `${USER_FIELD_NAMESPACE}.${d.slug.trim()}`,
-            ...body,
-          } satisfies CreateWorldFieldRequest)
+        ? this.worlds.createField(this.id(), { segment: d.segment.trim(), ...body } satisfies CreateWorldFieldRequest)
         : this.worlds.updateField(this.id(), d.editingId, body);
     op$.subscribe({
       next: () => {
@@ -360,13 +371,12 @@ export class WorldFieldsPanel implements OnInit {
 }
 
 /**
- * The form model → a Field body (id-less {@link FieldSchema}) for the request. A **Field of a Structured
- * Data Type** is neither required nor facetable, whatever a stale draft carries (ADR-0050).
+ * The form model → a key/id-less Field body (ADR-0056; the server derives the key). A **Field of a
+ * Structured Data Type** is never required or facetable (ADR-0050).
  */
-function toFieldSchema(d: Draft): FieldSchema {
+function toFieldBody(d: Draft): UpdateWorldFieldRequest {
   const structured = isStructuredKind(d.kind);
   return {
-    key: d.key.trim(),
     label: d.label.trim(),
     dataType: toFieldDataType(d.kind, d.options, d.stored),
     required: !structured && d.required,

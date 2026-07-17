@@ -2,8 +2,8 @@ import type { APIRequestContext, Page } from '@playwright/test';
 import { contentViewToggle, createEntity, authorWorldType, enterLibrary, expect, flushSave, test } from './fixtures';
 
 /** A prose View is bound to the Field it renders (ADR-0051), so each of the Saint's two afford their own. */
-const CONTENT_VIEW = contentViewToggle('content');
-const SECRETS_VIEW = contentViewToggle('secrets');
+const CONTENT_VIEW = contentViewToggle('world.content');
+const SECRETS_VIEW = contentViewToggle('world.secrets');
 
 const LORE = 'Lady Mara rules the northern reach.';
 const SECRET = 'The assassin lives in the cellar.';
@@ -27,8 +27,8 @@ test('an Entity with two prose Fields affords two content Views, each with its o
     id: 'saint',
     name: 'Saint',
     fields: [
-      { key: 'content', label: 'Content', kind: 'core.rich-content' },
-      { key: 'secrets', label: 'Secrets', kind: 'core.rich-content' },
+      { segment: 'content', label: 'Content', kind: 'core.rich-content' },
+      { segment: 'secrets', label: 'Secrets', kind: 'core.rich-content' },
     ],
   });
 
@@ -80,11 +80,11 @@ test('an Entity with two prose Fields affords two content Views, each with its o
 
   // Two Fields of the one EntityDocument, each holding the prose typed on its own View (ADR-0051).
   const doc = await savedDocument(request, entityId);
-  expect(JSON.stringify(doc['content'].snapshot)).toContain(LORE);
-  expect(JSON.stringify(doc['secrets'].snapshot)).toContain(SECRET);
+  expect(JSON.stringify(doc['world.content'].snapshot)).toContain(LORE);
+  expect(JSON.stringify(doc['world.secrets'].snapshot)).toContain(SECRET);
   // Distinct keys: the secret is not in the public body, nor the lore in the secret.
-  expect(JSON.stringify(doc['content'].snapshot)).not.toContain('assassin');
-  expect(JSON.stringify(doc['secrets'].snapshot)).not.toContain('Lady Mara');
+  expect(JSON.stringify(doc['world.content'].snapshot)).not.toContain('assassin');
+  expect(JSON.stringify(doc['world.secrets'].snapshot)).not.toContain('Lady Mara');
 });
 
 /** Focus the open editor and rewind its history — TipTap keeps its own undo (ADR-0051); extra presses no-op. */

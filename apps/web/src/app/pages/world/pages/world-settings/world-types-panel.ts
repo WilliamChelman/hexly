@@ -5,10 +5,11 @@ import {
   CreateUserDefinedTypeRequest,
   CreateWorldFieldRequest,
   Field,
-  FieldSchema,
   isStructuredDataType,
-  USER_FIELD_NAMESPACE,
+  slugifyFieldSegment,
+  UpdateWorldFieldRequest,
   USER_TYPE_NAMESPACE,
+  worldFieldIdFromSegment,
 } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
 import { produce } from '@hexly/immer';
@@ -34,8 +35,10 @@ interface Draft {
 
 /** The inline "new Field" sub-form — authors a World Field the type can then reference (ADR-0054). */
 interface FieldDraft {
-  slug: string;
-  key: string;
+  /** The `world.`-less key slug, auto-slugged from the label and editable before save (ADR-0056). */
+  segment: string;
+  /** Once the owner hand-edits the segment, the label stops overwriting it. */
+  segmentEdited: boolean;
   label: string;
   kind: string;
   /** Comma-separated enum options; ignored for non-enum kinds. */
@@ -136,20 +139,24 @@ interface FieldDraft {
           <fieldset class="newfield" data-testid="newfield-editor">
             <input
               appInput
-              [attr.aria-label]="'worldFields.keyLabel' | transloco"
-              [placeholder]="'worldFields.keyLabel' | transloco"
-              [value]="fd.key"
-              data-testid="newfield-key"
-              (input)="patchFieldDraft({ key: value($event), slug: fd.slug || value($event) })"
-            />
-            <input
-              appInput
               [attr.aria-label]="'worldFields.nameLabel' | transloco"
               [placeholder]="'worldFields.nameLabel' | transloco"
               [value]="fd.label"
               data-testid="newfield-name"
-              (input)="patchFieldDraft({ label: value($event) })"
+              (input)="editFieldLabel(value($event))"
             />
+            <!-- One label-driven key (ADR-0056): the world. slug, auto-filled from the label, editable. -->
+            <div class="newfield-key-row">
+              <span class="type-id-prefix">{{ 'worldFields.idPrefix' | transloco }}</span>
+              <input
+                appInput
+                [attr.aria-label]="'worldFields.keyLabel' | transloco"
+                [placeholder]="'worldFields.keyLabel' | transloco"
+                [value]="fd.segment"
+                data-testid="newfield-key"
+                (input)="editFieldSegment(value($event))"
+              />
+            </div>
             <select
               appSelect
               [attr.aria-label]="'worldFields.typeLabel' | transloco"
@@ -267,6 +274,9 @@ interface FieldDraft {
     .newfield {
       @apply mt-1 flex flex-col gap-2 rounded-md border border-line p-3;
     }
+    .newfield-key-row {
+      @apply flex items-center gap-1;
+    }
     .type-actions {
       @apply mt-2 flex items-center gap-2;
     }
@@ -313,10 +323,10 @@ export class WorldTypesPanel implements OnInit {
     return !!d && d.label.trim().length > 0 && (d.editingId !== null || d.slug.trim().length > 0);
   });
 
-  /** The new-Field sub-form saves once it has a key, a label, and an id slug. */
+  /** The new-Field sub-form saves once it has a label and a derived key slug. */
   protected readonly canSaveField = computed(() => {
     const fd = this.fieldDraft();
-    return !!fd && fd.key.trim().length > 0 && fd.label.trim().length > 0 && fd.slug.trim().length > 0;
+    return !!fd && fd.label.trim().length > 0 && fd.segment.trim().length > 0;
   });
 
   ngOnInit(): void {
@@ -417,18 +427,32 @@ export class WorldTypesPanel implements OnInit {
   // ── The inline "new Field" sub-form: mint a World Field, then reference it (ADR-0054). ──
 
   protected startNewField(): void {
-    this.fieldDraft.set({ slug: '', key: '', label: '', kind: 'string', options: '' });
+    this.fieldDraft.set({ segment: '', segmentEdited: false, label: '', kind: 'string', options: '' });
   }
 
   protected patchFieldDraft(patch: Partial<FieldDraft>): void {
     this.fieldDraft.update((fd) => (fd ? { ...fd, ...patch } : fd));
   }
 
+  /** Edit the new Field's label; keep its key slug in sync until the owner hand-edits it (ADR-0056). */
+  protected editFieldLabel(label: string): void {
+    this.fieldDraft.update((fd) =>
+      fd ? { ...fd, label, segment: fd.segmentEdited ? fd.segment : slugifyFieldSegment(label) } : fd,
+    );
+  }
+
+  /** Hand-edit the new Field's key slug; slug it live so the shown key is the derived one. */
+  protected editFieldSegment(segment: string): void {
+    this.fieldDraft.update((fd) => (fd ? { ...fd, segment: slugifyFieldSegment(segment), segmentEdited: true } : fd));
+  }
+
   protected saveField(): void {
     const fd = this.fieldDraft();
     if (!fd || !this.canSaveField()) return;
-    const id = `${USER_FIELD_NAMESPACE}.${fd.slug.trim()}`;
-    this.worlds.createField(this.id(), { id, ...toFieldSchema(fd) } satisfies CreateWorldFieldRequest).subscribe({
+    const segment = fd.segment.trim();
+    // Same slug the server derives, so this matches the Field it creates (ADR-0056).
+    const id = worldFieldIdFromSegment(segment);
+    this.worlds.createField(this.id(), { segment, ...toFieldBody(fd) } satisfies CreateWorldFieldRequest).subscribe({
       next: () => {
         this.fieldDraft.set(null);
         // Re-project the World's Fields so the registry offers the new one, then reference it.
@@ -467,10 +491,9 @@ export class WorldTypesPanel implements OnInit {
   }
 }
 
-/** The new-Field sub-form → a Field body (id-less {@link FieldSchema}). A structured Field is neither required nor facetable. */
-function toFieldSchema(fd: FieldDraft): FieldSchema {
+/** The new-Field sub-form → a key/id-less Field body (ADR-0056). A structured Field is never required or facetable. */
+function toFieldBody(fd: FieldDraft): UpdateWorldFieldRequest {
   return {
-    key: fd.key.trim(),
     label: fd.label.trim(),
     dataType: toFieldDataType(fd.kind, fd.options),
     required: false,

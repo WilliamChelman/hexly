@@ -13,8 +13,7 @@ test('attaches a reused World Field to a note, persists its value, and detaches 
   const worldId = await enterLibrary(page);
   // A reusable World enum Field — no type declares it; it exists to be attached.
   await authorWorldField(page, worldId, {
-    id: 'size',
-    key: 'size',
+    segment: 'size',
     label: 'Size',
     kind: 'enum',
     options: 'Tiny, Small, Medium, Large, Huge, Gargantuan',
@@ -38,7 +37,7 @@ test('attaches a reused World Field to a note, persists its value, and detaches 
   await page.getByTestId(FIELDS_VIEW).click();
 
   // Attached-but-empty, it renders as an empty control before it is filled.
-  const size = page.getByTestId('field-size').locator('select');
+  const size = page.getByTestId('field-world.size').locator('select');
   await expect(size).toBeVisible();
   await expect(size).toHaveValue('');
   await size.selectOption('Huge');
@@ -46,12 +45,12 @@ test('attaches a reused World Field to a note, persists its value, and detaches 
   const saved = await flushSave(page);
   // The value lands in the one EntityDocument map; the attachment persists in `fields[]`.
   const body = await saved.json();
-  expect(body.document).toMatchObject({ size: 'Huge' });
+  expect(body.document).toMatchObject({ 'world.size': 'Huge' });
   expect(body.fields).toEqual(['world.size']);
 
   await page.reload();
   await page.getByTestId(FIELDS_VIEW).click();
-  await expect(page.getByTestId('field-size').locator('select')).toHaveValue('Huge');
+  await expect(page.getByTestId('field-world.size').locator('select')).toHaveValue('Huge');
 
   // Detach it: the Field drops from `fields[]` and its value is cleared from the document.
   await openEntityActions(page);
@@ -67,6 +66,6 @@ test('attaches a reused World Field to a note, persists its value, and detaches 
   const res = await request.get(`/api/entities/${id}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
-  expect(detail.document.size).toBeUndefined();
+  expect(detail.document['world.size']).toBeUndefined();
   expect(detail.fields ?? []).toEqual([]);
 });

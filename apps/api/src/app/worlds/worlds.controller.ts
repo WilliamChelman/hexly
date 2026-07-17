@@ -210,7 +210,8 @@ export class WorldsController {
     return result;
   }
 
-  // Author a new World-defined Field (#230): Owner-only, id unique in the World (else 409).
+  // Author a new World-defined Field (#230, ADR-0056): Owner-only. The server slugs the `world.<segment>`
+  // id/key from the payload; a derived slug colliding with an existing Field is refused (409).
   @Post(':id/fields')
   createField(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Field {
     const parsed = createWorldFieldRequestSchema.safeParse(body);

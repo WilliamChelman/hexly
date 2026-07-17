@@ -160,7 +160,8 @@ export async function createEntity(page: Page, typeId: string): Promise<string> 
 
 /** A Field on a user-defined type, as the World Types editor's form takes one. */
 export interface AuthoredField {
-  readonly key: string;
+  /** The `world.`-less key segment the form slugs into a `world.<segment>` id/key (ADR-0056). */
+  readonly segment: string;
   readonly label: string;
   /** A **Structured Data Type** (`core.hex-grid`, #201); absent leaves the form's `string`. */
   readonly kind?: string;
@@ -181,14 +182,15 @@ export async function authorWorldType(
   await page.getByTestId('type-name-input').fill(type.name);
 
   // A type *references* Fields by id (ADR-0054): mint each inline from the new-Field modal, which
-  // creates a `world.<key>` Field and references it. The reference checkbox confirms it landed.
+  // slugs a `world.<segment>` Field from the label/segment and references it (ADR-0056). The reference
+  // checkbox confirms it landed.
   for (const field of type.fields) {
     await page.getByTestId('new-field').click();
-    await page.getByTestId('newfield-key').fill(field.key);
     await page.getByTestId('newfield-name').fill(field.label);
+    await page.getByTestId('newfield-key').fill(field.segment);
     if (field.kind) await page.getByTestId('newfield-kind').selectOption(field.kind);
     await page.getByTestId('newfield-save').click();
-    await expect(page.getByTestId(`field-ref-checkbox-world.${field.key}`)).toBeChecked();
+    await expect(page.getByTestId(`field-ref-checkbox-world.${field.segment}`)).toBeChecked();
   }
 
   await page.getByTestId('type-save').click();
@@ -196,24 +198,24 @@ export async function authorWorldType(
 }
 
 /**
- * Author a reusable World-defined Field in a World's settings (ADR-0054, #230), and land back on the
- * Fields list with it saved. `id` is the bare slug the form takes; the World's namespace makes it
- * `world.<id>`. `kind` defaults to the form's `string`; `options` fills an enum's comma-separated list.
+ * Author a reusable World-defined Field in a World's settings (ADR-0054, #230, ADR-0056), and land back
+ * on the Fields list with it saved. `segment` is the `world.`-less key the form slugs into `world.<segment>`
+ * (its id *and* document key); the label drives it but the fixture sets it explicitly. `kind` defaults to
+ * the form's `string`; `options` fills an enum's comma-separated list.
  */
 export async function authorWorldField(
   page: Page,
   worldId: string,
-  field: { id: string; key: string; label: string; kind?: string; options?: string },
+  field: { segment: string; label: string; kind?: string; options?: string },
 ): Promise<void> {
   await page.goto(`/w/${worldId}/settings`);
   await page.getByTestId('field-new').click();
-  await page.getByTestId('field-id-input').fill(field.id);
-  await page.getByTestId('field-key-input').fill(field.key);
   await page.getByTestId('field-name-input').fill(field.label);
+  await page.getByTestId('field-key-input').fill(field.segment);
   if (field.kind) await page.getByTestId('field-kind').selectOption(field.kind);
   if (field.options !== undefined) await page.getByTestId('field-options').fill(field.options);
   await page.getByTestId('field-save').click();
-  await expect(page.getByTestId(`field-world.${field.id}`)).toBeVisible();
+  await expect(page.getByTestId(`field-world.${field.segment}`)).toBeVisible();
 }
 
 /**
