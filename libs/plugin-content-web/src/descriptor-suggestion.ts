@@ -1,7 +1,7 @@
 import { Extension } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
 import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
-import { DescriptorPicker } from './descriptor-picker';
+import { DescriptorPicker } from './descriptor-picker.component';
 import { entityLinkPosBefore, setLinkAttr } from './descriptors';
 import { VocabItem, vocabItems } from '@hexly/plugin-content';
 

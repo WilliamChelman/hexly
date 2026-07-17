@@ -26,7 +26,7 @@ import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { TypeRegistry } from './entity-types/type-registry';
-import { provideBuiltInCommands } from './shell/command-palette/command-palette';
+import { provideBuiltInCommands } from './shell/command-palette/command-palette.component';
 
 export const appConfig: ApplicationConfig = {
   providers: [

@@ -1,0 +1,66 @@
+import { provideTranslocoTesting } from '../testing/transloco-testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { Component } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
+import { App } from './app.component';
+import { AppShellStore } from '@hexly/web-core';
+
+@Component({ template: 'page' })
+class Blank {}
+
+describe('App', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [App, provideTranslocoTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([
+          { path: 'login', component: Blank },
+          { path: 'entities', component: Blank },
+          { path: '', pathMatch: 'full', redirectTo: 'entities' },
+        ]),
+      ],
+    }).compileComponents();
+  });
+
+  it('boots and renders a router outlet', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('router-outlet')).not.toBeNull();
+  });
+
+  it('renders the persistent nav rail beside the outlet, not a shell header', async () => {
+    const fixture = TestBed.createComponent(App);
+    await TestBed.inject(Router).navigateByUrl('/entities');
+    fixture.detectChanges();
+
+    // The shell is the rail alone now (ADR-0022); the single app header is gone.
+    expect(fixture.nativeElement.querySelector('app-nav-rail')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('app-header')).toBeNull();
+  });
+
+  it('stays chrome-free before the first navigation resolves (no rail flash on a cold login load)', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges(); // no navigation has resolved yet
+
+    expect(fixture.nativeElement.querySelector('app-nav-rail')).toBeNull();
+  });
+
+  it('hides the rail when a page marks the shell standalone (e.g. login)', async () => {
+    const fixture = TestBed.createComponent(App);
+    TestBed.inject(AppShellStore).standalone.set(true);
+    await TestBed.inject(Router).navigateByUrl('/login');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-nav-rail')).toBeNull();
+  });
+
+  it('applies a theme to the document on boot', () => {
+    TestBed.createComponent(App);
+    expect(document.documentElement.dataset['theme']).toMatch(/^(light|dark)$/);
+  });
+});
