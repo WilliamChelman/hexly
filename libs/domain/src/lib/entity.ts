@@ -261,10 +261,11 @@ export interface FacetCount {
 }
 
 /**
- * One type's facetable **Field** as a facet: the EntityDocument `key` it types, its human `label` and
- * `dataType` (the rail picks a data-type-appropriate control — value toggles for enum/list/string,
- * a range for number/date), and its live `values` with counts. Surfaced **contextually** — a Field
- * facet appears only once its type is in the active Type filter.
+ * A facetable **Field** (or a structured Data Type's harvested dimension, ADR-0055) as a facet: the
+ * `key` it surfaces under, its human `label` and `dataType` (the rail picks a data-type-appropriate
+ * control — value toggles for enum/list/string, a range for number/date), and its live `values` with
+ * counts. Surfaced **by presence** (#231) — a Field facet appears whenever the current result set
+ * carries values for its key, whatever types those Entities hold.
  */
 export interface FieldFacet {
   readonly key: string;
@@ -278,8 +279,8 @@ export interface FieldFacet {
  * drill down — every category is computed against all *other* active constraints
  * but not its own, so a category still lists the sibling values you could add.
  * Zero-count values are omitted. The universal facets (`type`/`tag`/`visibility`)
- * are always present; `fields` carries a type's Field facets only while that type
- * is the active filter.
+ * are always present; `fields` carries a Field facet for every key the current
+ * result set carries values for (#231), whatever types those Entities hold.
  */
 export interface EntityFacets {
   readonly type: readonly FacetCount[];

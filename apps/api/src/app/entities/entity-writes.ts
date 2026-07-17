@@ -366,7 +366,7 @@ export class EntityWrites {
       searchText: deriveSearchText(doc, fields, dataTypes),
       descriptors: descriptorsSchema.parse(edges.flatMap((e) => e.descriptor ?? [])),
       edges,
-      fieldFacets: deriveFieldFacets(fields, doc),
+      fieldFacets: deriveFieldFacets(fields, doc, dataTypes),
     };
   }
 

@@ -15,6 +15,7 @@
 
 import { z } from 'zod';
 import type { EntityEdge } from './entity-edges';
+import type { FieldDataType } from './field';
 
 /**
  * A structured data-type's id: a `namespace.id` key (`dnd.encounter`), mirroring the Entity Type
@@ -82,6 +83,29 @@ export const structuredDataTypeIdSchema = z.custom<StructuredDataTypeId>(
 );
 
 /**
+ * One **Facet** dimension a structured data-type harvests (ADR-0055): the facet `key` it surfaces under
+ * (shared with scalar Fields' document keys), its i18n `labelKey`, and the `dataType` the rail picks a
+ * control from. The static mirror of {@link StructuredDataType.valueSchema}.
+ */
+export interface FacetDimension {
+  readonly key: string;
+  readonly labelKey: string;
+  readonly dataType: FieldDataType;
+}
+
+/**
+ * One facet row a structured data-type emits from a value (ADR-0055): a `key` drawn from the declared
+ * {@link FacetDimension}s, its string `value`, and `num` — the numeric form of a numeric dimension, else
+ * `null`. A separate declaration from the scalar `FieldFacetValue` it mirrors, so this module needn't
+ * import back from `field.ts`.
+ */
+export interface HarvestedFacet {
+  readonly key: string;
+  readonly value: string;
+  readonly num: number | null;
+}
+
+/**
  * One registered structured data-type, as the domain consumes it — type-erased over its value.
  * Plugins go through {@link defineStructuredDataType}, which keeps the value type.
  */
@@ -102,6 +126,16 @@ export interface StructuredDataType {
    */
   extractText?(value: unknown): string;
   /**
+   * The **Facet** dimensions this value harvests (ADR-0055) — the static declaration {@link harvestFacets}
+   * draws its emitted keys from. Absent when the data-type harvests no facets.
+   */
+  readonly facetDimensions?: readonly FacetDimension[];
+  /**
+   * The Facet values this value carries (a stat block's size and challenge-rating), harvested into the
+   * facet index. Emitted keys are drawn from {@link facetDimensions}. Absent when it harvests none.
+   */
+  harvestFacets?(value: unknown): readonly HarvestedFacet[];
+  /**
    * How this value takes its place in an exported Markdown file (CONTEXT.md → Vault Projection). The
    * data-type supplies the default slot; a Field may override it. `core.rich-content` projects to the
    * `body`, `core.hex-grid` to `frontmatter`. Absent when the data-type has no opinion (the vault layer
@@ -113,9 +147,10 @@ export interface StructuredDataType {
 /**
  * Declare a structured data-type. A malformed id (`strig` — no namespace) throws at module load.
  *
- * The declared capabilities see a *parsed* value; a value that does not inhabit `valueSchema` yields
- * no edges and no text rather than throwing — the forward-only tolerance the write path needs for a
- * document at rest this build cannot parse.
+ * The declared harvesters see a *parsed* value; a value that does not inhabit `valueSchema` yields
+ * nothing rather than throwing — the forward-only tolerance the write path needs for a document at rest
+ * this build cannot parse. `harvestFacets` rows are additionally filtered to the declared
+ * `facetDimensions` keys; `facetDimensions` itself passes through unwrapped.
  */
 export function defineStructuredDataType<T>(definition: {
   readonly id: string;
@@ -123,6 +158,8 @@ export function defineStructuredDataType<T>(definition: {
   readonly empty: () => T;
   readonly harvestEdges?: (value: T) => readonly EntityEdge[];
   readonly extractText?: (value: T) => string;
+  readonly facetDimensions?: readonly FacetDimension[];
+  readonly harvestFacets?: (value: T) => readonly HarvestedFacet[];
   /**
    * The data-type's default {@link VaultProjection}. Its converters see the value *unparsed* (cast to
    * `T`), unlike {@link harvestEdges}/{@link extractText}: an export must tolerate a value this build
@@ -135,7 +172,8 @@ export function defineStructuredDataType<T>(definition: {
   };
 }): StructuredDataType {
   const id = structuredDataTypeIdSchema.parse(definition.id);
-  const { valueSchema, empty, harvestEdges, extractText, vault } = definition;
+  const { valueSchema, empty, harvestEdges, extractText, facetDimensions, harvestFacets, vault } = definition;
+  const declaredFacetKeys = new Set((facetDimensions ?? []).map((dimension) => dimension.key));
   return Object.freeze<StructuredDataType>({
     id,
     valueSchema: valueSchema as z.ZodType,
@@ -150,6 +188,14 @@ export function defineStructuredDataType<T>(definition: {
       extractText: (value: unknown) => {
         const parsed = valueSchema.safeParse(value);
         return parsed.success ? extractText(parsed.data) : '';
+      },
+    }),
+    ...(facetDimensions && { facetDimensions }),
+    ...(harvestFacets && {
+      harvestFacets: (value: unknown) => {
+        const parsed = valueSchema.safeParse(value);
+        // Forward-only, and keys must be declared: a row under an undeclared key never reaches the index.
+        return parsed.success ? harvestFacets(parsed.data).filter((row) => declaredFacetKeys.has(row.key)) : [];
       },
     }),
     ...(vault && {

@@ -37,6 +37,15 @@ function validate(
   return validateFields(fields, metadata, dataTypes);
 }
 
+/** `deriveFieldFacets` takes the data-type set explicitly too; the scalar path needs none of it. */
+function facets(
+  fields: readonly FieldSchema[],
+  doc: EntityDocument | undefined,
+  dataTypes = NO_STRUCTURED_DATA_TYPES,
+): ReturnType<typeof deriveFieldFacets> {
+  return deriveFieldFacets(fields, doc, dataTypes);
+}
+
 /** A stand-in for a plugin's structured data-type. */
 const BOARD = defineStructuredDataType({
   id: 'test.board',
@@ -298,7 +307,7 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054)', () 
 
   it('derives facets, resolves structured Fields, and harvests link edges over the effective set', () => {
     // Facets: only the facetable built-in (`cr` here is not facetable) — a structured Field never facets.
-    expect(deriveFieldFacets(effective, { cr: 3 })).toEqual([]);
+    expect(facets(effective, { cr: 3 }, DATA_TYPES)).toEqual([]);
     // Structured-field resolution: the attached `battleMap` resolves against the host set.
     expect(resolvedStructuredDataTypeFields(effective, DATA_TYPES).map((r) => r.field.key)).toEqual(['battleMap']);
     // Link-edge harvest: the attached `lair` link is harvested from the effective set like a type default.
@@ -423,58 +432,56 @@ describe('deriveFieldFacets (the write-time denormalisation, a lens over EntityD
   ];
 
   it('materialises each facetable Field value, tagging a number with its numeric form', () => {
-    const facets = deriveFieldFacets(fields, {
+    const derived = facets(fields, {
       cr: 10,
       size: 'large',
       born: '2026-07-11',
       senses: ['darkvision', 'truesight'],
       name: 'Aboleth',
     });
-    expect(facets).toContainEqual({ key: 'cr', value: '10', num: 10 });
-    expect(facets).toContainEqual({ key: 'size', value: 'large', num: null });
-    expect(facets).toContainEqual({
+    expect(derived).toContainEqual({ key: 'cr', value: '10', num: 10 });
+    expect(derived).toContainEqual({ key: 'size', value: 'large', num: null });
+    expect(derived).toContainEqual({
       key: 'born',
       value: '2026-07-11',
       num: null,
     });
     // A list explodes to one row per item.
-    expect(facets).toContainEqual({
+    expect(derived).toContainEqual({
       key: 'senses',
       value: 'darkvision',
       num: null,
     });
-    expect(facets).toContainEqual({
+    expect(derived).toContainEqual({
       key: 'senses',
       value: 'truesight',
       num: null,
     });
     // A non-facetable Field is never materialised.
-    expect(facets.some((f) => f.key === 'name')).toBe(false);
+    expect(derived.some((f) => f.key === 'name')).toBe(false);
   });
 
   it('skips absent values and ill-typed values — data at rest is tolerated, not indexed', () => {
     // `cr` is present but the wrong type, `size` absent: neither reaches the facet index.
-    expect(deriveFieldFacets(fields, { cr: 'huge' })).toEqual([]);
-    expect(deriveFieldFacets(fields, undefined)).toEqual([]);
+    expect(facets(fields, { cr: 'huge' })).toEqual([]);
+    expect(facets(fields, undefined)).toEqual([]);
     // A list drops only the ill-typed items, keeping the good ones.
-    expect(deriveFieldFacets(fields, { senses: ['darkvision', 7] })).toEqual([
-      { key: 'senses', value: 'darkvision', num: null },
-    ]);
+    expect(facets(fields, { senses: ['darkvision', 7] })).toEqual([{ key: 'senses', value: 'darkvision', num: null }]);
   });
 
   it('dedupes repeated values within one Entity so a count is per-Entity, not per-occurrence', () => {
-    expect(deriveFieldFacets(fields, { senses: ['darkvision', 'darkvision'] })).toEqual([
+    expect(facets(fields, { senses: ['darkvision', 'darkvision'] })).toEqual([
       { key: 'senses', value: 'darkvision', num: null },
     ]);
   });
 
   it('materialises an entityLink Field as its target id (a stable filter key, not the mutable name)', () => {
     const lairFields = [field({ key: 'lair', dataType: { kind: 'entityLink' }, facetable: true })];
-    expect(deriveFieldFacets(lairFields, { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } })).toEqual([
+    expect(facets(lairFields, { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } })).toEqual([
       { key: 'lair', value: 'whisperwood', num: null },
     ]);
     // A malformed link (no entityId) is tolerated at rest, never indexed.
-    expect(deriveFieldFacets(lairFields, { lair: { label: 'Ghost' } })).toEqual([]);
+    expect(facets(lairFields, { lair: { label: 'Ghost' } })).toEqual([]);
   });
 });
 
@@ -631,6 +638,43 @@ describe('Structured Data Type (ADR-0050)', () => {
       expect(swatch.harvestEdges).toBeUndefined();
     });
 
+    it('passes facetDimensions through unwrapped and wraps harvestFacets forward-only (ADR-0055)', () => {
+      const statBlock = defineStructuredDataType({
+        id: 'test.harvester',
+        valueSchema: z.object({ cr: z.number() }),
+        empty: () => ({ cr: 0 }),
+        facetDimensions: [{ key: 'challenge_rating', labelKey: 'facet.cr', dataType: { kind: 'number' } }],
+        harvestFacets: (block) => [{ key: 'challenge_rating', value: String(block.cr), num: block.cr }],
+      });
+      // The static declaration is the literal one passed in.
+      expect(statBlock.facetDimensions).toEqual([
+        { key: 'challenge_rating', labelKey: 'facet.cr', dataType: { kind: 'number' } },
+      ]);
+      expect(statBlock.harvestFacets?.({ cr: 5 })).toEqual([{ key: 'challenge_rating', value: '5', num: 5 }]);
+      // Forward-only: a value the schema cannot parse harvests nothing, never a throw.
+      expect(statBlock.harvestFacets?.('garbage')).toEqual([]);
+      expect(statBlock.harvestFacets?.(undefined)).toEqual([]);
+    });
+
+    it('filters an emitted row whose key is not among the declared dimensions', () => {
+      const leaky = defineStructuredDataType({
+        id: 'test.leaky-def',
+        valueSchema: z.object({ ok: z.string() }),
+        empty: () => ({ ok: '' }),
+        facetDimensions: [{ key: 'declared', labelKey: 'facet.declared', dataType: { kind: 'string' } }],
+        harvestFacets: (v) => [
+          { key: 'declared', value: v.ok, num: null },
+          { key: 'stray', value: v.ok, num: null },
+        ],
+      });
+      expect(leaky.harvestFacets?.({ ok: 'yes' })).toEqual([{ key: 'declared', value: 'yes', num: null }]);
+    });
+
+    it('leaves facetDimensions and harvestFacets absent when the data-type declares none', () => {
+      expect(BOARD.facetDimensions).toBeUndefined();
+      expect(BOARD.harvestFacets).toBeUndefined();
+    });
+
     it('refuses to compose a set with a duplicate id', () => {
       expect(() => structuredDataTypeSet([BOARD, BOARD])).toThrow(/test\.board/);
     });
@@ -744,10 +788,87 @@ describe('Structured Data Type (ADR-0050)', () => {
     });
   });
 
-  describe('deriveFieldFacets and a Field of a Structured Data Type', () => {
-    it('never facets one, whatever its facetable flag says — a document has no values to count', () => {
+  describe('deriveFieldFacets and a Field of a Structured Data Type (ADR-0055)', () => {
+    it('never facets a structured Field *directly*, whatever its facetable flag says', () => {
+      // `test.board` declares no dimensions and harvests nothing: the blob has no values to count.
       const facetable = field({ key: 'board', dataType: { kind: 'test.board' }, facetable: true });
-      expect(deriveFieldFacets([facetable], { board: { tiles: [{ entityId: 'riverbend' }] } })).toEqual([]);
+      expect(facets([facetable], { board: { tiles: [{ entityId: 'riverbend' }] } }, DATA_TYPES)).toEqual([]);
+    });
+
+    /**
+     * A stand-in for `dnd.stat-block` (ADR-0055): a structured value that *harvests* facet dimensions.
+     * It declares three — a numeric `challenge_rating`, an enum `size`, and a `creature_type` sharing the
+     * `type` key a scalar Field also lenses — and emits their values per Entity.
+     */
+    const STAT_BLOCK = defineStructuredDataType({
+      id: 'test.stat-block',
+      valueSchema: z.object({ cr: z.number(), size: z.string(), kind: z.string() }),
+      empty: () => ({ cr: 0, size: 'medium', kind: 'beast' }),
+      facetDimensions: [
+        { key: 'challenge_rating', labelKey: 'facet.cr', dataType: { kind: 'number' } },
+        { key: 'size', labelKey: 'facet.size', dataType: { kind: 'enum', options: ['small', 'large'] } },
+        { key: 'type', labelKey: 'facet.type', dataType: { kind: 'string' } },
+      ],
+      harvestFacets: (block) => [
+        { key: 'challenge_rating', value: String(block.cr), num: block.cr },
+        { key: 'size', value: block.size, num: null },
+        { key: 'type', value: block.kind, num: null },
+      ],
+    });
+    const withStatBlock = structuredDataTypeSet([STAT_BLOCK]);
+    const statField = field({ key: 'stat_block', dataType: { kind: 'test.stat-block' } });
+    const statBlock = { stat_block: { cr: 5, size: 'large', kind: 'dragon' } };
+
+    it('harvests the declared dimensions from a structured value, numeric dimension keeping its num', () => {
+      expect(facets([statField], statBlock, withStatBlock)).toEqual([
+        { key: 'challenge_rating', value: '5', num: 5 },
+        { key: 'size', value: 'large', num: null },
+        { key: 'type', value: 'dragon', num: null },
+      ]);
+    });
+
+    it('harvests nothing from an absent or ill-typed value at rest, rather than throwing', () => {
+      expect(facets([statField], {}, withStatBlock)).toEqual([]);
+      expect(facets([statField], { stat_block: 'garbage' }, withStatBlock)).toEqual([]);
+    });
+
+    it('harvests nothing when the structured kind is unregistered — an absent plugin degrades cleanly', () => {
+      expect(facets([statField], statBlock, NO_STRUCTURED_DATA_TYPES)).toEqual([]);
+    });
+
+    it('drops a row under a key the data-type never declared — an undeclared dimension is never emitted', () => {
+      const leaky = defineStructuredDataType({
+        id: 'test.leaky',
+        valueSchema: z.object({ ok: z.string() }),
+        empty: () => ({ ok: '' }),
+        facetDimensions: [{ key: 'declared', labelKey: 'facet.declared', dataType: { kind: 'string' } }],
+        // Emits one declared row and one stray, undeclared key.
+        harvestFacets: (v) => [
+          { key: 'declared', value: v.ok, num: null },
+          { key: 'stray', value: v.ok, num: null },
+        ],
+      });
+      const leakyField = field({ key: 'leaky', dataType: { kind: 'test.leaky' } });
+      expect(facets([leakyField], { leaky: { ok: 'yes' } }, structuredDataTypeSet([leaky]))).toEqual([
+        { key: 'declared', value: 'yes', num: null },
+      ]);
+    });
+
+    it('merges a harvested key sharing a scalar Field key into one bucket, the scalar winning a collision', () => {
+      // The scalar `type` Field and the stat block's `type` dimension share the flat key space. Distinct
+      // values union under `type`; a coinciding (key, value) collapses, the scalar row (its `num`) winning.
+      const scalarType = field({ key: 'type', dataType: { kind: 'string' }, facetable: true });
+      const doc = { type: 'humanoid', stat_block: { cr: 5, size: 'large', kind: 'dragon' } };
+      expect(facets([scalarType, statField], doc, withStatBlock)).toEqual([
+        { key: 'type', value: 'humanoid', num: null },
+        { key: 'challenge_rating', value: '5', num: 5 },
+        { key: 'size', value: 'large', num: null },
+        { key: 'type', value: 'dragon', num: null },
+      ]);
+      // When both resolve the same (key, value), the scalar row — walked first — is the one kept.
+      const collide = { type: 'dragon', stat_block: { cr: 5, size: 'large', kind: 'dragon' } };
+      const merged = facets([scalarType, statField], collide, withStatBlock).filter((f) => f.key === 'type');
+      expect(merged).toEqual([{ key: 'type', value: 'dragon', num: null }]);
     });
   });
 });
