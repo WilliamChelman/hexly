@@ -116,7 +116,7 @@ interface FieldDraft {
                 (change)="toggleRef(f.id, checked($event))"
               />
               <span class="type-field-name">{{ f.label }}</span>
-              <span class="type-field-id">{{ f.key }} · {{ f.typeLabel }}</span>
+              <span class="type-field-id">{{ f.id }} · {{ f.typeLabel }}</span>
             </label>
             <!-- A referenced Field of a Structured Data Type places a View; the toggle authors where. -->
             @if (d.fieldRefs.includes(f.id) && f.structured) {
@@ -310,7 +310,6 @@ export class WorldTypesPanel implements OnInit {
     const structured = new Map(this.structuredKinds().map((s) => [s.kind, s.labelKey]));
     return this.registry.availableFields().map((field) => ({
       id: field.id,
-      key: field.key,
       label: field.labelKey ? this.transloco.translate(field.labelKey) : field.label,
       structured: isStructuredDataType(field.dataType),
       typeLabel: this.dataTypeLabel(field.dataType.kind, structured),
@@ -402,8 +401,8 @@ export class WorldTypesPanel implements OnInit {
     if (!d || !this.canSave()) return;
     // Resolve the referenced Fields to derive the default View order (a structured Field places a View).
     const fields = d.fieldRefs.map((id) => this.registry.field(id)).filter((field): field is Field => !!field);
-    const shown = new Set(fields.filter((field) => d.shownAsView[field.id] ?? true).map((field) => field.key));
-    const views = userTypeViews(fields, (field) => shown.has(field.key));
+    const shown = new Set(fields.filter((field) => d.shownAsView[field.id] ?? true).map((field) => field.id));
+    const views = userTypeViews(fields, (field) => shown.has(field.id));
     const label = d.label.trim();
     const op$ =
       d.editingId === null

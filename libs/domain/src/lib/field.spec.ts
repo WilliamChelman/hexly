@@ -6,7 +6,6 @@ import {
   entityLinkFieldValues,
   Field,
   FieldResolver,
-  FieldSchema,
   fieldSchema,
   fieldSchemaSchema,
   FieldValidation,
@@ -23,14 +22,19 @@ import {
 import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
 import { vaultSlotOf } from './field';
 
-/** A terse FieldSchema builder for the specs — required/facetable default to false. */
-function field(partial: Partial<FieldSchema> & Pick<FieldSchema, 'key' | 'dataType'>): FieldSchema {
-  return fieldSchemaSchema.parse({ label: partial.key, ...partial });
+/**
+ * A terse {@link Field} builder for the specs — required/facetable default to false. `id` *is* the
+ * document key (ADR-0056); parsed through {@link fieldSchemaSchema} for the body defaults, then re-headed
+ * with the (test-bare) id so a downstream function can lens `doc[field.id]`.
+ */
+function field(partial: Partial<Field> & Pick<Field, 'id' | 'dataType'>): Field {
+  const { id, ...body } = partial;
+  return { id, ...fieldSchemaSchema.parse({ label: id, ...body }) };
 }
 
 /** `validateFields` takes the data-type set explicitly, and the built-in data-types need none of it. */
 function validate(
-  fields: readonly FieldSchema[],
+  fields: readonly Field[],
   metadata: EntityDocument | undefined,
   dataTypes = NO_STRUCTURED_DATA_TYPES,
 ): FieldValidation {
@@ -39,7 +43,7 @@ function validate(
 
 /** `deriveFieldFacets` takes the data-type set explicitly too; the scalar path needs none of it. */
 function facets(
-  fields: readonly FieldSchema[],
+  fields: readonly Field[],
   doc: EntityDocument | undefined,
   dataTypes = NO_STRUCTURED_DATA_TYPES,
 ): ReturnType<typeof deriveFieldFacets> {
@@ -57,17 +61,15 @@ const BOARD = defineStructuredDataType({
 
 const DATA_TYPES = structuredDataTypeSet([BOARD]);
 
-const boardField = field({ key: 'board', dataType: { kind: 'test.board' } });
+const boardField = field({ id: 'board', dataType: { kind: 'test.board' } });
 
 describe('fieldSchemaSchema', () => {
   it('accepts a scalar / enum / date / list declaration and defaults required + facetable to false', () => {
     const parsed = fieldSchemaSchema.parse({
-      key: 'cr',
       label: 'Challenge Rating',
       dataType: { kind: 'number' },
     });
     expect(parsed).toEqual({
-      key: 'cr',
       label: 'Challenge Rating',
       dataType: { kind: 'number' },
       required: false,
@@ -78,7 +80,6 @@ describe('fieldSchemaSchema', () => {
   it('accepts an enum with options and a list of a scalar item type', () => {
     expect(
       fieldSchemaSchema.parse({
-        key: 'size',
         label: 'Size',
         dataType: { kind: 'enum', options: ['small', 'medium', 'large'] },
       }).dataType,
@@ -86,7 +87,6 @@ describe('fieldSchemaSchema', () => {
 
     expect(
       fieldSchemaSchema.parse({
-        key: 'senses',
         label: 'Senses',
         dataType: { kind: 'list', of: { kind: 'string' } },
       }).dataType,
@@ -96,21 +96,18 @@ describe('fieldSchemaSchema', () => {
   it('rejects an unknown data-type kind, an empty enum, and a list of a list', () => {
     expect(
       fieldSchemaSchema.safeParse({
-        key: 'k',
         label: 'K',
         dataType: { kind: 'geo' },
       }).success,
     ).toBe(false);
     expect(
       fieldSchemaSchema.safeParse({
-        key: 'k',
         label: 'K',
         dataType: { kind: 'enum', options: [] },
       }).success,
     ).toBe(false);
     expect(
       fieldSchemaSchema.safeParse({
-        key: 'k',
         label: 'K',
         dataType: {
           kind: 'list',
@@ -121,12 +118,11 @@ describe('fieldSchemaSchema', () => {
   });
 
   it('accepts an entityLink, with or without a target-type constraint (#190)', () => {
-    expect(fieldSchemaSchema.parse({ key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' } }).dataType).toEqual({
+    expect(fieldSchemaSchema.parse({ label: 'Lair', dataType: { kind: 'entityLink' } }).dataType).toEqual({
       kind: 'entityLink',
     });
     expect(
       fieldSchemaSchema.parse({
-        key: 'lair',
         label: 'Lair',
         dataType: { kind: 'entityLink', targetTypes: ['world.place'] },
       }).dataType,
@@ -136,7 +132,6 @@ describe('fieldSchemaSchema', () => {
   it('rejects an entityLink whose target-type constraint is not a `namespace.id` key', () => {
     expect(
       fieldSchemaSchema.safeParse({
-        key: 'lair',
         label: 'Lair',
         dataType: { kind: 'entityLink', targetTypes: ['place'] },
       }).success,
@@ -144,17 +139,16 @@ describe('fieldSchemaSchema', () => {
   });
 });
 
-describe('Field — first-class, reusable (ADR-0054)', () => {
-  it('round-trips an `id` distinct from the `key` it lenses', () => {
+describe('Field — first-class, reusable (ADR-0054/ADR-0056)', () => {
+  it('round-trips an `id` that is the document key it lenses (one identifier, ADR-0056)', () => {
     const parsed = fieldSchema.parse({
       id: 'world.element',
-      key: 'element',
       label: 'Element',
       dataType: { kind: 'enum', options: ['fire', 'ice'] },
     });
-    // id (the reuse handle) and key (the document key) are deliberately two things (ADR-0033/0054).
+    // One identifier: the id is both the reuse handle and the EntityDocument key — no separate `key`.
     expect(parsed.id).toBe('world.element');
-    expect(parsed.key).toBe('element');
+    expect('key' in parsed).toBe(false);
     expect({ required: parsed.required, facetable: parsed.facetable }).toEqual({ required: false, facetable: false });
   });
 
@@ -162,7 +156,6 @@ describe('Field — first-class, reusable (ADR-0054)', () => {
     it('returns a frozen Field mirroring defineType', () => {
       const element = defineField({
         id: 'core.element',
-        key: 'element',
         label: 'Element',
         labelKey: 'field.element',
         dataType: { kind: 'enum', options: ['fire', 'ice'] },
@@ -170,7 +163,6 @@ describe('Field — first-class, reusable (ADR-0054)', () => {
       });
       expect(element).toEqual({
         id: 'core.element',
-        key: 'element',
         label: 'Element',
         labelKey: 'field.element',
         dataType: { kind: 'enum', options: ['fire', 'ice'] },
@@ -181,28 +173,24 @@ describe('Field — first-class, reusable (ADR-0054)', () => {
     });
 
     it('throws at load on a bare id (no namespace)', () => {
-      expect(() =>
-        defineField({ id: 'element', key: 'element', label: 'Element', dataType: { kind: 'string' } }),
-      ).toThrow();
+      expect(() => defineField({ id: 'element', label: 'Element', dataType: { kind: 'string' } })).toThrow();
     });
 
     it('throws at load on an unknown data-type kind — but not on a well-formed structured one (membership is resolved later)', () => {
-      expect(() => defineField({ id: 'core.k', key: 'k', label: 'K', dataType: { kind: 'geo' } as never })).toThrow();
+      expect(() => defineField({ id: 'core.k', label: 'K', dataType: { kind: 'geo' } as never })).toThrow();
       // A `namespace.id` kind is shape-valid here; an unregistered one dies at resolution, not load.
-      expect(
-        defineField({ id: 'core.map', key: 'grid', label: 'Grid', dataType: { kind: 'core.hex-grid' } }).dataType,
-      ).toEqual({
+      expect(defineField({ id: 'core.map', label: 'Grid', dataType: { kind: 'core.hex-grid' } }).dataType).toEqual({
         kind: 'core.hex-grid',
       });
     });
   });
 });
 
-describe('resolveEffectiveFields — the effective-set resolver (ADR-0054)', () => {
+describe('resolveEffectiveFields — the effective-set resolver (ADR-0054/ADR-0056)', () => {
   // A small registry of first-class Fields, resolved by id.
-  const element = defineField({ id: 'world.element', key: 'element', label: 'Element', dataType: { kind: 'string' } });
-  const cr = defineField({ id: 'dnd.cr', key: 'cr', label: 'CR', dataType: { kind: 'number' } });
-  const region = defineField({ id: 'world.region', key: 'region', label: 'Region', dataType: { kind: 'string' } });
+  const element = defineField({ id: 'world.element', label: 'Element', dataType: { kind: 'string' } });
+  const cr = defineField({ id: 'dnd.cr', label: 'CR', dataType: { kind: 'number' } });
+  const region = defineField({ id: 'world.region', label: 'Region', dataType: { kind: 'string' } });
   const registry = new Map<string, Field>([element, cr, region].map((f) => [f.id, f]));
   const fieldResolver: FieldResolver = (id) => registry.get(id);
 
@@ -218,7 +206,7 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054)', () 
       typeFieldRefs,
     });
     // Instance attachment first, then each type's defaults in order.
-    expect(effective.map((f) => f.key)).toEqual(['element', 'cr', 'region']);
+    expect(effective.map((f) => f.id)).toEqual(['world.element', 'dnd.cr', 'world.region']);
   });
 
   it('drops an id that resolves to nothing — a disabled plugin / deleted World Field degrades to a plain value', () => {
@@ -231,56 +219,46 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054)', () 
     expect(effective.map((f) => f.id)).toEqual(['dnd.cr']);
   });
 
-  describe('precedence on a shared key: instance > primary type > later types', () => {
-    // Three Fields that all lens the same document key `k`.
-    const instanceK = defineField({ id: 'world.k-inst', key: 'k', label: 'Instance', dataType: { kind: 'string' } });
-    const primaryK = defineField({ id: 'a.k-primary', key: 'k', label: 'Primary', dataType: { kind: 'string' } });
-    const laterK = defineField({ id: 'b.k-later', key: 'k', label: 'Later', dataType: { kind: 'string' } });
-    const kRegistry = new Map<string, Field>([instanceK, primaryK, laterK].map((f) => [f.id, f]));
-    const kResolver: FieldResolver = (id) => kRegistry.get(id);
-    const kTypeRefs = (t: string) =>
-      (({ 'a.type': ['a.k-primary'], 'b.type': ['b.k-later'] }) as Record<string, string[]>)[t];
+  describe('dedups by id, with no cross-field key override (ADR-0056)', () => {
+    it('resolves a Field reaching an Entity via both a direct attach and a type default to one entry', () => {
+      // `dnd.cr` is a `dnd.beast` default AND directly attached — deduped by id to a single entry.
+      const effective = resolveEffectiveFields({
+        types: ['dnd.beast'],
+        fieldIds: ['dnd.cr'],
+        fieldResolver,
+        typeFieldRefs,
+      });
+      expect(effective.map((f) => f.id)).toEqual(['dnd.cr']);
+    });
 
-    it('keeps the primary type’s Field over a later type’s on the same key', () => {
+    it('keeps two differently-named Fields as two distinct entries — a namespaced key is unique, so neither shadows the other', () => {
+      // Both a primary and a later type default a Field with the same *leaf* `k`, but under distinct
+      // namespaces — two predicates, two keys, no override (the retired "dedup by key" precedence).
+      const primaryK = defineField({ id: 'a.k', label: 'Primary', dataType: { kind: 'string' } });
+      const laterK = defineField({ id: 'b.k', label: 'Later', dataType: { kind: 'string' } });
+      const kRegistry = new Map<string, Field>([primaryK, laterK].map((f) => [f.id, f]));
       const effective = resolveEffectiveFields({
         types: ['a.type', 'b.type'],
         fieldIds: [],
-        fieldResolver: kResolver,
-        typeFieldRefs: kTypeRefs,
+        fieldResolver: (id) => kRegistry.get(id),
+        typeFieldRefs: (t) => (({ 'a.type': ['a.k'], 'b.type': ['b.k'] }) as Record<string, string[]>)[t],
       });
-      expect(effective).toHaveLength(1);
-      expect(effective[0].id).toBe('a.k-primary');
-    });
-
-    it('lets an instance attachment win the key over both types — the loser drops, its value untouched', () => {
-      const effective = resolveEffectiveFields({
-        types: ['a.type', 'b.type'],
-        fieldIds: ['world.k-inst'],
-        fieldResolver: kResolver,
-        typeFieldRefs: kTypeRefs,
-      });
-      expect(effective).toHaveLength(1);
-      expect(effective[0].id).toBe('world.k-inst');
-      // The resolver never touches a document: it produces the set, and a losing Field's value stays put.
-      const doc = { k: 'a value the dropped type-default would have lensed' };
-      expect(doc.k).toBe('a value the dropped type-default would have lensed');
+      expect(effective.map((f) => f.id)).toEqual(['a.k', 'b.k']);
     });
   });
 
-  // The whole point of the expand step: every downstream pure function already takes a `FieldSchema[]`,
-  // and a resolved `Field[]` is a structural superset, so each runs over the effective set unchanged in
-  // spirit (AC: validation, facet derivation, link-edge harvest, structured-field resolution, vault
-  // projection over the effective set). A structured Field attached directly to an Entity — a deity's
-  // `battleMap` — and an instance-attached link both flow through as a type default would.
+  // The whole point of the expand step: every downstream pure function keys the document off `field.id`,
+  // so each runs over the effective set (AC: validation, facet derivation, link-edge harvest,
+  // structured-field resolution, vault projection over the effective set). A structured Field attached
+  // directly to an Entity — a deity's `core.battle-map` — and an instance-attached link both flow through
+  // as a type default would.
   const battleMap = defineField({
     id: 'core.battle-map',
-    key: 'battleMap',
     label: 'Battle Map',
     dataType: { kind: 'test.board' },
   });
   const lair = defineField({
     id: 'world.lair',
-    key: 'lair',
     label: 'Lair',
     dataType: { kind: 'entityLink', targetTypes: ['world.place'] },
   });
@@ -293,30 +271,30 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054)', () 
   });
 
   it('runs forward-only validation over the effective set — required-if-required, tolerant at rest', () => {
-    // `cr` (a type default) present and well-typed passes; a missing required attached Field fails; an
+    // `dnd.cr` (a type default) present and well-typed passes; a missing required attached Field fails; an
     // ill-typed value at rest is tolerated (never retroactively invalidated).
-    expect(validate(effective, { cr: 3 }, DATA_TYPES).ok).toBe(true);
+    expect(validate(effective, { 'dnd.cr': 3 }, DATA_TYPES).ok).toBe(true);
     const required = resolveEffectiveFields({
       types: [],
       fieldIds: ['world.element'],
       fieldResolver: (id) => (id === 'world.element' ? { ...element, required: true } : undefined),
       typeFieldRefs,
     });
-    expect(validate(required, {}).errors).toEqual([{ key: 'element', code: 'required' }]);
+    expect(validate(required, {}).errors).toEqual([{ key: 'world.element', code: 'required' }]);
   });
 
   it('derives facets, resolves structured Fields, and harvests link edges over the effective set', () => {
-    // Facets: only the facetable built-in (`cr` here is not facetable) — a structured Field never facets.
-    expect(facets(effective, { cr: 3 }, DATA_TYPES)).toEqual([]);
-    // Structured-field resolution: the attached `battleMap` resolves against the host set.
-    expect(resolvedStructuredDataTypeFields(effective, DATA_TYPES).map((r) => r.field.key)).toEqual(['battleMap']);
-    // Link-edge harvest: the attached `lair` link is harvested from the effective set like a type default.
-    expect(entityLinkFieldValues(effective, { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } })).toEqual([
-      { key: 'lair', value: { entityId: 'whisperwood', label: 'The Whisperwood' } },
-    ]);
-    expect(entityLinkConstraints(effective, { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } })).toEqual([
-      { key: 'lair', entityId: 'whisperwood', targetTypes: ['world.place'] },
-    ]);
+    // Facets: only the facetable built-in (`dnd.cr` here is not facetable) — a structured Field never facets.
+    expect(facets(effective, { 'dnd.cr': 3 }, DATA_TYPES)).toEqual([]);
+    // Structured-field resolution: the attached `core.battle-map` resolves against the host set.
+    expect(resolvedStructuredDataTypeFields(effective, DATA_TYPES).map((r) => r.field.id)).toEqual(['core.battle-map']);
+    // Link-edge harvest: the attached `world.lair` link is harvested from the effective set like a type default.
+    expect(
+      entityLinkFieldValues(effective, { 'world.lair': { entityId: 'whisperwood', label: 'The Whisperwood' } }),
+    ).toEqual([{ key: 'world.lair', value: { entityId: 'whisperwood', label: 'The Whisperwood' } }]);
+    expect(
+      entityLinkConstraints(effective, { 'world.lair': { entityId: 'whisperwood', label: 'The Whisperwood' } }),
+    ).toEqual([{ key: 'world.lair', entityId: 'whisperwood', targetTypes: ['world.place'] }]);
   });
 
   it('resolves a Vault Projection slot over the effective set (a Field override wins the data-type default)', () => {
@@ -329,7 +307,6 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054)', () 
     const dataTypes = structuredDataTypeSet([framed]);
     const map = defineField({
       id: 'core.map',
-      key: 'map',
       label: 'Map',
       dataType: { kind: 'test.framed' },
       vault: { slot: 'omit' },
@@ -347,16 +324,16 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054)', () 
 
 describe('validateFields (forward-only)', () => {
   const fields: FieldSchema[] = [
-    field({ key: 'name', dataType: { kind: 'string' }, required: true }),
-    field({ key: 'cr', dataType: { kind: 'number' } }),
-    field({ key: 'legendary', dataType: { kind: 'boolean' } }),
-    field({ key: 'born', dataType: { kind: 'date' } }),
+    field({ id: 'name', dataType: { kind: 'string' }, required: true }),
+    field({ id: 'cr', dataType: { kind: 'number' } }),
+    field({ id: 'legendary', dataType: { kind: 'boolean' } }),
+    field({ id: 'born', dataType: { kind: 'date' } }),
     field({
-      key: 'size',
+      id: 'size',
       dataType: { kind: 'enum', options: ['small', 'large'] },
     }),
     field({
-      key: 'senses',
+      id: 'senses',
       dataType: { kind: 'list', of: { kind: 'string' } },
     }),
   ];
@@ -401,13 +378,13 @@ describe('validateFields (forward-only)', () => {
   });
 
   it('accepts a full ISO datetime and rejects an out-of-range calendar date', () => {
-    const dateField = [field({ key: 'born', dataType: { kind: 'date' } })];
+    const dateField = [field({ id: 'born', dataType: { kind: 'date' } })];
     expect(validate(dateField, { born: '2026-07-11T09:30:00Z' }).ok).toBe(true);
     expect(validate(dateField, { born: '2026-13-40' }).ok).toBe(false);
   });
 
   it('rejects a NaN / non-finite number', () => {
-    const numberField = [field({ key: 'cr', dataType: { kind: 'number' } })];
+    const numberField = [field({ id: 'cr', dataType: { kind: 'number' } })];
     expect(validate(numberField, { cr: Number.NaN }).ok).toBe(false);
     expect(validate(numberField, { cr: Infinity }).ok).toBe(false);
   });
@@ -415,20 +392,20 @@ describe('validateFields (forward-only)', () => {
 
 describe('deriveFieldFacets (the write-time denormalisation, a lens over EntityDocument)', () => {
   const fields: FieldSchema[] = [
-    field({ key: 'cr', dataType: { kind: 'number' }, facetable: true }),
+    field({ id: 'cr', dataType: { kind: 'number' }, facetable: true }),
     field({
-      key: 'size',
+      id: 'size',
       dataType: { kind: 'enum', options: ['small', 'large'] },
       facetable: true,
     }),
-    field({ key: 'born', dataType: { kind: 'date' }, facetable: true }),
+    field({ id: 'born', dataType: { kind: 'date' }, facetable: true }),
     field({
-      key: 'senses',
+      id: 'senses',
       dataType: { kind: 'list', of: { kind: 'string' } },
       facetable: true,
     }),
     // Declared but NOT facetable — never materialised.
-    field({ key: 'name', dataType: { kind: 'string' }, facetable: false }),
+    field({ id: 'name', dataType: { kind: 'string' }, facetable: false }),
   ];
 
   it('materialises each facetable Field value, tagging a number with its numeric form', () => {
@@ -476,7 +453,7 @@ describe('deriveFieldFacets (the write-time denormalisation, a lens over EntityD
   });
 
   it('materialises an entityLink Field as its target id (a stable filter key, not the mutable name)', () => {
-    const lairFields = [field({ key: 'lair', dataType: { kind: 'entityLink' }, facetable: true })];
+    const lairFields = [field({ id: 'lair', dataType: { kind: 'entityLink' }, facetable: true })];
     expect(facets(lairFields, { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } })).toEqual([
       { key: 'lair', value: 'whisperwood', num: null },
     ]);
@@ -486,8 +463,8 @@ describe('deriveFieldFacets (the write-time denormalisation, a lens over EntityD
 });
 
 describe('entityLink Fields (#190)', () => {
-  const lair = field({ key: 'lair', dataType: { kind: 'entityLink', targetTypes: ['world.place'] } });
-  const ally = field({ key: 'ally', dataType: { kind: 'entityLink' } });
+  const lair = field({ id: 'lair', dataType: { kind: 'entityLink', targetTypes: ['world.place'] } });
+  const ally = field({ id: 'ally', dataType: { kind: 'entityLink' } });
 
   it('validates the value shape forward-only — an object with a non-blank entityId', () => {
     expect(validate([lair], { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } }).ok).toBe(true);
@@ -563,7 +540,7 @@ describe('parseFieldFilter (`key:op:value`)', () => {
 });
 
 describe('readField / writeField (a lens over the one EntityDocument map)', () => {
-  const cr = field({ key: 'cr', dataType: { kind: 'number' } });
+  const cr = field({ id: 'cr', dataType: { kind: 'number' } });
 
   it('reads a Field’s value straight off the EntityDocument map', () => {
     expect(readField({ cr: 7, other: 'x' }, cr)).toBe(7);
@@ -591,7 +568,7 @@ describe('readField / writeField (a lens over the one EntityDocument map)', () =
       writeField(
         { senses: ['a'] },
         field({
-          key: 'senses',
+          id: 'senses',
           dataType: { kind: 'list', of: { kind: 'string' } },
         }),
         [],
@@ -714,16 +691,16 @@ describe('Structured Data Type (ADR-0050)', () => {
     });
 
     it("takes the data-type's default when the Field declares no override", () => {
-      expect(vaultSlotOf(field({ key: 'g', dataType: { kind: 'test.framed' } }), framed)).toBe('frontmatter');
+      expect(vaultSlotOf(field({ id: 'g', dataType: { kind: 'test.framed' } }), framed)).toBe('frontmatter');
     });
 
     it('honours a Field override', () => {
-      const overridden = field({ key: 'g', dataType: { kind: 'test.framed' }, vault: { slot: 'omit' } });
+      const overridden = field({ id: 'g', dataType: { kind: 'test.framed' }, vault: { slot: 'omit' } });
       expect(vaultSlotOf(overridden, framed)).toBe('omit');
     });
 
     it('is undefined when neither Field nor data-type has an opinion', () => {
-      expect(vaultSlotOf(field({ key: 'name', dataType: { kind: 'string' } }), undefined)).toBeUndefined();
+      expect(vaultSlotOf(field({ id: 'name', dataType: { kind: 'string' } }), undefined)).toBeUndefined();
     });
   });
 
@@ -732,21 +709,19 @@ describe('Structured Data Type (ADR-0050)', () => {
       expect(boardField.dataType).toEqual({ kind: 'test.board' });
       // Shape, not membership: `defineType()` runs at module load, so no schema could enumerate the
       // very plugin registering a kind. A well-formed typo passes here and dies at resolution.
-      expect(field({ key: 'board', dataType: { kind: 'test.bord' } }).dataType).toEqual({ kind: 'test.bord' });
+      expect(field({ id: 'board', dataType: { kind: 'test.bord' } }).dataType).toEqual({ kind: 'test.bord' });
     });
 
     it('rejects a kind that is neither a built-in nor `namespace.id`-shaped', () => {
-      expect(() => field({ key: 'name', dataType: { kind: 'strig' } as never })).toThrow();
+      expect(() => field({ id: 'name', dataType: { kind: 'strig' } as never })).toThrow();
       // A code-registered Field carries the same guard: a malformed kind throws at `defineField`.
-      expect(() =>
-        defineField({ id: 'test.name', key: 'name', label: 'Name', dataType: { kind: 'strig' } as never }),
-      ).toThrow();
+      expect(() => defineField({ id: 'test.name', label: 'Name', dataType: { kind: 'strig' } as never })).toThrow();
     });
   });
 
   describe('unresolvedDataTypeErrors — where an unregistered kind is rejected', () => {
     it('flags a well-formed but unregistered kind, against the host-composed set', () => {
-      const typo = field({ key: 'grid', dataType: { kind: 'test.bord' } });
+      const typo = field({ id: 'grid', dataType: { kind: 'test.bord' } });
       expect(unresolvedDataTypeErrors([typo], DATA_TYPES)).toEqual([{ key: 'grid', code: 'unknown-data-type' }]);
     });
 
@@ -758,7 +733,7 @@ describe('Structured Data Type (ADR-0050)', () => {
     });
 
     it('never flags a built-in data-type', () => {
-      expect(unresolvedDataTypeErrors([field({ key: 'cr', dataType: { kind: 'number' } })], DATA_TYPES)).toEqual([]);
+      expect(unresolvedDataTypeErrors([field({ id: 'cr', dataType: { kind: 'number' } })], DATA_TYPES)).toEqual([]);
     });
   });
 
@@ -791,7 +766,7 @@ describe('Structured Data Type (ADR-0050)', () => {
   describe('deriveFieldFacets and a Field of a Structured Data Type (ADR-0055)', () => {
     it('never facets a structured Field *directly*, whatever its facetable flag says', () => {
       // `test.board` declares no dimensions and harvests nothing: the blob has no values to count.
-      const facetable = field({ key: 'board', dataType: { kind: 'test.board' }, facetable: true });
+      const facetable = field({ id: 'board', dataType: { kind: 'test.board' }, facetable: true });
       expect(facets([facetable], { board: { tiles: [{ entityId: 'riverbend' }] } }, DATA_TYPES)).toEqual([]);
     });
 
@@ -816,7 +791,7 @@ describe('Structured Data Type (ADR-0050)', () => {
       ],
     });
     const withStatBlock = structuredDataTypeSet([STAT_BLOCK]);
-    const statField = field({ key: 'stat_block', dataType: { kind: 'test.stat-block' } });
+    const statField = field({ id: 'stat_block', dataType: { kind: 'test.stat-block' } });
     const statBlock = { stat_block: { cr: 5, size: 'large', kind: 'dragon' } };
 
     it('harvests the declared dimensions from a structured value, numeric dimension keeping its num', () => {
@@ -848,7 +823,7 @@ describe('Structured Data Type (ADR-0050)', () => {
           { key: 'stray', value: v.ok, num: null },
         ],
       });
-      const leakyField = field({ key: 'leaky', dataType: { kind: 'test.leaky' } });
+      const leakyField = field({ id: 'leaky', dataType: { kind: 'test.leaky' } });
       expect(facets([leakyField], { leaky: { ok: 'yes' } }, structuredDataTypeSet([leaky]))).toEqual([
         { key: 'declared', value: 'yes', num: null },
       ]);
@@ -857,7 +832,7 @@ describe('Structured Data Type (ADR-0050)', () => {
     it('merges a harvested key sharing a scalar Field key into one bucket, the scalar winning a collision', () => {
       // The scalar `type` Field and the stat block's `type` dimension share the flat key space. Distinct
       // values union under `type`; a coinciding (key, value) collapses, the scalar row (its `num`) winning.
-      const scalarType = field({ key: 'type', dataType: { kind: 'string' }, facetable: true });
+      const scalarType = field({ id: 'type', dataType: { kind: 'string' }, facetable: true });
       const doc = { type: 'humanoid', stat_block: { cr: 5, size: 'large', kind: 'dragon' } };
       expect(facets([scalarType, statField], doc, withStatBlock)).toEqual([
         { key: 'type', value: 'humanoid', num: null },

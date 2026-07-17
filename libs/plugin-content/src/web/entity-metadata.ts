@@ -43,7 +43,7 @@ export class EntityMetadata {
         this.types
           .effectiveFields(this.session.current()?.types, this.session.current()?.fields)
           .filter((field) => isStructuredDataType(field.dataType))
-          .map((field) => field.key),
+          .map((field) => field.id),
       ),
   );
 

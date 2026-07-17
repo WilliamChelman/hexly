@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   AvailableType,
+  Field,
   FieldDataType,
-  FieldSchema,
   isFacetableField,
   resolveEffectiveFields,
   TypeFieldRefsResolver,
@@ -71,14 +71,13 @@ export class WorldTypeFields {
   }
 
   /**
-   * An Entity's **effective Field set** (CONTEXT.md → Entity, ADR-0054): its attached Fields (`fieldIds`)
-   * unioned with its types' defaults, deduped by document `key` with precedence instance > primary type
-   * > later types. What every downstream pure function runs over, so an attached Field is validated,
-   * faceted, and edge-harvested like a type default. An id resolving to nothing (a disabled/absent
-   * plugin's Field, or a deleted World Field, ADR-0052/0054) is skipped, its value left untouched
-   * (forward-only) — one resolution path, id → Field, with no inline schema.
+   * An Entity's **effective Field set** (CONTEXT.md → Entity, ADR-0054/ADR-0056): its attached Fields
+   * (`fieldIds`) unioned with its types' defaults, deduped by `id`. What every downstream pure function
+   * runs over, so an attached Field is validated, faceted, and edge-harvested like a type default. An id
+   * resolving to nothing (a disabled/absent plugin's Field, or a deleted World Field, ADR-0052/0054) is
+   * skipped, its value left untouched (forward-only) — one resolution path, id → Field, with no inline schema.
    */
-  effectiveFields(worldId: string | undefined, types: readonly string[], fieldIds: readonly string[]): FieldSchema[] {
+  effectiveFields(worldId: string | undefined, types: readonly string[], fieldIds: readonly string[]): Field[] {
     // World-scoped when a `worldId` is in play so its user-defined Fields resolve too; else the Plugin
     // fields alone (a gate that runs before a row's World is known).
     const fieldResolver = worldId ? this.worldFields.resolverFor(worldId) : this.plugins.fieldResolver;
@@ -102,10 +101,10 @@ export class WorldTypeFields {
   facetSourcesByKey(worldId: string | undefined): Map<string, FacetSource> {
     const byKey = new Map<string, FacetSource>();
     // Scalar Fields first — Plugin then World, so a World-defined Field wins the key (ADR-0054).
-    for (const field of this.plugins.fields()) if (isFacetableField(field)) byKey.set(field.key, scalarSource(field));
+    for (const field of this.plugins.fields()) if (isFacetableField(field)) byKey.set(field.id, scalarSource(field));
     if (worldId)
       for (const field of this.worldFields.list(worldId))
-        if (isFacetableField(field)) byKey.set(field.key, scalarSource(field));
+        if (isFacetableField(field)) byKey.set(field.id, scalarSource(field));
     // Then harvested dimensions — the scalar walk ran first, so a shared key keeps its scalar (ADR-0055).
     for (const dataType of this.plugins.structuredDataTypes.values())
       for (const dimension of dataType.facetDimensions ?? [])
@@ -133,6 +132,6 @@ export interface FacetSource {
 }
 
 /** A scalar Field as a {@link FacetSource}: its authored `label`, no `labelKey` (nothing to translate). */
-function scalarSource(field: FieldSchema): FacetSource {
-  return { key: field.key, label: field.label, dataType: field.dataType };
+function scalarSource(field: Field): FacetSource {
+  return { key: field.id, label: field.label, dataType: field.dataType };
 }

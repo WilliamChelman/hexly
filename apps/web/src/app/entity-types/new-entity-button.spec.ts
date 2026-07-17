@@ -228,7 +228,7 @@ describe('NewEntityButton', () => {
     // no longer has a required *scalar* Field — its stat block is structured, ADR-0055 — so it creates blind.)
     const registry = TestBed.inject(TypeRegistry);
     registry.setWorldFields([
-      defineField({ id: 'world.rank', key: 'rank', label: 'Rank', dataType: { kind: 'number' }, required: true }),
+      defineField({ id: 'world.rank', label: 'Rank', dataType: { kind: 'number' }, required: true }),
     ]);
     registry.register(worldType('world.knight', ['world.rank']));
     const fixture = render();

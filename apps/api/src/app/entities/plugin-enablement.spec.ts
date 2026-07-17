@@ -74,13 +74,12 @@ describe('plugin enablement — uniform absence on the server', () => {
       const registry = new TypeFieldRegistry(allEnabled());
       expect(registry.fieldResolver('core.grid')).toMatchObject({
         id: 'core.grid',
-        key: 'core.grid',
         dataType: { kind: CORE_HEX_GRID },
       });
       // The content plugin owns the prose Field; the hexmap and dnd types reference it by id.
-      expect(registry.fieldResolver('core.content')?.key).toBe('core.content');
+      expect(registry.fieldResolver('core.content')?.id).toBe('core.content');
       // The thirteen scalar stat Fields retired: dnd contributes the one `dnd.stat-block` Field now (ADR-0055).
-      expect(registry.fieldResolver('dnd.stat_block')?.key).toBe('dnd.stat_block');
+      expect(registry.fieldResolver('dnd.stat_block')?.id).toBe('dnd.stat_block');
     });
 
     it('drops a disabled Plugin’s Fields — a reference degrades to a plain value', () => {
@@ -88,7 +87,7 @@ describe('plugin enablement — uniform absence on the server', () => {
       expect(registry.fieldResolver('core.grid')).toBeUndefined();
       // `core.content` is owned by the (still-enabled) content plugin, so the hexmap type's other
       // reference still resolves.
-      expect(registry.fieldResolver('core.content')?.key).toBe('core.content');
+      expect(registry.fieldResolver('core.content')?.id).toBe('core.content');
     });
 
     it('resolves nothing for an unknown id', () => {

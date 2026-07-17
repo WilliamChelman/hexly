@@ -29,7 +29,7 @@ export class OutlineStore {
   readonly headings = computed<OutlineHeading[]>(
     () => {
       // The prose lives at the `content` Field key now (ADR-0051); a prose-less body has no headings.
-      const content = this.session.doc()[CONTENT_FIELD.key] as Content | undefined;
+      const content = this.session.doc()[CONTENT_FIELD.id] as Content | undefined;
       return content ? extractOutline(content) : [];
     },
     {

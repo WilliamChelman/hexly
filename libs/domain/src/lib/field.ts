@@ -1,10 +1,10 @@
 /**
- * Typed **Fields** as a lens over **EntityDocument** (CONTEXT.md → Field, ADR-0048).
+ * Typed **Fields** as a lens over **EntityDocument** (CONTEXT.md → Field, ADR-0048, ADR-0056).
  *
- * A Field is not a store: it gives one EntityDocument key a name, a data-type, and facet-ability, while the
- * value stays in the Entity's one EntityDocument map. An absent Type Definition (a missing plugin) leaves
- * the value as plain EntityDocument, and Obsidian import/export (ADR-0033) is untouched — the Field only
- * *types and surfaces* a key it never owns.
+ * A Field is not a store: its `id` — one `namespace.id` key — names the EntityDocument slot it types, gives
+ * it a data-type and facet-ability, while the value stays in the Entity's one EntityDocument map. An absent
+ * Type Definition (a missing plugin) leaves the value as plain EntityDocument, and Obsidian import/export
+ * (ADR-0033) is untouched — the Field only *types and surfaces* a key it never owns.
  */
 
 import { z } from 'zod';
@@ -138,17 +138,17 @@ export function isEntityLinkDataType(dataType: FieldDataType): boolean {
  * whatever its `facetable` flag says (ADR-0050): the blob has no discrete values to count. Its Data Type
  * may still *harvest* facet dimensions instead ({@link deriveFieldFacets}, ADR-0055).
  */
-export function isFacetableField(field: FieldSchema): field is FieldSchema & { dataType: BuiltInDataType } {
+export function isFacetableField(field: Field): field is Field & { dataType: BuiltInDataType } {
   return field.facetable && !isStructuredDataType(field.dataType);
 }
 
 /**
- * One Field's declaration in a Type Definition's schema: the EntityDocument `key` it types, a human `label`,
- * its `dataType`, whether it is `required`, and whether it is `facetable` (surfaced as a per-type facet
- * in the Entity Browser, ADR-0035).
+ * A Field's attributes *without* its identity (ADR-0056): a human `label`, its `dataType`, whether it is
+ * `required`, and whether it is `facetable` (surfaced as a per-type facet in the Entity Browser, ADR-0035).
+ * The id-less half a create/update request body carries; {@link fieldSchema} promotes it with the `id` that
+ * *is* its EntityDocument key.
  */
 export const fieldSchemaSchema = z.object({
-  key: z.string().trim().min(1),
   label: z.string().trim().min(1),
   /**
    * A transloco key for this Field's display name, set only on a **code-registered** Field (a plugin's,
@@ -170,11 +170,11 @@ export const fieldSchemaSchema = z.object({
 export type FieldSchema = z.infer<typeof fieldSchemaSchema>;
 
 /**
- * A first-class, reusable **Field** (CONTEXT.md → Field, ADR-0054): a {@link FieldSchema} promoted with a
- * `namespace.id` {@link fieldIdSchema} `id`, its reuse handle. A Type Definition references one by id
- * (`fieldRefs`) and an Entity attaches one by id (`fields`), so the same Field is a default of many types
- * or rides an Entity whose types never named it. Structurally a superset of `FieldSchema`, so every
- * downstream pure function that already takes a `FieldSchema[]` runs over a resolved `Field[]` unchanged.
+ * A first-class, reusable **Field** (CONTEXT.md → Field, ADR-0054/ADR-0056): a {@link FieldSchema} promoted
+ * with its `namespace.id` {@link fieldIdSchema} `id` — its reuse handle *and* the EntityDocument key it
+ * lenses, one identifier (ADR-0056). A Type Definition references one by id (`fieldRefs`) and an Entity
+ * attaches one by id (`fields`), so the same Field is a default of many types or rides an Entity whose types
+ * never named it. Every downstream pure function keys the document off `field.id`.
  */
 export const fieldSchema = fieldSchemaSchema.extend({ id: fieldIdSchema });
 
@@ -189,7 +189,6 @@ export type Field = z.infer<typeof fieldSchema>;
  */
 export function defineField(definition: {
   readonly id: string;
-  readonly key: string;
   readonly label: string;
   readonly labelKey?: string;
   readonly dataType: FieldDataType;
@@ -214,18 +213,20 @@ export type FieldResolver = (id: string) => Field | undefined;
 export type TypeFieldRefsResolver = (typeId: string) => readonly string[] | undefined;
 
 /**
- * The **effective Field set** of an Entity (CONTEXT.md → Entity, ADR-0054): its directly-attached Fields
- * (`fieldIds`) unioned with its types' default Fields (each type's `fieldRefs`, primary type first),
- * every id resolved to a {@link Field} and the whole deduped by document `key`.
+ * The **effective Field set** of an Entity (CONTEXT.md → Entity, ADR-0054/ADR-0056): its directly-attached
+ * Fields (`fieldIds`) unioned with its types' default Fields (each type's `fieldRefs`, primary type first),
+ * every id resolved to a {@link Field} and the whole deduped by `id`.
  *
- * Precedence, when two Fields resolve to one `key`: **instance > primary type > later types** — the
- * most-specific source wins the key, the loser simply drops from the set (its document value is left
- * untouched, forward-only tolerance). An id that resolves to nothing is skipped, so a disabled plugin or
- * a deleted World Field degrades to a plain document value rather than erroring. The one resolution
- * path (id → Field): a Type Definition names its default Fields by id (`fieldRefs`), never inline.
+ * Dedup is by id alone (ADR-0056): a Field reaching an Entity via both a direct attach and a type default
+ * resolves to one entry (first seen wins — instance, then types primary→later). Because a `namespace.id`
+ * key is unique, two *different* Fields can never claim one key, so the old "dedup by key, most-specific
+ * wins" override retires — two differently-named Fields occupy two distinct keys and neither shadows the
+ * other. An id that resolves to nothing is skipped, so a disabled plugin or a deleted World Field degrades
+ * to a plain document value rather than erroring. The one resolution path (id → Field): a Type Definition
+ * names its default Fields by id (`fieldRefs`), never inline.
  *
- * The returned order encodes that precedence (instance-attached first, then types primary→later); display
- * and View ordering is a concern of the layer that consumes the set, not of resolution.
+ * The returned order is instance-attached first, then types primary→later; display and View ordering is a
+ * concern of the layer that consumes the set, not of resolution.
  */
 export function resolveEffectiveFields(args: {
   readonly types: readonly string[];
@@ -234,15 +235,15 @@ export function resolveEffectiveFields(args: {
   readonly typeFieldRefs: TypeFieldRefsResolver;
 }): Field[] {
   const { types, fieldIds, fieldResolver, typeFieldRefs } = args;
-  const byKey = new Map<string, Field>();
+  const byId = new Map<string, Field>();
   const consider = (id: string) => {
     const field = fieldResolver(id);
-    if (field && !byKey.has(field.key)) byKey.set(field.key, field);
+    if (field && !byId.has(field.id)) byId.set(field.id, field);
   };
-  // Instance attachments first (most specific), then each type's defaults in `types` order.
+  // Instance attachments first, then each type's defaults in `types` order.
   for (const id of fieldIds) consider(id);
   for (const type of types) for (const id of typeFieldRefs(type) ?? []) consider(id);
-  return [...byKey.values()];
+  return [...byId.values()];
 }
 
 /**
@@ -277,7 +278,7 @@ export interface FieldValidation {
  * rejected where the Type is declared instead ({@link unresolvedDataTypeErrors}).
  */
 export function validateFields(
-  fields: readonly FieldSchema[],
+  fields: readonly Field[],
   doc: EntityDocument | undefined,
   dataTypes: StructuredDataTypeSet,
 ): FieldValidation {
@@ -285,12 +286,12 @@ export function validateFields(
   for (const field of fields) {
     const matches = valueMatcher(field.dataType, dataTypes);
     if (!matches) continue;
-    const value = doc?.[field.key];
+    const value = doc?.[field.id];
     if (isAbsent(value)) {
-      if (field.required) errors.push({ key: field.key, code: 'required' });
+      if (field.required) errors.push({ key: field.id, code: 'required' });
       continue;
     }
-    if (!matches(value)) errors.push({ key: field.key, code: 'type' });
+    if (!matches(value)) errors.push({ key: field.id, code: 'type' });
   }
   return { ok: errors.length === 0, errors };
 }
@@ -314,13 +315,10 @@ function valueMatcher(
  * not carry. Run where a Type is declared (a plugin type at startup, a **User-defined type** as a
  * World Owner saves it), never against an Entity's EntityDocument.
  */
-export function unresolvedDataTypeErrors(
-  fields: readonly FieldSchema[],
-  dataTypes: StructuredDataTypeSet,
-): FieldError[] {
+export function unresolvedDataTypeErrors(fields: readonly Field[], dataTypes: StructuredDataTypeSet): FieldError[] {
   return fields.flatMap((field) =>
     isStructuredDataType(field.dataType) && !resolveStructuredDataType(dataTypes, field.dataType)
-      ? [{ key: field.key, code: 'unknown-data-type' as const }]
+      ? [{ key: field.id, code: 'unknown-data-type' as const }]
       : [],
   );
 }
@@ -346,7 +344,7 @@ export interface FieldFacetValue {
  * collapse so a count is per-Entity.
  */
 export function deriveFieldFacets(
-  fields: readonly FieldSchema[],
+  fields: readonly Field[],
   doc: EntityDocument | undefined,
   dataTypes: StructuredDataTypeSet,
 ): FieldFacetValue[] {
@@ -365,7 +363,7 @@ export function deriveFieldFacets(
     if (!isFacetableField(field)) continue;
     const raw = readField(doc, field);
     if (raw === undefined || raw === null) continue;
-    for (const item of facetItems(field.dataType, raw)) add({ key: field.key, value: item.value, num: item.num });
+    for (const item of facetItems(field.dataType, raw)) add({ key: field.id, value: item.value, num: item.num });
   }
   // Then each structured Field's harvested dimensions (ADR-0055) — the wrapper already degraded an
   // at-rest value and dropped any undeclared key.
@@ -401,14 +399,14 @@ function scalarFacet(dataType: ScalarDataType, raw: unknown): { value: string; n
  * forward-only). Feeds {@link harvestEdges}.
  */
 export function entityLinkFieldValues(
-  fields: readonly FieldSchema[],
+  fields: readonly Field[],
   doc: EntityDocument | undefined,
 ): { key: string; value: EntityLinkValue }[] {
   const out: { key: string; value: EntityLinkValue }[] = [];
   for (const field of fields) {
     if (field.dataType.kind !== 'entityLink') continue;
     const parsed = entityLinkValueSchema.safeParse(readField(doc, field));
-    if (parsed.success) out.push({ key: field.key, value: parsed.data });
+    if (parsed.success) out.push({ key: field.id, value: parsed.data });
   }
   return out;
 }
@@ -418,10 +416,10 @@ export function entityLinkFieldValues(
  * to (ADR-0050). An unregistered kind drops out rather than throwing — nothing can render or harvest it.
  */
 export function resolvedStructuredDataTypeFields(
-  fields: readonly FieldSchema[],
+  fields: readonly Field[],
   dataTypes: StructuredDataTypeSet,
-): { field: FieldSchema; dataType: StructuredDataType }[] {
-  const out: { field: FieldSchema; dataType: StructuredDataType }[] = [];
+): { field: Field; dataType: StructuredDataType }[] {
+  const out: { field: Field; dataType: StructuredDataType }[] = [];
   for (const field of fields) {
     if (!isStructuredDataType(field.dataType)) continue;
     const dataType = resolveStructuredDataType(dataTypes, field.dataType);
@@ -452,7 +450,7 @@ export interface EntityLinkConstraint {
 }
 
 export function entityLinkConstraints(
-  fields: readonly FieldSchema[],
+  fields: readonly Field[],
   doc: EntityDocument | undefined,
 ): EntityLinkConstraint[] {
   const out: EntityLinkConstraint[] = [];
@@ -461,7 +459,7 @@ export function entityLinkConstraints(
     const targetTypes = field.dataType.targetTypes ?? [];
     if (targetTypes.length === 0) continue;
     const parsed = entityLinkValueSchema.safeParse(readField(doc, field));
-    if (parsed.success) out.push({ key: field.key, entityId: parsed.data.entityId, targetTypes });
+    if (parsed.success) out.push({ key: field.id, entityId: parsed.data.entityId, targetTypes });
   }
   return out;
 }
@@ -506,19 +504,20 @@ export function parseFieldFilters(raw: readonly string[] | undefined): FieldFilt
   });
 }
 
-/** Read a Field's value straight off the EntityDocument map — the lens, so it never copies or coerces. */
-export function readField(doc: EntityDocument | undefined, field: FieldSchema): unknown {
-  return doc?.[field.key];
+/** Read a Field's value straight off the EntityDocument map at `field.id` — the lens, so it never copies or coerces. */
+export function readField(doc: EntityDocument | undefined, field: Field): unknown {
+  return doc?.[field.id];
 }
 
 /**
- * Write a Field's value back into the EntityDocument map, returning a fresh map. An emptied value clears the
- * key — a cleared Field is absent, not blank — leaving every sibling EntityDocument entry untouched.
+ * Write a Field's value back into the EntityDocument map at `field.id`, returning a fresh map. An emptied
+ * value clears the key — a cleared Field is absent, not blank — leaving every sibling EntityDocument entry
+ * untouched.
  */
-export function writeField(doc: EntityDocument | undefined, field: FieldSchema, value: unknown): EntityDocument {
+export function writeField(doc: EntityDocument | undefined, field: Field, value: unknown): EntityDocument {
   const next: EntityDocument = { ...(doc ?? {}) };
-  if (isEmpty(value)) delete next[field.key];
-  else next[field.key] = value;
+  if (isEmpty(value)) delete next[field.id];
+  else next[field.id] = value;
   return next;
 }
 
@@ -527,10 +526,10 @@ export function writeField(doc: EntityDocument | undefined, field: FieldSchema, 
  * View editing the body through Immer's `mutate`, where the body **is** the map (ADR-0051) and the draft
  * root cannot be reassigned. An emptied value deletes the key; else it sets it.
  */
-export function writeFieldInPlace(draft: EntityDocument, field: FieldSchema, value: unknown): void {
+export function writeFieldInPlace(draft: EntityDocument, field: Field, value: unknown): void {
   const next = writeField(draft, field, value);
-  if (field.key in next) draft[field.key] = next[field.key];
-  else delete draft[field.key];
+  if (field.id in next) draft[field.id] = next[field.id];
+  else delete draft[field.id];
 }
 
 /** Absent for the *required* check: `undefined`/`null` (an absent key), not a present-but-empty value. */

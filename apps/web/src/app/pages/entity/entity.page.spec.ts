@@ -159,7 +159,7 @@ describe('EntityPage routing', () => {
   it('restores the View of a Field of a Structured Data Type — Field key and all — from ?view (ADR-0050)', async () => {
     // A map View is bound to the Field it renders, so the param carries both: a reload or a shared link
     // has to land on *this* grid, not merely on "a map".
-    await configure('m1', { view: viewInstanceKey({ viewId: CORE_VIEW_MAP, fieldKey: HEX_GRID_FIELD.key }) });
+    await configure('m1', { view: viewInstanceKey({ viewId: CORE_VIEW_MAP, fieldKey: HEX_GRID_FIELD.id }) });
     entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
     const fixture = mount();
     await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_MAP);
@@ -169,7 +169,7 @@ describe('EntityPage routing', () => {
     expect(el.querySelector('app-map-canvas')).not.toBeNull();
     expect(fixture.debugElement.injector.get(EntityViewStore).activeView()).toEqual({
       viewId: CORE_VIEW_MAP,
-      fieldKey: HEX_GRID_FIELD.key,
+      fieldKey: HEX_GRID_FIELD.id,
     });
   });
 

@@ -28,7 +28,7 @@ describe('dnd.monster', () => {
       typeFieldRefs: () => DND_MONSTER_TYPE.fieldRefs,
     });
 
-    expect(fields.map((field) => field.key)).toContain(DND_STAT_BLOCK_KEY);
+    expect(fields.map((field) => field.id)).toContain(DND_STAT_BLOCK_KEY);
 
     // The forward-only gate resolves the stat block against its own valueSchema (ADR-0050/0055): a
     // well-typed block passes; a mistyped stat (a CR that is a string a block prints, not a number) fails.

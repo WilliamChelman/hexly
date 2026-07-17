@@ -13,7 +13,6 @@ describe('WorldTypesLoader', () => {
   // A World's own Fields, resolved through the registry by the ids a type references (ADR-0054).
   const domainField = defineField({
     id: 'world.domain',
-    key: 'domain',
     label: 'Domain',
     dataType: { kind: 'string' },
     facetable: true,
@@ -21,7 +20,6 @@ describe('WorldTypesLoader', () => {
   /** A World Owner's own **Field of a Structured Data Type**: a grid on the type they defined, no code (#201). */
   const battlemapField = defineField({
     id: 'world.battlemap',
-    key: 'battlemap',
     label: 'Battlemap',
     dataType: { kind: 'core.hex-grid' },
   });
@@ -64,7 +62,7 @@ describe('WorldTypesLoader', () => {
     // Prose is a Field of a Structured Data Type now, so a deity gets a content View only when it declares one.
     expect(def?.views).toEqual([CORE_VIEW_FIELDS]);
     // Its Fields resolve, so the generic view and facets pick them up.
-    expect(registry.resolveFields(['world.deity']).map((f) => f.key)).toEqual(['domain']);
+    expect(registry.resolveFields(['world.deity']).map((f) => f.id)).toEqual(['world.domain']);
   });
 
   it('defaults the View of a Field of a Structured Data Type to *last*, so a deity with a battlemap still opens on its Fields', () => {
@@ -72,7 +70,7 @@ describe('WorldTypesLoader', () => {
     worldId.set('w1');
     TestBed.flushEffects();
 
-    expect(registry.get('world.deity')?.views).toEqual([CORE_VIEW_FIELDS, { field: 'battlemap' }]);
+    expect(registry.get('world.deity')?.views).toEqual([CORE_VIEW_FIELDS, { field: 'world.battlemap' }]);
   });
 
   it('projects the author’s own View order verbatim, so "Show as a view" can drop one', () => {

@@ -24,10 +24,9 @@ describe('the core.hex-grid Structured Data Type (ADR-0050)', () => {
       fieldResolver: (id) => byId.get(id),
       typeFieldRefs: () => CORE_HEXMAP_TYPE.fieldRefs,
     });
-    expect(fields.map((field) => field.key)).toEqual([CONTENT_FIELD.key, HEX_GRID_FIELD.key]);
+    expect(fields.map((field) => field.id)).toEqual([CONTENT_FIELD.id, HEX_GRID_FIELD.id]);
     expect(HEX_GRID_FIELD).toMatchObject({
       id: 'core.grid',
-      key: 'core.grid',
       dataType: { kind: CORE_HEX_GRID },
       facetable: false,
     });

@@ -51,7 +51,7 @@ describe('SaveStatus', () => {
         EntitySession,
         HexMapStore,
         // The store edits *a* grid, so it is told which — as the entity page's outlet tells it.
-        { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.key },
+        { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.id },
         { provide: ENTITY_SESSION, useExisting: EntitySession },
         { provide: EntitiesClient, useValue: entities },
         provideRouter([]),

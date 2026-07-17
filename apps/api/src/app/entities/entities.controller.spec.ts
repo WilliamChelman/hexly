@@ -528,8 +528,8 @@ describe('Entities endpoints', () => {
     // A plugin-style type declaring a required string Field and an optional number Field.
     beforeEach(() => {
       registerType(app.get(TypeFieldRegistry), 'test.beast', [
-        defineField({ id: 'test.name', key: 'name', label: 'Name', dataType: { kind: 'string' }, required: true }),
-        defineField({ id: 'test.cr', key: 'cr', label: 'Challenge Rating', dataType: { kind: 'number' } }),
+        defineField({ id: 'test.name', label: 'Name', dataType: { kind: 'string' }, required: true }),
+        defineField({ id: 'test.cr', label: 'Challenge Rating', dataType: { kind: 'number' } }),
       ]);
     });
 
@@ -545,7 +545,7 @@ describe('Entities endpoints', () => {
       const res = await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: bodyWith({ cr: 10 }),
+          document: bodyWith({ 'test.cr': 10 }),
           version: 1,
           tags: [],
           types: ['test.beast'],
@@ -553,7 +553,7 @@ describe('Entities endpoints', () => {
         .expect(400);
       expect(res.body.code).toBe('invalid-fields');
       expect(res.body.data.fields).toContainEqual({
-        key: 'name',
+        key: 'test.name',
         code: 'required',
       });
     });
@@ -565,13 +565,13 @@ describe('Entities endpoints', () => {
       const res = await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: bodyWith({ name: 'Aboleth', cr: 'huge' }),
+          document: bodyWith({ 'test.name': 'Aboleth', 'test.cr': 'huge' }),
           version: 1,
           tags: [],
           types: ['test.beast'],
         })
         .expect(400);
-      expect(res.body.data.fields).toContainEqual({ key: 'cr', code: 'type' });
+      expect(res.body.data.fields).toContainEqual({ key: 'test.cr', code: 'type' });
     });
 
     it('accepts a typed edit that satisfies the type’s Fields, keeping values in the EntityDocument map', async () => {
@@ -581,14 +581,14 @@ describe('Entities endpoints', () => {
       const res = await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: bodyWith({ name: 'Aboleth', cr: 10 }),
+          document: bodyWith({ 'test.name': 'Aboleth', 'test.cr': 10 }),
           version: 1,
           tags: [],
           types: ['test.beast'],
         })
         .expect(200);
       expect(res.body.types).toEqual(['test.beast']);
-      expect(res.body.document).toEqual({ 'core.content': emptyContent(), name: 'Aboleth', cr: 10 });
+      expect(res.body.document).toEqual({ 'core.content': emptyContent(), 'test.name': 'Aboleth', 'test.cr': 10 });
     });
 
     it('accepts a plain body save that omits types — data at rest is never retroactively invalidated', async () => {
@@ -600,7 +600,7 @@ describe('Entities endpoints', () => {
       await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: bodyWith({ cr: 'still wrong' }),
+          document: bodyWith({ 'test.cr': 'still wrong' }),
           version: 1,
           tags: [],
         })
@@ -621,17 +621,17 @@ describe('Entities endpoints', () => {
         name: 'Kraken',
         types: ['test.beast'],
         tags: [],
-        document: bodyWith({ cr: 'wrong' }),
+        document: bodyWith({ 'test.cr': 'wrong' }),
       });
       await ada.get('/entities/imported-beast').expect(200);
 
       // At rest: corrupt the stored EntityDocument directly, then confirm a read never validates it.
       db.update(entities)
-        .set({ document: JSON.stringify(bodyWith({ cr: 'wrong at rest' })) })
+        .set({ document: JSON.stringify(bodyWith({ 'test.cr': 'wrong at rest' })) })
         .where(eq(entities.id, created.body.id))
         .run();
       const loaded = await ada.get(`/entities/${created.body.id}`).expect(200);
-      expect(loaded.body.document).toEqual({ 'core.content': emptyContent(), cr: 'wrong at rest' });
+      expect(loaded.body.document).toEqual({ 'core.content': emptyContent(), 'test.cr': 'wrong at rest' });
     });
   });
 
@@ -1341,28 +1341,24 @@ describe('Entities endpoints', () => {
       registerType(app.get(TypeFieldRegistry), 'test.beast', [
         defineField({
           id: 'test.alignment',
-          key: 'alignment',
           label: 'Alignment',
           dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
           facetable: true,
         }),
         defineField({
           id: 'test.cr',
-          key: 'cr',
           label: 'Challenge Rating',
           dataType: { kind: 'number' },
           facetable: true,
         }),
         defineField({
           id: 'test.discovered',
-          key: 'discovered',
           label: 'Discovered',
           dataType: { kind: 'date' },
           facetable: true,
         }),
         defineField({
           id: 'test.senses',
-          key: 'senses',
           label: 'Senses',
           dataType: { kind: 'list', of: { kind: 'string' } },
           facetable: true,
@@ -1370,7 +1366,6 @@ describe('Entities endpoints', () => {
         // Declared but not facetable — never surfaces as a Field facet.
         defineField({
           id: 'test.secret',
-          key: 'secret',
           label: 'Secret',
           dataType: { kind: 'string' },
           facetable: false,
@@ -1407,8 +1402,12 @@ describe('Entities endpoints', () => {
 
     it('surfaces a facetable Field by presence in the result set, no active Type filter needed (#231)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const kobold = await beast(ada, 'Kobold', { alignment: 'lawful-good', cr: 1, secret: 'hidden' });
-      await beast(ada, 'Aboleth', { alignment: 'chaotic-evil', cr: 10 });
+      const kobold = await beast(ada, 'Kobold', {
+        'test.alignment': 'lawful-good',
+        'test.cr': 1,
+        'test.secret': 'hidden',
+      });
+      await beast(ada, 'Aboleth', { 'test.alignment': 'chaotic-evil', 'test.cr': 10 });
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
 
       // No active Type filter: Field facets surface by presence, universal facets present as always.
@@ -1416,8 +1415,8 @@ describe('Entities endpoints', () => {
       const fields = res.body.fields as FieldFacetBody[];
       // Only Fields the result set carries values for surface — `discovered`/`senses` are declared
       // facetable but unset, so they never appear; the non-facetable `secret` never appears either.
-      expect(fields.map((f) => f.key).sort()).toEqual(['alignment', 'cr']);
-      const alignment = fields.find((f) => f.key === 'alignment')!;
+      expect(fields.map((f) => f.key).sort()).toEqual(['test.alignment', 'test.cr']);
+      const alignment = fields.find((f) => f.key === 'test.alignment')!;
       expect(alignment.label).toBe('Alignment');
       expect(alignment.dataType).toEqual({ kind: 'enum', options: ['lawful-good', 'chaotic-evil'] });
       expect(byValue(alignment.values)).toEqual([
@@ -1434,21 +1433,20 @@ describe('Entities endpoints', () => {
       registerType(app.get(TypeFieldRegistry), 'test.spirit', [
         defineField({
           id: 'test.alignment',
-          key: 'alignment',
           label: 'Alignment',
           dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
           facetable: true,
         }),
       ]);
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const kobold = await beast(ada, 'Kobold', { alignment: 'lawful-good', cr: 1 });
+      const kobold = await beast(ada, 'Kobold', { 'test.alignment': 'lawful-good', 'test.cr': 1 });
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
       // A spirit (a different type) carrying the same Field, saved as an active typed edit.
       const spirit = await ada.post('/entities').send({ name: 'Wisp', types: ['core.note'] });
       await ada
         .put(`/entities/${spirit.body.id}`)
         .send({
-          document: { 'core.content': emptyContent(), alignment: 'lawful-good' },
+          document: { 'core.content': emptyContent(), 'test.alignment': 'lawful-good' },
           version: 1,
           tags: [],
           types: ['test.spirit'],
@@ -1457,48 +1455,51 @@ describe('Entities endpoints', () => {
 
       // No Type filter: the single `alignment` facet counts both types' Entities together.
       const res = await ada.get('/entities/facets').query({ worldId }).expect(200);
-      const alignment = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'alignment')!;
+      const alignment = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'test.alignment')!;
       expect(alignment).toBeDefined();
       expect(byValue(alignment.values)).toEqual([{ value: 'lawful-good', count: 2 }]);
     });
 
     it('keeps an actively-filtered Field on the rail even when its selected value matches nothing (drill-down)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const kobold = await beast(ada, 'Kobold', { alignment: 'lawful-good', cr: 1 });
-      await beast(ada, 'Sphinx', { alignment: 'lawful-good', cr: 11 });
+      const kobold = await beast(ada, 'Kobold', { 'test.alignment': 'lawful-good', 'test.cr': 1 });
+      await beast(ada, 'Sphinx', { 'test.alignment': 'lawful-good', 'test.cr': 11 });
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
 
       // Filter to a value no Entity carries: like the universal facets, `alignment` drops its own filter
       // when counting, so it stays on the rail listing the value you *could* switch to — not vanishing.
-      const res = await ada.get('/entities/facets').query({ worldId, field: 'alignment:eq:chaotic-evil' }).expect(200);
-      const alignment = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'alignment')!;
+      const res = await ada
+        .get('/entities/facets')
+        .query({ worldId, field: 'test.alignment:eq:chaotic-evil' })
+        .expect(200);
+      const alignment = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'test.alignment')!;
       expect(alignment).toBeDefined();
       expect(byValue(alignment.values)).toEqual([{ value: 'lawful-good', count: 2 }]);
     });
 
     it('filters the list by an enum Field value (membership)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      await beast(ada, 'Kobold', { alignment: 'lawful-good', cr: 1 });
-      await beast(ada, 'Aboleth', { alignment: 'chaotic-evil', cr: 10 });
+      await beast(ada, 'Kobold', { 'test.alignment': 'lawful-good', 'test.cr': 1 });
+      await beast(ada, 'Aboleth', { 'test.alignment': 'chaotic-evil', 'test.cr': 10 });
 
       const res = await ada
         .get('/entities')
-        .query({ type: 'test.beast', field: 'alignment:eq:lawful-good' })
+        .query({ type: 'test.beast', field: 'test.alignment:eq:lawful-good' })
         .expect(200);
       expect(names(res)).toEqual(['Kobold']);
     });
 
     it('ORs multiple values within one enum Field', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      await beast(ada, 'Kobold', { alignment: 'lawful-good', cr: 1 });
-      await beast(ada, 'Aboleth', { alignment: 'chaotic-evil', cr: 10 });
-      await beast(ada, 'Sphinx', { alignment: 'lawful-good', cr: 11 });
+      await beast(ada, 'Kobold', { 'test.alignment': 'lawful-good', 'test.cr': 1 });
+      await beast(ada, 'Aboleth', { 'test.alignment': 'chaotic-evil', 'test.cr': 10 });
+      await beast(ada, 'Sphinx', { 'test.alignment': 'lawful-good', 'test.cr': 11 });
 
       const res = await ada
         .get('/entities')
         .query({
           type: 'test.beast',
-          field: ['alignment:eq:chaotic-evil', 'alignment:eq:lawful-good'],
+          field: ['test.alignment:eq:chaotic-evil', 'test.alignment:eq:lawful-good'],
         })
         .expect(200);
       expect(names(res)).toEqual(['Aboleth', 'Kobold', 'Sphinx']);
@@ -1506,18 +1507,18 @@ describe('Entities endpoints', () => {
 
     it('filters the list by a numeric Field range, comparing as a number not a string', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      await beast(ada, 'Kobold', { alignment: 'lawful-good', cr: 1 });
-      await beast(ada, 'Sphinx', { alignment: 'lawful-good', cr: 5 });
-      await beast(ada, 'Aboleth', { alignment: 'chaotic-evil', cr: 10 });
+      await beast(ada, 'Kobold', { 'test.alignment': 'lawful-good', 'test.cr': 1 });
+      await beast(ada, 'Sphinx', { 'test.alignment': 'lawful-good', 'test.cr': 5 });
+      await beast(ada, 'Aboleth', { 'test.alignment': 'chaotic-evil', 'test.cr': 10 });
 
       // cr >= 5: a string compare would drop '10' (< '5' lexically); the numeric `num` keeps it.
-      const gte = await ada.get('/entities').query({ type: 'test.beast', field: 'cr:gte:5' }).expect(200);
+      const gte = await ada.get('/entities').query({ type: 'test.beast', field: 'test.cr:gte:5' }).expect(200);
       expect(names(gte)).toEqual(['Aboleth', 'Sphinx']);
 
       // A bounded range ANDs the two bounds.
       const range = await ada
         .get('/entities')
-        .query({ type: 'test.beast', field: ['cr:gte:5', 'cr:lte:9'] })
+        .query({ type: 'test.beast', field: ['test.cr:gte:5', 'test.cr:lte:9'] })
         .expect(200);
       expect(names(range)).toEqual(['Sphinx']);
     });
@@ -1525,49 +1526,52 @@ describe('Entities endpoints', () => {
     it('filters the list by list-membership on a list Field', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       await beast(ada, 'Kobold', {
-        alignment: 'lawful-good',
-        cr: 1,
-        senses: ['darkvision'],
+        'test.alignment': 'lawful-good',
+        'test.cr': 1,
+        'test.senses': ['darkvision'],
       });
       await beast(ada, 'Aboleth', {
-        alignment: 'chaotic-evil',
-        cr: 10,
-        senses: ['darkvision', 'truesight'],
+        'test.alignment': 'chaotic-evil',
+        'test.cr': 10,
+        'test.senses': ['darkvision', 'truesight'],
       });
       await beast(ada, 'Sphinx', {
-        alignment: 'lawful-good',
-        cr: 11,
-        senses: ['truesight'],
+        'test.alignment': 'lawful-good',
+        'test.cr': 11,
+        'test.senses': ['truesight'],
       });
 
       // Membership matches any Entity whose list contains the value.
-      const res = await ada.get('/entities').query({ type: 'test.beast', field: 'senses:eq:truesight' }).expect(200);
+      const res = await ada
+        .get('/entities')
+        .query({ type: 'test.beast', field: 'test.senses:eq:truesight' })
+        .expect(200);
       expect(names(res)).toEqual(['Aboleth', 'Sphinx']);
     });
 
     it('filters the list by a date Field range (lexical ISO compare)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       await beast(ada, 'Kobold', {
-        alignment: 'lawful-good',
-        cr: 1,
-        discovered: '2020-01-01',
+        'test.alignment': 'lawful-good',
+        'test.cr': 1,
+        'test.discovered': '2020-01-01',
       });
       await beast(ada, 'Sphinx', {
-        alignment: 'lawful-good',
-        cr: 11,
-        discovered: '2023-06-15',
+        'test.alignment': 'lawful-good',
+        'test.cr': 11,
+        'test.discovered': '2023-06-15',
       });
       await beast(ada, 'Aboleth', {
-        alignment: 'chaotic-evil',
-        cr: 10,
-        discovered: '2026-12-31',
+        'test.alignment': 'chaotic-evil',
+        'test.cr': 10,
+        'test.discovered': '2026-12-31',
       });
 
       const res = await ada
         .get('/entities')
         .query({
           type: 'test.beast',
-          field: ['discovered:gte:2022-01-01', 'discovered:lte:2025-01-01'],
+          field: ['test.discovered:gte:2022-01-01', 'test.discovered:lte:2025-01-01'],
         })
         .expect(200);
       expect(names(res)).toEqual(['Sphinx']);
@@ -1576,10 +1580,10 @@ describe('Entities endpoints', () => {
     it('surfaces the date and list Field facets with their data-type for the rail’s control', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const kobold = await beast(ada, 'Kobold', {
-        alignment: 'lawful-good',
-        cr: 1,
-        discovered: '2020-01-01',
-        senses: ['darkvision', 'truesight'],
+        'test.alignment': 'lawful-good',
+        'test.cr': 1,
+        'test.discovered': '2020-01-01',
+        'test.senses': ['darkvision', 'truesight'],
       });
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
 
@@ -1589,11 +1593,11 @@ describe('Entities endpoints', () => {
         dataType: { kind: string };
         values: { value: string; count: number }[];
       }[];
-      expect(fields.find((f) => f.key === 'discovered')!.dataType).toEqual({
+      expect(fields.find((f) => f.key === 'test.discovered')!.dataType).toEqual({
         kind: 'date',
       });
       // A list Field explodes to one facet value per item.
-      expect(byValue(fields.find((f) => f.key === 'senses')!.values).map((v) => v.value)).toEqual([
+      expect(byValue(fields.find((f) => f.key === 'test.senses')!.values).map((v) => v.value)).toEqual([
         'darkvision',
         'truesight',
       ]);
@@ -1601,15 +1605,15 @@ describe('Entities endpoints', () => {
 
     it('ANDs a Field filter across different keys and with the universal facets', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      await beast(ada, 'Kobold', { alignment: 'lawful-good', cr: 1 });
-      await beast(ada, 'Sphinx', { alignment: 'lawful-good', cr: 11 });
-      await beast(ada, 'Aboleth', { alignment: 'chaotic-evil', cr: 10 });
+      await beast(ada, 'Kobold', { 'test.alignment': 'lawful-good', 'test.cr': 1 });
+      await beast(ada, 'Sphinx', { 'test.alignment': 'lawful-good', 'test.cr': 11 });
+      await beast(ada, 'Aboleth', { 'test.alignment': 'chaotic-evil', 'test.cr': 10 });
 
       const res = await ada
         .get('/entities')
         .query({
           type: 'test.beast',
-          field: ['alignment:eq:lawful-good', 'cr:gte:5'],
+          field: ['test.alignment:eq:lawful-good', 'test.cr:gte:5'],
         })
         .expect(200);
       expect(names(res)).toEqual(['Sphinx']);
@@ -1618,28 +1622,28 @@ describe('Entities endpoints', () => {
     it('drills Field-facet value counts down against the other active constraints', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const kobold = await beast(ada, 'Kobold', {
-        alignment: 'lawful-good',
-        cr: 1,
+        'test.alignment': 'lawful-good',
+        'test.cr': 1,
       });
-      await beast(ada, 'Sphinx', { alignment: 'lawful-good', cr: 11 });
-      await beast(ada, 'Aboleth', { alignment: 'chaotic-evil', cr: 10 });
+      await beast(ada, 'Sphinx', { 'test.alignment': 'lawful-good', 'test.cr': 11 });
+      await beast(ada, 'Aboleth', { 'test.alignment': 'chaotic-evil', 'test.cr': 10 });
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
 
       const res = await ada
         .get('/entities/facets')
-        .query({ worldId, type: 'test.beast', field: 'cr:gte:5' })
+        .query({ worldId, type: 'test.beast', field: 'test.cr:gte:5' })
         .expect(200);
       const fields = res.body.fields as {
         key: string;
         values: { value: string; count: number }[];
       }[];
       // The `alignment` facet is narrowed by the active `cr >= 5`: only Sphinx + Aboleth qualify.
-      expect(byValue(fields.find((f) => f.key === 'alignment')!.values)).toEqual([
+      expect(byValue(fields.find((f) => f.key === 'test.alignment')!.values)).toEqual([
         { value: 'chaotic-evil', count: 1 },
         { value: 'lawful-good', count: 1 },
       ]);
       // But the `cr` facet ignores its own filter (drill-down), so it still lists every value.
-      expect(byValue(fields.find((f) => f.key === 'cr')!.values)).toEqual([
+      expect(byValue(fields.find((f) => f.key === 'test.cr')!.values)).toEqual([
         { value: '1', count: 1 },
         { value: '10', count: 1 },
         { value: '11', count: 1 },
@@ -1649,8 +1653,8 @@ describe('Entities endpoints', () => {
     it('recomputes Field facets on the shared derive path so a re-save keeps them fresh', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const id = await beast(ada, 'Kobold', {
-        alignment: 'lawful-good',
-        cr: 1,
+        'test.alignment': 'lawful-good',
+        'test.cr': 1,
       });
       const worldId = (await ada.get(`/entities/${id}`)).body.worldId;
 
@@ -1660,8 +1664,8 @@ describe('Entities endpoints', () => {
         .send({
           document: {
             'core.content': emptyContent(),
-            alignment: 'chaotic-evil',
-            cr: 7,
+            'test.alignment': 'chaotic-evil',
+            'test.cr': 7,
           },
           version: 2,
           tags: [],
@@ -1671,7 +1675,7 @@ describe('Entities endpoints', () => {
 
       const res = await ada.get('/entities/facets').query({ worldId, type: 'test.beast' }).expect(200);
       const alignment = (res.body.fields as { key: string; values: { value: string }[] }[]).find(
-        (f) => f.key === 'alignment',
+        (f) => f.key === 'test.alignment',
       )!;
       expect(alignment.values.map((v) => v.value)).toEqual(['chaotic-evil']);
     });
@@ -1679,9 +1683,10 @@ describe('Entities endpoints', () => {
 
   describe('Harvested facet dimensions surface as Facets (#235, ADR-0055)', () => {
     // A fixture harvesting Structured Data Type — no D&D dependency, so this ticket verifies on its own.
-    // Its dimension keys are fixture-only (`fx_*`) so they claim keys no bundled plugin Field holds: a
-    // dimension surfaces where no scalar Field is behind it. The `fx_disposition` key deliberately
-    // collides with a scalar enum Field the type also declares, to prove scalar-wins for the label/control.
+    // Its `fx_*` dimension keys are fixture-only so they claim keys no bundled plugin Field holds: a
+    // dimension surfaces where no scalar Field is behind it. The `fixture.disposition` dimension key
+    // deliberately collides with a scalar enum Field the type also declares (its id), to prove
+    // scalar-wins for the label/control.
     const STAT_BLOCK = defineStructuredDataType({
       id: 'fixture.stat-block',
       valueSchema: z.object({ size: z.string(), threat: z.number(), disposition: z.string() }).partial(),
@@ -1689,14 +1694,14 @@ describe('Entities endpoints', () => {
       facetDimensions: [
         { key: 'fx_size', labelKey: 'fixture.facets.size', dataType: { kind: 'enum', options: ['tiny', 'huge'] } },
         { key: 'fx_threat', labelKey: 'fixture.facets.threat', dataType: { kind: 'number' } },
-        // Shares the `fx_disposition` key with the scalar Field below — the scalar wins the label/control.
-        { key: 'fx_disposition', labelKey: 'fixture.facets.disposition', dataType: { kind: 'string' } },
+        // Shares the `fixture.disposition` key with the scalar Field below — the scalar wins the label/control.
+        { key: 'fixture.disposition', labelKey: 'fixture.facets.disposition', dataType: { kind: 'string' } },
       ],
       harvestFacets: (v: { size?: string; threat?: number; disposition?: string }) => {
         const rows: { key: string; value: string; num: number | null }[] = [];
         if (v.size !== undefined) rows.push({ key: 'fx_size', value: v.size, num: null });
         if (v.threat !== undefined) rows.push({ key: 'fx_threat', value: String(v.threat), num: v.threat });
-        if (v.disposition !== undefined) rows.push({ key: 'fx_disposition', value: v.disposition, num: null });
+        if (v.disposition !== undefined) rows.push({ key: 'fixture.disposition', value: v.disposition, num: null });
         return rows;
       },
     });
@@ -1704,18 +1709,16 @@ describe('Entities endpoints', () => {
     beforeEach(() => {
       const registry = app.get(TypeFieldRegistry);
       registry.registerStructuredDataType(STAT_BLOCK);
-      // A type carrying the structured `stat` Field plus a scalar `fx_disposition` Field sharing that key.
+      // A type carrying the structured `fixture.stat` Field plus a scalar `fixture.disposition` Field sharing that key.
       registerType(registry, 'fixture.creature', [
         defineField({
           id: 'fixture.stat',
-          key: 'stat',
           label: 'Stat Block',
           dataType: { kind: 'fixture.stat-block' },
           facetable: false,
         }),
         defineField({
           id: 'fixture.disposition',
-          key: 'fx_disposition',
           label: 'Disposition',
           dataType: { kind: 'enum', options: ['friendly', 'hostile'] },
           facetable: true,
@@ -1735,7 +1738,7 @@ describe('Entities endpoints', () => {
       await agent
         .put(`/entities/${created.body.id}`)
         .send({
-          document: { 'core.content': emptyContent(), stat, ...extra },
+          document: { 'core.content': emptyContent(), 'fixture.stat': stat, ...extra },
           version: 1,
           tags: [],
           types: ['fixture.creature'],
@@ -1775,12 +1778,12 @@ describe('Entities endpoints', () => {
 
     it('resolves a key claimed by both a scalar Field and a dimension to the scalar (scalar wins, #235)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      // The scalar `fx_disposition` value and the stat block both feed the `fx_disposition` key.
-      const kobold = await creature(ada, 'Kobold', { disposition: 'hostile' }, { fx_disposition: 'friendly' });
+      // The scalar `fixture.disposition` value and the stat block both feed the `fixture.disposition` key.
+      const kobold = await creature(ada, 'Kobold', { disposition: 'hostile' }, { 'fixture.disposition': 'friendly' });
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
 
       const res = await ada.get('/entities/facets').query({ worldId }).expect(200);
-      const disposition = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'fx_disposition')!;
+      const disposition = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'fixture.disposition')!;
       // Scalar wins the label/control: its authored label and enum data-type, and no i18n key.
       expect(disposition.label).toBe('Disposition');
       expect(disposition.labelKey).toBeUndefined();
@@ -1840,7 +1843,6 @@ describe('Entities endpoints', () => {
       registerType(app.get(TypeFieldRegistry), 'test.monster', [
         defineField({
           id: 'test.lair',
-          key: 'lair',
           label: 'Lair',
           dataType: { kind: 'entityLink', targetTypes: ['world.place'] },
           facetable: true,
@@ -1870,7 +1872,7 @@ describe('Entities endpoints', () => {
         .send({ name, types: ['core.note'] })
         .expect(201);
       const res = await agent.put(`/entities/${created.body.id}`).send({
-        document: { 'core.content': emptyContent(), ...(link ? { lair: link } : {}) },
+        document: { 'core.content': emptyContent(), ...(link ? { 'test.lair': link } : {}) },
         version: 1,
         tags: [],
         types: ['test.monster'],
@@ -1890,7 +1892,7 @@ describe('Entities endpoints', () => {
       // "all monsters whose lair is in the Whisperwood" — an eq filter on the target id.
       const res = await ada
         .get('/entities')
-        .query({ type: 'test.monster', field: `lair:eq:${whisperwood}` })
+        .query({ type: 'test.monster', field: `test.lair:eq:${whisperwood}` })
         .expect(200);
       expect(names(res)).toEqual(['Aboleth']);
     });
@@ -1908,7 +1910,7 @@ describe('Entities endpoints', () => {
           dataType: { kind: string };
           values: { value: string; label?: string; count: number }[];
         }[]
-      ).find((f) => f.key === 'lair')!;
+      ).find((f) => f.key === 'test.lair')!;
       expect(lair.dataType.kind).toBe('entityLink');
       // The facet value is the stable target id; the label is the target's live name for the rail.
       expect(lair.values).toEqual([{ value: whisperwood, label: 'The Whisperwood', count: 1 }]);
@@ -1925,7 +1927,7 @@ describe('Entities endpoints', () => {
       const worldId = (await ada.get(`/entities/${id}`)).body.worldId;
       const facets = await ada.get('/entities/facets').query({ worldId, type: 'test.monster' }).expect(200);
       const lair = (facets.body.fields as { key: string; values: { value: string; label?: string }[] }[]).find(
-        (f) => f.key === 'lair',
+        (f) => f.key === 'test.lair',
       )!;
       expect(lair.values).toEqual([{ value: 'ghost-place', count: 1 }]);
     });
@@ -1941,7 +1943,7 @@ describe('Entities endpoints', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('invalid-fields');
-      expect(res.body.data.fields).toContainEqual({ key: 'lair', code: 'type' });
+      expect(res.body.data.fields).toContainEqual({ key: 'test.lair', code: 'type' });
     });
 
     it('never leaks a private target’s name through the link facet label (ADR-0046)', async () => {
@@ -1960,7 +1962,7 @@ describe('Entities endpoints', () => {
       const res = await bob.get('/entities/facets').query({ worldId, type: 'test.monster' }).expect(200);
       const lair = (
         res.body.fields as { key: string; values: { value: string; label?: string; count: number }[] }[]
-      ).find((f) => f.key === 'lair')!;
+      ).find((f) => f.key === 'test.lair')!;
       // Bob sees a link exists (the readable monster), but the private target's name never resolves.
       expect(lair.values).toEqual([{ value: whisperwood, count: 1 }]);
     });

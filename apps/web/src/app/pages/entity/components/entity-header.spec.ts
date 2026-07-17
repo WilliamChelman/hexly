@@ -22,7 +22,7 @@ import { EntityHeader } from './entity-header';
 import { noteDetail } from './note-detail.fixtures';
 
 /** The Hex Map's map View, as the toggle keys it: the View id plus the Field it renders. */
-const MAP_VIEW_KEY = viewInstanceKey({ viewId: CORE_VIEW_MAP, fieldKey: HEX_GRID_FIELD.key });
+const MAP_VIEW_KEY = viewInstanceKey({ viewId: CORE_VIEW_MAP, fieldKey: HEX_GRID_FIELD.id });
 
 /** The active World the header reads for pin state — 'm1' is the opened entity's id. */
 function worldDetail(pinnedEntityIds: string[] = [], rights: WorldVerb[] = ['read', 'manage']): WorldDetail {

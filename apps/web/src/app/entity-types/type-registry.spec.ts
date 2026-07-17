@@ -43,29 +43,25 @@ function definition(id: string, fieldRefs: readonly string[] = []): TypeDefiniti
 }
 
 // World-defined Fields a spec type references by id (ADR-0054); set on the registry in `beforeEach`.
-const crField = defineField({ id: 'world.cr', key: 'cr', label: 'Challenge Rating', dataType: { kind: 'number' } });
+const crField = defineField({ id: 'world.cr', label: 'Challenge Rating', dataType: { kind: 'number' } });
 // A second scalar Field, the attach-a-built-in fixture the retired `dnd.size`/`dnd.alignment` used to be.
 const alignmentField = defineField({
   id: 'world.alignment',
-  key: 'alignment',
   label: 'Alignment',
   dataType: { kind: 'string' },
 });
 const battlemapField = defineField({
   id: 'world.battlemap',
-  key: 'battlemap',
   label: 'Battlemap',
   dataType: { kind: CORE_HEX_GRID },
 });
 const proseContent = defineField({
   id: 'world.content',
-  key: 'content',
   label: 'Content',
   dataType: { kind: CORE_RICH_CONTENT },
 });
 const proseSecrets = defineField({
   id: 'world.secrets',
-  key: 'secrets',
   label: 'Secrets',
   dataType: { kind: CORE_RICH_CONTENT },
 });
@@ -185,7 +181,7 @@ describe('TypeRegistry', () => {
     // View) resolves to one — so the type affords only the Views that can actually render.
     registry.register({
       ...definition('dnd.beast', ['world.cr']),
-      views: [{ field: 'cr' }, { field: 'nonesuch' }, CORE_VIEW_CONTENT],
+      views: [{ field: 'world.cr' }, { field: 'nonesuch' }, CORE_VIEW_CONTENT],
     });
     expect(viewKeys(registry.viewsFor(['dnd.beast']))).toEqual([CORE_VIEW_CONTENT]);
   });
@@ -194,21 +190,21 @@ describe('TypeRegistry', () => {
     it('affords the grid’s map View, bound to the Field — and still opens on its Fields', () => {
       registry.register({
         ...definition('world.deity', ['world.battlemap']),
-        views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT, { field: 'battlemap' }],
+        views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT, { field: 'world.battlemap' }],
       });
 
       // The map is last, so the default View — the primary type's first — is the deity's own Fields.
       expect(viewKeys(registry.viewsFor(['world.deity']))).toEqual([
         CORE_VIEW_FIELDS,
         CORE_VIEW_CONTENT,
-        `${CORE_VIEW_MAP}:battlemap`,
+        `${CORE_VIEW_MAP}:world.battlemap`,
       ]);
     });
 
     it('affords *two* map Views when it also carries core.hexmap — one per grid', () => {
       registry.register({
         ...definition('world.deity', ['world.battlemap']),
-        views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
+        views: [CORE_VIEW_FIELDS, { field: 'world.battlemap' }],
       });
 
       // Two Views of one Entity, each bound to its own Field — why a View is an instance (#200).
@@ -216,7 +212,7 @@ describe('TypeRegistry', () => {
         `${CORE_VIEW_MAP}:core.grid`,
         CORE_VIEW_CONTENT,
         CORE_VIEW_FIELDS,
-        `${CORE_VIEW_MAP}:battlemap`,
+        `${CORE_VIEW_MAP}:world.battlemap`,
       ]);
     });
 
@@ -228,7 +224,7 @@ describe('TypeRegistry', () => {
       });
 
       expect(viewKeys(registry.viewsFor(['world.deity']))).toEqual([CORE_VIEW_FIELDS, CORE_VIEW_CONTENT]);
-      expect(registry.resolveFields(['world.deity']).map((f) => f.key)).toEqual(['battlemap']);
+      expect(registry.resolveFields(['world.deity']).map((f) => f.id)).toEqual(['world.battlemap']);
     });
   });
 
@@ -238,16 +234,16 @@ describe('TypeRegistry', () => {
       // Views, each bound to the Field it renders — the twin of two grids affording two map Views (#202).
       registry.register({
         ...definition('world.saint', ['world.content', 'world.secrets']),
-        views: [CORE_VIEW_FIELDS, { field: 'content' }, { field: 'secrets' }],
+        views: [CORE_VIEW_FIELDS, { field: 'world.content' }, { field: 'world.secrets' }],
       });
 
       expect(viewKeys(registry.viewsFor(['world.saint']))).toEqual([
         CORE_VIEW_FIELDS,
-        `${CORE_VIEW_CONTENT}:content`,
-        `${CORE_VIEW_CONTENT}:secrets`,
+        `${CORE_VIEW_CONTENT}:world.content`,
+        `${CORE_VIEW_CONTENT}:world.secrets`,
       ]);
       // Both Fields are declared and resolve — neither shadows the other.
-      expect(registry.resolveFields(['world.saint']).map((f) => f.key)).toEqual(['content', 'secrets']);
+      expect(registry.resolveFields(['world.saint']).map((f) => f.id)).toEqual(['world.content', 'world.secrets']);
     });
   });
 
@@ -261,12 +257,12 @@ describe('TypeRegistry', () => {
 
   it('resolves the union of Field schemas a types[] set declares, primary type first', () => {
     registry.register(definition('dnd.beast', ['world.cr']));
-    expect(registry.resolveFields(['dnd.beast']).map((f) => f.key)).toEqual(['cr']);
+    expect(registry.resolveFields(['dnd.beast']).map((f) => f.id)).toEqual(['world.cr']);
     // The bundled plugin's schema resolves through the same path — the web twin of what the API's
     // write gate and facet build read (#192).
-    expect(registry.resolveFields([DND_MONSTER]).map((f) => f.key)).toContain('dnd.stat_block');
+    expect(registry.resolveFields([DND_MONSTER]).map((f) => f.id)).toContain('dnd.stat_block');
     // `core.note` declares exactly the canonical prose Field now (ADR-0051).
-    expect(registry.resolveFields(['core.note']).map((f) => f.key)).toEqual(['core.content']);
+    expect(registry.resolveFields(['core.note']).map((f) => f.id)).toEqual(['core.content']);
     // No types at all resolves to no Fields.
     expect(registry.resolveFields(undefined)).toEqual([]);
   });
@@ -283,18 +279,18 @@ describe('TypeRegistry', () => {
   describe('effective Field set', () => {
     it('resolves a plugin type’s defaults through fieldRefs → the composed Plugin-Field resolver', () => {
       // Not from the inline `fields` mirror: the reuse handles drive resolution now, like the server.
-      expect(registry.effectiveFields([DND_MONSTER], []).map((f) => f.key)).toContain('dnd.stat_block');
-      expect(registry.effectiveFields(['core.note'], []).map((f) => f.key)).toEqual(['core.content']);
+      expect(registry.effectiveFields([DND_MONSTER], []).map((f) => f.id)).toContain('dnd.stat_block');
+      expect(registry.effectiveFields(['core.note'], []).map((f) => f.id)).toEqual(['core.content']);
     });
 
     it('unions an Entity’s attached Fields with its types’ defaults, deduped by key', () => {
       // A `core.note` carrying one attached stat-block Field — a Field its type never named (CONTEXT.md → Entity).
-      const keys = registry.effectiveFields(['core.note'], ['dnd.stat_block']).map((f) => f.key);
+      const keys = registry.effectiveFields(['core.note'], ['dnd.stat_block']).map((f) => f.id);
       expect(keys).toEqual(['dnd.stat_block', 'core.content']); // attachment first (instance precedence), then the type default
     });
 
     it('drops an attached id that resolves to nothing — an absent plugin’s Field left as plain document', () => {
-      expect(registry.effectiveFields(['core.note'], ['pathfinder.nonesuch']).map((f) => f.key)).toEqual([
+      expect(registry.effectiveFields(['core.note'], ['pathfinder.nonesuch']).map((f) => f.id)).toEqual([
         'core.content',
       ]);
     });
@@ -302,7 +298,7 @@ describe('TypeRegistry', () => {
     it('lets an attachment win the key over a type default — instance precedence', () => {
       // Both resolve to the `core.content` key; the attached one is considered first, so it wins the set.
       const resolved = registry.effectiveFields(['core.note'], [CONTENT_FIELD.id]);
-      expect(resolved.map((f) => f.key)).toEqual(['core.content']);
+      expect(resolved.map((f) => f.id)).toEqual(['core.content']);
     });
   });
 
@@ -316,7 +312,7 @@ describe('TypeRegistry', () => {
     it('never offers a Field whose key the effective set already covers (a default or an attachment)', () => {
       // `core.content` is a note default, so its Field is never offered; an already-attached `dnd.stat_block` drops too.
       const offered = registry.attachableFields(['core.note'], ['dnd.stat_block']);
-      expect(offered.map((f) => f.key)).not.toContain('core.content');
+      expect(offered.map((f) => f.id)).not.toContain('core.content');
       expect(offered.map((f) => f.id)).not.toContain('dnd.stat_block');
     });
   });
@@ -324,7 +320,6 @@ describe('TypeRegistry', () => {
   describe('World-defined Fields composed over the Plugin fields (ADR-0054, #230)', () => {
     const element = defineField({
       id: 'world.element',
-      key: 'element',
       label: 'Element',
       dataType: { kind: 'enum', options: ['fire', 'ice', 'water'] },
       facetable: true,
@@ -333,8 +328,8 @@ describe('TypeRegistry', () => {
     it('resolves a World Field by id, and unions an attached one into the effective set', () => {
       registry.setWorldFields([element]);
       expect(registry.field('world.element')?.label).toBe('Element');
-      expect(registry.effectiveFields(['core.note'], ['world.element']).map((f) => f.key)).toEqual([
-        'element',
+      expect(registry.effectiveFields(['core.note'], ['world.element']).map((f) => f.id)).toEqual([
+        'world.element',
         'core.content',
       ]);
     });
@@ -351,15 +346,15 @@ describe('TypeRegistry', () => {
       registry.setWorldFields([]); // deleted (or re-keyed under a new id) — its old id stops resolving
       expect(registry.field('world.element')).toBeUndefined();
       // The attached id resolves to nothing, so it drops from the set (its value left as plain document).
-      expect(registry.effectiveFields(['core.note'], ['world.element']).map((f) => f.key)).toEqual(['core.content']);
+      expect(registry.effectiveFields(['core.note'], ['world.element']).map((f) => f.id)).toEqual(['core.content']);
     });
 
     it('reuses one World Field across two unrelated types via instance attachment', () => {
       registry.setWorldFields([element]);
       registry.register({ ...definition('world.deity', []), views: [CORE_VIEW_FIELDS] });
       // Attached to a plain note and to a world.deity — one Field, two unrelated types.
-      expect(registry.effectiveFields(['core.note'], ['world.element']).map((f) => f.key)).toContain('element');
-      expect(registry.effectiveFields(['world.deity'], ['world.element']).map((f) => f.key)).toContain('element');
+      expect(registry.effectiveFields(['core.note'], ['world.element']).map((f) => f.id)).toContain('world.element');
+      expect(registry.effectiveFields(['world.deity'], ['world.element']).map((f) => f.id)).toContain('world.element');
     });
   });
 
@@ -479,7 +474,7 @@ describe('TypeRegistry without the Hex Map plugin', () => {
       id: 'world.deity' as TypeDefinition['id'],
       icon: 'label',
       labelText: 'Deity',
-      views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
+      views: [CORE_VIEW_FIELDS, { field: 'world.battlemap' }],
       fieldRefs: ['world.battlemap'],
       graphColorToken: '--color-ink-muted',
     });
@@ -589,7 +584,7 @@ describe('TypeRegistry filtering by the enabled-Plugin set', () => {
       id: 'world.realm' as TypeDefinition['id'],
       icon: 'label',
       labelText: 'Realm',
-      views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
+      views: [CORE_VIEW_FIELDS, { field: 'world.battlemap' }],
       fieldRefs: ['world.battlemap'],
       graphColorToken: '--color-ink-muted',
     });

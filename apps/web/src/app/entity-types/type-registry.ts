@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { EntityType, Field, FieldSchema, isStructuredDataType } from '@hexly/domain';
+import { EntityType, Field, isStructuredDataType } from '@hexly/domain';
 import {
   CORE_VIEW_FIELDS,
   EntityTypes,
@@ -121,10 +121,10 @@ export class TypeRegistry implements EntityTypes {
       if (!seen.has(key)) seen.set(key, instance);
     };
     // A placement resolves its Field against the whole effective set (a type default or an attachment).
-    const byKey = new Map(this.effectiveFields(types, fieldIds).map((field) => [field.key, field] as const));
-    const affordField = (field: FieldSchema | undefined) => {
+    const byKey = new Map(this.effectiveFields(types, fieldIds).map((field) => [field.id, field] as const));
+    const affordField = (field: Field | undefined) => {
       const view = this.views.forDataType(field?.dataType.kind);
-      if (field && view) afford({ viewId: view.id, fieldKey: field.key });
+      if (field && view) afford({ viewId: view.id, fieldKey: field.id });
     };
 
     for (const type of types ?? []) {
@@ -154,26 +154,26 @@ export class TypeRegistry implements EntityTypes {
   }
 
   /**
-   * The union of Field schemas an Entity carrying `types` affords — every registered type's default
-   * Fields, primary type first, deduped by EntityDocument key. The type-only projection of
-   * {@link effectiveFields} (no attachments), for the create and type-authoring surfaces.
+   * The union of Fields an Entity carrying `types` affords — every registered type's default Fields,
+   * primary type first, deduped by id. The type-only projection of {@link effectiveFields} (no
+   * attachments), for the create and type-authoring surfaces.
    */
-  resolveFields(types: readonly string[] | null | undefined): FieldSchema[] {
+  resolveFields(types: readonly string[] | null | undefined): Field[] {
     return this.effectiveFields(types, []);
   }
 
   /**
-   * An Entity's **effective Field set** (CONTEXT.md → Entity, ADR-0054): its attached Fields (`fieldIds`)
-   * unioned with its types' defaults, deduped by `key` with precedence instance > primary type > later
-   * types. Mirrors the server's `WorldTypeFields.effectiveFields`.
+   * An Entity's **effective Field set** (CONTEXT.md → Entity, ADR-0054/ADR-0056): its attached Fields
+   * (`fieldIds`) unioned with its types' defaults, deduped by `id`. Mirrors the server's
+   * `WorldTypeFields.effectiveFields`.
    */
   effectiveFields(
     types: readonly string[] | null | undefined,
     fieldIds: readonly string[] | null | undefined,
-  ): FieldSchema[] {
-    const byKey = new Map<string, FieldSchema>();
-    const consider = (field: FieldSchema | undefined) => {
-      if (field && !byKey.has(field.key)) byKey.set(field.key, field);
+  ): Field[] {
+    const byId = new Map<string, Field>();
+    const consider = (field: Field | undefined) => {
+      if (field && !byId.has(field.id)) byId.set(field.id, field);
     };
     for (const id of fieldIds ?? []) consider(this.resolveField(id));
     for (const type of types ?? []) {
@@ -181,7 +181,7 @@ export class TypeRegistry implements EntityTypes {
       // A type declares its default Fields by id only (`fieldRefs`, ADR-0054) — one resolution path.
       for (const id of def?.fieldRefs ?? []) consider(this.resolveField(id));
     }
-    return [...byKey.values()];
+    return [...byId.values()];
   }
 
   /**
@@ -204,17 +204,17 @@ export class TypeRegistry implements EntityTypes {
 
   /**
    * The registered Fields an Entity carrying `types`/`fieldIds` may still **attach directly** (ADR-0054):
-   * every World-defined Field and enabled Plugin Field whose document `key` its effective set does not
-   * already cover — so the attach picker never offers a Field a type default already places, or one
-   * already attached. World Fields come first (always active); a disabled Plugin's Fields drop out (they
-   * would only degrade to a plain value).
+   * every World-defined Field and enabled Plugin Field whose `id` its effective set does not already cover
+   * — so the attach picker never offers a Field a type default already places, or one already attached.
+   * World Fields come first (always active); a disabled Plugin's Fields drop out (they would only degrade
+   * to a plain value).
    */
   attachableFields(
     types: readonly string[] | null | undefined,
     fieldIds: readonly string[] | null | undefined,
   ): Field[] {
-    const present = new Set(this.effectiveFields(types, fieldIds).map((field) => field.key));
-    return this.availableFields().filter((field) => !present.has(field.key));
+    const present = new Set(this.effectiveFields(types, fieldIds).map((field) => field.id));
+    return this.availableFields().filter((field) => !present.has(field.id));
   }
 
   /**

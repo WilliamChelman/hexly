@@ -9,7 +9,6 @@ import {
 
 const elementField = {
   id: 'world.element',
-  key: 'world.element',
   label: 'Element',
   dataType: { kind: 'enum' as const, options: ['fire', 'ice', 'water'] },
 };

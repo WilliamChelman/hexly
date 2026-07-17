@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { EntityLinkValue, entityLinkValueSchema, EntitySummary, FieldSchema } from '@hexly/domain';
+import { EntityLinkValue, entityLinkValueSchema, EntitySummary, Field } from '@hexly/domain';
 import { EntitySearchPicker } from '@hexly/web-ui';
 
 /**
@@ -15,7 +15,7 @@ import { EntitySearchPicker } from '@hexly/web-ui';
   template: `
     @switch (field().dataType.kind) {
       @case ('entityLink') {
-        <div class="flex flex-col gap-1.5" [attr.data-testid]="'entity-link-field-' + field().key">
+        <div class="flex flex-col gap-1.5" [attr.data-testid]="'entity-link-field-' + field().id">
           <!-- Render the last-known name, so a deleted/hidden target stays legible, never erroring. -->
           @if (link(); as current) {
             <div class="flex items-center gap-2">
@@ -116,7 +116,7 @@ import { EntitySearchPicker } from '@hexly/web-ui';
   `,
 })
 export class FieldControl {
-  readonly field = input.required<FieldSchema>();
+  readonly field = input.required<Field>();
   /** The Field's current raw EntityDocument value (a lens, never copied — CONTEXT.md → Field). */
   readonly value = input<unknown>();
   readonly disabled = input(false);

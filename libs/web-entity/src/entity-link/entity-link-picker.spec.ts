@@ -43,7 +43,6 @@ const deity: TypeDefinition = {
 /** A required Field the monster references — it cannot be minted blind, so create-and-link never offers the type. */
 const crField = defineField({
   id: 'dnd.cr',
-  key: 'cr',
   label: 'Challenge Rating',
   dataType: { kind: 'number' },
   required: true,

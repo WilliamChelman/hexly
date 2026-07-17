@@ -1,12 +1,18 @@
 import { z } from 'zod';
-import { fieldSchemaSchema, FieldSchema, EntityDocument } from './field';
+import { fieldSchemaSchema, Field, EntityDocument } from './field';
 import { harvestEdges } from './entity-edges';
 import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
+
+/** A terse {@link Field} builder — `id` *is* the document key it lenses (ADR-0056), bare for the specs. */
+const field = (id: string, kind: string): Field => ({
+  id,
+  ...fieldSchemaSchema.parse({ label: id, dataType: { kind } }),
+});
 
 /** `harvestEdges` takes the resolved Fields and the data-type set explicitly; most cases need neither. */
 function harvest(
   doc: EntityDocument,
-  fields: readonly FieldSchema[] = [],
+  fields: readonly Field[] = [],
   dataTypes = NO_STRUCTURED_DATA_TYPES,
 ): ReturnType<typeof harvestEdges> {
   return harvestEdges(doc, fields, dataTypes);
@@ -39,8 +45,8 @@ const LINKS = defineStructuredDataType({
 });
 
 const DATA_TYPES = structuredDataTypeSet([BOARD, LINKS]);
-const boardField = fieldSchemaSchema.parse({ key: 'board', label: 'Board', dataType: { kind: 'test.board' } });
-const linksField = fieldSchemaSchema.parse({ key: 'links', label: 'Links', dataType: { kind: 'test.links' } });
+const boardField = field('board', 'test.board');
+const linksField = field('links', 'test.links');
 
 /** A doc whose `board` Field holds two placements. */
 const board = (): EntityDocument => ({ board: { tiles: [{ entityId: 'riverbend' }, { entityId: 'harbour' }] } });
@@ -94,7 +100,7 @@ describe('harvestEdges (#179, ADR-0046, ADR-0051)', () => {
    * placement — harvested against the Entity's resolved `fields`, straight off the EntityDocument map.
    */
   describe('Entity-Link Field edges (#190)', () => {
-    const lair = fieldSchemaSchema.parse({ key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' } });
+    const lair = field('lair', 'entityLink');
 
     it('emits an edge per Entity-Link Field value, resolved against the Entity fields', () => {
       const doc: EntityDocument = { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } };
@@ -136,7 +142,7 @@ describe('harvestEdges (#179, ADR-0046, ADR-0051)', () => {
     });
 
     it('harvests nothing when the kind is unregistered, or the set is empty', () => {
-      const typo = fieldSchemaSchema.parse({ key: 'board', label: 'Board', dataType: { kind: 'test.bord' } });
+      const typo = field('board', 'test.bord');
       expect(harvest(board(), [boardField])).toEqual([]);
       expect(harvest(board(), [typo], DATA_TYPES)).toEqual([]);
     });

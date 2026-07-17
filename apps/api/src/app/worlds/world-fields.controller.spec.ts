@@ -56,10 +56,9 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
     dataType: { kind: 'enum', options: ['fire', 'ice', 'water'] },
     facetable: true,
   };
-  // The resolved Field the server derives and returns — id === key === `world.element`.
+  // The resolved Field the server derives and returns — its id (== the document key it lenses) is `world.element`.
   const resolvedElement = {
     id: 'world.element',
-    key: 'world.element',
     label: 'Element',
     dataType: { kind: 'enum', options: ['fire', 'ice', 'water'] },
     required: false,
@@ -75,7 +74,7 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
       expect(created.body).toEqual(resolvedElement);
 
       const listed = await ada.get(`/worlds/${world}/fields`).expect(200);
-      expect(listed.body).toContainEqual(expect.objectContaining({ id: 'world.element', key: 'world.element' }));
+      expect(listed.body).toContainEqual(expect.objectContaining({ id: 'world.element' }));
 
       // Re-body wholesale: the id/key is immutable (a path param), so the body carries no key — renaming
       // is label-only, and the document key stays pinned to the id.
@@ -85,7 +84,6 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
         .expect(200);
       expect(rebodied.body).toEqual({
         id: 'world.element',
-        key: 'world.element',
         label: 'Elemental affinity',
         dataType: { kind: 'string' },
         required: false,
@@ -111,7 +109,7 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
           key: 'x',
         })
         .expect(201);
-      expect(created.body).toMatchObject({ id: 'world.elemental-affinity', key: 'world.elemental-affinity' });
+      expect(created.body).toMatchObject({ id: 'world.elemental-affinity' });
     });
 
     it('rejects a segment that slugs to no key (400)', async () => {
@@ -132,7 +130,7 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
         .patch(`/worlds/${world}/fields/world.element`)
         .send({ label: 'Renamed', dataType: { kind: 'string' }, key: 'sneaky', id: 'world.other' })
         .expect(200);
-      expect(rebodied.body).toMatchObject({ id: 'world.element', key: 'world.element' });
+      expect(rebodied.body).toMatchObject({ id: 'world.element' });
     });
 
     it('refuses a second Field whose derived slug collides with an existing one (409)', async () => {
@@ -304,7 +302,7 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
         .send({
           id: 'world.deity',
           label: 'Deity',
-          fields: [{ key: 'domain', label: 'Domain', dataType: { kind: 'string' } }],
+          fieldRefs: ['world.element'],
         })
         .expect(201);
 

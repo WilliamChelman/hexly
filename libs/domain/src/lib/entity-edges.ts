@@ -4,13 +4,7 @@
  */
 
 import { EntityType } from './entity';
-import {
-  entityLinkFieldValues,
-  FieldSchema,
-  EntityDocument,
-  readField,
-  resolvedStructuredDataTypeFields,
-} from './field';
+import { entityLinkFieldValues, Field, EntityDocument, readField, resolvedStructuredDataTypeFields } from './field';
 import type { StructuredDataTypeSet } from './structured-data-type';
 
 /** What an edge points at: another Entity, or an Asset (CONTEXT.md → Asset). */
@@ -77,7 +71,7 @@ export interface EntityReferences {
  */
 export function harvestEdges(
   doc: EntityDocument,
-  fields: readonly FieldSchema[],
+  fields: readonly Field[],
   dataTypes: StructuredDataTypeSet,
 ): EntityEdge[] {
   const edges = new Map<string, EntityEdge>();

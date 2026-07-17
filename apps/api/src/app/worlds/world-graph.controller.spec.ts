@@ -65,7 +65,7 @@ describe('World Graph', () => {
   it('renders an Entity-Link Field relation as a graph edge, hidden when an endpoint is private', async () => {
     const registry = app.get(TypeFieldRegistry);
     registry.registerField(
-      defineField({ id: 'test.lair', key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' }, facetable: false }),
+      defineField({ id: 'test.lair', label: 'Lair', dataType: { kind: 'entityLink' }, facetable: false }),
     );
     registry.register('test.monster', ['test.lair']);
     const ada = await signIn('ada@hexly.test');
@@ -283,7 +283,7 @@ describe('World Graph', () => {
     await owner
       .put(`/entities/${id}`)
       .send({
-        document: { 'core.content': tiptapContent({ type: 'doc', content: [] }), lair: link },
+        document: { 'core.content': tiptapContent({ type: 'doc', content: [] }), 'test.lair': link },
         version: current.version,
         tags: [],
         types: ['test.monster'],

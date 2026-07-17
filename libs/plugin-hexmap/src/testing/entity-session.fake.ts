@@ -9,7 +9,7 @@ import { HexMapStore } from '../web/services/hexmap-store';
  * lives in the one EntityDocument map (ADR-0051). `unknown`, not `HexMap`, so {@link FakeEntitySession.loadRawGrid}
  * can seed a document at rest this build can't parse. */
 function docWithGrid(grid: unknown): EntityDocument {
-  return { [HEX_GRID_FIELD.key]: grid };
+  return { [HEX_GRID_FIELD.id]: grid };
 }
 
 /**
@@ -51,5 +51,5 @@ export function provideFakeEntitySession(): Provider[] {
  * {@link VIEW_FIELD_KEY} with its own key.
  */
 export function provideHexMapStoreTesting(): Provider[] {
-  return [HexMapStore, { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.key }, ...provideFakeEntitySession()];
+  return [HexMapStore, { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.id }, ...provideFakeEntitySession()];
 }

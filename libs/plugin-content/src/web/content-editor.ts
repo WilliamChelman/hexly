@@ -253,7 +253,7 @@ export class ContentEditor {
    * a Field placed the View (so `content` and `secrets` each get their own editor), else the canonical
    * `content` key when placed by id or mounted bare (a spec).
    */
-  private readonly fieldKey = inject(VIEW_FIELD_KEY, { optional: true }) ?? CONTENT_FIELD.key;
+  private readonly fieldKey = inject(VIEW_FIELD_KEY, { optional: true }) ?? CONTENT_FIELD.id;
   private readonly destroyRef = inject(DestroyRef);
   // The shared id→name resolver backs both the `@` picker (its entity list) and
   // every entityLink node view; provided at the entities/:id route so navigating

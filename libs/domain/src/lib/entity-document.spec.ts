@@ -1,8 +1,14 @@
 import { z } from 'zod';
 import { emptyEntityDocument, withFieldDefaults } from './entity-document';
 import { entityDocumentSchema } from './entity';
-import { fieldSchemaSchema } from './field';
+import { Field, fieldSchemaSchema } from './field';
 import { defineStructuredDataType, structuredDataTypeSet } from './structured-data-type';
+
+/** A terse {@link Field} builder — `id` *is* the document key it lenses (ADR-0056), bare for the specs. */
+const field = (id: string, kind: string): Field => ({
+  id,
+  ...fieldSchemaSchema.parse({ label: id, dataType: { kind } }),
+});
 
 /** A stand-in for a plugin's Structured Data Type — the domain bundles none of its own. */
 const BOARD = defineStructuredDataType({
@@ -15,10 +21,10 @@ const emptyBoard = () => BOARD.empty();
 /** The set a host composes from what it bundles — what the API and the web each thread in. */
 const dataTypes = structuredDataTypeSet([BOARD]);
 
-const BOARD_FIELD = fieldSchemaSchema.parse({ key: 'board', label: 'Board', dataType: { kind: BOARD.id } });
+const BOARD_FIELD = field('board', BOARD.id);
 
 /** The resolved effective Field sets a host threads in — a bodyless type declares none; an atlas its grid. */
-const plainFields: ReturnType<typeof fieldSchemaSchema.parse>[] = [];
+const plainFields: Field[] = [];
 const atlasFields = [BOARD_FIELD];
 
 describe('emptyEntityDocument', () => {
@@ -95,11 +101,7 @@ describe('withFieldDefaults', () => {
       valueSchema: z.array(z.object({ at: z.string() })),
       empty: () => [],
     });
-    const events = fieldSchemaSchema.parse({
-      key: 'events',
-      label: 'Events',
-      dataType: { kind: 'test.timeline' },
-    });
+    const events = field('events', 'test.timeline');
 
     const body = emptyEntityDocument([events], structuredDataTypeSet([timeline]));
 

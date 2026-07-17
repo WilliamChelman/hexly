@@ -3,7 +3,7 @@
  * minting adds keys to the one map directly — there is no wrapper and no Content base to seed.
  */
 
-import { FieldSchema, EntityDocument, readField, resolvedStructuredDataTypeFields } from './field';
+import { Field, EntityDocument, readField, resolvedStructuredDataTypeFields } from './field';
 import { NO_STRUCTURED_DATA_TYPES, StructuredDataTypeSet } from './structured-data-type';
 
 /**
@@ -11,7 +11,7 @@ import { NO_STRUCTURED_DATA_TYPES, StructuredDataTypeSet } from './structured-da
  * arguments it yields the empty map — an empty placeholder a load clears the canvas to.
  */
 export function emptyEntityDocument(
-  fields: readonly FieldSchema[] = [],
+  fields: readonly Field[] = [],
   dataTypes: StructuredDataTypeSet = NO_STRUCTURED_DATA_TYPES,
 ): EntityDocument {
   return withFieldDefaults({}, fields, dataTypes);
@@ -28,7 +28,7 @@ export function emptyEntityDocument(
  */
 export function withFieldDefaults(
   doc: EntityDocument,
-  fields: readonly FieldSchema[],
+  fields: readonly Field[],
   dataTypes: StructuredDataTypeSet,
 ): EntityDocument {
   let next: EntityDocument | undefined;
@@ -36,7 +36,7 @@ export function withFieldDefaults(
     if (readField(next ?? doc, field) !== undefined) continue;
     // Not `writeField`: it clears a key whose value reads as emptied, so a data-type whose `empty()`
     // is `[]` (a blank timeline) would mint nothing.
-    next = { ...(next ?? doc), [field.key]: dataType.empty() };
+    next = { ...(next ?? doc), [field.id]: dataType.empty() };
   }
   return next ?? doc;
 }

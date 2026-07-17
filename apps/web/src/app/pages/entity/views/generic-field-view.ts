@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import {
-  FieldSchema,
+  Field,
   isStructuredDataType,
   EntityDocument,
   NO_STRUCTURED_DATA_TYPES,
@@ -54,7 +54,7 @@ import { FieldControl } from '@hexly/web-entity/controls';
         <!-- The declared Fields: one labelled, typed control each. -->
         @if (fields().length > 0) {
           <dl class="grid grid-cols-[minmax(8rem,12rem)_1fr] items-center gap-x-6 gap-y-3 m-0">
-            @for (field of fields(); track field.key) {
+            @for (field of fields(); track field.id) {
               <dt class="text-sm text-ink-muted">
                 <!-- A plugin's Field ships translated copy under a labelKey; a World Owner's Field
                      shows its authored label verbatim, never as a key (ADR-0014, #191, #200). -->
@@ -63,7 +63,7 @@ import { FieldControl } from '@hexly/web-entity/controls';
                   <span class="text-danger" aria-hidden="true">&nbsp;*</span>
                 }
               </dt>
-              <dd class="m-0" [attr.data-testid]="'field-' + field.key">
+              <dd class="m-0" [attr.data-testid]="'field-' + field.id">
                 <app-field-control
                   [field]="field"
                   [value]="rawValue(field)"
@@ -108,7 +108,7 @@ export class GenericFieldView {
   /** The open Entity's World, scoping an Entity-Link Field picker to same-World targets (#190). */
   protected readonly worldId = computed(() => this.session.current()?.worldId);
 
-  /** The open Entity's **effective Field set** (ADR-0054): its types' defaults unioned with its attached Fields, deduped by key. */
+  /** The open Entity's **effective Field set** (ADR-0054): its types' defaults unioned with its attached Fields, deduped by id. */
   private readonly declared = computed(() => this.types.effectiveFields(this.session.types(), this.session.fields()));
 
   /**
@@ -126,7 +126,7 @@ export class GenericFieldView {
 
   /** EntityDocument keys no declared Field types — shown read-only as plain EntityDocument. */
   protected readonly plainEntries = computed(() => {
-    const declared = new Set(this.declared().map((field) => field.key));
+    const declared = new Set(this.declared().map((field) => field.id));
     return Object.entries(this.metadata())
       .filter(([key]) => !declared.has(key))
       .map(([key, value]) => ({ key, value: displayPlain(value) }));
@@ -140,12 +140,12 @@ export class GenericFieldView {
       ),
   );
 
-  protected isInvalid(field: FieldSchema): boolean {
-    return this.invalidKeys().has(field.key);
+  protected isInvalid(field: Field): boolean {
+    return this.invalidKeys().has(field.id);
   }
 
   /** The Field's raw value straight off the live EntityDocument map — the lens the control reads. */
-  protected rawValue(field: FieldSchema): unknown {
+  protected rawValue(field: Field): unknown {
     return readField(this.metadata(), field);
   }
 
@@ -153,7 +153,7 @@ export class GenericFieldView {
    * Write a value into the one EntityDocument map every View shares (ADR-0048). {@link writeFieldInPlace}
    * clears the key when the value is emptied rather than leaving a blank behind. No-op for a read-only opener.
    */
-  protected set(field: FieldSchema, value: unknown): void {
+  protected set(field: Field, value: unknown): void {
     if (!this.session.writable()) return;
     this.session.mutate((draft) => writeFieldInPlace(draft, field, value));
   }
