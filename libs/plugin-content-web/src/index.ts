@@ -12,5 +12,5 @@
  */
 export { providePluginContent } from './provide-plugin-content';
 export { CORE_VIEW_CONTENT } from './content-types';
-export { EntityNameResolver } from './entity-name-resolver';
-export { RIGHT_DOCK_PANELS, type RightPanel } from './right-dock';
+export { EntityNameResolver } from './services/entity-name-resolver';
+export { RIGHT_DOCK_PANELS, type RightPanel } from './services/right-dock';

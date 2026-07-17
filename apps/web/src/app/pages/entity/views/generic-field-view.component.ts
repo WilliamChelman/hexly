@@ -11,7 +11,7 @@ import {
 } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { FieldControl } from '@hexly/web-entity/controls';
+import { FieldControl } from '@hexly/web-entity';
 
 /**
  * The **generic Field View** (`core.view.fields`, ADR-0048, #187): renders an Entity's

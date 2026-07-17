@@ -1,8 +1,8 @@
 import { inject, Provider, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { Field } from '@hexly/domain';
-import { ENTITY_TYPES, EntityTypes } from '../lib/entity-types';
-import { TypeDefinition, TypeLabels } from '../lib/type-definition';
+import { ENTITY_TYPES, EntityTypes } from '../models/entity-types';
+import { TypeDefinition, TypeLabels } from '../models/type-definition';
 
 /**
  * The note type id, inlined rather than imported: it ships from `@hexly/plugin-content` now (ADR-0051),

@@ -27,7 +27,7 @@ export function providePluginDnd(): EnvironmentProviders {
         dataType: DND_STAT_BLOCK,
         // The copy naming the *kind* where a World Owner picks it, in the World Types editor (#201).
         dataTypeLabelKey: 'dnd.statBlock.dataType',
-        loadComponent: () => import('./stat-block-view.component').then((m) => m.StatBlockView),
+        loadComponent: () => import('./components/stat-block-view.component').then((m) => m.StatBlockView),
       },
     ],
     dataTypes: [STAT_BLOCK_DATA_TYPE],

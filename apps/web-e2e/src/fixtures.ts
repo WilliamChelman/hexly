@@ -4,7 +4,7 @@ import { test as base, expect, type APIRequestContext, type Page, type Response 
 // process. The nx module-boundary rule is waived for these pure utils via eslint.config.mjs `allow`.
 import { idFromSegment, segment } from '../../../libs/web-core/src/utils/pretty-id';
 // Same waiver: the View-instance codec is framework-free.
-import { viewInstanceKey } from '../../../libs/web-entity/src/lib/view-instance';
+import { viewInstanceKey } from '../../../libs/web-entity/src/utils/view-instance';
 
 /**
  * The base test for the authenticated suite. An auto fixture resets the database before each test

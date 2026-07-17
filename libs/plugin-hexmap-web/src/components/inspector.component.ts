@@ -1,12 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { coordKey, Label, TerrainId } from '@hexly/plugin-hexmap';
+import { EntityLinkPicker } from '@hexly/web-entity';
 import { Button, Coord, Eyebrow, Field, Input } from '@hexly/web-ui';
-import { EntityLinkPicker } from '@hexly/web-entity/entity-link';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { HexMapStore, Selection } from '../services/hexmap-store';
 import { featureKey, terrainKey } from '../utils/catalog-keys';
 import { inputValue } from '../utils/input-value';
-import { HexMapStore, Selection } from '../services/hexmap-store';
 import { RegionFields } from './region-fields.component';
 
 /** The Selection kinds, in the order the multi-selection breakdown lists them. */

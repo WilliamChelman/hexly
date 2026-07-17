@@ -1,7 +1,7 @@
 import { Provider, signal } from '@angular/core';
 import { EntityDetail, EntityDocument } from '@hexly/domain';
 import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
-import { ENTITY_SESSION, EntitySession, LiveEditor } from '../lib/entity-session';
+import { ENTITY_SESSION, EntitySession, LiveEditor } from '../models/entity-session';
 
 /**
  * A minimal in-memory {@link EntitySession} for a View lib's specs: it carries only the **Entity
