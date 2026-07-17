@@ -1,5 +1,5 @@
 /**
- * `core.hexmap` — the Hex Map Entity Type. Its grid **Field of a Structured Data Type** at the `grid` key is what
+ * `core.hexmap` — the Hex Map Entity Type. Its grid **Field of a Structured Data Type** at the `core.grid` key is what
  * makes an Entity a Hex Map; it declares the canonical prose {@link CONTENT_FIELD} beside it, so a Hex
  * Map carries lore like any other Entity (ADR-0051).
  *

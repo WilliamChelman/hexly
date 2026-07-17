@@ -13,8 +13,8 @@ function prose(...links: Record<string, unknown>[]) {
 const harvest = (value: unknown) => RICH_CONTENT_DATA_TYPE.harvestEdges?.(value) ?? [];
 
 describe('core.rich-content data-type (ADR-0051)', () => {
-  it('declares the canonical content Field at the `content` key', () => {
-    expect(CONTENT_FIELD.key).toBe('content');
+  it('declares the canonical content Field at the `core.content` key', () => {
+    expect(CONTENT_FIELD.key).toBe('core.content');
     expect(CONTENT_FIELD.dataType).toEqual({ kind: CORE_RICH_CONTENT });
     expect(CONTENT_FIELD.facetable).toBe(false);
   });

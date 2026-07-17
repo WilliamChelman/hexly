@@ -33,8 +33,10 @@ describe('dnd.monster', () => {
     // The forward-only gate resolves the stat block against its own valueSchema (ADR-0050/0055): a
     // well-typed block passes; a mistyped stat (a CR that is a string a block prints, not a number) fails.
     const dataTypes = structuredDataTypeSet([STAT_BLOCK_DATA_TYPE]);
-    expect(validateFields(fields, { stat_block: { challenge_rating: 5, size: 'Large' } }, dataTypes).ok).toBe(true);
-    expect(validateFields(fields, { stat_block: { challenge_rating: '5' } }, dataTypes).ok).toBe(false);
+    expect(validateFields(fields, { 'dnd.stat_block': { challenge_rating: 5, size: 'Large' } }, dataTypes).ok).toBe(
+      true,
+    );
+    expect(validateFields(fields, { 'dnd.stat_block': { challenge_rating: '5' } }, dataTypes).ok).toBe(false);
     // An absent block is tolerated — the stat-block Field is not required (it opens empty, ADR-0054).
     expect(validateFields(fields, {}, dataTypes).ok).toBe(true);
   });

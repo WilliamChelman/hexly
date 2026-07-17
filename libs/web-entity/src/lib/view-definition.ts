@@ -25,7 +25,7 @@ export const CORE_VIEW_FIELDS = 'core.view.fields';
  * View (ADR-0050).
  *
  * A Type thereby **places** a Structured Data Type's View in its own order — `core.hexmap` declares
- * `[{ field: 'grid' }, CORE_VIEW_CONTENT]`, placing its grid by `{ field }` and the content View by id
+ * `[{ field: 'core.grid' }, CORE_VIEW_CONTENT]`, placing its grid by `{ field }` and the content View by id
  * (ADR-0051). A User-defined type's list is data: persisted, and validated at the trust boundary.
  */
 export type { ViewPlacement };

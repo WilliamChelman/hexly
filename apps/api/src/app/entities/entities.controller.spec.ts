@@ -35,8 +35,8 @@ function registerType(registry: TypeFieldRegistry, typeId: string, fields: reado
 /** A Hex Map Entity Document: prose at `content`, grid at `grid` (ADR-0051). */
 function hexmapBody(hexes: Record<string, unknown> = {}) {
   return {
-    content: emptyContent(),
-    grid: { hexes, regions: [], labels: [] },
+    'core.content': emptyContent(),
+    'core.grid': { hexes, regions: [], labels: [] },
   };
 }
 
@@ -146,7 +146,7 @@ describe('Entities endpoints', () => {
       .expect(201);
 
     expect(res.body.types).toEqual(['core.note']);
-    expect(res.body.document).toEqual({ content: emptyContent() });
+    expect(res.body.document).toEqual({ 'core.content': emptyContent() });
   });
 
   it('seeds a multi-type create’s initial EntityDocument into the minted body (#189)', async () => {
@@ -163,8 +163,8 @@ describe('Entities endpoints', () => {
     // The collected EntityDocument seeds over the minted defaults, not in place of them. `core.note` and
     // `core.hexmap` both reference the prose Field, but the effective set dedupes it to one (ADR-0051).
     expect(res.body.document).toEqual({
-      content: emptyContent(),
-      grid: { hexes: {}, regions: [], labels: [] },
+      'core.content': emptyContent(),
+      'core.grid': { hexes: {}, regions: [], labels: [] },
       role: 'lich',
     });
   });
@@ -196,7 +196,7 @@ describe('Entities endpoints', () => {
       .expect(201);
     // `size` is a plain enum Field, so it mints no default — the note still opens as Content-only.
     expect(created.body.fields).toEqual(['world.size']);
-    expect(created.body.document).toEqual({ content: emptyContent() });
+    expect(created.body.document).toEqual({ 'core.content': emptyContent() });
 
     const loaded = await ada.get(`/entities/${created.body.id}`).expect(200);
     expect(loaded.body.fields).toEqual(['world.size']);
@@ -206,7 +206,7 @@ describe('Entities endpoints', () => {
     const saved = await ada
       .put(`/entities/${created.body.id}`)
       .send({
-        document: { content: emptyContent(), size: 'Large' },
+        document: { 'core.content': emptyContent(), size: 'Large' },
         version: created.body.version,
         tags: [],
         fields: ['world.size'],
@@ -237,7 +237,7 @@ describe('Entities endpoints', () => {
     await ada
       .put(`/entities/${created.body.id}`)
       .send({
-        document: { content: emptyContent(), size: 'Colossal' },
+        document: { 'core.content': emptyContent(), size: 'Colossal' },
         version: created.body.version,
         tags: [],
         fields: ['world.size'],
@@ -448,7 +448,7 @@ describe('Entities endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/entities').send({ name: 'Lady A', types: ['core.note'] });
     const id = created.body.id;
-    const body = { content: emptyContent() };
+    const body = { 'core.content': emptyContent() };
 
     const res = await ada
       .put(`/entities/${id}`)
@@ -466,7 +466,7 @@ describe('Entities endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/entities').send({ name: 'Lady A', types: ['core.note'] });
     const id = created.body.id;
-    const body = { content: emptyContent() };
+    const body = { 'core.content': emptyContent() };
 
     const res = await ada
       .put(`/entities/${id}`)
@@ -492,12 +492,12 @@ describe('Entities endpoints', () => {
       type: 'doc',
       content: [{ type: 'futureBlock', attrs: { z: [1] } }],
     };
-    const body = { content: { format: 'tiptap-v1', snapshot } };
+    const body = { 'core.content': { format: 'tiptap-v1', snapshot } };
 
     await ada.put(`/entities/${created.body.id}`).send({ document: body, version: 1, tags: [] }).expect(200);
 
     const reloaded = await ada.get(`/entities/${created.body.id}`).expect(200);
-    expect(reloaded.body.document.content.snapshot).toEqual(snapshot);
+    expect(reloaded.body.document['core.content'].snapshot).toEqual(snapshot);
   });
 
   it('rejects a save built on a stale version with 409 and keeps the entity intact', async () => {
@@ -532,7 +532,7 @@ describe('Entities endpoints', () => {
     });
 
     const bodyWith = (metadata?: Record<string, unknown>) => ({
-      content: emptyContent(),
+      'core.content': emptyContent(),
       ...metadata,
     });
 
@@ -586,7 +586,7 @@ describe('Entities endpoints', () => {
         })
         .expect(200);
       expect(res.body.types).toEqual(['test.beast']);
-      expect(res.body.document).toEqual({ content: emptyContent(), name: 'Aboleth', cr: 10 });
+      expect(res.body.document).toEqual({ 'core.content': emptyContent(), name: 'Aboleth', cr: 10 });
     });
 
     it('accepts a plain body save that omits types — data at rest is never retroactively invalidated', async () => {
@@ -629,7 +629,7 @@ describe('Entities endpoints', () => {
         .where(eq(entities.id, created.body.id))
         .run();
       const loaded = await ada.get(`/entities/${created.body.id}`).expect(200);
-      expect(loaded.body.document).toEqual({ content: emptyContent(), cr: 'wrong at rest' });
+      expect(loaded.body.document).toEqual({ 'core.content': emptyContent(), cr: 'wrong at rest' });
     });
   });
 
@@ -729,7 +729,7 @@ describe('Entities endpoints', () => {
     // harvests the vocabulary from *this*, not from a separate field (ADR-0023/0035).
     function bodyWithDescriptors(...descriptors: string[]) {
       return {
-        content: tiptapContent({
+        'core.content': tiptapContent({
           type: 'doc',
           content: [
             {
@@ -862,7 +862,7 @@ describe('Entities endpoints', () => {
       const created = await agent.post('/entities').send({ name, types: ['core.note'] });
       await agent
         .put(`/entities/${created.body.id}`)
-        .send({ document: { content: emptyContent() }, version: 1, tags })
+        .send({ document: { 'core.content': emptyContent() }, version: 1, tags })
         .expect(200);
     }
 
@@ -892,7 +892,7 @@ describe('Entities endpoints', () => {
     async function noteWithProse(agent: Awaited<ReturnType<typeof signIn>>, name: string, text: string) {
       const created = await agent.post('/entities').send({ name, types: ['core.note'] });
       const document = {
-        content: tiptapContent({
+        'core.content': tiptapContent({
           type: 'doc',
           content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
         }),
@@ -921,8 +921,8 @@ describe('Entities endpoints', () => {
       const created = await ada.post('/entities').send({ name: 'The Reach', types: ['core.hexmap'] });
       await noteWithProse(ada, 'Decoy', 'A note that names no place at all.');
       const document = {
-        content: emptyContent(),
-        grid: {
+        'core.content': emptyContent(),
+        'core.grid': {
           hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'grass', name: 'Ashford' } },
           regions: [{ id: 'r1', name: 'The Kingdom of Avalon', color: '#aabbcc', hexes: {} }],
           labels: [],
@@ -942,7 +942,7 @@ describe('Entities endpoints', () => {
       await ada
         .put(`/entities/${tagged.body.id}`)
         .send({
-          document: { content: emptyContent() },
+          document: { 'core.content': emptyContent() },
           version: 1,
           tags: ['Deity'],
         })
@@ -1007,7 +1007,7 @@ describe('Entities endpoints', () => {
         .put(`/entities/${id}`)
         .send({
           document: {
-            content: tiptapContent({
+            'core.content': tiptapContent({
               type: 'doc',
               content: [
                 {
@@ -1081,7 +1081,7 @@ describe('Entities endpoints', () => {
         .put(`/entities/${inB.body.id}`)
         .send({
           document: {
-            content: tiptapContent({
+            'core.content': tiptapContent({
               type: 'doc',
               content: [
                 {
@@ -1135,7 +1135,7 @@ describe('Entities endpoints', () => {
     async function tag(agent: Awaited<ReturnType<typeof signIn>>, id: string, ...tags: string[]) {
       await agent
         .put(`/entities/${id}`)
-        .send({ document: { content: emptyContent() }, version: 1, tags })
+        .send({ document: { 'core.content': emptyContent() }, version: 1, tags })
         .expect(200);
     }
     // No sharing UI ships with #155, so flip Visibility straight in the column.
@@ -1290,7 +1290,7 @@ describe('Entities endpoints', () => {
       await ada
         .put(`/entities/${inB}`)
         .send({
-          document: { content: emptyContent() },
+          document: { 'core.content': emptyContent() },
           version: 1,
           tags: ['otherworld'],
         })
@@ -1383,7 +1383,7 @@ describe('Entities endpoints', () => {
       await agent
         .put(`/entities/${created.body.id}`)
         .send({
-          document: { content: emptyContent(), ...metadata },
+          document: { 'core.content': emptyContent(), ...metadata },
           version: 1,
           tags: [],
           types: ['test.beast'],
@@ -1446,7 +1446,7 @@ describe('Entities endpoints', () => {
       await ada
         .put(`/entities/${spirit.body.id}`)
         .send({
-          document: { content: emptyContent(), alignment: 'lawful-good' },
+          document: { 'core.content': emptyContent(), alignment: 'lawful-good' },
           version: 1,
           tags: [],
           types: ['test.spirit'],
@@ -1657,7 +1657,7 @@ describe('Entities endpoints', () => {
         .put(`/entities/${id}`)
         .send({
           document: {
-            content: emptyContent(),
+            'core.content': emptyContent(),
             alignment: 'chaotic-evil',
             cr: 7,
           },
@@ -1733,7 +1733,7 @@ describe('Entities endpoints', () => {
       await agent
         .put(`/entities/${created.body.id}`)
         .send({
-          document: { content: emptyContent(), stat, ...extra },
+          document: { 'core.content': emptyContent(), stat, ...extra },
           version: 1,
           tags: [],
           types: ['fixture.creature'],
@@ -1868,7 +1868,7 @@ describe('Entities endpoints', () => {
         .send({ name, types: ['core.note'] })
         .expect(201);
       const res = await agent.put(`/entities/${created.body.id}`).send({
-        document: { content: emptyContent(), ...(link ? { lair: link } : {}) },
+        document: { 'core.content': emptyContent(), ...(link ? { lair: link } : {}) },
         version: 1,
         tags: [],
         types: ['test.monster'],
@@ -1977,7 +1977,7 @@ describe('Entities endpoints', () => {
         .expect(201);
       const res = await agent.put(`/entities/${created.body.id}`).send({
         // The stat block is one grouped value at `stat_block` now (ADR-0055), not thirteen top-level keys.
-        document: { content: emptyContent(), stat_block: statBlock },
+        document: { 'core.content': emptyContent(), 'dnd.stat_block': statBlock },
         version: 1,
         tags: [],
         types: ['dnd.monster'],
@@ -1992,7 +1992,7 @@ describe('Entities endpoints', () => {
       const illTyped = await saveMonster(ada, { challenge_rating: '24' });
       expect(illTyped.res.status).toBe(400);
       expect(illTyped.res.body.code).toBe('invalid-fields');
-      expect(illTyped.res.body.data.fields).toContainEqual({ key: 'stat_block', code: 'type' });
+      expect(illTyped.res.body.data.fields).toContainEqual({ key: 'dnd.stat_block', code: 'type' });
 
       // An unknown size is not one of the enum options the block admits.
       const badSize = await saveMonster(ada, { size: 'Colossal' });
@@ -2114,11 +2114,11 @@ describe('Entities endpoints', () => {
 
     await ada
       .put(`/entities/${id}`)
-      .send({ document: { content: emptyContent(), grid: 'not-a-grid' }, version: 1, tags: [] })
+      .send({ document: { 'core.content': emptyContent(), 'core.grid': 'not-a-grid' }, version: 1, tags: [] })
       .expect(200);
 
     const reloaded = await ada.get(`/entities/${id}`).expect(200);
-    expect(reloaded.body.document).toEqual({ content: emptyContent(), grid: 'not-a-grid' });
+    expect(reloaded.body.document).toEqual({ 'core.content': emptyContent(), 'core.grid': 'not-a-grid' });
   });
 
   it('tolerates a malformed prose value at rest on an untyped save, rather than 500ing on read (ADR-0051)', async () => {
@@ -2130,11 +2130,11 @@ describe('Entities endpoints', () => {
 
     await ada
       .put(`/entities/${id}`)
-      .send({ document: { content: 'not-a-doc' }, version: 1, tags: [] })
+      .send({ document: { 'core.content': 'not-a-doc' }, version: 1, tags: [] })
       .expect(200);
 
     const reloaded = await ada.get(`/entities/${id}`).expect(200);
-    expect(reloaded.body.document).toEqual({ content: 'not-a-doc' });
+    expect(reloaded.body.document).toEqual({ 'core.content': 'not-a-doc' });
   });
 
   describe('Entity Visibility & read access (ADR-0037, #160)', () => {
@@ -2278,7 +2278,7 @@ describe('Entities endpoints', () => {
       app.get(WorldsService).addMember(adaId, worldId, carolId, 'contributor');
       const carol = await signIn('carol@hexly.test', 'purple monkey');
 
-      const doc = { content: emptyContent() };
+      const doc = { 'core.content': emptyContent() };
       // The World Owner curates the shared surface: editing another's shared Entity → 200.
       await ada.put(`/entities/${hall.body.id}`).send({ document: doc, version: 1, tags: [] }).expect(200);
 

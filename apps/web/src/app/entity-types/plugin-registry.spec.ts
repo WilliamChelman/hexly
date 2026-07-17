@@ -48,10 +48,10 @@ describe('PluginRegistry', () => {
       });
       const plugins = TestBed.inject(PluginRegistry);
 
-      expect(plugins.fieldResolver('core.content')?.key).toBe('content');
-      expect(plugins.fieldResolver('core.grid')?.key).toBe('grid');
+      expect(plugins.fieldResolver('core.content')?.key).toBe('core.content');
+      expect(plugins.fieldResolver('core.grid')?.key).toBe('core.grid');
       // The thirteen scalar stat Fields retired: dnd contributes the one `dnd.stat-block` Field now (ADR-0055).
-      expect(plugins.fieldResolver('dnd.stat_block')?.key).toBe('stat_block');
+      expect(plugins.fieldResolver('dnd.stat_block')?.key).toBe('dnd.stat_block');
     });
 
     it('resolves nothing for an absent plugin’s Field — dropped from the effective set, value left intact', () => {
@@ -106,18 +106,18 @@ describe('PluginRegistry', () => {
       expect(plugins.isFieldActive('dnd.stat_block')).toBe(false);
       expect(plugins.fieldResolver('dnd.stat_block')).toBeUndefined();
       // A still-enabled Plugin's Field resolves as ever; an ownerless (World-defined) id is never gated.
-      expect(plugins.fieldResolver('core.content')?.key).toBe('content');
+      expect(plugins.fieldResolver('core.content')?.key).toBe('core.content');
       expect(plugins.isFieldActive('world.element')).toBe(true);
 
       enabled.set(new Set([CONTENT_PLUGIN_ID, HEXMAP_PLUGIN_ID, DND_PLUGIN_ID]));
-      expect(plugins.fieldResolver('dnd.stat_block')?.key).toBe('stat_block');
+      expect(plugins.fieldResolver('dnd.stat_block')?.key).toBe('dnd.stat_block');
     });
 
     it('fieldDefinition resolves a disabled Plugin’s Field regardless of enablement — so a detach can still clear its key (#229)', () => {
       // The enablement-gated resolver drops it, but detach needs the key to clear the value even
       // when the owning Plugin is off — only a build that never bundled the Field leaves an orphan.
       expect(plugins.fieldResolver('dnd.stat_block')).toBeUndefined();
-      expect(plugins.fieldDefinition('dnd.stat_block')?.key).toBe('stat_block');
+      expect(plugins.fieldDefinition('dnd.stat_block')?.key).toBe('dnd.stat_block');
       expect(plugins.fieldDefinition('pathfinder.nonesuch')).toBeUndefined();
     });
   });

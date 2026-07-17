@@ -52,7 +52,7 @@ export const HEX_GRID_DATA_TYPE = defineStructuredDataType({
   vault: { slot: 'frontmatter' },
 });
 
-/** The grid Field's reuse handle (ADR-0054) — its `id`, distinct from the `grid` key and the `core.hex-grid` Data Type. */
+/** The grid Field's namespaced identifier — its `id`, and (ADR-0056) the EntityDocument key it lenses. */
 export const HEX_GRID_FIELD_ID = 'core.grid';
 
 /**
@@ -60,15 +60,17 @@ export const HEX_GRID_FIELD_ID = 'core.grid';
  * first-class **Plugin Field** ({@link defineField}, ADR-0054).
  *
  * The header's View toggle reads its label, a Structured Data Type's View being bound to the Field it
- * renders (ADR-0050); `labelKey` keeps that toggle translated. A World Owner's own grid Field has no
- * key, and shows its authored name verbatim.
+ * renders (ADR-0050); `labelKey` keeps that toggle translated.
+ *
+ * Its document `key` equals its `id` (`core.grid`): a Field has one namespaced identifier that is the
+ * slot it lenses (ADR-0056). The `key` property survives only until it retires from the Field schema.
  *
  * Not `required`: an absent grid opens as an empty plane and the first edit mints one. Never
  * facetable — a document has no discrete values to count (ADR-0050).
  */
 export const HEX_GRID_FIELD: Field = defineField({
   id: HEX_GRID_FIELD_ID,
-  key: 'grid',
+  key: HEX_GRID_FIELD_ID,
   // The untranslated fallback the API's available-types list reports; the web resolves `labelKey`.
   label: 'Map',
   labelKey: 'map.hexmap.view.map',

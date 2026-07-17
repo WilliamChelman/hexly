@@ -22,14 +22,18 @@ import {
 } from '@hexly/domain';
 import { z } from 'zod';
 
-/** The `namespace.id` kind naming the stat-block data-type — what marks the `stat_block` Field structured. */
+/** The `namespace.id` kind naming the stat-block data-type — what marks the `dnd.stat_block` Field structured. */
 export const DND_STAT_BLOCK: StructuredDataTypeId = 'dnd.stat-block';
 
-/** The stat-block Field's reuse handle (ADR-0054) — its `id`, distinct from the `stat_block` key it lenses. */
+/** The stat-block Field's namespaced identifier — its `id`, and (ADR-0056) the EntityDocument key it lenses. */
 export const DND_STAT_BLOCK_FIELD_ID = 'dnd.stat_block';
 
-/** The EntityDocument key the whole block projects to — nested under `stat_block:` in exported frontmatter (ADR-0055). */
-export const DND_STAT_BLOCK_KEY = 'stat_block';
+/**
+ * The EntityDocument key the whole block projects to — nested under `dnd.stat_block:` in exported
+ * frontmatter (ADR-0055). Equal to the Field's `id` now (ADR-0056): a Field has one namespaced
+ * identifier that is the slot it lenses.
+ */
+export const DND_STAT_BLOCK_KEY = DND_STAT_BLOCK_FIELD_ID;
 
 /** A creature's Size, in stat-block order — an `enum` dimension the Browser toggles values on. */
 export const DND_SIZE_OPTIONS = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'] as const;

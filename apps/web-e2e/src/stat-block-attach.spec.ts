@@ -9,7 +9,7 @@ import {
   test,
 } from './fixtures';
 
-/** The attached stat block's View toggle, keyed by the `stat_block` Field the attachment carries (ADR-0055). */
+/** The attached stat block's View toggle, keyed by the `dnd.stat_block` Field the attachment carries (ADR-0055). */
 const STAT_BLOCK_VIEW = statBlockViewToggle();
 /** The note's own content View, placed by id — keys plain. */
 const NOTE_VIEW = contentViewToggle();
@@ -48,11 +48,11 @@ test('attaches dnd.stat-block to a note, affords its View, and browses its stats
 
   await flushSave(page);
 
-  // The whole block round-trips as one grouped value at the `stat_block` key, and the attachment persists.
+  // The whole block round-trips as one grouped value at the `dnd.stat_block` key, and the attachment persists.
   const res = await request.get(`/api/entities/${id}`);
   const detail = await res.json();
   expect(detail.fields).toEqual(['dnd.stat_block']);
-  expect(detail.document.stat_block).toMatchObject({
+  expect(detail.document['dnd.stat_block']).toMatchObject({
     size: 'Large',
     creature_type: 'aberration',
     challenge_rating: 10,
