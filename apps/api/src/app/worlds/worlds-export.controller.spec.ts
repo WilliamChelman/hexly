@@ -286,6 +286,29 @@ describe('Vault export endpoint', () => {
     });
   });
 
+  it("exports a monster's stat block as one nested frontmatter value, and round-trips it (ADR-0055)", async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const worldId = await importVault(ada, { 'Note.md': '# Note' });
+
+    const entities = app.get(EntitiesService);
+    const created = entities.create(adaId, { types: ['dnd.monster'], name: 'Ancient Red Dragon', worldId, tags: [] });
+    const statBlock = { size: 'Huge', creature_type: 'dragon', challenge_rating: 24, strength: 30 };
+    entities.save(adaId, created.id, {
+      version: created.version,
+      tags: [],
+      descriptors: [],
+      // The whole stat block is one grouped value at `stat_block` (ADR-0055), beside the prose.
+      document: { content: tiptapContent({ type: 'doc', content: [] }), stat_block: statBlock },
+    });
+
+    const { files } = await exportZip(ada, worldId);
+    const fm = frontmatter(text(files, 'Ancient Red Dragon.md'));
+
+    // The stat block projects to frontmatter (`vault: { slot: 'frontmatter' }`) as one nested value the
+    // generic EntityDocument path serializes and re-reads — no custom converter, mirroring the grid.
+    expect(fm['stat_block']).toEqual(statBlock);
+  });
+
   it('round-trips a fixture vault: import → export reproduces the folder layout and content', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 8, 7, 6]);

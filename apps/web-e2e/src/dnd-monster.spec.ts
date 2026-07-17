@@ -1,49 +1,46 @@
-import { addType, enterLibrary, entityIdFromUrl, expect, flushSave, mapViewToggle, test } from './fixtures';
+import {
+  addType,
+  contentViewToggle,
+  createEntity,
+  enterLibrary,
+  expect,
+  flushSave,
+  mapViewToggle,
+  statBlockViewToggle,
+  test,
+} from './fixtures';
 
 /** The Hex Map's map View toggle: bound to the `grid` Field `core.hexmap` declares. */
 const MAP_VIEW = mapViewToggle();
+/** The monster's stat-block View toggle: bound to the `stat_block` Field `dnd.monster` places (ADR-0055). */
+const STAT_BLOCK_VIEW = statBlockViewToggle();
+/** The Note View toggle: `dnd.monster` places the content View by id, so it keys plain. */
+const NOTE_VIEW = contentViewToggle();
 
-test('creates a dnd.monster, fills its required Fields, and reads the stat block', async ({ page, request }) => {
+test('creates a dnd.monster, fills its stat block, and reads it back', async ({ page, request }) => {
   await enterLibrary(page);
 
-  // The create Command is hand-wired nowhere: it falls out of the type registry.
-  await page.keyboard.press('ControlOrMeta+k');
-  await page.getByTestId('command-palette-input').fill('>monster');
-  await page.getByTestId('command-palette-option-create-dnd.monster').click();
-
-  await expect(page.getByTestId('create-entity-name')).toBeVisible();
-  await page.getByTestId('create-entity-name').fill('Ancient Red Dragon');
-
-  // Create is gated until the type's required Field is supplied (forward-only, #187/#189); the dialog
-  // reads the same schema the API's write gate resolves.
-  const submit = page.getByTestId('create-entity-submit');
-  await expect(submit).toHaveAttribute('aria-disabled', 'true');
-
-  await page.getByTestId('create-field-challenge_rating').locator('input').fill('24');
-  await expect(submit).not.toHaveAttribute('aria-disabled', 'true');
-  await submit.click();
-
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const id = entityIdFromUrl(page);
-  await expect(page.getByTestId('title')).toHaveText('Ancient Red Dragon');
+  // The monster's stat block is structured now (ADR-0055), so it has no required *scalar* Field: the
+  // create Command mints it blind, like a Note, and the block is filled in place. No create dialog.
+  const id = await createEntity(page, 'dnd.monster');
+  await expect(page.getByTestId('title')).toBeVisible();
 
   // One View per surface: the plugin's stat block and the rich-content Note, defaulting to the
   // primary type's own (ADR-0048, Views amendment).
-  await expect(page.getByTestId('dnd.view.stat-block')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('core.view.content')).toBeVisible();
+  await expect(page.getByTestId(STAT_BLOCK_VIEW)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId(NOTE_VIEW)).toBeVisible();
   // A map View's toggle is keyed by the Field it renders — and a monster has no grid at all.
   await expect(page.getByTestId(MAP_VIEW)).toHaveCount(0);
 
-  // The CR carries over from the create dialog; the rest of the block is editable in place.
   await expect(page.getByTestId('stat-block-view')).toBeVisible();
-  await expect(page.getByTestId('stat-challenge_rating').locator('input')).toHaveValue('24');
 
+  // The whole block is editable in place — the block is the monster's only stat-authoring surface.
+  await page.getByTestId('stat-challenge_rating').locator('input').fill('24');
   await page.getByTestId('stat-strength').locator('input').fill('30');
   // The modifier is derived, not stored: a raw 30 is a +10.
   await expect(page.getByTestId('stat-mod-strength')).toHaveText('+10');
 
-  // The block is the only surface the optional Fields have (the create dialog collects the required
-  // ones), so a facetable Field like `size` must be settable here.
+  // A facetable dimension like `size` is settable here, and the subtitle is derived from it.
   await page.getByTestId('stat-size').locator('select').selectOption('Huge');
   await expect(page.getByTestId('stat-block-subtitle')).toContainText('Huge');
 
@@ -51,36 +48,32 @@ test('creates a dnd.monster, fills its required Fields, and reads the stat block
   await page.reload();
 
   await expect(page.getByTestId('stat-block-view')).toBeVisible();
+  await expect(page.getByTestId('stat-challenge_rating').locator('input')).toHaveValue('24');
   await expect(page.getByTestId('stat-strength').locator('input')).toHaveValue('30');
   await expect(page.getByTestId('stat-size').locator('select')).toHaveValue('Huge');
 
-  // A Field is a lens over the one EntityDocument map — which is the body itself now (ADR-0051): the stat
-  // block's values sit at the body root, so an instance without the plugin loses nothing.
+  // The stat block is one grouped value at the `stat_block` key of the one EntityDocument map (ADR-0055),
+  // so an instance without the plugin keeps it intact as plain document.
   const res = await request.get(`/api/entities/${id}`);
   expect(res.ok()).toBeTruthy();
   const body = await res.json();
   expect(body.types).toEqual(['dnd.monster']);
-  expect(body.document).toMatchObject({ challenge_rating: 24, strength: 30, size: 'Huge' });
+  expect(body.document.stat_block).toMatchObject({ challenge_rating: 24, strength: 30, size: 'Huge' });
 });
 
-test('a facetable Field surfaces in the browser rail by presence, no active Type filter (#231)', async ({ page }) => {
+test('a monster’s harvested dimensions surface in the browser rail by presence, no active Type filter (#231/#236)', async ({
+  page,
+}) => {
   await enterLibrary(page);
 
-  // A monster carrying a value for the facetable `size` Field.
-  await page.keyboard.press('ControlOrMeta+k');
-  await page.getByTestId('command-palette-input').fill('>monster');
-  await page.getByTestId('command-palette-option-create-dnd.monster').click();
-  await page.getByTestId('create-entity-name').fill('Ancient Red Dragon');
-  await page.getByTestId('create-field-challenge_rating').locator('input').fill('24');
-  await page.getByTestId('create-entity-submit').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const id = entityIdFromUrl(page);
-
+  const id = await createEntity(page, 'dnd.monster');
+  await page.getByTestId('title').waitFor();
+  await page.getByTestId('stat-challenge_rating').locator('input').fill('24');
   await page.getByTestId('stat-size').locator('select').selectOption('Huge');
   await flushSave(page);
 
   // Back in the Library with no Type filter selected: the `size` facet surfaces because the result set
-  // carries a value for it — the ADR-0054 presence rule, not the retired type-gated unfold.
+  // carries a value for it — harvested off the stat block's Data Type (ADR-0055), not a scalar Field.
   await page.getByRole('link', { name: 'Library' }).click();
   await expect(page).toHaveURL(/\/entities$/);
   await expect(page.getByTestId('facet-field-size')).toBeVisible();
@@ -93,23 +86,17 @@ test('a facetable Field surfaces in the browser rail by presence, no active Type
 test('a dnd.monster carrying core.hexmap offers the stat block, Note, and Map views', async ({ page }) => {
   await enterLibrary(page);
 
-  await page.keyboard.press('ControlOrMeta+k');
-  await page.getByTestId('command-palette-input').fill('>monster');
-  await page.getByTestId('command-palette-option-create-dnd.monster').click();
-  await page.getByTestId('create-entity-name').fill('The Sunken Keep');
-  await page.getByTestId('create-field-challenge_rating').locator('input').fill('7');
-  await page.getByTestId('create-entity-submit').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await createEntity(page, 'dnd.monster');
 
   // Add the hexmap type on the open Entity, which mints the empty grid its `grid` Field declares.
   await addType(page, 'core.hexmap');
 
-  await expect(page.getByTestId('dnd.view.stat-block')).toBeVisible();
-  await expect(page.getByTestId('core.view.content')).toBeVisible();
+  await expect(page.getByTestId(STAT_BLOCK_VIEW)).toBeVisible();
+  await expect(page.getByTestId(NOTE_VIEW)).toBeVisible();
   await expect(page.getByTestId(MAP_VIEW)).toBeVisible();
 
   // `dnd.monster` is still primary, so its own View stays the default.
-  await expect(page.getByTestId('dnd.view.stat-block')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId(STAT_BLOCK_VIEW)).toHaveAttribute('aria-pressed', 'true');
 
   // The Map view opens on the empty grid the added type's `grid` Field minted, not a blank frame.
   await page.getByTestId(MAP_VIEW).click();

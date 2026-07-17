@@ -1,7 +1,7 @@
 import { EnvironmentProviders } from '@angular/core';
 import { providePlugin } from '@hexly/web-entity';
 import { PLUGIN_ID } from '../lib/plugin-id';
-import { DND_MONSTER_FIELDS } from '../lib/monster';
+import { DND_STAT_BLOCK, DND_STAT_BLOCK_FIELD, STAT_BLOCK_DATA_TYPE } from '../lib/stat-block';
 import { DND_TRANSLATIONS } from '../i18n/dnd-translations';
 import { DND_TYPE_DEFINITIONS, DND_VIEW_STAT_BLOCK } from './dnd-types';
 
@@ -16,15 +16,22 @@ export function providePluginDnd(): EnvironmentProviders {
   return providePlugin({
     id: PLUGIN_ID,
     types: DND_TYPE_DEFINITIONS,
-    // The stat-block Fields (ADR-0054); the prose `core.content` it also references is the content plugin's.
-    fields: DND_MONSTER_FIELDS,
+    // The `dnd.stat-block` structured Field (ADR-0054); the prose `core.content` it also references is
+    // the content plugin's.
+    fields: [DND_STAT_BLOCK_FIELD],
     views: [
       {
         id: DND_VIEW_STAT_BLOCK,
-        labelKey: 'dnd.monster.view.statBlock',
+        // The `dnd.stat-block` data-type's View, not the `dnd.monster` type's (ADR-0055): it renders
+        // whichever stat-block Field placed it and takes its toggle label from that Field — so no toggle
+        // copy of its own, mirroring the map View (ADR-0050).
+        dataType: DND_STAT_BLOCK,
+        // The copy naming the *kind* where a World Owner picks it, in the World Types editor (#201).
+        dataTypeLabelKey: 'dnd.statBlock.dataType',
         loadComponent: () => import('./stat-block-view').then((m) => m.StatBlockView),
       },
     ],
+    dataTypes: [STAT_BLOCK_DATA_TYPE],
     translations: DND_TRANSLATIONS,
   });
 }

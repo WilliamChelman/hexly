@@ -43,6 +43,15 @@ function hexmapBody(hexes: Record<string, unknown> = {}) {
 /** The empty plane a fresh Hex Map is minted with (and the editor round-trips). */
 const emptyHexmapBody = hexmapBody();
 
+/** A World-authored scalar enum Field — the attach fixture the retired `dnd.size` used to be (ADR-0055). */
+const SIZE_FIELD = {
+  id: 'world.size',
+  key: 'size',
+  label: 'Size',
+  dataType: { kind: 'enum', options: ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'] },
+  facetable: true,
+};
+
 describe('Entities endpoints', () => {
   let app: INestApplication;
   let db: Db;
@@ -172,22 +181,25 @@ describe('Entities endpoints', () => {
   });
 
   /**
-   * A directly-attached Field (`fields[]`, ADR-0054) round-trips through create → load → save. The dnd
-   * `size` Field rides a plain Note the note type never names (story 2).
+   * A directly-attached Field (`fields[]`, ADR-0054) round-trips through create → load → save. A
+   * World-authored `size` enum Field rides a plain Note the note type never names (story 2). (The dnd
+   * scalar Fields retired, ADR-0055, so a World Field is the scalar-attach fixture now.)
    */
   it('round-trips an Entity’s directly-attached fields[] through create, load, and save', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
+    const worldId = (await ada.get('/worlds').expect(200)).body[0].id;
+    await ada.post(`/worlds/${worldId}/fields`).send(SIZE_FIELD).expect(201);
 
     const created = await ada
       .post('/entities')
-      .send({ name: 'Ealdred', types: ['core.note'], fields: ['dnd.size'] })
+      .send({ name: 'Ealdred', types: ['core.note'], fields: ['world.size'], worldId })
       .expect(201);
     // `size` is a plain enum Field, so it mints no default — the note still opens as Content-only.
-    expect(created.body.fields).toEqual(['dnd.size']);
+    expect(created.body.fields).toEqual(['world.size']);
     expect(created.body.document).toEqual({ content: emptyContent() });
 
     const loaded = await ada.get(`/entities/${created.body.id}`).expect(200);
-    expect(loaded.body.fields).toEqual(['dnd.size']);
+    expect(loaded.body.fields).toEqual(['world.size']);
 
     // A save replaces the attached-Field set and fills the Field's value; validation runs over the
     // effective set, so the enum value is checked though no type declares `size`.
@@ -197,13 +209,13 @@ describe('Entities endpoints', () => {
         document: { content: emptyContent(), size: 'Large' },
         version: created.body.version,
         tags: [],
-        fields: ['dnd.size'],
+        fields: ['world.size'],
       })
       .expect(200);
-    expect(saved.body.fields).toEqual(['dnd.size']);
+    expect(saved.body.fields).toEqual(['world.size']);
 
     const reloaded = await ada.get(`/entities/${created.body.id}`).expect(200);
-    expect(reloaded.body.fields).toEqual(['dnd.size']);
+    expect(reloaded.body.fields).toEqual(['world.size']);
     expect(reloaded.body.document.size).toBe('Large');
   });
 
@@ -213,10 +225,12 @@ describe('Entities endpoints', () => {
    */
   it('rejects a save whose attached Field value is ill-typed, though no type declares it', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
+    const worldId = (await ada.get('/worlds').expect(200)).body[0].id;
+    await ada.post(`/worlds/${worldId}/fields`).send(SIZE_FIELD).expect(201);
 
     const created = await ada
       .post('/entities')
-      .send({ name: 'Ealdred', types: ['core.note'], fields: ['dnd.size'] })
+      .send({ name: 'Ealdred', types: ['core.note'], fields: ['world.size'], worldId })
       .expect(201);
 
     // `size` is an enum; a value outside its options fails the effective-set validation.
@@ -226,7 +240,7 @@ describe('Entities endpoints', () => {
         document: { content: emptyContent(), size: 'Colossal' },
         version: created.body.version,
         tags: [],
-        fields: ['dnd.size'],
+        fields: ['world.size'],
       })
       .expect(400);
   });
@@ -1955,14 +1969,15 @@ describe('Entities endpoints', () => {
    * {@link TypeFieldRegistry} seeds it at startup.
    */
   describe('the bundled dnd.monster plugin type', () => {
-    /** Typed-save a monster with the given EntityDocument — an active typed edit, so the gate applies. */
-    async function saveMonster(agent: Awaited<ReturnType<typeof signIn>>, metadata: Record<string, unknown>) {
+    /** Typed-save a monster whose stat block is the given value — an active typed edit, so the gate applies. */
+    async function saveMonster(agent: Awaited<ReturnType<typeof signIn>>, statBlock: Record<string, unknown>) {
       const created = await agent
         .post('/entities')
         .send({ name: 'Aboleth', types: ['core.note'] })
         .expect(201);
       const res = await agent.put(`/entities/${created.body.id}`).send({
-        document: { content: emptyContent(), ...metadata },
+        // The stat block is one grouped value at `stat_block` now (ADR-0055), not thirteen top-level keys.
+        document: { content: emptyContent(), stat_block: statBlock },
         version: 1,
         tags: [],
         types: ['dnd.monster'],
@@ -1970,23 +1985,28 @@ describe('Entities endpoints', () => {
       return { id: created.body.id as string, worldId: created.body.worldId as string, res };
     }
 
-    it('resolves the plugin’s schema for the forward-only gate — a monster needs its challenge_rating', async () => {
+    it('resolves the plugin’s stat-block schema for the forward-only gate — a mistyped stat is rejected', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
 
-      const missing = await saveMonster(ada, { size: 'Huge' });
-      expect(missing.res.status).toBe(400);
-      expect(missing.res.body.code).toBe('invalid-fields');
-      expect(missing.res.body.data.fields).toContainEqual({ key: 'challenge_rating', code: 'required' });
-
-      // A CR is a number; the string a stat block *prints* is not the value it stores.
+      // A CR is a number; the string a stat block *prints* is not the value it stores — the whole block fails.
       const illTyped = await saveMonster(ada, { challenge_rating: '24' });
       expect(illTyped.res.status).toBe(400);
+      expect(illTyped.res.body.code).toBe('invalid-fields');
+      expect(illTyped.res.body.data.fields).toContainEqual({ key: 'stat_block', code: 'type' });
+
+      // An unknown size is not one of the enum options the block admits.
+      const badSize = await saveMonster(ada, { size: 'Colossal' });
+      expect(badSize.res.status).toBe(400);
 
       const ok = await saveMonster(ada, { challenge_rating: 24, size: 'Huge', creature_type: 'dragon' });
       expect(ok.res.status).toBe(200);
+
+      // The block imposes no required stat — a deity borrowing it for its size facet alone is valid (ADR-0055).
+      const noCr = await saveMonster(ada, { size: 'Large' });
+      expect(noCr.res.status).toBe(200);
     });
 
-    it('facets a monster on the plugin’s facetable Fields, challenge_rating as a number', async () => {
+    it('facets a monster on the stat block’s harvested dimensions, challenge_rating as a number', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const dragon = await saveMonster(ada, { challenge_rating: 24, size: 'Huge', creature_type: 'dragon' });
       expect(dragon.res.status).toBe(200);

@@ -4,7 +4,7 @@ import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { signal, WritableSignal } from '@angular/core';
 import { of } from 'rxjs';
-import { EntityDetail } from '@hexly/domain';
+import { defineField, EntityDetail } from '@hexly/domain';
 import { ActiveWorld, ClientConfigStore, EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
@@ -12,7 +12,7 @@ import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
 import { PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
-import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
+import { CORE_VIEW_FIELDS, TypeDefinition } from '@hexly/web-entity';
 import { NewEntityButton } from './new-entity-button';
 import { TypeRegistry } from './type-registry';
 import { CreateEntityDialogState } from '../shell/command-palette/create-entity-dialog.state';
@@ -47,6 +47,25 @@ const created = (id: string, name: string, types: string[]) =>
     updatedAt: 1,
     document: { content: { format: 'tiptap-v1', snapshot: {} } },
   }) as unknown as EntityDetail;
+
+/** A minimal registered TypeDefinition referencing its Fields by id (ADR-0054) — the fixture for the dialog gate. */
+function worldType(id: string, fieldRefs: string[]): TypeDefinition {
+  return {
+    id: id as TypeDefinition['id'],
+    icon: 'label',
+    views: [CORE_VIEW_FIELDS],
+    fieldRefs,
+    graphColorToken: '--color-ink-muted',
+    labels: {
+      eyebrow: `${id}.eyebrow`,
+      titleLabel: `${id}.titleLabel`,
+      rename: `${id}.rename`,
+      editorLabel: `${id}.editorLabel`,
+      create: `${id}.create`,
+      untitled: `${id}.untitled`,
+    },
+  };
+}
 
 describe('NewEntityButton', () => {
   let entities: MockEntitiesClient;
@@ -204,15 +223,32 @@ describe('NewEntityButton', () => {
   });
 
   it('opens the create dialog for a Type with a required Field, rather than minting an unsavable Entity', () => {
-    // `dnd.monster` requires `challenge_rating` (#192); a blind create would land the author on an
-    // Entity the write gate refuses to save (#187), so the dialog collects it first (#189).
+    // A World type referencing a required scalar Field: a blind create would land the author on an
+    // Entity the write gate refuses to save (#187), so the dialog collects it first (#189). (`dnd.monster`
+    // no longer has a required *scalar* Field — its stat block is structured, ADR-0055 — so it creates blind.)
+    const registry = TestBed.inject(TypeRegistry);
+    registry.setWorldFields([
+      defineField({ id: 'world.rank', key: 'rank', label: 'Rank', dataType: { kind: 'number' }, required: true }),
+    ]);
+    registry.register(worldType('world.knight', ['world.rank']));
     const fixture = render();
+
+    openMenu(fixture);
+    menuItem('world.knight')!.click();
+
+    expect(entities.create).not.toHaveBeenCalled();
+    expect(TestBed.inject(CreateEntityDialogState).types()).toEqual(['world.knight']);
+  });
+
+  it('creates a dnd.monster blind — its stat block is structured, so it has no required scalar Field (ADR-0055)', () => {
+    const fixture = render();
+    entities.create.mockReturnValueOnce(of(created('m1', 'Untitled monster', ['dnd.monster'])));
 
     openMenu(fixture);
     menuItem('dnd.monster')!.click();
 
-    expect(entities.create).not.toHaveBeenCalled();
-    expect(TestBed.inject(CreateEntityDialogState).types()).toEqual(['dnd.monster']);
+    expect(entities.create).toHaveBeenCalledWith('Untitled monster', ['dnd.monster'], 'w1');
+    expect(TestBed.inject(CreateEntityDialogState).types()).toBeNull();
   });
 
   it('names the type in French when French is the active language', () => {
