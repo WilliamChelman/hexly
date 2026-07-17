@@ -124,11 +124,12 @@ export class VaultImportService {
         // with the default type appended as the lowest-priority fallback: a foreign or unregistered-type
         // note still lands its prose in `content` rather than losing it, while a type that references
         // `content` itself keeps its own projection (deduped by key, primary type first). No default type
-        // → no fallback. A brand-new World has no user-defined types/Fields, so the Plugin resolvers cover
-        // every file — no attachments (`fieldIds: []`) on a fresh import.
+        // → no fallback. The body Fields come from the stamped types alone — the document is being built
+        // here, so there is nothing yet to derive attachments from (`doc: {}`, ADR-0057). A namespaced
+        // frontmatter key becomes an attachment naturally once the imported document is read back.
         const fields = resolveEffectiveFields({
           types: defaultType ? [...types, defaultType] : [...types],
-          fieldIds: [],
+          doc: {},
           fieldResolver: this.typeFields.fieldResolver,
           typeFieldRefs: this.typeFields.typeFieldRefs,
         });

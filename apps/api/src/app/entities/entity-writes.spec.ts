@@ -638,15 +638,16 @@ describe('EntityWrites', () => {
         typeFields.registerField(ALLY);
       });
 
-      it('harvests an edge and a facet from an attached link Field its types never named', () => {
+      it('harvests an edge and a facet from an attached link Field its types never named (derived from the document, ADR-0057)', () => {
         writes.insert({
           ownerId: ADA,
           worldId: WORLD,
           name: 'Ealdred',
           types: ['core.note'],
-          fields: ['test.ally'],
-          tags: [],
+          // No stored attachment set: `test.ally` is a registered key the document carries that `core.note`
+          // never defaults, so it resolves into the effective set as an attachment.
           document: { 'core.content': emptyContent(), 'test.ally': { entityId: 'mira', label: 'Mira' } },
+          tags: [],
         });
 
         expect(edgesOf('Ealdred')).toEqual([
@@ -655,24 +656,10 @@ describe('EntityWrites', () => {
         expect(facetsOf('Ealdred')).toEqual([{ key: 'test.ally', value: 'mira', num: null }]);
       });
 
-      it('round-trips the attached `fields[]` set through the row', () => {
-        const row = writes.insert({
-          ownerId: ADA,
-          worldId: WORLD,
-          name: 'Ealdred',
-          types: ['core.note'],
-          fields: ['test.ally'],
-          tags: [],
-          document: { 'core.content': emptyContent(), 'test.ally': { entityId: 'mira', label: 'Mira' } },
-        });
-
-        expect(rowOf(row.id).fields).toEqual(['test.ally']);
-      });
-
-      it('rebuilds the attached Field’s edge and facet from the stored fields[] column on reindex', () => {
-        // Seeded raw with the `fields[]` column set and no derived rows, so the rebuild is observed
-        // independently of `insert` — the reindex must resolve the effective set from `types` + `fields`.
-        seedAttachedRaw('ealdred', WORLD, ['core.note'], ['test.ally'], {
+      it('rebuilds the attached Field’s edge and facet from the document on reindex (ADR-0057)', () => {
+        // Seeded raw with no derived rows, so the rebuild is observed independently of `insert` — the
+        // reindex must derive the effective set from `types` + the document's own attachment keys.
+        seedAttachedRaw('ealdred', WORLD, ['core.note'], {
           'core.content': emptyContent(),
           'test.ally': { entityId: 'mira', label: 'Mira' },
         });
@@ -685,14 +672,8 @@ describe('EntityWrites', () => {
         expect(facetsOf('ealdred')).toEqual([{ key: 'test.ally', value: 'mira', num: null }]);
       });
 
-      /** An Entity seeded raw with its `fields[]` column and no derived rows, for a reindex to rebuild. */
-      function seedAttachedRaw(
-        id: string,
-        worldId: string,
-        types: readonly string[],
-        fields: readonly string[],
-        doc: EntityDocument,
-      ): void {
+      /** An Entity seeded raw with no derived rows, for a reindex to rebuild from its document (ADR-0057). */
+      function seedAttachedRaw(id: string, worldId: string, types: readonly string[], doc: EntityDocument): void {
         const now = Date.now();
         db.insert(entities)
           .values({
@@ -700,7 +681,6 @@ describe('EntityWrites', () => {
             worldId,
             name: id,
             types: [...types],
-            fields: [...fields],
             tags: [],
             visibility: 'private',
             version: 1,

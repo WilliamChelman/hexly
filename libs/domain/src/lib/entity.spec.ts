@@ -141,23 +141,8 @@ describe('createEntityRequestSchema', () => {
     expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).worldId).toBeUndefined();
   });
 
-  it('accepts directly-attached Field ids (fields[], ADR-0054), deduping and defaulting to empty', () => {
-    expect(
-      createEntityRequestSchema.parse({
-        name: 'Sol',
-        types: ['world.deity'],
-        fields: ['world.element', 'world.element', 'world.domain'],
-      }).fields,
-    ).toEqual(['world.element', 'world.domain']);
-    // Omitted → an Entity attaching no Field of its own (its effective set is its types' defaults).
-    expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).fields).toEqual([]);
-  });
-
-  it('rejects an attached Field id that is not a `namespace.id` key', () => {
-    expect(createEntityRequestSchema.safeParse({ name: 'x', types: ['core.note'], fields: ['element'] }).success).toBe(
-      false,
-    );
-  });
+  // ADR-0057: a create no longer carries a `fields` set — an attachment is a namespaced document key,
+  // so it rides the initial `document` map like any other value; the server derives the effective set.
 
   it('carries an optional initial EntityDocument map for a picked type’s required Fields (#189)', () => {
     const parsed = createEntityRequestSchema.parse({
@@ -225,16 +210,15 @@ describe('saveEntityRequestSchema', () => {
     expect(saveEntityRequestSchema.parse({ document: body, version: 1, tags: [] })).not.toHaveProperty('types');
   });
 
-  it('accepts an optional attached-Field id set the save replaces, and omits it when absent (ADR-0054)', () => {
-    expect(
-      saveEntityRequestSchema.parse({
-        document: body,
-        version: 1,
-        tags: [],
-        fields: ['world.element', 'world.element'],
-      }).fields,
-    ).toEqual(['world.element']);
-    expect(saveEntityRequestSchema.parse({ document: body, version: 1, tags: [] })).not.toHaveProperty('fields');
+  it('carries no attached-Field set — an attachment rides the document itself now (ADR-0057)', () => {
+    // A stale client's `fields` is a stripped unknown key, not a schema field.
+    const parsed = saveEntityRequestSchema.parse({
+      document: body,
+      version: 1,
+      tags: [],
+      fields: ['world.element'],
+    });
+    expect(parsed).not.toHaveProperty('fields');
   });
 
   it('ignores a descriptors field a stale client still sends (server harvests them now, #96)', () => {

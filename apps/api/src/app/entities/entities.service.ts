@@ -132,7 +132,6 @@ export class EntitiesService {
         worldId: entities.worldId,
         name: entities.name,
         types: entities.types,
-        fields: entities.fields,
         tags: entities.tags,
         visibility: entities.visibility,
         version: entities.version,
@@ -484,7 +483,9 @@ export class EntitiesService {
     // The World comes first: a user-defined type's Fields resolve only within their World (#191), and the
     // minted body is the defaults the effective Field set declares (ADR-0050, ADR-0054).
     const worldId = this.resolveWorldId(ownerId, req.worldId);
-    const fields = this.worldTypeFields.effectiveFields(worldId, req.types, req.fields);
+    // The effective set — hence the defaults to mint — is the types' defaults plus whatever the initial
+    // document already attaches (a namespaced key no type defaults, ADR-0057).
+    const fields = this.worldTypeFields.effectiveFields(worldId, req.types, req.document);
     const minted = emptyEntityDocument(fields, this.typeFields.structuredDataTypes);
     // Initial document seeds over the minted defaults. Ungated: like an import, a create establishes
     // at-rest data (the Field gate is save-only).
@@ -494,7 +495,6 @@ export class EntitiesService {
       worldId,
       name: req.name,
       types: req.types,
-      fields: req.fields,
       tags: req.tags,
       document: doc,
     });
@@ -525,10 +525,9 @@ export class EntitiesService {
       document: req.document,
       // Tags always fully replace (a save carries the full set).
       tags: req.tags,
-      // Types / attached Fields replace only when the save carries them; omitted leaves each
-      // untouched (ADR-0048, ADR-0054).
+      // Types replace only when the save carries them; omitted leaves the set untouched (ADR-0048).
+      // Attachments ride the document itself now (ADR-0057), so there is no separate set to send.
       types: req.types,
-      fields: req.fields,
       version: req.version,
     });
     switch (result.status) {
@@ -544,23 +543,18 @@ export class EntitiesService {
   }
 
   /**
-   * The forward-only Field gate (ADR-0048, ADR-0054). A save carrying an explicit `types` or attached
-   * `fields` set is an active typed edit, so its EntityDocument must satisfy the *effective* set — an
-   * attached Field validates even when its types never named it (story 15). A save carrying neither is a
-   * plain body edit, left untouched, so a document at rest is never retroactively invalidated.
+   * The forward-only Field gate (ADR-0048, ADR-0054, ADR-0057). A save carrying an explicit `types` set is
+   * an active typed edit, so its EntityDocument must satisfy the *effective* set — including the extras the
+   * document itself attaches, so an attached Field validates even when its types never named it (story 15). A
+   * save carrying no `types` is a plain body edit, left untouched, so a document at rest — or a foreign
+   * import re-saved — is never retroactively invalidated.
    */
   private gateTypedEdit(userId: string, id: string, req: SaveEntityRequest): void {
-    if (req.types === undefined && req.fields === undefined) return;
-    // Read the stored World/types/fields so a partial save (types xor fields) validates against the
-    // effective set the row would hold. A missing row 404s in `mutate` regardless.
-    const stored = this.db
-      .select({ worldId: entities.worldId, types: entities.types, fields: entities.fields })
-      .from(entities)
-      .where(eq(entities.id, id))
-      .get();
-    const types = req.types ?? stored?.types ?? [];
-    const fieldIds = req.fields ?? stored?.fields ?? [];
-    this.assertTypedFieldsValid(userId, stored?.worldId, types, fieldIds, req.document);
+    if (req.types === undefined) return;
+    // Read the stored World so the effective set resolves this row's user-defined Fields. A missing row
+    // 404s in `mutate` regardless.
+    const stored = this.db.select({ worldId: entities.worldId }).from(entities).where(eq(entities.id, id)).get();
+    this.assertTypedFieldsValid(userId, stored?.worldId, req.types, req.document);
   }
 
   /**
@@ -573,10 +567,9 @@ export class EntitiesService {
     userId: string,
     worldId: string | undefined,
     types: readonly EntityType[],
-    fieldIds: readonly string[],
     metadata: EntityDocument,
   ): void {
-    const fields = this.worldTypeFields.effectiveFields(worldId, types, fieldIds);
+    const fields = this.worldTypeFields.effectiveFields(worldId, types, metadata);
     const errors: FieldError[] = [
       ...validateFields(fields, metadata, this.typeFields.structuredDataTypes).errors,
       ...this.linkTargetTypeErrors(userId, fields, metadata),
@@ -1021,9 +1014,6 @@ function toSummary(row: SummaryColumns): EntitySummary {
     worldId: row.worldId,
     name: row.name,
     types: typesSchema.parse(row.types),
-    // Emitted only when non-empty (ADR-0054): an Entity attaching none stays `fields`-free, the optional
-    // interface shape the not-yet-migrated web tolerates.
-    ...(row.fields.length ? { fields: [...row.fields] } : {}),
     tags: tagsSchema.parse(row.tags),
     visibility: visibilitySchema.parse(row.visibility),
     version: row.version,

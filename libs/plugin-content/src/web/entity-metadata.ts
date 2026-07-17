@@ -36,12 +36,16 @@ export class EntityMetadata {
   private readonly session = inject(ENTITY_SESSION);
   private readonly types = inject(ENTITY_TYPES);
 
-  /** The EntityDocument keys a Structured Data Type types — a document, shown on its own View, never here. Over the effective set (ADR-0054). */
+  /**
+   * The EntityDocument keys a Structured Data Type types — a document, shown on its own View, never here.
+   * Over the effective set, with attachments derived from the document's own keys (ADR-0054/ADR-0057):
+   * passing every document key as an attachment candidate resolves the extras and drops foreign bare keys.
+   */
   private readonly structuredKeys = computed(
     () =>
       new Set(
         this.types
-          .effectiveFields(this.session.current()?.types, this.session.current()?.fields)
+          .effectiveFields(this.session.current()?.types, Object.keys(this.session.current()?.document ?? {}))
           .filter((field) => isStructuredDataType(field.dataType))
           .map((field) => field.id),
       ),

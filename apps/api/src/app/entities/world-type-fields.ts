@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   AvailableType,
+  EntityDocument,
   Field,
   FieldDataType,
   isFacetableField,
@@ -71,19 +72,20 @@ export class WorldTypeFields {
   }
 
   /**
-   * An Entity's **effective Field set** (CONTEXT.md → Entity, ADR-0054/ADR-0056): its attached Fields
-   * (`fieldIds`) unioned with its types' defaults, deduped by `id`. What every downstream pure function
-   * runs over, so an attached Field is validated, faceted, and edge-harvested like a type default. An id
-   * resolving to nothing (a disabled/absent plugin's Field, or a deleted World Field, ADR-0052/0054) is
-   * skipped, its value left untouched (forward-only) — one resolution path, id → Field, with no inline schema.
+   * An Entity's **effective Field set** (CONTEXT.md → Entity, ADR-0054/ADR-0056/ADR-0057): its attached
+   * extras — derived from the `doc` (a registered key no type defaults) — unioned with its types' defaults,
+   * deduped by `id`. What every downstream pure function runs over, so an attached Field is validated,
+   * faceted, and edge-harvested like a type default. A key resolving to nothing (a disabled/absent plugin's
+   * Field, a deleted World Field, a foreign bare key, ADR-0052/0054) is skipped, its value left untouched
+   * (forward-only) — one resolution path, id → Field, with no inline schema and no stored attachment list.
    */
-  effectiveFields(worldId: string | undefined, types: readonly string[], fieldIds: readonly string[]): Field[] {
+  effectiveFields(worldId: string | undefined, types: readonly string[], doc: EntityDocument | undefined): Field[] {
     // World-scoped when a `worldId` is in play so its user-defined Fields resolve too; else the Plugin
     // fields alone (a gate that runs before a row's World is known).
     const fieldResolver = worldId ? this.worldFields.resolverFor(worldId) : this.plugins.fieldResolver;
     return resolveEffectiveFields({
       types,
-      fieldIds: fieldIds ?? [],
+      doc,
       fieldResolver,
       typeFieldRefs: this.typeFieldRefsFor(worldId),
     });

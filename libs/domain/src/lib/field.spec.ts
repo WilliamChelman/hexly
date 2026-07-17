@@ -198,21 +198,56 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054/ADR-00
   const typeFieldRefs = (type: string) =>
     (({ 'dnd.beast': ['dnd.cr'], 'world.place': ['world.region'] }) as Record<string, string[]>)[type];
 
-  it('unions an Entity’s attached Fields with its types’ default Fields (types primary-first)', () => {
+  it('unions an Entity’s attached Fields (derived from the document) with its types’ default Fields (types primary-first)', () => {
     const effective = resolveEffectiveFields({
       types: ['dnd.beast', 'world.place'],
-      fieldIds: ['world.element'],
+      doc: { 'world.element': 'fire' },
       fieldResolver,
       typeFieldRefs,
     });
-    // Instance attachment first, then each type's defaults in order.
+    // Attached extra first (document order), then each type's defaults in order.
     expect(effective.map((f) => f.id)).toEqual(['world.element', 'dnd.cr', 'world.region']);
   });
 
-  it('drops an id that resolves to nothing — a disabled plugin / deleted World Field degrades to a plain value', () => {
+  it('treats a null-valued document key as an attached-but-empty Field (ADR-0057)', () => {
+    const effective = resolveEffectiveFields({
+      types: [],
+      doc: { 'world.element': null },
+      fieldResolver,
+      typeFieldRefs,
+    });
+    expect(effective.map((f) => f.id)).toEqual(['world.element']);
+  });
+
+  it('drops a document key that resolves to nothing — a foreign bare key, a disabled plugin, a deleted World Field', () => {
     const effective = resolveEffectiveFields({
       types: ['dnd.beast'],
-      fieldIds: ['world.gone'],
+      // `world.gone` resolves to no Field; `element` is an un-namespaced foreign key lensed by nothing.
+      doc: { 'world.gone': 'x', element: 'fire' },
+      fieldResolver,
+      typeFieldRefs,
+    });
+    expect(effective.map((f) => f.id)).toEqual(['dnd.cr']);
+  });
+
+  it('keeps a *filled* type default in type-order, never promoting it to an extra (ADR-0057)', () => {
+    // `dnd.cr` has a value in the document AND is a `dnd.beast` default: it stays a type default (type-order),
+    // not an attached extra, so `world.element` (a true extra) still sorts first.
+    const effective = resolveEffectiveFields({
+      types: ['dnd.beast'],
+      doc: { 'dnd.cr': 3, 'world.element': 'fire' },
+      fieldResolver,
+      typeFieldRefs,
+    });
+    expect(effective.map((f) => f.id)).toEqual(['world.element', 'dnd.cr']);
+  });
+
+  it('surfaces a filled default as an attachment once its type is removed, while a blank one vanishes (ADR-0057)', () => {
+    // `dnd.beast` defaulted `dnd.cr`; drop the type. The filled `dnd.cr` survives as a derived attachment;
+    // `world.region` (a `world.place` default never given a value, no key) simply disappears.
+    const effective = resolveEffectiveFields({
+      types: [],
+      doc: { 'dnd.cr': 3 },
       fieldResolver,
       typeFieldRefs,
     });
@@ -220,11 +255,11 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054/ADR-00
   });
 
   describe('dedups by id, with no cross-field key override (ADR-0056)', () => {
-    it('resolves a Field reaching an Entity via both a direct attach and a type default to one entry', () => {
-      // `dnd.cr` is a `dnd.beast` default AND directly attached — deduped by id to a single entry.
+    it('resolves a Field reaching an Entity via both the document and a type default to one entry', () => {
+      // `dnd.cr` is a `dnd.beast` default AND carries a document value — deduped by id to a single entry.
       const effective = resolveEffectiveFields({
         types: ['dnd.beast'],
-        fieldIds: ['dnd.cr'],
+        doc: { 'dnd.cr': 3 },
         fieldResolver,
         typeFieldRefs,
       });
@@ -239,7 +274,7 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054/ADR-00
       const kRegistry = new Map<string, Field>([primaryK, laterK].map((f) => [f.id, f]));
       const effective = resolveEffectiveFields({
         types: ['a.type', 'b.type'],
-        fieldIds: [],
+        doc: {},
         fieldResolver: (id) => kRegistry.get(id),
         typeFieldRefs: (t) => (({ 'a.type': ['a.k'], 'b.type': ['b.k'] }) as Record<string, string[]>)[t],
       });
@@ -265,7 +300,10 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054/ADR-00
   const richRegistry = new Map<string, Field>([...registry, [battleMap.id, battleMap], [lair.id, lair]]);
   const effective = resolveEffectiveFields({
     types: ['dnd.beast'],
-    fieldIds: ['core.battle-map', 'world.lair'],
+    doc: {
+      'core.battle-map': { placeholder: true },
+      'world.lair': { entityId: 'whisperwood', label: 'The Whisperwood' },
+    },
     fieldResolver: (id) => richRegistry.get(id),
     typeFieldRefs,
   });
@@ -276,7 +314,7 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054/ADR-00
     expect(validate(effective, { 'dnd.cr': 3 }, DATA_TYPES).ok).toBe(true);
     const required = resolveEffectiveFields({
       types: [],
-      fieldIds: ['world.element'],
+      doc: { 'world.element': null },
       fieldResolver: (id) => (id === 'world.element' ? { ...element, required: true } : undefined),
       typeFieldRefs,
     });
@@ -313,7 +351,7 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054/ADR-00
     });
     const [resolved] = resolveEffectiveFields({
       types: [],
-      fieldIds: ['core.map'],
+      doc: { 'core.map': null },
       fieldResolver: (id) => (id === 'core.map' ? map : undefined),
       typeFieldRefs,
     });

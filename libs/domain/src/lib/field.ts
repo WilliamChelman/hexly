@@ -213,35 +213,46 @@ export type FieldResolver = (id: string) => Field | undefined;
 export type TypeFieldRefsResolver = (typeId: string) => readonly string[] | undefined;
 
 /**
- * The **effective Field set** of an Entity (CONTEXT.md → Entity, ADR-0054/ADR-0056): its directly-attached
- * Fields (`fieldIds`) unioned with its types' default Fields (each type's `fieldRefs`, primary type first),
- * every id resolved to a {@link Field} and the whole deduped by `id`.
+ * The **effective Field set** of an Entity (CONTEXT.md → Entity, ADR-0054/ADR-0056/ADR-0057): its
+ * **attached extras** — a registered Field key present in the EntityDocument that no current type defaults —
+ * unioned with its types' default Fields (each type's `fieldRefs`, primary type first), every id resolved to
+ * a {@link Field} and the whole deduped by `id`.
  *
- * Dedup is by id alone (ADR-0056): a Field reaching an Entity via both a direct attach and a type default
- * resolves to one entry (first seen wins — instance, then types primary→later). Because a `namespace.id`
- * key is unique, two *different* Fields can never claim one key, so the old "dedup by key, most-specific
- * wins" override retires — two differently-named Fields occupy two distinct keys and neither shadows the
- * other. An id that resolves to nothing is skipped, so a disabled plugin or a deleted World Field degrades
- * to a plain document value rather than erroring. The one resolution path (id → Field): a Type Definition
- * names its default Fields by id (`fieldRefs`), never inline.
+ * Attachment is *derived*, not stored (ADR-0057): once a Field's id **is** its document key (ADR-0056), a
+ * directly-attached Field is exactly a document key that resolves to a registered Field and is not already a
+ * type default. A `null` value counts as present, so an attached-but-empty Field persists (its key sits in
+ * the document as `null`); a discard deletes the key. The "minus the types' defaults" clause keeps a *filled*
+ * type default in type-order rather than promoting it to an extra, and is what lets a filled default survive
+ * a type removal as a first-class attachment while a blank one vanishes.
  *
- * The returned order is instance-attached first, then types primary→later; display and View ordering is a
- * concern of the layer that consumes the set, not of resolution.
+ * Dedup is by id alone (ADR-0056): a key reaching the set via both the document and a type default resolves
+ * to one entry (extras first, then types primary→later). Because a `namespace.id` key is unique, two
+ * *different* Fields can never claim one key. A key that resolves to nothing is skipped — a foreign bare key,
+ * a disabled plugin's Field, a deleted World Field — leaving the document value plain (forward-only). The one
+ * resolution path (id → Field): a Type Definition names its default Fields by id (`fieldRefs`), never inline.
+ *
+ * The returned order is attached extras (document order) first, then types primary→later; display and View
+ * ordering is a concern of the layer that consumes the set, not of resolution.
  */
 export function resolveEffectiveFields(args: {
   readonly types: readonly string[];
-  readonly fieldIds: readonly string[];
+  readonly doc: EntityDocument | undefined;
   readonly fieldResolver: FieldResolver;
   readonly typeFieldRefs: TypeFieldRefsResolver;
 }): Field[] {
-  const { types, fieldIds, fieldResolver, typeFieldRefs } = args;
+  const { types, doc, fieldResolver, typeFieldRefs } = args;
+  // The types' default Field ids — a document key is an attached "extra" only when it is *not* one (ADR-0057).
+  const typeDefaultIds = new Set<string>();
+  for (const type of types) for (const id of typeFieldRefs(type) ?? []) typeDefaultIds.add(id);
+
   const byId = new Map<string, Field>();
   const consider = (id: string) => {
     const field = fieldResolver(id);
     if (field && !byId.has(field.id)) byId.set(field.id, field);
   };
-  // Instance attachments first, then each type's defaults in `types` order.
-  for (const id of fieldIds) consider(id);
+  // Attached extras first (ADR-0057): a registered Field key in the document (null included) that no type
+  // defaults, in document insertion order. Then each type's defaults in `types` order.
+  for (const key of Object.keys(doc ?? {})) if (!typeDefaultIds.has(key)) consider(key);
   for (const type of types) for (const id of typeFieldRefs(type) ?? []) consider(id);
   return [...byId.values()];
 }
@@ -516,7 +527,7 @@ export function readField(doc: EntityDocument | undefined, field: Field): unknow
  */
 export function writeField(doc: EntityDocument | undefined, field: Field, value: unknown): EntityDocument {
   const next: EntityDocument = { ...(doc ?? {}) };
-  if (isEmpty(value)) delete next[field.id];
+  if (isEmptyFieldValue(value)) delete next[field.id];
   else next[field.id] = value;
   return next;
 }
@@ -537,8 +548,12 @@ function isAbsent(value: unknown): boolean {
   return value === undefined || value === null;
 }
 
-/** Emptied for {@link writeField}: absent, a blank string, or an empty list — all "clear the key". */
-function isEmpty(value: unknown): boolean {
+/**
+ * Whether a Field value reads as emptied: absent (`undefined`/`null`), a blank string, or an empty list.
+ * {@link writeField} clears the key on it; the generic Field editor writes `null` instead, so *clearing* a
+ * value keeps the Field attached (ADR-0057) while *discarding* it (a document-key delete) detaches it.
+ */
+export function isEmptyFieldValue(value: unknown): boolean {
   return isAbsent(value) || value === '' || (Array.isArray(value) && value.length === 0);
 }
 

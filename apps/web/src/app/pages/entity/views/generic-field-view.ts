@@ -2,12 +2,12 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { TranslocoPipe } from '@jsverse/transloco';
 import {
   Field,
+  isEmptyFieldValue,
   isStructuredDataType,
   EntityDocument,
   NO_STRUCTURED_DATA_TYPES,
   readField,
   validateFields,
-  writeFieldInPlace,
 } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
@@ -150,12 +150,16 @@ export class GenericFieldView {
   }
 
   /**
-   * Write a value into the one EntityDocument map every View shares (ADR-0048). {@link writeFieldInPlace}
-   * clears the key when the value is emptied rather than leaving a blank behind. No-op for a read-only opener.
+   * Write a value into the one EntityDocument map every View shares (ADR-0048). Emptying a control keeps
+   * the Field **attached** — its key stays as `null` (attached-but-empty), the same state as a fresh
+   * attach (ADR-0057) — rather than deleting the key, which is the fields dialog's *discard*. A required
+   * Field emptied to `null` still reads as absent, so its control keeps flagging itself. No-op read-only.
    */
   protected set(field: Field, value: unknown): void {
     if (!this.session.writable()) return;
-    this.session.mutate((draft) => writeFieldInPlace(draft, field, value));
+    this.session.mutate((draft) => {
+      draft[field.id] = isEmptyFieldValue(value) ? null : value;
+    });
   }
 }
 

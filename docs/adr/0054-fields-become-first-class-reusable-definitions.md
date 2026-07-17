@@ -44,7 +44,10 @@ duality: a **Plugin field** (code, `defineField`, instance-wide) and a **User-de
 World-scoped, reserved `world.` namespace, authored in a **World Fields** editor beside the World Types
 editor — a new `world_fields` collection beside `world_types`).
 
-**An Entity carries `fields[]` (attached Field ids) alongside `types[]`.** Its **effective Field set** is
+**An Entity carries `fields[]` (attached Field ids) alongside `types[]`.** _(Superseded by ADR-0057: the
+`fields[]` column is dropped and attachment is derived from the document once id = key (ADR-0056). The
+effective-set definition below stands; only its "extras" input changes from a stored array to a
+document-derived set.)_ Its **effective Field set** is
 its types' default Fields (resolved **live**, primary type first) unioned with its attached Fields. Live,
 not snapshotted: editing a type propagates to its existing Entities. The stated use case is served purely
 by the _additive_ instance layer — attach `world.element` to one deity, leave the deity type untouched —

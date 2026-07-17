@@ -76,9 +76,10 @@ export class VaultExportService {
     };
     return entityToMarkdown({
       doc: entity.document,
-      // The Entity's effective Field set — its types' defaults plus its own attachments (ADR-0054) —
-      // so a directly-attached Field's Vault Projection lands correctly too, not just a type default's.
-      fields: this.worldTypeFields.effectiveFields(worldId, entity.types, entity.fields ?? []),
+      // The Entity's effective Field set — its types' defaults plus the attachments derived from its
+      // document (ADR-0054/ADR-0057) — so a directly-attached Field's Vault Projection lands correctly
+      // too, not just a type default's.
+      fields: this.worldTypeFields.effectiveFields(worldId, entity.types, entity.document),
       dataTypes: this.typeFields.structuredDataTypes,
       frontmatter: frontmatterAdditions(entity, this.typeFields.defaultType),
       context,

@@ -6,7 +6,6 @@
 
 import { z } from 'zod';
 import { FieldDataType, EntityDocument } from './field';
-import { dedupedFieldIdsSchema, fieldRefsSchema } from './field-id';
 
 /**
  * A single Entity Type identity (CONTEXT.md → Entity Type): an **open**,
@@ -100,9 +99,6 @@ export const createEntityRequestSchema = z.object({
   name: nameSchema,
   // The ordered type set; `types[0]` is primary. One or more per creation (ADR-0048).
   types: typesSchema,
-  // The ids of Fields attached directly to this Entity (ADR-0054), beside its types' defaults. Deduped,
-  // order preserved; omitted → none.
-  fields: fieldRefsSchema,
   tags: tagsSchema,
   // Initial Entity Document values seeded into the minted body — what the create dialog collected for
   // a picked type's required Fields. Merged over the server-minted defaults; omitted → a blank map.
@@ -122,9 +118,8 @@ export const saveEntityRequestSchema = z.object({
   // Optional: a save replaces the type set when present, and leaves it untouched when omitted.
   // Multi-type authoring is not surfaced yet, so the current client omits it (ADR-0048).
   types: typesSchema.optional(),
-  // Optional: a save replaces the directly-attached Field id set when present (ADR-0054); omitted leaves
-  // it untouched, mirroring `types`.
-  fields: dedupedFieldIdsSchema.optional(),
+  // Attached Fields ride the document itself (ADR-0057): a directly-attached Field is a namespaced key the
+  // document carries that no type defaults, so there is no separate attachment set to send.
 });
 
 export type SaveEntityRequest = z.infer<typeof saveEntityRequestSchema>;
@@ -302,11 +297,6 @@ export interface EntitySummary {
   readonly name: string;
   /** The ordered Entity Type set; `types[0]` is primary (CONTEXT.md → Entity Type). */
   readonly types: readonly EntityType[];
-  /**
-   * The ids of Fields attached directly to this Entity (`fields`, ADR-0054), beside its types' defaults.
-   * Optional through the expand step, while the write path and read model still round-trip only `types`.
-   */
-  readonly fields?: readonly string[];
   readonly tags: readonly string[];
   readonly visibility: Visibility;
   /** The optimistic-concurrency counter; a save must carry this base value. */
