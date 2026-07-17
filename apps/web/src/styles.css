@@ -44,7 +44,7 @@
 @import '@angular/cdk/a11y-prebuilt.css';
 
 /* Menu chrome utilities, co-located with the ui/menu primitives that apply them. */
-@import '../../../libs/web-ui/src/menu.css';
+@import '../../../libs/web-ui/src/directives/menu.css';
 
 /* Tell Tailwind where to scan for class names (Nx monorepo: be explicit). */
 @source './**/*.{html,ts}';
