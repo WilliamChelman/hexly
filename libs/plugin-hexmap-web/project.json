@@ -1,0 +1,19 @@
+{
+  "name": "plugin-hexmap-web",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/plugin-hexmap-web/src",
+  "prefix": "app",
+  "projectType": "library",
+  "tags": ["scope:web", "type:feature"],
+  "targets": {
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "watch": false,
+        "buildTarget": "web:build:development",
+        "tsConfig": "libs/plugin-hexmap-web/tsconfig.spec.json",
+        "setupFiles": ["libs/plugin-hexmap-web/src/test-setup.ts"]
+      }
+    }
+  }
+}

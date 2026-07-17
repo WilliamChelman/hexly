@@ -17,7 +17,7 @@
     "e2e": "nx e2e web-e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "private": true,
   "lint-staged": {
