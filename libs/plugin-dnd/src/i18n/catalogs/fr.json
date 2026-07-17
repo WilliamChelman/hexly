@@ -10,5 +10,13 @@
     "view": {
       "statBlock": "Bloc de stats"
     }
+  },
+  "statBlock": {
+    "dataType": "Bloc de stats",
+    "facet": {
+      "size": "Taille",
+      "creatureType": "Type de créature",
+      "challengeRating": "Facteur de puissance"
+    }
   }
 }

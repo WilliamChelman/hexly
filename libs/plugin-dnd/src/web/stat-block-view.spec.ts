@@ -4,21 +4,26 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { EntityDocument } from '@hexly/domain';
 import { produceWithPatches } from '@hexly/immer';
-import { ENTITY_SESSION, EntitySession } from '@hexly/web-entity';
+import { ENTITY_SESSION, EntitySession, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { DND_STAT_BLOCK_KEY } from '../lib/stat-block';
 import { DND_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { StatBlockView } from './stat-block-view';
 
 /**
- * The plugin's bespoke View (#192). It binds to nothing but the {@link ENTITY_SESSION} contract, so a
- * minimal fake session stands in for the app's.
+ * The `dnd.stat-block` data-type's View (#192, ADR-0055). It binds to the {@link ENTITY_SESSION} contract
+ * plus {@link VIEW_FIELD_KEY} — the one document key its whole block lives at — so a minimal fake session
+ * and a fixed key stand in for the app's.
  */
 describe('StatBlockView', () => {
   /** A stand-in for the app's central store: the one Entity Document every View reads its slice off. */
-  function fakeSession(metadata: EntityDocument, writable = true): EntitySession {
-    const doc = signal<EntityDocument>({ content: { format: 'tiptap-v1', snapshot: {} }, ...metadata });
+  function fakeSession(block: Record<string, unknown>, writable = true): EntitySession {
+    // The block is one grouped value at the stat-block key, beside the prose every Entity carries.
+    const doc = signal<EntityDocument>({
+      content: { format: 'tiptap-v1', snapshot: {} },
+      [DND_STAT_BLOCK_KEY]: block,
+    });
     return {
-      // The stat block reads its slice off `doc`; it needs no Entity-level facts, so `current` is null.
       current: signal(null).asReadonly(),
       doc: doc.asReadonly(),
       writable: signal(writable).asReadonly(),
@@ -29,23 +34,31 @@ describe('StatBlockView', () => {
         return { redo, undo };
       },
       applyPatches: () => undefined,
-      // The stat block renders from the document and never holds a live doc, so it registers no editor.
       registerEditor: () => () => undefined,
     };
   }
 
-  function render(metadata: EntityDocument, writable = true) {
-    const session = fakeSession(metadata, writable);
+  /** Render the View over a stat block seeded at {@link DND_STAT_BLOCK_KEY} — the key the page injects. */
+  function render(block: Record<string, unknown>, writable = true) {
+    const session = fakeSession(block, writable);
     TestBed.configureTestingModule({
       imports: [StatBlockView, provideTranslocoTesting(DND_TEST_CATALOGS)],
-      providers: [{ provide: ENTITY_SESSION, useValue: session }, provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        { provide: ENTITY_SESSION, useValue: session },
+        { provide: VIEW_FIELD_KEY, useValue: DND_STAT_BLOCK_KEY },
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     });
     const fixture = TestBed.createComponent(StatBlockView);
     fixture.detectChanges();
     return { fixture, session, el: fixture.nativeElement as HTMLElement };
   }
 
-  it('prints the monster as a stat block, not as raw EntityDocument', () => {
+  /** The stat block as it sits inside the document — the value at the injected key. */
+  const statBlock = (session: EntitySession) => session.doc()[DND_STAT_BLOCK_KEY];
+
+  it('prints the block from one grouped value, not from raw top-level EntityDocument', () => {
     const { el } = render({
       size: 'Huge',
       creature_type: 'dragon',
@@ -54,7 +67,7 @@ describe('StatBlockView', () => {
       strength: 30,
     });
 
-    // The flavour line is derived from the Fields, not authored as prose.
+    // The flavour line is derived from the stats, not authored as prose.
     expect(el.querySelector('[data-testid=stat-block-subtitle]')?.textContent).toContain('Huge dragon, chaotic evil');
     // The derived ability modifier: a raw 30 means +10.
     expect(el.querySelector('[data-testid=stat-mod-strength]')?.textContent).toContain('+10');
@@ -63,7 +76,7 @@ describe('StatBlockView', () => {
     expect(el.textContent).toContain('Switch to the Note view');
   });
 
-  it('edits a stat straight into the one EntityDocument map every other View reads', () => {
+  it('edits a stat back into the one grouped block value every other View reads', () => {
     const { fixture, session, el } = render({ challenge_rating: 5 });
 
     const cr = el.querySelector('[data-testid=stat-challenge_rating] input') as HTMLInputElement;
@@ -72,13 +85,11 @@ describe('StatBlockView', () => {
     cr.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    // A Field is a lens: the stat block writes the same EntityDocument the Browser facets on (#188).
-    expect(session.doc()).toMatchObject({ challenge_rating: 13 });
+    // A structured Field is a lens: the block writes back at its one key, which the Browser harvests on (#188/#236).
+    expect(statBlock(session)).toMatchObject({ challenge_rating: 13 });
   });
 
-  // The block is the only surface a monster's optional Fields have (the create dialog collects the
-  // required ones only), so an unrendered Field would be unsettable anywhere in the app.
-  it('offers an editable slot for every Field the type declares, not just the required one', () => {
+  it('offers an editable slot for every stat, not just the required one', () => {
     const { fixture, session, el } = render({ challenge_rating: 5 });
 
     const size = el.querySelector('[data-testid=stat-size] select') as HTMLSelectElement;
@@ -91,13 +102,23 @@ describe('StatBlockView', () => {
     alignment.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    expect(session.doc()).toMatchObject({ size: 'Huge', alignment: 'chaotic evil' });
-    // The subtitle is derived, so it re-reads the moment its Fields are edited.
+    expect(statBlock(session)).toMatchObject({ size: 'Huge', alignment: 'chaotic evil', challenge_rating: 5 });
+    // The subtitle is derived, so it re-reads the moment its stats are edited.
     expect(el.querySelector('[data-testid=stat-block-subtitle]')?.textContent).toContain('Huge, chaotic evil');
   });
 
-  it('flags a missing required Field rather than silently accepting an incomplete monster', () => {
+  it('does not flag a missing stat — the reusable block imposes no required stat (ADR-0055)', () => {
+    // A deity that borrows the block for its size facet and leaves CR blank must see no spurious error:
+    // requiredness is a consumer's concern, not the block's. Only an at-rest ill-typed value is flagged.
     const { el } = render({ size: 'Large' });
+
+    const cr = el.querySelector('[data-testid=stat-challenge_rating] input') as HTMLInputElement;
+    expect(cr.getAttribute('aria-invalid')).not.toBe('true');
+  });
+
+  it('flags an at-rest ill-typed stat — a string where a number belongs (forward-only)', () => {
+    // A value this build cannot re-type is tolerated (never dropped) but marked, so an active edit can fix it.
+    const { el } = render({ challenge_rating: 'huge' as unknown as number });
 
     const cr = el.querySelector('[data-testid=stat-challenge_rating] input') as HTMLInputElement;
     expect(cr.getAttribute('aria-invalid')).toBe('true');
@@ -116,5 +137,18 @@ describe('StatBlockView', () => {
 
     expect(el.querySelector('[data-testid=stat-mod-wisdom]')?.textContent).toContain('—');
     expect(el.querySelector('[data-testid=stat-block-subtitle]')?.textContent?.trim()).toBe('');
+  });
+
+  it('mints the block on the first edit of an Entity that had none (an attach-and-afford opener)', () => {
+    // A non-monster carrying an attached stat-block Field: the key is absent until the first stat lands.
+    const { fixture, session, el } = render({});
+    expect(statBlock(session)).toEqual({});
+
+    const size = el.querySelector('[data-testid=stat-size] select') as HTMLSelectElement;
+    size.value = 'Medium';
+    size.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(statBlock(session)).toEqual({ size: 'Medium' });
   });
 });

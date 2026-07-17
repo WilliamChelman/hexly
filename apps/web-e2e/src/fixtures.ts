@@ -81,6 +81,15 @@ export function contentViewToggle(fieldKey?: string): string {
   return viewInstanceKey({ viewId: 'core.view.content', fieldKey });
 }
 
+/**
+ * The stat-block View toggle's testid (ADR-0055). The stat block is a **Structured Data Type**'s View
+ * now, bound to the `dnd.stat-block` Field that placed it, so it keys `viewId:fieldKey` like the map —
+ * `dnd.monster` places it at `stat_block`, an attachment at whatever key the Field carries.
+ */
+export function statBlockViewToggle(fieldKey = 'stat_block'): string {
+  return viewInstanceKey({ viewId: 'dnd.view.stat-block', fieldKey });
+}
+
 /** Wait for a successful entity PUT. There is no Save button (ADR-0026): pair this with Cmd/Ctrl+S. */
 export function waitForSave(page: Page): Promise<Response> {
   return page.waitForResponse(

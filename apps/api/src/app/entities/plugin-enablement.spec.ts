@@ -1,7 +1,14 @@
-import { deriveSearchText, harvestEdges, resolveEffectiveFields, VaultExportContext } from '@hexly/domain';
+import {
+  deriveFieldFacets,
+  deriveSearchText,
+  harvestEdges,
+  resolveEffectiveFields,
+  VaultExportContext,
+} from '@hexly/domain';
 import { entityToMarkdown } from '@hexly/obsidian';
 import { CORE_NOTE, PLUGIN_ID as CONTENT_PLUGIN_ID, tiptapContent } from '@hexly/plugin-content';
 import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
+import { DND_MONSTER, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
 import { HexlyConfig, loadConfig } from '../config';
 import { BUNDLED_PLUGIN_CONFIGS } from './bundled-plugins';
 import { TypeFieldRegistry } from './type-field-registry';
@@ -72,7 +79,8 @@ describe('plugin enablement — uniform absence on the server', () => {
       });
       // The content plugin owns the prose Field; the hexmap and dnd types reference it by id.
       expect(registry.fieldResolver('core.content')?.key).toBe('content');
-      expect(registry.fieldResolver('dnd.challenge_rating')?.key).toBe('challenge_rating');
+      // The thirteen scalar stat Fields retired: dnd contributes the one `dnd.stat-block` Field now (ADR-0055).
+      expect(registry.fieldResolver('dnd.stat_block')?.key).toBe('stat_block');
     });
 
     it('drops a disabled Plugin’s Fields — a reference degrades to a plain value', () => {
@@ -114,6 +122,31 @@ describe('plugin enablement — uniform absence on the server', () => {
       const fields = fieldsFor(registry, ['core.hexmap']);
       expect(harvestEdges(doc, fields, registry.structuredDataTypes)).toEqual([]);
       expect(deriveSearchText(doc, fields, registry.structuredDataTypes)).toBe('');
+    });
+  });
+
+  describe('facet harvest over an Entity carrying a disabled Plugin’s Field of a Structured Data Type (ADR-0055)', () => {
+    // A stat block carrying the three harvested dimensions — plus an ability score that is never a facet.
+    const doc = { stat_block: { size: 'Huge', creature_type: 'dragon', challenge_rating: 24, strength: 30 } };
+
+    it('harvests the stat block’s dimensions when dnd is enabled — never its ability scores', () => {
+      const registry = new TypeFieldRegistry(allEnabled());
+      const fields = fieldsFor(registry, [DND_MONSTER]);
+      const facets = deriveFieldFacets(fields, doc, registry.structuredDataTypes);
+      expect(facets).toEqual([
+        { key: 'size', value: 'Huge', num: null },
+        { key: 'creature_type', value: 'dragon', num: null },
+        { key: 'challenge_rating', value: '24', num: 24 },
+      ]);
+    });
+
+    it('harvests no facets when dnd is disabled, leaving the stat block intact as plain document', () => {
+      const registry = new TypeFieldRegistry(withDisabled(DND_PLUGIN_ID));
+      const fields = fieldsFor(registry, [DND_MONSTER]);
+      // The `dnd.stat-block` Data Type drops from the set, so faceting simply stops (ADR-0055)…
+      expect(deriveFieldFacets(fields, doc, registry.structuredDataTypes)).toEqual([]);
+      // …and the value is untouched — a lens that doesn't apply leaves the document readable.
+      expect(doc.stat_block).toEqual({ size: 'Huge', creature_type: 'dragon', challenge_rating: 24, strength: 30 });
     });
   });
 

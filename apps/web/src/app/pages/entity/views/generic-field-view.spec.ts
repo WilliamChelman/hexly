@@ -4,7 +4,6 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { EntityDetail, EntityVerb, defineField } from '@hexly/domain';
 import { ENTITY_SESSION } from '@hexly/web-entity';
-import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { GenericFieldView } from './generic-field-view';
@@ -202,8 +201,8 @@ describe('GenericFieldView', () => {
 
 /**
  * The generic Field view renders the **effective** set (ADR-0054): a Field attached directly to the
- * Entity (`fields[]`) renders even though no type of the Entity named it. Composes the dnd plugin so its
- * `dnd.size` Plugin Field resolves through the registry's id → Field resolver.
+ * Entity (`fields[]`) renders even though no type of the Entity named it. Sets a scalar World Field on the
+ * registry so its `test.size` enum resolves through the id → Field resolver — the attach case.
  */
 describe('GenericFieldView over the effective Field set', () => {
   let session: EntitySession;
@@ -214,22 +213,22 @@ describe('GenericFieldView over the effective Field set', () => {
       providers: [
         EntitySession,
         { provide: ENTITY_SESSION, useExisting: EntitySession },
-        providePluginDnd(),
         provideHttpClient(),
         provideHttpClientTesting(),
       ],
     }).compileComponents();
     session = TestBed.inject(EntitySession);
+    TestBed.inject(TypeRegistry).setWorldFields(beastFields);
   });
 
   it('renders an attached Field a Field its types never named', () => {
-    // A typeless Entity carrying one attached `dnd.size` (enum) Field — the attach case (CONTEXT.md → Entity).
+    // A typeless Entity carrying one attached `test.size` (enum) Field — the attach case (CONTEXT.md → Entity).
     session.adopt({
       id: 'e1',
       worldId: 'w1',
       name: 'Aboleth',
       types: [],
-      fields: ['dnd.size'],
+      fields: ['test.size'],
       tags: [],
       visibility: 'private',
       version: 1,
@@ -237,7 +236,7 @@ describe('GenericFieldView over the effective Field set', () => {
       createdAt: 1,
       updatedAt: 1,
       rights: ['edit'],
-      document: { size: 'Large' },
+      document: { size: 'large' },
     });
     const fixture = TestBed.createComponent(GenericFieldView);
     fixture.detectChanges();
@@ -245,7 +244,7 @@ describe('GenericFieldView over the effective Field set', () => {
 
     // The attached enum Field renders as a typed control off the document, not a plain-value row.
     const size = el.querySelector('[data-testid=field-size] select') as HTMLSelectElement;
-    expect(size.value).toBe('Large');
+    expect(size.value).toBe('large');
     expect(el.querySelector('[data-testid=field-plain-metadata]')).toBeNull();
   });
 });

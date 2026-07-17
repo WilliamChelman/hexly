@@ -44,6 +44,13 @@ function definition(id: string, fieldRefs: readonly string[] = []): TypeDefiniti
 
 // World-defined Fields a spec type references by id (ADR-0054); set on the registry in `beforeEach`.
 const crField = defineField({ id: 'world.cr', key: 'cr', label: 'Challenge Rating', dataType: { kind: 'number' } });
+// A second scalar Field, the attach-a-built-in fixture the retired `dnd.size`/`dnd.alignment` used to be.
+const alignmentField = defineField({
+  id: 'world.alignment',
+  key: 'alignment',
+  label: 'Alignment',
+  dataType: { kind: 'string' },
+});
 const battlemapField = defineField({
   id: 'world.battlemap',
   key: 'battlemap',
@@ -77,7 +84,7 @@ describe('TypeRegistry', () => {
     registry = TestBed.inject(TypeRegistry);
     // A spec type references these World Fields by id; the registry resolves them like the real
     // WorldFieldsLoader's projection (ADR-0054).
-    registry.setWorldFields([crField, battlemapField, proseContent, proseSecrets]);
+    registry.setWorldFields([crField, alignmentField, battlemapField, proseContent, proseSecrets]);
   });
 
   it('seeds every code type from a bundled plugin — all through one register()', () => {
@@ -138,12 +145,16 @@ describe('TypeRegistry', () => {
   /** One View per surface the Entity's types afford — the header's whole rule (#192). */
   describe('view-per-surface for the bundled dnd.monster plugin', () => {
     it('offers the stat block and the Note view, defaulting to the plugin’s own', () => {
-      expect(viewKeys(registry.viewsFor([DND_MONSTER]))).toEqual([DND_VIEW_STAT_BLOCK, CORE_VIEW_CONTENT]);
+      // The stat block is placed by its `{ field }` now (ADR-0055), so it keys to its Field like the Map does.
+      expect(viewKeys(registry.viewsFor([DND_MONSTER]))).toEqual([
+        `${DND_VIEW_STAT_BLOCK}:stat_block`,
+        CORE_VIEW_CONTENT,
+      ]);
     });
 
     it('offers the stat block, Note, and Map when the monster also carries core.hexmap', () => {
       expect(viewKeys(registry.viewsFor([DND_MONSTER, 'core.hexmap']))).toEqual([
-        DND_VIEW_STAT_BLOCK,
+        `${DND_VIEW_STAT_BLOCK}:stat_block`,
         CORE_VIEW_CONTENT,
         `${CORE_VIEW_MAP}:grid`,
       ]);
@@ -151,7 +162,7 @@ describe('TypeRegistry', () => {
       expect(viewKeys(registry.viewsFor(['core.hexmap', DND_MONSTER]))).toEqual([
         `${CORE_VIEW_MAP}:grid`,
         CORE_VIEW_CONTENT,
-        DND_VIEW_STAT_BLOCK,
+        `${DND_VIEW_STAT_BLOCK}:stat_block`,
       ]);
     });
 
@@ -253,7 +264,7 @@ describe('TypeRegistry', () => {
     expect(registry.resolveFields(['dnd.beast']).map((f) => f.key)).toEqual(['cr']);
     // The bundled plugin's schema resolves through the same path — the web twin of what the API's
     // write gate and facet build read (#192).
-    expect(registry.resolveFields([DND_MONSTER]).map((f) => f.key)).toContain('challenge_rating');
+    expect(registry.resolveFields([DND_MONSTER]).map((f) => f.key)).toContain('stat_block');
     // `core.note` declares exactly the canonical prose Field now (ADR-0051).
     expect(registry.resolveFields(['core.note']).map((f) => f.key)).toEqual(['content']);
     // No types at all resolves to no Fields.
@@ -272,14 +283,14 @@ describe('TypeRegistry', () => {
   describe('effective Field set', () => {
     it('resolves a plugin type’s defaults through fieldRefs → the composed Plugin-Field resolver', () => {
       // Not from the inline `fields` mirror: the reuse handles drive resolution now, like the server.
-      expect(registry.effectiveFields([DND_MONSTER], []).map((f) => f.key)).toContain('challenge_rating');
+      expect(registry.effectiveFields([DND_MONSTER], []).map((f) => f.key)).toContain('stat_block');
       expect(registry.effectiveFields(['core.note'], []).map((f) => f.key)).toEqual(['content']);
     });
 
     it('unions an Entity’s attached Fields with its types’ defaults, deduped by key', () => {
-      // A `core.note` carrying one attached stat Field — a Field its type never named (CONTEXT.md → Entity).
-      const keys = registry.effectiveFields(['core.note'], ['dnd.size']).map((f) => f.key);
-      expect(keys).toEqual(['size', 'content']); // attachment first (instance precedence), then the type default
+      // A `core.note` carrying one attached stat-block Field — a Field its type never named (CONTEXT.md → Entity).
+      const keys = registry.effectiveFields(['core.note'], ['dnd.stat_block']).map((f) => f.key);
+      expect(keys).toEqual(['stat_block', 'content']); // attachment first (instance precedence), then the type default
     });
 
     it('drops an attached id that resolves to nothing — an absent plugin’s Field left as plain document', () => {
@@ -296,15 +307,15 @@ describe('TypeRegistry', () => {
   describe('attachableFields — the attach picker’s offer (ADR-0054)', () => {
     it('offers a registered Plugin Field a note’s types never named', () => {
       const ids = registry.attachableFields(['core.note'], []).map((f) => f.id);
-      expect(ids).toContain('dnd.size');
-      expect(ids).toContain('dnd.alignment');
+      // The one plugin Field dnd contributes now (ADR-0055) — the retired scalars are gone.
+      expect(ids).toContain('dnd.stat_block');
     });
 
     it('never offers a Field whose key the effective set already covers (a default or an attachment)', () => {
-      // `content` is a note default, so its Field is never offered; an already-attached `dnd.size` drops too.
-      const offered = registry.attachableFields(['core.note'], ['dnd.size']);
+      // `content` is a note default, so its Field is never offered; an already-attached `dnd.stat_block` drops too.
+      const offered = registry.attachableFields(['core.note'], ['dnd.stat_block']);
       expect(offered.map((f) => f.key)).not.toContain('content');
-      expect(offered.map((f) => f.id)).not.toContain('dnd.size');
+      expect(offered.map((f) => f.id)).not.toContain('dnd.stat_block');
     });
   });
 
@@ -330,7 +341,7 @@ describe('TypeRegistry', () => {
       registry.setWorldFields([element]);
       const ids = registry.attachableFields(['core.note'], []).map((f) => f.id);
       expect(ids).toContain('world.element');
-      expect(ids).toContain('dnd.size');
+      expect(ids).toContain('dnd.stat_block');
     });
 
     it('degrades to a plain document value once the World Field is gone — the delete/rename case', () => {
@@ -360,14 +371,14 @@ describe('TypeRegistry', () => {
     });
 
     it('affords the generic Field view for an attached built-in Field — its control needs a home (ADR-0054)', () => {
-      // `dnd.size` is an enum with no View of its own; attaching it to a note appends the generic Field
+      // `world.cr` is a number with no View of its own; attaching it to a note appends the generic Field
       // view so its control has a surface to render on (CONTEXT.md → View, #229).
-      expect(viewKeys(registry.viewsFor(['core.note'], ['dnd.size']))).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
+      expect(viewKeys(registry.viewsFor(['core.note'], ['world.cr']))).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
     });
 
     it('affords the generic Field view once for several attached built-in Fields', () => {
       // Two built-in attachments share the one generic Field view — dedup keeps a single toggle.
-      expect(viewKeys(registry.viewsFor(['core.note'], ['dnd.size', 'dnd.alignment']))).toEqual([
+      expect(viewKeys(registry.viewsFor(['core.note'], ['world.cr', 'world.alignment']))).toEqual([
         CORE_VIEW_CONTENT,
         CORE_VIEW_FIELDS,
       ]);
@@ -543,7 +554,10 @@ describe('TypeRegistry filtering by the enabled-Plugin set', () => {
     // …a late-arriving set (initializer timing, or a future live push) turns it on with no re-register.
     enabled.set(new Set([CONTENT_PLUGIN_ID, HEXMAP_PLUGIN_ID, DND_PLUGIN_ID]));
     expect(registry.all().map((d) => d.id)).toContain(DND_MONSTER);
-    expect(viewKeys(registry.viewsFor([DND_MONSTER]))).toEqual([DND_VIEW_STAT_BLOCK, CORE_VIEW_CONTENT]);
+    expect(viewKeys(registry.viewsFor([DND_MONSTER]))).toEqual([
+      `${DND_VIEW_STAT_BLOCK}:stat_block`,
+      CORE_VIEW_CONTENT,
+    ]);
     // …and turning content off drops core.note, the once-privileged Type, like any other.
     enabled.set(new Set([HEXMAP_PLUGIN_ID, DND_PLUGIN_ID]));
     expect(registry.get('core.note')).toBeUndefined();

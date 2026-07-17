@@ -1,41 +1,42 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import {
-  FieldSchema,
   EntityDocument,
+  FieldSchema,
   NO_STRUCTURED_DATA_TYPES,
   readField,
   validateFields,
   writeFieldInPlace,
 } from '@hexly/domain';
-import { ENTITY_SESSION } from '@hexly/web-entity';
+import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import {
   abilityModifier,
   DND_ABILITY_KEYS,
   DND_CHALLENGE_KEY,
   DND_DEFENCE_KEYS,
   DND_IDENTITY_KEYS,
-  DND_MONSTER_FIELDS,
+  DND_STAT_BLOCK_FIELD,
+  DND_STAT_FIELDS,
+  DND_STAT_FIELDS_BY_KEY,
   formatModifier,
-} from '../lib/monster';
+} from '../lib/stat-block';
 import { StatSlot } from './stat-slot';
 
-/** One rendered slot of the stat block: the Field to edit through, plus its live value. */
+/** One rendered slot of the stat block: the stat descriptor to edit through, plus its live value. */
 interface Slot {
   readonly field: FieldSchema;
   readonly value: unknown;
 }
 
-/** The plugin's declared Fields, by EntityDocument key. The block renders its own type, so it needs no registry. */
-const FIELDS_BY_KEY = new Map(DND_MONSTER_FIELDS.map((field) => [field.key, field]));
-
 /**
- * The `dnd.monster` bespoke View (`dnd.view.stat-block`): edits the same EntityDocument map every other
- * View reads, through {@link ENTITY_SESSION}.
+ * The `dnd.stat-block` data-type's View (`dnd.view.stat-block`, ADR-0055): a laid-out stat block over
+ * one grouped **Structured Data Type** value. It renders whichever stat-block Field placed it, reading
+ * that Field's EntityDocument key from {@link VIEW_FIELD_KEY} — so a monster's `stat_block`, or the key of
+ * a `dnd.stat-block` Field attached to any other type or a single Entity, are all edited here (ADR-0054).
  *
- * It must render every Field the type declares: it is a monster's only authoring surface (the create
- * dialog collects required Fields only, and a type with a bespoke view affords no generic Field
- * view), so an unrendered Field would be unsettable.
+ * The block is its Entity's only stat-authoring surface (the create dialog collects scalar required
+ * Fields only, and a `dnd.stat-block` Field is structured), so it must offer a slot for every stat: an
+ * unrendered one would be unsettable.
  */
 @Component({
   selector: 'dnd-stat-block-view',
@@ -49,7 +50,7 @@ const FIELDS_BY_KEY = new Map(DND_MONSTER_FIELDS.map((field) => [field.key, fiel
       class="max-w-[42rem] mx-auto my-6 rounded-md border border-line border-t-4 border-t-astra bg-surface px-6 py-5 shadow-1"
     >
       <!-- The name line is the page header directly above, so the card opens on the flavour line,
-           derived from the identity Fields below. -->
+           derived from the identity stats below. -->
       <p class="m-0 border-b border-line pb-3 text-sm italic text-ink-muted" data-testid="stat-block-subtitle">
         {{ subtitle() }}
       </p>
@@ -91,7 +92,7 @@ const FIELDS_BY_KEY = new Map(DND_MONSTER_FIELDS.map((field) => [field.key, fiel
         }
       </div>
 
-      <!-- Challenge Rating: the one required Field, and the number the Browser ranges on. -->
+      <!-- Challenge Rating: the number the Browser ranges on, harvested with its numeric num (ADR-0055). -->
       @if (challenge(); as cr) {
         <dl class="grid grid-cols-[minmax(6rem,9rem)_1fr] items-center gap-x-4 gap-y-2 m-0 pt-3">
           <dt class="text-sm font-semibold text-astra">{{ cr.field.label }}</dt>
@@ -117,24 +118,30 @@ export class StatBlockView {
 
   protected readonly writable = this.session.writable;
 
-  /** The live working EntityDocument — the body IS the map now (ADR-0051), and the stat block is a lens over it. */
-  private readonly metadata = computed<EntityDocument>(() => this.session.doc());
+  /**
+   * The stat-block Field this View renders — {@link DND_STAT_BLOCK_FIELD} re-keyed to {@link VIEW_FIELD_KEY},
+   * so it lenses whichever document key the placing Field named (a monster's `stat_block`, or an
+   * attachment's own key). The whole block is one value at that key (ADR-0055).
+   */
+  private readonly field: FieldSchema = { ...DND_STAT_BLOCK_FIELD, key: inject(VIEW_FIELD_KEY) };
 
+  /** The live stat-block value — a lens over the one EntityDocument map, coerced to a bare record to read stats off. */
+  private readonly block = computed<Record<string, unknown>>(() => asBlock(readField(this.session.doc(), this.field)));
+
+  /** The inner stats failing the forward-only gate — Challenge Rating when absent, a mistyped stat otherwise. */
   private readonly invalidKeys = computed(
-    () =>
-      new Set(
-        validateFields(DND_MONSTER_FIELDS, this.metadata(), NO_STRUCTURED_DATA_TYPES).errors.map((error) => error.key),
-      ),
+    () => new Set(validateFields(DND_STAT_FIELDS, this.block(), NO_STRUCTURED_DATA_TYPES).errors.map((e) => e.key)),
   );
 
-  /** The labelled rows above the ability grid: the identity Fields, then the defences. */
+  /** The labelled rows above the ability grid: the identity stats, then the defences. */
   protected readonly rows = computed(() => this.slots([...DND_IDENTITY_KEYS, ...DND_DEFENCE_KEYS]));
   protected readonly abilities = computed(() => this.slots(DND_ABILITY_KEYS));
   protected readonly challenge = computed(() => this.slots([DND_CHALLENGE_KEY])[0]);
 
-  /** The flavour line ("Large dragon, chaotic evil"), assembled from whichever identity Fields are filled. */
+  /** The flavour line ("Large dragon, chaotic evil"), assembled from whichever identity stats are filled. */
   protected readonly subtitle = computed(() => {
-    const [size, creatureType, alignment] = DND_IDENTITY_KEYS.map((key) => text(this.metadata()[key]));
+    const block = this.block();
+    const [size, creatureType, alignment] = DND_IDENTITY_KEYS.map((key) => text(block[key]));
     const creature = [size, creatureType].filter(Boolean).join(' ');
     return [creature, alignment].filter(Boolean).join(', ');
   });
@@ -149,22 +156,40 @@ export class StatBlockView {
     return this.invalidKeys().has(field.key);
   }
 
-  /** Write a stat back into the EntityDocument map through the central store, the channel every View uses. */
-  protected set(field: FieldSchema, value: unknown): void {
+  /**
+   * Write a stat back into the block, then the whole block back into the EntityDocument at the Field's one
+   * key — through the central store, the channel every View uses (ADR-0055). An emptied stat drops from
+   * the block; the block itself stays (an empty object is not a cleared key), so the Field's slice persists.
+   */
+  protected set(stat: FieldSchema, value: unknown): void {
     if (!this.session.writable()) return;
-    this.session.mutate((draft) => writeFieldInPlace(draft, field, value));
+    this.session.mutate((draft: EntityDocument) => {
+      const next = { ...asBlock(readField(draft, this.field)) };
+      if (value === undefined || value === null || value === '') delete next[stat.key];
+      else next[stat.key] = value;
+      writeFieldInPlace(draft, this.field, next);
+    });
   }
 
-  /** The slots for the given EntityDocument keys, in stat-block order — one per Field the type declares. */
+  /** The slots for the given inner stat keys, in stat-block order — one per stat the block declares. */
   private slots(keys: readonly string[]): Slot[] {
+    const block = this.block();
     return keys.flatMap((key) => {
-      const field = FIELDS_BY_KEY.get(key);
-      return field ? [{ field, value: readField(this.metadata(), field) }] : [];
+      const field = DND_STAT_FIELDS_BY_KEY.get(key);
+      return field ? [{ field, value: block[key] }] : [];
     });
   }
 }
 
-/** A Field value as the subtitle reads it: its text, or blank for an absent or ill-typed one. */
+/**
+ * A stat-block document value coerced to a bare record. Forward-only: a value this build cannot read as
+ * a block (a scalar, an array, absent) reads as empty rather than throwing.
+ */
+function asBlock(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+/** A stat value as the subtitle reads it: its text, or blank for an absent or ill-typed one. */
 function text(value: unknown): string {
   return typeof value === 'string' && value.trim() !== '' ? value : '';
 }

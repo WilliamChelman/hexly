@@ -1,16 +1,7 @@
-import { defineType, NO_STRUCTURED_DATA_TYPES, resolveEffectiveFields, validateFields } from '@hexly/domain';
+import { defineType, resolveEffectiveFields, structuredDataTypeSet, validateFields } from '@hexly/domain';
 import { CONTENT_FIELD } from '@hexly/plugin-content';
-import {
-  abilityModifier,
-  DND_ABILITY_KEYS,
-  DND_CHALLENGE_KEY,
-  DND_DEFENCE_KEYS,
-  DND_IDENTITY_KEYS,
-  DND_MONSTER,
-  DND_MONSTER_FIELDS,
-  DND_MONSTER_TYPE,
-  formatModifier,
-} from './monster';
+import { DND_MONSTER, DND_MONSTER_TYPE } from './monster';
+import { DND_STAT_BLOCK_FIELD, DND_STAT_BLOCK_FIELD_ID, DND_STAT_BLOCK_KEY, STAT_BLOCK_DATA_TYPE } from './stat-block';
 
 describe('defineType', () => {
   it('rejects a malformed plugin at declaration time, not at runtime', () => {
@@ -22,15 +13,14 @@ describe('defineType', () => {
 });
 
 describe('dnd.monster', () => {
-  it('is namespaced, and declares challenge_rating as a required number', () => {
+  it('is namespaced, and references its prose and stat-block Fields — nothing else (ADR-0055)', () => {
     expect(DND_MONSTER).toBe('dnd.monster');
-
-    const cr = DND_MONSTER_FIELDS.find((field) => field.key === DND_CHALLENGE_KEY);
-    expect(cr).toMatchObject({ dataType: { kind: 'number' }, required: true, facetable: true });
+    // The thirteen scalar stat Fields retired: a monster is now one grouped stat block plus its prose.
+    expect(DND_MONSTER_TYPE.fieldRefs).toEqual([CONTENT_FIELD.id, DND_STAT_BLOCK_FIELD_ID]);
   });
 
-  it('resolves through the shared types[] → Fields path both sides ride', () => {
-    const byId = new Map(DND_MONSTER_FIELDS.map((field) => [field.id, field]));
+  it('resolves the stat-block Field through the shared types[] → Fields path both sides ride', () => {
+    const byId = new Map([DND_STAT_BLOCK_FIELD, CONTENT_FIELD].map((field) => [field.id, field]));
     const fields = resolveEffectiveFields({
       types: [DND_MONSTER],
       fieldIds: [],
@@ -38,53 +28,14 @@ describe('dnd.monster', () => {
       typeFieldRefs: () => DND_MONSTER_TYPE.fieldRefs,
     });
 
-    expect(fields.map((field) => field.key)).toContain(DND_CHALLENGE_KEY);
-    // The forward-only gate: a monster without its required Field is rejected on an active typed edit…
-    expect(validateFields(fields, { size: 'Large' }, NO_STRUCTURED_DATA_TYPES).ok).toBe(false);
-    // …and passes once it's supplied, with the rest of the stat block optional.
-    expect(validateFields(fields, { challenge_rating: 5 }, NO_STRUCTURED_DATA_TYPES).ok).toBe(true);
-    // A wrong data-type is rejected too — a CR is a number, not the string a stat block prints.
-    expect(validateFields(fields, { challenge_rating: '5' }, NO_STRUCTURED_DATA_TYPES).ok).toBe(false);
-  });
+    expect(fields.map((field) => field.key)).toContain(DND_STAT_BLOCK_KEY);
 
-  it('exposes exactly the facetable Fields the Browser unfolds under the type filter', () => {
-    const facetable = DND_MONSTER_FIELDS.filter((field) => field.facetable).map((field) => field.key);
-    expect(facetable).toEqual(['size', 'creature_type', 'challenge_rating']);
-  });
-
-  /**
-   * The stat-block view skips any key the schema doesn't declare (forward-only), so a Field renamed
-   * here would vanish from the block in silence unless the two lists are pinned together.
-   */
-  it('declares a Field for every key the stat block prints, and prints every stat Field it declares', () => {
-    // The canonical prose Field is declared beside the stats (ADR-0051) but rendered by the content
-    // editor, not the stat block — so it is the one declared Field the block does not print.
-    const declared = new Set(DND_MONSTER_FIELDS.map((field) => field.key).filter((key) => key !== CONTENT_FIELD.key));
-    const printed = [...DND_IDENTITY_KEYS, ...DND_DEFENCE_KEYS, ...DND_ABILITY_KEYS, DND_CHALLENGE_KEY];
-
-    expect(printed.filter((key) => !declared.has(key))).toEqual([]);
-    // The block is a monster's only authoring surface, so an unprinted Field would be unsettable.
-    expect([...declared].filter((key) => !printed.includes(key))).toEqual([]);
-  });
-});
-
-describe('abilityModifier', () => {
-  it('derives the printed modifier from a raw score', () => {
-    expect(abilityModifier(10)).toBe(0);
-    expect(abilityModifier(16)).toBe(3);
-    expect(abilityModifier(8)).toBe(-1);
-    expect(abilityModifier(1)).toBe(-5);
-  });
-
-  it('is blank for an absent or ill-typed score, never a bogus modifier (forward-only tolerance)', () => {
-    expect(abilityModifier(undefined)).toBeNull();
-    expect(abilityModifier('strong')).toBeNull();
-    expect(abilityModifier(Number.NaN)).toBeNull();
-  });
-
-  it('prints a modifier signed, as a stat block does', () => {
-    expect(formatModifier(3)).toBe('+3');
-    expect(formatModifier(0)).toBe('+0');
-    expect(formatModifier(-1)).toBe('-1');
+    // The forward-only gate resolves the stat block against its own valueSchema (ADR-0050/0055): a
+    // well-typed block passes; a mistyped stat (a CR that is a string a block prints, not a number) fails.
+    const dataTypes = structuredDataTypeSet([STAT_BLOCK_DATA_TYPE]);
+    expect(validateFields(fields, { stat_block: { challenge_rating: 5, size: 'Large' } }, dataTypes).ok).toBe(true);
+    expect(validateFields(fields, { stat_block: { challenge_rating: '5' } }, dataTypes).ok).toBe(false);
+    // An absent block is tolerated — the stat-block Field is not required (it opens empty, ADR-0054).
+    expect(validateFields(fields, {}, dataTypes).ok).toBe(true);
   });
 });

@@ -11,7 +11,7 @@ import {
   HEX_GRID_FIELD_ID,
   PLUGIN_ID as HEXMAP_PLUGIN_ID,
 } from '@hexly/plugin-hexmap';
-import { DND_MONSTER, DND_MONSTER_TYPE, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
+import { DND_MONSTER, DND_MONSTER_TYPE, DND_STAT_BLOCK, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
 import { serverPluginContent } from '@hexly/plugin-content/server';
 import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
 import { serverPluginDnd } from '@hexly/plugin-dnd/server';
@@ -45,8 +45,8 @@ describe('bundled plugin identity', () => {
   it('associates each Structured Data Type with the Plugin that owns it', () => {
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_RICH_CONTENT)).toBe(CONTENT_PLUGIN_ID);
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_HEX_GRID)).toBe(HEXMAP_PLUGIN_ID);
-    // dnd contributes a Type but no data-type, so it owns none.
-    expect([...BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.values()]).not.toContain(DND_PLUGIN_ID);
+    // dnd now owns the `dnd.stat-block` Data Type — the first plugin-contributed harvest source (ADR-0055).
+    expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(DND_STAT_BLOCK)).toBe(DND_PLUGIN_ID);
   });
 });
 
@@ -63,7 +63,7 @@ describe('bundled Plugin Fields', () => {
     // content owns the prose Field; hexmap owns the grid Field; dnd owns the stat block.
     expect(ids).toContain(CONTENT_FIELD_ID);
     expect(ids).toContain(HEX_GRID_FIELD_ID);
-    expect(ids).toContain('dnd.challenge_rating');
+    expect(ids).toContain('dnd.stat_block');
   });
 
   it('declares each Field id exactly once — a plugin references another’s Field by id, never re-declares it', () => {

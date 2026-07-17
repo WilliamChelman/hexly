@@ -3,7 +3,7 @@ import { Signal, signal, WritableSignal } from '@angular/core';
 import { ClientConfigStore } from '@hexly/web-core';
 import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { CORE_RICH_CONTENT, PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
-import { DND_MONSTER, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
+import { DND_MONSTER, DND_STAT_BLOCK, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
 import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { DND_VIEW_STAT_BLOCK, providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
@@ -28,7 +28,7 @@ describe('PluginRegistry', () => {
       });
       const plugins = TestBed.inject(PluginRegistry);
 
-      expect([...plugins.structuredDataTypes.keys()]).toEqual([CORE_RICH_CONTENT, CORE_HEX_GRID]);
+      expect([...plugins.structuredDataTypes.keys()]).toEqual([CORE_RICH_CONTENT, CORE_HEX_GRID, DND_STAT_BLOCK]);
       expect(plugins.structuredDataTypes.get(CORE_HEX_GRID)?.empty()).toEqual({ hexes: {}, regions: [], labels: [] });
     });
 
@@ -42,7 +42,7 @@ describe('PluginRegistry', () => {
   });
 
   describe('Plugin-Field resolver composed from the plugins provided (ADR-0054)', () => {
-    it('resolves a Field by id — the prose Field from content, a stat Field from dnd', () => {
+    it('resolves a Field by id — the prose Field from content, the stat-block Field from dnd', () => {
       TestBed.configureTestingModule({
         providers: [providePluginContent(), providePluginHexmap(), providePluginDnd()],
       });
@@ -50,7 +50,8 @@ describe('PluginRegistry', () => {
 
       expect(plugins.fieldResolver('core.content')?.key).toBe('content');
       expect(plugins.fieldResolver('core.grid')?.key).toBe('grid');
-      expect(plugins.fieldResolver('dnd.challenge_rating')?.key).toBe('challenge_rating');
+      // The thirteen scalar stat Fields retired: dnd contributes the one `dnd.stat-block` Field now (ADR-0055).
+      expect(plugins.fieldResolver('dnd.stat_block')?.key).toBe('stat_block');
     });
 
     it('resolves nothing for an absent plugin’s Field — dropped from the effective set, value left intact', () => {
@@ -100,23 +101,23 @@ describe('PluginRegistry', () => {
     });
 
     it('degrades an attached Field of a disabled Plugin: the resolver drops it, leaving its value plain (ADR-0054)', () => {
-      // A `dnd.size` an Entity attached directly bypasses the Type layer, so the Field resolver
+      // A `dnd.stat_block` an Entity attached directly bypasses the Type layer, so the Field resolver
       // must gate it by its owning Plugin — else a disabled dnd would still type the value.
-      expect(plugins.isFieldActive('dnd.size')).toBe(false);
-      expect(plugins.fieldResolver('dnd.size')).toBeUndefined();
+      expect(plugins.isFieldActive('dnd.stat_block')).toBe(false);
+      expect(plugins.fieldResolver('dnd.stat_block')).toBeUndefined();
       // A still-enabled Plugin's Field resolves as ever; an ownerless (World-defined) id is never gated.
       expect(plugins.fieldResolver('core.content')?.key).toBe('content');
       expect(plugins.isFieldActive('world.element')).toBe(true);
 
       enabled.set(new Set([CONTENT_PLUGIN_ID, HEXMAP_PLUGIN_ID, DND_PLUGIN_ID]));
-      expect(plugins.fieldResolver('dnd.size')?.key).toBe('size');
+      expect(plugins.fieldResolver('dnd.stat_block')?.key).toBe('stat_block');
     });
 
     it('fieldDefinition resolves a disabled Plugin’s Field regardless of enablement — so a detach can still clear its key (#229)', () => {
       // The enablement-gated resolver drops it, but detach needs the key to clear the value even
       // when the owning Plugin is off — only a build that never bundled the Field leaves an orphan.
-      expect(plugins.fieldResolver('dnd.size')).toBeUndefined();
-      expect(plugins.fieldDefinition('dnd.size')?.key).toBe('size');
+      expect(plugins.fieldResolver('dnd.stat_block')).toBeUndefined();
+      expect(plugins.fieldDefinition('dnd.stat_block')?.key).toBe('stat_block');
       expect(plugins.fieldDefinition('pathfinder.nonesuch')).toBeUndefined();
     });
   });
