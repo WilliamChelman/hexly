@@ -212,7 +212,8 @@
     "home": "Accueil Hexly",
     "users": "Utilisateurs",
     "admin": "Admin",
-    "worldSettings": "Paramètres du monde"
+    "worldSettings": "Paramètres du monde",
+    "settingsSections": "Sections des paramètres"
   },
   "commandPalette": {
     "searchLabel": "Rechercher ou exécuter une commande",
@@ -303,11 +304,22 @@
     "hint": "La page ou l'entité que vous cherchez n'existe pas, ou vous n'y avez pas accès.",
     "backToWorlds": "Retour à vos mondes"
   },
+  "picker": {
+    "searchFields": "Rechercher des champs…",
+    "searchTypes": "Rechercher des types…",
+    "allSources": "Toutes les sources",
+    "sourceWorld": "Ce monde",
+    "sourceBuiltIn": "Intégré",
+    "selectedEmpty": "Aucun champ sélectionné pour l’instant.",
+    "noMatch": "Aucun résultat pour votre recherche."
+  },
   "worldTypes": {
     "heading": "Types personnalisés",
     "subhead": "Définissez vos propres types d'entités pour ce monde, chacun avec des champs typés filtrables.",
     "empty": "Aucun type personnalisé pour l'instant.",
     "add": "Nouveau type",
+    "createTitle": "Nouveau type",
+    "editTitle": "Modifier le type",
     "edit": "Modifier",
     "remove": "Supprimer",
     "idLabel": "Identifiant",
@@ -350,6 +362,8 @@
     "subhead": "Définissez des champs réutilisables une fois, puis attachez-les à n'importe quelle entité ou type de ce monde.",
     "empty": "Aucun champ personnalisé pour l'instant.",
     "add": "Nouveau champ",
+    "createTitle": "Nouveau champ",
+    "editTitle": "Modifier le champ",
     "edit": "Modifier",
     "remove": "Supprimer",
     "idPrefix": "world.",

@@ -1,4 +1,4 @@
-import { provideTranslocoTesting } from '../../../../../testing/transloco-testing';
+import { provideTranslocoTesting } from '../../../../../../testing/transloco-testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
@@ -9,7 +9,7 @@ import { MockWorldsClient } from '@hexly/web-core/testing';
 import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
 import { CORE_HEX_GRID } from '@hexly/plugin-hexmap';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
-import { TypeRegistry } from '../../../../entity-types/type-registry';
+import { TypeRegistry } from '../../../../../entity-types/type-registry';
 import { WorldTypesPanel } from './world-types-panel';
 
 /**
@@ -72,14 +72,6 @@ describe('WorldTypesPanel', () => {
     fixture.detectChanges();
   }
 
-  /** Pick an option in the `<select>` with `data-testid`. */
-  function select(testid: string, value: string): void {
-    const el: HTMLSelectElement = fixture.debugElement.query(By.css(`[data-testid="${testid}"]`)).nativeElement;
-    el.value = value;
-    el.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-  }
-
   /** Submit the open editor form. */
   function submit(): void {
     fixture.debugElement
@@ -88,7 +80,9 @@ describe('WorldTypesPanel', () => {
   }
 
   function checked(testid: string): boolean {
-    return (fixture.debugElement.query(By.css(`[data-testid="${testid}"]`)).nativeElement as HTMLInputElement).checked;
+    const el = fixture.debugElement.query(By.css(`[data-testid="${testid}"]`)).nativeElement as HTMLElement;
+    // The reference picker's rows are role=checkbox buttons (aria-checked); the show-as-view flags are inputs.
+    return el instanceof HTMLInputElement ? el.checked : el.getAttribute('aria-checked') === 'true';
   }
 
   it('offers the World’s registered Fields as a reference checklist', () => {
@@ -172,9 +166,11 @@ describe('WorldTypesPanel', () => {
   it('offers the map plugin’s data-type on the new-Field modal’s kind picker', () => {
     click('type-new');
     click('new-field');
+    // The kind picker is a card grid; each card is a button testid'd `newfield-kind-option-<kind>`.
     const kinds = fixture.debugElement
-      .queryAll(By.css('[data-testid="newfield-kind"] option'))
-      .map((option) => (option.nativeElement as HTMLOptionElement).value);
+      .queryAll(By.css('[data-testid^="newfield-kind-option-"]'))
+      .map((card) => (card.nativeElement as HTMLElement).getAttribute('data-testid') ?? '')
+      .map((testid) => testid.replace('newfield-kind-option-', ''));
     expect(kinds).toEqual(['string', 'number', 'boolean', 'date', 'enum', CORE_HEX_GRID]);
   });
 

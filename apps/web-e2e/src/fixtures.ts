@@ -177,6 +177,8 @@ export async function authorWorldType(
   type: { id: string; name: string; fields: readonly AuthoredField[] },
 ): Promise<void> {
   await page.goto(`/w/${worldId}/settings`);
+  // Settings is a master/detail layout; the type/field editors live under the Schema section.
+  await page.getByTestId('settings-nav-schema').click();
   await page.getByTestId('type-new').click();
   await page.getByTestId('type-id-input').fill(type.id);
   await page.getByTestId('type-name-input').fill(type.name);
@@ -188,7 +190,7 @@ export async function authorWorldType(
     await page.getByTestId('new-field').click();
     await page.getByTestId('newfield-name').fill(field.label);
     await page.getByTestId('newfield-key').fill(field.segment);
-    if (field.kind) await page.getByTestId('newfield-kind').selectOption(field.kind);
+    if (field.kind) await page.getByTestId(`newfield-kind-option-${field.kind}`).click();
     await page.getByTestId('newfield-save').click();
     await expect(page.getByTestId(`field-ref-checkbox-world.${field.segment}`)).toBeChecked();
   }
@@ -209,10 +211,12 @@ export async function authorWorldField(
   field: { segment: string; label: string; kind?: string; options?: string },
 ): Promise<void> {
   await page.goto(`/w/${worldId}/settings`);
+  // Settings is a master/detail layout; the type/field editors live under the Schema section.
+  await page.getByTestId('settings-nav-schema').click();
   await page.getByTestId('field-new').click();
   await page.getByTestId('field-name-input').fill(field.label);
   await page.getByTestId('field-key-input').fill(field.segment);
-  if (field.kind) await page.getByTestId('field-kind').selectOption(field.kind);
+  if (field.kind) await page.getByTestId(`field-kind-option-${field.kind}`).click();
   if (field.options !== undefined) await page.getByTestId('field-options').fill(field.options);
   await page.getByTestId('field-save').click();
   await expect(page.getByTestId(`field-world.${field.segment}`)).toBeVisible();
