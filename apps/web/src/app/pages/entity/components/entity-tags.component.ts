@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, viewChild } from '@angular/core';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { catchError, firstValueFrom, of } from 'rxjs';
-import { Chip } from '@hexly/web-ui';
+import { ChipComponent } from '@hexly/web-ui';
 import { EntitiesClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
-import { TagPicker } from './tag-picker.component';
+import { TagPickerComponent } from './tag-picker.component';
 import { tagItems } from './tag-suggestions';
 
 /**
@@ -14,7 +14,7 @@ import { tagItems } from './tag-suggestions';
 @Component({
   selector: 'app-entity-tags',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Chip, TranslocoPipe, TagPicker],
+  imports: [ChipComponent, TranslocoPipe, TagPickerComponent],
   template: `
     <div class="flex flex-wrap items-center gap-2" data-testid="entity-tags">
       @for (tag of tags(); track tag) {
@@ -52,7 +52,7 @@ import { tagItems } from './tag-suggestions';
     <app-tag-picker (picked)="commit($event)" />
   `,
 })
-export class EntityTags {
+export class EntityTagsComponent {
   private readonly session = inject(EntitySession);
   private readonly entities = inject(EntitiesClient);
   protected readonly tags = this.session.tags;
@@ -61,7 +61,7 @@ export class EntityTags {
   protected readonly addLabel = translateSignal('entityTags.addLabel');
   protected readonly addPlaceholder = translateSignal('entityTags.addPlaceholder');
   private readonly input = viewChild.required<ElementRef<HTMLInputElement>>('tagInput');
-  private readonly picker = viewChild.required(TagPicker);
+  private readonly picker = viewChild.required(TagPickerComponent);
 
   // Fetched lazily on first keystroke and memoized for the component's lifetime; reflects
   // last-saved state. Caching the in-flight promise (not just its result) makes a fast burst of

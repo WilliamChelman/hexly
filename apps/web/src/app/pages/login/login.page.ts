@@ -3,12 +3,12 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { AuthClient, AppShellStore } from '@hexly/web-core';
-import { Button, Field, Input, Panel } from '@hexly/web-ui';
+import { ButtonComponent, FieldComponent, InputComponent, PanelComponent } from '@hexly/web-ui';
 
 @Component({
   selector: 'app-login',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Panel, Field, Input, Button, TranslocoPipe],
+  imports: [PanelComponent, FieldComponent, InputComponent, ButtonComponent, TranslocoPipe],
   template: `
     <main class="grid place-items-center min-h-full p-6 bg-surface-sunken">
       <section class="w-full max-w-[22rem] p-8" appPanel raised>
@@ -49,7 +49,7 @@ import { Button, Field, Input, Panel } from '@hexly/web-ui';
     </main>
   `,
 })
-export class Login {
+export class LoginPage {
   private readonly auth = inject(AuthClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);

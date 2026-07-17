@@ -3,8 +3,8 @@ import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { WorldGraph as WorldGraphPayload } from '@hexly/domain';
 import { ActiveWorld, entityRoute, ToasterService, WorldsClient } from '@hexly/web-core';
-import { Eyebrow, PageHeader, Panel } from '@hexly/web-ui';
-import { GraphCanvas, GraphOpen } from './components/graph-canvas.component';
+import { EyebrowComponent, PageHeaderComponent, PanelComponent } from '@hexly/web-ui';
+import { GraphCanvasComponent, GraphOpen } from './components/graph-canvas.component';
 
 /**
  * The World Graph page at `/w/:worldId/graph`: the World's readable Entities as nodes, their Entity
@@ -17,7 +17,7 @@ import { GraphCanvas, GraphOpen } from './components/graph-canvas.component';
 @Component({
   selector: 'app-world-graph',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Eyebrow, PageHeader, Panel, GraphCanvas],
+  imports: [TranslocoPipe, EyebrowComponent, PageHeaderComponent, PanelComponent, GraphCanvasComponent],
   host: { class: 'flex flex-col h-full bg-surface-sunken' },
   template: `
     <app-page-header sticky>
@@ -54,7 +54,7 @@ import { GraphCanvas, GraphOpen } from './components/graph-canvas.component';
     </main>
   `,
 })
-export class WorldGraph {
+export class WorldGraphPage {
   private readonly worlds = inject(WorldsClient);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly router = inject(Router);

@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Editor } from '@tiptap/core';
-import { Button } from '@hexly/web-ui';
+import { ButtonComponent } from '@hexly/web-ui';
 import { FORMAT_ITEMS, FormatItem, applyLink, clearLink, isLinkActive } from '../models/formatting-items';
 
 /**
@@ -22,7 +22,7 @@ import { FORMAT_ITEMS, FormatItem, applyLink, clearLink, isLinkActive } from '..
 @Component({
   selector: 'app-formatting-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Button],
+  imports: [TranslocoPipe, ButtonComponent],
   // `absolute` (not fixed) matches the bubble-menu plugin's default Floating UI
   // strategy. The plugin computes the position in absolute space and only switches
   // the element to position:absolute *after* its first async layout — so a fixed host
@@ -82,7 +82,7 @@ import { FORMAT_ITEMS, FormatItem, applyLink, clearLink, isLinkActive } from '..
     </div>
   `,
 })
-export class FormattingMenu {
+export class FormattingMenuComponent {
   readonly editor = input.required<Editor>();
 
   protected readonly items = FORMAT_ITEMS;

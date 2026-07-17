@@ -10,7 +10,7 @@ import { WEB_ENTITY_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { provideEntityTypesTesting } from '../testing/entity-types.fake';
 import { CORE_VIEW_FIELDS } from '../models/view-definition';
 import { TypeDefinition } from '../models/type-definition';
-import { EntityLinkPicker } from './entity-link-picker.component';
+import { EntityLinkPickerComponent } from './entity-link-picker.component';
 
 /** A code-registered type, chrome and all — the shape the picker reads its create row off. It declares its default Fields by id (`fieldRefs`, ADR-0054). */
 function codeType(id: string, fieldRefs: readonly string[] = []): TypeDefinition {
@@ -73,7 +73,7 @@ let nextCreatedId = 'created-1';
 
 /** A host holding the link, as the Hex Map's Inspector (and any other slot owner) does. */
 @Component({
-  imports: [EntityLinkPicker],
+  imports: [EntityLinkPickerComponent],
   template: `<app-entity-link-picker [entityId]="linked()" [slot]="slot()" (linkChange)="linked.set($event)" />`,
 })
 class Host {

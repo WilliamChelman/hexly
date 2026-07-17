@@ -26,7 +26,7 @@ import { ChangeDetectionStrategy, Component, booleanAttribute, input } from '@an
     }
   `,
 })
-export class Dot {
+export class DotComponent {
   /** A healthy/lit dot — green with a soft halo. */
   readonly positive = input(false, { transform: booleanAttribute });
 }

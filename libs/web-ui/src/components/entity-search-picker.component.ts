@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, effect, inject, input, output, sign
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
-import { Button } from './button.component';
-import { Input } from './input.component';
+import { ButtonComponent } from './button.component';
+import { InputComponent } from './input.component';
 
 /**
  * The shared server-side Entity picker (ADR-0025): a search box over the owner-scoped
@@ -17,7 +17,7 @@ import { Input } from './input.component';
 @Component({
   selector: 'app-entity-search-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Input, TranslocoPipe],
+  imports: [ButtonComponent, InputComponent, TranslocoPipe],
   template: `
     <div class="rounded-md border border-line bg-surface p-1 shadow-2" [attr.data-testid]="testid() + '-menu'">
       <input
@@ -53,7 +53,7 @@ import { Input } from './input.component';
     </div>
   `,
 })
-export class EntitySearchPicker {
+export class EntitySearchPickerComponent {
   private readonly entitiesClient = inject(EntitiesClient);
 
   /** Prefix for the search box / option / menu `data-testid`s, per embedding surface. */

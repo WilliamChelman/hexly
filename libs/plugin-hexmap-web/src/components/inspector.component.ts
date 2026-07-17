@@ -1,13 +1,13 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { coordKey, Label, TerrainId } from '@hexly/plugin-hexmap';
-import { EntityLinkPicker } from '@hexly/web-entity';
-import { Button, Coord, Eyebrow, Field, Input } from '@hexly/web-ui';
+import { EntityLinkPickerComponent } from '@hexly/web-entity';
+import { ButtonComponent, CoordComponent, EyebrowComponent, FieldComponent, InputComponent } from '@hexly/web-ui';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HexMapStore, Selection } from '../services/hexmap-store';
 import { featureKey, terrainKey } from '../utils/catalog-keys';
 import { inputValue } from '../utils/input-value';
-import { RegionFields } from './region-fields.component';
+import { RegionFieldsComponent } from './region-fields.component';
 
 /** The Selection kinds, in the order the multi-selection breakdown lists them. */
 const SELECTION_KINDS: readonly {
@@ -69,7 +69,17 @@ interface SelectedEntity {
   host: {
     class: 'flex flex-col gap-4 p-4 overflow-y-auto bg-surface',
   },
-  imports: [Button, Coord, EntityLinkPicker, Eyebrow, Field, Input, NgTemplateOutlet, RegionFields, TranslocoPipe],
+  imports: [
+    ButtonComponent,
+    CoordComponent,
+    EntityLinkPickerComponent,
+    EyebrowComponent,
+    FieldComponent,
+    InputComponent,
+    NgTemplateOutlet,
+    RegionFieldsComponent,
+    TranslocoPipe,
+  ],
   template: `
     <!--
       The Entity Link control, declared once and outletted by each branch whose selection carries a
@@ -349,7 +359,7 @@ interface SelectedEntity {
     }
   `,
 })
-export class Inspector {
+export class InspectorComponent {
   protected readonly store = inject(HexMapStore);
 
   /** The Add/Remove membership-direction toggle pair, for the template `@for`. */

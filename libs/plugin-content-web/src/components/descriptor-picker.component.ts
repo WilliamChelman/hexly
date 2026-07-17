@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ListboxController, Listbox, ListboxEmpty, ListboxOption } from '@hexly/web-ui';
+import { ListboxController, ListboxComponent, ListboxEmptyComponent, ListboxOptionComponent } from '@hexly/web-ui';
 import { VocabItem } from '@hexly/plugin-content';
 
 /**
@@ -12,7 +12,7 @@ import { VocabItem } from '@hexly/plugin-content';
 @Component({
   selector: 'app-descriptor-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Listbox, ListboxOption, ListboxEmpty],
+  imports: [TranslocoPipe, ListboxComponent, ListboxOptionComponent, ListboxEmptyComponent],
   template: `
     @if (visible()) {
       <app-listbox
@@ -44,6 +44,6 @@ import { VocabItem } from '@hexly/plugin-content';
     }
   `,
 })
-export class DescriptorPicker extends ListboxController<VocabItem> {
+export class DescriptorPickerComponent extends ListboxController<VocabItem> {
   protected readonly optionIdPrefix = 'descriptor-opt-';
 }

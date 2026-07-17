@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Field } from '@hexly/domain';
-import { Chip } from '@hexly/web-ui';
+import { ChipComponent } from '@hexly/web-ui';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
@@ -14,7 +14,7 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
 @Component({
   selector: 'app-entity-fields-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Chip],
+  imports: [TranslocoPipe, ChipComponent],
   template: `
     <div class="flex flex-col gap-3" data-testid="entity-fields-editor">
       <div class="flex flex-wrap items-center gap-2">
@@ -54,7 +54,7 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
     </div>
   `,
 })
-export class EntityFieldsEditor {
+export class EntityFieldsEditorComponent {
   private readonly registry = inject(TypeRegistry);
   private readonly transloco = inject(TranslocoService);
 

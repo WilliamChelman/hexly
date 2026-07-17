@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Button, Dialog } from '@hexly/web-ui';
+import { ButtonComponent, DialogComponent } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
-import { EntityFieldsEditor } from './entity-fields-editor.component';
+import { EntityFieldsEditorComponent } from './entity-fields-editor.component';
 
 /**
- * The open Entity's Edit-fields dialog (ADR-0054, #229): binds {@link EntityFieldsEditor} to the
+ * The open Entity's Edit-fields dialog (ADR-0054, #229): binds {@link EntityFieldsEditorComponent} to the
  * {@link EntitySession} — an attach lands on `attachField` (minting the Field's default), a detach on
  * `detachField` (clearing its value), so both ride the version-checked autosave beside the type set.
  */
@@ -13,7 +13,7 @@ import { EntityFieldsEditor } from './entity-fields-editor.component';
   selector: 'app-entity-fields-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [Button, Dialog, EntityFieldsEditor, TranslocoPipe],
+  imports: [ButtonComponent, DialogComponent, EntityFieldsEditorComponent, TranslocoPipe],
   template: `
     @if (open()) {
       <app-dialog [open]="true" [heading]="'entityFields.heading' | transloco" (closed)="closed.emit()">
@@ -32,7 +32,7 @@ import { EntityFieldsEditor } from './entity-fields-editor.component';
     }
   `,
 })
-export class EntityFieldsDialog {
+export class EntityFieldsDialogComponent {
   protected readonly session = inject(EntitySession);
 
   readonly open = input(false);

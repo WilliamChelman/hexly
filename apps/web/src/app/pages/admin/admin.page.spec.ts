@@ -5,7 +5,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ReindexJob } from '@hexly/domain';
 import { AdminClient, ToasterService } from '@hexly/web-core';
 import { MockAdminClient, reindexJob } from '@hexly/web-core/testing';
-import { Admin } from './admin.page';
+import { AdminPage } from './admin.page';
 
 /** Matches the panel's own poll interval; one `tick` of it advances the walk by one poll. */
 const POLL_MS = 1000;
@@ -22,7 +22,7 @@ describe('Admin panel (Reindex)', () => {
   beforeEach(async () => {
     admin = new MockAdminClient();
     await TestBed.configureTestingModule({
-      imports: [Admin, provideTranslocoTesting()],
+      imports: [AdminPage, provideTranslocoTesting()],
       providers: [{ provide: AdminClient, useValue: admin }],
     }).compileComponents();
     toaster = TestBed.inject(ToasterService);
@@ -32,7 +32,7 @@ describe('Admin panel (Reindex)', () => {
   afterEach(() => vi.useRealTimers());
 
   function render() {
-    const fixture = TestBed.createComponent(Admin);
+    const fixture = TestBed.createComponent(AdminPage);
     fixture.detectChanges();
     return fixture;
   }

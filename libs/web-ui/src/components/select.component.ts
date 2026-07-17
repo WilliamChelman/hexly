@@ -85,4 +85,4 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
     }
   `,
 })
-export class Select {}
+export class SelectComponent {}

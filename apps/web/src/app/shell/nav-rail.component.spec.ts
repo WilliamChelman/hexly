@@ -6,7 +6,7 @@ import { provideRouter, Router } from '@angular/router';
 import { BehaviorSubject, Observable, map, of } from 'rxjs';
 import { AuthClient, WorldsClient, ActiveWorld } from '@hexly/web-core';
 import { MockAuthClient, MockWorldsClient } from '@hexly/web-core/testing';
-import { NavRail } from './nav-rail.component';
+import { NavRailComponent } from './nav-rail.component';
 import { NavRailStore } from './nav-rail.store';
 
 @Component({ template: '' })
@@ -36,7 +36,7 @@ describe('NavRail', () => {
     // (ADR-0024); tests that never expand simply never call this.
     worldsClient.list.mockReturnValue(of([]));
     await TestBed.configureTestingModule({
-      imports: [NavRail, provideTranslocoTesting()],
+      imports: [NavRailComponent, provideTranslocoTesting()],
       providers: [
         provideRouter([
           { path: '', component: Blank },
@@ -67,7 +67,7 @@ describe('NavRail', () => {
   }
 
   function render() {
-    const fixture = TestBed.createComponent(NavRail);
+    const fixture = TestBed.createComponent(NavRailComponent);
     fixture.detectChanges();
     return fixture;
   }

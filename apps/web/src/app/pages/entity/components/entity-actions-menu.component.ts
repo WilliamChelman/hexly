@@ -1,6 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Button, Icon, MenuItem, MenuItemCheckbox, MenuPanel, MenuTrigger } from '@hexly/web-ui';
+import {
+  ButtonComponent,
+  IconComponent,
+  MenuItemDirective,
+  MenuItemCheckboxDirective,
+  MenuPanelDirective,
+  MenuTriggerDirective,
+} from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
 import { ActiveWorld } from '@hexly/web-core';
 
@@ -16,7 +23,15 @@ import { ActiveWorld } from '@hexly/web-core';
   selector: 'app-entity-actions-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [MenuTrigger, MenuPanel, MenuItem, MenuItemCheckbox, Button, Icon, TranslocoPipe],
+  imports: [
+    MenuTriggerDirective,
+    MenuPanelDirective,
+    MenuItemDirective,
+    MenuItemCheckboxDirective,
+    ButtonComponent,
+    IconComponent,
+    TranslocoPipe,
+  ],
   template: `
     @if (editable() || canPin() || manageable()) {
       <button
@@ -100,7 +115,7 @@ import { ActiveWorld } from '@hexly/web-core';
     </ng-template>
   `,
 })
-export class EntityActionsMenu {
+export class EntityActionsMenuComponent {
   private readonly session = inject(EntitySession);
   private readonly activeWorld = inject(ActiveWorld);
 

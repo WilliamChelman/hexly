@@ -21,10 +21,10 @@ import {
   USER_FIELD_NAMESPACE,
 } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
-import { Button, Input } from '@hexly/web-ui';
+import { ButtonComponent, InputComponent } from '@hexly/web-ui';
 import { ViewRegistry } from '../../../../../entity-types/view-registry';
 import { BUILT_IN_KINDS, toFieldDataType } from '../utils/field-data-type';
-import { DatatypePicker } from './datatype-picker.component';
+import { DatatypePickerComponent } from './datatype-picker.component';
 import { dataTypeChoices } from '../utils/datatype-choices';
 
 /** The open editor's working copy: creating (`editingId === null`) or editing an existing Field by id. */
@@ -55,7 +55,7 @@ interface Draft {
 @Component({
   selector: 'app-world-field-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Button, Input, DatatypePicker, FormField],
+  imports: [TranslocoPipe, ButtonComponent, InputComponent, DatatypePickerComponent, FormField],
   template: `
     @let d = draftModel();
     <form id="field-editor-form" class="field-editor" data-testid="field-editor" (submit)="onSubmit($event)">
@@ -152,7 +152,7 @@ interface Draft {
     }
   `,
 })
-export class WorldFieldForm {
+export class WorldFieldFormComponent {
   readonly worldId = input.required<string>();
   /** The Field to edit, or `null` to author a new one. */
   readonly field = input<Field | null>(null);

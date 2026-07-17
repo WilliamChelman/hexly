@@ -6,7 +6,7 @@ import { EntityDetail, EntityVerb, defineField } from '@hexly/domain';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { GenericFieldView } from './generic-field-view.component';
+import { GenericFieldViewComponent } from './generic-field-view.component';
 
 // World Fields a spec type references by id (ADR-0054); set on the registry before each register().
 const beastFields = [
@@ -60,7 +60,7 @@ describe('GenericFieldView', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [GenericFieldView, provideTranslocoTesting()],
+      imports: [GenericFieldViewComponent, provideTranslocoTesting()],
       providers: [
         EntitySession,
         { provide: ENTITY_SESSION, useExisting: EntitySession },
@@ -74,7 +74,7 @@ describe('GenericFieldView', () => {
 
   function render(detailToOpen: EntityDetail) {
     session.adopt(detailToOpen);
-    const fixture = TestBed.createComponent(GenericFieldView);
+    const fixture = TestBed.createComponent(GenericFieldViewComponent);
     fixture.detectChanges();
     return { fixture, el: fixture.nativeElement as HTMLElement };
   }
@@ -220,7 +220,7 @@ describe('GenericFieldView over the effective Field set', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [GenericFieldView, provideTranslocoTesting()],
+      imports: [GenericFieldViewComponent, provideTranslocoTesting()],
       providers: [
         EntitySession,
         { provide: ENTITY_SESSION, useExisting: EntitySession },
@@ -249,7 +249,7 @@ describe('GenericFieldView over the effective Field set', () => {
       rights: ['edit'],
       document: { 'test.size': 'large' },
     });
-    const fixture = TestBed.createComponent(GenericFieldView);
+    const fixture = TestBed.createComponent(GenericFieldViewComponent);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 

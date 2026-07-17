@@ -25,7 +25,7 @@ import { booleanAttribute, ChangeDetectionStrategy, Component, input } from '@an
     }
   `,
 })
-export class Eyebrow {
+export class EyebrowComponent {
   /** Prefix the gilded ✦ section mark (codex right-rail/panel eyebrows). */
   readonly mark = input(false, { transform: booleanAttribute });
 }

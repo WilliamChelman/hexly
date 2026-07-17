@@ -159,7 +159,7 @@ export interface FieldRangeChange {
     </div>
   `,
 })
-export class FacetRail {
+export class FacetRailComponent {
   private readonly transloco = inject(TranslocoService);
   private readonly types = inject(TypeRegistry);
 

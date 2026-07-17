@@ -33,4 +33,4 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
     }
   `,
 })
-export class ButtonGroup {}
+export class ButtonGroupComponent {}

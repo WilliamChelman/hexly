@@ -14,6 +14,6 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   template:
     '<span class="text-xs font-semibold text-ink-muted tracking-wide uppercase">{{ label() }}</span><ng-content />',
 })
-export class Field {
+export class FieldComponent {
   readonly label = input.required<string>();
 }

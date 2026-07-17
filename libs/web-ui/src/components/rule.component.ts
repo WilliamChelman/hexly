@@ -14,4 +14,4 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
     }
   `,
 })
-export class Rule {}
+export class RuleComponent {}

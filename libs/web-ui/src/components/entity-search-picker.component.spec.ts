@@ -4,7 +4,7 @@ import { of } from 'rxjs';
 import { EntityPage, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
-import { EntitySearchPicker } from './entity-search-picker.component';
+import { EntitySearchPickerComponent } from './entity-search-picker.component';
 import { WEB_UI_TEST_CATALOGS } from '../i18n/test-catalogs';
 
 function summary(id: string, name = id, type: EntityType = 'core.note'): EntitySummary {
@@ -28,7 +28,7 @@ const page = (items: EntitySummary[]): EntityPage => ({
 
 /** A host that owns the controlled query, mirroring how a page embeds the picker. */
 @Component({
-  imports: [EntitySearchPicker],
+  imports: [EntitySearchPickerComponent],
   template: `<app-entity-search-picker
     testid="pin-picker"
     [worldId]="worldId"

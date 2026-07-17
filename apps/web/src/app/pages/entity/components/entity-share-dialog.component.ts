@@ -1,6 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Button, Dialog, GrantSet, OwnerSet, PublicLinkControl } from '@hexly/web-ui';
+import {
+  ButtonComponent,
+  DialogComponent,
+  GrantSetComponent,
+  OwnerSetComponent,
+  PublicLinkComponent,
+} from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
 
 /**
@@ -15,7 +21,7 @@ import { EntitySession } from '../services/entity-session';
   selector: 'app-entity-share-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [Button, Dialog, GrantSet, OwnerSet, PublicLinkControl, TranslocoPipe],
+  imports: [ButtonComponent, DialogComponent, GrantSetComponent, OwnerSetComponent, PublicLinkComponent, TranslocoPipe],
   template: `
     @if (open() && entityId(); as id) {
       <app-dialog [open]="true" [heading]="'ui.owners.heading' | transloco" (closed)="closed.emit()">
@@ -51,7 +57,7 @@ import { EntitySession } from '../services/entity-session';
     }
   `,
 })
-export class EntityShareDialog {
+export class EntityShareDialogComponent {
   private readonly session = inject(EntitySession);
 
   /** Whether the dialog is shown; the caller owns this state (toggled from the actions menu). */

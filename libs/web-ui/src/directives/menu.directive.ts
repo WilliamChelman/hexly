@@ -46,7 +46,7 @@ import {
   ],
   providers: [{ provide: MENU_TRIGGER, useExisting: CdkMenuTrigger }, PARENT_OR_NEW_MENU_STACK_PROVIDER],
 })
-export class MenuTrigger {}
+export class MenuTriggerDirective {}
 
 /** The dropdown panel — one `<div appMenuPanel>` inside the trigger's `<ng-template>`. */
 @Directive({
@@ -54,7 +54,7 @@ export class MenuTrigger {}
   hostDirectives: [CdkMenu],
   host: { class: 'menu-panel' },
 })
-export class MenuPanel {}
+export class MenuPanelDirective {}
 
 /** A plain menu row — a `<button>` action or an `<a>` link. Re-exposes CDK's `(triggered)`. */
 @Directive({
@@ -62,7 +62,7 @@ export class MenuPanel {}
   hostDirectives: [{ directive: CdkMenuItem, outputs: ['cdkMenuItemTriggered: triggered'] }],
   host: { class: 'menu-item' },
 })
-export class MenuItem {}
+export class MenuItemDirective {}
 
 /** A checkbox row: a trailing check reflects `[checked]`; flips on `(triggered)`. */
 @Directive({
@@ -76,9 +76,9 @@ export class MenuItem {}
   ],
   host: { class: 'menu-item justify-between w-full' },
 })
-export class MenuItemCheckbox {}
+export class MenuItemCheckboxDirective {}
 
-/** A radio row within an {@link MenuGroup}: `[checked]` marks the active one. */
+/** A radio row within an {@link MenuGroupDirective}: `[checked]` marks the active one. */
 @Directive({
   selector: '[appMenuItemRadio]',
   hostDirectives: [
@@ -90,11 +90,11 @@ export class MenuItemCheckbox {}
   ],
   host: { class: 'menu-item justify-between w-full' },
 })
-export class MenuItemRadio {}
+export class MenuItemRadioDirective {}
 
 /** Groups radio rows so exactly one stays checked (ARIA radiogroup semantics). */
 @Directive({
   selector: '[appMenuGroup]',
   hostDirectives: [CdkMenuGroup],
 })
-export class MenuGroup {}
+export class MenuGroupDirective {}

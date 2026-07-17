@@ -1,10 +1,10 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Dialog } from './dialog.component';
+import { DialogComponent } from './dialog.component';
 
 /** Drives the primitive from a typed signal, the way the Index does. */
 @Component({
-  imports: [Dialog],
+  imports: [DialogComponent],
   template: `
     <app-dialog [open]="open()" [heading]="heading()" (closed)="closes = closes + 1">
       <p>Body</p>

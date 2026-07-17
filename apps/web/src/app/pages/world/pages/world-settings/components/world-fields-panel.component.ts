@@ -2,15 +2,15 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, si
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Field } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
-import { Button, Dialog } from '@hexly/web-ui';
+import { ButtonComponent, DialogComponent } from '@hexly/web-ui';
 import { WorldFieldsLoader } from '../../../../../entity-types/world-fields-loader';
 import { ViewRegistry } from '../../../../../entity-types/view-registry';
 import { dataTypeLabel } from '../utils/field-data-type';
-import { WorldFieldForm } from './world-field-form.component';
+import { WorldFieldFormComponent } from './world-field-form.component';
 
 /**
  * The World-Owner surface for authoring reusable **Fields** (ADR-0054, #230), sibling to the World
- * Types editor: it lists a World's custom Fields and hosts the {@link WorldFieldForm} in a dialog to
+ * Types editor: it lists a World's custom Fields and hosts the {@link WorldFieldFormComponent} in a dialog to
  * create/edit one. The form persists; this panel owns the list and re-projects on success via
  * {@link WorldFieldsLoader} so attach pickers and entity editors see the change at once. Deletes are
  * Owner-gated server-side; a refusal toasts and leaves the list untouched.
@@ -18,7 +18,7 @@ import { WorldFieldForm } from './world-field-form.component';
 @Component({
   selector: 'app-world-fields',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Button, Dialog, WorldFieldForm],
+  imports: [TranslocoPipe, ButtonComponent, DialogComponent, WorldFieldFormComponent],
   template: `
     <ul class="field-list">
       @for (f of rows(); track f.id) {
@@ -78,7 +78,7 @@ import { WorldFieldForm } from './world-field-form.component';
     }
   `,
 })
-export class WorldFieldsPanel implements OnInit {
+export class WorldFieldsPanelComponent implements OnInit {
   readonly id = input.required<string>();
 
   private readonly worlds = inject(WorldsClient);

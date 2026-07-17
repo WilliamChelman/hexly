@@ -40,7 +40,7 @@ import { LinkedEntity } from '@hexly/domain';
     }
   `,
 })
-export class ReferenceRow {
+export class ReferenceRowComponent {
   /** The far end of the link, or `null` for a dangling outbound target. */
   readonly entity = input.required<LinkedEntity | null>();
   /** The Link Descriptor, as the author spelled it. */

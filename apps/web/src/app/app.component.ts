@@ -3,20 +3,27 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map, of, switchMap, timer } from 'rxjs';
 import { AppShellStore } from '@hexly/web-core';
-import { CommandPalette } from './shell/command-palette/command-palette.component';
-import { CreateEntityDialog } from './shell/command-palette/create-entity-dialog.component';
-import { NavRail } from './shell/nav-rail.component';
-import { Toaster } from './shell/toaster.component';
-import { Icon } from '@hexly/web-ui';
+import { CommandPaletteComponent } from './shell/command-palette/command-palette.component';
+import { CreateEntityDialogComponent } from './shell/command-palette/create-entity-dialog.component';
+import { NavRailComponent } from './shell/nav-rail.component';
+import { ToasterComponent } from './shell/toaster.component';
+import { IconComponent } from '@hexly/web-ui';
 
 /** How long `full` loading must persist before the curtain shows (debounce). */
 const FULL_CURTAIN_DELAY_MS = 150;
 
-/** Application root. The only persistent chrome is the {@link NavRail} (ADR-0022). */
+/** Application root. The only persistent chrome is the {@link NavRailComponent} (ADR-0022). */
 @Component({
   selector: 'app-root',
   host: { class: 'flex h-screen' },
-  imports: [RouterOutlet, NavRail, Toaster, CommandPalette, CreateEntityDialog, Icon],
+  imports: [
+    RouterOutlet,
+    NavRailComponent,
+    ToasterComponent,
+    CommandPaletteComponent,
+    CreateEntityDialogComponent,
+    IconComponent,
+  ],
   template: `
     @if (navigated() && !shell.standalone()) {
       <app-nav-rail />

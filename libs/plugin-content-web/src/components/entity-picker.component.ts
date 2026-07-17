@@ -1,7 +1,13 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
-import { ListboxController, ListboxProps, Listbox, ListboxEmpty, ListboxOption } from '@hexly/web-ui';
+import {
+  ListboxController,
+  ListboxProps,
+  ListboxComponent,
+  ListboxEmptyComponent,
+  ListboxOptionComponent,
+} from '@hexly/web-ui';
 
 /** What the `@`/`/link` suggestion plugin hands the picker on open/update. */
 export type EntityPickerProps = ListboxProps<EntitySummary>;
@@ -14,7 +20,7 @@ export type EntityPickerProps = ListboxProps<EntitySummary>;
 @Component({
   selector: 'app-entity-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Listbox, ListboxOption, ListboxEmpty],
+  imports: [TranslocoPipe, ListboxComponent, ListboxOptionComponent, ListboxEmptyComponent],
   template: `
     @if (visible()) {
       <app-listbox
@@ -44,6 +50,6 @@ export type EntityPickerProps = ListboxProps<EntitySummary>;
     }
   `,
 })
-export class EntityPicker extends ListboxController<EntitySummary> {
+export class EntityPickerComponent extends ListboxController<EntitySummary> {
   protected readonly optionIdPrefix = 'entity-opt-';
 }

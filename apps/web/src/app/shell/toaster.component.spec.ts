@@ -3,7 +3,7 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { ToasterService } from '@hexly/web-core';
-import { Toaster } from './toaster.component';
+import { ToasterComponent } from './toaster.component';
 
 describe('Toaster', () => {
   let announce: ReturnType<typeof vi.fn>;
@@ -11,13 +11,13 @@ describe('Toaster', () => {
   beforeEach(() => {
     announce = vi.fn();
     TestBed.configureTestingModule({
-      imports: [Toaster, provideTranslocoTesting()],
+      imports: [ToasterComponent, provideTranslocoTesting()],
       providers: [{ provide: LiveAnnouncer, useValue: { announce } }],
     });
   });
 
   function render() {
-    const fixture = TestBed.createComponent(Toaster);
+    const fixture = TestBed.createComponent(ToasterComponent);
     fixture.detectChanges();
     return fixture;
   }

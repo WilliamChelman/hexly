@@ -2,15 +2,15 @@ import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { Styleguide } from './styleguide.page';
+import { StyleguidePage } from './styleguide.page';
 
 describe('Styleguide', () => {
   function render() {
     TestBed.configureTestingModule({
-      imports: [Styleguide, provideTranslocoTesting()],
+      imports: [StyleguidePage, provideTranslocoTesting()],
       providers: [provideRouter([])],
     });
-    const fixture = TestBed.createComponent(Styleguide);
+    const fixture = TestBed.createComponent(StyleguidePage);
     fixture.detectChanges();
     return fixture;
   }

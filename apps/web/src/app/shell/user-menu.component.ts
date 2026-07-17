@@ -2,7 +2,16 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AuthClient, Locale, LocaleService, ThemeService } from '@hexly/web-core';
-import { Button, Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, MenuTrigger } from '@hexly/web-ui';
+import {
+  ButtonComponent,
+  IconComponent,
+  RuleComponent,
+  MenuGroupDirective,
+  MenuItemDirective,
+  MenuItemRadioDirective,
+  MenuPanelDirective,
+  MenuTriggerDirective,
+} from '@hexly/web-ui';
 
 /**
  * The header's account control (ADR-0015): a trigger opening a CDK menu with the
@@ -13,7 +22,18 @@ import { Button, Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, Menu
 @Component({
   selector: 'app-user-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MenuTrigger, MenuPanel, MenuItem, MenuItemRadio, MenuGroup, RouterLink, Button, Icon, Rule, TranslocoPipe],
+  imports: [
+    MenuTriggerDirective,
+    MenuPanelDirective,
+    MenuItemDirective,
+    MenuItemRadioDirective,
+    MenuGroupDirective,
+    RouterLink,
+    ButtonComponent,
+    IconComponent,
+    RuleComponent,
+    TranslocoPipe,
+  ],
   template: `
     <button
       type="button"
@@ -92,7 +112,7 @@ import { Button, Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, Menu
     </ng-template>
   `,
 })
-export class UserMenu {
+export class UserMenuComponent {
   /** Whether the nav rail is expanded — drives the full-name vs avatar-only trigger. */
   readonly expanded = input(false);
 

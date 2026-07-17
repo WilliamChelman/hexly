@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { AuthClient, LocaleService, ThemeService } from '@hexly/web-core';
 import { MockAuthClient } from '@hexly/web-core/testing';
-import { UserMenu } from './user-menu.component';
+import { UserMenuComponent } from './user-menu.component';
 
 describe('UserMenu', () => {
   let auth: MockAuthClient;
@@ -13,7 +13,7 @@ describe('UserMenu', () => {
     localStorage.clear();
     auth = new MockAuthClient();
     await TestBed.configureTestingModule({
-      imports: [UserMenu, provideTranslocoTesting()],
+      imports: [UserMenuComponent, provideTranslocoTesting()],
       providers: [provideRouter([]), { provide: AuthClient, useValue: auth }],
     }).compileComponents();
   });
@@ -56,14 +56,14 @@ describe('UserMenu', () => {
   }
 
   it('exposes a trigger by its accessible name', () => {
-    const fixture = TestBed.createComponent(UserMenu);
+    const fixture = TestBed.createComponent(UserMenuComponent);
     fixture.detectChanges();
 
     expect(trigger(fixture)).not.toBeNull();
   });
 
   it('opens a menu with theme and language commands', () => {
-    const fixture = TestBed.createComponent(UserMenu);
+    const fixture = TestBed.createComponent(UserMenuComponent);
     fixture.detectChanges();
 
     const menu = openMenu(fixture);
@@ -75,7 +75,7 @@ describe('UserMenu', () => {
 
   it('toggles the theme from the menu', () => {
     const theme = TestBed.inject(ThemeService);
-    const fixture = TestBed.createComponent(UserMenu);
+    const fixture = TestBed.createComponent(UserMenuComponent);
     fixture.detectChanges();
 
     const before = theme.theme();
@@ -87,7 +87,7 @@ describe('UserMenu', () => {
   it('marks the active language and flips it live', () => {
     const locale = TestBed.inject(LocaleService);
     const transloco = TestBed.inject(TranslocoService);
-    const fixture = TestBed.createComponent(UserMenu);
+    const fixture = TestBed.createComponent(UserMenuComponent);
     fixture.detectChanges();
 
     const menu = openMenu(fixture);
@@ -103,7 +103,7 @@ describe('UserMenu', () => {
 
   it('reflects the signed-in user in the menu', () => {
     signIn();
-    const fixture = TestBed.createComponent(UserMenu);
+    const fixture = TestBed.createComponent(UserMenuComponent);
     fixture.detectChanges();
 
     expect(openMenu(fixture).textContent).toContain('Ada Lovelace');
@@ -111,7 +111,7 @@ describe('UserMenu', () => {
 
   it('links to the User Settings page when signed in (ADR-0038)', () => {
     signIn();
-    const fixture = TestBed.createComponent(UserMenu);
+    const fixture = TestBed.createComponent(UserMenuComponent);
     fixture.detectChanges();
 
     const settings = item(openMenu(fixture), /settings|paramètres/i);
@@ -119,7 +119,7 @@ describe('UserMenu', () => {
   });
 
   it('offers no Settings link to anonymous viewers — there is no account to edit', () => {
-    const fixture = TestBed.createComponent(UserMenu);
+    const fixture = TestBed.createComponent(UserMenuComponent);
     fixture.detectChanges();
 
     expect(() => item(openMenu(fixture), /settings|paramètres/i)).toThrow();
@@ -128,7 +128,7 @@ describe('UserMenu', () => {
   it('calls auth.signOut() when the sign-out item is clicked', () => {
     signIn();
     const signOut = vi.spyOn(auth, 'signOut');
-    const fixture = TestBed.createComponent(UserMenu);
+    const fixture = TestBed.createComponent(UserMenuComponent);
     fixture.detectChanges();
 
     item(openMenu(fixture), /sign out/i).click();
@@ -137,7 +137,7 @@ describe('UserMenu', () => {
   });
 
   it('offers Login instead of Sign out when signed out', () => {
-    const fixture = TestBed.createComponent(UserMenu);
+    const fixture = TestBed.createComponent(UserMenuComponent);
     fixture.detectChanges();
 
     const menu = openMenu(fixture);

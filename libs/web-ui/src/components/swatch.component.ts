@@ -15,4 +15,4 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   },
   template: '',
 })
-export class Swatch {}
+export class SwatchComponent {}

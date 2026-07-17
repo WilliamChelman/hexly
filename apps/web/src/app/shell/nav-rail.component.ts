@@ -6,9 +6,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AuthClient, WorldStore, ActiveWorld, AuthScopedStorage, AppShellStore } from '@hexly/web-core';
-import { Button, Cartouche, Icon } from '@hexly/web-ui';
-import { UserMenu } from './user-menu.component';
-import { WorldSwitcher } from './world-switcher.component';
+import { ButtonComponent, CartoucheComponent, IconComponent } from '@hexly/web-ui';
+import { UserMenuComponent } from './user-menu.component';
+import { WorldSwitcherComponent } from './world-switcher.component';
 import { NavEntry, NavRailStore } from './nav-rail.store';
 
 const STATIC_ENTRIES: readonly NavEntry[] = [
@@ -41,11 +41,11 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
     A11yModule,
     RouterLink,
     RouterLinkActive,
-    Button,
-    Cartouche,
-    Icon,
-    UserMenu,
-    WorldSwitcher,
+    ButtonComponent,
+    CartoucheComponent,
+    IconComponent,
+    UserMenuComponent,
+    WorldSwitcherComponent,
     TranslocoPipe,
   ],
   template: `
@@ -153,7 +153,7 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
     </ng-template>
   `,
 })
-export class NavRail {
+export class NavRailComponent {
   private readonly auth = inject(AuthClient);
   private readonly worlds = inject(WorldStore);
   private readonly activeWorld = inject(ActiveWorld);

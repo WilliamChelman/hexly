@@ -4,10 +4,10 @@ import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { HEXMAP_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { HexMapStore } from '../services/hexmap-store';
-import { EditorRail } from './editor-rail.component';
+import { EditorRailComponent } from './editor-rail.component';
 
 function setup() {
-  const fixture = TestBed.createComponent(EditorRail);
+  const fixture = TestBed.createComponent(EditorRailComponent);
   const store = TestBed.inject(HexMapStore);
   fixture.detectChanges();
   const regions = () => fixture.nativeElement.querySelector('[data-testid=rail-regions]') as HTMLButtonElement;
@@ -17,7 +17,7 @@ function setup() {
 describe('EditorRail', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [EditorRail, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
+      imports: [EditorRailComponent, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
       providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });

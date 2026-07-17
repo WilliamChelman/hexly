@@ -1,7 +1,15 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { featureLibrary, terrainPalette } from '@hexly/plugin-hexmap';
-import { IconButton, Icon, IconName, IconPath, Panel, Rule, Swatch } from '@hexly/web-ui';
+import {
+  IconButtonComponent,
+  IconComponent,
+  IconName,
+  IconPathComponent,
+  PanelComponent,
+  RuleComponent,
+  SwatchComponent,
+} from '@hexly/web-ui';
 import { featureKey, terrainKey } from '../utils/catalog-keys';
 import { HexMapStore, featureSubtools, SelectSubtool, selectSubtools } from '../services/hexmap-store';
 import { TOOLS } from './tools';
@@ -21,7 +29,15 @@ function glyphFor(subtool: SelectSubtool): IconName {
   selector: 'app-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex items-start gap-2' },
-  imports: [IconButton, Icon, IconPath, Swatch, Panel, Rule, TranslocoPipe],
+  imports: [
+    IconButtonComponent,
+    IconComponent,
+    IconPathComponent,
+    SwatchComponent,
+    PanelComponent,
+    RuleComponent,
+    TranslocoPipe,
+  ],
   template: `
     <div
       class="flex flex-col gap-2 p-2 min-h-0 max-h-full overflow-y-auto"
@@ -149,7 +165,7 @@ function glyphFor(subtool: SelectSubtool): IconName {
     }
   `,
 })
-export class ToolPalette {
+export class ToolPaletteComponent {
   protected readonly store = inject(HexMapStore);
 
   // Keycap is the hotkey upper-cased for display. The glyph is flattened to its two cases —

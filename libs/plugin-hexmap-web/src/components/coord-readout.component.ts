@@ -25,7 +25,7 @@ import { Axial } from '@hexly/plugin-hexmap';
     }
   `,
 })
-export class CoordReadout {
+export class CoordReadoutComponent {
   readonly coord = input<Axial | null>(null);
   readonly terrainKey = input.required<string>();
 }

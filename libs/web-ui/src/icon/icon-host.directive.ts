@@ -9,4 +9,4 @@ import { Directive } from '@angular/core';
   selector: '[appIconHost]',
   host: { class: 'inline-flex leading-[0]' },
 })
-export class IconHost {}
+export class IconHostDirective {}

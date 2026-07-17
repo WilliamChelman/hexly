@@ -6,17 +6,17 @@ import { ActiveWorld, EntitiesClient, HexlyDatePipe, entityRoute, worldRoute } f
 import { CORE_VIEW_MAP } from '@hexly/web-entity';
 import {
   ACCENT_BAR,
-  Button,
-  EntitySearchPicker,
-  Eyebrow,
-  Icon,
+  ButtonComponent,
+  EntitySearchPickerComponent,
+  EyebrowComponent,
+  IconComponent,
   IconName,
-  PageHeader,
-  Panel,
+  PageHeaderComponent,
+  PanelComponent,
   accentFor,
 } from '@hexly/web-ui';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { NewEntityButton } from '../../../../entity-types/new-entity-button.component';
+import { NewEntityButtonComponent } from '../../../../entity-types/new-entity-button.component';
 import { TypeNamePipe } from '../../../../entity-types/type-name.pipe';
 import { TypeRegistry } from '../../../../entity-types/type-registry';
 
@@ -26,7 +26,7 @@ const MAPS_LIMIT = 8;
 /**
  * The World Dashboard: the per-World landing at `/w/:worldId`. Read-only — it authors
  * nothing, only queries the list/facets endpoints for pins, recents, Hex Maps and Type
- * counts. Creating is {@link NewEntityButton}'s job.
+ * counts. Creating is {@link NewEntityButtonComponent}'s job.
  */
 @Component({
   selector: 'app-world-dashboard',
@@ -37,13 +37,13 @@ const MAPS_LIMIT = 8;
     TranslocoPipe,
     HexlyDatePipe,
     TypeNamePipe,
-    Button,
-    Eyebrow,
-    Panel,
-    PageHeader,
-    Icon,
-    EntitySearchPicker,
-    NewEntityButton,
+    ButtonComponent,
+    EyebrowComponent,
+    PanelComponent,
+    PageHeaderComponent,
+    IconComponent,
+    EntitySearchPickerComponent,
+    NewEntityButtonComponent,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
@@ -261,7 +261,7 @@ const MAPS_LIMIT = 8;
     </main>
   `,
 })
-export class WorldDashboard {
+export class WorldDashboardPage {
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly types = inject(TypeRegistry);

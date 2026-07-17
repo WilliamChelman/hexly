@@ -13,4 +13,4 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   },
   template: '<ng-content />',
 })
-export class Cartouche {}
+export class CartoucheComponent {}

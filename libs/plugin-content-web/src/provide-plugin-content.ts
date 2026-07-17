@@ -29,7 +29,7 @@ export function providePluginContent(): EnvironmentProviders {
         labelKey: 'editor.view.content',
         // Names the kind in the World Types picker (#201).
         dataTypeLabelKey: 'editor.dataType.richContent',
-        loadComponent: () => import('./components/content-view.component').then((m) => m.ContentView),
+        loadComponent: () => import('./components/content-view.component').then((m) => m.ContentViewComponent),
       },
     ],
     dataTypes: [RICH_CONTENT_DATA_TYPE],

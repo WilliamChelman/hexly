@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { Icon } from '@hexly/web-ui';
+import { IconComponent } from '@hexly/web-ui';
 
 /**
  * Map's zoom cluster: zoom out, level, zoom in, fit-to-content. Purely
@@ -15,7 +15,7 @@ import { Icon } from '@hexly/web-ui';
     '[attr.aria-label]': 'groupLabel()',
     class: 'flex items-center gap-[2px] p-[3px] border border-line rounded-lg shadow-2 backdrop-blur-[4px]',
   },
-  imports: [Icon, TranslocoPipe],
+  imports: [IconComponent, TranslocoPipe],
   template: `
     <button type="button" class="zbtn" [attr.aria-label]="'map.canvas.zoomOut' | transloco" (click)="zoomOut.emit()">
       <app-icon name="minus" [size]="16" />
@@ -55,7 +55,7 @@ import { Icon } from '@hexly/web-ui';
     }
   `,
 })
-export class ZoomControl {
+export class ZoomControlComponent {
   private readonly transloco = inject(TranslocoService);
 
   readonly percent = input.required<number>();

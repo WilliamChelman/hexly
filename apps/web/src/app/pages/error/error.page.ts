@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Button, Eyebrow } from '@hexly/web-ui';
+import { ButtonComponent, EyebrowComponent } from '@hexly/web-ui';
 
 /**
  * The catch-all error page: shown for an unmatched URL and when `/entities/:id`
@@ -10,7 +10,7 @@ import { Button, Eyebrow } from '@hexly/web-ui';
 @Component({
   selector: 'app-error-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Eyebrow, RouterLink, TranslocoPipe],
+  imports: [ButtonComponent, EyebrowComponent, RouterLink, TranslocoPipe],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <main class="mx-auto flex max-w-[40rem] flex-col items-center gap-3 px-6 py-[6rem] text-center">

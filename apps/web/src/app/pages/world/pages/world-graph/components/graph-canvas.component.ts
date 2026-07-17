@@ -182,7 +182,7 @@ export interface GraphOpen {
     </div>
   `,
 })
-export class GraphCanvas {
+export class GraphCanvasComponent {
   readonly graph = input.required<WorldGraph>();
   /** The Entity a reader clicked, for the page to navigate to. */
   readonly open = output<GraphOpen>();

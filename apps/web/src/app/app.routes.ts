@@ -15,7 +15,7 @@ export const appRoutes: Route[] = [
   {
     path: 'login',
     canActivate: [loginGuard],
-    loadComponent: () => import('./pages/login/login.page').then((m) => m.Login),
+    loadComponent: () => import('./pages/login/login.page').then((m) => m.LoginPage),
     title: 'auth.tabTitle',
   },
   {
@@ -35,7 +35,7 @@ export const appRoutes: Route[] = [
     // Account-scoped, so it sits outside the World scope.
     path: 'settings',
     canActivate: [authGuard],
-    loadComponent: () => import('./pages/user-settings/user-settings.page').then((m) => m.UserSettings),
+    loadComponent: () => import('./pages/user-settings/user-settings.page').then((m) => m.UserSettingsPage),
     title: 'settings.tabTitle',
   },
   {
@@ -43,14 +43,14 @@ export const appRoutes: Route[] = [
     // re-checks every action.
     path: 'users',
     canActivate: [manageUsersGuard],
-    loadComponent: () => import('./pages/users/users.page').then((m) => m.Users),
+    loadComponent: () => import('./pages/users/users.page').then((m) => m.UsersPage),
     title: 'users.tabTitle',
   },
   {
     // The Superadmin repair surface: the Reindex (ADR-0046). Superadmin-only.
     path: 'admin',
     canActivate: [superadminGuard],
-    loadComponent: () => import('./pages/admin/admin.page').then((m) => m.Admin),
+    loadComponent: () => import('./pages/admin/admin.page').then((m) => m.AdminPage),
     title: 'admin.tabTitle',
   },
   {
@@ -66,7 +66,7 @@ export const appRoutes: Route[] = [
         path: '',
         pathMatch: 'full',
         loadComponent: () =>
-          import('./pages/world/pages/world-dashboard/world-dashboard.page').then((m) => m.WorldDashboard),
+          import('./pages/world/pages/world-dashboard/world-dashboard.page').then((m) => m.WorldDashboardPage),
         title: 'worldDashboard.tabTitle',
       },
       {
@@ -74,13 +74,13 @@ export const appRoutes: Route[] = [
         path: 'settings',
         pathMatch: 'full',
         loadComponent: () =>
-          import('./pages/world/pages/world-settings/world-settings.page').then((m) => m.WorldSettings),
+          import('./pages/world/pages/world-settings/world-settings.page').then((m) => m.WorldSettingsPage),
         title: 'ui.owners.tabTitle',
       },
       {
         path: 'entities',
         pathMatch: 'full',
-        loadComponent: () => import('./pages/entity-browser/entity-browser.page').then((m) => m.EntityBrowser),
+        loadComponent: () => import('./pages/entity-browser/entity-browser.page').then((m) => m.EntityBrowserPage),
         title: 'entityBrowser.tabTitle',
       },
       {
@@ -88,7 +88,7 @@ export const appRoutes: Route[] = [
         // of WebGL that nothing outside this page needs.
         path: 'graph',
         pathMatch: 'full',
-        loadComponent: () => import('./pages/world/pages/world-graph/world-graph.page').then((m) => m.WorldGraph),
+        loadComponent: () => import('./pages/world/pages/world-graph/world-graph.page').then((m) => m.WorldGraphPage),
         title: 'worldGraph.tabTitle',
       },
       {
@@ -115,7 +115,7 @@ export const appRoutes: Route[] = [
   },
   {
     path: 'styleguide',
-    loadComponent: () => import('./pages/styleguide/styleguide.page').then((m) => m.Styleguide),
+    loadComponent: () => import('./pages/styleguide/styleguide.page').then((m) => m.StyleguidePage),
     title: 'styleguide.tabTitle',
   },
   // Unauthenticated Public Link surface: token-scoped, read-only. Deliberately

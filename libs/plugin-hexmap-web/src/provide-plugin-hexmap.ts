@@ -31,7 +31,7 @@ export function providePluginHexmap(): EnvironmentProviders {
         dataType: CORE_HEX_GRID,
         // The copy naming the *kind* where a World Owner picks it, in the World Types editor (#201).
         dataTypeLabelKey: 'map.dataType.hexGrid',
-        loadComponent: () => import('./components/map-view.component').then((m) => m.MapView),
+        loadComponent: () => import('./components/map-view.component').then((m) => m.MapViewComponent),
       },
     ],
     dataTypes: [HEX_GRID_DATA_TYPE],

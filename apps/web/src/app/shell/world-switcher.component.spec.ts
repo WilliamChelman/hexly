@@ -5,7 +5,7 @@ import { Subject } from 'rxjs';
 import { WorldSummary } from '@hexly/domain';
 import { ActiveWorld, AuthClient, WorldsClient } from '@hexly/web-core';
 import { MockAuthClient, MockWorldsClient } from '@hexly/web-core/testing';
-import { WorldSwitcher } from './world-switcher.component';
+import { WorldSwitcherComponent } from './world-switcher.component';
 
 function world(id: string, name = id): WorldSummary {
   return {
@@ -25,7 +25,7 @@ describe('WorldSwitcher', () => {
   beforeEach(async () => {
     worldsClient = new MockWorldsClient();
     await TestBed.configureTestingModule({
-      imports: [WorldSwitcher, provideTranslocoTesting()],
+      imports: [WorldSwitcherComponent, provideTranslocoTesting()],
       providers: [
         provideRouter([]),
         { provide: AuthClient, useValue: new MockAuthClient() },
@@ -50,7 +50,7 @@ describe('WorldSwitcher', () => {
     TestBed.inject(ActiveWorld).set(activeId);
     const list$ = new Subject<WorldSummary[]>();
     worldsClient.list.mockReturnValue(list$);
-    const fixture = TestBed.createComponent(WorldSwitcher);
+    const fixture = TestBed.createComponent(WorldSwitcherComponent);
     fixture.componentRef.setInput('expanded', expanded);
     fixture.detectChanges(); // load() -> WorldStore.load()
     list$.next(worlds);

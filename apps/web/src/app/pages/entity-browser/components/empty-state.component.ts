@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { Panel } from '@hexly/web-ui';
+import { PanelComponent } from '@hexly/web-ui';
 
 /**
  * A centered panel for a list's zero-row states — empty library, no search matches, load error.
@@ -9,7 +9,7 @@ import { Panel } from '@hexly/web-ui';
 @Component({
   selector: 'app-empty-state',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Panel],
+  imports: [PanelComponent],
   host: { class: 'contents' },
   template: `
     <section class="p-8 text-center text-ink-muted" [attr.data-testid]="testid()" appPanel>
@@ -18,7 +18,7 @@ import { Panel } from '@hexly/web-ui';
     </section>
   `,
 })
-export class EmptyState {
+export class EmptyStateComponent {
   /** Distinguishes the state in the DOM (`empty`, `no-matches`, `load-error`). */
   readonly testid = input.required<string>();
   readonly title = input.required<string>();

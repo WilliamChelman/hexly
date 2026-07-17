@@ -35,7 +35,7 @@ import {
     </button>
   `,
 })
-export class ListboxOption {
+export class ListboxOptionComponent {
   readonly optionId = input.required<string>();
   readonly testid = input.required<string>();
   readonly selected = input.required<boolean>();
@@ -57,4 +57,4 @@ export class ListboxOption {
   selector: 'li[appListboxEmpty]',
   host: { class: 'px-3 py-1 text-sm text-ink-muted' },
 })
-export class ListboxEmpty {}
+export class ListboxEmptyComponent {}

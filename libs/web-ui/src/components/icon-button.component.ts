@@ -64,7 +64,7 @@ import { ChangeDetectionStrategy, Component, booleanAttribute, input } from '@an
     }
   `,
 })
-export class IconButton {
+export class IconButtonComponent {
   /** The selected/armed highlight; also feeds `aria-pressed` when `toggle` is set. */
   readonly active = input(false, { transform: booleanAttribute });
   /** Exposes `aria-pressed` (from `active`). Off by default: a momentary action isn't a toggle. */

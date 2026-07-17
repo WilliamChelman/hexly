@@ -30,6 +30,6 @@ import { booleanAttribute, ChangeDetectionStrategy, Component, input } from '@an
     </div>
   `,
 })
-export class PageHeader {
+export class PageHeaderComponent {
   readonly sticky = input(false, { transform: booleanAttribute });
 }

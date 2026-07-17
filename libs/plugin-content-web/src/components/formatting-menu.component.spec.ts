@@ -4,12 +4,12 @@ import { TextSelection } from '@tiptap/pm/state';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { CONTENT_EXTENSIONS } from '../extensions/content-extensions';
-import { FormattingMenu } from './formatting-menu.component';
+import { FormattingMenuComponent } from './formatting-menu.component';
 
 describe('FormattingMenu', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [FormattingMenu, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
+      imports: [FormattingMenuComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
     }).compileComponents();
   });
 
@@ -21,7 +21,7 @@ describe('FormattingMenu', () => {
     });
     editor.commands.setTextSelection({ from: 1, to: text.length + 1 });
 
-    const fixture = TestBed.createComponent(FormattingMenu);
+    const fixture = TestBed.createComponent(FormattingMenuComponent);
     fixture.componentRef.setInput('editor', editor);
     fixture.detectChanges();
     return { fixture, editor, el: fixture.nativeElement as HTMLElement };

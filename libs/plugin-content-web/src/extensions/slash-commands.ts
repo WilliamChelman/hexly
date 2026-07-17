@@ -1,14 +1,17 @@
 import { Extension } from '@tiptap/core';
 import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { SLASH_ITEMS, SlashItem, filterSlashItems } from '../models/slash-menu-items';
-import { SlashMenu } from '../components/slash-menu.component';
+import { SlashMenuComponent } from '../components/slash-menu.component';
 
 /**
- * The `/` trigger for the Content editor's slash menu. Drives the {@link SlashMenu} chrome
+ * The `/` trigger for the Content editor's slash menu. Drives the {@link SlashMenuComponent} chrome
  * through `getMenu`, which is deferred so the editor can be built before its `viewChild`
  * resolves. `items` can be overridden to patch individual items.
  */
-export function slashCommands(getMenu: () => SlashMenu | undefined, items: SlashItem[] = SLASH_ITEMS): Extension {
+export function slashCommands(
+  getMenu: () => SlashMenuComponent | undefined,
+  items: SlashItem[] = SLASH_ITEMS,
+): Extension {
   return Extension.create({
     name: 'slashCommands',
     addProseMirrorPlugins() {

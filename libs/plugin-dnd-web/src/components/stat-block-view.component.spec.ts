@@ -8,7 +8,7 @@ import { ENTITY_SESSION, EntitySession, VIEW_FIELD_KEY } from '@hexly/web-entity
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { DND_STAT_BLOCK_KEY } from '@hexly/plugin-dnd';
 import { DND_TEST_CATALOGS } from '../i18n/test-catalogs';
-import { StatBlockView } from './stat-block-view.component';
+import { StatBlockViewComponent } from './stat-block-view.component';
 
 /**
  * The `dnd.stat-block` data-type's View (#192, ADR-0055). It binds to the {@link ENTITY_SESSION} contract
@@ -42,7 +42,7 @@ describe('StatBlockView', () => {
   function render(block: Record<string, unknown>, writable = true) {
     const session = fakeSession(block, writable);
     TestBed.configureTestingModule({
-      imports: [StatBlockView, provideTranslocoTesting(DND_TEST_CATALOGS)],
+      imports: [StatBlockViewComponent, provideTranslocoTesting(DND_TEST_CATALOGS)],
       providers: [
         { provide: ENTITY_SESSION, useValue: session },
         { provide: VIEW_FIELD_KEY, useValue: DND_STAT_BLOCK_KEY },
@@ -50,7 +50,7 @@ describe('StatBlockView', () => {
         provideHttpClientTesting(),
       ],
     });
-    const fixture = TestBed.createComponent(StatBlockView);
+    const fixture = TestBed.createComponent(StatBlockViewComponent);
     fixture.detectChanges();
     return { fixture, session, el: fixture.nativeElement as HTMLElement };
   }

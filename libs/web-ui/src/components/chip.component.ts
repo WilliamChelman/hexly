@@ -44,6 +44,6 @@ export type ChipTone = 'gold' | 'sea' | 'astra';
     }
   `,
 })
-export class Chip {
+export class ChipComponent {
   readonly tone = input<ChipTone>();
 }

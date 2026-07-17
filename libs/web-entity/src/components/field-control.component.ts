@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityLinkValue, entityLinkValueSchema, EntitySummary, Field } from '@hexly/domain';
-import { EntitySearchPicker } from '@hexly/web-ui';
+import { EntitySearchPickerComponent } from '@hexly/web-ui';
 
 /**
  * One data-type-appropriate control for a typed Field (ADR-0048). Reads a raw EntityDocument `value`, emits
@@ -11,7 +11,7 @@ import { EntitySearchPicker } from '@hexly/web-ui';
   selector: 'app-field-control',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [TranslocoPipe, EntitySearchPicker],
+  imports: [TranslocoPipe, EntitySearchPickerComponent],
   template: `
     @switch (field().dataType.kind) {
       @case ('entityLink') {
@@ -115,7 +115,7 @@ import { EntitySearchPicker } from '@hexly/web-ui';
     }
   `,
 })
-export class FieldControl {
+export class FieldControlComponent {
   readonly field = input.required<Field>();
   /** The Field's current raw EntityDocument value (a lens, never copied — CONTEXT.md → Field). */
   readonly value = input<unknown>();

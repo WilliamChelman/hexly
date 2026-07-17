@@ -1,7 +1,7 @@
 import { Extension } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
 import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
-import { LinkTextPicker } from '../components/link-text-picker.component';
+import { LinkTextPickerComponent } from '../components/link-text-picker.component';
 import { entityLinkPosBefore, linkTextRows, setLinkAttr } from '../utils/descriptors';
 import { VocabItem } from '@hexly/plugin-content';
 
@@ -19,7 +19,7 @@ export function linkTextSuggestion(opts: {
   name: string;
   char: string;
   attr: 'display' | 'heading';
-  getPicker: () => LinkTextPicker | undefined;
+  getPicker: () => LinkTextPickerComponent | undefined;
 }): Extension {
   const { name, char, attr, getPicker } = opts;
   return Extension.create({

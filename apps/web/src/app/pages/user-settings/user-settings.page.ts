@@ -2,7 +2,14 @@ import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, sig
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { MIN_PASSWORD_LENGTH } from '@hexly/domain';
 import { FormatLocale, Locale, LocaleService, AuthClient, ThemeService, Theme, ToasterService } from '@hexly/web-core';
-import { Eyebrow, Field, Input, Panel, Select, Button } from '@hexly/web-ui';
+import {
+  EyebrowComponent,
+  FieldComponent,
+  InputComponent,
+  PanelComponent,
+  SelectComponent,
+  ButtonComponent,
+} from '@hexly/web-ui';
 
 /** Keyed into `settings.password.*`. */
 type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
@@ -14,7 +21,15 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
 @Component({
   selector: 'app-user-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Eyebrow, Field, Input, Panel, Select, Button],
+  imports: [
+    TranslocoPipe,
+    EyebrowComponent,
+    FieldComponent,
+    InputComponent,
+    PanelComponent,
+    SelectComponent,
+    ButtonComponent,
+  ],
   template: `
     <section class="settings">
       <span appEyebrow>{{ 'settings.heading' | transloco }}</span>
@@ -170,7 +185,7 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
     }
   `,
 })
-export class UserSettings {
+export class UserSettingsPage {
   private readonly auth = inject(AuthClient);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);

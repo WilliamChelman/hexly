@@ -5,7 +5,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ReindexJob } from '@hexly/domain';
 import { switchMap, takeWhile, timer } from 'rxjs';
 import { AdminClient, ToasterService } from '@hexly/web-core';
-import { Eyebrow, Panel, Button } from '@hexly/web-ui';
+import { EyebrowComponent, PanelComponent, ButtonComponent } from '@hexly/web-ui';
 
 /** How often a running Reindex is polled. */
 const REINDEX_POLL_MS = 1000;
@@ -18,7 +18,7 @@ const REINDEX_POLL_MS = 1000;
 @Component({
   selector: 'app-admin',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Eyebrow, Panel, Button],
+  imports: [TranslocoPipe, EyebrowComponent, PanelComponent, ButtonComponent],
   template: `
     <section class="admin">
       <span appEyebrow>{{ 'admin.heading' | transloco }}</span>
@@ -59,7 +59,7 @@ const REINDEX_POLL_MS = 1000;
     }
   `,
 })
-export class Admin {
+export class AdminPage {
   private readonly admin = inject(AdminClient);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);

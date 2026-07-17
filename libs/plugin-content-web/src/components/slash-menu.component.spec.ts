@@ -2,17 +2,17 @@ import { TestBed } from '@angular/core/testing';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { SLASH_ITEMS, SlashItem } from '../models/slash-menu-items';
-import { SlashMenu } from './slash-menu.component';
+import { SlashMenuComponent } from './slash-menu.component';
 
 describe('SlashMenu', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SlashMenu, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
+      imports: [SlashMenuComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
     }).compileComponents();
   });
 
   function open(items: SlashItem[] = SLASH_ITEMS) {
-    const fixture = TestBed.createComponent(SlashMenu);
+    const fixture = TestBed.createComponent(SlashMenuComponent);
     const menu = fixture.componentInstance;
     const command = vi.fn();
     menu.open({
@@ -38,7 +38,7 @@ describe('SlashMenu', () => {
   });
 
   it('renders nothing until opened', () => {
-    const fixture = TestBed.createComponent(SlashMenu);
+    const fixture = TestBed.createComponent(SlashMenuComponent);
     fixture.detectChanges();
 
     expect(el(fixture).querySelector('[data-testid=slash-menu]')).toBeNull();

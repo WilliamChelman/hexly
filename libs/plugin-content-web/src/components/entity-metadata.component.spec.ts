@@ -5,10 +5,10 @@ import { FakeEntitySession, provideFakeEntitySession, provideEntityTypesTesting 
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { CONTENT_FIELD, CORE_NOTE } from '@hexly/plugin-content';
-import { EntityMetadata } from './entity-metadata.component';
+import { EntityMetadataComponent } from './entity-metadata.component';
 
 /**
- * {@link EntityMetadata} reads the open Entity's document off `ENTITY_SESSION.current` and its declared
+ * {@link EntityMetadataComponent} reads the open Entity's document off `ENTITY_SESSION.current` and its declared
  * Fields off `ENTITY_TYPES.resolveFields` (ADR-0051), so these specs drive the two contracts' fakes — no
  * `apps/web` session and no map plugin.
  */
@@ -68,7 +68,7 @@ describe('EntityMetadata', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [EntityMetadata, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
+      imports: [EntityMetadataComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
       providers: [
         provideFakeEntitySession(),
         provideEntityTypesTesting([NOTE_TYPE, MAP_TYPE], [CONTENT_FIELD, GRID_FIELD]),
@@ -79,7 +79,7 @@ describe('EntityMetadata', () => {
 
   function render(metadata?: Record<string, unknown>) {
     session.loadDetail(noteWith([CORE_NOTE], metadata));
-    const fixture = TestBed.createComponent(EntityMetadata);
+    const fixture = TestBed.createComponent(EntityMetadataComponent);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
@@ -118,7 +118,7 @@ describe('EntityMetadata', () => {
     // its own View: dumping it here as a line of JSON would tell the reader nothing. A type carrying
     // nothing but Fields of a Structured Data Type therefore shows no disclosure at all.
     session.loadDetail(noteWith(['core.hexmap'], { 'test.grid': { hexes: {} } }));
-    const fixture = TestBed.createComponent(EntityMetadata);
+    const fixture = TestBed.createComponent(EntityMetadataComponent);
     fixture.detectChanges();
 
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=entity-metadata]')).toBeNull();
@@ -132,7 +132,7 @@ describe('EntityMetadata', () => {
 describe('EntityMetadata without the Hex Map plugin', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [EntityMetadata, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
+      imports: [EntityMetadataComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
       // Only `core.note` is registered; `core.hexmap` resolves no Fields.
       providers: [provideFakeEntitySession(), provideEntityTypesTesting([NOTE_TYPE], [CONTENT_FIELD])],
     }).compileComponents();
@@ -142,7 +142,7 @@ describe('EntityMetadata without the Hex Map plugin', () => {
     TestBed.inject(FakeEntitySession).loadDetail(
       noteWith(['core.hexmap'], { 'test.grid': { hexes: {} }, status: 'canon' }),
     );
-    const fixture = TestBed.createComponent(EntityMetadata);
+    const fixture = TestBed.createComponent(EntityMetadataComponent);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 

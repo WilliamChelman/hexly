@@ -35,7 +35,7 @@ import {
   LucideGlobe,
   LucideWaypoints,
 } from '@lucide/angular';
-import { IconHost } from './icon-host';
+import { IconHostDirective } from './icon-host.directive';
 
 /** The `<svg>` root attrs Lucide glyphs are drawn with (its house stroke, lightened to 1.6). */
 const LUCIDE_ATTRS = 'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
@@ -129,11 +129,11 @@ export type IconName = keyof typeof CUSTOM | keyof typeof LUCIDE;
 @Component({
   selector: 'app-icon',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  hostDirectives: [IconHost],
+  hostDirectives: [IconHostDirective],
   host: { '[innerHTML]': 'svg()' },
   template: '',
 })
-export class Icon {
+export class IconComponent {
   private readonly sanitizer = inject(DomSanitizer);
 
   readonly name = input.required<IconName>();

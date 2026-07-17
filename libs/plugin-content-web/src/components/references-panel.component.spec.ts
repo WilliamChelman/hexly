@@ -9,7 +9,7 @@ import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { CORE_NOTE } from '@hexly/plugin-content';
 import { ReferencesStore } from '../services/references-store';
 import { RightDock } from '../services/right-dock';
-import { ReferencesPanel } from './references-panel.component';
+import { ReferencesPanelComponent } from './references-panel.component';
 
 /**
  * The References panel (ADR-0046, #179): an Entity's own links (*References*) and the Entities
@@ -43,7 +43,7 @@ describe('ReferencesPanel', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ReferencesPanel, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
+      imports: [ReferencesPanelComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
       providers: [
         // The store is route-scoped and reads the open Entity off the session; no Entity is
         // adopted here, so its fetch effect never fires and `adopt` is the only source.
@@ -63,7 +63,7 @@ describe('ReferencesPanel', () => {
     // The panel is closed by default, so the store's fetch never fires; `adopt` is the only source.
     session.loadDetail(noteDetail('Ealdred'));
     store.adopt('n1', { ...NONE, ...references });
-    const fixture = TestBed.createComponent(ReferencesPanel);
+    const fixture = TestBed.createComponent(ReferencesPanelComponent);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
@@ -114,7 +114,7 @@ describe('ReferencesPanel', () => {
   /** "Nothing links here" is a claim about the edge index, not about the fetch: it must not appear before the list lands. */
   it('claims nothing until the list has landed', () => {
     session.loadDetail(noteDetail('Ealdred'));
-    const fixture = TestBed.createComponent(ReferencesPanel);
+    const fixture = TestBed.createComponent(ReferencesPanelComponent);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 

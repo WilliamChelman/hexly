@@ -2,7 +2,7 @@ import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { ComponentRef } from '@angular/core';
 import { defineField } from '@hexly/domain';
-import { EntityTypesEditor } from './entity-types-editor.component';
+import { EntityTypesEditorComponent } from './entity-types-editor.component';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { TypeDefinition } from '@hexly/web-entity';
 import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
@@ -33,20 +33,20 @@ const lairField = defineField({
 });
 
 describe('EntityTypesEditor', () => {
-  let ref: ComponentRef<EntityTypesEditor>;
+  let ref: ComponentRef<EntityTypesEditorComponent>;
   let el: HTMLElement;
   let emittedTypes: string[][];
   let emittedMetadata: Record<string, unknown>[];
 
   function render(types: string[], metadata: Record<string, unknown> = {}, writable = true) {
     TestBed.configureTestingModule({
-      imports: [EntityTypesEditor, provideTranslocoTesting()],
+      imports: [EntityTypesEditorComponent, provideTranslocoTesting()],
       providers: [providePluginContent()],
     });
     const registry = TestBed.inject(TypeRegistry);
     registry.setWorldFields([lairField]);
     registry.register(definition('test.monster', ['test.lair']));
-    const fixture = TestBed.createComponent(EntityTypesEditor);
+    const fixture = TestBed.createComponent(EntityTypesEditorComponent);
     ref = fixture.componentRef;
     ref.setInput('types', types);
     ref.setInput('metadata', metadata);

@@ -6,7 +6,7 @@ import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MockAuthClient } from '@hexly/web-core/testing';
 import { AuthClient } from '@hexly/web-core';
-import { Login } from './login.page';
+import { LoginPage } from './login.page';
 
 describe('Login', () => {
   let auth: MockAuthClient;
@@ -18,7 +18,7 @@ describe('Login', () => {
     navigate = vi.fn().mockResolvedValue(true);
     queryParams = {};
     await TestBed.configureTestingModule({
-      imports: [Login, provideTranslocoTesting()],
+      imports: [LoginPage, provideTranslocoTesting()],
       providers: [
         { provide: AuthClient, useValue: auth },
         { provide: Router, useValue: { navigateByUrl: navigate } },
@@ -43,7 +43,7 @@ describe('Login', () => {
   }
 
   it('owns its page heading in the standalone screen', () => {
-    const fixture = TestBed.createComponent(Login);
+    const fixture = TestBed.createComponent(LoginPage);
     fixture.detectChanges();
 
     // Login renders with no rail/header chrome (ADR-0022); the sr-only <h1> is
@@ -63,7 +63,7 @@ describe('Login', () => {
         isSuperadmin: false,
       }),
     );
-    const fixture = TestBed.createComponent(Login);
+    const fixture = TestBed.createComponent(LoginPage);
     const el = fixture.nativeElement as HTMLElement;
     fixture.detectChanges();
 
@@ -93,7 +93,7 @@ describe('Login', () => {
         isSuperadmin: false,
       }),
     );
-    const fixture = TestBed.createComponent(Login);
+    const fixture = TestBed.createComponent(LoginPage);
     const el = fixture.nativeElement as HTMLElement;
     fixture.detectChanges();
 
@@ -116,7 +116,7 @@ describe('Login', () => {
       }),
     );
     queryParams = { returnUrl: '/atlas/42' };
-    const fixture = TestBed.createComponent(Login);
+    const fixture = TestBed.createComponent(LoginPage);
     const el = fixture.nativeElement as HTMLElement;
     fixture.detectChanges();
 
@@ -128,7 +128,7 @@ describe('Login', () => {
   });
 
   it('renders the whole screen in French when French is the active language', () => {
-    const fixture = TestBed.createComponent(Login);
+    const fixture = TestBed.createComponent(LoginPage);
     const el = fixture.nativeElement as HTMLElement;
     fixture.detectChanges();
 
@@ -146,7 +146,7 @@ describe('Login', () => {
 
   it('shows the rejection error translated when French is active', () => {
     auth.login.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
-    const fixture = TestBed.createComponent(Login);
+    const fixture = TestBed.createComponent(LoginPage);
     const el = fixture.nativeElement as HTMLElement;
     fixture.detectChanges();
     TestBed.inject(TranslocoService).setActiveLang('fr');
@@ -162,7 +162,7 @@ describe('Login', () => {
 
   it('shows an error and stays put when the credentials are rejected', () => {
     auth.login.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
-    const fixture = TestBed.createComponent(Login);
+    const fixture = TestBed.createComponent(LoginPage);
     const el = fixture.nativeElement as HTMLElement;
     fixture.detectChanges();
 

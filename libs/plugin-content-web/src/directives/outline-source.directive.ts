@@ -9,7 +9,7 @@ import { OutlineStore } from '../services/outline-store';
  * The store is optional: a Content editor may be mounted outside an Outline-scoped route.
  */
 @Directive({ selector: '[appOutlineSource]' })
-export class OutlineSource {
+export class OutlineSourceDirective {
   private readonly store = inject(OutlineStore, { optional: true });
   private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
 

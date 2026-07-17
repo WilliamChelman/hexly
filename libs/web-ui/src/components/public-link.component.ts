@@ -3,8 +3,8 @@ import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { PublicLink } from '@hexly/domain';
 import { EntitiesClient, WorldsClient, ToasterService } from '@hexly/web-core';
-import { Button } from './button.component';
-import { Input } from './input.component';
+import { ButtonComponent } from './button.component';
+import { InputComponent } from './input.component';
 
 /** Which resource this control links, and thus which client + public route it targets. */
 export type PublicLinkKind = 'world' | 'entity';
@@ -18,7 +18,7 @@ export type PublicLinkKind = 'world' | 'entity';
 @Component({
   selector: 'app-public-link',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Button, Input],
+  imports: [TranslocoPipe, ButtonComponent, InputComponent],
   template: `
     @if (token(); as t) {
       <div class="public-link-active">
@@ -60,7 +60,7 @@ export type PublicLinkKind = 'world' | 'entity';
     }
   `,
 })
-export class PublicLinkControl implements OnInit {
+export class PublicLinkComponent implements OnInit {
   readonly kind = input.required<PublicLinkKind>();
   readonly id = input.required<string>();
 

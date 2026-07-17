@@ -8,7 +8,7 @@ import {
   output,
   viewChild,
 } from '@angular/core';
-import { Panel } from './panel.component';
+import { PanelComponent } from './panel.component';
 
 /** Process-wide counter for unique heading ids, so aria-labelledby always resolves. */
 let nextDialogId = 0;
@@ -33,7 +33,7 @@ let nextDialogId = 0;
   // conditionally-inserted dialog must contribute no box — otherwise, dropped into a
   // fixed grid (e.g. the entity page's `auto 1fr`), it steals a track and shoves siblings.
   host: { class: 'contents' },
-  imports: [Panel],
+  imports: [PanelComponent],
   template: `
     <!-- Backdrop-click-to-dismiss on the native <dialog>: the platform already gives the
          keyboard equivalent (Escape → close, wired via (close)), and the <dialog> itself must
@@ -66,7 +66,7 @@ let nextDialogId = 0;
     }
   `,
 })
-export class Dialog {
+export class DialogComponent {
   /** Whether the modal is shown; drives the native showModal/close imperatively. */
   readonly open = input(false, { transform: booleanAttribute });
   /** Optional title; when set, it labels the dialog for assistive tech. */
