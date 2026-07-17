@@ -9,6 +9,7 @@
     "dev:web": "nx serve web",
     "seed": "nx build api && HEXLY_DIR=hexly-data node dist/apps/api/seed.js",
     "db:generate": "cd apps/api && drizzle-kit generate",
+    "db:check": "node scripts/check-drizzle-migrations.mjs",
     "build": "nx run-many -t build -p api,web",
     "test": "nx run-many -t test",
     "lint": "nx run-many -t lint",

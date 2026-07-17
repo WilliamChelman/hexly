@@ -53,6 +53,10 @@ jobs:
       # matches nothing and passes silently, so the rules carry their own RuleTester suites.
       - run: pnpm test:eslint-rules
 
+      # schema.ts is the single migration source of truth (ADR-0027): this fails the build on a
+      # hand-authored migration or a schema change that never went through `pnpm db:generate`.
+      - run: pnpm db:check
+
       - run: pnpm exec nx run-many -t lint test build i18n-sync
 
   e2e:
