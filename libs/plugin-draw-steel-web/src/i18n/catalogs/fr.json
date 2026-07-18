@@ -1,0 +1,51 @@
+{
+  "monster": {
+    "eyebrow": "Monstre",
+    "titleLabel": "Nom du monstre",
+    "rename": "Renommer le monstre",
+    "editorLabel": "Description du monstre",
+    "create": "Nouveau monstre",
+    "untitled": "Monstre sans titre",
+    "loreHint": "Passez à la vue Note pour la description, les tactiques et les notes de ce monstre.",
+    "view": {
+      "statBlock": "Bloc de stats"
+    }
+  },
+  "statBlock": {
+    "dataType": "Bloc de stats",
+    "stat": {
+      "might": "Puissance",
+      "agility": "Agilité",
+      "reason": "Raison",
+      "intuition": "Intuition",
+      "presence": "Présence",
+      "stamina": "Vigueur",
+      "size": "Taille",
+      "stability": "Stabilité",
+      "save_threshold": "Seuil de sauvegarde",
+      "speed": "Vitesse",
+      "free_strike": "Attaque gratuite",
+      "movement_types": "Déplacement",
+      "role": "Rôle",
+      "organization": "Organisation",
+      "level": "Niveau",
+      "ev": "VR",
+      "keywords": "Mots-clés"
+    },
+    "section": {
+      "immunities": "Immunités",
+      "weaknesses": "Faiblesses"
+    },
+    "damage": {
+      "acid": "Acide",
+      "cold": "Froid",
+      "corruption": "Corruption",
+      "fire": "Feu",
+      "holy": "Sacré",
+      "lightning": "Foudre",
+      "poison": "Poison",
+      "psychic": "Psychique",
+      "sonic": "Sonique"
+    }
+  }
+}

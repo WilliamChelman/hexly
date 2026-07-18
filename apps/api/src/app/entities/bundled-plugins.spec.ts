@@ -12,9 +12,16 @@ import {
   PLUGIN_ID as HEXMAP_PLUGIN_ID,
 } from '@hexly/plugin-hexmap';
 import { DND_MONSTER, DND_MONSTER_TYPE, DND_STAT_BLOCK, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
+import {
+  DS_MONSTER,
+  DS_MONSTER_TYPE,
+  DS_STAT_BLOCK,
+  PLUGIN_ID as DRAW_STEEL_PLUGIN_ID,
+} from '@hexly/plugin-draw-steel';
 import { serverPluginContent } from '@hexly/plugin-content/server';
 import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
 import { serverPluginDnd } from '@hexly/plugin-dnd/server';
+import { serverPluginDrawSteel } from '@hexly/plugin-draw-steel/server';
 import { loadConfig } from '../config';
 import {
   BUNDLED_PLUGIN_CONFIGS,
@@ -29,9 +36,11 @@ describe('bundled plugin identity', () => {
     expect(CONTENT_PLUGIN_ID).toBe('content');
     expect(HEXMAP_PLUGIN_ID).toBe('hexmap');
     expect(DND_PLUGIN_ID).toBe('dnd');
+    expect(DRAW_STEEL_PLUGIN_ID).toBe('draw-steel');
     expect(serverPluginContent().id).toBe(CONTENT_PLUGIN_ID);
     expect(serverPluginHexmap().id).toBe(HEXMAP_PLUGIN_ID);
     expect(serverPluginDnd().id).toBe(DND_PLUGIN_ID);
+    expect(serverPluginDrawSteel().id).toBe(DRAW_STEEL_PLUGIN_ID);
   });
 
   it('associates each contributed Entity Type with the Plugin that owns it', () => {
@@ -40,6 +49,7 @@ describe('bundled plugin identity', () => {
     expect(BUNDLED_PLUGIN_TYPE_OWNERS.get(CORE_NOTE)).toBe(CONTENT_PLUGIN_ID);
     expect(BUNDLED_PLUGIN_TYPE_OWNERS.get('core.hexmap')).toBe(HEXMAP_PLUGIN_ID);
     expect(BUNDLED_PLUGIN_TYPE_OWNERS.get(DND_MONSTER)).toBe(DND_PLUGIN_ID);
+    expect(BUNDLED_PLUGIN_TYPE_OWNERS.get(DS_MONSTER)).toBe(DRAW_STEEL_PLUGIN_ID);
   });
 
   it('associates each Structured Data Type with the Plugin that owns it', () => {
@@ -47,6 +57,7 @@ describe('bundled plugin identity', () => {
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_HEX_GRID)).toBe(HEXMAP_PLUGIN_ID);
     // dnd now owns the `dnd.stat-block` Data Type — the first plugin-contributed harvest source (ADR-0055).
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(DND_STAT_BLOCK)).toBe(DND_PLUGIN_ID);
+    expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(DS_STAT_BLOCK)).toBe(DRAW_STEEL_PLUGIN_ID);
   });
 });
 
@@ -64,6 +75,7 @@ describe('bundled Plugin Fields', () => {
     expect(ids).toContain(CONTENT_FIELD_ID);
     expect(ids).toContain(HEX_GRID_FIELD_ID);
     expect(ids).toContain('dnd.stat_block');
+    expect(ids).toContain('draw-steel.stat_block');
   });
 
   it('declares each Field id exactly once — a plugin references another’s Field by id, never re-declares it', () => {
@@ -75,7 +87,7 @@ describe('bundled Plugin Fields', () => {
 
   it('resolves every `fieldRef` a bundled Type references to a bundled Field', () => {
     const byId = new Set(fields().map((field) => field.id));
-    for (const type of [CORE_NOTE_TYPE, CORE_HEXMAP_TYPE, DND_MONSTER_TYPE])
+    for (const type of [CORE_NOTE_TYPE, CORE_HEXMAP_TYPE, DND_MONSTER_TYPE, DS_MONSTER_TYPE])
       for (const ref of type.fieldRefs) expect(byId.has(ref)).toBe(true);
   });
 });
@@ -84,7 +96,7 @@ describe('bundled Plugin Fields', () => {
 describe('bundled plugin config', () => {
   it('contributes one config schema per bundled Plugin, keyed by canonical id', () => {
     expect(BUNDLED_PLUGIN_CONFIGS.map((p) => p.id).sort()).toEqual(
-      [CONTENT_PLUGIN_ID, DND_PLUGIN_ID, HEXMAP_PLUGIN_ID].sort(),
+      [CONTENT_PLUGIN_ID, DND_PLUGIN_ID, DRAW_STEEL_PLUGIN_ID, HEXMAP_PLUGIN_ID].sort(),
     );
   });
 
@@ -93,5 +105,6 @@ describe('bundled plugin config', () => {
     expect(plugin[CONTENT_PLUGIN_ID].enabled).toBe(true);
     expect(plugin[HEXMAP_PLUGIN_ID].enabled).toBe(true);
     expect(plugin[DND_PLUGIN_ID].enabled).toBe(true);
+    expect(plugin[DRAW_STEEL_PLUGIN_ID].enabled).toBe(true);
   });
 });

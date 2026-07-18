@@ -10,6 +10,7 @@ import {
 import { HexlyConfig, PluginConfigContribution } from '../config';
 import { serverPluginContent } from '@hexly/plugin-content/server';
 import { serverPluginDnd } from '@hexly/plugin-dnd/server';
+import { serverPluginDrawSteel } from '@hexly/plugin-draw-steel/server';
 import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
 
 /**
@@ -19,7 +20,12 @@ import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
  * `providePluginX()`); this composition root folds the list rather than reaching into each plugin's
  * individual exports.
  */
-const BUNDLED_PLUGINS: readonly ServerPlugin[] = [serverPluginContent(), serverPluginHexmap(), serverPluginDnd()];
+const BUNDLED_PLUGINS: readonly ServerPlugin[] = [
+  serverPluginContent(),
+  serverPluginHexmap(),
+  serverPluginDnd(),
+  serverPluginDrawSteel(),
+];
 
 /** Whether the Plugin owning `pluginId` is enabled (ADR-0052); absent from `features.plugin` → enabled. */
 function pluginEnabled(config: HexlyConfig, pluginId: string): boolean {
