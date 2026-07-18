@@ -2,15 +2,8 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ActiveWorld } from '@hexly/web-core';
-import {
-  EyebrowComponent,
-  PanelComponent,
-  IconComponent,
-  IconName,
-  OwnerSetComponent,
-  MemberSetComponent,
-  PublicLinkComponent,
-} from '@hexly/web-ui';
+import { EyebrowComponent, PanelComponent, IconComponent, IconName } from '@hexly/web-ui';
+import { OwnerSetComponent, MemberSetComponent, PublicLinkComponent } from '@hexly/web-entity';
 import { WorldTypesPanelComponent } from './components/world-types-panel.component';
 import { WorldFieldsPanelComponent } from './components/world-fields-panel.component';
 
@@ -61,12 +54,14 @@ type Section = 'access' | 'schema' | 'sharing';
             @case ('access') {
               <header class="detail-head">
                 <h1 class="detail-title">
-                  {{ 'ui.owners.heading' | transloco }} & {{ 'ui.members.heading' | transloco }}
+                  {{ 'collab.owners.heading' | transloco }} & {{ 'collab.members.heading' | transloco }}
                 </h1>
-                <p class="detail-sub">{{ 'ui.owners.subhead' | transloco: { kind: 'ui.owners.world' | transloco } }}</p>
+                <p class="detail-sub">
+                  {{ 'collab.owners.subhead' | transloco: { kind: 'collab.owners.world' | transloco } }}
+                </p>
               </header>
               <div class="pane" appPanel><app-owner-set kind="world" [id]="id" (resigned)="leave()" /></div>
-              <h2 class="group-head">{{ 'ui.members.heading' | transloco }}</h2>
+              <h2 class="group-head">{{ 'collab.members.heading' | transloco }}</h2>
               <div class="pane" appPanel><app-member-set [id]="id" /></div>
             }
             @case ('schema') {
@@ -81,8 +76,8 @@ type Section = 'access' | 'schema' | 'sharing';
             }
             @case ('sharing') {
               <header class="detail-head">
-                <h1 class="detail-title">{{ 'ui.publicLink.worldHeading' | transloco }}</h1>
-                <p class="detail-sub">{{ 'ui.publicLink.worldSubhead' | transloco }}</p>
+                <h1 class="detail-title">{{ 'collab.publicLink.worldHeading' | transloco }}</h1>
+                <p class="detail-sub">{{ 'collab.publicLink.worldSubhead' | transloco }}</p>
               </header>
               <div class="pane" appPanel><app-public-link kind="world" [id]="id" /></div>
             }
@@ -137,9 +132,9 @@ export class WorldSettingsPage {
   readonly active = signal<Section>('access');
 
   readonly items: { section: Section; icon: IconName; label: string }[] = [
-    { section: 'access', icon: 'user', label: 'ui.members.heading' },
+    { section: 'access', icon: 'user', label: 'collab.members.heading' },
     { section: 'schema', icon: 'label', label: 'worldTypes.heading' },
-    { section: 'sharing', icon: 'share', label: 'ui.publicLink.worldHeading' },
+    { section: 'sharing', icon: 'share', label: 'collab.publicLink.worldHeading' },
   ];
 
   leave(): void {

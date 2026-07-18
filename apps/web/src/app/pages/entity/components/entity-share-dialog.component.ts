@@ -1,12 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import {
-  ButtonComponent,
-  DialogComponent,
-  GrantSetComponent,
-  OwnerSetComponent,
-  PublicLinkComponent,
-} from '@hexly/web-ui';
+import { ButtonComponent, DialogComponent } from '@hexly/web-ui';
+import { GrantSetComponent, OwnerSetComponent, PublicLinkComponent } from '@hexly/web-entity';
 import { EntitySession } from '../services/entity-session';
 
 /**
@@ -24,20 +19,20 @@ import { EntitySession } from '../services/entity-session';
   imports: [ButtonComponent, DialogComponent, GrantSetComponent, OwnerSetComponent, PublicLinkComponent, TranslocoPipe],
   template: `
     @if (open() && entityId(); as id) {
-      <app-dialog [open]="true" [heading]="'ui.owners.heading' | transloco" (closed)="closed.emit()">
+      <app-dialog [open]="true" [heading]="'collab.owners.heading' | transloco" (closed)="closed.emit()">
         <app-owner-set kind="entity" [id]="id" (resigned)="resigned.emit()" />
         <!-- Named per-Entity grants (ADR-0037, #161): the surgical layer below ownership —
              hand a specific user Editor/Viewer on just this Entity, piercing private. -->
-        <h3 class="grants-heading">{{ 'ui.grants.heading' | transloco }}</h3>
-        <p class="grants-subhead">{{ 'ui.grants.subhead' | transloco }}</p>
+        <h3 class="grants-heading">{{ 'collab.grants.heading' | transloco }}</h3>
+        <p class="grants-subhead">{{ 'collab.grants.subhead' | transloco }}</p>
         <app-grant-set [id]="id" />
         <!-- Anonymous per-entity Public Link (ADR-0037, #162): one revocable read-only URL
              for someone without an account — pierces private, like a named Viewer grant. -->
         <h3 class="grants-heading">
-          {{ 'ui.publicLink.entityHeading' | transloco }}
+          {{ 'collab.publicLink.entityHeading' | transloco }}
         </h3>
         <p class="grants-subhead">
-          {{ 'ui.publicLink.entitySubhead' | transloco }}
+          {{ 'collab.publicLink.entitySubhead' | transloco }}
         </p>
         <app-public-link kind="entity" [id]="id" />
         <button dialogFooter type="button" appButton data-testid="owners-close" (click)="closed.emit()">

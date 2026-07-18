@@ -6,9 +6,8 @@ import {
   WEB_CORE_TEST_CATALOGS,
   provideTranslocoTesting as provideCatalogs,
 } from '@hexly/web-core/testing';
-import { WEB_ENTITY_TEST_CATALOGS } from '@hexly/web-entity/testing';
+import { WEB_ENTITY_TEST_CATALOGS, COLLAB_TEST_CATALOGS } from '@hexly/web-entity/testing';
 import { HEXMAP_TEST_CATALOGS } from '@hexly/plugin-hexmap/testing';
-import { WEB_UI_TEST_CATALOGS } from '@hexly/web-ui/testing';
 import en from '../i18n/catalogs/en.json';
 import fr from '../i18n/catalogs/fr.json';
 
@@ -23,8 +22,8 @@ export function provideTranslocoTesting(...overrides: readonly TestCatalogs[]) {
   return provideCatalogs(
     APP_TEST_CATALOGS,
     WEB_CORE_TEST_CATALOGS,
-    WEB_UI_TEST_CATALOGS,
     WEB_ENTITY_TEST_CATALOGS,
+    COLLAB_TEST_CATALOGS,
     COMMAND_PALETTE_TEST_CATALOGS,
     CONTENT_EDITOR_TEST_CATALOGS,
     HEXMAP_TEST_CATALOGS,

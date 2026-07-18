@@ -4,7 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { WorldMember } from '@hexly/domain';
 import { WorldsClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
 import { MockWorldsClient, MockUserDirectoryClient, provideTranslocoTesting } from '@hexly/web-core/testing';
-import { WEB_UI_TEST_CATALOGS } from '../i18n/test-catalogs';
+import { COLLAB_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { MemberSetComponent } from './member-set.component';
 
 describe('MemberSet', () => {
@@ -16,7 +16,7 @@ describe('MemberSet', () => {
     worlds = new MockWorldsClient();
     users = new MockUserDirectoryClient();
     await TestBed.configureTestingModule({
-      imports: [MemberSetComponent, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
+      imports: [MemberSetComponent, provideTranslocoTesting(COLLAB_TEST_CATALOGS)],
       providers: [
         { provide: WorldsClient, useValue: worlds },
         { provide: UserDirectoryClient, useValue: users },

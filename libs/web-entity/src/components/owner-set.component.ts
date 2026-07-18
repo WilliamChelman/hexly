@@ -4,8 +4,7 @@ import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { UserSummary } from '@hexly/domain';
 import { WorldsClient, EntitiesClient, UserDirectoryClient, AuthClient, ToasterService } from '@hexly/web-core';
-import { ButtonComponent } from './button.component';
-import { SelectComponent } from './select.component';
+import { ButtonComponent, SelectComponent } from '@hexly/web-ui';
 
 /**
  * The symmetric ownership set of a World or Entity (ADR-0037): view, add, remove, or
@@ -26,16 +25,16 @@ import { SelectComponent } from './select.component';
           <span class="owner-name"
             >{{ o.name }}
             @if (o.isSelf) {
-              <span class="owner-you"> ({{ 'ui.owners.you' | transloco }})</span>
+              <span class="owner-you"> ({{ 'collab.owners.you' | transloco }})</span>
             }
           </span>
           @if (o.isSelf) {
             <button appButton size="sm" [attr.data-testid]="'resign-' + o.id" (click)="resign()">
-              {{ 'ui.owners.resign' | transloco }}
+              {{ 'collab.owners.resign' | transloco }}
             </button>
           } @else {
             <button appButton size="sm" danger [attr.data-testid]="'remove-' + o.id" (click)="remove(o.id)">
-              {{ 'ui.owners.remove' | transloco }}
+              {{ 'collab.owners.remove' | transloco }}
             </button>
           }
         </li>
@@ -43,7 +42,7 @@ import { SelectComponent } from './select.component';
     </ul>
 
     <div class="owner-add">
-      <label class="owner-add-label" for="owner-add-select">{{ 'ui.owners.addLabel' | transloco }}</label>
+      <label class="owner-add-label" for="owner-add-select">{{ 'collab.owners.addLabel' | transloco }}</label>
       <div class="owner-add-row">
         <select
           appSelect
@@ -53,13 +52,13 @@ import { SelectComponent } from './select.component';
           [value]="selected()"
           (change)="selected.set($any($event.target).value)"
         >
-          <option value="">{{ 'ui.owners.addPlaceholder' | transloco }}</option>
+          <option value="">{{ 'collab.owners.addPlaceholder' | transloco }}</option>
           @for (c of candidates(); track c.id) {
             <option [value]="c.id">{{ c.displayName }}</option>
           }
         </select>
         <button appButton variant="primary" data-testid="add" [disabled]="!selected()" (click)="add()">
-          {{ 'ui.owners.add' | transloco }}
+          {{ 'collab.owners.add' | transloco }}
         </button>
       </div>
     </div>
@@ -140,14 +139,14 @@ export class OwnerSetComponent implements OnInit {
   add(): void {
     const userId = this.selected();
     if (!userId) return;
-    this.mutate(this.client().addOwner(this.id(), userId), 'ui.owners.addError', (owners) => {
+    this.mutate(this.client().addOwner(this.id(), userId), 'collab.owners.addError', (owners) => {
       this.owners.set(owners);
       this.selected.set('');
     });
   }
 
   remove(userId: string): void {
-    this.mutate(this.client().removeOwner(this.id(), userId), 'ui.owners.removeError', (owners) =>
+    this.mutate(this.client().removeOwner(this.id(), userId), 'collab.owners.removeError', (owners) =>
       this.owners.set(owners),
     );
   }
@@ -155,7 +154,7 @@ export class OwnerSetComponent implements OnInit {
   resign(): void {
     const me = this.me();
     if (!me) return;
-    this.mutate(this.client().removeOwner(this.id(), me), 'ui.owners.removeError', () => this.resigned.emit());
+    this.mutate(this.client().removeOwner(this.id(), me), 'collab.owners.removeError', () => this.resigned.emit());
   }
 
   /**
@@ -169,10 +168,10 @@ export class OwnerSetComponent implements OnInit {
       next: onOk,
       error: (err: unknown) => {
         const lastOwner = err instanceof HttpErrorResponse && err.status === 409;
-        const key = lastOwner ? 'ui.owners.lastOwner' : genericKey;
+        const key = lastOwner ? 'collab.owners.lastOwner' : genericKey;
         this.toaster.show(
           this.transloco.translate(key, {
-            kind: this.transloco.translate(`ui.owners.${this.kind()}`),
+            kind: this.transloco.translate(`collab.owners.${this.kind()}`),
           }),
           'error',
         );
@@ -191,7 +190,7 @@ export class OwnerSetComponent implements OnInit {
 
   /** A read (directory or owner set) failed — the panel can't be trusted, so say so. */
   private loadFailed(): void {
-    this.toaster.show(this.transloco.translate('ui.owners.loadError'), 'error');
+    this.toaster.show(this.transloco.translate('collab.owners.loadError'), 'error');
   }
 
   private client(): WorldsClient | EntitiesClient {

@@ -3,8 +3,7 @@ import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { PublicLink } from '@hexly/domain';
 import { EntitiesClient, WorldsClient, ToasterService } from '@hexly/web-core';
-import { ButtonComponent } from './button.component';
-import { InputComponent } from './input.component';
+import { ButtonComponent, InputComponent } from '@hexly/web-ui';
 
 /** Which resource this control links, and thus which client + public route it targets. */
 export type PublicLinkKind = 'world' | 'entity';
@@ -31,10 +30,10 @@ export type PublicLinkKind = 'world' | 'entity';
           (focus)="$any($event.target).select()"
         />
         <button appButton size="sm" data-testid="public-link-copy" (click)="copy()">
-          {{ 'ui.publicLink.copy' | transloco }}
+          {{ 'collab.publicLink.copy' | transloco }}
         </button>
         <button appButton size="sm" danger data-testid="public-link-revoke" (click)="revoke()">
-          {{ 'ui.publicLink.revoke' | transloco }}
+          {{ 'collab.publicLink.revoke' | transloco }}
         </button>
       </div>
     } @else {
@@ -46,7 +45,7 @@ export type PublicLinkKind = 'world' | 'entity';
         [disabled]="busy()"
         (click)="mint()"
       >
-        {{ 'ui.publicLink.create' | transloco }}
+        {{ 'collab.publicLink.create' | transloco }}
       </button>
     }
   `,
@@ -85,7 +84,7 @@ export class PublicLinkComponent implements OnInit {
   ngOnInit(): void {
     this.link(this.id()).subscribe({
       next: (l) => this.token.set(l?.token ?? null),
-      error: () => this.toaster.show(this.transloco.translate('ui.publicLink.loadError'), 'error'),
+      error: () => this.toaster.show(this.transloco.translate('collab.publicLink.loadError'), 'error'),
     });
   }
 
@@ -98,7 +97,7 @@ export class PublicLinkComponent implements OnInit {
       },
       error: () => {
         this.busy.set(false);
-        this.toaster.show(this.transloco.translate('ui.publicLink.mintError'), 'error');
+        this.toaster.show(this.transloco.translate('collab.publicLink.mintError'), 'error');
       },
     });
   }
@@ -106,7 +105,7 @@ export class PublicLinkComponent implements OnInit {
   revoke(): void {
     this.revokeLink(this.id()).subscribe({
       next: () => this.token.set(null),
-      error: () => this.toaster.show(this.transloco.translate('ui.publicLink.revokeError'), 'error'),
+      error: () => this.toaster.show(this.transloco.translate('collab.publicLink.revokeError'), 'error'),
     });
   }
 
@@ -115,12 +114,12 @@ export class PublicLinkComponent implements OnInit {
     // the `?.` would silently no-op, so surface the same copyError toast a rejection gives.
     const copied = navigator.clipboard?.writeText(this.url());
     if (!copied) {
-      this.toaster.show(this.transloco.translate('ui.publicLink.copyError'), 'error');
+      this.toaster.show(this.transloco.translate('collab.publicLink.copyError'), 'error');
       return;
     }
     copied.then(
-      () => this.toaster.show(this.transloco.translate('ui.publicLink.copied'), 'success'),
-      () => this.toaster.show(this.transloco.translate('ui.publicLink.copyError'), 'error'),
+      () => this.toaster.show(this.transloco.translate('collab.publicLink.copied'), 'success'),
+      () => this.toaster.show(this.transloco.translate('collab.publicLink.copyError'), 'error'),
     );
   }
 
