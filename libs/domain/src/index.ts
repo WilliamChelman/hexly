@@ -9,7 +9,7 @@ export * from './lib/field';
 export * from './lib/structured-data-type';
 export * from './lib/view-placement';
 export * from './lib/entity-edges';
-export * from './lib/derive-search-text';
+export * from './lib/derive-document-state';
 export * from './lib/join-search-text';
 export * from './lib/asset';
 export * from './lib/world';

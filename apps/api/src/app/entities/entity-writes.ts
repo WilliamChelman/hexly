@@ -1,16 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  DocumentDerivedState,
   EntityEdge,
   FieldFacetValue,
   GrantRole,
   EntityDocument,
   ReindexFailure,
   Visibility,
-  descriptorsSchema,
-  deriveFieldFacets,
-  deriveSearchText,
-  harvestEdges,
+  deriveDocumentState,
 } from '@hexly/domain';
 import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-access';
@@ -22,16 +20,6 @@ import { WorldTypeFields } from './world-type-fields';
 
 /** A fresh Entity starts at version 1 — the optimistic-concurrency token's floor. */
 const INITIAL_VERSION = 1;
-
-/** Everything one save derives from the Entity's document (and its types), in one pass. */
-interface Derived {
-  /** The Entity's searchable text — the Content's prose and every Field of a Structured Data Type's (#205). */
-  searchText: string;
-  descriptors: string[];
-  edges: EntityEdge[];
-  /** The denormalised facetable Field values (ADR-0048, #188) — depends on `types` *and* EntityDocument. */
-  fieldFacets: FieldFacetValue[];
-}
 
 /**
  * SQLite's `SQLITE_MAX_VARIABLE_NUMBER` — the most bound parameters one statement may carry. A
@@ -303,7 +291,7 @@ export class EntityWrites {
 
     // Derive first, outside the transaction: pure, and the only step a bad document can throw in.
     const failures: ReindexFailure[] = [];
-    const derived: { row: (typeof rows)[number]; derived: Derived }[] = [];
+    const derived: { row: (typeof rows)[number]; derived: DocumentDerivedState }[] = [];
     for (const row of rows) {
       try {
         derived.push({
@@ -338,30 +326,21 @@ export class EntityWrites {
   }
 
   /**
-   * The one derivation of the Entity's document. It takes the whole document, not just the Content: a
-   * Hex Map's Entity Links live on its Hexes, Features, and Regions as well as in its prose
-   * (ADR-0046), and so do the names it is searchable by (#205).
+   * The one derivation of the Entity's document-derived state (CONTEXT.md → Reindex). It takes the whole
+   * document, not just the Content: a Hex Map's Entity Links live on its Hexes, Features, and Regions as
+   * well as in its prose (ADR-0046), and so do the names it is searchable by (#205).
    *
-   * It names no extractor of its own: a **Field of a Structured Data Type** offers its own edges and its own text
-   * through the host-composed data-type set, so a new plugin needs no change here.
-   *
-   * The `::` vocabulary is a *projection* of the edge set, not a second walk: only a
-   * `content → entity` edge carries a descriptor, so the non-null ones are exactly the descriptors
-   * the Content uses.
+   * This method's job is host-side: resolve the effective Field set and the registered data-types, then
+   * hand them to {@link deriveDocumentState}, which owns the pure walk. It names no extractor of its own —
+   * a **Field of a Structured Data Type** offers its own edges, text, and facets through the data-type set,
+   * so a new plugin needs no change here.
    */
-  private derive(doc: EntityDocument, types: readonly string[], worldId: string): Derived {
+  private derive(doc: EntityDocument, types: readonly string[], worldId: string): DocumentDerivedState {
     // The effective Field set (ADR-0054/ADR-0057), scoped to the Entity's World and derived from the
     // document itself: an attached link Field harvests its edge and an attached facetable Field its facet,
     // like a type default.
     const fields = this.worldTypeFields.effectiveFields(worldId, types, doc);
-    const dataTypes = this.typeFields.structuredDataTypes;
-    const edges = harvestEdges(doc, fields, dataTypes);
-    return {
-      searchText: deriveSearchText(doc, fields, dataTypes),
-      descriptors: descriptorsSchema.parse(edges.flatMap((e) => e.descriptor ?? [])),
-      edges,
-      fieldFacets: deriveFieldFacets(fields, doc, dataTypes),
-    };
+    return deriveDocumentState(doc, fields, this.typeFields.structuredDataTypes);
   }
 
   /**
@@ -369,7 +348,7 @@ export class EntityWrites {
    * diffing, so they are self-pruning. Must run in the same transaction as the document write, so the
    * indexes reflect the last *successful* save and never a rejected one.
    */
-  private replaceDerived(id: string, worldId: string, derived: Derived): void {
+  private replaceDerived(id: string, worldId: string, derived: DocumentDerivedState): void {
     this.replaceDescriptors(id, derived.descriptors);
     this.replaceEdges(id, worldId, derived.edges);
     this.replaceFieldFacets(id, worldId, derived.fieldFacets);

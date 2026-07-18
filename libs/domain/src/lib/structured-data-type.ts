@@ -9,8 +9,8 @@
  * well-formed but unregistered kind (`core.gird`) fails at resolution, against the set the host
  * composes.
  *
- * The set is threaded explicitly, never global: {@link validateFields} and {@link harvestEdges} take
- * a {@link StructuredDataTypeSet} as a parameter. The domain grows no mutable registry.
+ * The set is threaded explicitly, never global: {@link validateFields} and {@link deriveDocumentState}
+ * take a {@link StructuredDataTypeSet} as a parameter. The domain grows no mutable registry.
  */
 
 import { z } from 'zod';
