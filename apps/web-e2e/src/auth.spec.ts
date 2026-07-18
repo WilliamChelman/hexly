@@ -18,8 +18,9 @@ test('guards the app, signs in, and signs out', async ({ page }) => {
   await page.getByLabel('Password').fill(TEST_USER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 
-  // The returnUrl carries us back to the gated page we were headed to — the Index.
-  await expect(page).toHaveURL(/\/$/);
+  // The returnUrl carries us back to the gated page we were headed to — the World
+  // Index at /worlds, which `/` redirects to (ADR-0028).
+  await expect(page).toHaveURL(/\/worlds$/);
   await expect(page.getByRole('heading', { name: /Welcome back/ })).toBeVisible();
 
   // Sign out returns to /login (the action lives behind the rail avatar, ADR-0022).
