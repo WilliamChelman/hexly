@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { Observable, Subject, map, of, shareReplay } from 'rxjs';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient, searchEntities, entityRoute } from '@hexly/web-core';
-import { Command, CommandProvider } from '../command';
+import { Command, CommandProvider } from '@hexly/command-palette-web';
 
 /**
  * The empty-prefix Quick Open Provider (ADR-0032, CONTEXT.md → Command

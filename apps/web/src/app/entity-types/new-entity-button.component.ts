@@ -7,6 +7,7 @@ import { ActiveWorld, ClientConfigStore, EntitiesClient, ToasterService, entityR
 import {
   ButtonComponent,
   ButtonGroupComponent,
+  DialogService,
   IconComponent,
   MenuItemDirective,
   MenuPanelDirective,
@@ -14,7 +15,7 @@ import {
 } from '@hexly/web-ui';
 import { TypeRegistry } from './type-registry';
 import { TypeNamePipe } from './type-name.pipe';
-import { CreateEntityDialogState } from '../shell/command-palette/create-entity-dialog.state';
+import { CreateEntityDialogComponent } from './create-entity-dialog.component';
 
 /**
  * A split button: the primary action creates the Instance's default Type (`entities.defaultType`),
@@ -90,7 +91,7 @@ export class NewEntityButtonComponent {
   private readonly transloco = inject(TranslocoService);
   private readonly registry = inject(TypeRegistry);
   private readonly clientConfig = inject(ClientConfigStore);
-  private readonly dialog = inject(CreateEntityDialogState);
+  private readonly dialogs = inject(DialogService);
 
   /**
    * The primary action's Type, resolved softly against the enabled registry (ADR-0052): the
@@ -119,7 +120,7 @@ export class NewEntityButtonComponent {
     // A required Field must be collected *before* the Entity exists, or the author lands on one
     // that cannot be saved (the write gate, #187). The create dialog is that collection surface.
     if (this.registry.resolveFields([type]).some((field) => field.required)) {
-      this.dialog.open(type);
+      this.dialogs.open(CreateEntityDialogComponent, { type });
       return;
     }
     this.creating.set(true);

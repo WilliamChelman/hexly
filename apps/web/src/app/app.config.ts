@@ -22,12 +22,13 @@ import {
 import { WEB_UI_TRANSLATIONS } from '@hexly/web-ui/i18n';
 import { WEB_ENTITY_TRANSLATIONS } from '@hexly/web-entity/i18n';
 import { ADMIN_TRANSLATIONS } from '@hexly/admin-web/i18n';
+import { COMMAND_PALETTE_TRANSLATIONS } from '@hexly/command-palette-web/i18n';
 import { ENTITY_TYPES } from '@hexly/web-entity';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { TypeRegistry } from './entity-types/type-registry';
-import { provideBuiltInCommands } from './shell/command-palette/command-palette.component';
+import { provideBuiltInCommands } from './shell/built-in-commands';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -50,7 +51,15 @@ export const appConfig: ApplicationConfig = {
     // (the content plugin's `editor` scope arrives with `providePluginContent()`).
     // admin's scope is eager because its route `title` (`admin.tabTitle`) is resolved by the
     // TitleStrategy before the lazy Admin page can trigger the load (ADR-0049).
-    provideEagerTranslations(CORE_TRANSLATIONS, WEB_UI_TRANSLATIONS, WEB_ENTITY_TRANSLATIONS, ADMIN_TRANSLATIONS),
+    provideEagerTranslations(
+      CORE_TRANSLATIONS,
+      WEB_UI_TRANSLATIONS,
+      WEB_ENTITY_TRANSLATIONS,
+      ADMIN_TRANSLATIONS,
+      // The palette's section labels and Command copy are read from Providers (services), where no
+      // pipe of the palette lib is guaranteed to trigger the scope's load (ADR-0049).
+      COMMAND_PALETTE_TRANSLATIONS,
+    ),
     // ICU MessageFormat transpiler: count-aware plural keys (e.g. the hex count)
     // resolve per the active locale's plural rules. It delegates {{…}} to the
     // default transpiler, so existing double-brace interpolation is unaffected.

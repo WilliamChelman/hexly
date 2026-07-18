@@ -215,19 +215,6 @@
     "worldSettings": "Paramètres du monde",
     "settingsSections": "Sections des paramètres"
   },
-  "commandPalette": {
-    "searchLabel": "Rechercher ou exécuter une commande",
-    "placeholder": "Rechercher ou taper > pour les commandes…",
-    "empty": "Aucun résultat",
-    "entities": "Entités",
-    "worlds": "Mondes",
-    "commands": "Commandes",
-    "goToUsers": "Aller aux utilisateurs",
-    "goToAdmin": "Aller à l'administration",
-    "goToStyleguide": "Aller au guide de style",
-    "nameLabel": "Nom",
-    "worldLabel": "Monde"
-  },
   "worlds": {
     "switcherLabel": "Monde actif",
     "crestLabel": "Monde",

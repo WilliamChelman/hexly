@@ -5,6 +5,7 @@ export * from './components/cartouche.component';
 export * from './components/chip.component';
 export * from './components/coord.component';
 export * from './components/dialog.component';
+export * from './components/dialog.service';
 export * from './components/dot.component';
 export * from './components/entity-search-picker.component';
 export * from './components/eyebrow.component';

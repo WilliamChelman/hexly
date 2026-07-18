@@ -13,9 +13,10 @@ import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
 import { PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { CORE_VIEW_FIELDS, TypeDefinition } from '@hexly/web-entity';
+import { DialogService } from '@hexly/web-ui';
 import { NewEntityButtonComponent } from './new-entity-button.component';
 import { TypeRegistry } from './type-registry';
-import { CreateEntityDialogState } from '../shell/command-palette/create-entity-dialog.state';
+import { CreateEntityDialogComponent } from './create-entity-dialog.component';
 
 /**
  * A {@link ClientConfigStore} whose default Type and enabled set the test drives (ADR-0052, Seam 4):
@@ -72,9 +73,11 @@ describe('NewEntityButton', () => {
   let navigate: ReturnType<typeof vi.spyOn>;
   let defaultType: WritableSignal<string | undefined>;
   let enabled: WritableSignal<ReadonlySet<string> | null>;
+  let openDialog: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     entities = new MockEntitiesClient();
+    openDialog = vi.fn();
     // Unset default + unloaded enabled set: the pre-config-fetch state, where the button resolves
     // to the first enabled Type (core.note) — today's "New Note" behaviour, unchanged (ADR-0052).
     defaultType = signal<string | undefined>(undefined);
@@ -87,6 +90,7 @@ describe('NewEntityButton', () => {
         provideRouter([]),
         { provide: EntitiesClient, useValue: entities },
         { provide: ClientConfigStore, useValue: fakeClientConfig(defaultType, enabled) },
+        { provide: DialogService, useValue: { open: openDialog } },
         providePluginContent(),
         providePluginHexmap(),
         providePluginDnd(),
@@ -237,7 +241,7 @@ describe('NewEntityButton', () => {
     menuItem('world.knight')!.click();
 
     expect(entities.create).not.toHaveBeenCalled();
-    expect(TestBed.inject(CreateEntityDialogState).types()).toEqual(['world.knight']);
+    expect(openDialog).toHaveBeenCalledWith(CreateEntityDialogComponent, { type: 'world.knight' });
   });
 
   it('creates a dnd.monster blind — its stat block is structured, so it has no required scalar Field (ADR-0055)', () => {
@@ -248,7 +252,7 @@ describe('NewEntityButton', () => {
     menuItem('dnd.monster')!.click();
 
     expect(entities.create).toHaveBeenCalledWith('Untitled monster', ['dnd.monster'], 'w1');
-    expect(TestBed.inject(CreateEntityDialogState).types()).toBeNull();
+    expect(openDialog).not.toHaveBeenCalled();
   });
 
   it('names the type in French when French is the active language', () => {
