@@ -27,9 +27,9 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       @apply appearance-none py-2 px-3 pr-9 text-sm text-ink-strong
         bg-surface-sunken border border-line-strong rounded-md shadow-inset
         cursor-pointer;
-      /* The chevron rides as a background so the native element stays a plain
-         <select>. data-uris cannot read CSS vars, so its stroke is a fixed
-         warm gray legible on the sunken well in both themes. */
+      /* Pre-base-select fallback: the chevron rides as a background so the native element stays a plain
+         <select> (base-select browsers replace this with an in-flow picker-icon below). data-uris cannot
+         read CSS vars, so its stroke is a fixed warm gray legible on the sunken well in both themes. */
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23968f7f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 0.75rem center;
@@ -60,9 +60,26 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       :host(:open) {
         @apply border-gold;
       }
-      /* base-select adds its own arrow; the host already wears the chevron. */
+      /* In base-select the chevron is a real in-flow element (the native picker-icon), so it follows the
+         value rather than floating over it the way a background image does — long text can never slide
+         under it. Drop the background chevron and its reserved right pad here, and paint the app's own
+         chevron onto the icon so the look is unchanged. */
+      :host {
+        background-image: none;
+        padding-right: 0.75rem;
+      }
       :host::picker-icon {
-        display: none;
+        appearance: none;
+        width: 1rem;
+        height: 1rem;
+        margin-left: 0.5rem;
+        color: transparent;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23968f7f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+          no-repeat center / 1rem;
+        transition: transform var(--dur-fast) var(--ease-out);
+      }
+      :host(:open)::picker-icon {
+        transform: rotate(180deg);
       }
       :host::picker(select) {
         @apply mt-1 p-1 bg-surface-raised border border-line rounded-md shadow-2;
