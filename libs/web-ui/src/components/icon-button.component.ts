@@ -22,6 +22,7 @@ import { ChangeDetectionStrategy, Component, booleanAttribute, input } from '@an
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[class.is-active]': 'active()',
+    '[class.is-sm]': "size() === 'sm'",
     '[attr.aria-pressed]': 'toggle() ? active() : null',
     '[attr.type]': '"button"',
   },
@@ -39,6 +40,10 @@ import { ChangeDetectionStrategy, Component, booleanAttribute, input } from '@an
         background-color var(--dur-fast) var(--ease-out),
         border-color var(--dur-fast) var(--ease-out),
         color var(--dur-fast) var(--ease-out);
+    }
+    /* A notch down for inline use beside a heading — a 32px gem, glyph set by the consumer. */
+    :host(.is-sm) {
+      @apply w-8 h-8 rounded-md;
     }
     /* Hover (only when not armed): gold glyph + gilded border, fill unchanged. */
     :host(:hover:not(:disabled):not(.is-active)) {
@@ -69,4 +74,6 @@ export class IconButtonComponent {
   readonly active = input(false, { transform: booleanAttribute });
   /** Exposes `aria-pressed` (from `active`). Off by default: a momentary action isn't a toggle. */
   readonly toggle = input(false, { transform: booleanAttribute });
+  /** Gem size: the default 42px codex gem, or `sm` (32px) for inline use beside a heading. */
+  readonly size = input<'md' | 'sm'>('md');
 }
