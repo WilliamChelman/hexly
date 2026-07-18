@@ -5,7 +5,7 @@ import { EntityGrant } from '@hexly/domain';
 import { EntitiesClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
 import { MockEntitiesClient, MockUserDirectoryClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { GrantSetComponent } from './grant-set.component';
-import { WEB_UI_TEST_CATALOGS } from '../i18n/test-catalogs';
+import { COLLAB_TEST_CATALOGS } from '../i18n/test-catalogs';
 
 describe('GrantSet', () => {
   let entities: MockEntitiesClient;
@@ -16,7 +16,7 @@ describe('GrantSet', () => {
     entities = new MockEntitiesClient();
     users = new MockUserDirectoryClient();
     await TestBed.configureTestingModule({
-      imports: [GrantSetComponent, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
+      imports: [GrantSetComponent, provideTranslocoTesting(COLLAB_TEST_CATALOGS)],
       providers: [
         { provide: EntitiesClient, useValue: entities },
         { provide: UserDirectoryClient, useValue: users },

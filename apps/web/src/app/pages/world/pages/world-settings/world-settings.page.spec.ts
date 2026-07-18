@@ -5,7 +5,7 @@ import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { WorldsClient, EntitiesClient, UserDirectoryClient, AuthClient, ActiveWorld } from '@hexly/web-core';
 import { MockWorldsClient, MockEntitiesClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
-import { OwnerSetComponent } from '@hexly/web-ui';
+import { OwnerSetComponent } from '@hexly/web-entity';
 import { WorldSettingsPage } from './world-settings.page';
 
 describe('WorldSettings', () => {

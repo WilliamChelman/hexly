@@ -3,8 +3,7 @@ import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityGrant, GrantRole, UserSummary } from '@hexly/domain';
 import { EntitiesClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
-import { ButtonComponent } from './button.component';
-import { SelectComponent } from './select.component';
+import { ButtonComponent, SelectComponent } from '@hexly/web-ui';
 
 /**
  * An Entity's named grant set (ADR-0037): the Editor or Viewer grants an Owner hands any
@@ -32,20 +31,20 @@ import { SelectComponent } from './select.component';
             [value]="g.role"
             (change)="setRole(g, $any($event.target))"
           >
-            <option value="editor">{{ 'ui.grants.editor' | transloco }}</option>
-            <option value="viewer">{{ 'ui.grants.viewer' | transloco }}</option>
+            <option value="editor">{{ 'collab.grants.editor' | transloco }}</option>
+            <option value="viewer">{{ 'collab.grants.viewer' | transloco }}</option>
           </select>
           <button appButton size="sm" danger [attr.data-testid]="'grant-revoke-' + g.userId" (click)="revoke(g.userId)">
-            {{ 'ui.grants.revoke' | transloco }}
+            {{ 'collab.grants.revoke' | transloco }}
           </button>
         </li>
       } @empty {
-        <li class="grant-empty">{{ 'ui.grants.empty' | transloco }}</li>
+        <li class="grant-empty">{{ 'collab.grants.empty' | transloco }}</li>
       }
     </ul>
 
     <div class="grant-add">
-      <label class="grant-add-label" for="grant-add-select">{{ 'ui.grants.addLabel' | transloco }}</label>
+      <label class="grant-add-label" for="grant-add-select">{{ 'collab.grants.addLabel' | transloco }}</label>
       <div class="grant-add-row">
         <select
           appSelect
@@ -55,7 +54,7 @@ import { SelectComponent } from './select.component';
           [value]="selectedUser()"
           (change)="selectedUser.set($any($event.target).value)"
         >
-          <option value="">{{ 'ui.grants.addPlaceholder' | transloco }}</option>
+          <option value="">{{ 'collab.grants.addPlaceholder' | transloco }}</option>
           @for (c of candidates(); track c.id) {
             <option [value]="c.id">{{ c.displayName }}</option>
           }
@@ -67,11 +66,11 @@ import { SelectComponent } from './select.component';
           [value]="selectedRole()"
           (change)="selectedRole.set($any($event.target).value)"
         >
-          <option value="editor">{{ 'ui.grants.editor' | transloco }}</option>
-          <option value="viewer">{{ 'ui.grants.viewer' | transloco }}</option>
+          <option value="editor">{{ 'collab.grants.editor' | transloco }}</option>
+          <option value="viewer">{{ 'collab.grants.viewer' | transloco }}</option>
         </select>
         <button appButton variant="primary" data-testid="grant-add" [disabled]="!selectedUser()" (click)="add()">
-          {{ 'ui.grants.add' | transloco }}
+          {{ 'collab.grants.add' | transloco }}
         </button>
       </div>
     </div>
@@ -154,7 +153,7 @@ export class GrantSetComponent implements OnInit {
   add(): void {
     const userId = this.selectedUser();
     if (!userId) return;
-    this.mutate(this.entities.addGrant(this.id(), userId, this.selectedRole()), 'ui.grants.addError', (grants) => {
+    this.mutate(this.entities.addGrant(this.id(), userId, this.selectedRole()), 'collab.grants.addError', (grants) => {
       this.grants.set(grants);
       this.selectedUser.set('');
     });
@@ -166,14 +165,14 @@ export class GrantSetComponent implements OnInit {
     // failure (the signal is unchanged, so nothing else would).
     this.mutate(
       this.entities.addGrant(this.id(), row.userId, select.value as GrantRole),
-      'ui.grants.roleError',
+      'collab.grants.roleError',
       (grants) => this.grants.set(grants),
       () => (select.value = row.role),
     );
   }
 
   revoke(userId: string): void {
-    this.mutate(this.entities.removeGrant(this.id(), userId), 'ui.grants.revokeError', (grants) =>
+    this.mutate(this.entities.removeGrant(this.id(), userId), 'collab.grants.revokeError', (grants) =>
       this.grants.set(grants),
     );
   }
@@ -200,7 +199,7 @@ export class GrantSetComponent implements OnInit {
 
   /** A read (directory or grant set) failed — the panel can't be trusted, so say so. */
   private loadFailed(): void {
-    this.toaster.show(this.transloco.translate('ui.grants.loadError'), 'error');
+    this.toaster.show(this.transloco.translate('collab.grants.loadError'), 'error');
   }
 
   private nameOf(id: string): string {

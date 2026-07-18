@@ -3,8 +3,7 @@ import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { MemberRole, UserSummary, WorldMember } from '@hexly/domain';
 import { WorldsClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
-import { ButtonComponent } from './button.component';
-import { SelectComponent } from './select.component';
+import { ButtonComponent, SelectComponent } from '@hexly/web-ui';
 
 /**
  * A World's non-owner membership set (ADR-0037): a World Owner adds an Instance user as a
@@ -33,21 +32,21 @@ import { SelectComponent } from './select.component';
             (change)="setRole(m, $any($event.target))"
           >
             <option value="contributor">
-              {{ 'ui.members.contributor' | transloco }}
+              {{ 'collab.members.contributor' | transloco }}
             </option>
-            <option value="viewer">{{ 'ui.members.viewer' | transloco }}</option>
+            <option value="viewer">{{ 'collab.members.viewer' | transloco }}</option>
           </select>
           <button appButton size="sm" danger [attr.data-testid]="'remove-' + m.userId" (click)="remove(m.userId)">
-            {{ 'ui.members.remove' | transloco }}
+            {{ 'collab.members.remove' | transloco }}
           </button>
         </li>
       } @empty {
-        <li class="member-empty">{{ 'ui.members.empty' | transloco }}</li>
+        <li class="member-empty">{{ 'collab.members.empty' | transloco }}</li>
       }
     </ul>
 
     <div class="member-add">
-      <label class="member-add-label" for="member-add-select">{{ 'ui.members.addLabel' | transloco }}</label>
+      <label class="member-add-label" for="member-add-select">{{ 'collab.members.addLabel' | transloco }}</label>
       <div class="member-add-row">
         <select
           appSelect
@@ -57,7 +56,7 @@ import { SelectComponent } from './select.component';
           [value]="selectedUser()"
           (change)="selectedUser.set($any($event.target).value)"
         >
-          <option value="">{{ 'ui.members.addPlaceholder' | transloco }}</option>
+          <option value="">{{ 'collab.members.addPlaceholder' | transloco }}</option>
           @for (c of candidates(); track c.id) {
             <option [value]="c.id">{{ c.displayName }}</option>
           }
@@ -70,12 +69,12 @@ import { SelectComponent } from './select.component';
           (change)="selectedRole.set($any($event.target).value)"
         >
           <option value="contributor">
-            {{ 'ui.members.contributor' | transloco }}
+            {{ 'collab.members.contributor' | transloco }}
           </option>
-          <option value="viewer">{{ 'ui.members.viewer' | transloco }}</option>
+          <option value="viewer">{{ 'collab.members.viewer' | transloco }}</option>
         </select>
         <button appButton variant="primary" data-testid="add" [disabled]="!selectedUser()" (click)="add()">
-          {{ 'ui.members.add' | transloco }}
+          {{ 'collab.members.add' | transloco }}
         </button>
       </div>
     </div>
@@ -158,7 +157,7 @@ export class MemberSetComponent implements OnInit {
   add(): void {
     const userId = this.selectedUser();
     if (!userId) return;
-    this.mutate(this.worlds.addMember(this.id(), userId, this.selectedRole()), 'ui.members.addError', (members) => {
+    this.mutate(this.worlds.addMember(this.id(), userId, this.selectedRole()), 'collab.members.addError', (members) => {
       this.members.set(members);
       this.selectedUser.set('');
     });
@@ -170,14 +169,14 @@ export class MemberSetComponent implements OnInit {
     // failure (the signal is unchanged, so nothing else would).
     this.mutate(
       this.worlds.setMemberRole(this.id(), row.userId, select.value as MemberRole),
-      'ui.members.roleError',
+      'collab.members.roleError',
       (members) => this.members.set(members),
       () => (select.value = row.role),
     );
   }
 
   remove(userId: string): void {
-    this.mutate(this.worlds.removeMember(this.id(), userId), 'ui.members.removeError', (members) =>
+    this.mutate(this.worlds.removeMember(this.id(), userId), 'collab.members.removeError', (members) =>
       this.members.set(members),
     );
   }
@@ -204,7 +203,7 @@ export class MemberSetComponent implements OnInit {
 
   /** A read (directory or member set) failed — the panel can't be trusted, so say so. */
   private loadFailed(): void {
-    this.toaster.show(this.transloco.translate('ui.members.loadError'), 'error');
+    this.toaster.show(this.transloco.translate('collab.members.loadError'), 'error');
   }
 
   private nameOf(id: string): string {

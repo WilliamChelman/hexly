@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityLinkValue, entityLinkValueSchema, EntitySummary, Field } from '@hexly/domain';
-import { EntitySearchPickerComponent } from '@hexly/web-ui';
+import { EntitySearchPickerComponent } from './entity-search-picker.component';
 
 /**
  * One data-type-appropriate control for a typed Field (ADR-0048). Reads a raw EntityDocument `value`, emits

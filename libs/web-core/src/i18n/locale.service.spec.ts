@@ -167,7 +167,7 @@ describe('LocaleService', () => {
           provideHttpClientTesting(),
           provideTransloco({ config: translocoAppConfig, loader: TranslocoHttpLoader }),
           provideEagerTranslations({
-            scope: 'ui',
+            scope: 'collab',
             loader: {
               en: () => Promise.resolve({ owners: { heading: 'Owners' } }),
               fr: () => Promise.resolve({ owners: { heading: 'Propriétaires' } }),
@@ -186,7 +186,7 @@ describe('LocaleService', () => {
 
       // No component has rendered, so nothing could have triggered the scope's load — yet the key
       // resolves, exactly as it must for the command palette or a route title.
-      expect(transloco.translate('ui.owners.heading')).toBe('Owners');
+      expect(transloco.translate('collab.owners.heading')).toBe('Owners');
       http.verify();
     });
 

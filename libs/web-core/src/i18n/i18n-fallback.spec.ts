@@ -33,9 +33,9 @@ describe('i18n fallback', () => {
         provideTranslocoTesting({
           en: {},
           fr: {},
-          'ui/en': { owners: { heading: 'Owners', add: 'Add owner' } },
+          'collab/en': { owners: { heading: 'Owners', add: 'Add owner' } },
           // The French catalog of a *scoped* lib, missing one key.
-          'ui/fr': { owners: { heading: 'Propriétaires' } },
+          'collab/fr': { owners: { heading: 'Propriétaires' } },
         }),
       ],
     });
@@ -44,7 +44,7 @@ describe('i18n fallback', () => {
 
     // A lib's catalog is loaded under its scope but flattened into the same key space as the app's
     // (ADR-0049), so the English fallback reaches into it exactly as it does the root catalog.
-    expect(transloco.translate('ui.owners.heading')).toBe('Propriétaires');
-    expect(transloco.translate('ui.owners.add')).toBe('Add owner');
+    expect(transloco.translate('collab.owners.heading')).toBe('Propriétaires');
+    expect(transloco.translate('collab.owners.add')).toBe('Add owner');
   });
 });

@@ -15,7 +15,8 @@ import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld } from '@hexly/web-core';
-import { ButtonComponent, FieldComponent, IconComponent, EntitySearchPickerComponent } from '@hexly/web-ui';
+import { ButtonComponent, FieldComponent, IconComponent } from '@hexly/web-ui';
+import { EntitySearchPickerComponent } from './entity-search-picker.component';
 import { ENTITY_TYPES } from '../models/entity-types';
 
 /**

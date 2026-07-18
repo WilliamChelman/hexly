@@ -19,8 +19,7 @@ import {
 // The `/i18n` entry points carry the scope declaration and nothing else: importing a lib's
 // translations through its main barrel drags that lib's code into the initial bundle (content-editor
 // would pull Tiptap out of the lazy entity chunk).
-import { WEB_UI_TRANSLATIONS } from '@hexly/web-ui/i18n';
-import { WEB_ENTITY_TRANSLATIONS } from '@hexly/web-entity/i18n';
+import { WEB_ENTITY_TRANSLATIONS, COLLAB_TRANSLATIONS } from '@hexly/web-entity/i18n';
 import { ADMIN_TRANSLATIONS } from '@hexly/admin-web/i18n';
 import { COMMAND_PALETTE_TRANSLATIONS } from '@hexly/command-palette-web/i18n';
 import { ENTITY_TYPES } from '@hexly/web-entity';
@@ -53,8 +52,8 @@ export const appConfig: ApplicationConfig = {
     // TitleStrategy before the lazy Admin page can trigger the load (ADR-0049).
     provideEagerTranslations(
       CORE_TRANSLATIONS,
-      WEB_UI_TRANSLATIONS,
       WEB_ENTITY_TRANSLATIONS,
+      COLLAB_TRANSLATIONS,
       ADMIN_TRANSLATIONS,
       // The palette's section labels and Command copy are read from Providers (services), where no
       // pipe of the palette lib is guaranteed to trigger the scope's load (ADR-0049).

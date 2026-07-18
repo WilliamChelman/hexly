@@ -5,7 +5,7 @@ import { EntityPage, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySearchPickerComponent } from './entity-search-picker.component';
-import { WEB_UI_TEST_CATALOGS } from '../i18n/test-catalogs';
+import { COLLAB_TEST_CATALOGS } from '../i18n/test-catalogs';
 
 function summary(id: string, name = id, type: EntityType = 'core.note'): EntitySummary {
   return {
@@ -59,7 +59,7 @@ describe('EntitySearchPicker', () => {
       ),
     );
     await TestBed.configureTestingModule({
-      imports: [Host, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
+      imports: [Host, provideTranslocoTesting(COLLAB_TEST_CATALOGS)],
       providers: [{ provide: EntitiesClient, useValue: entities }],
     }).compileComponents();
   });

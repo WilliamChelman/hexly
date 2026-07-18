@@ -75,7 +75,7 @@ export const appRoutes: Route[] = [
         pathMatch: 'full',
         loadComponent: () =>
           import('./pages/world/pages/world-settings/world-settings.page').then((m) => m.WorldSettingsPage),
-        title: 'ui.owners.tabTitle',
+        title: 'collab.owners.tabTitle',
       },
       {
         path: 'entities',

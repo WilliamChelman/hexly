@@ -3,11 +3,10 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } 
 import { RouterLink } from '@angular/router';
 import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
 import { ActiveWorld, EntitiesClient, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
-import { CORE_VIEW_MAP } from '@hexly/web-entity';
+import { CORE_VIEW_MAP, EntitySearchPickerComponent } from '@hexly/web-entity';
 import {
   ACCENT_BAR,
   ButtonComponent,
-  EntitySearchPickerComponent,
   EyebrowComponent,
   IconComponent,
   IconName,

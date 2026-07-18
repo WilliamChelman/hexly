@@ -2,8 +2,7 @@ import { ChangeDetectionStrategy, Component, effect, inject, input, output, sign
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
-import { ButtonComponent } from './button.component';
-import { InputComponent } from './input.component';
+import { ButtonComponent, InputComponent } from '@hexly/web-ui';
 
 /**
  * The shared server-side Entity picker (ADR-0025): a search box over the owner-scoped
@@ -59,9 +58,9 @@ export class EntitySearchPickerComponent {
   /** Prefix for the search box / option / menu `data-testid`s, per embedding surface. */
   readonly testid = input('entity-picker');
   /** Transloco key for the search input placeholder. */
-  readonly placeholderKey = input('ui.entitySearchPicker.searchPlaceholder');
+  readonly placeholderKey = input('collab.entitySearchPicker.searchPlaceholder');
   /** Transloco key shown when no Entity matches the query. */
-  readonly emptyKey = input('ui.entitySearchPicker.empty');
+  readonly emptyKey = input('collab.entitySearchPicker.empty');
   /** The controlled query — the consumer owns it so it can reset or reuse it. */
   readonly query = input('');
   /**
