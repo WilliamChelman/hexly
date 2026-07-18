@@ -1,7 +1,7 @@
 /**
  * CI key-sync gate: fail when the locale catalogs drift, or when two projects claim the same slice
- * of the key space. Every project owns its own catalogs (ADR-0049) — the app's root one, and one
- * scoped catalog per lib. Compares key sets and owners only. Run via the `web:i18n-sync` Nx target.
+ * of the key space. Every project owns its own catalogs (ADR-0049) — the app's root one, and one or
+ * more scoped catalogs per lib. Compares key sets and owners only. Run via the `web:i18n-sync` Nx target.
  *
  * **Parity.** Each locale is compared against its catalog's `en.json` (ADR-0014); a key missing
  * *or* orphaned relative to the reference fails the build.
@@ -34,35 +34,35 @@ interface Catalog {
 }
 
 /**
- * A lib declares its scope in the `TranslationScope` beside its catalogs. A catalog with no scope
- * declaration is a bug: its copy could never be loaded.
+ * A lib declares each scope in a `TranslationScope` beside its catalogs, one per `*-translations.ts`
+ * file, pairing the scope name with the catalog dir its loader imports from. A declaration missing
+ * either — no scope, or a loader pointing nowhere — is a bug: its copy could never be loaded. A lib
+ * may own more than one scope (web-entity owns `fields` and `collab`), each in its own file and dir.
  */
-function readScope(i18nDir: string, project: string): string {
+function readCatalogs(i18nDir: string, project: string): Catalog[] {
   const declarations = readdirSync(i18nDir).filter((name) => name.endsWith('-translations.ts'));
-  const scopes = declarations.flatMap((name) => {
+  return declarations.map((name) => {
     const source = readFileSync(join(i18nDir, name), 'utf8');
-    return [...source.matchAll(/scope:\s*'([^']+)'/g)].map((match) => match[1]);
-  });
+    const scopes = [...source.matchAll(/scope:\s*'([^']+)'/g)].map((match) => match[1]);
+    // The catalog dir is whatever the loader's dynamic `import('./<dir>/<locale>.json')` points at.
+    const dirs = [...new Set([...source.matchAll(/import\(\s*'\.\/([^'/]+)\/[^']*\.json'/g)].map((match) => match[1]))];
 
-  if (scopes.length !== 1) {
-    console.error(
-      `✘ ${project}: expected exactly one scope declared in ${i18nDir}/*-translations.ts, found ${scopes.length}` +
-        (scopes.length ? ` (${scopes.join(', ')})` : ''),
-    );
-    process.exit(1);
-  }
-  return scopes[0];
+    if (scopes.length !== 1 || dirs.length !== 1) {
+      console.error(
+        `✘ ${project}: expected exactly one scope and one catalog dir in ${join(i18nDir, name)}, ` +
+          `found scope(s) [${scopes.join(', ')}] and dir(s) [${dirs.join(', ')}]`,
+      );
+      process.exit(1);
+    }
+    return { project, dir: join(i18nDir, dirs[0]), scope: scopes[0] };
+  });
 }
 
 function discoverCatalogs(): Catalog[] {
   const libs = readdirSync(LIBS_DIR)
     .map((project) => ({ project, i18n: join(LIBS_DIR, project, 'src', 'i18n') }))
-    .filter(({ i18n }) => existsSync(join(i18n, 'catalogs')))
-    .map(({ project, i18n }) => ({
-      project,
-      dir: join(i18n, 'catalogs'),
-      scope: readScope(i18n, project),
-    }));
+    .filter(({ i18n }) => existsSync(i18n) && readdirSync(i18n).some((name) => name.endsWith('-translations.ts')))
+    .flatMap(({ project, i18n }) => readCatalogs(i18n, project));
 
   return [{ project: 'web', dir: APP_CATALOGS }, ...libs];
 }
