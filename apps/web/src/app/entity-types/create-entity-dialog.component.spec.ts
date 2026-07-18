@@ -1,4 +1,4 @@
-import { provideTranslocoTesting } from '../../../testing/transloco-testing';
+import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
@@ -6,9 +6,9 @@ import { defineField, EntityDetail, WorldSummary } from '@hexly/domain';
 import { emptyContent } from '@hexly/plugin-content';
 import { ActiveWorld, EntitiesClient, WorldStore } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
-import { CreateEntityDialogState } from './create-entity-dialog.state';
-import { CreateEntityDialogComponent } from './create-entity-dialog.component';
-import { TypeRegistry } from '../../entity-types/type-registry';
+import { DialogRef } from '@hexly/web-ui';
+import { CreateEntityDialogComponent, CreateEntityDialogData } from './create-entity-dialog.component';
+import { TypeRegistry } from './type-registry';
 import { TypeDefinition } from '@hexly/web-entity';
 import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
@@ -52,10 +52,14 @@ function world(id: string, name: string): WorldSummary {
 describe('CreateEntityDialog', () => {
   let entitiesClient: MockEntitiesClient;
   let navigate: ReturnType<typeof vi.spyOn>;
-  let state: CreateEntityDialogState;
+  let dialogRef: DialogRef<CreateEntityDialogData>;
 
-  function render(worlds: WorldSummary[], activeWorldId: string | null) {
+  // The dialog seeds itself from `DialogRef.data` at creation (no more open-state signal), so a
+  // seeded type's registration must land via `setup` *before* the component is built.
+  function render(worlds: WorldSummary[], activeWorldId: string | null, seedType = 'core.note', setup?: () => void) {
     entitiesClient = new MockEntitiesClient();
+    dialogRef = new DialogRef<CreateEntityDialogData>({ type: seedType });
+    vi.spyOn(dialogRef, 'close');
     TestBed.configureTestingModule({
       imports: [CreateEntityDialogComponent, provideTranslocoTesting()],
       providers: [
@@ -64,11 +68,12 @@ describe('CreateEntityDialog', () => {
         provideRouter([]),
         { provide: EntitiesClient, useValue: entitiesClient },
         { provide: WorldStore, useValue: { worlds: () => worlds } },
+        { provide: DialogRef, useValue: dialogRef },
       ],
     });
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     TestBed.inject(ActiveWorld).set(activeWorldId);
-    state = TestBed.inject(CreateEntityDialogState);
+    setup?.();
     const fixture = TestBed.createComponent(CreateEntityDialogComponent);
     fixture.detectChanges();
     return fixture;
@@ -78,16 +83,8 @@ describe('CreateEntityDialog', () => {
     return fixture.nativeElement.querySelector(`[data-testid="${testid}"]`);
   }
 
-  it('stays closed until the dialog state names a type to create', () => {
-    const fixture = render([world('w1', 'Aldermoor')], 'w1');
-    expect(fixture.nativeElement.querySelector('dialog')?.open).toBeFalsy();
-  });
-
-  it('opens prefilled to the active World when Create Note runs', () => {
+  it('opens seeded, prefilled to the active World', () => {
     const fixture = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')], 'w2');
-
-    state.open('core.note');
-    fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('dialog')?.open).toBe(true);
     const select: HTMLSelectElement = q(fixture, 'create-entity-world');
@@ -95,10 +92,7 @@ describe('CreateEntityDialog', () => {
   });
 
   it("falls back to the first loaded World when there's no active World", () => {
-    const fixture = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')], null);
-
-    state.open('core.hexmap');
-    fixture.detectChanges();
+    const fixture = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')], null, 'core.hexmap');
 
     const select: HTMLSelectElement = q(fixture, 'create-entity-world');
     expect(select.value).toBe('w1');
@@ -121,9 +115,6 @@ describe('CreateEntityDialog', () => {
     };
     entitiesClient.create.mockReturnValue(of(created));
 
-    state.open('core.note');
-    fixture.detectChanges();
-
     const nameInput: HTMLInputElement = q(fixture, 'create-entity-name');
     nameInput.value = 'The Reach';
     nameInput.dispatchEvent(new Event('input'));
@@ -135,7 +126,7 @@ describe('CreateEntityDialog', () => {
     // The seeded type rides as a one-element ordered set; no EntityDocument (core types declare no Fields).
     expect(entitiesClient.create).toHaveBeenCalledWith('The Reach', ['core.note'], 'w1', undefined);
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'e1']);
-    expect(fixture.nativeElement.querySelector('dialog')?.open).toBeFalsy();
+    expect(dialogRef.close).toHaveBeenCalled();
   });
 
   it('lets the author add a second type before creating, sending the ordered set (#189)', () => {
@@ -156,9 +147,6 @@ describe('CreateEntityDialog', () => {
       } as EntityDetail),
     );
 
-    state.open('core.note');
-    fixture.detectChanges();
-
     // Add the hexmap type through the embedded editor's picker.
     const add: HTMLSelectElement = q(fixture, 'type-add');
     add.value = 'core.hexmap';
@@ -172,10 +160,12 @@ describe('CreateEntityDialog', () => {
   });
 
   it('collects a seeded required-Field type’s Fields, gating Create until supplied (#189)', () => {
-    const fixture = render([world('w1', 'Aldermoor')], 'w1');
-    const registry = TestBed.inject(TypeRegistry);
-    registry.setWorldFields([lairField]);
-    registry.register(monster);
+    // Seeded with the required-Field type (as a "Create Monster" command would), registered before build.
+    const fixture = render([world('w1', 'Aldermoor')], 'w1', 'test.monster', () => {
+      const registry = TestBed.inject(TypeRegistry);
+      registry.setWorldFields([lairField]);
+      registry.register(monster);
+    });
     entitiesClient.create.mockReturnValue(
       of({
         id: 'e1',
@@ -191,10 +181,6 @@ describe('CreateEntityDialog', () => {
         document: { 'core.content': emptyContent(), 'test.lair': 'Sunken keep' },
       } as EntityDetail),
     );
-
-    // Open seeded with the required-Field type (as a "Create Monster" command would).
-    state.open('test.monster');
-    fixture.detectChanges();
 
     const nameInput: HTMLInputElement = q(fixture, 'create-entity-name');
     nameInput.value = 'Balthazar';
@@ -225,13 +211,11 @@ describe('CreateEntityDialog', () => {
 
   it('closes without creating anything on cancel', () => {
     const fixture = render([world('w1', 'Aldermoor')], 'w1');
-    state.open('core.note');
-    fixture.detectChanges();
 
     (q(fixture, 'create-entity-cancel') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     expect(entitiesClient.create).not.toHaveBeenCalled();
-    expect(fixture.nativeElement.querySelector('dialog')?.open).toBeFalsy();
+    expect(dialogRef.close).toHaveBeenCalled();
   });
 });

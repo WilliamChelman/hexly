@@ -1,3 +1,4 @@
+import { COMMAND_PALETTE_TEST_CATALOGS } from '@hexly/command-palette-web/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '@hexly/plugin-content/testing';
 import { DND_TEST_CATALOGS } from '@hexly/plugin-dnd/testing';
 import {
@@ -24,6 +25,7 @@ export function provideTranslocoTesting(...overrides: readonly TestCatalogs[]) {
     WEB_CORE_TEST_CATALOGS,
     WEB_UI_TEST_CATALOGS,
     WEB_ENTITY_TEST_CATALOGS,
+    COMMAND_PALETTE_TEST_CATALOGS,
     CONTENT_EDITOR_TEST_CATALOGS,
     HEXMAP_TEST_CATALOGS,
     DND_TEST_CATALOGS,

@@ -215,19 +215,6 @@
     "worldSettings": "World Settings",
     "settingsSections": "Settings sections"
   },
-  "commandPalette": {
-    "searchLabel": "Search or run a command",
-    "placeholder": "Search or type > for commands…",
-    "empty": "No matches",
-    "entities": "Entities",
-    "worlds": "Worlds",
-    "commands": "Commands",
-    "goToUsers": "Go to Users",
-    "goToAdmin": "Go to Admin",
-    "goToStyleguide": "Go to Styleguide",
-    "nameLabel": "Name",
-    "worldLabel": "World"
-  },
   "worlds": {
     "switcherLabel": "Active world",
     "crestLabel": "World",

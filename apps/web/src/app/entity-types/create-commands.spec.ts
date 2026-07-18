@@ -1,23 +1,29 @@
-import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
+import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { firstValueFrom } from 'rxjs';
-import { CreateEntityDialogState } from '../create-entity-dialog.state';
+import { DialogService } from '@hexly/web-ui';
 import { CreateCommands } from './create-commands';
+import { CreateEntityDialogComponent } from './create-entity-dialog.component';
 
 describe('CreateCommands', () => {
   let provider: CreateCommands;
-  let state: CreateEntityDialogState;
+  let open: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    open = vi.fn();
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
-      providers: [providePluginContent(), providePluginHexmap(), providePluginDnd()],
+      providers: [
+        providePluginContent(),
+        providePluginHexmap(),
+        providePluginDnd(),
+        { provide: DialogService, useValue: { open } },
+      ],
     });
     provider = TestBed.inject(CreateCommands);
-    state = TestBed.inject(CreateEntityDialogState);
   });
 
   it('answers the > (Show Commands) prefix', () => {
@@ -34,14 +40,14 @@ describe('CreateCommands', () => {
   it('opens the create dialog seeded with the Note type when Create Note runs', async () => {
     const [createNote] = await firstValueFrom(provider.search(''));
     createNote.run();
-    // The Command seeds a one-element ordered set; the dialog lets the author add more (#189).
-    expect(state.types()).toEqual(['core.note']);
+    // The Command seeds the dialog with its type; the dialog lets the author add more (#189).
+    expect(open).toHaveBeenCalledWith(CreateEntityDialogComponent, { type: 'core.note' });
   });
 
   it('opens the create dialog seeded with the Map type when Create Map runs', async () => {
     const [, createMap] = await firstValueFrom(provider.search(''));
     createMap.run();
-    expect(state.types()).toEqual(['core.hexmap']);
+    expect(open).toHaveBeenCalledWith(CreateEntityDialogComponent, { type: 'core.hexmap' });
   });
 
   it('narrows to commands whose label matches the typed query, case-insensitively', async () => {

@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, of } from 'rxjs';
 import { WorldStore, worldDashboardRoute } from '@hexly/web-core';
-import { Command, CommandProvider } from '../command';
+import { Command, CommandProvider } from '@hexly/command-palette-web';
 
 /**
  * The empty-prefix Quick Open Provider for Worlds (ADR-0032): a client-side

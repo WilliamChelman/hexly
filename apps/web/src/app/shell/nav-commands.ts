@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { Observable, of } from 'rxjs';
 import { AuthClient } from '@hexly/web-core';
-import { Command, CommandProvider } from '../command';
+import { Command, CommandProvider } from '@hexly/command-palette-web';
 
 /**
  * The `>`-prefix navigation Commands (ADR-0041): the instance-scoped destinations the

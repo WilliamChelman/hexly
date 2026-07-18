@@ -3,8 +3,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map, of, switchMap, timer } from 'rxjs';
 import { AppShellStore } from '@hexly/web-core';
-import { CommandPaletteComponent } from './shell/command-palette/command-palette.component';
-import { CreateEntityDialogComponent } from './shell/command-palette/create-entity-dialog.component';
+import { CommandPaletteComponent } from '@hexly/command-palette-web';
 import { NavRailComponent } from './shell/nav-rail.component';
 import { ToasterComponent } from './shell/toaster.component';
 import { IconComponent } from '@hexly/web-ui';
@@ -16,14 +15,7 @@ const FULL_CURTAIN_DELAY_MS = 150;
 @Component({
   selector: 'app-root',
   host: { class: 'flex h-screen' },
-  imports: [
-    RouterOutlet,
-    NavRailComponent,
-    ToasterComponent,
-    CommandPaletteComponent,
-    CreateEntityDialogComponent,
-    IconComponent,
-  ],
+  imports: [RouterOutlet, NavRailComponent, ToasterComponent, CommandPaletteComponent, IconComponent],
   template: `
     @if (navigated() && !shell.standalone()) {
       <app-nav-rail />
@@ -70,7 +62,6 @@ const FULL_CURTAIN_DELAY_MS = 150;
     }
     <app-toaster />
     <app-command-palette />
-    <app-create-entity-dialog />
   `,
 })
 export class AppComponent {

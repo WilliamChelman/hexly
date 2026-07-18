@@ -4,7 +4,6 @@ import {
   ElementRef,
   HostListener,
   InjectionToken,
-  Provider,
   computed,
   effect,
   inject,
@@ -21,23 +20,12 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonComponent, DialogComponent, InputComponent } from '@hexly/web-ui';
 import { Command, CommandProvider, parseCommandQuery } from './command';
 import { CommandRegistry, CommandSection } from './command-registry';
-import { EntityQuickOpen } from './providers/entity-quick-open';
-import { WorldQuickOpen } from './providers/world-quick-open';
-import { CreateCommands } from './providers/create-commands';
-import { NavCommands } from './providers/nav-commands';
 
-/** Built-in Command Providers, registered by the Palette on mount. */
+/**
+ * The Providers a host registers into the Palette on mount (ADR-0032). The concrete Providers live
+ * with their domain, not here; the host binds them to this token — order is the palette's section order.
+ */
 export const COMMAND_PROVIDERS = new InjectionToken<readonly CommandProvider[]>('COMMAND_PROVIDERS');
-
-/** Listing order is the palette's section order. */
-export function provideBuiltInCommands(): Provider[] {
-  return [
-    { provide: COMMAND_PROVIDERS, useExisting: EntityQuickOpen, multi: true },
-    { provide: COMMAND_PROVIDERS, useExisting: WorldQuickOpen, multi: true },
-    { provide: COMMAND_PROVIDERS, useExisting: CreateCommands, multi: true },
-    { provide: COMMAND_PROVIDERS, useExisting: NavCommands, multi: true },
-  ];
-}
 
 /**
  * The Command Palette: a Cmd/Ctrl+K overlay, mounted once in {@link App},
