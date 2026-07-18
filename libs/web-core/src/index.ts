@@ -12,7 +12,6 @@ export * from './i18n/transloco-http.loader';
 export * from './i18n/transloco.config';
 export * from './interceptors/with-credentials.interceptor';
 export * from './services/active-world';
-export * from './services/admin.client';
 export * from './services/app-shell.store';
 export * from './services/auth-scoped-storage';
 export * from './services/auth.client';

@@ -50,7 +50,7 @@ export const appRoutes: Route[] = [
     // The Superadmin repair surface: the Reindex (ADR-0046). Superadmin-only.
     path: 'admin',
     canActivate: [superadminGuard],
-    loadComponent: () => import('./pages/admin/admin.page').then((m) => m.AdminPage),
+    loadComponent: () => import('@hexly/admin-web').then((m) => m.AdminPage),
     title: 'admin.tabTitle',
   },
   {
