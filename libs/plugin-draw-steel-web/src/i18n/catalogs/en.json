@@ -1,0 +1,51 @@
+{
+  "monster": {
+    "eyebrow": "Monster",
+    "titleLabel": "Monster name",
+    "rename": "Rename monster",
+    "editorLabel": "Monster lore",
+    "create": "New monster",
+    "untitled": "Untitled monster",
+    "loreHint": "Switch to the Note view for this monster's lore, tactics, and director notes.",
+    "view": {
+      "statBlock": "Stat block"
+    }
+  },
+  "statBlock": {
+    "dataType": "Stat block",
+    "stat": {
+      "might": "Might",
+      "agility": "Agility",
+      "reason": "Reason",
+      "intuition": "Intuition",
+      "presence": "Presence",
+      "stamina": "Stamina",
+      "size": "Size",
+      "stability": "Stability",
+      "save_threshold": "Save threshold",
+      "speed": "Speed",
+      "free_strike": "Free strike",
+      "movement_types": "Movement",
+      "role": "Role",
+      "organization": "Organization",
+      "level": "Level",
+      "ev": "EV",
+      "keywords": "Keywords"
+    },
+    "section": {
+      "immunities": "Immunities",
+      "weaknesses": "Weaknesses"
+    },
+    "damage": {
+      "acid": "Acid",
+      "cold": "Cold",
+      "corruption": "Corruption",
+      "fire": "Fire",
+      "holy": "Holy",
+      "lightning": "Lightning",
+      "poison": "Poison",
+      "psychic": "Psychic",
+      "sonic": "Sonic"
+    }
+  }
+}

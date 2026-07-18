@@ -25,6 +25,7 @@ import { COMMAND_PALETTE_TRANSLATIONS } from '@hexly/command-palette-web/i18n';
 import { ENTITY_TYPES } from '@hexly/web-entity';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
+import { providePluginDrawSteel } from '@hexly/plugin-draw-steel/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { TypeRegistry } from './entity-types/type-registry';
 import { provideBuiltInCommands } from './shell/built-in-commands';
@@ -83,5 +84,6 @@ export const appConfig: ApplicationConfig = {
     providePluginContent(),
     providePluginHexmap(),
     providePluginDnd(),
+    providePluginDrawSteel(),
   ],
 };

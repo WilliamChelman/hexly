@@ -1,6 +1,7 @@
 import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
+import { providePluginDrawSteel } from '@hexly/plugin-draw-steel/web';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { firstValueFrom } from 'rxjs';
@@ -20,6 +21,7 @@ describe('CreateCommands', () => {
         providePluginContent(),
         providePluginHexmap(),
         providePluginDnd(),
+        providePluginDrawSteel(),
         { provide: DialogService, useValue: { open } },
       ],
     });
@@ -33,8 +35,20 @@ describe('CreateCommands', () => {
   it('offers a create Command per registered type — core first, then the bundled plugins', async () => {
     const commands = await firstValueFrom(provider.search(''));
     // Not one of these is enumerated in the app: each `providePluginX()` registers its type, and the
-    // Command — id and label alike — falls out of `types.all()` (#192, #199).
-    expect(commands.map((c) => c.id)).toEqual(['create-core.note', 'create-core.hexmap', 'create-dnd.monster']);
+    // Command — id and label alike — falls out of `types.all()` (#192, #199). Enabling the Draw Steel
+    // plugin surfaces its own Monster create affordance beside dnd's (#243).
+    expect(commands.map((c) => c.id)).toEqual([
+      'create-core.note',
+      'create-core.hexmap',
+      'create-dnd.monster',
+      'create-draw-steel.monster',
+    ]);
+  });
+
+  it('opens the create dialog seeded with the Draw Steel Monster type when its Command runs', async () => {
+    const commands = await firstValueFrom(provider.search(''));
+    commands.find((c) => c.id === 'create-draw-steel.monster')?.run();
+    expect(open).toHaveBeenCalledWith(CreateEntityDialogComponent, { type: 'draw-steel.monster' });
   });
 
   it('opens the create dialog seeded with the Note type when Create Note runs', async () => {

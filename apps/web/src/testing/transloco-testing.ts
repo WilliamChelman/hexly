@@ -1,6 +1,7 @@
 import { COMMAND_PALETTE_TEST_CATALOGS } from '@hexly/command-palette-web/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '@hexly/plugin-content/testing';
 import { DND_TEST_CATALOGS } from '@hexly/plugin-dnd/testing';
+import { DS_TEST_CATALOGS } from '@hexly/plugin-draw-steel/testing';
 import {
   TestCatalogs,
   WEB_CORE_TEST_CATALOGS,
@@ -28,6 +29,7 @@ export function provideTranslocoTesting(...overrides: readonly TestCatalogs[]) {
     CONTENT_EDITOR_TEST_CATALOGS,
     HEXMAP_TEST_CATALOGS,
     DND_TEST_CATALOGS,
+    DS_TEST_CATALOGS,
     ...overrides,
   );
 }
