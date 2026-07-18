@@ -1,10 +1,4 @@
-import {
-  deriveFieldFacets,
-  deriveSearchText,
-  harvestEdges,
-  resolveEffectiveFields,
-  VaultExportContext,
-} from '@hexly/domain';
+import { deriveDocumentState, resolveEffectiveFields, VaultExportContext } from '@hexly/domain';
 import { entityToMarkdown } from '@hexly/obsidian';
 import { CORE_NOTE, PLUGIN_ID as CONTENT_PLUGIN_ID, tiptapContent } from '@hexly/plugin-content';
 import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
@@ -108,19 +102,21 @@ describe('plugin enablement — uniform absence on the server', () => {
     it('harvests the grid’s edges and search text when hexmap is enabled', () => {
       const registry = new TypeFieldRegistry(allEnabled());
       const fields = fieldsFor(registry, ['core.hexmap']);
-      expect(harvestEdges(doc, fields, registry.structuredDataTypes)).toContainEqual({
+      const state = deriveDocumentState(doc, fields, registry.structuredDataTypes);
+      expect(state.edges).toContainEqual({
         targetKind: 'entity',
         targetId: 'ashford-note',
         descriptor: null,
       });
-      expect(deriveSearchText(doc, fields, registry.structuredDataTypes)).toContain('Ashford');
+      expect(state.searchText).toContain('Ashford');
     });
 
     it('harvests no edges and no derived search text when hexmap is disabled', () => {
       const registry = new TypeFieldRegistry(withDisabled(HEXMAP_PLUGIN_ID));
       const fields = fieldsFor(registry, ['core.hexmap']);
-      expect(harvestEdges(doc, fields, registry.structuredDataTypes)).toEqual([]);
-      expect(deriveSearchText(doc, fields, registry.structuredDataTypes)).toBe('');
+      const state = deriveDocumentState(doc, fields, registry.structuredDataTypes);
+      expect(state.edges).toEqual([]);
+      expect(state.searchText).toBe('');
     });
   });
 
@@ -131,7 +127,7 @@ describe('plugin enablement — uniform absence on the server', () => {
     it('harvests the stat block’s dimensions when dnd is enabled — never its ability scores', () => {
       const registry = new TypeFieldRegistry(allEnabled());
       const fields = fieldsFor(registry, [DND_MONSTER]);
-      const facets = deriveFieldFacets(fields, doc, registry.structuredDataTypes);
+      const facets = deriveDocumentState(doc, fields, registry.structuredDataTypes).fieldFacets;
       expect(facets).toEqual([
         { key: 'size', value: 'Huge', num: null },
         { key: 'creature_type', value: 'dragon', num: null },
@@ -143,7 +139,7 @@ describe('plugin enablement — uniform absence on the server', () => {
       const registry = new TypeFieldRegistry(withDisabled(DND_PLUGIN_ID));
       const fields = fieldsFor(registry, [DND_MONSTER]);
       // The `dnd.stat-block` Data Type drops from the set, so faceting simply stops (ADR-0055)…
-      expect(deriveFieldFacets(fields, doc, registry.structuredDataTypes)).toEqual([]);
+      expect(deriveDocumentState(doc, fields, registry.structuredDataTypes).fieldFacets).toEqual([]);
       // …and the value is untouched — a lens that doesn't apply leaves the document readable.
       expect(doc['dnd.stat_block']).toEqual({
         size: 'Huge',

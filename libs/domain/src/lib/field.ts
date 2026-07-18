@@ -136,7 +136,7 @@ export function isEntityLinkDataType(dataType: FieldDataType): boolean {
 /**
  * Whether a Field is offered as a **direct** Facet. A Field of a **Structured Data Type** never is,
  * whatever its `facetable` flag says (ADR-0050): the blob has no discrete values to count. Its Data Type
- * may still *harvest* facet dimensions instead ({@link deriveFieldFacets}, ADR-0055).
+ * may still *harvest* facet dimensions instead ({@link deriveDocumentState}, ADR-0055).
  */
 export function isFacetableField(field: Field): field is Field & { dataType: BuiltInDataType } {
   return field.facetable && !isStructuredDataType(field.dataType);
@@ -347,47 +347,11 @@ export interface FieldFacetValue {
 }
 
 /**
- * The pure Field-facet derivation (ADR-0048, ADR-0055): a resolved Field set + EntityDocument + the
- * host-composed **Structured Data Type** set → the denormalised facet values. Two sources share one flat
- * `key` space — scalar facetable Fields (a *present, well-typed* value; a `list` explodes per item) and
- * the dimensions a structured Field's Data Type harvests (never its `facetable` flag, ADR-0055). The
- * scalar walk runs first, so it wins a `(key, value)` collision; values repeated within one Entity
- * collapse so a count is per-Entity.
- */
-export function deriveFieldFacets(
-  fields: readonly Field[],
-  doc: EntityDocument | undefined,
-  dataTypes: StructuredDataTypeSet,
-): FieldFacetValue[] {
-  const seen = new Set<string>();
-  const out: FieldFacetValue[] = [];
-  const add = (row: FieldFacetValue) => {
-    // Dedup on (key, value) so a value repeated within one Entity — a list with dupes, or a scalar and a
-    // harvested dimension coinciding — counts once. JSON.stringify keeps the two parts unambiguous.
-    const dedupKey = JSON.stringify([row.key, row.value]);
-    if (seen.has(dedupKey)) return;
-    seen.add(dedupKey);
-    out.push(row);
-  };
-  // Scalar Fields first, so a scalar wins a shared (key, value) (ADR-0048).
-  for (const field of fields) {
-    if (!isFacetableField(field)) continue;
-    const raw = readField(doc, field);
-    if (raw === undefined || raw === null) continue;
-    for (const item of facetItems(field.dataType, raw)) add({ key: field.id, value: item.value, num: item.num });
-  }
-  // Then each structured Field's harvested dimensions (ADR-0055) — the wrapper already degraded an
-  // at-rest value and dropped any undeclared key.
-  for (const { field, dataType } of resolvedStructuredDataTypeFields(fields, dataTypes))
-    for (const row of dataType.harvestFacets?.(readField(doc, field)) ?? []) add(row);
-  return out;
-}
-
-/**
  * A Field's facet rows: a `list` maps each well-typed item, an `entityLink` yields its target id (the
- * facet filters by a stable id, not the mutable name), a scalar its one well-typed value.
+ * facet filters by a stable id, not the mutable name), a scalar its one well-typed value. The scalar
+ * counterpart to a **Structured Data Type**'s `harvestFacets`; {@link deriveDocumentState} composes both.
  */
-function facetItems(dataType: BuiltInDataType, raw: unknown): { value: string; num: number | null }[] {
+export function facetItems(dataType: BuiltInDataType, raw: unknown): { value: string; num: number | null }[] {
   if (dataType.kind === 'list') return Array.isArray(raw) ? raw.flatMap((item) => scalarFacet(dataType.of, item)) : [];
   if (dataType.kind === 'entityLink') {
     const parsed = entityLinkValueSchema.safeParse(raw);
@@ -407,7 +371,7 @@ function scalarFacet(dataType: ScalarDataType, raw: unknown): { value: string; n
 /**
  * Every Entity-Link Field value an Entity's EntityDocument carries, keyed by the Field. Only an `entityLink`
  * Field with a present, shape-valid value contributes (a blank or ill-typed one is skipped,
- * forward-only). Feeds {@link harvestEdges}.
+ * forward-only). Feeds {@link deriveDocumentState}.
  */
 export function entityLinkFieldValues(
   fields: readonly Field[],

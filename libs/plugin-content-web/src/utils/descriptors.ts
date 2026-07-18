@@ -2,7 +2,7 @@ import { Editor } from '@tiptap/core';
 import { EditorState } from '@tiptap/pm/state';
 import { VocabItem, vocabItems } from '@hexly/plugin-content';
 
-// Link Descriptors are harvested server-side from the saved Content (`harvestEdges` in
+// Link Descriptors are harvested server-side from the saved Content (`deriveDocumentState` in
 // @hexly/domain, run by the write path on every save), so this module only sets attrs on
 // links: the `::`/`|`/`#` picker mechanics. Shared vocabulary rows live in vocab-items.ts.
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
+import { deriveDocumentState, DocumentDerivedState } from './derive-document-state';
 import {
   defineField,
-  deriveFieldFacets,
   entityLinkConstraints,
   entityLinkFieldValues,
   Field,
@@ -41,13 +41,16 @@ function validate(
   return validateFields(fields, metadata, dataTypes);
 }
 
-/** `deriveFieldFacets` takes the data-type set explicitly too; the scalar path needs none of it. */
+/**
+ * The facet rows `deriveDocumentState` derives, crossing the one document-derived-state seam (the scalar
+ * path needs no data-types). The facet behaviour these specs assert now rides the composed derivation.
+ */
 function facets(
   fields: readonly Field[],
   doc: EntityDocument | undefined,
   dataTypes = NO_STRUCTURED_DATA_TYPES,
-): ReturnType<typeof deriveFieldFacets> {
-  return deriveFieldFacets(fields, doc, dataTypes);
+): DocumentDerivedState['fieldFacets'] {
+  return deriveDocumentState(doc, fields, dataTypes).fieldFacets;
 }
 
 /** A stand-in for a plugin's structured data-type. */
@@ -428,7 +431,7 @@ describe('validateFields (forward-only)', () => {
   });
 });
 
-describe('deriveFieldFacets (the write-time denormalisation, a lens over EntityDocument)', () => {
+describe('deriveDocumentState fieldFacets (the write-time denormalisation, a lens over EntityDocument)', () => {
   const fields: FieldSchema[] = [
     field({ id: 'cr', dataType: { kind: 'number' }, facetable: true }),
     field({
@@ -801,7 +804,7 @@ describe('Structured Data Type (ADR-0050)', () => {
     });
   });
 
-  describe('deriveFieldFacets and a Field of a Structured Data Type (ADR-0055)', () => {
+  describe('deriveDocumentState fieldFacets and a Field of a Structured Data Type (ADR-0055)', () => {
     it('never facets a structured Field *directly*, whatever its facetable flag says', () => {
       // `test.board` declares no dimensions and harvests nothing: the blob has no values to count.
       const facetable = field({ id: 'board', dataType: { kind: 'test.board' }, facetable: true });

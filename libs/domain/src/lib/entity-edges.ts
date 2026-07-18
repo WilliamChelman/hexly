@@ -1,11 +1,9 @@
 /**
- * Harvest the Entity Links an Entity's document expresses, as a flat edge set (ADR-0046). The write
- * path derives this on every save and materializes it into the derived edge index.
+ * The Entity-Link edge shapes (ADR-0046) — the flat edge set an Entity's document expresses, and the
+ * per-viewer References an edge resolves to. The derivation itself lives in {@link deriveDocumentState}.
  */
 
 import { EntityType } from './entity';
-import { entityLinkFieldValues, Field, EntityDocument, readField, resolvedStructuredDataTypeFields } from './field';
-import type { StructuredDataTypeSet } from './structured-data-type';
 
 /** What an edge points at: another Entity, or an Asset (CONTEXT.md → Asset). */
 export type EdgeTargetKind = 'entity' | 'asset';
@@ -56,44 +54,4 @@ export interface InboundReference {
 export interface EntityReferences {
   readonly references: readonly OutboundReference[];
   readonly referencedBy: readonly InboundReference[];
-}
-
-/**
- * Every edge the doc expresses, deduplicated on `(targetKind, targetId, descriptor)`: resolved
- * against the Entity's `fields`, each typed **Entity-Link Field** value (#190) and each **Structured
- * Data Type** Field's own harvest (a map's placements, a document's inline links and image Assets, ADR-0050,
- * ADR-0051). Nothing records *where* a link was expressed, so a prose mention, a map placement, and a
- * Field link to the same target collapse to one edge, while two descriptors to that target stay two.
- *
- * `doc` is the EntityDocument map, `fields` its resolved Field schema set ({@link resolveEffectiveFields}) and
- * `dataTypes` the host-composed **Structured Data Type** set (ADR-0050). The domain names no extractor
- * of its own: prose reaches this loop as the `core.rich-content` data-type, exactly as a grid does.
- */
-export function harvestEdges(
-  doc: EntityDocument,
-  fields: readonly Field[],
-  dataTypes: StructuredDataTypeSet,
-): EntityEdge[] {
-  const edges = new Map<string, EntityEdge>();
-  const add = (edge: EntityEdge) => {
-    // `\0` cannot occur in an id or a descriptor, so the key is unambiguous. The descriptor folds
-    // into the key but not into the row: `"Spouse"` and `"spouse"` name one relationship, and the
-    // first spelling authored is the one the edge — and so the References panel — carries.
-    const key = `${edge.targetKind}\0${edge.targetId}\0${edge.descriptor?.toLowerCase() ?? ''}`;
-    if (!edges.has(key)) edges.set(key, edge);
-  };
-  const entityEdge = (targetId: string | undefined, descriptor: string | null) => {
-    if (targetId) add({ targetKind: 'entity', targetId, descriptor });
-  };
-
-  // A typed Entity-Link Field value is a descriptor-less edge to its target (#190).
-  for (const { value } of entityLinkFieldValues(fields, doc)) entityEdge(value.entityId, null);
-
-  // A Field of a Structured Data Type harvests its own (ADR-0050): the value goes to the data-type the
-  // host registered, and the edges come back — the domain never learns what is inside it. Prose's inline
-  // links and image Assets arrive this way now too, through `core.rich-content` (ADR-0051).
-  for (const { field, dataType } of resolvedStructuredDataTypeFields(fields, dataTypes))
-    for (const edge of dataType.harvestEdges?.(readField(doc, field)) ?? []) add(edge);
-
-  return [...edges.values()];
 }
