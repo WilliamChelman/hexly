@@ -11,6 +11,8 @@ export * from './components/eyebrow.component';
 export * from './components/field.component';
 export * from './components/icon-button.component';
 export * from './icon/icon.component';
+export * from './icon/icon-glyph';
+export * from './icon/icon-registry';
 export * from './icon/icon-host.directive';
 export * from './icon/icon-path.component';
 export * from './components/input.component';
