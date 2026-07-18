@@ -22,9 +22,14 @@ export default [
           // jiti-run i18n-sync tool) that must not drag in the barrel's Angular
           // services layer; neither runtime resolves the tsconfig `paths` alias,
           // so a relative import is used and waived here.
+          // admin-web hosts a lazily-routed page (its barrel is `import()`-ed by the route), which
+          // marks the whole project lazy. Its `/i18n` entry must still be imported eagerly (ADR-0049,
+          // the route `title` needs the scope before the page loads); that entry carries only the
+          // scope declaration and JSON loaders, so it never drags the page barrel into the eager bundle.
           allow: [
             '^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$',
             '@hexly/web-core/testing',
+            '@hexly/admin-web/i18n',
             '^.*/libs/web-core/src/(utils/pretty-id|i18n/locale-key-sync)$',
           ],
           // ponytail: layering (core←ui←app) holds by construction and review;

@@ -1,0 +1,19 @@
+{
+  "tabTitle": "Admin — Hexly",
+  "heading": "Instance repair",
+  "reindex": {
+    "heading": "Repair",
+    "description": "Recompute every Entity's search text, Link Descriptors, and links from its content. Safe to run at any time.",
+    "submit": "Reindex all Entities",
+    "progress": "Reindexing… {{walked}} / {{total}}"
+  },
+  "toast": {
+    "reindexed": "Reindexed {count, plural, one {# entity} other {# entities}}",
+    "reindexedWithFailures": "Reindexed {count, plural, one {# entity} other {# entities}}. {failed, plural, one {# entity} other {# entities}} could not be read and {failed, plural, one {was} other {were}} skipped.",
+    "reindexAborted": "The reindex stopped before it finished. Nothing was lost — press Reindex again to resume.",
+    "error": "Something went wrong."
+  },
+  "error": {
+    "reindex-running": "A reindex is already running on this instance."
+  }
+}

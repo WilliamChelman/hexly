@@ -21,6 +21,7 @@ import {
 // would pull Tiptap out of the lazy entity chunk).
 import { WEB_UI_TRANSLATIONS } from '@hexly/web-ui/i18n';
 import { WEB_ENTITY_TRANSLATIONS } from '@hexly/web-entity/i18n';
+import { ADMIN_TRANSLATIONS } from '@hexly/admin-web/i18n';
 import { ENTITY_TYPES } from '@hexly/web-entity';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
@@ -47,7 +48,9 @@ export const appConfig: ApplicationConfig = {
     // declaring lib can trigger a load — from services, and from a type's label keys
     // (ADR-0049). A plugin's scope is not listed here: it rides on its `providePluginX()`
     // (the content plugin's `editor` scope arrives with `providePluginContent()`).
-    provideEagerTranslations(CORE_TRANSLATIONS, WEB_UI_TRANSLATIONS, WEB_ENTITY_TRANSLATIONS),
+    // admin's scope is eager because its route `title` (`admin.tabTitle`) is resolved by the
+    // TitleStrategy before the lazy Admin page can trigger the load (ADR-0049).
+    provideEagerTranslations(CORE_TRANSLATIONS, WEB_UI_TRANSLATIONS, WEB_ENTITY_TRANSLATIONS, ADMIN_TRANSLATIONS),
     // ICU MessageFormat transpiler: count-aware plural keys (e.g. the hex count)
     // resolve per the active locale's plural rules. It delegates {{…}} to the
     // default transpiler, so existing double-brace interpolation is unaffected.

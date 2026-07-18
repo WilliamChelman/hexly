@@ -4,8 +4,9 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ReindexJob } from '@hexly/domain';
 import { switchMap, takeWhile, timer } from 'rxjs';
-import { AdminClient, ToasterService } from '@hexly/web-core';
+import { ToasterService } from '@hexly/web-core';
 import { EyebrowComponent, PanelComponent, ButtonComponent } from '@hexly/web-ui';
+import { AdminClient } from '../services/admin.client';
 
 /** How often a running Reindex is polled. */
 const REINDEX_POLL_MS = 1000;

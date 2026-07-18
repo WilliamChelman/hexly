@@ -1,10 +1,12 @@
-import { provideTranslocoTesting } from '../../../testing/transloco-testing';
+import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ReindexJob } from '@hexly/domain';
-import { AdminClient, ToasterService } from '@hexly/web-core';
-import { MockAdminClient, reindexJob } from '@hexly/web-core/testing';
+import { ToasterService } from '@hexly/web-core';
+import { ADMIN_TEST_CATALOGS } from '../i18n/test-catalogs';
+import { AdminClient } from '../services/admin.client';
+import { MockAdminClient, reindexJob } from '../testing';
 import { AdminPage } from './admin.page';
 
 /** Matches the panel's own poll interval; one `tick` of it advances the walk by one poll. */
@@ -22,7 +24,7 @@ describe('Admin panel (Reindex)', () => {
   beforeEach(async () => {
     admin = new MockAdminClient();
     await TestBed.configureTestingModule({
-      imports: [AdminPage, provideTranslocoTesting()],
+      imports: [AdminPage, provideTranslocoTesting(ADMIN_TEST_CATALOGS)],
       providers: [{ provide: AdminClient, useValue: admin }],
     }).compileComponents();
     toaster = TestBed.inject(ToasterService);
