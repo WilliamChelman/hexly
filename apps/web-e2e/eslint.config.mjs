@@ -14,7 +14,7 @@ export default [
           allow: [
             '^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$',
             '^.*/libs/web-core/src/utils/pretty-id$',
-            '^.*/libs/web-entity/src/lib/view-instance$',
+            '^.*/libs/web-entity/src/utils/view-instance$',
           ],
           depConstraints: [
             {
