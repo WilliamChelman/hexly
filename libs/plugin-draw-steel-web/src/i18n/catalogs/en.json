@@ -22,19 +22,29 @@
       "stamina": "Stamina",
       "size": "Size",
       "stability": "Stability",
-      "save_threshold": "Save threshold",
       "speed": "Speed",
       "free_strike": "Free strike",
       "movement_types": "Movement",
+      "with_captain": "With Captain",
       "role": "Role",
       "organization": "Organization",
       "level": "Level",
       "ev": "EV",
       "keywords": "Keywords"
     },
+    "evForMinions": "for four minions",
+    "addDamageType": "Add type…",
+    "addKeyword": "Add keyword…",
+    "addMovement": "Add movement…",
+    "remove": "Remove",
+    "comingSoon": "Coming soon",
+    "startEditing": "Edit stats",
+    "doneEditing": "Done editing",
     "section": {
-      "immunities": "Immunities",
-      "weaknesses": "Weaknesses"
+      "immunities": "Immunity",
+      "weaknesses": "Weakness",
+      "abilities": "Abilities",
+      "traits": "Traits"
     },
     "damage": {
       "acid": "Acid",

@@ -22,19 +22,29 @@
       "stamina": "Vigueur",
       "size": "Taille",
       "stability": "Stabilité",
-      "save_threshold": "Seuil de sauvegarde",
       "speed": "Vitesse",
       "free_strike": "Attaque gratuite",
       "movement_types": "Déplacement",
+      "with_captain": "Avec capitaine",
       "role": "Rôle",
       "organization": "Organisation",
       "level": "Niveau",
       "ev": "VR",
       "keywords": "Mots-clés"
     },
+    "evForMinions": "pour quatre sbires",
+    "addDamageType": "Ajouter un type…",
+    "addKeyword": "Ajouter un mot-clé…",
+    "addMovement": "Ajouter un déplacement…",
+    "remove": "Retirer",
+    "comingSoon": "À venir",
+    "startEditing": "Modifier les stats",
+    "doneEditing": "Terminer",
     "section": {
-      "immunities": "Immunités",
-      "weaknesses": "Faiblesses"
+      "immunities": "Immunité",
+      "weaknesses": "Faiblesse",
+      "abilities": "Capacités",
+      "traits": "Traits"
     },
     "damage": {
       "acid": "Acide",

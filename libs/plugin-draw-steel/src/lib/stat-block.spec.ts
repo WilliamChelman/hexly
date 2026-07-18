@@ -35,8 +35,9 @@ describe('draw-steel.stat-block data type', () => {
     // A partial block and the empty block both inhabit the schema — requiredness is a consumer concern.
     expect(statBlockSchema.safeParse({ level: 3, role: 'brute', might: 2 }).success).toBe(true);
     expect(statBlockSchema.safeParse({}).success).toBe(true);
-    // The damage maps and the movement list parse as nested/enum-checked values.
-    expect(statBlockSchema.safeParse({ immunities: { fire: 5 }, movement_types: ['fly', 'walk'] }).success).toBe(true);
+    // The damage maps and the movement list parse as nested/enum-checked values, and size as a token.
+    expect(statBlockSchema.safeParse({ immunities: { fire: 5 }, movement_types: ['fly', 'climb'] }).success).toBe(true);
+    expect(statBlockSchema.safeParse({ size: '1S' }).success).toBe(true);
   });
 
   it('rejects a mistyped stat — a string where a number belongs, an out-of-enum role (forward-only gate)', () => {
@@ -44,8 +45,10 @@ describe('draw-steel.stat-block data type', () => {
     expect(statBlockSchema.safeParse({ role: 'wizard' }).success).toBe(false);
     // The nested map holds numbers; a non-damage-type key or a non-number value is rejected.
     expect(statBlockSchema.safeParse({ immunities: { fire: 'lots' } }).success).toBe(false);
-    // A movement type outside the pinned `ds.CONFIG` set is rejected.
-    expect(statBlockSchema.safeParse({ movement_types: ['glide'] }).success).toBe(false);
+    // A movement type outside the pinned set is rejected — `walk` was dropped, `hover` added.
+    expect(statBlockSchema.safeParse({ movement_types: ['walk'] }).success).toBe(false);
+    // Size is a closed token set now, not free text.
+    expect(statBlockSchema.safeParse({ size: '6' }).success).toBe(false);
   });
 
   it('strips an unknown top-level key rather than carrying it into the block', () => {

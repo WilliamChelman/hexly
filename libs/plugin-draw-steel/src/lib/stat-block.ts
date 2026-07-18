@@ -50,7 +50,13 @@ export const DS_ROLE_OPTIONS = [
 export const DS_ORGANIZATION_OPTIONS = ['minion', 'horde', 'platoon', 'elite', 'leader', 'solo'] as const;
 
 /** The movement kinds `speed` may apply to — the item type of the `movement_types` list. */
-export const DS_MOVEMENT_TYPE_OPTIONS = ['walk', 'climb', 'fly', 'burrow', 'swim', 'teleport'] as const;
+export const DS_MOVEMENT_TYPE_OPTIONS = ['climb', 'swim', 'fly', 'burrow', 'hover', 'teleport'] as const;
+
+/**
+ * The printed size tokens a creature may carry — a closed set (`1T` tiny … `5`), so the View offers a
+ * pick rather than free text. Draw Steel writes size as a token, not a number, hence a string enum.
+ */
+export const DS_SIZE_OPTIONS = ['1T', '1S', '1M', '1L', '2', '3', '4', '5'] as const;
 
 /** The damage types a creature may be immune or weak to — the keys of the `immunities`/`weaknesses` maps. */
 export const DS_DAMAGE_TYPE_OPTIONS = [
@@ -91,10 +97,12 @@ export const DS_IDENTITY_KEYS = ['level', 'role', 'organization', 'ev', 'keyword
 export const DS_DEFENCE_KEYS = [
   'stamina',
   'stability',
-  'save_threshold',
   'speed',
   'free_strike',
   'movement_types',
+  // The minion captain bonus rides this block on the card, so it partitions here beside movement — a
+  // free-text line (`+1 damage bonus to strikes`), rendered only for a `minion` organization.
+  'with_captain',
 ] as const;
 
 /** The two per-damage-type maps — rendered as their own sections, never flat slots. */
@@ -121,13 +129,14 @@ export const statBlockSchema = z
     presence: z.number().finite(),
     // Defences / movement.
     stamina: z.number().finite(),
-    // Draw Steel size is a printed token (`1S`, `1M`, `1L`, `2`, …), not a closed enum.
-    size: z.string(),
+    // Draw Steel writes size as a printed token; {@link DS_SIZE_OPTIONS} pins the closed set.
+    size: z.enum(DS_SIZE_OPTIONS),
     stability: z.number().finite(),
-    save_threshold: z.number().finite(),
     speed: z.number().finite(),
     movement_types: z.array(z.enum(DS_MOVEMENT_TYPE_OPTIONS)),
     free_strike: z.number().finite(),
+    // Minion-only free text ("+1 damage bonus to strikes"); the View gates its render on `organization`.
+    with_captain: z.string(),
     immunities: damageMapSchema,
     weaknesses: damageMapSchema,
     // Identity.
@@ -191,14 +200,14 @@ export const DS_STAT_FIELDS: readonly Field[] = [
   stat('organization', 'Organization', { kind: 'enum', options: [...DS_ORGANIZATION_OPTIONS] }),
   stat('ev', 'EV', { kind: 'number' }),
   stat('keywords', 'Keywords', { kind: 'list', of: { kind: 'string' } }),
-  stat('size', 'Size', { kind: 'string' }),
+  stat('size', 'Size', { kind: 'enum', options: [...DS_SIZE_OPTIONS] }),
   // Defences / movement.
   stat('stamina', 'Stamina', { kind: 'number' }),
   stat('stability', 'Stability', { kind: 'number' }),
-  stat('save_threshold', 'Save threshold', { kind: 'number' }),
   stat('speed', 'Speed', { kind: 'number' }),
   stat('free_strike', 'Free strike', { kind: 'number' }),
   stat('movement_types', 'Movement', { kind: 'list', of: { kind: 'enum', options: [...DS_MOVEMENT_TYPE_OPTIONS] } }),
+  stat('with_captain', 'With Captain', { kind: 'string' }),
   // Characteristics (the grid prints the abbreviation; this label is the row fallback / catalog anchor).
   ...DS_CHARACTERISTIC_KEYS.map((key) => stat(key, capitalize(key), { kind: 'number' })),
 ];
