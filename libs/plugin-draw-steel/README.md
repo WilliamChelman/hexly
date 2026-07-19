@@ -44,13 +44,18 @@ shows**, not a resolvable rules engine (a later importer maps Foundry pack-sourc
 - **Keywords** — free-form tags grouping a creature (humanoid, goblin, undead, …).
 - **Trait** — a passive property a creature always has (name + effect prose), printed above its abilities.
 - **Ability** — an active action a creature takes: a signature strike, a maneuver, a triggered or villain
-  action. Carries its action `type` (from `ds.CONFIG.abilityTypes`), display `distance`/`target`, optional
-  `cost`/`trigger`, and either a **Power Roll** or a flat `effect`.
+  action. Carries its action `type` (from `ds.CONFIG.abilityTypes`), an optional `category` (`signature` /
+  `heroic` / `villain` / `maliceAncestry`) distinct from that turn slot, display `distance`/`target`, an
+  optional numeric `malice` cost and `trigger`, and either a **Power Roll** or a flat `effect`.
 - **Power Roll** — the 2d6 + Characteristic roll an Ability resolves through, read here as its three flat
   **tier** texts (`t1` ≤11 / `t2` 12–16 / `t3` 17+). Render-faithful, not resolvable.
 
-The enum vocabularies (role, organization, movement type, damage type, ability type) are pinned from the
-Draw Steel repo's `ds.CONFIG` (branch `1.1.x`) so they match the data a bulk import will later read.
+Beyond the characteristics and identity, the block carries the action-economy defences a stat block prints:
+`save` and `turns` (numbers) and a closed `condition_immunities` list (from `ds.CONFIG.conditions`).
+
+The enum vocabularies (role, organization, movement type, damage type, condition, ability type, ability
+category) are pinned from the Draw Steel repo's `ds.CONFIG` (branch `1.1.x`) so they match the data a bulk
+import will later read.
 
 ## Stat-block shape and stance
 

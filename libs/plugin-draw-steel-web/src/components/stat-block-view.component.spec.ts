@@ -183,7 +183,7 @@ describe('StatBlockView (draw-steel)', () => {
           {
             name: 'Cleave',
             type: 'main',
-            cost: 'Signature',
+            category: 'signature',
             keywords: ['melee', 'weapon'],
             distance: 'Melee 1',
             target: 'One creature',
@@ -587,5 +587,119 @@ describe('StatBlockView (draw-steel)', () => {
     for (const stat of DS_STAT_FIELDS) {
       expect(el.querySelector(`[data-testid=stat-${stat.id}]`)).not.toBeNull();
     }
+  });
+
+  // --- Schema delta #254: save, turns, condition immunities, ability malice + category ----------------
+
+  it('prints the save and turns defences on the rail for a reader (#254)', () => {
+    const { el } = render({ save: 4, turns: 2 }, false);
+    expect(el.querySelector('[data-testid=stat-save]')?.textContent).toContain('4');
+    expect(el.querySelector('[data-testid=stat-turns]')?.textContent).toContain('2');
+  });
+
+  it('edits the save defence back through the same lens the rest of the card writes (#254)', () => {
+    const { fixture, session, el } = render({ save: 4, turns: 2 });
+    startEditing(el, fixture);
+    const save = el.querySelector('[data-testid=stat-save] input') as HTMLInputElement;
+    expect(save.value).toBe('4');
+    save.value = '5';
+    save.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(statBlock(session)).toMatchObject({ save: 5, turns: 2 });
+  });
+
+  it('constrains condition immunities to the pinned set, adding one into a nested list (#254)', () => {
+    const { fixture, session, el } = render({}); // empty → edit mode
+
+    const add = el.querySelector('[data-testid=stat-condition_immunities] select') as HTMLSelectElement;
+    const options = Array.from(add.options).map((o) => o.value);
+    expect(options).toContain('frightened');
+    expect(options).not.toContain('stunned');
+
+    add.value = 'prone';
+    add.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(statBlock(session)).toEqual({ condition_immunities: ['prone'] });
+  });
+
+  it('prints condition immunities joined for a reader (#254)', () => {
+    const { el } = render({ condition_immunities: ['frightened', 'prone'] }, false);
+    expect(el.querySelector('[data-testid=stat-condition_immunities]')?.textContent).toContain('frightened, prone');
+  });
+
+  it('edits an ability malice (number) and category (enum) into the block, dropping blanks (#254)', () => {
+    const { fixture, session, el } = render({
+      abilities: [{ name: 'Doom', type: 'villain', keywords: [], distance: '', target: '' }],
+    });
+    startEditing(el, fixture);
+
+    const category = el.querySelector('[data-testid=ability-0] [data-testid=ability-category]') as HTMLSelectElement;
+    expect(Array.from(category.options).map((o) => o.value)).toContain('villain');
+    category.value = 'villain';
+    category.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const malice = el.querySelector('[data-testid=ability-0] [data-testid=ability-malice]') as HTMLInputElement;
+    malice.value = '3';
+    malice.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(statBlock(session)).toEqual({
+      abilities: [
+        { name: 'Doom', type: 'villain', category: 'villain', malice: 3, keywords: [], distance: '', target: '' },
+      ],
+    });
+
+    // Clearing the malice drops it — no husk into the frontmatter.
+    malice.value = '';
+    malice.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(statBlock(session)).toEqual({
+      abilities: [{ name: 'Doom', type: 'villain', category: 'villain', keywords: [], distance: '', target: '' }],
+    });
+  });
+
+  it('reads a hand-authored malice + category ability, showing the category and the malice (#254)', () => {
+    const { el } = render(
+      {
+        abilities: [
+          {
+            name: 'Doom',
+            type: 'villain',
+            category: 'villain',
+            malice: 3,
+            keywords: [],
+            distance: '',
+            target: '',
+            effect: 'Everyone suffers.',
+          },
+        ],
+      },
+      false,
+    );
+    const ability = el.querySelector('[data-testid=section-abilities] [data-testid=ability-0]');
+    expect(ability?.querySelector('[data-testid=ability-category-read]')?.textContent).toContain('Villain');
+    expect(ability?.querySelector('[data-testid=ability-malice-read]')?.textContent).toContain('3');
+  });
+
+  it('drives the signature highlight off the category enum, not a cost string (#254)', () => {
+    const { el } = render(
+      {
+        abilities: [
+          {
+            name: 'Cleave',
+            type: 'triggered',
+            category: 'signature',
+            keywords: [],
+            distance: '',
+            target: '',
+            effect: 'x',
+          },
+        ],
+      },
+      false,
+    );
+    // A signature-categorised ability gets the gold accent bar even when its turn-slot type is not `main`.
+    expect(el.querySelector('[data-testid=ability-0]')?.getAttribute('class')).toContain('border-gold');
   });
 });

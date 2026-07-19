@@ -1,14 +1,17 @@
 import { EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
 import {
   LucideAnchor,
+  LucideBan,
   LucideCrown,
   LucideDices,
   LucideFootprints,
   LucideGauge,
   LucideHeart,
+  LucideRepeat,
   LucideRuler,
   LucideShieldAlert,
   LucideShieldCheck,
+  LucideShieldHalf,
   LucideSwords,
   LucideZap,
 } from '@lucide/angular';
@@ -41,6 +44,10 @@ export function providePluginDrawSteel(): EnvironmentProviders {
       lucideGlyph('ds-speed', LucideGauge),
       lucideGlyph('ds-stamina', LucideHeart),
       lucideGlyph('ds-stability', LucideAnchor),
+      // The action-economy defences #254 adds: the saving throw, the extra-turn count, condition immunity.
+      lucideGlyph('ds-save', LucideShieldHalf),
+      lucideGlyph('ds-turns', LucideRepeat),
+      lucideGlyph('ds-condition', LucideBan),
       lucideGlyph('ds-free-strike', LucideZap),
       lucideGlyph('ds-movement', LucideFootprints),
       lucideGlyph('ds-captain', LucideCrown),
