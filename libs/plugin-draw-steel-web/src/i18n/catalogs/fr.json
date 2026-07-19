@@ -67,6 +67,11 @@
     "powerRoll": "Jet de puissance",
     "addPowerRoll": "Ajouter un jet de puissance",
     "removePowerRoll": "Retirer le jet de puissance",
+    "tier": {
+      "t1": "Palier 1",
+      "t2": "Palier 2",
+      "t3": "Palier 3"
+    },
     "abilityTypeOption": {
       "main": "Action principale",
       "maneuver": "Manœuvre",

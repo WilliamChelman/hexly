@@ -13,6 +13,7 @@ import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import {
   DS_CHARACTERISTIC_ABBREVIATIONS,
   DS_CHARACTERISTIC_KEYS,
+  DsCharacteristicKey,
   DS_DAMAGE_TYPE_OPTIONS,
   DS_MAP_KEYS,
   DS_STAT_BLOCK_FIELD,
@@ -251,6 +252,7 @@ import { AbilitiesSectionComponent } from './abilities-section.component';
         <ds-abilities-section
           [value]="value('abilities')"
           [writable]="edit()"
+          [characteristics]="characteristics()"
           (valueChange)="setByKey('abilities', $event)"
         />
 
@@ -297,6 +299,20 @@ export class StatBlockViewComponent {
   /** The stat strip's keys, in printed-card order — a size token then the four numeric defences. */
   protected readonly stripKeys = ['size', 'speed', 'stamina', 'stability', 'free_strike'] as const;
   protected readonly characteristicKeys = DS_CHARACTERISTIC_KEYS;
+
+  /**
+   * The five characteristic scores as a map, fed to the Abilities section so a read-view power roll resolves
+   * `2d10 + the characteristic` (#252). An absent or ill-typed score is simply omitted — the roll adds `0`.
+   */
+  protected readonly characteristics = computed<Partial<Record<DsCharacteristicKey, number>>>(() => {
+    const block = this.block();
+    const map: Partial<Record<DsCharacteristicKey, number>> = {};
+    for (const key of DS_CHARACTERISTIC_KEYS) {
+      const value = block[key];
+      if (typeof value === 'number') map[key] = value;
+    }
+    return map;
+  });
   /** The two damage maps, rendered as their own labelled lines above movement. */
   protected readonly damageSectionKeys = DS_MAP_KEYS;
   /** The closed damage vocabulary the immunity/weakness editors offer. */
