@@ -30,6 +30,17 @@ const baseElementShape = {
   z: z.number().int(),
 } as const;
 
+/**
+ * A **Box** element: a plain placed rectangle carrying nothing beyond the shared geometry and z-order.
+ * The **minimal static element** that proves the surface-agnostic element pipeline (Seam B, #267) — it
+ * has no kind-specific data of its own, so the Tool/Selection/Inspector/z-order machinery can be built
+ * and exercised end-to-end before the Text Block (#268) and Image (#269) kinds wire real content on.
+ */
+export const boxElementSchema = z.object({
+  ...baseElementShape,
+  kind: z.literal('box'),
+});
+
 /** An **Image** element: geometry plus the World **Asset** URL it displays. Always static (never armed). */
 export const imageElementSchema = z.object({
   ...baseElementShape,
@@ -64,8 +75,9 @@ export const textElementSchema = z.object({
   content: contentSchema,
 });
 
-/** A placed thing on the surface — one of the three kinds, discriminated by `kind`. */
+/** A placed thing on the surface — one of the element kinds, discriminated by `kind`. */
 export const boardElementSchema = z.discriminatedUnion('kind', [
+  boxElementSchema,
   imageElementSchema,
   embedElementSchema,
   textElementSchema,
@@ -83,6 +95,8 @@ export const boardSurfaceSchema = z.object({
 export type Point = z.infer<typeof pointSchema>;
 /** An element's drawn extent in world pixels. */
 export type Size = z.infer<typeof sizeSchema>;
+/** A Box Board Element — the minimal static element (Seam B, #267). */
+export type BoxElement = z.infer<typeof boxElementSchema>;
 /** An Image Board Element. */
 export type ImageElement = z.infer<typeof imageElementSchema>;
 /** An Embed Board Element. */

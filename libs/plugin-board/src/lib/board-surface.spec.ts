@@ -1,5 +1,7 @@
 import {
   addElement,
+  boardSurfaceSchema,
+  BoxElement,
   bringForward,
   bringToFront,
   BoardSurface,
@@ -25,6 +27,34 @@ const image = (id: string, z = 0): ImageElement => ({
 
 /** The ids in bottom→top stacking order. */
 const order = (surface: BoardSurface): string[] => stackingOrder(surface).map((element) => element.id);
+
+/** A minimal Box element — the Seam B minimal static element (#267). */
+const box = (id: string, z = 0): BoxElement => ({
+  id,
+  kind: 'box',
+  position: { x: 0, y: 0 },
+  size: { width: 10, height: 10 },
+  z,
+});
+
+describe('Box element (minimal static element, #267)', () => {
+  it('round-trips through the surface schema as a discriminated-union member', () => {
+    const surface = addElement(emptyBoardSurface(), box('a'));
+    const parsed = boardSurfaceSchema.safeParse(surface);
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.elements[0].kind).toBe('box');
+  });
+
+  it('flows through the shared geometry and z-order helpers like any element', () => {
+    let surface = addElement(addElement(emptyBoardSurface(), box('a')), box('b'));
+    surface = moveElement(surface, 'a', { x: 4, y: 6 });
+    surface = resizeElement(surface, 'a', { width: 30, height: 40 });
+    expect(stackingOrder(surface).map((e) => e.id)).toEqual(['a', 'b']);
+    const a = surface.elements.find((e) => e.id === 'a');
+    expect(a?.position).toEqual({ x: 4, y: 6 });
+    expect(a?.size).toEqual({ width: 30, height: 40 });
+  });
+});
 
 describe('Board element helpers (#263)', () => {
   it('adds an element on top of the stack (user story 21)', () => {

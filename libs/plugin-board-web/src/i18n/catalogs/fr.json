@@ -13,9 +13,35 @@
   },
   "canvas": {
     "label": "Surface de tableau",
+    "element": "Élément de tableau",
     "zoom": "Zoom",
     "zoomIn": "Zoom avant",
     "zoomOut": "Zoom arrière",
     "fit": "Réinitialiser la vue"
+  },
+  "toolPalette": {
+    "tools": "Outils",
+    "select": "Sélection",
+    "box": "Boîte",
+    "undo": "Annuler",
+    "redo": "Rétablir"
+  },
+  "inspector": {
+    "title": "Inspecteur",
+    "emptyHint": "Sélectionnez un élément pour modifier sa géométrie et son ordre d’empilement.",
+    "selectedElement": "Élément sélectionné",
+    "x": "X",
+    "y": "Y",
+    "width": "Largeur",
+    "height": "Hauteur",
+    "order": "Ordre d’empilement",
+    "toFront": "Premier plan",
+    "bringForward": "Avancer",
+    "sendBackward": "Reculer",
+    "toBack": "Arrière-plan",
+    "deleteElement": "Supprimer l’élément",
+    "multiTitle": "Sélection",
+    "selectedCount": "sélectionnés",
+    "deleteAll": "Tout supprimer"
   }
 }
