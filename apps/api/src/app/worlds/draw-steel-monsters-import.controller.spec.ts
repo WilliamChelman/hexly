@@ -80,6 +80,20 @@ describe('Draw Steel monsters import', () => {
       keywords: ['humanoid', 'human'],
     });
 
+    // The full stat block lands faithfully (#258/#259): three traits and the 16 abilities.
+    const ajaxBlock = ajax.detail.document[DS_STAT_BLOCK_KEY] as {
+      traits: { name: string }[];
+      abilities: { name: string; category?: string; powerRoll?: { t1: string } }[];
+    };
+    expect(ajaxBlock.traits.map((trait) => trait.name)).toEqual(['Ajax', "I'm Not Done Yet.", 'Tactical Stance']);
+    expect(ajaxBlock.abilities).toHaveLength(16);
+    // The signature ability's multi-tier power roll survives the round trip through produce → reconcile.
+    const blade = ajaxBlock.abilities.find((ability) => ability.name === 'Blade of the Gol King');
+    expect(blade?.category).toBe('signature');
+    expect(blade?.powerRoll?.t1).toBe('16 damage; M < 4 the target loses 1d3 Recoveries');
+    // No raw enricher token leaks into the landed document.
+    expect(JSON.stringify(ajaxBlock)).not.toMatch(/\[\[|\]\]|\{\{|@chr/);
+
     // Provenance stamped by the reconcile — the importer id and the pinned rev.
     expect(ajax.detail.document[HEXLY_SOURCE_KEY]).toEqual({
       importer: MONSTERS_IMPORTER_ID,
@@ -90,7 +104,14 @@ describe('Draw Steel monsters import', () => {
     // Art is dropped — no `img` anywhere in the imported document (ADR-0061).
     expect(JSON.stringify(ajax.detail.document)).not.toContain('.webp');
 
-    expect((await entityByName(ada, world, 'Goblin Warrior')).id).toBeDefined();
+    // The Goblin imports its family too, including the applied-condition tiers resolved via monster potency.
+    const goblin = await entityByName(ada, world, 'Goblin Warrior');
+    const goblinBlock = goblin.detail.document[DS_STAT_BLOCK_KEY] as {
+      abilities: { name: string; powerRoll?: { t1: string } }[];
+    };
+    expect(goblinBlock.abilities).toHaveLength(5);
+    const bury = goblinBlock.abilities.find((ability) => ability.name === 'Bury The Point');
+    expect(bury?.powerRoll?.t1).toBe('5 damage; M < 0 bleeding (save ends)');
   });
 
   it('lands a fetch failure as a failed run', async () => {

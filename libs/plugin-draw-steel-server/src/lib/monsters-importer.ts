@@ -8,8 +8,9 @@
  * free strike, and the per-type damage immunities/weaknesses). This pass adds the **structural, non-ability**
  * mapping (#258): the size token, movement types, the role→organization remap, condition immunities, the
  * `feature` items folded into `traits[]`, and the biography folded into `core.content` — every prose field
- * run through the one {@link foundryProseToText} converter so no raw enricher token leaks. Abilities remain a
- * follow-up. The transform is where Creator-License compliance is *baked in*, not left to a checklist
+ * run through the one {@link foundryProseToText} converter so no raw enricher token leaks. The `ability` items
+ * and their multi-tier power rolls fold into `abilities[]` through {@link abilitiesOf} (#259). The transform is
+ * where Creator-License compliance is *baked in*, not left to a checklist
  * (ADR-0061): the actor's art (`img`) is simply never read, so it cannot leak.
  */
 
@@ -31,6 +32,7 @@ import { CONTENT_FIELD } from '@hexly/plugin-content';
 import { ImportContext, Importer, ImportProduction, ImportRecord } from '@hexly/domain';
 import { z } from 'zod';
 import { foundryProseToContent, foundryProseToText } from './foundry-prose';
+import { abilitiesOf, MonsterCharacteristics } from './monster-abilities';
 import { MONSTERS_PINNED_SHA, MonstersFetchPort } from './monster-fetch-port';
 
 /** This Importer's `namespace.id` — the `importer` an Import Source names, and its key in the registry. */
@@ -71,8 +73,8 @@ const characteristicSchema = z.object({ value: z.number().finite() }).partial();
 const damageRecordSchema = z.record(z.string(), z.number()).optional();
 const descriptionSchema = z.object({ value: z.string(), director: z.string() }).partial().optional();
 
-/** A Foundry embedded item; only `feature` items are read (→ traits), and only their name + description. */
-const rawItemSchema = z
+/** A Foundry `feature` item; only its name + description are read (→ traits). Abilities are parsed apart, in {@link abilitiesOf}. */
+const featureItemSchema = z
   .object({
     name: z.string(),
     type: z.string(),
@@ -85,7 +87,8 @@ const rawMonsterSchema = z.object({
   name: z.string().optional(),
   type: z.string().optional(),
   img: z.string().optional(), // read only to be *ignored* — art is dropped (ADR-0061); never copied into the document
-  items: z.array(rawItemSchema).optional(),
+  // Items stay raw here: the ability transform (#259) needs the full item, not a feature-only projection.
+  items: z.array(z.unknown()).optional(),
   system: z
     .object({
       stamina: z.object({ max: z.number().finite() }).partial().optional(),
@@ -203,7 +206,24 @@ function statBlockOf(actor: RawMonster): StatBlock {
   const traits = traitsOf(actor.items);
   if (traits.length > 0) block.traits = traits;
 
+  const abilities = abilitiesOf(actor.items, characteristicScores(characteristics));
+  if (abilities.length > 0) block.abilities = abilities;
+
   return block;
+}
+
+/** The five characteristic scores as a flat record — the potency input the ability transform's power rolls read (#259). */
+function characteristicScores(
+  characteristics: NonNullable<RawMonster['system']>['characteristics'],
+): MonsterCharacteristics {
+  const source = characteristics ?? {};
+  return {
+    might: source.might?.value,
+    agility: source.agility?.value,
+    reason: source.reason?.value,
+    intuition: source.intuition?.value,
+    presence: source.presence?.value,
+  };
 }
 
 /** The closed enum vocabularies as membership sets — allocated once, shared by the structural mappers below. */
@@ -266,12 +286,15 @@ function conditionsOf(immunities: string[] | undefined): DsCondition[] {
  * yields a trait (its name is the content), mirroring how the source lists a named-only trait.
  */
 function traitsOf(items: RawMonster['items']): Trait[] {
-  return (items ?? [])
-    .filter((item) => item.type === 'feature' && typeof item.name === 'string')
-    .map((item) => ({
-      name: item.name as string,
-      effect: foundryProseToText(joinProse(item.system?.description)),
-    }));
+  const traits: Trait[] = [];
+  for (const raw of items ?? []) {
+    const parsed = featureItemSchema.safeParse(raw);
+    if (!parsed.success) continue;
+    const item = parsed.data;
+    if (item.type !== 'feature' || typeof item.name !== 'string') continue;
+    traits.push({ name: item.name, effect: foundryProseToText(joinProse(item.system?.description)) });
+  }
+  return traits;
 }
 
 /**
