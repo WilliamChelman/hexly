@@ -312,6 +312,87 @@ describe('Vault export endpoint', () => {
     expect(fm['dnd.stat_block']).toEqual(statBlock);
   });
 
+  it("round-trips a Draw Steel Monster's FULL stat block — numeric, traits, and abilities (ADR-0055, #247)", async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const worldId = await importVault(ada, { 'Note.md': '# Note' });
+
+    const entities = app.get(EntitiesService);
+    const created = entities.create(adaId, { types: ['draw-steel.monster'], name: 'Bone Colossus', worldId, tags: [] });
+    // Every branch in one value — scalars, damage maps, Traits (#245), Abilities (#246): if any needed a
+    // bespoke `toMarkdown`, that branch would drop on the round-trip (ADR-0055).
+    const statBlock = {
+      level: 3,
+      role: 'brute',
+      organization: 'elite',
+      ev: 12,
+      keywords: ['undead', 'humanoid'],
+      size: '2',
+      might: 3,
+      agility: 1,
+      reason: 0,
+      intuition: 1,
+      presence: 2,
+      stamina: 80,
+      stability: 2,
+      speed: 5,
+      free_strike: 6,
+      movement_types: ['climb'],
+      with_captain: '+1 damage bonus to strikes',
+      immunities: { fire: 5 },
+      weaknesses: { cold: 5 },
+      traits: [{ name: 'Crafty', effect: 'Ignores difficult terrain.' }],
+      abilities: [
+        {
+          name: 'Cleave',
+          type: 'main',
+          cost: 'Signature',
+          keywords: ['melee', 'weapon'],
+          distance: 'Melee 1',
+          target: 'One creature',
+          powerRoll: { characteristic: 'might', t1: '2 damage', t2: '5 damage', t3: '8 damage; push 1' },
+        },
+        {
+          name: 'Watchful',
+          type: 'triggered',
+          keywords: [],
+          distance: 'Self',
+          target: 'Self',
+          trigger: 'An enemy moves adjacent',
+          effect: 'The creature shifts 1.',
+        },
+      ],
+    };
+    entities.save(adaId, created.id, {
+      version: created.version,
+      tags: [],
+      document: {
+        'core.content': tiptapContent({
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'A tower of fused bone.' }] }],
+        }),
+        'draw-steel.stat_block': statBlock,
+      },
+    });
+
+    const { res, files } = await exportZip(ada, worldId);
+    const md = text(files, 'Bone Colossus.md');
+
+    // The whole block rides the frontmatter as one nested value; the prose projects to the body.
+    expect(frontmatter(md)['draw-steel.stat_block']).toEqual(statBlock);
+    expect(md).toContain('A tower of fused bone.');
+
+    // Re-importing the export reconstructs the block byte-for-byte — every branch survives the generic
+    // frontmatter path, no bespoke converter required (ADR-0055).
+    const reimport = await ada
+      .post('/worlds/import')
+      .attach('file', Buffer.from(res.body), 'Aldermoor.zip')
+      .expect(201);
+    const reimported = entities.listByWorld(adaId, reimport.body.worldId).find((e) => e.name === 'Bone Colossus');
+    expect(reimported?.types).toEqual(['draw-steel.monster']);
+    expect(reimported?.document['draw-steel.stat_block']).toEqual(statBlock);
+    expect(JSON.stringify(reimported?.document['core.content'])).toContain('A tower of fused bone.');
+  });
+
   it('round-trips a fixture vault: import → export reproduces the folder layout and content', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 8, 7, 6]);

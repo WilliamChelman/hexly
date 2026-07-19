@@ -152,7 +152,8 @@ describe('plugin enablement — uniform absence on the server', () => {
   });
 
   describe('facet harvest over a Draw Steel Monster (identity dimensions, ADR-0055 / #244)', () => {
-    // A stat block carrying the five identity dimensions — plus a characteristic and stamina, never facets.
+    // A FULL block — scalars, Traits (#245), Abilities (#246) — so the disabled case proves the whole
+    // value survives intact, not just the scalars (ADR-0052).
     const doc = {
       'draw-steel.stat_block': {
         role: 'brute',
@@ -162,6 +163,17 @@ describe('plugin enablement — uniform absence on the server', () => {
         keywords: ['undead', 'humanoid'],
         might: 2,
         stamina: 80,
+        traits: [{ name: 'Crafty', effect: 'Ignores difficult terrain.' }],
+        abilities: [
+          {
+            name: 'Cleave',
+            type: 'main',
+            keywords: ['melee'],
+            distance: 'Melee 1',
+            target: 'One creature',
+            powerRoll: { characteristic: 'might', t1: '2 damage', t2: '5 damage', t3: '8 damage; push 1' },
+          },
+        ],
       },
     };
 
@@ -186,7 +198,7 @@ describe('plugin enablement — uniform absence on the server', () => {
       const fields = fieldsFor(registry, [DS_MONSTER]);
       // The `draw-steel.stat-block` Data Type drops from the set, so faceting simply stops (ADR-0055)…
       expect(deriveDocumentState(doc, fields, registry.structuredDataTypes).fieldFacets).toEqual([]);
-      // …and the value is untouched — a lens that doesn't apply leaves the document readable.
+      // …and the whole block is untouched — a lens that doesn't apply leaves the document readable (ADR-0052).
       expect(doc['draw-steel.stat_block']).toEqual({
         role: 'brute',
         organization: 'elite',
@@ -195,6 +207,17 @@ describe('plugin enablement — uniform absence on the server', () => {
         keywords: ['undead', 'humanoid'],
         might: 2,
         stamina: 80,
+        traits: [{ name: 'Crafty', effect: 'Ignores difficult terrain.' }],
+        abilities: [
+          {
+            name: 'Cleave',
+            type: 'main',
+            keywords: ['melee'],
+            distance: 'Melee 1',
+            target: 'One creature',
+            powerRoll: { characteristic: 'might', t1: '2 damage', t2: '5 damage', t3: '8 damage; push 1' },
+          },
+        ],
       });
     });
   });

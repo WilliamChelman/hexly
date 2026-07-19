@@ -2,8 +2,12 @@
 
 The bundled **Draw Steel** plugin (CONTEXT.md → Type Definition, ADR-0048/0058): the
 `draw-steel.monster` Entity Type and the stat-block View that renders it — a sibling of `plugin-dnd`
-with the same three-part shape. This first pass (#243, the "spine") is the **numeric/identity half** of
-the stat block; Traits, Abilities, and the Browser facet harvest are deliberate follow-ups (#242).
+with the same three-part shape. The stat block is now whole: the numeric/identity spine (#243), the
+Browser facet harvest (#244), the passive **Traits** (#245), and the **Abilities** with their
+render-faithful **Power Roll** tiers (#246). The block reuses the framework's Entity, Entity Type,
+Field, Structured Data Type, View, and Facet as-is — no bespoke Vault Projection and no new ADR: it
+projects to nested frontmatter and round-trips generically, degrading to the generic Field view with
+its values intact when the operator disables the Plugin (ADR-0052/0055, root `CONTEXT.md` untouched).
 
 Three entry points, because a plugin's halves have different consumers:
 
@@ -38,6 +42,31 @@ shows**, not a resolvable rules engine (a later importer maps Foundry pack-sourc
 - **Organization** — how it fields in an encounter (Minion, Horde, Platoon, Elite, Leader, Solo).
 - **Level / EV** — its level and Encounter Value, for budgeting an encounter.
 - **Keywords** — free-form tags grouping a creature (humanoid, goblin, undead, …).
+- **Trait** — a passive property a creature always has (name + effect prose), printed above its abilities.
+- **Ability** — an active action a creature takes: a signature strike, a maneuver, a triggered or villain
+  action. Carries its action `type` (from `ds.CONFIG.abilityTypes`), display `distance`/`target`, optional
+  `cost`/`trigger`, and either a **Power Roll** or a flat `effect`.
+- **Power Roll** — the 2d6 + Characteristic roll an Ability resolves through, read here as its three flat
+  **tier** texts (`t1` ≤11 / `t2` 12–16 / `t3` 17+). Render-faithful, not resolvable.
 
-The enum vocabularies (role, organization, movement type, damage type) are pinned from the Draw Steel
-repo's `ds.CONFIG` (branch `1.1.x`) so they match the data a bulk import will later read.
+The enum vocabularies (role, organization, movement type, damage type, ability type) are pinned from the
+Draw Steel repo's `ds.CONFIG` (branch `1.1.x`) so they match the data a bulk import will later read.
+
+## Stat-block shape and stance
+
+The `draw-steel.stat-block` **Structured Data Type** is one value in the EntityDocument, three bands the
+View lays out in printed-card order:
+
+1. **Identity** — `level`, `role`, `organization`, `ev`, `keywords`, `size`. The first five **harvest**
+   facet dimensions onto the Browser rail (#244), so a GM filters Monsters by what they _are_; a
+   characteristic or `stamina` is a stat, never a facet.
+2. **Defence / movement** — the five characteristics (`might`/`agility`/`reason`/`intuition`/`presence`,
+   where the value _is_ the modifier), `stamina`, `stability`, `speed`, `free_strike`, `movement_types`,
+   the minion-only `with_captain` line, and the `immunities`/`weaknesses` damage maps.
+3. **Sections** — the passive `traits` list, then the `abilities` list.
+
+**Render-faithful, flat-text tiers.** The block captures _what a printed block shows_, not a resolvable
+rules engine: Hexly never rolls, so a Power Roll's tiers are prose, and an Ability's `distance`/`target`
+are display strings, not typed geometry. This is a deliberate stance, not an ADR — the plugin reuses
+Entity, Entity Type, Field, Structured Data Type, View, and Facet unchanged, so root `CONTEXT.md` needs
+no new term. A later importer maps the Foundry pack-source onto this shape (#242).
