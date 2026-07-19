@@ -1,15 +1,17 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonComponent, InputComponent, SelectComponent, TextareaComponent } from '@hexly/web-ui';
 import {
   Ability,
   DS_ABILITY_TYPE_OPTIONS,
   DS_CHARACTERISTIC_KEYS,
+  DS_POWER_ROLL_TIERS,
   DsCharacteristicKey,
+  DsTierKey,
   PowerRoll,
 } from '@hexly/plugin-draw-steel';
-import { DICE_RNG, evaluate, formatRoll, parse } from '@hexly/dice-web';
 import { TokenListComponent } from './token-list.component';
+import { PowerRollDiceComponent } from './power-roll-dice.component';
 
 /**
  * The active **Abilities** section of the {@link StatBlockViewComponent} (#246). A lens, like the rest of
@@ -21,17 +23,23 @@ import { TokenListComponent } from './token-list.component';
  * `distance`/`target`/`cost`/`trigger` are display strings, not typed geometry.
  *
  * Storage stays render-faithful (the tiers are prose), but the read view **resolves a power roll ephemerally**
- * (#252): a roll button rolls `2d10 + the ability's characteristic`, the total bands to a tier (Draw Steel
- * owns that mapping — the dice lib stays generic), and the result rides a bubble anchored above the button
- * while its tier row highlights in place. The Roll is transient — nothing persists (CONTEXT.md → Dice) — and
- * a document click dismisses it.
+ * (#252): a {@link PowerRollDiceComponent} rolls `2d10 + the ability's characteristic` in its own bubble and
+ * reports back the banded tier, which this section highlights on the matching tier row. The Roll is transient —
+ * nothing persists (CONTEXT.md → Dice).
  */
 @Component({
   selector: 'ds-abilities-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  // A click anywhere outside a bubble dismisses it; the button/bubble handlers stop propagation to survive.
-  host: { class: 'contents', '(document:click)': 'dismissAll()' },
-  imports: [TranslocoPipe, ButtonComponent, InputComponent, TextareaComponent, SelectComponent, TokenListComponent],
+  host: { class: 'contents' },
+  imports: [
+    TranslocoPipe,
+    ButtonComponent,
+    InputComponent,
+    TextareaComponent,
+    SelectComponent,
+    TokenListComponent,
+    PowerRollDiceComponent,
+  ],
   template: `
     <section class="border-b border-line py-3 last:border-b-0" data-testid="section-abilities">
       <h3 class="m-0 mb-1 text-sm font-semibold text-sea">{{ 'drawSteel.statBlock.section.abilities' | transloco }}</h3>
@@ -250,70 +258,26 @@ import { TokenListComponent } from './token-list.component';
                   </p>
                 }
                 @if (ability.powerRoll; as roll) {
-                  <dl class="relative m-0 mt-1" data-testid="ability-powerroll">
+                  <dl class="m-0 mt-1" data-testid="ability-powerroll">
                     <div class="flex items-center justify-between gap-2">
                       <div class="text-2xs uppercase tracking-wider text-ink-muted">
                         {{ 'drawSteel.statBlock.powerRoll' | transloco }} ·
                         {{ 'drawSteel.statBlock.stat.' + roll.characteristic | transloco }}
                       </div>
-                      <!-- Read-only ephemeral resolution (#252): rolls 2d10 + the characteristic, never persisted. -->
-                      <button
-                        type="button"
-                        appButton
-                        variant="ghost"
-                        size="sm"
-                        data-testid="ability-roll"
-                        [title]="'dice.rollAction' | transloco"
-                        [attr.aria-label]="'dice.rollAction' | transloco"
-                        (click)="rollAbility(abilityIndex, roll, $event)"
-                      >
-                        🎲 {{ 'dice.rollAction' | transloco }}
-                      </button>
+                      <!-- Read-only ephemeral resolution (#252): the roller rolls 2d10 + the characteristic and
+                           reports the banded tier back, which we highlight below. Nothing persists. -->
+                      <ds-power-roll-dice
+                        [modifier]="modifierFor(roll.characteristic)"
+                        (resolved)="setActiveTier(abilityIndex, $event)"
+                      />
                     </div>
-
-                    <!-- Anchored within the card (no overlay primitive): the Roll Result sits above the button. -->
-                    @if (rollFor(abilityIndex); as state) {
-                      <div
-                        class="absolute bottom-full right-0 z-10 mb-1 w-max max-w-[16rem] rounded-md border border-line bg-surface p-2 text-left shadow-2"
-                        role="status"
-                        data-testid="ability-roll-bubble"
-                        (click)="$event.stopPropagation()"
-                      >
-                        <div class="flex items-center justify-between gap-3">
-                          <span class="text-2xs uppercase tracking-wider text-ink-muted">
-                            {{ 'dice.rollResult' | transloco }}
-                          </span>
-                          <button
-                            type="button"
-                            class="leading-none text-ink-muted hover:text-ink"
-                            data-testid="ability-roll-dismiss"
-                            [title]="'dice.dismiss' | transloco"
-                            [attr.aria-label]="'dice.dismiss' | transloco"
-                            (click)="dismiss(abilityIndex, $event)"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                        <div class="mt-0.5 flex items-baseline gap-2">
-                          <span class="text-lg font-bold text-ink-strong" data-testid="ability-roll-total">{{
-                            state.total
-                          }}</span>
-                          <span class="text-xs font-semibold text-sea" data-testid="ability-roll-tier">
-                            {{ 'drawSteel.statBlock.tier.' + state.tier | transloco }}
-                          </span>
-                        </div>
-                        <div class="mt-0.5 text-2xs text-ink-muted" data-testid="ability-roll-breakdown">
-                          {{ state.detail }}
-                        </div>
-                      </div>
-                    }
 
                     @for (tier of tierKeys; track tier.key) {
                       <div
                         class="flex gap-2 rounded px-1"
-                        [class.bg-sea-soft]="rollFor(abilityIndex)?.tier === tier.key"
+                        [class.bg-sea-soft]="activeTier(abilityIndex) === tier.key"
                         [attr.data-testid]="'ability-tier-' + tier.key"
-                        [attr.data-active]="rollFor(abilityIndex)?.tier === tier.key ? 'true' : null"
+                        [attr.data-active]="activeTier(abilityIndex) === tier.key ? 'true' : null"
                       >
                         <dt class="w-14 shrink-0 font-semibold text-sea">{{ tier.band }}</dt>
                         <dd class="m-0 text-ink">{{ roll[tier.key] || '—' }}</dd>
@@ -344,18 +308,18 @@ export class AbilitiesSectionComponent {
   readonly characteristics = input<Partial<Record<DsCharacteristicKey, number>>>({});
   readonly valueChange = output<Ability[]>();
 
-  /** Overridable RNG so a spec seeds the Roll (issue #249); production takes `Math.random`. */
-  private readonly rng = inject(DICE_RNG);
-
-  /** Per-ability last-roll state, keyed by ability index — sticky until re-roll, dismiss, or an outside click. */
-  private readonly rolls = signal<Record<number, AbilityRoll>>({});
+  /**
+   * The tier each ability's {@link PowerRollDiceComponent} last resolved, keyed by ability index — drives the
+   * in-place row highlight, cleared to `null` when its bubble is dismissed. The Roll state itself lives in the
+   * roller; this section keeps only what it needs to highlight (#252).
+   */
+  private readonly activeTiers = signal<Record<number, DsTierKey | null>>({});
 
   protected readonly abilities = computed<UiAbility[]>(() => asAbilities(this.value()));
 
   protected readonly abilityTypes = DS_ABILITY_TYPE_OPTIONS;
   protected readonly characteristicKeys = DS_CHARACTERISTIC_KEYS;
-  /** The three power-roll tiers, in printed order — one source for both the printed band and {@link resolveTier}. */
-  protected readonly tierKeys = TIER_BANDS;
+  protected readonly tierKeys = DS_POWER_ROLL_TIERS;
 
   protected addAbility(): void {
     this.emit([...this.abilities(), emptyAbility()]);
@@ -366,43 +330,19 @@ export class AbilitiesSectionComponent {
     this.emit(this.abilities().filter((_, i) => i !== index));
   }
 
-  /** The last Roll resolved for an ability, if any — drives its bubble and the highlighted tier row. */
-  protected rollFor(index: number): AbilityRoll | undefined {
-    return this.rolls()[index];
+  /** The characteristic score added to a power roll (`2d10 + …`); an absent score adds 0 (#252). */
+  protected modifierFor(characteristic: DsCharacteristicKey): number {
+    return this.characteristics()[characteristic] ?? 0;
   }
 
-  /**
-   * Resolve a power roll ephemerally (#252): `2d10 + the characteristic` (an absent value adds `0`), banded
-   * to a Draw Steel tier. The click stops here — it would otherwise bubble to {@link dismissAll} and clear
-   * the bubble it just opened. A re-roll replaces the ability's previous state in one click; nothing persists.
-   */
-  protected rollAbility(index: number, roll: PowerRoll, event: Event): void {
-    event.stopPropagation();
-    const modifier = this.characteristics()[roll.characteristic] ?? 0;
-    const expression = modifier < 0 ? `2d10 - ${-modifier}` : `2d10 + ${modifier}`;
-    const ast = parse(expression);
-    if (ast.isErr()) return;
-    const result = evaluate(ast.value, this.rng);
-    const { detail } = formatRoll(expression, result);
-    this.rolls.update((rolls) => ({
-      ...rolls,
-      [index]: { total: result.total, tier: resolveTier(result.total), detail },
-    }));
+  /** The tier highlighted for an ability, if its roller has a Roll standing. */
+  protected activeTier(index: number): DsTierKey | null {
+    return this.activeTiers()[index] ?? null;
   }
 
-  /** Explicit dismiss of one ability's bubble; stops the click reaching {@link dismissAll}. */
-  protected dismiss(index: number, event: Event): void {
-    event.stopPropagation();
-    this.rolls.update((rolls) => {
-      const next = { ...rolls };
-      delete next[index];
-      return next;
-    });
-  }
-
-  /** An outside click clears every bubble at once (the document listener). */
-  protected dismissAll(): void {
-    if (Object.keys(this.rolls()).length) this.rolls.set({});
+  /** The roller reports its banded tier (or `null` on dismiss); we highlight the matching row. */
+  protected setActiveTier(index: number, tier: DsTierKey | null): void {
+    this.activeTiers.update((tiers) => ({ ...tiers, [index]: tier }));
   }
 
   protected patch(index: number, change: Partial<UiAbility>): void {
@@ -440,34 +380,6 @@ export class AbilitiesSectionComponent {
   private emit(list: UiAbility[]): void {
     this.valueChange.emit(list.map(toStored));
   }
-}
-
-/**
- * The three power-roll tiers, in printed order: the `key` its stored tier text and highlight ride, the printed
- * `band`, and the inclusive `max` a resolved total falls under. One source of truth so the printed band and the
- * roll-time mapping can never drift (#252). `max: Infinity` makes the top tier the open-ended catch-all.
- */
-const TIER_BANDS = [
-  { key: 't1', band: '≤11', max: 11 },
-  { key: 't2', band: '12–16', max: 16 },
-  { key: 't3', band: '17+', max: Infinity },
-] as const;
-
-type TierKey = (typeof TIER_BANDS)[number]['key'];
-
-/** A resolved read-time Roll for one ability — the total, its banded tier, and the breakdown the bubble shows. */
-interface AbilityRoll {
-  readonly total: number;
-  readonly tier: TierKey;
-  readonly detail: string;
-}
-
-/**
- * Draw Steel owns the tier mapping (the dice lib stays generic): a resolved total bands to a {@link TIER_BANDS}
- * tier — the same bands the stored tiers print beside (#252).
- */
-function resolveTier(total: number): TierKey {
-  return (TIER_BANDS.find((tier) => total <= tier.max) ?? TIER_BANDS[TIER_BANDS.length - 1]).key;
 }
 
 /** The always-present UI shape the editor binds to — every slot filled so a control never binds `undefined`. */
