@@ -101,14 +101,14 @@ describe('StatBlockView (draw-steel)', () => {
     expect(el.querySelector('[data-testid=stat-might]')?.textContent).toContain('+2');
   });
 
-  it('renders the Traits section above the abilities stub — the printed-card order (#245)', () => {
+  it('renders the Abilities section above the Traits section — abilities lead the card', () => {
     const { el } = render({}, false);
     const traits = el.querySelector('[data-testid=section-traits]') as Element;
     const abilities = el.querySelector('[data-testid=section-abilities]') as Element;
     expect(traits).not.toBeNull();
     expect(abilities).not.toBeNull();
-    // Traits sits above the future Abilities section.
-    expect(traits.compareDocumentPosition(abilities) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Abilities sits above the Traits section.
+    expect(abilities.compareDocumentPosition(traits) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('prints passive Traits (name + effect) for a reader (#245)', () => {
@@ -142,6 +142,29 @@ describe('StatBlockView (draw-steel)', () => {
     (el.querySelector('[data-testid=trait-0] [data-testid=trait-remove]') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(statBlock(session)).toEqual({});
+  });
+
+  it('reorders Traits within the section by swapping with a neighbour', () => {
+    const { fixture, session, el } = render({
+      traits: [
+        { name: 'First', effect: 'a' },
+        { name: 'Second', effect: 'b' },
+      ],
+    });
+    startEditing(el, fixture);
+
+    // The first trait can't move up (button disabled); moving it down swaps it past the second.
+    expect((el.querySelector('[data-testid=trait-0] [data-testid=trait-move-up]') as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    (el.querySelector('[data-testid=trait-0] [data-testid=trait-move-down]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(statBlock(session)).toEqual({
+      traits: [
+        { name: 'Second', effect: 'b' },
+        { name: 'First', effect: 'a' },
+      ],
+    });
   });
 
   it('suppresses Trait editing for a read-only opener (writable: false is the ADR-0037 gate)', () => {
@@ -239,6 +262,29 @@ describe('StatBlockView (draw-steel)', () => {
     (el.querySelector('[data-testid=ability-0] [data-testid=ability-remove]') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(statBlock(session)).toEqual({});
+  });
+
+  it('reorders Abilities within the section by swapping with a neighbour', () => {
+    const { fixture, session, el } = render({
+      abilities: [
+        { name: 'First', type: 'main', keywords: [], distance: '', target: '' },
+        { name: 'Second', type: 'main', keywords: [], distance: '', target: '' },
+      ],
+    });
+    startEditing(el, fixture);
+
+    // The last ability can't move down (button disabled); moving it up swaps it above the first.
+    expect(
+      (el.querySelector('[data-testid=ability-1] [data-testid=ability-move-down]') as HTMLButtonElement).disabled,
+    ).toBe(true);
+    (el.querySelector('[data-testid=ability-1] [data-testid=ability-move-up]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(statBlock(session)).toEqual({
+      abilities: [
+        { name: 'Second', type: 'main', keywords: [], distance: '', target: '' },
+        { name: 'First', type: 'main', keywords: [], distance: '', target: '' },
+      ],
+    });
   });
 
   it('suppresses Ability editing for a read-only opener (writable: false is the ADR-0037 gate) (#246)', () => {

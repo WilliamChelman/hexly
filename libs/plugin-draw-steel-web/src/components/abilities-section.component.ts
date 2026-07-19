@@ -41,14 +41,14 @@ import { PowerRollDiceComponent } from './power-roll-dice.component';
     PowerRollDiceComponent,
   ],
   template: `
-    <section class="border-b border-line py-3 last:border-b-0" data-testid="section-abilities">
+    <section class="border-b border-line py-3" data-testid="section-abilities">
       <h3 class="m-0 mb-1 text-sm font-semibold text-sea">{{ 'drawSteel.statBlock.section.abilities' | transloco }}</h3>
 
       @if (writable()) {
         <div class="flex flex-col gap-3">
           <!-- Tracked by index: an ability has no stable key and may be blank or duplicate. The nested
                tier loop shadows the loop index, so the ability's own is aliased for its handlers to reach. -->
-          @for (ability of abilities(); track $index; let abilityIndex = $index) {
+          @for (ability of abilities(); track $index; let abilityIndex = $index; let first = $first; let last = $last) {
             <div class="rounded border border-line bg-surface-sunken p-2" [attr.data-testid]="'ability-' + $index">
               <div class="flex items-center gap-2">
                 <input
@@ -59,6 +59,34 @@ import { PowerRollDiceComponent } from './power-roll-dice.component';
                   [placeholder]="'drawSteel.statBlock.abilityName' | transloco"
                   (input)="patch($index, { name: inputVal($event) })"
                 />
+                <button
+                  type="button"
+                  appButton
+                  variant="ghost"
+                  size="sm"
+                  icon
+                  data-testid="ability-move-up"
+                  [disabled]="first"
+                  [title]="'drawSteel.statBlock.moveUp' | transloco"
+                  [attr.aria-label]="'drawSteel.statBlock.moveUp' | transloco"
+                  (click)="moveAbility($index, -1)"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  appButton
+                  variant="ghost"
+                  size="sm"
+                  icon
+                  data-testid="ability-move-down"
+                  [disabled]="last"
+                  [title]="'drawSteel.statBlock.moveDown' | transloco"
+                  [attr.aria-label]="'drawSteel.statBlock.moveDown' | transloco"
+                  (click)="moveAbility($index, 1)"
+                >
+                  ↓
+                </button>
                 <button
                   type="button"
                   appButton
@@ -328,6 +356,15 @@ export class AbilitiesSectionComponent {
   /** Emitting `[]` for the last ability lets the View clear the key (no `{ abilities: [] }` husk). */
   protected removeAbility(index: number): void {
     this.emit(this.abilities().filter((_, i) => i !== index));
+  }
+
+  /** Swap an ability with its neighbour to reorder within the section; a no-op past either end. */
+  protected moveAbility(index: number, delta: number): void {
+    const next = [...this.abilities()];
+    const target = index + delta;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    this.emit(next);
   }
 
   /** The characteristic score added to a power roll (`2d10 + …`); an absent score adds 0 (#252). */

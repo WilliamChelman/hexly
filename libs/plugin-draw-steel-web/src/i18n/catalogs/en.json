@@ -47,6 +47,8 @@
     "traitName": "Trait name",
     "traitEffect": "Effect",
     "removeTrait": "Remove trait",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
     "noTraits": "No traits",
     "addAbility": "Add ability",
     "removeAbility": "Remove ability",
