@@ -1,5 +1,7 @@
 import { EnvironmentProviders, inject, Injectable, provideAppInitializer, signal } from '@angular/core';
 
+import { safeStorageGet, safeStorageSet } from '../utils/safe';
+
 export type Theme = 'light' | 'dark';
 
 const STORAGE_KEY = 'hexly-theme';
@@ -22,12 +24,8 @@ export function detectTheme(): Theme {
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
   private read(): Theme {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === 'light' || stored === 'dark') return stored;
-    } catch {
-      /* private mode */
-    }
+    const stored = safeStorageGet(STORAGE_KEY).unwrapOr(null); // private mode → null → OS preference
+    if (stored === 'light' || stored === 'dark') return stored;
     return detectTheme();
   }
 
@@ -47,11 +45,7 @@ export class ThemeService {
   set(theme: Theme): void {
     this._theme.set(theme);
     document.documentElement.dataset['theme'] = theme;
-    try {
-      localStorage.setItem(STORAGE_KEY, theme);
-    } catch {
-      /* private mode */
-    }
+    safeStorageSet(STORAGE_KEY, theme); // private mode: the choice just doesn't persist
   }
 }
 

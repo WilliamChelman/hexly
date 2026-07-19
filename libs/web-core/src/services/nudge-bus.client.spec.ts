@@ -20,6 +20,10 @@ class FakeEventSource {
   fire(type: string, data: unknown) {
     this.listeners.get(type)?.({ data: JSON.stringify(data) });
   }
+  /** Deliver a frame whose payload is *not* valid JSON, as a truncated stream would. */
+  fireRaw(type: string, data: string) {
+    this.listeners.get(type)?.({ data });
+  }
 }
 
 describe('NudgeBusClient', () => {
@@ -161,5 +165,29 @@ describe('NudgeBusClient', () => {
     FakeEventSource.instances[0].fire('nudge', [{ id: 'other', version: 9, updatedAt: 1 }]);
 
     expect(seen).toEqual([{ id: 'X', version: 7, updatedAt: 1 }]);
+  });
+
+  it('ignores a malformed frame without tearing down the listener', async () => {
+    const seen: unknown[] = [];
+    client.follow(entity('X')).subscribe((n) => seen.push(n));
+    await ready('c1');
+    http.expectOne('/api/events/c1/interest').flush(null);
+
+    // A truncated `nudge` payload must be dropped, not throw in the handler — a throw here would
+    // kill the listener and silently stop every future nudge on the stream.
+    expect(() => FakeEventSource.instances[0].fireRaw('nudge', '[{"id":"X",')).not.toThrow();
+    expect(seen).toEqual([]);
+
+    // The listener still delivers the next well-formed frame.
+    FakeEventSource.instances[0].fire('nudge', [{ id: 'X', version: 7, updatedAt: 1 }]);
+    expect(seen).toEqual([{ id: 'X', version: 7, updatedAt: 1 }]);
+  });
+
+  it('ignores a malformed handshake without capturing a connectionId', async () => {
+    client.follow(entity('X')).subscribe();
+    // A garbled `ready` frame leaves connectionId unset, so no interest PUT is attempted.
+    expect(() => FakeEventSource.instances[0].fireRaw('ready', 'not json')).not.toThrow();
+    await Promise.resolve();
+    http.expectNone(() => true);
   });
 });

@@ -1,5 +1,8 @@
 import { effect, Injectable, inject, Signal, signal, untracked } from '@angular/core';
+import { Result } from 'neverthrow';
 import { AuthClient } from './auth.client';
+
+import { safeStorageGet, safeStorageRemove, safeStorageSet } from '../utils/safe';
 
 function hashId(id: string): string {
   let h = 0;
@@ -42,7 +45,9 @@ export class AuthScopedStorage {
       if (!user) return; // anonymous / in-flight: keep everything, decide on a real user
       untracked(() => {
         const newHash = hashId(user.id);
-        try {
+        // Read-compare-sweep-tag is one all-or-nothing op over raw (unprefixed) keys, so it wraps
+        // as a whole rather than through the per-key helpers; a private-mode throw no-ops the sweep.
+        Result.fromThrowable(() => {
           const oldHash = localStorage.getItem(SCOPE_KEY);
           if (oldHash && oldHash !== newHash) {
             for (const key of Object.keys(localStorage)) {
@@ -50,35 +55,21 @@ export class AuthScopedStorage {
             }
           }
           localStorage.setItem(SCOPE_KEY, newHash);
-        } catch {
-          /* private mode */
-        }
+        })();
       });
     });
   }
 
   getItem(key: string): string | null {
-    try {
-      return localStorage.getItem(PREFIX + key);
-    } catch {
-      return null;
-    }
+    return safeStorageGet(PREFIX + key).unwrapOr(null);
   }
 
   setItem(key: string, value: string): void {
-    try {
-      localStorage.setItem(PREFIX + key, value);
-    } catch {
-      /* private mode */
-    }
+    safeStorageSet(PREFIX + key, value); // private mode: the preference just doesn't persist
   }
 
   removeItem(key: string): void {
-    try {
-      localStorage.removeItem(PREFIX + key);
-    } catch {
-      /* private mode */
-    }
+    safeStorageRemove(PREFIX + key);
   }
 
   /**
