@@ -89,10 +89,53 @@ describe('StatBlockView (draw-steel)', () => {
     expect(el.querySelector('[data-testid=stat-might]')?.textContent).toContain('+2');
   });
 
-  it('renders the abilities/traits stub sections — the #242 seam, visible so the card is whole', () => {
+  it('renders the Traits section above the abilities stub — the printed-card order (#245)', () => {
     const { el } = render({}, false);
-    expect(el.querySelector('[data-testid=section-abilities]')).not.toBeNull();
-    expect(el.querySelector('[data-testid=section-traits]')).not.toBeNull();
+    const traits = el.querySelector('[data-testid=section-traits]') as Element;
+    const abilities = el.querySelector('[data-testid=section-abilities]') as Element;
+    expect(traits).not.toBeNull();
+    expect(abilities).not.toBeNull();
+    // Traits sits above the future Abilities section.
+    expect(traits.compareDocumentPosition(abilities) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('prints passive Traits (name + effect) for a reader (#245)', () => {
+    const { el } = render({ traits: [{ name: 'Crafty', effect: 'Ignores difficult terrain.' }] }, false);
+    const trait = el.querySelector('[data-testid=section-traits] [data-testid=trait-0]');
+    expect(trait?.textContent).toContain('Crafty');
+    expect(trait?.textContent).toContain('Ignores difficult terrain.');
+    // A reader gets no editing affordance.
+    expect(el.querySelector('[data-testid=trait-add]')).toBeNull();
+  });
+
+  it('adds, edits, and removes a passive Trait into the one grouped block value (#245)', () => {
+    const { fixture, session, el } = render({}); // empty → opens in edit mode
+
+    (el.querySelector('[data-testid=trait-add]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(statBlock(session)).toEqual({ traits: [{ name: '', effect: '' }] });
+
+    const name = el.querySelector('[data-testid=trait-0] [data-testid=trait-name]') as HTMLInputElement;
+    name.value = 'Crafty';
+    name.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const effect = el.querySelector('[data-testid=trait-0] [data-testid=trait-effect]') as HTMLTextAreaElement;
+    effect.value = 'Ignores difficult terrain.';
+    effect.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(statBlock(session)).toEqual({ traits: [{ name: 'Crafty', effect: 'Ignores difficult terrain.' }] });
+
+    // Removing the last trait clears the key — no `{ traits: [] }` husk into the frontmatter.
+    (el.querySelector('[data-testid=trait-0] [data-testid=trait-remove]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(statBlock(session)).toEqual({});
+  });
+
+  it('suppresses Trait editing for a read-only opener (writable: false is the ADR-0037 gate)', () => {
+    const { el } = render({ traits: [{ name: 'Crafty', effect: 'x' }] }, false);
+    expect(el.querySelector('[data-testid=trait-add]')).toBeNull();
+    expect(el.querySelector('[data-testid=trait-0] [data-testid=trait-name]')).toBeNull();
   });
 
   it('shows the minion-only lines (EV suffix, With Captain) for a minion', () => {

@@ -3,6 +3,7 @@ import {
   DS_DEFENCE_KEYS,
   DS_IDENTITY_KEYS,
   DS_MAP_KEYS,
+  DS_SECTION_KEYS,
   DS_STAT_BLOCK,
   DS_STAT_BLOCK_FIELD,
   DS_STAT_FIELDS,
@@ -112,6 +113,23 @@ describe('draw-steel.stat-block data type', () => {
     expect(statBlockSchema.safeParse({ size: '6' }).success).toBe(false);
   });
 
+  it('accepts a well-formed passive Traits list and rejects a malformed trait shape (#245)', () => {
+    // A trait is a name + its effect text; the empty list and a freshly-added blank trait both parse.
+    expect(
+      statBlockSchema.safeParse({ traits: [{ name: 'Crafty', effect: 'Ignores difficult terrain.' }] }).success,
+    ).toBe(true);
+    expect(statBlockSchema.safeParse({ traits: [] }).success).toBe(true);
+    expect(statBlockSchema.safeParse({ traits: [{ name: '', effect: '' }] }).success).toBe(true);
+    // A malformed trait — a non-string field, a missing field, or a bare string where a record belongs.
+    expect(statBlockSchema.safeParse({ traits: [{ name: 5, effect: 'x' }] }).success).toBe(false);
+    expect(statBlockSchema.safeParse({ traits: [{ name: 'Crafty' }] }).success).toBe(false);
+    expect(statBlockSchema.safeParse({ traits: ['Crafty'] }).success).toBe(false);
+    // Unknown keys inside a trait are stripped, mirroring the block itself.
+    expect(statBlockSchema.parse({ traits: [{ name: 'Crafty', effect: 'x', extra: true }] })).toEqual({
+      traits: [{ name: 'Crafty', effect: 'x' }],
+    });
+  });
+
   it('strips an unknown top-level key rather than carrying it into the block', () => {
     const parsed = statBlockSchema.parse({ level: 2, made_up: true });
     expect(parsed).toEqual({ level: 2 });
@@ -124,8 +142,8 @@ describe('draw-steel.stat-block data type', () => {
     // stat — would silently drop. The two damage maps render as sections, so they sit outside this set.
     expect([...declared].sort()).toEqual([...printed].sort());
 
-    // Every schema key is either a flat descriptor or one of the two damage maps — nothing unaccounted.
-    const accounted = new Set<string>([...declared, ...DS_MAP_KEYS]);
+    // Every schema key is a flat descriptor, a damage map, or a list-of-record section — nothing unaccounted.
+    const accounted = new Set<string>([...declared, ...DS_MAP_KEYS, ...DS_SECTION_KEYS]);
     expect(Object.keys(statBlockSchema.shape).sort()).toEqual([...accounted].sort());
 
     // No stat is required, and each carries a translatable labelKey under the plugin's stat namespace.

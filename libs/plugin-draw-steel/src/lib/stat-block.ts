@@ -109,10 +109,21 @@ export const DS_DEFENCE_KEYS = [
 /** The two per-damage-type maps — rendered as their own sections, never flat slots. */
 export const DS_MAP_KEYS = ['immunities', 'weaknesses'] as const;
 
+/** List-of-record sections rendered below the stat grid, apart from the flat {@link DS_STAT_FIELDS} — `traits` now (#245), `abilities` to follow (#242). */
+export const DS_SECTION_KEYS = ['traits'] as const;
+
 /** A per-damage-type number map (e.g. `{ fire: 5, cold: 3 }`) — every damage type optional. */
 const damageMapSchema = z.partialRecord(z.enum(DS_DAMAGE_TYPE_OPTIONS), z.number().finite());
 
 export type DamageMap = z.infer<typeof damageMapSchema>;
+
+/** A passive Trait — name + effect. Required strings (not `.partial()`) so a blank added trait is well-formed while a malformed shape is rejected (#245). */
+export const traitSchema = z.object({
+  name: z.string(),
+  effect: z.string(),
+});
+
+export type Trait = z.infer<typeof traitSchema>;
 
 /**
  * The stat-block value (CONTEXT.md → Structured Data Type): the five characteristics plus the
@@ -146,6 +157,8 @@ export const statBlockSchema = z
     level: z.number().finite(),
     ev: z.number().finite(),
     keywords: z.array(z.string()),
+    // Sections ({@link DS_SECTION_KEYS}).
+    traits: z.array(traitSchema),
   })
   .partial();
 
