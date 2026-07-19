@@ -66,13 +66,16 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
          chevron onto the icon so the look is unchanged. */
       :host {
         background-image: none;
-        padding-right: 0.75rem;
+        @apply pr-1 flex items-center;
       }
       :host::picker-icon {
         appearance: none;
         width: 1rem;
         height: 1rem;
-        margin-left: 0.5rem;
+        /* auto margin right-aligns; the min keeps a gap so long values never butt against the chevron. */
+        margin-left: auto;
+        padding-left: 0.5rem;
+        box-sizing: content-box;
         color: transparent;
         background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23968f7f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
           no-repeat center / 1rem;
