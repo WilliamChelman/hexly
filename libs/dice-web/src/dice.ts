@@ -1,4 +1,5 @@
 import { InjectionToken } from '@angular/core';
+import { Result } from 'neverthrow';
 
 /**
  * The pure dice engine's contracts (issue #249): the parsed Dice Expression AST,
@@ -85,9 +86,8 @@ export interface DiceError {
   readonly position?: number;
 }
 
-export type ParseResult =
-  | { readonly ok: true; readonly ast: DiceAst }
-  | { readonly ok: false; readonly error: DiceError };
+/** `ok` carries the parsed AST; `err` carries a typed {@link DiceError} — parsing never throws. */
+export type ParseResult = Result<DiceAst, DiceError>;
 
 // --- Roll Result --------------------------------------------------------------
 

@@ -1,32 +1,20 @@
-import { BinaryNode, Comparator, DiceAst, DiceErrorCode, DiceModifier, ParseResult } from './dice';
+import { err, ok, Result } from 'neverthrow';
+
+import { BinaryNode, Comparator, DiceAst, DiceError, DiceModifier, ParseResult } from './dice';
+
+type ParseStep<T> = Result<T, DiceError>;
 
 /**
  * Parse a Dice Expression into an AST, or a typed error — never throws (issue
- * #249). Recursive descent with standard precedence: `+ -` bind looser than
- * `* /`, parentheses override, and per-term modifiers (`kh`/`kl`/`dh`/`dl`, `!`,
- * `r`) attach to the `NdM` term they follow. Whitespace around operators is
- * tolerated; the digits of an `NdM` term and its modifiers are not split.
+ * #249). Every step returns a neverthrow `Result`, so a failure propagates as a
+ * value rather than an exception. Recursive descent with standard precedence:
+ * `+ -` bind looser than `* /`, parentheses override, and per-term modifiers
+ * (`kh`/`kl`/`dh`/`dl`, `!`, `r`) attach to the `NdM` term they follow.
+ * Whitespace around operators is tolerated; the digits of an `NdM` term and its
+ * modifiers are not split.
  */
 export function parse(expression: string): ParseResult {
-  const parser = new Parser(expression);
-  try {
-    const ast = parser.parseRoot();
-    return { ok: true, ast };
-  } catch (e) {
-    if (e instanceof ParseFailure) {
-      return { ok: false, error: { code: e.code, message: e.message, position: e.position } };
-    }
-    throw e;
-  }
-}
-
-/** Internal control-flow signal; `parse` converts it into a typed `DiceError`. */
-class ParseFailure {
-  constructor(
-    readonly code: DiceErrorCode,
-    readonly message: string,
-    readonly position: number,
-  ) {}
+  return new Parser(expression).parseRoot();
 }
 
 class Parser {
@@ -34,46 +22,55 @@ class Parser {
 
   constructor(private readonly src: string) {}
 
-  parseRoot(): DiceAst {
+  parseRoot(): ParseStep<DiceAst> {
     this.skipWhitespace();
     if (this.pos >= this.src.length) {
-      throw new ParseFailure('empty', 'Expression is empty.', 0);
+      return err({ code: 'empty', message: 'Expression is empty.', position: 0 });
     }
-    const ast = this.parseAdditive();
-    this.skipWhitespace();
-    if (this.pos < this.src.length) {
-      throw new ParseFailure('trailing-input', `Unexpected "${this.src[this.pos]}".`, this.pos);
-    }
-    return ast;
+    return this.parseAdditive().andThen((ast) => {
+      this.skipWhitespace();
+      if (this.pos < this.src.length) {
+        return err<DiceAst, DiceError>({
+          code: 'trailing-input',
+          message: `Unexpected "${this.src[this.pos]}".`,
+          position: this.pos,
+        });
+      }
+      return ok(ast);
+    });
   }
 
-  private parseAdditive(): DiceAst {
+  private parseAdditive(): ParseStep<DiceAst> {
     return this.parseBinaryLevel(['+', '-'], () => this.parseMultiplicative());
   }
 
-  private parseMultiplicative(): DiceAst {
+  private parseMultiplicative(): ParseStep<DiceAst> {
     return this.parseBinaryLevel(['*', '/'], () => this.parseUnary());
   }
 
   /** One left-associative precedence tier: `next` operands joined by `ops`. */
-  private parseBinaryLevel(ops: readonly BinaryNode['op'][], next: () => DiceAst): DiceAst {
-    let left = next();
+  private parseBinaryLevel(ops: readonly BinaryNode['op'][], next: () => ParseStep<DiceAst>): ParseStep<DiceAst> {
+    const first = next();
+    if (first.isErr()) return first;
+    let left = first.value;
     for (;;) {
       this.skipWhitespace();
       const op = this.peek();
       if (op === undefined || !ops.includes(op as BinaryNode['op'])) break;
       this.pos++;
-      left = { type: 'binary', op: op as BinaryNode['op'], left, right: next() };
+      const right = next();
+      if (right.isErr()) return right;
+      left = { type: 'binary', op: op as BinaryNode['op'], left, right: right.value };
     }
-    return left;
+    return ok(left);
   }
 
-  private parseUnary(): DiceAst {
+  private parseUnary(): ParseStep<DiceAst> {
     this.skipWhitespace();
     const ch = this.peek();
     if (ch === '-') {
       this.pos++;
-      return { type: 'negate', operand: this.parseUnary() };
+      return this.parseUnary().map((operand) => ({ type: 'negate', operand }));
     }
     if (ch === '+') {
       this.pos++;
@@ -82,44 +79,54 @@ class Parser {
     return this.parsePrimary();
   }
 
-  private parsePrimary(): DiceAst {
+  private parsePrimary(): ParseStep<DiceAst> {
     this.skipWhitespace();
     if (this.peek() === '(') {
       this.pos++;
-      const inner = this.parseAdditive();
-      this.skipWhitespace();
-      if (this.peek() !== ')') {
-        throw new ParseFailure('unbalanced-parens', 'Missing closing parenthesis.', this.pos);
-      }
-      this.pos++;
-      return inner;
+      return this.parseAdditive().andThen((inner) => {
+        this.skipWhitespace();
+        if (this.peek() !== ')') {
+          return err<DiceAst, DiceError>({
+            code: 'unbalanced-parens',
+            message: 'Missing closing parenthesis.',
+            position: this.pos,
+          });
+        }
+        this.pos++;
+        return ok(inner);
+      });
     }
     return this.parseNumberOrDice();
   }
 
-  private parseNumberOrDice(): DiceAst {
-    const count = this.isDigit(this.peek()) ? this.readInteger() : undefined;
+  private parseNumberOrDice(): ParseStep<DiceAst> {
+    const start = this.pos;
+    const count = this.readInteger();
     // A die needs a `d` followed by its sides; `d20` (implicit count 1) is allowed.
     if (this.peek() === 'd' && this.isDigit(this.peekAt(1))) {
       this.pos++;
       const sides = this.readInteger();
-      if (sides <= 0) {
-        throw new ParseFailure('invalid-dice', 'A die needs at least one side.', this.pos);
+      if (sides === undefined || sides <= 0) {
+        return err({ code: 'invalid-dice', message: 'A die needs at least one side.', position: this.pos });
       }
       const diceCount = count ?? 1;
       if (diceCount <= 0) {
-        throw new ParseFailure('invalid-dice', 'A dice term needs at least one die.', 0);
+        return err({ code: 'invalid-dice', message: 'A dice term needs at least one die.', position: start });
       }
-      return { type: 'dice', count: diceCount, sides, modifiers: this.parseModifiers() };
+      return this.parseModifiers().map((modifiers) => ({ type: 'dice', count: diceCount, sides, modifiers }));
     }
     if (count === undefined) {
       const found = this.peek();
-      throw new ParseFailure('syntax', found ? `Unexpected "${found}".` : 'Unexpected end of input.', this.pos);
+      return err({
+        code: 'syntax',
+        message: found ? `Unexpected "${found}".` : 'Unexpected end of input.',
+        position: this.pos,
+      });
     }
-    return { type: 'number', value: count };
+    return ok({ type: 'number', value: count });
   }
 
-  private parseModifiers(): DiceModifier[] {
+  private parseModifiers(): ParseStep<DiceModifier[]> {
     const mods: DiceModifier[] = [];
     for (;;) {
       const ch = this.peek();
@@ -127,10 +134,10 @@ class Parser {
         this.pos++;
         const end = this.peek();
         if (end !== 'h' && end !== 'l') {
-          throw new ParseFailure('syntax', `Expected "h" or "l" after "${ch}".`, this.pos);
+          return err({ code: 'syntax', message: `Expected "h" or "l" after "${ch}".`, position: this.pos });
         }
         this.pos++;
-        const count = this.isDigit(this.peek()) ? this.readInteger() : 1;
+        const count = this.readInteger() ?? 1;
         mods.push({ kind: ch === 'k' ? 'keep' : 'drop', end: end === 'h' ? 'high' : 'low', count });
       } else if (ch === '!') {
         this.pos++;
@@ -139,12 +146,15 @@ class Parser {
         this.pos++;
         const comparator = this.readComparator();
         const value = this.readInteger();
+        if (value === undefined) {
+          return err({ code: 'syntax', message: 'Expected a number after "r".', position: this.pos });
+        }
         mods.push({ kind: 'reroll', comparator, value });
       } else {
         break;
       }
     }
-    return mods;
+    return ok(mods);
   }
 
   private readComparator(): Comparator {
@@ -172,12 +182,11 @@ class Parser {
     return '=';
   }
 
-  private readInteger(): number {
+  /** Consumes a run of digits, or `undefined` when none follow the cursor. */
+  private readInteger(): number | undefined {
     const start = this.pos;
     while (this.isDigit(this.peek())) this.pos++;
-    if (this.pos === start) {
-      throw new ParseFailure('syntax', 'Expected a number.', this.pos);
-    }
+    if (this.pos === start) return undefined;
     return Number(this.src.slice(start, this.pos));
   }
 
