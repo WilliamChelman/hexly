@@ -6,10 +6,13 @@ import { HEXLY_CONFIG, type HexlyConfig } from '../config';
 import { DbModule } from '../db/db.module';
 import { EntitiesModule } from '../entities/entities.module';
 import { EventsModule } from '../events/events.module';
+import { ImporterRegistry } from './importer-registry';
+import { ImportReconcileService } from './import-reconcile.service';
 import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
 import { VaultUnzipper } from './vault-unzipper';
 import { WorldGraphService } from './world-graph.service';
+import { WorldImportersController } from './world-importers.controller';
 import { WorldsController } from './worlds.controller';
 import { WorldsService } from './worlds.service';
 import { WorldTypesService } from './world-types.service';
@@ -37,7 +40,7 @@ import { WorldWrites } from './world-writes';
       }),
     }),
   ],
-  controllers: [WorldsController],
+  controllers: [WorldsController, WorldImportersController],
   providers: [
     WorldsService,
     WorldTypesService,
@@ -47,6 +50,8 @@ import { WorldWrites } from './world-writes';
     VaultImportService,
     VaultExportService,
     VaultUnzipper,
+    ImporterRegistry,
+    ImportReconcileService,
   ],
   // WorldWrites is exported so the Admin account purge (ADR-0045) routes its `world_members`
   // deletion through the one handle that bumps `seq` — the World peer of EntityWrites.

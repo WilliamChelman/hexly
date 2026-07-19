@@ -72,6 +72,25 @@ export interface InsertEntityInput {
   types: readonly string[];
   tags: readonly string[];
   document: EntityDocument;
+  /**
+   * The Entity's initial Visibility; defaults to `private`. The reconcile sets it from the run's
+   * chosen visibility so an imported set can land `shared` in one pass (ADR-0060); a plain create
+   * omits it and starts private like any hand-authored Entity.
+   */
+  visibility?: Visibility;
+}
+
+/**
+ * The fields an import reconcile overwrites onto an existing Entity, reusing its id (ADR-0060). Owner,
+ * grants, and `createdAt` are left untouched — an imported set is a managed reference library whose
+ * identity survives reimport, not its authored edits.
+ */
+export interface ImportOverwrite {
+  name: string;
+  types: readonly string[];
+  tags: readonly string[];
+  document: EntityDocument;
+  visibility: Visibility;
 }
 
 /** A stored `entities` row. */
@@ -178,7 +197,7 @@ export class EntityWrites {
       name: input.name,
       types: [...input.types],
       tags: [...input.tags],
-      visibility: 'private',
+      visibility: input.visibility ?? 'private',
       version: INITIAL_VERSION,
       seq: INITIAL_SEQ,
       document: JSON.stringify(input.document),
@@ -191,6 +210,68 @@ export class EntityWrites {
       this.db.insert(entityGrants).values({ entityId: row.id, userId: input.ownerId, role: 'owner' }).run();
       this.replaceDerived(row.id, row.worldId, derived);
       return row;
+    });
+  }
+
+  /**
+   * Overwrite an imported Entity in place, reusing its id (ADR-0060) — a **system write** the import
+   * reconcile drives once the World's Owner gate has run. Identity-preserving: the id, owner grants,
+   * and `createdAt` are kept, so a pre-existing inbound Entity Link still resolves; the document,
+   * types, tags, and visibility are replaced wholesale and the derived indexes (`hexly.source`
+   * included) re-materialised, so a user's authored edits are *not* preserved across a reimport.
+   * Bumps `seq` and nudges. A row that vanished between plan and apply is a silent no-op — the next
+   * (idempotent) run reconciles it.
+   *
+   * Meant to run inside a caller-opened chunk transaction ({@link transact} is re-entrant), so a
+   * whole reconcile chunk commits and nudges once.
+   */
+  importOverwrite(id: string, input: ImportOverwrite): void {
+    const now = Date.now();
+    this.transact(() => {
+      const existing = this.db
+        .select({ worldId: entities.worldId, seq: entities.seq, version: entities.version })
+        .from(entities)
+        .where(eq(entities.id, id))
+        .get();
+      if (!existing) return;
+      const derived = this.derive(input.document, input.types, existing.worldId);
+      this.db
+        .update(entities)
+        .set({
+          name: input.name,
+          types: [...input.types],
+          tags: [...input.tags],
+          visibility: input.visibility,
+          document: JSON.stringify(input.document),
+          contentText: derived.searchText,
+          version: existing.version + 1,
+          updatedAt: now,
+          seq: existing.seq + 1,
+        })
+        .where(eq(entities.id, id))
+        .run();
+      this.replaceDerived(id, existing.worldId, derived);
+      this.enqueue(id);
+    });
+  }
+
+  /**
+   * Delete Entities by id, nudging each — a **system write** the import reconcile drives (a Record
+   * whose `sourceId` vanished upstream, or a whole importer-owned set on Remove). The World's Owner
+   * gate has already run, and the ids are resolved from the provenance index, so no per-Entity Right
+   * could refuse it. Batched under the bound-parameter ceiling; grants, links, and derived rows
+   * cascade with each Entity.
+   */
+  importDelete(ids: readonly string[]): void {
+    if (ids.length === 0) return;
+    this.transact(() => {
+      for (const batch of batched(ids, 1)) {
+        this.db
+          .delete(entities)
+          .where(inArray(entities.id, [...batch]))
+          .run();
+      }
+      for (const id of ids) this.enqueue(id);
     });
   }
 
