@@ -35,7 +35,7 @@ import { ChipComponent, InputComponent, SelectComponent } from '@hexly/web-ui';
       @if (options(); as opts) {
         @if (addable().length) {
           <select appSelect class="py-1 text-xs" [attr.aria-invalid]="invalid() || null" (change)="add($event)">
-            <option value="">{{ placeholderKey() | transloco }}</option>
+            <option value="" hidden selected>{{ placeholderKey() | transloco }}</option>
             @for (opt of addable(); track opt) {
               <option [value]="opt">{{ opt }}</option>
             }

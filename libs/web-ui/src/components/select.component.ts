@@ -46,6 +46,9 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
     :host(:disabled) {
       @apply opacity-50 cursor-not-allowed;
     }
+    :host(:has(> option[value='']:checked)) {
+      @apply text-ink-faint;
+    }
 
     /* Customizable select, where supported: both the element and its picker
        must opt in via base-select for ::picker(select) to apply. The panel
