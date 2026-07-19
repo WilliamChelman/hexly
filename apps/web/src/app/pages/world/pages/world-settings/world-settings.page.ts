@@ -6,8 +6,9 @@ import { EyebrowComponent, PanelComponent, IconComponent, IconName } from '@hexl
 import { OwnerSetComponent, MemberSetComponent, PublicLinkComponent } from '@hexly/web-entity';
 import { WorldTypesPanelComponent } from './components/world-types-panel.component';
 import { WorldFieldsPanelComponent } from './components/world-fields-panel.component';
+import { WorldImportsPanelComponent } from './components/world-imports-panel.component';
 
-type Section = 'access' | 'schema' | 'sharing';
+type Section = 'access' | 'schema' | 'imports' | 'sharing';
 
 /**
  * The World settings page: a master/detail layout whose in-page rail navigates between setting
@@ -29,6 +30,7 @@ type Section = 'access' | 'schema' | 'sharing';
     PublicLinkComponent,
     WorldTypesPanelComponent,
     WorldFieldsPanelComponent,
+    WorldImportsPanelComponent,
   ],
   template: `
     @if (worldId(); as id) {
@@ -73,6 +75,13 @@ type Section = 'access' | 'schema' | 'sharing';
               <h2 class="group-head">{{ 'worldFields.heading' | transloco }}</h2>
               <p class="detail-sub">{{ 'worldFields.subhead' | transloco }}</p>
               <div class="pane" appPanel><app-world-fields [id]="id" /></div>
+            }
+            @case ('imports') {
+              <header class="detail-head">
+                <h1 class="detail-title">{{ 'imports.heading' | transloco }}</h1>
+                <p class="detail-sub">{{ 'imports.subhead' | transloco }}</p>
+              </header>
+              <div class="pane" appPanel><app-world-imports [id]="id" /></div>
             }
             @case ('sharing') {
               <header class="detail-head">
@@ -134,6 +143,7 @@ export class WorldSettingsPage {
   readonly items: { section: Section; icon: IconName; label: string }[] = [
     { section: 'access', icon: 'user', label: 'collab.members.heading' },
     { section: 'schema', icon: 'label', label: 'worldTypes.heading' },
+    { section: 'imports', icon: 'download', label: 'imports.heading' },
     { section: 'sharing', icon: 'share', label: 'collab.publicLink.worldHeading' },
   ];
 

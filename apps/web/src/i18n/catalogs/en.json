@@ -377,6 +377,26 @@
     "updateError": "Couldn't save that field. Please try again.",
     "removeError": "Couldn't delete that field. Please try again."
   },
+  "imports": {
+    "heading": "Imports",
+    "subhead": "Bring in a managed reference library from a plugin's source. A reimport overwrites the set; your hand-authored entities are untouched.",
+    "empty": "No importers available. Enable a plugin that contributes one.",
+    "visibility": "Visibility of imported entities",
+    "shared": "Shared",
+    "private": "Private",
+    "import": "Import",
+    "reimport": "Reimport",
+    "remove": "Remove",
+    "running": "Importing…",
+    "lastRun": "Revision {{rev}} · {{count}} entities · {{date}}",
+    "imported": "Imported {{count}} entities.",
+    "removed": "Removed the imported set.",
+    "loadError": "Couldn't load this world's importers.",
+    "statusError": "Lost track of the import run. Reload to check where it landed.",
+    "runError": "The import didn't finish. Please try again.",
+    "runningError": "An import is already running for this world.",
+    "removeError": "Couldn't remove that imported set. Please try again."
+  },
   "publicView": {
     "tabTitle": "Shared — Hexly",
     "banner": "You're viewing a read-only shared page.",

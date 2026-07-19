@@ -95,7 +95,8 @@ describe('World importers', () => {
     expect(started.body).toMatchObject({ importer: STUB_ID, status: 'running' });
 
     const done = await pollUntilDone(ada, world);
-    expect(done).toMatchObject({ status: 'succeeded', created: 2, updated: 0, deleted: 0, skipped: [] });
+    // The status surfaces the pinned rev the run resolved, so the panel's last-run line can show it (#260).
+    expect(done).toMatchObject({ status: 'succeeded', rev: 'rev-1', created: 2, updated: 0, deleted: 0, skipped: [] });
 
     const goblin = await entityByName(ada, world, 'Goblin');
     expect(goblin.detail.document[HEXLY_SOURCE_KEY]).toEqual({ importer: STUB_ID, sourceId: 'goblin', rev: 'rev-1' });

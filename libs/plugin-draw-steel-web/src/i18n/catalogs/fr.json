@@ -1,4 +1,7 @@
 {
+  "importer": {
+    "monsters": "Draw Steel — Monstres"
+  },
   "monster": {
     "eyebrow": "Monstre",
     "titleLabel": "Nom du monstre",
