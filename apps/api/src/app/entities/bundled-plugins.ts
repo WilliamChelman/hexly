@@ -9,6 +9,7 @@ import {
   StructuredDataTypeSet,
 } from '@hexly/domain';
 import { HexlyConfig, PluginConfigContribution } from '../config';
+import { serverPluginBoard } from '@hexly/plugin-board/server';
 import { serverPluginContent } from '@hexly/plugin-content/server';
 import { serverPluginDnd } from '@hexly/plugin-dnd/server';
 import { serverPluginDrawSteel } from '@hexly/plugin-draw-steel/server';
@@ -24,6 +25,7 @@ import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
 const BUNDLED_PLUGINS: readonly ServerPlugin[] = [
   serverPluginContent(),
   serverPluginHexmap(),
+  serverPluginBoard(),
   serverPluginDnd(),
   serverPluginDrawSteel(),
 ];

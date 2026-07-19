@@ -965,6 +965,51 @@ describe('EntityWrites', () => {
       expect(edgesFrom(row.id)).toHaveLength(7000);
     });
 
+    /**
+     * A Board is a first-class Entity like a Hex Map (#263): its `core.board-surface` Field harvests every
+     * Embed target and every Text Block inline link as a descriptor-less edge, and its Text Block prose
+     * feeds the search text — all through the generic derive pass, since `board` is a bundled Plugin.
+     */
+    it('an inserted Board harvests its Embed and Text Block links and indexes its Text Block prose', () => {
+      const geometry = { position: { x: 0, y: 0 }, size: { width: 100, height: 100 }, z: 0 } as const;
+      writes.insert({
+        ownerId: ADA,
+        worldId: WORLD,
+        name: 'The Session Board',
+        types: ['core.board'],
+        tags: [],
+        document: {
+          'core.content': emptyContent(),
+          'core.surface': {
+            elements: [
+              { id: 'em1', kind: 'embed', targetEntityId: 'e2', viewInstance: '', ...geometry },
+              {
+                id: 'tx1',
+                kind: 'text',
+                content: tiptapContent({
+                  type: 'doc',
+                  content: [
+                    { type: 'paragraph', content: [{ type: 'text', text: 'The Whisperwood' }] },
+                    { type: 'entityLink', attrs: { entityId: 'e3', label: 'e3' } },
+                  ],
+                }),
+                ...geometry,
+              },
+            ],
+          },
+        },
+      });
+
+      expect(edgesOf('The Session Board')).toEqual(
+        expect.arrayContaining([
+          { worldId: WORLD, targetKind: 'entity', targetId: 'e2', descriptor: null },
+          { worldId: WORLD, targetKind: 'entity', targetId: 'e3', descriptor: null },
+        ]),
+      );
+      expect(edgesOf('The Session Board')).toHaveLength(2);
+      expect(contentTextOf('The Session Board')).toBe('The Whisperwood');
+    });
+
     /** Content holding one bare `entityLink` at `targetId`. */
     function linkTo(targetId: string) {
       return tiptapContent({

@@ -11,6 +11,13 @@ import {
   HEX_GRID_FIELD_ID,
   PLUGIN_ID as HEXMAP_PLUGIN_ID,
 } from '@hexly/plugin-hexmap';
+import {
+  CORE_BOARD,
+  CORE_BOARD_SURFACE,
+  CORE_BOARD_TYPE,
+  PLUGIN_ID as BOARD_PLUGIN_ID,
+  SURFACE_FIELD_ID,
+} from '@hexly/plugin-board';
 import { DND_MONSTER, DND_MONSTER_TYPE, DND_STAT_BLOCK, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
 import {
   DS_MONSTER,
@@ -20,6 +27,7 @@ import {
 } from '@hexly/plugin-draw-steel';
 import { serverPluginContent } from '@hexly/plugin-content/server';
 import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
+import { serverPluginBoard } from '@hexly/plugin-board/server';
 import { serverPluginDnd } from '@hexly/plugin-dnd/server';
 import { serverPluginDrawSteel } from '@hexly/plugin-draw-steel/server';
 import { ImportRecord, serverPlugin } from '@hexly/domain';
@@ -37,10 +45,12 @@ describe('bundled plugin identity', () => {
   it("each bundled plugin carries its framework-free half's canonical id", () => {
     expect(CONTENT_PLUGIN_ID).toBe('content');
     expect(HEXMAP_PLUGIN_ID).toBe('hexmap');
+    expect(BOARD_PLUGIN_ID).toBe('board');
     expect(DND_PLUGIN_ID).toBe('dnd');
     expect(DRAW_STEEL_PLUGIN_ID).toBe('draw-steel');
     expect(serverPluginContent().id).toBe(CONTENT_PLUGIN_ID);
     expect(serverPluginHexmap().id).toBe(HEXMAP_PLUGIN_ID);
+    expect(serverPluginBoard().id).toBe(BOARD_PLUGIN_ID);
     expect(serverPluginDnd().id).toBe(DND_PLUGIN_ID);
     expect(serverPluginDrawSteel().id).toBe(DRAW_STEEL_PLUGIN_ID);
   });
@@ -50,6 +60,7 @@ describe('bundled plugin identity', () => {
     // different Plugins — so the owner is read off each plugin's id.
     expect(BUNDLED_PLUGIN_TYPE_OWNERS.get(CORE_NOTE)).toBe(CONTENT_PLUGIN_ID);
     expect(BUNDLED_PLUGIN_TYPE_OWNERS.get('core.hexmap')).toBe(HEXMAP_PLUGIN_ID);
+    expect(BUNDLED_PLUGIN_TYPE_OWNERS.get(CORE_BOARD)).toBe(BOARD_PLUGIN_ID);
     expect(BUNDLED_PLUGIN_TYPE_OWNERS.get(DND_MONSTER)).toBe(DND_PLUGIN_ID);
     expect(BUNDLED_PLUGIN_TYPE_OWNERS.get(DS_MONSTER)).toBe(DRAW_STEEL_PLUGIN_ID);
   });
@@ -57,6 +68,7 @@ describe('bundled plugin identity', () => {
   it('associates each Structured Data Type with the Plugin that owns it', () => {
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_RICH_CONTENT)).toBe(CONTENT_PLUGIN_ID);
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_HEX_GRID)).toBe(HEXMAP_PLUGIN_ID);
+    expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_BOARD_SURFACE)).toBe(BOARD_PLUGIN_ID);
     // dnd now owns the `dnd.stat-block` Data Type — the first plugin-contributed harvest source (ADR-0055).
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(DND_STAT_BLOCK)).toBe(DND_PLUGIN_ID);
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(DS_STAT_BLOCK)).toBe(DRAW_STEEL_PLUGIN_ID);
@@ -73,9 +85,10 @@ describe('bundled Plugin Fields', () => {
 
   it('folds each enabled Plugin’s registered Fields into one id-keyed set', () => {
     const ids = fields().map((field) => field.id);
-    // content owns the prose Field; hexmap owns the grid Field; dnd owns the stat block.
+    // content owns the prose Field; hexmap owns the grid Field; board owns the surface Field; dnd the stat block.
     expect(ids).toContain(CONTENT_FIELD_ID);
     expect(ids).toContain(HEX_GRID_FIELD_ID);
+    expect(ids).toContain(SURFACE_FIELD_ID);
     expect(ids).toContain('dnd.stat_block');
     expect(ids).toContain('draw-steel.stat_block');
   });
@@ -89,7 +102,7 @@ describe('bundled Plugin Fields', () => {
 
   it('resolves every `fieldRef` a bundled Type references to a bundled Field', () => {
     const byId = new Set(fields().map((field) => field.id));
-    for (const type of [CORE_NOTE_TYPE, CORE_HEXMAP_TYPE, DND_MONSTER_TYPE, DS_MONSTER_TYPE])
+    for (const type of [CORE_NOTE_TYPE, CORE_HEXMAP_TYPE, CORE_BOARD_TYPE, DND_MONSTER_TYPE, DS_MONSTER_TYPE])
       for (const ref of type.fieldRefs) expect(byId.has(ref)).toBe(true);
   });
 });
@@ -118,7 +131,7 @@ describe('bundled Importers', () => {
 describe('bundled plugin config', () => {
   it('contributes one config schema per bundled Plugin, keyed by canonical id', () => {
     expect(BUNDLED_PLUGIN_CONFIGS.map((p) => p.id).sort()).toEqual(
-      [CONTENT_PLUGIN_ID, DND_PLUGIN_ID, DRAW_STEEL_PLUGIN_ID, HEXMAP_PLUGIN_ID].sort(),
+      [BOARD_PLUGIN_ID, CONTENT_PLUGIN_ID, DND_PLUGIN_ID, DRAW_STEEL_PLUGIN_ID, HEXMAP_PLUGIN_ID].sort(),
     );
   });
 
@@ -126,6 +139,7 @@ describe('bundled plugin config', () => {
     const plugin = loadConfig(':memory:', BUNDLED_PLUGIN_CONFIGS).features.plugin;
     expect(plugin[CONTENT_PLUGIN_ID].enabled).toBe(true);
     expect(plugin[HEXMAP_PLUGIN_ID].enabled).toBe(true);
+    expect(plugin[BOARD_PLUGIN_ID].enabled).toBe(true);
     expect(plugin[DND_PLUGIN_ID].enabled).toBe(true);
     expect(plugin[DRAW_STEEL_PLUGIN_ID].enabled).toBe(true);
   });
