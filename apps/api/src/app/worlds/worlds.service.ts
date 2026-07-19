@@ -327,12 +327,17 @@ export class WorldsService {
   }
 
   /**
-   * The World's stored Assets, for a picker (#269, ADR-0034): the Image element and Content
-   * reference a World Asset by its capability URL. Reachable-gated — any member may browse the
-   * World's Assets; unreachable ≡ 404.
+   * The World's stored Assets, for the Board image picker (#269, ADR-0034): the Image element and
+   * Content reference a World Asset by its capability URL. Contributor-gated (owner ∨ contributor ∨
+   * Superadmin), the same standing {@link uploadAsset} requires — the picker is an editing surface,
+   * and the guard-less serving route (ADR-0034) makes any listed URL fetchable, so a World Viewer
+   * who sees only `shared` Entities must not enumerate Assets referenced solely by `private` ones
+   * (board review). Unreachable → 404, reachable-but-not-contributor → 403.
    */
-  listAssets(userId: string, id: string): AssetSummary[] | 'not-found' {
-    if (!worldAccess(this.db, userId).decideMeta(id)?.reachable) return 'not-found';
+  listAssets(userId: string, id: string): AssetSummary[] | 'not-found' | 'forbidden' {
+    const meta = worldAccess(this.db, userId).decideMeta(id);
+    if (!meta?.reachable) return 'not-found';
+    if (!meta.canContribute) return 'forbidden';
     return this.assets.list(id);
   }
 

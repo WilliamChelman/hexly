@@ -10,6 +10,8 @@ import { BoardImagePickerComponent, ImagePickerData } from './board-image-picker
 const EXISTING: AssetSummary[] = [
   { url: '/assets/w1/one.png', originalFilename: 'one.png', mime: 'image/png', size: 10 },
   { url: '/assets/w1/two.jpg', originalFilename: 'two.jpg', mime: 'image/jpeg', size: 20 },
+  // A non-image Asset the World holds — the grid renders `<img>`, so it must be filtered out.
+  { url: '/assets/w1/notes.pdf', originalFilename: 'notes.pdf', mime: 'application/pdf', size: 30 },
 ];
 
 /** A fake AssetsClient the picker drives — records the upload call and returns canned streams. */
@@ -79,6 +81,14 @@ describe('BoardImagePicker', () => {
 
     expect(closed).toEqual([]); // never closed
     expect(fixture.nativeElement.querySelector('[data-testid=image-upload-error]')).not.toBeNull();
+  });
+
+  it('excludes non-image Assets from the grid (a PDF would render as a broken tile, board review)', () => {
+    const tiles = fixture.nativeElement.querySelectorAll('[data-testid=image-asset-choice]');
+    // Only the two image Assets — the PDF is filtered out.
+    expect(tiles.length).toBe(2);
+    const labels = Array.from(tiles).map((t) => (t as HTMLElement).getAttribute('aria-label'));
+    expect(labels).toEqual(['one.png', 'two.jpg']);
   });
 
   it('cancels without choosing — closes with no result, so nothing is placed', () => {

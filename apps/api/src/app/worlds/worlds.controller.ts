@@ -151,13 +151,17 @@ export class WorldsController {
   }
 
   /**
-   * The World's stored Assets, for a picker (#269, ADR-0034): a Board Image element (and Content)
-   * references a World Asset by its capability URL. Reachable-gated (any member); unreachable → 404.
+   * The World's stored Assets, for the Board image picker (#269, ADR-0034): a Board Image element
+   * (and Content) references a World Asset by its capability URL. Contributor-gated in the service —
+   * the picker is an editing surface and a listed URL is fetchable via the guard-less serving route,
+   * so a Viewer must not enumerate (board review): unreachable → 404, reachable-but-not-contributor
+   * → 403.
    */
   @Get(':id/assets')
   assets(@CurrentUser() user: AuthUser, @Param('id') id: string): AssetSummary[] {
     const result = this.worlds.listAssets(user.id, id);
     if (result === 'not-found') throw new NotFoundException();
+    if (result === 'forbidden') throw new ForbiddenException();
     return result;
   }
 
