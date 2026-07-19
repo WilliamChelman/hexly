@@ -14,6 +14,7 @@
   "canvas": {
     "label": "Surface de tableau",
     "element": "Élément de tableau",
+    "textBlock": "Bloc de texte",
     "zoom": "Zoom",
     "zoomIn": "Zoom avant",
     "zoomOut": "Zoom arrière",
@@ -23,6 +24,7 @@
     "tools": "Outils",
     "select": "Sélection",
     "box": "Boîte",
+    "text": "Texte",
     "undo": "Annuler",
     "redo": "Rétablir"
   },

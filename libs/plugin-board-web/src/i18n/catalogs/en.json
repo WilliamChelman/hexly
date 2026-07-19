@@ -14,6 +14,7 @@
   "canvas": {
     "label": "Board surface",
     "element": "Board element",
+    "textBlock": "Text block",
     "zoom": "Zoom",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
@@ -23,6 +24,7 @@
     "tools": "Tools",
     "select": "Select",
     "box": "Box",
+    "text": "Text",
     "undo": "Undo",
     "redo": "Redo"
   },

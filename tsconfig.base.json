@@ -32,6 +32,7 @@
       "@hexly/plugin-board/testing": ["./libs/plugin-board-web/src/testing/index.ts"],
       "@hexly/plugin-board/web": ["./libs/plugin-board-web/src/index.ts"],
       "@hexly/plugin-content": ["./libs/plugin-content/src/index.ts"],
+      "@hexly/plugin-content/editor": ["./libs/plugin-content-web/src/editor.ts"],
       "@hexly/plugin-content/i18n": ["./libs/plugin-content-web/src/i18n/index.ts"],
       "@hexly/plugin-content/server": ["./libs/plugin-content-server/src/index.ts"],
       "@hexly/plugin-content/testing": ["./libs/plugin-content-web/src/testing/index.ts"],

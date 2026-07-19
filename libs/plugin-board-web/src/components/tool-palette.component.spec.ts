@@ -42,6 +42,17 @@ describe('Board ToolPalette', () => {
     expect(box.classList.contains('is-active')).toBe(false);
   });
 
+  it('offers the Text Block Tool and arms it from the palette (#268)', () => {
+    const { fixture, store } = setup();
+
+    const text = fixture.nativeElement.querySelector('[data-testid=tool-text]') as HTMLButtonElement;
+    expect(text).not.toBeNull();
+
+    click(fixture, 'tool-text');
+    expect(store.tool()).toBe('text');
+    expect(text.classList.contains('is-active')).toBe(true);
+  });
+
   it('arms exactly one Tool at a time from the palette', () => {
     const { fixture, store } = setup();
 

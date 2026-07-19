@@ -15,6 +15,7 @@ import {
   Size,
   SURFACE_FIELD,
 } from '@hexly/plugin-board';
+import { Content, emptyContent } from '@hexly/plugin-content';
 import { Patch } from '@hexly/immer';
 import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { BoardSelection } from './board-selection';
@@ -26,12 +27,15 @@ export type { SelectMode } from './board-selection';
 /**
  * A top-level Tool armed in the palette; exactly one armed, a canvas gesture applies it (CONTEXT.md →
  * Tool, #267). `select` is the non-destructive picker a Board opens on; `box` places the minimal static
- * element. The Text Block (#268) and Image (#269) tickets add their own placement Tools onto this list.
+ * element; `text` places a **Text Block** (#268). The Image (#269) ticket adds its own placement Tool.
  */
-export type ToolId = 'select' | 'box';
+export type ToolId = 'select' | 'box' | 'text';
 
 /** The world-pixel size a freshly-placed Box is drawn at, before it is resized. */
 export const DEFAULT_BOX_SIZE: Size = { width: 160, height: 120 };
+
+/** The world-pixel size a freshly-placed Text Block is drawn at — a comfortable line's width to start typing. */
+export const DEFAULT_TEXT_SIZE: Size = { width: 240, height: 120 };
 
 /**
  * The Board editor's store: tools, selection, and undo/redo over the surface. The document is the value
@@ -194,27 +198,59 @@ export class BoardStore {
 
   /**
    * Add the minimal Box element at world `position`, on top of the stack (CONTEXT.md → Board Element;
-   * user story 21), selecting it. The store mints the id and stamps `z` above the current top via the
-   * pure {@link addElement} helper, so a freshly placed element is never hidden. Returns the new id.
+   * user story 21), selecting it. The store mints the id and stamps `z` above the current top, so a
+   * freshly placed element is never hidden. Returns the new id.
    */
   addElement(position: Point): string {
     const id = mintId();
-    const element: BoardElement = {
+    this.place({ id, kind: 'box', position: { x: position.x, y: position.y }, size: { ...DEFAULT_BOX_SIZE }, z: 0 });
+    return id;
+  }
+
+  /**
+   * Add a **Text Block** at world `position` — an empty `core.rich-content` value edited with the same
+   * editor as an Entity's Content (CONTEXT.md → Text Block, #268). Placed on top and selected like any
+   * element, then **armed** so the author writes in it at once: the Text Block is the first inline-edit
+   * consumer of the arm/disarm machinery #267 stood up. Returns the new id.
+   */
+  addText(position: Point): string {
+    const id = mintId();
+    this.place({
       id,
-      kind: 'box',
+      kind: 'text',
       position: { x: position.x, y: position.y },
-      size: { ...DEFAULT_BOX_SIZE },
-      z: 0, // addElement stamps the real z on top; this is a placeholder the helper overwrites.
-    };
-    // Compute the next surface from the committed (plain) document, then overwrite the draft wholesale —
-    // never read the Immer draft into a pure helper, which would splice draft proxies into a new array.
+      size: { ...DEFAULT_TEXT_SIZE },
+      z: 0,
+      content: emptyContent(),
+    });
+    this.arm(id);
+    return id;
+  }
+
+  /**
+   * Replace a **Text Block**'s prose with `content` (the inline editor's committed doc, #268), as one
+   * undoable step. A no-op — no undo step — for a missing id or a non-text element, so a stray call from
+   * a mis-wired host never corrupts a Box or Image.
+   */
+  setContent(id: string, content: Content): void {
+    this.commit((surface) => {
+      const element = surface.elements.find((e) => e.id === id);
+      if (element?.kind === 'text') element.content = content;
+    });
+  }
+
+  /**
+   * Place `element` on top of the stack via the pure {@link addElement} helper, selecting it so the
+   * Inspector opens on it. The `z` on `element` is a placeholder the helper overwrites. Compute the next
+   * surface from the committed (plain) document, then overwrite the draft wholesale — never read the
+   * Immer draft into a pure helper, which would splice draft proxies into a new array.
+   */
+  private place(element: BoardElement): void {
     const next = addElement(this.document(), element);
     const committed = this.commit((surface) => replaceSurface(surface, next));
-    // Select the fresh element so the Inspector opens on it. Stamp the selection so undo drops it with
-    // the element.
-    this.sel.select(id, 'replace');
+    // Stamp the selection so undo drops the element and its selection together.
+    this.sel.select(element.id, 'replace');
     if (committed) this.trackSelectionOnLastEdit();
-    return id;
   }
 
   /** Move element `id` to world `position`; a no-op (no undo step) if there is no such element. */

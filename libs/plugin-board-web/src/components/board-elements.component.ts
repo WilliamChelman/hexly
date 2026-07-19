@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, HostListener, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Point, Size, stackingOrder } from '@hexly/plugin-board';
+import { Point, Size, stackingOrder, TextElement } from '@hexly/plugin-board';
 import { BoardCamera } from '../services/board-camera';
 import { BoardStore } from '../services/board-store';
 import { DRAG_THRESHOLD } from '../utils/gesture';
+import { TextBlockComponent } from './text-block.component';
 import { toolForHotkey } from './tools';
 
 /** A resize handle's compass direction — the edge(s) it drags. A closed union, like {@link ToolId}. */
@@ -31,7 +32,7 @@ const HANDLES: readonly Handle[] = [
 /** Smallest a resize may shrink an element, in world pixels — a positive floor `sizeSchema` demands. */
 const MIN_SIZE = 20;
 
-/** One element resolved for the DOM: its screen-space box and whether it reads as selected. */
+/** One element resolved for the DOM: its screen-space box, its selection/armed state, and its content. */
 interface Rendered {
   readonly id: string;
   readonly left: number;
@@ -39,6 +40,10 @@ interface Rendered {
   readonly width: number;
   readonly height: number;
   readonly selected: boolean;
+  /** Whether this element is the armed one — its editor is live, so drag/resize is suppressed on it. */
+  readonly armed: boolean;
+  /** The Text Block element to render in place, or null for any other kind (Box, Image, Embed). */
+  readonly text: TextElement | null;
 }
 
 /** A live drag: moving the whole selection, or resizing one element from a handle. */
@@ -71,12 +76,14 @@ type Gesture =
   selector: 'app-board-elements',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'absolute inset-0 pointer-events-none overflow-hidden' },
-  imports: [TranslocoPipe],
+  imports: [TranslocoPipe, TextBlockComponent],
   template: `
     @for (el of rendered(); track el.id) {
       <div
         class="element"
         [class.is-selected]="el.selected"
+        [class.is-armed]="el.armed"
+        [class.is-text]="!!el.text"
         [style.left.px]="el.left"
         [style.top.px]="el.top"
         [style.width.px]="el.width"
@@ -84,8 +91,12 @@ type Gesture =
         [attr.data-testid]="'element-' + el.id"
         [attr.aria-label]="'board.canvas.element' | transloco"
         (pointerdown)="onElementDown(el.id, $event)"
+        (dblclick)="onElementDblClick(el.id)"
       >
-        @if (el.selected && single()) {
+        @if (el.text; as text) {
+          <app-board-text-block [element]="text" />
+        }
+        @if (el.selected && single() && !el.armed) {
           @for (h of handles; track h.dir) {
             <span
               class="handle {{ h.at }}"
@@ -105,6 +116,14 @@ type Gesture =
       @apply absolute pointer-events-auto rounded-sm cursor-move;
       background: color-mix(in srgb, var(--color-gold-soft) 55%, transparent);
       border: 1px solid var(--color-line-strong);
+    }
+    /* A Text Block reads as paper carrying prose, not a gold placeholder; armed, it invites a caret. */
+    .element.is-text {
+      @apply bg-surface-raised;
+      border-color: var(--color-line);
+    }
+    .element.is-armed {
+      @apply cursor-text;
     }
     .element.is-selected {
       border-color: var(--color-gold);
@@ -141,6 +160,7 @@ export class BoardElementsComponent {
   protected readonly rendered = computed<Rendered[]>(() => {
     const camera = this.cam.camera();
     const selected = new Set(this.store.selectedIds());
+    const armed = this.store.armed();
     const move = this.moveDelta();
     const resize = this.resizePreview();
     return stackingOrder(this.store.document()).map((el) => {
@@ -160,6 +180,8 @@ export class BoardElementsComponent {
         width: size.width * camera.zoom,
         height: size.height * camera.zoom,
         selected: selected.has(el.id),
+        armed: armed === el.id,
+        text: el.kind === 'text' ? el : null,
       };
     });
   });
@@ -168,6 +190,9 @@ export class BoardElementsComponent {
 
   protected onElementDown(id: string, event: PointerEvent): void {
     if (event.button !== 0) return;
+    // An armed Text Block owns the pointer for typing and text selection: let the press reach its editor
+    // and start no move gesture — dragging requires disarming first (CONTEXT.md → Text Block, #268).
+    if (this.store.armed() === id) return;
     event.stopPropagation();
     (event.target as Element).setPointerCapture?.(event.pointerId);
 
@@ -183,6 +208,18 @@ export class BoardElementsComponent {
     // Arm the move only if the pressed element ended up selected (a toggle-off leaves nothing to drag).
     if (!this.store.selectedIds().includes(id)) return;
     this.gesture = { kind: 'move', startX: event.clientX, startY: event.clientY, id, group, moved: false };
+  }
+
+  /**
+   * Double-click **arms** an interactive element for inline editing (CONTEXT.md → Text Block, #268): a
+   * plain click selects and can drag, a second click into it hands the pointer to its editor. Only the
+   * Text Block arms today; other kinds have no edit mode, so the double-click is inert on them.
+   */
+  protected onElementDblClick(id: string): void {
+    const element = this.store.document().elements.find((e) => e.id === id);
+    if (element?.kind !== 'text') return;
+    this.store.select(id, 'replace');
+    this.store.arm(id);
   }
 
   // ---- Handle press: resize -------------------------------------------------

@@ -22,14 +22,19 @@ export interface ToolDef {
 /** A plain rectangle glyph for the Box tool — a 24-box outline, matching web-ui's icon viewBox. */
 const BOX_PATH = 'M4 5h16v14H4z';
 
+/** A capital "T" glyph for the Text tool — top bar plus stem, stroked in web-ui's 24-box viewBox. */
+const TEXT_PATH = 'M6 6h12M12 6v12';
+
 /**
- * The top-level Tools, in palette order: the non-destructive Select first (the boot default), then the
- * minimal Box placement Tool (Seam B, #267). The Text Block (#268) and Image (#269) Tools slot in after.
- * The visible name is resolved at the UI layer from the stable `id` (`board.toolPalette.<id>`, ADR-0014).
+ * The top-level Tools, in palette order: the non-destructive Select first (the boot default), the
+ * minimal Box placement Tool (Seam B, #267), then the Text Block Tool (#268). The Image (#269) Tool
+ * slots in after. The visible name is resolved at the UI layer from the stable `id`
+ * (`board.toolPalette.<id>`, ADR-0014).
  */
 export const TOOLS: readonly ToolDef[] = [
   { id: 'select', hotkey: 'v', glyph: { icon: 'select' } },
   { id: 'box', hotkey: 'b', glyph: { path: BOX_PATH } },
+  { id: 'text', hotkey: 't', glyph: { path: TEXT_PATH } },
 ];
 
 /** The Tool a keyboard key arms, or undefined for a non-hotkey key. Case-insensitive. */
