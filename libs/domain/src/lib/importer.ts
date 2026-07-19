@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { EntityType, HEXLY_METADATA_PREFIX } from './entity';
+import { EntityType, HEXLY_METADATA_PREFIX, visibilitySchema } from './entity';
 import { EntityDocument } from './field';
 
 /**
@@ -72,15 +72,108 @@ export interface ImportContext {
 }
 
 /**
+ * One {@link Importer.produce} run's whole output: the {@link ImportRecord}s to reconcile, and the
+ * pinned source `rev` they all reflect. The `rev` is a run property, not a per-Record one — the
+ * Importer resolves it once (the tarball version it fetched, ADR-0061) — and the reconcile stamps it
+ * into every landed Entity's {@link ImportSource}, since a Record deliberately carries no provenance.
+ */
+export interface ImportProduction {
+  /** The pinned source revision this run reflects — the `rev` every stamped {@link ImportSource} carries. */
+  readonly rev: string;
+  readonly records: readonly ImportRecord[];
+}
+
+/**
  * A code-registered producer that turns an external source into Entities (CONTEXT.md → Importer). A
  * Plugin contributes one by `namespace.id` through {@link ServerPlugin.importers}; it only fetches and
- * transforms, yielding {@link ImportRecord}s, and never touches the database, provenance, or the write
- * choke point — the framework's reconcile does (ADR-0060). This makes a plugin's import path a
+ * transforms, yielding an {@link ImportProduction}, and never touches the database, provenance, or the
+ * write choke point — the framework's reconcile does (ADR-0060). This makes a plugin's import path a
  * near-pure function that is trivially fixture-tested.
  */
 export interface Importer {
   /** This Importer's `namespace.id` — the `importer` an {@link ImportSource} names (`draw-steel.monsters`). */
   readonly id: string;
-  /** Fetch and transform the source into Import Records; the reconcile lands them. */
-  produce(ctx: ImportContext): Promise<readonly ImportRecord[]>;
+  /**
+   * The Importer's human copy for the generic Imports panel (CONTEXT.md → Importer). Optional — the
+   * panel falls back to the {@link id} — so a Plugin adds an Importer by shipping a `produce()` alone.
+   */
+  readonly label?: string;
+  /** Fetch and transform the source into an {@link ImportProduction}; the reconcile lands it. */
+  produce(ctx: ImportContext): Promise<ImportProduction>;
+}
+
+/**
+ * One Importer as the generic Imports panel lists it (CONTEXT.md → Importer): its `id` and the copy to
+ * show. The reconcile's `list` surface returns whatever Importers the enabled Plugins registered for a
+ * World — no per-Importer route or chrome.
+ */
+export interface ImporterSummary {
+  readonly id: string;
+  readonly label: string;
+}
+
+/** The body of `POST /worlds/:worldId/importers/:importerId/run`: the {@link Visibility} landed Entities take. */
+export const runImportRequestSchema = z.object({ visibility: visibilitySchema }).strict();
+
+/** A validated import-run request. */
+export type RunImportRequest = z.infer<typeof runImportRequestSchema>;
+
+/**
+ * The stable reasons the per-World Importer surface refuses a run — distinct from the vault
+ * `ImportErrorCode` (that gates a `.zip` upload; this gates a plugin Importer reconcile). Returned as
+ * `{ code }` in the 4xx body.
+ */
+export const ImporterErrorCode = {
+  /** A run is already reconciling this World — one at a time, so a second is a 409 (ADR-0060). */
+  ImportRunning: 'import-running',
+} as const;
+
+/** One of the {@link ImporterErrorCode} values. */
+export type ImporterErrorCode = (typeof ImporterErrorCode)[keyof typeof ImporterErrorCode];
+
+/**
+ * One Import Record the reconcile could not land — its transform was ill-shaped (no name, no types) —
+ * skipped and tallied so a single bad Record never aborts the run (CONTEXT.md → Import Record). Its
+ * upstream `sourceId` is *not* treated as vanished, so a still-present-but-malformed Record keeps its
+ * existing Entity rather than deleting it.
+ */
+export interface ImportSkip {
+  /** The Record's upstream id, or the empty string when the Record lacked even that. */
+  readonly sourceId: string;
+  /** What about the Record made it unlandable — surfaced verbatim for the panel. */
+  readonly reason: string;
+}
+
+/**
+ * Where a World's one import run stands. `idle` is the state before any run this process has seen;
+ * `succeeded` means the reconcile finished, even if it skipped Records (see {@link ImportRunSummary.skipped}).
+ * `failed` is reserved for a run that *aborted* — the Importer's fetch threw or the database refused,
+ * never a single bad Record.
+ */
+export type ImportRunStatus = 'idle' | 'running' | 'succeeded' | 'failed';
+
+/**
+ * A World's import run (ADR-0060) — the generic, importer-agnostic reconcile of an Importer's
+ * {@link ImportProduction} into one World. `POST …/run` starts it and returns at once (202); the
+ * matching `GET …/import/status` polls. Only ever one per World: a second run while one is in flight
+ * is a 409. Job state lives in the API process, not the DB — a restart forgets an unfinished run whose
+ * done chunks are already on disk (like the Reindex, ADR-0046).
+ *
+ * `created + updated` is the Records landed; `deleted` the Entities whose `sourceId` vanished upstream;
+ * `skipped` the ill-shaped Records, with reasons.
+ */
+export interface ImportRunSummary {
+  /** Which Importer this run reconciles, or null before any run (idle). */
+  readonly importer: string | null;
+  readonly status: ImportRunStatus;
+  /** Records the reconcile will process — the produced total minus the skipped, the denominator for progress. */
+  readonly total: number;
+  readonly created: number;
+  readonly updated: number;
+  readonly deleted: number;
+  readonly skipped: readonly ImportSkip[];
+  readonly startedAt: number | null;
+  readonly finishedAt: number | null;
+  /** Set only when `status === 'failed'`: why the run aborted. */
+  readonly error: string | null;
 }
