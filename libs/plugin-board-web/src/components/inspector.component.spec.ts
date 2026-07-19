@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
+import { Subject } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
+import { ENTITY_VIEW_CHOICES, EntityViewChoice } from '@hexly/web-entity';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { BOARD_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { BoardStore } from '../services/board-store';
@@ -111,6 +113,52 @@ describe('Board Inspector single-element editing', () => {
     expect(el.querySelector('header')?.textContent).toContain('Élément sélectionné');
     expect(el.textContent).toContain('Largeur');
     expect(el.querySelector('[data-testid=element-delete]')?.textContent).toContain('Supprimer l’élément');
+  });
+});
+
+describe('Board Inspector Embed view choices', () => {
+  let subjects: Map<string, Subject<readonly EntityViewChoice[]>>;
+
+  beforeEach(async () => {
+    subjects = new Map();
+    await TestBed.configureTestingModule({
+      imports: [InspectorComponent, provideTranslocoTesting(BOARD_TEST_CATALOGS)],
+      providers: [
+        ...provideBoardStoreTesting(),
+        // A controllable resolver: hands back a per-target Subject so a spec can emit out of order.
+        {
+          provide: ENTITY_VIEW_CHOICES,
+          useValue: (id: string) => {
+            const s = new Subject<readonly EntityViewChoice[]>();
+            subjects.set(id, s);
+            return s;
+          },
+        },
+      ],
+    }).compileComponents();
+  });
+
+  function labels(fixture: ReturnType<typeof render>): (string | undefined)[] {
+    return Array.from(fixture.nativeElement.querySelectorAll('[data-testid=embed-view-select] option')).map((o) =>
+      (o as HTMLElement).textContent?.trim(),
+    );
+  }
+
+  it('drops a stale response when the selected Embed target changes (out-of-order)', () => {
+    const store = TestBed.inject(BoardStore);
+    store.addEmbed({ x: 0, y: 0 }, 'target-a'); // selected → effect subscribes to A
+    const fixture = render();
+    store.addEmbed({ x: 50, y: 0 }, 'target-b'); // now selected → effect cancels A, subscribes to B
+    fixture.detectChanges();
+
+    // Responses land out of order: B (current) then A (stale, already cancelled).
+    subjects.get('target-b')?.next([{ view: { viewId: 'core.view.map', fieldKey: 'core.grid' }, label: 'Map' }]);
+    subjects.get('target-a')?.next([{ view: { viewId: 'core.view.content' }, label: 'Content' }]);
+    fixture.detectChanges();
+
+    const shown = labels(fixture);
+    expect(shown).toContain('Map'); // B's Views
+    expect(shown).not.toContain('Content'); // A's stale response never paints under B
   });
 });
 
