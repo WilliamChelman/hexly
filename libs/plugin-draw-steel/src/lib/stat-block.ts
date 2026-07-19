@@ -74,6 +74,24 @@ export const DS_DAMAGE_TYPE_OPTIONS = [
 
 export type DsDamageType = (typeof DS_DAMAGE_TYPE_OPTIONS)[number];
 
+/**
+ * An Ability's action type — its slot in the turn economy. Pinned from `ds.CONFIG.abilityTypes` (the
+ * Draw Steel repo, branch `1.1.x`) as its lowercase source keys, so an import maps one-to-one and the
+ * View shows them raw. `main` is the printed "Main Action"; `none`/`move` round out the source set.
+ */
+export const DS_ABILITY_TYPE_OPTIONS = [
+  'main',
+  'maneuver',
+  'freeManeuver',
+  'triggered',
+  'freeTriggered',
+  'move',
+  'none',
+  'villain',
+] as const;
+
+export type DsAbilityType = (typeof DS_ABILITY_TYPE_OPTIONS)[number];
+
 /** The five characteristics, in the order a stat block prints them. */
 export const DS_CHARACTERISTIC_KEYS = ['might', 'agility', 'reason', 'intuition', 'presence'] as const;
 
@@ -109,8 +127,8 @@ export const DS_DEFENCE_KEYS = [
 /** The two per-damage-type maps — rendered as their own sections, never flat slots. */
 export const DS_MAP_KEYS = ['immunities', 'weaknesses'] as const;
 
-/** List-of-record sections rendered below the stat grid, apart from the flat {@link DS_STAT_FIELDS} — `traits` now (#245), `abilities` to follow (#242). */
-export const DS_SECTION_KEYS = ['traits'] as const;
+/** List-of-record sections rendered below the stat grid, apart from the flat {@link DS_STAT_FIELDS} — `traits` (#245) then `abilities` (#246), in printed-card order. */
+export const DS_SECTION_KEYS = ['traits', 'abilities'] as const;
 
 /** A per-damage-type number map (e.g. `{ fire: 5, cold: 3 }`) — every damage type optional. */
 const damageMapSchema = z.partialRecord(z.enum(DS_DAMAGE_TYPE_OPTIONS), z.number().finite());
@@ -124,6 +142,42 @@ export const traitSchema = z.object({
 });
 
 export type Trait = z.infer<typeof traitSchema>;
+
+/**
+ * An Ability's **power roll** — render-faithful, not resolvable: a characteristic plus the three flat tier
+ * texts a printed block reads (`t1` ≤11 / `t2` 12–16 / `t3` 17+). Hexly never rolls; the tiers are prose.
+ * Required strings so a freshly-toggled power roll is well-formed, while a non-string tier is rejected (#246).
+ */
+export const powerRollSchema = z.object({
+  characteristic: z.enum(DS_CHARACTERISTIC_KEYS),
+  t1: z.string(),
+  t2: z.string(),
+  t3: z.string(),
+});
+
+export type PowerRoll = z.infer<typeof powerRollSchema>;
+
+/**
+ * An active **Ability** — a signature action, maneuver, or triggered/villain action. Render-faithful
+ * structured data (#246): `distance`/`target` are display strings this pass, not typed geometry, and an
+ * Ability either rolls (its {@link PowerRoll} three tiers) or states a flat `effect` — both optional, so a
+ * malformed power roll is caught while an effect-only ability is equally well-formed. `name`/`distance`/
+ * `target`/`keywords` are required (blank-tolerant, like {@link traitSchema}) so an added ability parses;
+ * `cost`/`trigger` are absent until authored. `type` is a required enum from {@link DS_ABILITY_TYPE_OPTIONS}.
+ */
+export const abilitySchema = z.object({
+  name: z.string(),
+  type: z.enum(DS_ABILITY_TYPE_OPTIONS),
+  cost: z.string().optional(),
+  keywords: z.array(z.string()),
+  distance: z.string(),
+  target: z.string(),
+  trigger: z.string().optional(),
+  powerRoll: powerRollSchema.optional(),
+  effect: z.string().optional(),
+});
+
+export type Ability = z.infer<typeof abilitySchema>;
 
 /**
  * The stat-block value (CONTEXT.md → Structured Data Type): the five characteristics plus the
@@ -159,6 +213,7 @@ export const statBlockSchema = z
     keywords: z.array(z.string()),
     // Sections ({@link DS_SECTION_KEYS}).
     traits: z.array(traitSchema),
+    abilities: z.array(abilitySchema),
   })
   .partial();
 

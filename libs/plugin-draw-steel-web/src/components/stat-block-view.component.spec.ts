@@ -138,6 +138,106 @@ describe('StatBlockView (draw-steel)', () => {
     expect(el.querySelector('[data-testid=trait-0] [data-testid=trait-name]')).toBeNull();
   });
 
+  it('prints an ability with its power-roll tiers, and one with a flat effect, for a reader (#246)', () => {
+    const { el } = render(
+      {
+        abilities: [
+          {
+            name: 'Cleave',
+            type: 'main',
+            cost: 'Signature',
+            keywords: ['melee', 'weapon'],
+            distance: 'Melee 1',
+            target: 'One creature',
+            powerRoll: { characteristic: 'might', t1: '2 damage', t2: '5 damage', t3: '8 damage; push 1' },
+          },
+          {
+            name: 'Watchful',
+            type: 'triggered',
+            keywords: [],
+            distance: 'Self',
+            target: 'Self',
+            trigger: 'An enemy moves adjacent',
+            effect: 'The creature shifts 1.',
+          },
+        ],
+      },
+      false,
+    );
+
+    const cleave = el.querySelector('[data-testid=section-abilities] [data-testid=ability-0]');
+    expect(cleave?.textContent).toContain('Cleave');
+    expect(cleave?.textContent).toContain('Melee 1');
+    // The three tiers render from the flat texts — Hexly never rolls (#246).
+    expect(cleave?.querySelector('[data-testid=ability-powerroll]')?.textContent).toContain('8 damage; push 1');
+
+    const watchful = el.querySelector('[data-testid=section-abilities] [data-testid=ability-1]');
+    expect(watchful?.textContent).toContain('An enemy moves adjacent');
+    // No power roll → the flat effect stands in.
+    expect(watchful?.querySelector('[data-testid=ability-powerroll]')).toBeNull();
+    expect(watchful?.querySelector('[data-testid=ability-effect]')?.textContent).toContain('The creature shifts 1.');
+    // A reader gets no editing affordance.
+    expect(el.querySelector('[data-testid=ability-add]')).toBeNull();
+  });
+
+  it('adds an ability, edits its fields, and toggles a power roll into the one grouped block value (#246)', () => {
+    const { fixture, session, el } = render({}); // empty → opens in edit mode
+
+    (el.querySelector('[data-testid=ability-add]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    // A fresh ability opens well-formed with a default type and no power roll (its flat effect editor shows).
+    expect(statBlock(session)).toEqual({
+      abilities: [{ name: '', type: 'main', keywords: [], distance: '', target: '' }],
+    });
+
+    const name = el.querySelector('[data-testid=ability-0] [data-testid=ability-name]') as HTMLInputElement;
+    name.value = 'Cleave';
+    name.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const distance = el.querySelector('[data-testid=ability-0] [data-testid=ability-distance]') as HTMLInputElement;
+    distance.value = 'Melee 1';
+    distance.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    // Toggle a power roll on: the flat-effect editor is replaced by the characteristic + three tiers.
+    (el.querySelector('[data-testid=ability-0] [data-testid=ability-powerroll-add]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=ability-0] [data-testid=ability-effect]')).toBeNull();
+
+    const t3 = el.querySelector('[data-testid=ability-0] [data-testid=ability-t3]') as HTMLInputElement;
+    t3.value = '8 damage; push 1';
+    t3.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(statBlock(session)).toEqual({
+      abilities: [
+        {
+          name: 'Cleave',
+          type: 'main',
+          keywords: [],
+          distance: 'Melee 1',
+          target: '',
+          powerRoll: { characteristic: 'might', t1: '', t2: '', t3: '8 damage; push 1' },
+        },
+      ],
+    });
+
+    // Removing the last ability clears the key — no `{ abilities: [] }` husk into the frontmatter.
+    (el.querySelector('[data-testid=ability-0] [data-testid=ability-remove]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(statBlock(session)).toEqual({});
+  });
+
+  it('suppresses Ability editing for a read-only opener (writable: false is the ADR-0037 gate) (#246)', () => {
+    const { el } = render(
+      { abilities: [{ name: 'Cleave', type: 'main', keywords: [], distance: '', target: '' }] },
+      false,
+    );
+    expect(el.querySelector('[data-testid=ability-add]')).toBeNull();
+    expect(el.querySelector('[data-testid=ability-0] [data-testid=ability-name]')).toBeNull();
+  });
+
   it('shows the minion-only lines (EV suffix, With Captain) for a minion', () => {
     const { el } = render({ organization: 'minion', ev: 3, with_captain: '+1 damage' }, false);
     expect(el.textContent).toContain('for four minions');

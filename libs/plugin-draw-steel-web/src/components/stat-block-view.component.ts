@@ -23,6 +23,7 @@ import { StatSlotComponent } from './stat-slot.component';
 import { StatControlComponent } from './stat-control.component';
 import { DamageMapComponent } from './damage-map.component';
 import { TraitsSectionComponent } from './traits-section.component';
+import { AbilitiesSectionComponent } from './abilities-section.component';
 
 /**
  * The `draw-steel.stat-block` data-type's View (`draw-steel.view.stat-block`, ADR-0055): the classic Draw
@@ -33,7 +34,7 @@ import { TraitsSectionComponent } from './traits-section.component';
  * One View, two modes (not two Views): read mode prints the card; edit mode swaps each value *in place*
  * for a control, gated on {@link EntitySession.writable}. The layout mirrors a printed card — a header
  * band, the stat strip, the immunity/weakness/movement/captain block, the M·A·R·I·P badges, then the
- * passive **Traits** section (#245). Abilities remains a labelled stub: the seam #242 fills next.
+ * passive **Traits** section (#245) and the active **Abilities** section (#246).
  *
  * The block is the Entity's only stat-authoring surface (the create dialog collects scalar required Fields
  * only, and a `draw-steel.stat-block` Field is structured), so every flat stat must have a slot here — an
@@ -49,6 +50,7 @@ import { TraitsSectionComponent } from './traits-section.component';
     StatControlComponent,
     DamageMapComponent,
     TraitsSectionComponent,
+    AbilitiesSectionComponent,
     IconComponent,
     IconButtonComponent,
   ],
@@ -244,18 +246,13 @@ import { TraitsSectionComponent } from './traits-section.component';
           }
         </div>
 
-        <!-- Traits, above the future Abilities section (#245). -->
+        <!-- Traits (#245), then the active Abilities section (#246) — the printed-card order. -->
         <ds-traits-section [value]="value('traits')" [writable]="edit()" (valueChange)="setByKey('traits', $event)" />
-
-        <!-- Abilities: the seam #242 fills. -->
-        @for (section of stubSections; track section) {
-          <section class="border-b border-line py-3 last:border-b-0" [attr.data-testid]="'section-' + section">
-            <h3 class="m-0 mb-1 text-sm font-semibold text-sea">
-              {{ 'drawSteel.statBlock.section.' + section | transloco }}
-            </h3>
-            <p class="m-0 text-sm italic text-ink-faint">{{ 'drawSteel.statBlock.comingSoon' | transloco }}</p>
-          </section>
-        }
+        <ds-abilities-section
+          [value]="value('abilities')"
+          [writable]="edit()"
+          (valueChange)="setByKey('abilities', $event)"
+        />
 
         <p class="my-3 text-xs text-ink-muted">{{ 'drawSteel.monster.loreHint' | transloco }}</p>
       </div>
@@ -304,8 +301,6 @@ export class StatBlockViewComponent {
   protected readonly damageSectionKeys = DS_MAP_KEYS;
   /** The closed damage vocabulary the immunity/weakness editors offer. */
   protected readonly damageTypes = DS_DAMAGE_TYPE_OPTIONS;
-  /** The labelled-but-empty Abilities section — the seam #242 fills. */
-  protected readonly stubSections = ['abilities'] as const;
 
   /** A minion is the only organization with a captain and the "for four minions" EV phrasing. */
   protected isMinion(): boolean {
