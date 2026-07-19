@@ -1,0 +1,21 @@
+{
+  "dataType": {
+    "surface": "Board surface"
+  },
+  "eyebrow": "Board",
+  "titleLabel": "Board title",
+  "rename": "Rename board",
+  "editorLabel": "Board notes",
+  "create": "Create Board",
+  "untitled": "Untitled board",
+  "view": {
+    "surface": "Board"
+  },
+  "canvas": {
+    "label": "Board surface",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Reset view"
+  }
+}
