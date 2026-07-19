@@ -55,6 +55,8 @@ import { WorldWrites } from './world-writes';
   ],
   // WorldWrites is exported so the Admin account purge (ADR-0045) routes its `world_members`
   // deletion through the one handle that bumps `seq` — the World peer of EntityWrites.
-  exports: [WorldWrites],
+  // ImporterRegistry is exported so the e2e-only TestModule can swap the Draw Steel monsters
+  // Importer's codeload fetch port (ADR-0061) for its committed fixtures — an offline import run.
+  exports: [WorldWrites, ImporterRegistry],
 })
 export class WorldsModule {}
