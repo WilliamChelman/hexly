@@ -9,6 +9,12 @@ import { evaluate } from './evaluate';
 import { formatRoll } from './format';
 
 /**
+ * A rolled result lingers longer than a default toast (4s): it carries the breakdown a GM reads off,
+ * not a fire-and-forget status, and it rides above the palette they just dismissed.
+ */
+export const DICE_TOAST_DURATION_MS = 8000;
+
+/**
  * The `/r ` Command Provider (issue #251): palette rolling. It depends only on the palette's
  * Command contract and web-core's toaster — no edge flows back into either lib. A valid Dice
  * Expression yields one runnable Command labelled with the expression; running it evaluates a fresh
@@ -47,8 +53,13 @@ export class DiceCommands implements CommandProvider {
       {
         id: 'dice-roll',
         label: this.transloco.translate('dice.roll', { expression }),
-        // Re-evaluate on each run, so pressing Enter again produces a fresh Roll (issue #251).
-        run: () => void this.toaster.show(formatRoll(expression, evaluate(ast, this.rng))),
+        // Re-evaluate on each run, so pressing Enter again produces a fresh Roll (issue #251). Anchor
+        // it to the top, where the palette sat, and let it linger (issue #251 follow-up).
+        run: () =>
+          void this.toaster.show(formatRoll(expression, evaluate(ast, this.rng)), 'info', {
+            placement: 'top',
+            durationMs: DICE_TOAST_DURATION_MS,
+          }),
       },
     ]);
   }

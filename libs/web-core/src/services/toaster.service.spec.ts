@@ -23,6 +23,22 @@ describe('ToasterService', () => {
     expect(toaster.toasts()[0].tone).toBe('info');
   });
 
+  it('defaults a toast to the bottom placement', () => {
+    const toaster = new ToasterService();
+
+    toaster.show('Saved');
+
+    expect(toaster.toasts()[0].placement).toBe('bottom');
+  });
+
+  it('anchors a toast to the top when asked', () => {
+    const toaster = new ToasterService();
+
+    toaster.show('2d6 = 7', 'info', { placement: 'top' });
+
+    expect(toaster.toasts()[0].placement).toBe('top');
+  });
+
   it('stacks multiple toasts, each with a distinct id, in order shown', () => {
     const toaster = new ToasterService();
 
@@ -45,7 +61,7 @@ describe('ToasterService', () => {
 
   it('auto-dismisses a toast after its duration elapses', () => {
     const toaster = new ToasterService();
-    toaster.show('transient', 'info', 1000);
+    toaster.show('transient', 'info', { durationMs: 1000 });
     expect(toaster.toasts()).toHaveLength(1);
 
     vi.advanceTimersByTime(999);
@@ -57,7 +73,7 @@ describe('ToasterService', () => {
 
   it('keeps a toast indefinitely when its duration is zero', () => {
     const toaster = new ToasterService();
-    toaster.show('sticky', 'error', 0);
+    toaster.show('sticky', 'error', { durationMs: 0 });
 
     vi.advanceTimersByTime(60_000);
 

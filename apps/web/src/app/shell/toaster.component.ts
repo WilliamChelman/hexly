@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, ElementRef, effect, inject } from '@angular/core';
-import { NgClass } from '@angular/common';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject } from '@angular/core';
+import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ToasterService } from '@hexly/web-core';
@@ -14,17 +14,29 @@ import { ToasterService } from '@hexly/web-core';
 @Component({
   selector: 'app-toaster',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  // The host ignores the pointer so it never blocks the canvas; each toast
-  // re-enables it for its own controls.
+  // The host spans the viewport but ignores the pointer so it never blocks the canvas; each toast
+  // re-enables it for its own controls. The two edge stacks position themselves within it, so a
+  // `top`-placed toast (a dice roll) lands near the command palette rather than at the far bottom.
   host: {
-    class: 'fixed left-1/2 bottom-5 -translate-x-1/2 z-[1000] flex flex-col gap-2 items-center pointer-events-none',
+    class: 'fixed inset-0 z-[1000] pointer-events-none',
     // A manual popover so the stack rides the top layer, above a modal <dialog>'s backdrop
     // (a plain z-index can't beat the top layer). `manual` = we own show/hide; no light-dismiss.
     popover: 'manual',
   },
-  imports: [NgClass, TranslocoPipe],
+  imports: [NgClass, NgTemplateOutlet, TranslocoPipe],
   template: `
-    @for (toast of toaster.toasts(); track toast.id) {
+    <div class="absolute top-5 left-1/2 -translate-x-1/2 flex flex-col gap-2 items-center">
+      @for (toast of topToasts(); track toast.id) {
+        <ng-container [ngTemplateOutlet]="toastRow" [ngTemplateOutletContext]="{ $implicit: toast }" />
+      }
+    </div>
+    <div class="absolute bottom-5 left-1/2 -translate-x-1/2 flex flex-col gap-2 items-center">
+      @for (toast of bottomToasts(); track toast.id) {
+        <ng-container [ngTemplateOutlet]="toastRow" [ngTemplateOutletContext]="{ $implicit: toast }" />
+      }
+    </div>
+
+    <ng-template #toastRow let-toast>
       <!-- .toast is a test/e2e hook; its styling is inline. -->
       <div
         class="toast pointer-events-auto flex items-center gap-3 max-w-[min(90vw,32rem)] py-2 px-3 bg-surface-raised text-ink border border-l-[3px] border-t-line border-r-line border-b-line rounded-md shadow-2 text-[0.9rem]"
@@ -45,15 +57,15 @@ import { ToasterService } from '@hexly/web-core';
           ✕
         </button>
       </div>
-    }
+    </ng-template>
   `,
   styles: `
     @reference '#app-styles.css';
     /* As a top-layer popover the host inherits the UA popover box (centered, bordered,
-       opaque); neutralize it so the toaster keeps its own transparent, bottom-centered,
-       click-through chrome. Outranks the host's positioning utilities, so re-set them. */
+       opaque); neutralize it back to a full-viewport, transparent, click-through layer so the
+       edge stacks keep their own positioning. Outranks the host's utilities, so re-set them. */
     :host:popover-open {
-      @apply inset-auto bottom-5 left-1/2 m-0 p-0 border-0 bg-transparent overflow-visible w-auto h-auto;
+      @apply inset-0 m-0 p-0 border-0 bg-transparent overflow-visible w-auto h-auto max-w-none max-h-none;
     }
   `,
 })
@@ -63,6 +75,10 @@ export class ToasterComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   /** Toast ids already announced, reconciled to the live set so it stays bounded. */
   private announced = new Set<number>();
+
+  // Split the stack by anchor edge; each renders in its own positioned container.
+  protected readonly topToasts = computed(() => this.toaster.toasts().filter((t) => t.placement === 'top'));
+  protected readonly bottomToasts = computed(() => this.toaster.toasts().filter((t) => t.placement !== 'top'));
 
   constructor() {
     effect(() => {
