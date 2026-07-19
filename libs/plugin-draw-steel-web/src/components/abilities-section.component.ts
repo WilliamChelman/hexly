@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ButtonComponent, InputComponent, SelectComponent, TextareaComponent } from '@hexly/web-ui';
+import { ButtonComponent, IconComponent, InputComponent, SelectComponent, TextareaComponent } from '@hexly/web-ui';
 import {
   Ability,
   DS_ABILITY_TYPE_OPTIONS,
@@ -12,6 +12,7 @@ import {
 } from '@hexly/plugin-draw-steel';
 import { TokenListComponent } from './token-list.component';
 import { PowerRollDiceComponent } from './power-roll-dice.component';
+import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
 
 /**
  * The active **Abilities** section of the {@link StatBlockViewComponent} (#246). A lens, like the rest of
@@ -39,10 +40,13 @@ import { PowerRollDiceComponent } from './power-roll-dice.component';
     SelectComponent,
     TokenListComponent,
     PowerRollDiceComponent,
+    IconComponent,
   ],
   template: `
     <section class="border-b border-line py-3" data-testid="section-abilities">
-      <h3 class="m-0 mb-1 text-sm font-semibold text-sea">{{ 'drawSteel.statBlock.section.abilities' | transloco }}</h3>
+      <h3 class="m-0 mb-2 font-serif text-lg font-bold italic text-gold-deep">
+        {{ 'drawSteel.statBlock.section.abilities' | transloco }}
+      </h3>
 
       @if (writable()) {
         <div class="flex flex-col gap-3">
@@ -257,41 +261,66 @@ import { PowerRollDiceComponent } from './power-roll-dice.component';
         </div>
       } @else {
         @if (abilities().length) {
-          <div class="flex flex-col gap-3 text-sm">
+          <div class="space-y-4 text-[15px] leading-relaxed">
             <!-- Aliased: the nested tier loop shadows the loop index, so the ability's own is reached for its roll state. -->
             @for (ability of abilities(); track $index; let abilityIndex = $index) {
-              <div [attr.data-testid]="'ability-' + $index">
-                <div class="flex items-baseline justify-between gap-2">
-                  <span class="font-semibold text-ink">{{ ability.name || '—' }}</span>
-                  <span class="shrink-0 text-2xs uppercase tracking-wider text-ink-muted">
-                    {{ 'drawSteel.statBlock.abilityTypeOption.' + ability.type | transloco }}
-                    @if (ability.cost) {
-                      · {{ ability.cost }}
+              <!-- Gold accent + chip mark the main action / signature ability (#stat-block-oomph). -->
+              <div [attr.data-testid]="'ability-' + $index" class="border-l-4 pl-3" [class]="accent(ability)">
+                <p class="m-0 flex flex-wrap items-baseline gap-x-2">
+                  <span class="flex items-baseline gap-1.5">
+                    @if (typeGlyph(ability); as g) {
+                      <app-icon [name]="g" class="text-base text-ink-muted" />
                     }
+                    <span class="font-serif text-base font-bold" [class]="nameClass(ability)">{{
+                      ability.name || '—'
+                    }}</span>
                   </span>
-                </div>
-                @if (ability.keywords.length) {
-                  <p class="m-0 text-xs italic text-ink-muted">{{ ability.keywords.join(', ') }}</p>
-                }
-                <p class="m-0 text-xs text-ink-muted">
-                  <span class="font-semibold text-sea">{{ 'drawSteel.statBlock.abilityDistance' | transloco }}</span>
-                  {{ ability.distance || '—' }}
-                  <span class="ml-2 font-semibold text-sea">{{ 'drawSteel.statBlock.abilityTarget' | transloco }}</span>
-                  {{ ability.target || '—' }}
+                  <span
+                    class="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                    [class]="pill(ability)"
+                  >
+                    {{ 'drawSteel.statBlock.abilityTypeOption.' + ability.type | transloco }}
+                  </span>
+                  @if (ability.cost) {
+                    <span class="text-xs font-bold text-gold-deep">{{ ability.cost }}</span>
+                  }
                 </p>
+
+                <!-- Distance / target / keyword chips, glyph-marked where the font carries the symbol. -->
+                <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
+                  <span class="inline-flex items-center gap-1">
+                    @if (distanceGlyph(ability); as g) {
+                      <app-icon [name]="g" class="text-sm text-sea" />
+                    }
+                    {{ ability.distance || '—' }}
+                  </span>
+                  <span class="inline-flex items-center gap-1">
+                    <app-icon name="ds-targets" class="text-sm text-sea" />
+                    {{ ability.target || '—' }}
+                  </span>
+                  @for (kw of ability.keywords; track kw) {
+                    <span class="inline-flex items-center gap-1 rounded bg-surface-sunken px-1.5 py-0.5 text-2xs">
+                      @if (keywordGlyph(kw); as g) {
+                        <app-icon [name]="g" class="text-sm text-sea" />
+                      }
+                      {{ kw }}
+                    </span>
+                  }
+                </div>
+
                 @if (ability.trigger) {
-                  <p class="m-0 text-xs text-ink-muted">
-                    <span class="font-semibold text-sea">{{ 'drawSteel.statBlock.abilityTrigger' | transloco }}</span>
-                    {{ ability.trigger }}
+                  <p class="m-0 mt-0.5 flex items-baseline gap-1 text-sm italic text-ink-muted">
+                    <app-icon name="ds-triggeredAction" class="not-italic text-sea" />{{ ability.trigger }}
                   </p>
                 }
+
                 @if (ability.powerRoll; as roll) {
-                  <dl class="m-0 mt-1" data-testid="ability-powerroll">
-                    <div class="flex items-center justify-between gap-2">
-                      <div class="text-2xs uppercase tracking-wider text-ink-muted">
+                  <div class="mt-1.5" data-testid="ability-powerroll">
+                    <div class="mb-1 flex items-center justify-between gap-2">
+                      <span class="text-2xs uppercase tracking-wider text-ink-muted">
                         {{ 'drawSteel.statBlock.powerRoll' | transloco }} ·
                         {{ 'drawSteel.statBlock.stat.' + roll.characteristic | transloco }}
-                      </div>
+                      </span>
                       <!-- Read-only ephemeral resolution (#252): the roller rolls 2d10 + the characteristic and
                            reports the banded tier back, which we highlight below. Nothing persists. -->
                       <ds-power-roll-dice
@@ -299,19 +328,22 @@ import { PowerRollDiceComponent } from './power-roll-dice.component';
                         (resolved)="setActiveTier(abilityIndex, $event)"
                       />
                     </div>
-
-                    @for (tier of tierKeys; track tier.key) {
-                      <div
-                        class="flex gap-2 rounded px-1"
-                        [class.bg-sea-soft]="activeTier(abilityIndex) === tier.key"
-                        [attr.data-testid]="'ability-tier-' + tier.key"
-                        [attr.data-active]="activeTier(abilityIndex) === tier.key ? 'true' : null"
-                      >
-                        <dt class="w-14 shrink-0 font-semibold text-sea">{{ tier.band }}</dt>
-                        <dd class="m-0 text-ink">{{ roll[tier.key] || '—' }}</dd>
-                      </div>
-                    }
-                  </dl>
+                    <!-- A's tier table: bordered, striped rows, glyph + band + text; the resolved tier highlights. -->
+                    <div class="overflow-hidden rounded border border-line">
+                      @for (tier of tierKeys; track tier.key; let i = $index) {
+                        <div
+                          class="flex items-center gap-2 px-2 py-1 text-sm"
+                          [class.bg-sea-soft]="activeTier(abilityIndex) === tier.key"
+                          [class.bg-surface-sunken]="activeTier(abilityIndex) !== tier.key && i % 2 === 1"
+                          [attr.data-testid]="'ability-tier-' + tier.key"
+                          [attr.data-active]="activeTier(abilityIndex) === tier.key ? 'true' : null"
+                        >
+                          <app-icon [name]="tierGlyph(i)" class="text-xl text-gold-deep" />
+                          <span class="text-ink">{{ roll[tier.key] || '—' }}</span>
+                        </div>
+                      }
+                    </div>
+                  </div>
                 } @else if (ability.effect) {
                   <p class="m-0 mt-0.5 text-ink" data-testid="ability-effect">{{ ability.effect }}</p>
                 }
@@ -370,6 +402,52 @@ export class AbilitiesSectionComponent {
   /** The characteristic score added to a power roll (`2d10 + …`); an absent score adds 0 (#252). */
   protected modifierFor(characteristic: DsCharacteristicKey): number {
     return this.characteristics()[characteristic] ?? 0;
+  }
+
+  // --- Read-view presentation (#stat-block-oomph): the "Bestiary Spread" ability chrome. -------------
+
+  /** Main actions and signature abilities are the ones a GM reaches for first — give them the gold pop. */
+  protected isSignature(a: UiAbility): boolean {
+    return a.type === 'main' || /signature/i.test(a.cost);
+  }
+
+  /** The ability's left accent bar — gold for signature/main, else a per-type hue. */
+  protected accent(a: UiAbility): string {
+    return this.isSignature(a) ? 'border-gold' : (ACCENT[a.type] ?? 'border-line');
+  }
+
+  /** The type pill's colours — gold for signature/main, else a per-type soft/ink pair. */
+  protected pill(a: UiAbility): string {
+    return this.isSignature(a) ? 'bg-gold-soft text-gold-deep' : (PILL[a.type] ?? 'bg-surface-sunken text-ink-muted');
+  }
+
+  protected nameClass(a: UiAbility): string {
+    return this.isSignature(a) ? 'text-gold-deep' : 'text-ink-strong';
+  }
+
+  /** The action-type glyph the font ships — activation, triggered, or the villain "malice" mark. */
+  protected typeGlyph(a: UiAbility): DsIconName | null {
+    const glyph = TYPE_GLYPH[a.type];
+    return glyph ? dsIcon(glyph) : null;
+  }
+
+  /** A distance glyph inferred from the ability's keywords, then its distance text (melee/ranged/area/burst). */
+  protected distanceGlyph(a: UiAbility): DsIconName | null {
+    for (const keyword of a.keywords) {
+      const glyph = keywordToGlyph(keyword);
+      if (glyph) return dsIcon(glyph);
+    }
+    const distance = keywordToGlyph(a.distance);
+    return distance ? dsIcon(distance) : null;
+  }
+
+  protected keywordGlyph(keyword: string): DsIconName | null {
+    const glyph = keywordToGlyph(keyword);
+    return glyph ? dsIcon(glyph) : null;
+  }
+
+  protected tierGlyph(index: number): DsIconName {
+    return dsIcon((['tier1', 'tier2', 'tier3'] as const)[index] ?? 'tier1');
   }
 
   /** The tier highlighted for an ability, if its roller has a Roll standing. */
@@ -493,4 +571,44 @@ function str(value: unknown): string {
 
 function strArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+/** The left-accent hue per action type (signature/main are handled apart, in gold). */
+const ACCENT: Record<string, string> = {
+  maneuver: 'border-sea',
+  freeManeuver: 'border-sea',
+  triggered: 'border-astra',
+  freeTriggered: 'border-astra',
+  villain: 'border-ember',
+};
+
+/** The type pill's colour pair per action type (signature/main are handled apart, in gold). */
+const PILL: Record<string, string> = {
+  maneuver: 'bg-sea-soft text-sea',
+  freeManeuver: 'bg-sea-soft text-sea',
+  triggered: 'bg-astra-soft text-astra',
+  freeTriggered: 'bg-astra-soft text-astra',
+  villain: 'bg-ember-soft text-ember',
+};
+
+/** The action-type glyph the Draw Steel font carries: an activation dot, a triggered mark, or villain "malice". */
+const TYPE_GLYPH: Record<string, DsGlyphName> = {
+  main: 'activation',
+  maneuver: 'activation',
+  freeManeuver: 'activation',
+  move: 'activation',
+  triggered: 'triggeredAction',
+  freeTriggered: 'triggeredAction',
+  villain: 'malice',
+};
+
+/** Map a keyword or distance phrase to the glyph the Draw Steel font carries for it, or null. */
+function keywordToGlyph(text: string): DsGlyphName | null {
+  const t = text.toLowerCase();
+  if (t.includes('melee')) return 'melee';
+  if (t.includes('ranged')) return 'ranged';
+  if (t.includes('burst')) return 'burst';
+  if (t.includes('aura') || t.includes('cube') || t.includes('line') || t.includes('wall') || t.includes('area'))
+    return 'area';
+  return null;
 }

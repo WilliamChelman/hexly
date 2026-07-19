@@ -1,10 +1,23 @@
 import { EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
-import { LucideDices, LucideSwords } from '@lucide/angular';
+import {
+  LucideAnchor,
+  LucideCrown,
+  LucideDices,
+  LucideFootprints,
+  LucideGauge,
+  LucideHeart,
+  LucideRuler,
+  LucideShieldAlert,
+  LucideShieldCheck,
+  LucideSwords,
+  LucideZap,
+} from '@lucide/angular';
 import { providePlugin } from '@hexly/web-entity';
-import { lucideGlyph, provideIcons } from '@hexly/web-ui';
+import { lucideGlyph, provideIconFont, provideIcons } from '@hexly/web-ui';
 import { PLUGIN_ID, DS_STAT_BLOCK, DS_STAT_BLOCK_FIELD, STAT_BLOCK_DATA_TYPE } from '@hexly/plugin-draw-steel';
 import { DS_TRANSLATIONS } from './i18n/draw-steel-translations';
 import { DS_TYPE_DEFINITIONS, DS_VIEW_STAT_BLOCK } from './draw-steel-types';
+import { DS_FONT, DS_FONT_GLYPHS } from './ds-glyphs';
 
 /**
  * The Draw Steel plugin's one entry point into the app (ADR-0048), the sibling of `providePluginDnd`.
@@ -15,10 +28,26 @@ import { DS_TYPE_DEFINITIONS, DS_VIEW_STAT_BLOCK } from './draw-steel-types';
  */
 export function providePluginDrawSteel(): EnvironmentProviders {
   return makeEnvironmentProviders([
-    // The `swords` glyph the monster type wears (#242) and the `dices` glyph the read-view power-roll
-    // button wears (#252): a bundled plugin dresses itself in Lucide glyphs web-ui's core vocabulary
-    // omits by registering them here, not by editing web-ui (ADR-0007).
-    provideIcons([lucideGlyph('swords', LucideSwords), lucideGlyph('dices', LucideDices)]),
+    // A bundled plugin dresses its types in glyphs web-ui's core vocabulary omits by registering them
+    // here, not by editing web-ui (ADR-0007): the `swords`/`dices` glyphs the monster type and read-view
+    // roller wear (#242, #252) and the `ds-*` Lucide glyphs the read card labels its spec-sheet stats and
+    // immunity/weakness chips with, plus the `ds-*` symbols the bundled Draw Steel font draws (the
+    // ability/tier/characteristic marks) — the font itself loaded through `provideIconFont`.
+    provideIconFont(DS_FONT),
+    provideIcons([
+      lucideGlyph('swords', LucideSwords),
+      lucideGlyph('dices', LucideDices),
+      lucideGlyph('ds-size', LucideRuler),
+      lucideGlyph('ds-speed', LucideGauge),
+      lucideGlyph('ds-stamina', LucideHeart),
+      lucideGlyph('ds-stability', LucideAnchor),
+      lucideGlyph('ds-free-strike', LucideZap),
+      lucideGlyph('ds-movement', LucideFootprints),
+      lucideGlyph('ds-captain', LucideCrown),
+      lucideGlyph('ds-immunity', LucideShieldCheck),
+      lucideGlyph('ds-weakness', LucideShieldAlert),
+      ...DS_FONT_GLYPHS,
+    ]),
     providePlugin({
       id: PLUGIN_ID,
       types: DS_TYPE_DEFINITIONS,
