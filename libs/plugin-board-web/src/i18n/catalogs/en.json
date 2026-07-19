@@ -13,9 +13,35 @@
   },
   "canvas": {
     "label": "Board surface",
+    "element": "Board element",
     "zoom": "Zoom",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "fit": "Reset view"
+  },
+  "toolPalette": {
+    "tools": "Tools",
+    "select": "Select",
+    "box": "Box",
+    "undo": "Undo",
+    "redo": "Redo"
+  },
+  "inspector": {
+    "title": "Inspector",
+    "emptyHint": "Select an element to edit its geometry and stacking order.",
+    "selectedElement": "Selected element",
+    "x": "X",
+    "y": "Y",
+    "width": "Width",
+    "height": "Height",
+    "order": "Stacking order",
+    "toFront": "To front",
+    "bringForward": "Forward",
+    "sendBackward": "Backward",
+    "toBack": "To back",
+    "deleteElement": "Delete element",
+    "multiTitle": "Selection",
+    "selectedCount": "selected",
+    "deleteAll": "Delete all"
   }
 }

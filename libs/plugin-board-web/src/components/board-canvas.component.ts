@@ -15,11 +15,11 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Point } from '@hexly/plugin-board';
 import { isTrackpadWheel, ThemeService, wheelDeltaPixels } from '@hexly/web-core';
 import { Camera } from '../utils/camera';
+import { DRAG_THRESHOLD } from '../utils/gesture';
+import { BoardCamera } from '../services/board-camera';
+import { BoardStore } from '../services/board-store';
 import { ZoomControlComponent } from './zoom-control.component';
 
-/** Clamp the zoom so the dot cull never has to draw an unbounded point count. */
-const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 4;
 /** Multiplier applied per zoom-button press. */
 const ZOOM_STEP = 1.15;
 /**
@@ -28,16 +28,22 @@ const ZOOM_STEP = 1.15;
  */
 const ZOOM_SENSITIVITY_TOUCHPAD = 0.006;
 const ZOOM_SENSITIVITY_MOUSE = 0.002;
-/** World-pixel spacing of the reference dot grid — the surface's only feedback for pan/zoom while empty. */
+/** World-pixel spacing of the reference dot grid — the surface's feedback for pan/zoom. */
 const GRID_SPACING = 48;
 /** A grid dot's drawn radius in screen pixels, held roughly constant across zoom. */
 const DOT_RADIUS = 1;
 
 /**
- * The live board surface: an infinite, pannable, zoomable plane on a Canvas (ADR-0003, #263). It owns
- * the {@link Camera} transform and draws a reference dot grid so pan and zoom read on the still-empty
- * plane. Element rendering layers on in a later ticket; for now the canvas is a pure read affordance —
- * dragging empty space pans, the wheel and the zoom cluster zoom.
+ * The live board surface's background layer: an infinite, pannable, zoomable plane on a Canvas
+ * (ADR-0003, #263). It draws the reference dot grid and owns the empty-space gestures — dragging pans,
+ * the wheel/cluster zoom. The Board Elements render in the DOM overlay above it
+ * (`BoardElementsComponent`); both read the same route-scoped {@link BoardCamera}, so grid and elements
+ * pan and zoom in lockstep.
+ *
+ * Tool-aware (#267): with the Box Tool armed, a primary click on empty plane places the minimal element
+ * at the clicked world point; with Select armed, a primary click on empty plane clears the selection.
+ * The overlay's element boxes are `pointer-events-auto`, so a click that lands on an element never
+ * reaches this canvas — only empty-plane gestures do.
  */
 @Component({
   selector: 'app-board-canvas',
@@ -86,12 +92,13 @@ const DOT_RADIUS = 1;
 export class BoardCanvasComponent {
   private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
 
-  /** The viewport transform — the single source of truth for pan and zoom. */
-  protected readonly camera = signal(Camera.initial());
+  private readonly cam = inject(BoardCamera);
+  private readonly store = inject(BoardStore);
+
   /** Whether an empty-space pan drag is in progress — drives the grab/grabbing cursor. */
   protected readonly panning = signal(false);
 
-  protected readonly zoomPercent = computed(() => Math.round(this.camera().zoom * 100));
+  protected readonly zoomPercent = computed(() => Math.round(this.cam.zoom() * 100));
 
   private readonly theme = inject(ThemeService);
   private readonly destroyRef = inject(DestroyRef);
@@ -103,9 +110,13 @@ export class BoardCanvasComponent {
   private dotColor = 'rgba(0,0,0,0.18)';
   private centred = false;
 
-  /** The `pointerId` that owns the canvas for the active pan; other pointers are ignored while it's held. */
+  /**
+   * The active empty-plane press. `moved` flips once the pointer crosses {@link DRAG_THRESHOLD} — a
+   * press that never moves is a click (place/deselect), one that moves is a pan. `button` decides which
+   * button owns the gesture; `world` is the down point, where a Box lands.
+   */
+  private press: { button: number; moved: boolean; start: Point; last: Point; world: Point } | null = null;
   private activePointerId: number | null = null;
-  private lastPointer: Point | null = null;
 
   constructor() {
     // Reading the camera inside renderFrame() registers it as a dependency, so a pan/zoom repaints.
@@ -130,39 +141,61 @@ export class BoardCanvasComponent {
 
   protected onPointerDown(event: PointerEvent): void {
     if (this.foreignPointer(event)) return;
-    // Any button drags the plane: an empty surface has nothing else to grab (#263). Right/aux buttons
-    // keep the context menu, so only the primary and middle buttons start a pan.
+    // Primary and middle buttons act; right/aux keep the context menu.
     if (event.button !== 0 && event.button !== 1) return;
     this.activePointerId = event.pointerId;
     (event.target as Element).setPointerCapture?.(event.pointerId);
-    this.panning.set(true);
-    this.lastPointer = { x: event.clientX, y: event.clientY };
+    const world = this.toWorld(event);
+
+    // Box Tool: a primary click on empty plane places the minimal element and selects it. No pan.
+    if (event.button === 0 && this.store.tool() === 'box') {
+      this.store.addElement(world);
+      this.activePointerId = null;
+      (event.target as Element).releasePointerCapture?.(event.pointerId);
+      return;
+    }
+
+    const start = { x: event.clientX, y: event.clientY };
+    this.press = { button: event.button, moved: false, start, last: start, world };
   }
 
   protected onPointerMove(event: PointerEvent): void {
-    if (this.foreignPointer(event) || !this.lastPointer) return;
-    const dx = event.clientX - this.lastPointer.x;
-    const dy = event.clientY - this.lastPointer.y;
-    this.lastPointer = { x: event.clientX, y: event.clientY };
-    this.camera.update((c) => c.panBy(dx, dy));
+    if (this.foreignPointer(event) || !this.press) return;
+    const dx = event.clientX - this.press.last.x;
+    const dy = event.clientY - this.press.last.y;
+    this.press.last = { x: event.clientX, y: event.clientY };
+    // The press promotes to a pan only past the threshold, so a click that jitters a pixel still reads
+    // as a click (place/deselect); once panning, it tracks the pointer smoothly.
+    const travel = Math.hypot(event.clientX - this.press.start.x, event.clientY - this.press.start.y);
+    if (travel >= DRAG_THRESHOLD) {
+      this.press.moved = true;
+      this.panning.set(true);
+    }
+    if (this.press.moved && (dx !== 0 || dy !== 0)) this.cam.panBy(dx, dy);
   }
 
   protected onPointerUp(event: PointerEvent): void {
     if (this.foreignPointer(event)) return;
     (event.target as Element).releasePointerCapture?.(event.pointerId);
-    this.endPan();
+    const press = this.press;
+    // A primary click that never became a pan clears the selection under the Select Tool — the empty
+    // plane has nothing to pick.
+    if (press && press.button === 0 && !press.moved && this.store.tool() === 'select') {
+      this.store.deselect();
+    }
+    this.endPress();
   }
 
   /** A pointer the OS/browser took away mid-gesture: end the pan where it stands, nothing to commit. */
   protected onPointerCancel(event: PointerEvent): void {
     if (this.foreignPointer(event)) return;
     (event.target as Element).releasePointerCapture?.(event.pointerId);
-    this.endPan();
+    this.endPress();
   }
 
   protected onPointerLeave(event: PointerEvent): void {
     if (this.foreignPointer(event)) return;
-    this.endPan();
+    this.endPress();
   }
 
   protected onWheel(event: WheelEvent): void {
@@ -171,16 +204,14 @@ export class BoardCanvasComponent {
     // A trackpad pinch arrives as a wheel event with ctrlKey set; Ctrl/Cmd+wheel zooms about the
     // cursor, plain scroll pans both axes.
     if (event.ctrlKey || event.metaKey) {
-      // A pinch and a Ctrl+wheel mouse both report ctrlKey, so the modifier alone can't tell them
-      // apart — the delta shape can.
       const sensitivity = isTrackpadWheel(event) ? ZOOM_SENSITIVITY_TOUCHPAD : ZOOM_SENSITIVITY_MOUSE;
       const factor = Math.exp(-wheelDeltaPixels(event.deltaY, event, el.clientHeight) * sensitivity);
-      this.zoomAround(this.localPoint(event), factor);
+      this.cam.zoomAround(this.localPoint(event), factor);
     } else {
       const dx = wheelDeltaPixels(event.deltaX, event, el.clientWidth);
       const dy = wheelDeltaPixels(event.deltaY, event, el.clientHeight);
       // Scrolling down/right moves the content up/left, like scrolling a page.
-      this.camera.update((c) => c.panBy(-dx, -dy));
+      this.cam.panBy(-dx, -dy);
     }
   }
 
@@ -189,38 +220,36 @@ export class BoardCanvasComponent {
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas) return;
     const centre = { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 };
-    this.zoomAround(centre, direction === 1 ? ZOOM_STEP : 1 / ZOOM_STEP);
+    this.cam.zoomAround(centre, direction === 1 ? ZOOM_STEP : 1 / ZOOM_STEP);
   }
 
   /** Re-centre the world origin in the viewport at zoom 1. */
   protected recenter(): void {
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas) return;
-    this.camera.set(Camera.initial().panBy(canvas.clientWidth / 2, canvas.clientHeight / 2));
+    this.cam.set(Camera.initial().panBy(canvas.clientWidth / 2, canvas.clientHeight / 2));
   }
 
-  private endPan(): void {
+  private endPress(): void {
     this.panning.set(false);
-    this.lastPointer = null;
+    this.press = null;
     this.activePointerId = null;
   }
 
-  /** Whether an active pan is owned by a pointer other than `event`'s, so a second pointer can't disturb it. */
+  /** Whether an active gesture is owned by a pointer other than `event`'s. */
   private foreignPointer(event: PointerEvent): boolean {
     return this.activePointerId !== null && event.pointerId !== this.activePointerId;
   }
 
-  private zoomAround(anchor: Point, factor: number): void {
-    this.camera.update((c) => {
-      const next = c.zoomAt(anchor, factor);
-      return next.zoom < MIN_ZOOM || next.zoom > MAX_ZOOM ? c : next;
-    });
-  }
-
   /** Cursor position in the canvas's local CSS-pixel space. */
-  private localPoint(event: WheelEvent): Point {
+  private localPoint(event: PointerEvent | WheelEvent): Point {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  /** Cursor position in world space under the current camera. */
+  private toWorld(event: PointerEvent): Point {
+    return this.cam.screenToWorld(this.localPoint(event));
   }
 
   /** Re-read the themed dot colour from the canvas's resolved styles (ADR-0007/0020). */
@@ -236,7 +265,7 @@ export class BoardCanvasComponent {
    * coordinates fall inside the viewport are drawn, so an infinite plane costs a bounded number of dots.
    */
   private renderFrame(): void {
-    const camera = this.camera();
+    const camera = this.cam.camera();
     const ctx = this.ctx;
     if (!ctx || this.width === 0 || this.height === 0) return;
 
@@ -272,7 +301,7 @@ export class BoardCanvasComponent {
       if (!this.centred) {
         this.centred = true;
         // Open with the world origin at the viewport centre, so a fresh Board lands mid-plane.
-        this.camera.set(Camera.initial().panBy(width / 2, height / 2));
+        this.cam.set(Camera.initial().panBy(width / 2, height / 2));
       } else {
         this.renderFrame();
       }
