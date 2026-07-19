@@ -12,6 +12,7 @@
 
 import { EntityType } from './entity';
 import { Field } from './field';
+import { Importer } from './importer';
 import { basePluginConfigSchema, PluginConfigSchema } from './plugin-config';
 import { PluginTypeDefinition } from './plugin-type';
 import { StructuredDataType } from './structured-data-type';
@@ -42,6 +43,12 @@ export interface ServerPlugin {
    */
   readonly dataTypes?: readonly StructuredDataType[];
   /**
+   * The **Importer**s this plugin contributes (ADR-0060): near-pure producers that fetch and transform an
+   * external source into Import Records. Folded through the composition root like {@link types}, {@link fields},
+   * and {@link dataTypes}; the framework's reconcile lands the Records and stamps their provenance.
+   */
+  readonly importers?: readonly Importer[];
+  /**
    * The Entity Type a vault import assigns a Markdown file with no `hexly.type` stamp — the "bare Note"
    * default (ADR-0051). Set by exactly one plugin (content); the composition root reads it from there
    * so the vault services need not import the content plugin to learn the default.
@@ -60,6 +67,7 @@ export function serverPlugin(plugin: ServerPlugin): ServerPlugin {
     types: plugin.types ?? [],
     fields: plugin.fields ?? [],
     dataTypes: plugin.dataTypes ?? [],
+    importers: plugin.importers ?? [],
     defaultType: plugin.defaultType,
     configSchema: plugin.configSchema ?? basePluginConfigSchema,
   });

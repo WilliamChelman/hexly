@@ -169,6 +169,13 @@
       "when": 1784302434119,
       "tag": "0023_drop_entities_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1784475692561,
+      "tag": "0024_silent_jack_power",
+      "breakpoints": true
     }
   ]
 }
