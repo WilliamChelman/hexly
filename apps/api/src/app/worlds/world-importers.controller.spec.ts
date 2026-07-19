@@ -78,7 +78,9 @@ describe('World importers', () => {
     const world = await makeWorld(ada);
 
     const res = await ada.get(`/worlds/${world}/importers`).expect(200);
-    expect(res.body).toEqual([{ id: STUB_ID, label: 'Stub Importer' }]);
+    // The bundled `draw-steel.monsters` Importer is also registered at boot, so assert the stub is offered
+    // rather than that it is the only entry.
+    expect(res.body).toContainEqual({ id: STUB_ID, label: 'Stub Importer' });
   });
 
   it('runs an Importer, stamps hexly.source, populates the provenance index, and reports the summary', async () => {

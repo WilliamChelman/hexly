@@ -96,13 +96,14 @@ describe('bundled Plugin Fields', () => {
 
 /**
  * The bundled **Importer**s fold through the composition root exactly like the type, Field, and
- * data-type sets (ADR-0060). No bundled Plugin ships one yet — the Draw Steel monster importer is a
- * later story — so the enabled set is empty here; the point is that the fold is wired and a Plugin
- * declaring an Importer surfaces it.
+ * data-type sets (ADR-0060). Draw Steel ships the first one — `draw-steel.monsters` (#257) — so the
+ * enabled set surfaces it; the point is that the fold is wired and a Plugin declaring an Importer
+ * surfaces it.
  */
 describe('bundled Importers', () => {
   it('folds each enabled Plugin’s contributed Importers into one set', () => {
-    expect(enabledPluginImporters(loadConfig(':memory:', BUNDLED_PLUGIN_CONFIGS))).toEqual([]);
+    const importers = enabledPluginImporters(loadConfig(':memory:', BUNDLED_PLUGIN_CONFIGS));
+    expect(importers.map((importer) => importer.id)).toContain('draw-steel.monsters');
   });
 
   it('carries an Importer a Plugin declares through the serverPlugin normaliser', () => {
