@@ -13,6 +13,13 @@
   },
   "statBlock": {
     "dataType": "Stat block",
+    "facet": {
+      "role": "Role",
+      "organization": "Organization",
+      "level": "Level",
+      "ev": "EV",
+      "keywords": "Keyword"
+    },
     "stat": {
       "might": "Might",
       "agility": "Agility",

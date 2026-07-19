@@ -4,14 +4,15 @@
  * map; `draw-steel.monster` declares it at the `stat_block` key beside its prose, and any type or Entity
  * may attach the one Field to auto-afford the stat-block View (ADR-0054).
  *
- * This is the **numeric/identity half** only (#243, the "spine"): the five characteristics, the
- * defences/movement, and the identity block. Traits, abilities, and the facet harvest are deliberate
- * follow-ups (#242) — the shape is chosen so they graft on without a rewrite.
+ * This is the **numeric/identity half** (#243, the "spine") plus its **facet harvest** (#244): the five
+ * characteristics, the defences/movement, and the identity block, which harvests five identity
+ * dimensions onto the Browser's facet rail. Traits and abilities are a deliberate follow-up (#242) — the
+ * shape is chosen so they graft on without a rewrite.
  *
  * The framework-free half, which the API reads. The Angular half is `@hexly/plugin-draw-steel/web`.
  */
 
-import { defineField, defineStructuredDataType, Field, StructuredDataTypeId } from '@hexly/domain';
+import { defineField, defineStructuredDataType, Field, HarvestedFacet, StructuredDataTypeId } from '@hexly/domain';
 import { z } from 'zod';
 
 /** The `namespace.id` kind naming the stat-block data-type — what marks the `draw-steel.stat_block` Field structured. */
@@ -156,15 +157,50 @@ export function emptyStatBlock(): StatBlock {
 }
 
 /**
- * The stat-block data-type (ADR-0055). This first pass harvests **no** facets (that lands with the
- * Browser filters in #242) — it is a pure grouped value. It projects to **frontmatter** (CONTEXT.md →
- * Vault Projection): the block rides the YAML as one nested value the vault layer serializes and re-reads
- * generically, so it round-trips with no `toMarkdown`.
+ * The stat-block data-type (ADR-0055). It harvests five **identity** Facet dimensions so a GM finds a
+ * creature by what it *is* (#244): `role` and `organization` (enum), `level` and `ev` (number, so their
+ * `num` is populated and the rail offers a range), and `keywords` (one harvested row per keyword the rail
+ * toggles). Characteristics, stamina, and every other stat are **never** harvested — the rail stays about
+ * identity, not raw stats.
+ *
+ * It projects to **frontmatter** (CONTEXT.md → Vault Projection): the block rides the YAML as one nested
+ * value the vault layer serializes and re-reads generically, so it round-trips with no `toMarkdown`.
  */
 export const STAT_BLOCK_DATA_TYPE = defineStructuredDataType({
   id: DS_STAT_BLOCK,
   valueSchema: statBlockSchema,
   empty: emptyStatBlock,
+  facetDimensions: [
+    {
+      key: 'role',
+      labelKey: 'drawSteel.statBlock.facet.role',
+      dataType: { kind: 'enum', options: [...DS_ROLE_OPTIONS] },
+    },
+    {
+      key: 'organization',
+      labelKey: 'drawSteel.statBlock.facet.organization',
+      dataType: { kind: 'enum', options: [...DS_ORGANIZATION_OPTIONS] },
+    },
+    { key: 'level', labelKey: 'drawSteel.statBlock.facet.level', dataType: { kind: 'number' } },
+    { key: 'ev', labelKey: 'drawSteel.statBlock.facet.ev', dataType: { kind: 'number' } },
+    // A list dimension: the harvest emits one row per keyword, and the rail picks value-toggles over them.
+    {
+      key: 'keywords',
+      labelKey: 'drawSteel.statBlock.facet.keywords',
+      dataType: { kind: 'list', of: { kind: 'string' } },
+    },
+  ],
+  harvestFacets: (block: StatBlock): HarvestedFacet[] => {
+    const rows: HarvestedFacet[] = [];
+    if (block.role) rows.push({ key: 'role', value: block.role, num: null });
+    if (block.organization) rows.push({ key: 'organization', value: block.organization, num: null });
+    // A level or EV of 0 is a legitimate value, so guard on the type, not on truthiness (#244).
+    if (typeof block.level === 'number') rows.push({ key: 'level', value: String(block.level), num: block.level });
+    if (typeof block.ev === 'number') rows.push({ key: 'ev', value: String(block.ev), num: block.ev });
+    // One row per keyword — the facet index counts each distinct keyword as its own toggle.
+    for (const keyword of block.keywords ?? []) rows.push({ key: 'keywords', value: keyword, num: null });
+    return rows;
+  },
   vault: { slot: 'frontmatter' },
 });
 
