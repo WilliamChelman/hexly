@@ -17,6 +17,7 @@ import { isTrackpadWheel, ThemeService, wheelDeltaPixels } from '@hexly/web-core
 import { Camera } from '../utils/camera';
 import { DRAG_THRESHOLD } from '../utils/gesture';
 import { BoardCamera } from '../services/board-camera';
+import { BoardImagePlacement } from '../services/board-image-placement';
 import { BoardStore } from '../services/board-store';
 import { ZoomControlComponent } from './zoom-control.component';
 
@@ -94,6 +95,7 @@ export class BoardCanvasComponent {
 
   private readonly cam = inject(BoardCamera);
   private readonly store = inject(BoardStore);
+  private readonly imagePlacement = inject(BoardImagePlacement);
 
   /** Whether an empty-space pan drag is in progress — drives the grab/grabbing cursor. */
   protected readonly panning = signal(false);
@@ -147,11 +149,13 @@ export class BoardCanvasComponent {
     (event.target as Element).setPointerCapture?.(event.pointerId);
     const world = this.toWorld(event);
 
-    // A placement Tool (Box, Text): a primary click on empty plane places its element at the clicked
-    // world point and selects it — no pan. Select is the only non-placing Tool.
+    // A placement Tool (Box, Text, Image): a primary click on empty plane places its element at the
+    // clicked world point and selects it — no pan. Select is the only non-placing Tool. Image can't place
+    // synchronously (it needs an Asset URL first), so it routes to the async source chooser instead.
     const tool = this.store.tool();
     if (event.button === 0 && tool !== 'select') {
       if (tool === 'text') this.store.addText(world);
+      else if (tool === 'image') this.imagePlacement.place(world);
       else this.store.addElement(world);
       this.activePointerId = null;
       (event.target as Element).releasePointerCapture?.(event.pointerId);

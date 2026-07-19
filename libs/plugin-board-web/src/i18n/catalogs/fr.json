@@ -15,6 +15,8 @@
     "label": "Surface de tableau",
     "element": "Élément de tableau",
     "textBlock": "Bloc de texte",
+    "image": "Image",
+    "missingAsset": "Image manquante",
     "zoom": "Zoom",
     "zoomIn": "Zoom avant",
     "zoomOut": "Zoom arrière",
@@ -25,8 +27,19 @@
     "select": "Sélection",
     "box": "Boîte",
     "text": "Texte",
+    "image": "Image",
     "undo": "Annuler",
     "redo": "Rétablir"
+  },
+  "imagePicker": {
+    "title": "Ajouter une image",
+    "upload": "Téléverser un fichier",
+    "uploading": "Téléversement…",
+    "uploadError": "Échec du téléversement. Réessayez.",
+    "existing": "Choisir une image existante",
+    "loading": "Chargement des images…",
+    "empty": "Aucune image téléversée pour l’instant.",
+    "cancel": "Annuler"
   },
   "inspector": {
     "title": "Inspecteur",

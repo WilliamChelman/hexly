@@ -27,15 +27,20 @@ export type { SelectMode } from './board-selection';
 /**
  * A top-level Tool armed in the palette; exactly one armed, a canvas gesture applies it (CONTEXT.md →
  * Tool, #267). `select` is the non-destructive picker a Board opens on; `box` places the minimal static
- * element; `text` places a **Text Block** (#268). The Image (#269) ticket adds its own placement Tool.
+ * element; `text` places a **Text Block** (#268); `image` places an **Image** displaying a World Asset
+ * (#269) — its click opens a source chooser (upload / pick) before the element lands, so unlike Box/Text
+ * the canvas does not place it synchronously.
  */
-export type ToolId = 'select' | 'box' | 'text';
+export type ToolId = 'select' | 'box' | 'text' | 'image';
 
 /** The world-pixel size a freshly-placed Box is drawn at, before it is resized. */
 export const DEFAULT_BOX_SIZE: Size = { width: 160, height: 120 };
 
 /** The world-pixel size a freshly-placed Text Block is drawn at — a comfortable line's width to start typing. */
 export const DEFAULT_TEXT_SIZE: Size = { width: 240, height: 120 };
+
+/** The world-pixel size a freshly-placed Image is drawn at, before it is resized to frame its Asset. */
+export const DEFAULT_IMAGE_SIZE: Size = { width: 240, height: 180 };
 
 /**
  * The Board editor's store: tools, selection, and undo/redo over the surface. The document is the value
@@ -224,6 +229,26 @@ export class BoardStore {
       content: emptyContent(),
     });
     this.arm(id);
+    return id;
+  }
+
+  /**
+   * Add an **Image** at world `position` displaying the World Asset at `assetUrl` (CONTEXT.md → Image,
+   * #269). Placed on top and selected like any element, but **never armed**: an Image has no edit mode,
+   * so a click only ever selects/moves it. `assetUrl` is the served capability URL the caller obtained by
+   * uploading a file or picking an existing Asset — the store takes it as-is; both sources funnel here.
+   * Returns the new id.
+   */
+  addImage(position: Point, assetUrl: string): string {
+    const id = mintId();
+    this.place({
+      id,
+      kind: 'image',
+      position: { x: position.x, y: position.y },
+      size: { ...DEFAULT_IMAGE_SIZE },
+      z: 0,
+      assetUrl,
+    });
     return id;
   }
 

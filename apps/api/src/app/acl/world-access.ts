@@ -106,10 +106,11 @@ export interface WorldAccess {
   /** The World row if the caller can reach `id`, else undefined (unreachable ≡ missing). */
   decide(id: string): typeof worlds.$inferSelect | undefined;
   /**
-   * Blob-free reachability + ownership in one query (no owner-set fetch), or undefined if no such
-   * World.
+   * Blob-free reachability + ownership + contribution in one query (no owner-set fetch), or
+   * undefined if no such World. `canContribute` is the Entity-creation standing (owner ∨
+   * contributor ∨ Superadmin) — the gate an Asset upload rides (#269, ADR-0034).
    */
-  decideMeta(id: string): { reachable: boolean; isOwner: boolean } | undefined;
+  decideMeta(id: string): { reachable: boolean; isOwner: boolean; canContribute: boolean } | undefined;
 }
 
 /** Resolve the World access context for `userId` (Superadmin resolved once). */
@@ -138,11 +139,14 @@ export function worldAccess(db: Db, userId: string): WorldAccess {
         .select({
           reachable: superadmin ? MATCH_ALL : reachableBy(userId, worldRef),
           isOwner: superadmin ? MATCH_ALL : ownedBy(userId, worldRef),
+          canContribute: superadmin ? MATCH_ALL : creatableBy(userId, worldRef),
         })
         .from(worlds)
         .where(eq(worlds.id, id))
         .get();
-      return row ? { reachable: !!row.reachable, isOwner: !!row.isOwner } : undefined;
+      return row
+        ? { reachable: !!row.reachable, isOwner: !!row.isOwner, canContribute: !!row.canContribute }
+        : undefined;
     },
   };
 }

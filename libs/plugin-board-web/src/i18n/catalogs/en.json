@@ -15,6 +15,8 @@
     "label": "Board surface",
     "element": "Board element",
     "textBlock": "Text block",
+    "image": "Image",
+    "missingAsset": "Missing image",
     "zoom": "Zoom",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
@@ -25,8 +27,19 @@
     "select": "Select",
     "box": "Box",
     "text": "Text",
+    "image": "Image",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "imagePicker": {
+    "title": "Add image",
+    "upload": "Upload a file",
+    "uploading": "Uploading…",
+    "uploadError": "Upload failed. Try again.",
+    "existing": "Choose existing",
+    "loading": "Loading images…",
+    "empty": "No images uploaded yet.",
+    "cancel": "Cancel"
   },
   "inspector": {
     "title": "Inspector",

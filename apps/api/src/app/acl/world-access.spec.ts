@@ -72,23 +72,34 @@ describe('worldAccess', () => {
   });
 
   describe('decideMeta (single-query reachability + ownership)', () => {
-    it('agrees with the manage rule for every standing', () => {
+    it('agrees with the manage and contribute rules for every standing', () => {
       expect(worldAccess(db, owner).decideMeta(worldId)).toEqual({
         reachable: true,
         isOwner: true,
+        canContribute: true,
       });
+      // A Contributor reaches and may contribute (author Entities/Assets) but does not own.
       expect(worldAccess(db, contributor).decideMeta(worldId)).toEqual({
         reachable: true,
         isOwner: false,
+        canContribute: true,
+      });
+      // A Viewer reaches but neither owns nor contributes.
+      expect(worldAccess(db, viewer).decideMeta(worldId)).toEqual({
+        reachable: true,
+        isOwner: false,
+        canContribute: false,
       });
       // A World that exists but is unreachable: reachable false, not undefined (undefined ≡ no row).
       expect(worldAccess(db, stranger).decideMeta(worldId)).toEqual({
         reachable: false,
         isOwner: false,
+        canContribute: false,
       });
       expect(worldAccess(db, superadmin).decideMeta(worldId)).toEqual({
         reachable: true,
         isOwner: true,
+        canContribute: true,
       });
     });
 
@@ -118,9 +129,11 @@ describe('worldAccess', () => {
         })
         .run();
       db.insert(entityGrants).values({ entityId, userId: exMember, role: 'owner' }).run();
+      // Reachable residue, but no member role — so neither owns nor contributes to the World.
       expect(worldAccess(db, exMember).decideMeta(worldId)).toEqual({
         reachable: true,
         isOwner: false,
+        canContribute: false,
       });
     });
   });

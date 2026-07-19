@@ -13,6 +13,7 @@ export * from './i18n/transloco.config';
 export * from './interceptors/with-credentials.interceptor';
 export * from './services/active-world';
 export * from './services/app-shell.store';
+export * from './services/assets.client';
 export * from './services/auth-scoped-storage';
 export * from './services/auth.client';
 export * from './services/client-config.store';
