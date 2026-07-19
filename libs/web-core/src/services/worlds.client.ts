@@ -7,12 +7,15 @@ import {
   CreateWorldFieldRequest,
   Field,
   FollowSignal,
+  ImporterSummary,
+  ImportRunSummary,
   ImportSummary,
   MemberRole,
   PublicLink,
   UpdateUserDefinedTypeRequest,
   UpdateWorldFieldRequest,
   UserDefinedType,
+  Visibility,
   WorldDetail,
   WorldGraph,
   WorldMember,
@@ -206,6 +209,26 @@ export class WorldsClient {
   /** Delete a World-defined Field. World-Owner-only server-side. */
   deleteField(id: string, fieldId: string): Observable<void> {
     return this.http.delete<void>(`/api/worlds/${id}/fields/${fieldId}`);
+  }
+
+  /** The Importers available for this World (ADR-0060) — the generic Imports panel's source. Owner-only server-side. */
+  importers(id: string): Observable<ImporterSummary[]> {
+    return this.http.get<ImporterSummary[]>(`/api/worlds/${id}/importers`);
+  }
+
+  /** Run (or reimport) an Importer, landing its Entities at the chosen Visibility; returns at once (202), then poll {@link importStatus}. */
+  runImport(id: string, importerId: string, visibility: Visibility): Observable<ImportRunSummary> {
+    return this.http.post<ImportRunSummary>(`/api/worlds/${id}/importers/${importerId}/run`, { visibility });
+  }
+
+  /** Where this World's one import run stands — the poll target while a reconcile is in flight, plus the last finished run. */
+  importStatus(id: string): Observable<ImportRunSummary> {
+    return this.http.get<ImportRunSummary>(`/api/worlds/${id}/import/status`);
+  }
+
+  /** Remove an Importer's whole set from this World (no recreate); hand-authored Entities are left intact. Owner-only server-side. */
+  removeImporter(id: string, importerId: string): Observable<void> {
+    return this.http.delete<void>(`/api/worlds/${id}/importers/${importerId}`);
   }
 
   /** The World's Public Link — the active token or null. Owner-only server-side. */

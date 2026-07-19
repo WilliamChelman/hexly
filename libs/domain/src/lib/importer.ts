@@ -165,6 +165,13 @@ export type ImportRunStatus = 'idle' | 'running' | 'succeeded' | 'failed';
 export interface ImportRunSummary {
   /** Which Importer this run reconciles, or null before any run (idle). */
   readonly importer: string | null;
+  /**
+   * The pinned source revision this run reflects (the {@link ImportProduction.rev} its Importer
+   * resolved) — the same `rev` every landed Entity's {@link ImportSource} carries. Null until the run
+   * has fetched (idle, or a run that failed in its fetch); the generic Imports panel shows it in the
+   * last-run status line so "which revision is this set?" is answerable without loading a document.
+   */
+  readonly rev: string | null;
   readonly status: ImportRunStatus;
   /** Records the reconcile will process — the produced total minus the skipped, the denominator for progress. */
   readonly total: number;

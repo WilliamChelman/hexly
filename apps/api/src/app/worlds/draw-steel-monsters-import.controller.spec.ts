@@ -49,7 +49,8 @@ describe('Draw Steel monsters import', () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     const res = await ada.get(`/worlds/${world}/importers`).expect(200);
-    expect(res.body).toContainEqual({ id: MONSTERS_IMPORTER_ID, label: 'Draw Steel — Monsters' });
+    // The label is a transloco key the web panel resolves through the plugin catalogs, not literal copy (#260).
+    expect(res.body).toContainEqual({ id: MONSTERS_IMPORTER_ID, label: 'drawSteel.importer.monsters' });
   });
 
   it('imports the fixture monsters as draw-steel.monster Entities with stat fields and provenance', async () => {

@@ -38,8 +38,12 @@ import { MONSTERS_PINNED_SHA, MonstersFetchPort } from './monster-fetch-port';
 /** This Importer's `namespace.id` — the `importer` an Import Source names, and its key in the registry. */
 export const MONSTERS_IMPORTER_ID = 'draw-steel.monsters';
 
-/** The Importer's human copy for the generic Imports panel (ADR-0060). */
-export const MONSTERS_IMPORTER_LABEL = 'Draw Steel — Monsters';
+/**
+ * The Importer's copy for the generic Imports panel (ADR-0060) — a transloco key, not literal text, so
+ * the panel renders it through the plugin's web catalogs (en + fr) the same way every plugin-contributed
+ * label resolves. An unlocalized host still shows a sensible fallback: transloco echoes the key on a miss.
+ */
+export const MONSTERS_IMPORTER_LABEL = 'drawSteel.importer.monsters';
 
 /**
  * The pinned source revision every landed monster's Import Source carries (ADR-0060/0061): the commit

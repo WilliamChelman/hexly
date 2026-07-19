@@ -25,6 +25,7 @@ const CHUNK_SIZE = 200;
 /** The state of a World that has seen no import run this process. */
 const IDLE: ImportRunSummary = {
   importer: null,
+  rev: null,
   status: 'idle',
   total: 0,
   created: 0,
@@ -126,7 +127,8 @@ export class ImportReconcileService {
       await yieldToEventLoop();
       const { rev, records } = await importer.produce({});
       const { ops, skipped, total } = this.plan(userId, worldId, importer.id, rev, records, visibility);
-      this.jobs.set(worldId, { ...(this.jobs.get(worldId) as ImportRunSummary), total, skipped });
+      // Record the pinned rev the moment it is known, so a poll mid-run — and the finished status line — carries it.
+      this.jobs.set(worldId, { ...(this.jobs.get(worldId) as ImportRunSummary), rev, total, skipped });
       for (let i = 0; i < ops.length; i += CHUNK_SIZE) {
         const chunk = ops.slice(i, i + CHUNK_SIZE);
         this.apply(chunk);
