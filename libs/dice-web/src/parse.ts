@@ -5,13 +5,8 @@ import { BinaryNode, Comparator, DiceAst, DiceError, DiceModifier, ParseResult }
 type ParseStep<T> = Result<T, DiceError>;
 
 /**
- * Parse a Dice Expression into an AST, or a typed error — never throws (issue
- * #249). Every step returns a neverthrow `Result`, so a failure propagates as a
- * value rather than an exception. Recursive descent with standard precedence:
- * `+ -` bind looser than `* /`, parentheses override, and per-term modifiers
- * (`kh`/`kl`/`dh`/`dl`, `!`, `r`) attach to the `NdM` term they follow.
- * Whitespace around operators is tolerated; the digits of an `NdM` term and its
- * modifiers are not split.
+ * Parse a Dice Expression (issue #249). Every step returns a neverthrow
+ * `Result`, so a failure propagates as a value rather than an exception.
  */
 export function parse(expression: string): ParseResult {
   return new Parser(expression).parseRoot();
@@ -48,7 +43,6 @@ class Parser {
     return this.parseBinaryLevel(['*', '/'], () => this.parseUnary());
   }
 
-  /** One left-associative precedence tier: `next` operands joined by `ops`. */
   private parseBinaryLevel(ops: readonly BinaryNode['op'][], next: () => ParseStep<DiceAst>): ParseStep<DiceAst> {
     const first = next();
     if (first.isErr()) return first;
@@ -102,7 +96,7 @@ class Parser {
   private parseNumberOrDice(): ParseStep<DiceAst> {
     const start = this.pos;
     const count = this.readInteger();
-    // A die needs a `d` followed by its sides; `d20` (implicit count 1) is allowed.
+    // `d20` — no leading count — is an implicit single die.
     if (this.peek() === 'd' && this.isDigit(this.peekAt(1))) {
       this.pos++;
       const sides = this.readInteger();
@@ -178,11 +172,11 @@ class Parser {
     if (ch === '=') {
       this.pos++;
     }
-    // A bare `r2` rerolls on equality, matching common dice notation.
+    // A bare `r2` rerolls on equality.
     return '=';
   }
 
-  /** Consumes a run of digits, or `undefined` when none follow the cursor. */
+  /** `undefined` when no digits follow the cursor. */
   private readInteger(): number | undefined {
     const start = this.pos;
     while (this.isDigit(this.peek())) this.pos++;
