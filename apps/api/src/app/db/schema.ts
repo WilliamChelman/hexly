@@ -1,5 +1,5 @@
 import { EdgeTargetKind, FieldSchema, ViewPlacement } from '@hexly/domain';
-import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 // Keep in sync by hand with the `CREATE TABLE` DDL in `./db.ts`; column changes
 // need a drizzle-kit migration to reach an existing database.
@@ -334,6 +334,37 @@ export const entityFieldFacets = sqliteTable(
     primaryKey({ columns: [table.entityId, table.key, table.value] }),
     // The World-scoped facet count and filter: group/match by (world, key, value).
     index('idx_entity_field_facets_key').on(table.worldId, table.key, table.value),
+  ],
+);
+
+/**
+ * The derived **Import Source** index (ADR-0060): one row per Entity whose EntityDocument carries the
+ * reserved `hexly.source` provenance — which `importer` produced it, its stable upstream `sourceId`, and
+ * the pinned `rev` it reflects. Like {@link entityEdges} and {@link entityFieldFacets} it is an
+ * **index, never a source of truth**: `EntityWrites` materialises it from the document at the write
+ * choke point and Reindex rebuilds it, so a provenance filter ("what did this Importer create here")
+ * answers with Entity ids alone, never loading a document blob. Deleting the Entity cascades the row away.
+ *
+ * `entityId` is the PK — an Entity carries at most one Import Source. `worldId` is denormalised off the
+ * source, mirroring the other derived indexes, so a `(world, importer)` wipe/query is one indexed lookup;
+ * the unique `(world, importer, sourceId)` is the reconcile's identity-preserving upsert-match key.
+ */
+export const entityImportSource = sqliteTable(
+  'entity_import_source',
+  {
+    entityId: text('entity_id')
+      .primaryKey()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    worldId: text('world_id').notNull(),
+    importer: text('importer').notNull(),
+    sourceId: text('source_id').notNull(),
+    rev: text('rev').notNull(),
+  },
+  (table) => [
+    // Wipe/query: every Entity an Importer created in a World.
+    index('idx_entity_import_source_world_importer').on(table.worldId, table.importer),
+    // The reconcile's upsert-match key: one Entity per (world, importer, sourceId).
+    uniqueIndex('idx_entity_import_source_upsert').on(table.worldId, table.importer, table.sourceId),
   ],
 );
 

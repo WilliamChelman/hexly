@@ -1,6 +1,6 @@
 import { defineField, EntityDocument, ReindexFailure, emptyEntityDocument } from '@hexly/domain';
 import { emptyContent, tiptapContent } from '@hexly/plugin-content';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { createDb, Db } from '../db/db';
 import {
   entities,
@@ -8,6 +8,7 @@ import {
   entityEdges,
   entityFieldFacets,
   entityGrants,
+  entityImportSource,
   users,
   worldMembers,
   worlds,
@@ -395,6 +396,32 @@ describe('EntityWrites', () => {
       });
 
       /**
+       * The **Import Source** index is derived state like the edges and facets (ADR-0060): a
+       * `hexly.source`-carrying document seeded with no provenance row gets one back on reindex, and
+       * the walk is instance-wide, so a stamped Entity in any World is rebuilt — no backfill migration.
+       */
+      it('rebuilds the Import Source index from hexly.source across Worlds', () => {
+        const OTHER = 'world-2';
+        seedUser(BOB);
+        seedWorld(OTHER, BOB);
+        seedUnindexed('goblin', WORLD, {
+          'hexly.source': { importer: 'draw-steel.monsters', sourceId: 'goblin', rev: 'sha-abc' },
+        });
+        seedUnindexed('ajax', OTHER, {
+          'hexly.source': { importer: 'draw-steel.monsters', sourceId: 'ajax', rev: 'sha-abc' },
+        });
+
+        reindexAll();
+
+        expect(importSourceOf('goblin')).toEqual([
+          { worldId: WORLD, importer: 'draw-steel.monsters', sourceId: 'goblin', rev: 'sha-abc' },
+        ]);
+        expect(importSourceOf('ajax')).toEqual([
+          { worldId: OTHER, importer: 'draw-steel.monsters', sourceId: 'ajax', rev: 'sha-abc' },
+        ]);
+      });
+
+      /**
        * The one write here that lands without a nudge *and* without a `seq` bump: recomputing from
        * an unchanged document writes back what it read. Only just after a deploy adds a derivation
        * does it yield new state, and that stale window closes on the reader's next navigation.
@@ -695,10 +722,159 @@ describe('EntityWrites', () => {
       }
     });
 
+    /**
+     * The derived **Import Source** index (ADR-0060): the reserved `hexly.source` document key
+     * mirrored beside the edge and facet indexes, so a World can be filtered by provenance without
+     * loading a document. Materialised at this same choke point; Reindex rebuilds it (below).
+     */
+    describe('Import Source index (ADR-0060)', () => {
+      const SOURCE = { importer: 'draw-steel.monsters', sourceId: 'goblin', rev: 'sha-abc' };
+
+      it('materialises a row from a document carrying hexly.source', () => {
+        writes.insert({
+          ownerId: ADA,
+          worldId: WORLD,
+          name: 'Goblin',
+          types: ['core.note'],
+          tags: [],
+          document: { 'hexly.source': SOURCE },
+        });
+
+        expect(importSourceOf('Goblin')).toEqual([{ worldId: WORLD, ...SOURCE }]);
+      });
+
+      it('leaves an un-stamped document without a provenance row', () => {
+        writes.insert({
+          ownerId: ADA,
+          worldId: WORLD,
+          name: 'Plain',
+          types: ['core.note'],
+          tags: [],
+          document: { 'core.content': emptyContent() },
+        });
+
+        expect(importSourceOf('Plain')).toEqual([]);
+      });
+
+      /** An ill-shaped stamp reads as un-stamped (forward-only), never a write error. */
+      it('ignores a malformed hexly.source', () => {
+        writes.insert({
+          ownerId: ADA,
+          worldId: WORLD,
+          name: 'Broken',
+          types: ['core.note'],
+          tags: [],
+          document: { 'hexly.source': { importer: 'draw-steel.monsters' } }, // no sourceId / rev
+        });
+
+        expect(importSourceOf('Broken')).toEqual([]);
+      });
+
+      it('rewrites the row when the stamp changes, and prunes it when the stamp clears (self-pruning)', () => {
+        const row = writes.insert({
+          ownerId: ADA,
+          worldId: WORLD,
+          name: 'Goblin',
+          types: ['core.note'],
+          tags: [],
+          document: { 'hexly.source': SOURCE },
+        });
+
+        writes.mutate(ADA, row.id, {
+          kind: 'edit',
+          version: row.version,
+          document: { 'hexly.source': { ...SOURCE, rev: 'sha-def' } },
+        });
+        expect(importSourceOf('Goblin')).toEqual([{ worldId: WORLD, ...SOURCE, rev: 'sha-def' }]);
+
+        writes.mutate(ADA, row.id, {
+          kind: 'edit',
+          version: rowOf(row.id).version,
+          document: { 'core.content': emptyContent() },
+        });
+        expect(importSourceOf('Goblin')).toEqual([]);
+      });
+
+      it('cascades the provenance row away when the Entity is deleted', () => {
+        const row = writes.insert({
+          ownerId: ADA,
+          worldId: WORLD,
+          name: 'Goblin',
+          types: ['core.note'],
+          tags: [],
+          document: { 'hexly.source': SOURCE },
+        });
+        expect(provenanceIdsOf(WORLD, SOURCE.importer)).toEqual([row.id]);
+
+        writes.mutate(ADA, row.id, { kind: 'delete' });
+
+        expect(provenanceIdsOf(WORLD, SOURCE.importer)).toEqual([]);
+      });
+
+      /**
+       * The provenance query the reconcile leans on (ADR-0060): a `(world, importer)` lookup returning
+       * Entity ids alone — never a document blob. {@link provenanceIdsOf} projects only `entity_id`,
+       * and the derived index carries no document, so the query cannot load one.
+       */
+      it('answers a (world, importer) query with Entity ids, excluding other importers', () => {
+        const goblin = writes.insert({
+          ownerId: ADA,
+          worldId: WORLD,
+          name: 'Goblin',
+          types: ['core.note'],
+          tags: [],
+          document: { 'hexly.source': SOURCE },
+        });
+        const ajax = writes.insert({
+          ownerId: ADA,
+          worldId: WORLD,
+          name: 'Ajax',
+          types: ['core.note'],
+          tags: [],
+          document: { 'hexly.source': { ...SOURCE, sourceId: 'ajax' } },
+        });
+        // A different Importer's Entity in the same World, excluded by the importer filter.
+        writes.insert({
+          ownerId: ADA,
+          worldId: WORLD,
+          name: 'Foreign',
+          types: ['core.note'],
+          tags: [],
+          document: { 'hexly.source': { importer: 'other.pack', sourceId: 'x', rev: 'r' } },
+        });
+
+        expect([...provenanceIdsOf(WORLD, SOURCE.importer)].sort()).toEqual([ajax.id, goblin.id].sort());
+      });
+    });
+
     function idOf(name: string): string {
       const row = db.select().from(entities).where(eq(entities.name, name)).get();
       if (!row) throw new Error(`no entity named ${name}`);
       return row.id;
+    }
+
+    /** The denormalised Import Source rows an Entity carries, by name (ADR-0060). */
+    function importSourceOf(name: string) {
+      return db
+        .select({
+          worldId: entityImportSource.worldId,
+          importer: entityImportSource.importer,
+          sourceId: entityImportSource.sourceId,
+          rev: entityImportSource.rev,
+        })
+        .from(entityImportSource)
+        .where(eq(entityImportSource.entityId, idOf(name)))
+        .all();
+    }
+
+    /** The `(world, importer)` provenance query: Entity ids only, no document loaded (ADR-0060). */
+    function provenanceIdsOf(worldId: string, importer: string): string[] {
+      return db
+        .select({ entityId: entityImportSource.entityId })
+        .from(entityImportSource)
+        .where(and(eq(entityImportSource.worldId, worldId), eq(entityImportSource.importer, importer)))
+        .all()
+        .map((r) => r.entityId);
     }
 
     /** The denormalised Field-facet rows an Entity carries, by name. */

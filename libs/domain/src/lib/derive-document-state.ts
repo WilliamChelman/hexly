@@ -24,6 +24,7 @@ import {
   readField,
   resolvedStructuredDataTypeFields,
 } from './field';
+import { ImportSource, readImportSource } from './importer';
 import { joinSearchText } from './join-search-text';
 import type { StructuredDataTypeSet } from './structured-data-type';
 
@@ -37,6 +38,12 @@ export interface DocumentDerivedState {
   readonly edges: EntityEdge[];
   /** The denormalised facetable Field values (ADR-0048, ADR-0055) — depends on the Fields *and* the document. */
   readonly fieldFacets: FieldFacetValue[];
+  /**
+   * The Entity's **Import Source** provenance, or `null` — the reserved `hexly.source` key, mirrored to the
+   * derived `entityImportSource` index at the write choke point (ADR-0060). Unlike the edges and facets it
+   * reads a plain document key, not a Field, so it needs neither the Field set nor the data-types.
+   */
+  readonly importSource: ImportSource | null;
 }
 
 export function deriveDocumentState(
@@ -95,5 +102,7 @@ export function deriveDocumentState(
     descriptors: descriptorsSchema.parse(edgeList.flatMap((e) => e.descriptor ?? [])),
     edges: edgeList,
     fieldFacets,
+    // Provenance is a plain reserved key, read forward-only: an absent or ill-shaped stamp is `null`.
+    importSource: readImportSource(doc) ?? null,
   };
 }

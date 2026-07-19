@@ -195,6 +195,23 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
     });
   });
 
+  describe('importSource: the reserved hexly.source key (ADR-0060)', () => {
+    const SOURCE = { importer: 'draw-steel.monsters', sourceId: 'goblin', rev: 'sha-abc' };
+
+    it('surfaces a well-formed Import Source, needing neither Fields nor data-types', () => {
+      expect(derive({ 'hexly.source': SOURCE }, []).importSource).toEqual(SOURCE);
+    });
+
+    it('is null when the document carries no stamp', () => {
+      expect(derive({ prose: { text: 'x' } }, [proseField]).importSource).toBeNull();
+    });
+
+    /** Forward-only: an ill-shaped stamp reads as un-stamped, never throws. */
+    it('is null when the stamp is malformed', () => {
+      expect(derive({ 'hexly.source': { importer: 'draw-steel.monsters' } }, []).importSource).toBeNull();
+    });
+  });
+
   describe('composition: one call yields every derived index for one document', () => {
     it('returns edges, descriptors, searchText and fieldFacets together', () => {
       const doc: EntityDocument = {

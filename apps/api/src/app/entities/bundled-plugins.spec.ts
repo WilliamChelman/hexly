@@ -22,12 +22,14 @@ import { serverPluginContent } from '@hexly/plugin-content/server';
 import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
 import { serverPluginDnd } from '@hexly/plugin-dnd/server';
 import { serverPluginDrawSteel } from '@hexly/plugin-draw-steel/server';
+import { ImportRecord, serverPlugin } from '@hexly/domain';
 import { loadConfig } from '../config';
 import {
   BUNDLED_PLUGIN_CONFIGS,
   BUNDLED_PLUGIN_TYPE_OWNERS,
   BUNDLED_STRUCTURED_DATA_TYPE_OWNERS,
   enabledPluginFields,
+  enabledPluginImporters,
 } from './bundled-plugins';
 
 /** Plugin identity at the API composition root (ADR-0052, #215) — the owner associations, not filtering. */
@@ -89,6 +91,25 @@ describe('bundled Plugin Fields', () => {
     const byId = new Set(fields().map((field) => field.id));
     for (const type of [CORE_NOTE_TYPE, CORE_HEXMAP_TYPE, DND_MONSTER_TYPE, DS_MONSTER_TYPE])
       for (const ref of type.fieldRefs) expect(byId.has(ref)).toBe(true);
+  });
+});
+
+/**
+ * The bundled **Importer**s fold through the composition root exactly like the type, Field, and
+ * data-type sets (ADR-0060). No bundled Plugin ships one yet — the Draw Steel monster importer is a
+ * later story — so the enabled set is empty here; the point is that the fold is wired and a Plugin
+ * declaring an Importer surfaces it.
+ */
+describe('bundled Importers', () => {
+  it('folds each enabled Plugin’s contributed Importers into one set', () => {
+    expect(enabledPluginImporters(loadConfig(':memory:', BUNDLED_PLUGIN_CONFIGS))).toEqual([]);
+  });
+
+  it('carries an Importer a Plugin declares through the serverPlugin normaliser', () => {
+    const importer = { id: 'test.pack', produce: async (): Promise<readonly ImportRecord[]> => [] };
+    expect(serverPlugin({ id: 'test', importers: [importer] }).importers).toEqual([importer]);
+    // A Plugin declaring none normalises to an empty set, like the other contributions.
+    expect(serverPlugin({ id: 'bare' }).importers).toEqual([]);
   });
 });
 

@@ -2,6 +2,7 @@ import {
   basePluginConfigSchema,
   EntityType,
   Field,
+  Importer,
   PluginTypeDefinition,
   ServerPlugin,
   structuredDataTypeSet,
@@ -53,6 +54,15 @@ export function enabledPluginTypes(config: HexlyConfig): readonly PluginTypeDefi
  */
 export function enabledPluginFields(config: HexlyConfig): readonly Field[] {
   return enabledPlugins(config).flatMap((plugin) => plugin.fields ?? []);
+}
+
+/**
+ * The enabled bundled Plugins' contributed **Importer**s (ADR-0060), folded from the same list like the
+ * type and Field sets. A disabled Plugin's Importers are absent, so its Imports-panel entry and reconcile
+ * path drop with it (ADR-0052). The generic Imports panel and reconcile serve whatever this returns.
+ */
+export function enabledPluginImporters(config: HexlyConfig): readonly Importer[] {
+  return enabledPlugins(config).flatMap((plugin) => plugin.importers ?? []);
 }
 
 /**

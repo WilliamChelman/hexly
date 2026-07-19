@@ -6,6 +6,7 @@ import {
   FieldFacetValue,
   GrantRole,
   EntityDocument,
+  ImportSource,
   ReindexFailure,
   Visibility,
   deriveDocumentState,
@@ -13,7 +14,15 @@ import {
 import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-access';
 import { DB, Db } from '../db/db';
-import { INITIAL_SEQ, entities, entityDescriptors, entityEdges, entityFieldFacets, entityGrants } from '../db/schema';
+import {
+  INITIAL_SEQ,
+  entities,
+  entityDescriptors,
+  entityEdges,
+  entityFieldFacets,
+  entityGrants,
+  entityImportSource,
+} from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
 import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
@@ -352,6 +361,22 @@ export class EntityWrites {
     this.replaceDescriptors(id, derived.descriptors);
     this.replaceEdges(id, worldId, derived.edges);
     this.replaceFieldFacets(id, worldId, derived.fieldFacets);
+    this.replaceImportSource(id, worldId, derived.importSource);
+  }
+
+  /**
+   * Replace the Entity's **Import Source** row with the freshly derived provenance (self-pruning,
+   * ADR-0060): a `hexly.source`-carrying document materialises one row, clearing or changing the stamp
+   * rewrites it, and the FK cascade drops it with the Entity. Derived, never authoritative — an index
+   * over the document like the edge and facet sets, so `worldId` is denormalised off the source.
+   */
+  private replaceImportSource(id: string, worldId: string, source: ImportSource | null): void {
+    this.db.delete(entityImportSource).where(eq(entityImportSource.entityId, id)).run();
+    if (source)
+      this.db
+        .insert(entityImportSource)
+        .values({ entityId: id, worldId, importer: source.importer, sourceId: source.sourceId, rev: source.rev })
+        .run();
   }
 
   /**
