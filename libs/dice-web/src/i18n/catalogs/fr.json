@@ -1,0 +1,5 @@
+{
+  "section": "Dés",
+  "roll": "Lancer {{expression}}",
+  "invalid": "Expression de dés invalide"
+}
