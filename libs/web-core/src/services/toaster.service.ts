@@ -3,11 +3,23 @@ import { Injectable, signal } from '@angular/core';
 /** A toast's severity; the {@link Toaster} component maps it onto tone styling. */
 export type ToastTone = 'info' | 'success' | 'error';
 
-/** One transient on-screen message: a stable `id`, its `message`, and its `tone`. */
+/** Which viewport edge a toast anchors to; `top` sits it near the command palette (ADR-0032). */
+export type ToastPlacement = 'top' | 'bottom';
+
+/** One transient on-screen message: a stable `id`, its `message`, `tone`, and `placement`. */
 export interface Toast {
   readonly id: number;
   readonly message: string;
   readonly tone: ToastTone;
+  readonly placement: ToastPlacement;
+}
+
+/** Per-call overrides for {@link ToasterService.show}; both fall back to the toaster's defaults. */
+export interface ToastOptions {
+  /** How long the toast lingers before auto-dismissing; `0` keeps it until dismissed. */
+  readonly durationMs?: number;
+  /** The edge to anchor to; defaults to `bottom`. */
+  readonly placement?: ToastPlacement;
 }
 
 /** How long a toast lingers before auto-dismissing, unless overridden per call. */
@@ -33,11 +45,13 @@ export class ToasterService {
 
   /**
    * Raise a toast, returning its id. Pass `durationMs` of `0` to keep it until
-   * dismissed. The timer is skipped where `setTimeout` is unavailable (SSR).
+   * dismissed, or `placement: 'top'` to anchor it near the command palette. The
+   * timer is skipped where `setTimeout` is unavailable (SSR).
    */
-  show(message: string, tone: ToastTone = 'info', durationMs = DEFAULT_TOAST_DURATION_MS): number {
+  show(message: string, tone: ToastTone = 'info', options: ToastOptions = {}): number {
+    const { durationMs = DEFAULT_TOAST_DURATION_MS, placement = 'bottom' } = options;
     const id = this.nextId++;
-    this._toasts.update((list) => [...list, { id, message, tone }]);
+    this._toasts.update((list) => [...list, { id, message, tone, placement }]);
     if (durationMs > 0 && typeof setTimeout === 'function') {
       this.timers.set(
         id,

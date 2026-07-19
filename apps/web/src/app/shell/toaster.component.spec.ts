@@ -29,8 +29,8 @@ describe('Toaster', () => {
 
   it('renders one element per toast, showing each message', () => {
     const toaster = TestBed.inject(ToasterService);
-    toaster.show('Move blocked', 'error', 0); // sticky so no timer races the assert
-    toaster.show('Saved', 'success', 0);
+    toaster.show('Move blocked', 'error', { durationMs: 0 }); // sticky so no timer races the assert
+    toaster.show('Saved', 'success', { durationMs: 0 });
 
     const fixture = render();
     const toasts = fixture.nativeElement.querySelectorAll('.toast');
@@ -39,8 +39,22 @@ describe('Toaster', () => {
     expect(fixture.nativeElement.textContent).toContain('Saved');
   });
 
+  it('routes a top-placed toast into the top stack and leaves the rest at the bottom', () => {
+    const toaster = TestBed.inject(ToasterService);
+    toaster.show('2d6 = 7', 'info', { durationMs: 0, placement: 'top' });
+    toaster.show('Saved', 'success', { durationMs: 0 });
+
+    const fixture = render();
+    const top = fixture.nativeElement.querySelector('.top-5');
+    const bottom = fixture.nativeElement.querySelector('.bottom-5');
+    expect(top.textContent).toContain('2d6 = 7');
+    expect(top.textContent).not.toContain('Saved');
+    expect(bottom.textContent).toContain('Saved');
+    expect(bottom.textContent).not.toContain('2d6 = 7');
+  });
+
   it('marks an error toast with its tone class', () => {
-    TestBed.inject(ToasterService).show('Move blocked', 'error', 0);
+    TestBed.inject(ToasterService).show('Move blocked', 'error', { durationMs: 0 });
 
     const fixture = render();
     const toast = fixture.nativeElement.querySelector('.toast');
@@ -49,7 +63,7 @@ describe('Toaster', () => {
   });
 
   it('announces an error toast assertively through the CDK live region', () => {
-    TestBed.inject(ToasterService).show('Move blocked', 'error', 0);
+    TestBed.inject(ToasterService).show('Move blocked', 'error', { durationMs: 0 });
 
     render();
 
@@ -57,7 +71,7 @@ describe('Toaster', () => {
   });
 
   it('announces a non-error toast politely', () => {
-    TestBed.inject(ToasterService).show('Saved', 'success', 0);
+    TestBed.inject(ToasterService).show('Saved', 'success', { durationMs: 0 });
 
     render();
 
@@ -66,7 +80,7 @@ describe('Toaster', () => {
 
   it('dismisses a toast when its dismiss control is clicked', () => {
     const toaster = TestBed.inject(ToasterService);
-    toaster.show('Move blocked', 'error', 0);
+    toaster.show('Move blocked', 'error', { durationMs: 0 });
     const fixture = render();
 
     fixture.nativeElement.querySelector('[data-testid="toast-dismiss"]').click();
