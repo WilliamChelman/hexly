@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DS_MONSTER, DS_STAT_BLOCK_KEY, statBlockSchema } from '@hexly/plugin-draw-steel';
+import { Ability, abilitySchema, DS_MONSTER, DS_STAT_BLOCK_KEY, statBlockSchema } from '@hexly/plugin-draw-steel';
 import { CONTENT_FIELD } from '@hexly/plugin-content';
 import { AJAX_MONSTER_FIXTURE, fixtureFetchPort, GOBLIN_MONSTER_FIXTURE } from '../testing';
 import { createMonstersImporter, MONSTERS_IMPORTER_ID, MONSTERS_REV, toMonsterRecord } from './monsters-importer';
@@ -175,5 +175,137 @@ describe('draw-steel monsters transform — structural mapping', () => {
       system: { biography: { value: 'A quiet life.', director: 'Hidden agenda.' } },
     })?.document[CONTENT_FIELD.id] as { snapshot: { content: unknown[] } } | undefined;
     expect(content?.snapshot.content).toHaveLength(2);
+  });
+});
+
+/** The ability transform (#259): abilities[] with composed distance/target/effect and multi-tier power rolls. */
+describe('draw-steel monsters transform — abilities + power rolls', () => {
+  const ajaxAbilities = (): Ability[] =>
+    (toMonsterRecord(AJAX_MONSTER_FIXTURE)?.document[DS_STAT_BLOCK_KEY] as { abilities: Ability[] }).abilities;
+  const goblinAbilities = (): Ability[] =>
+    (toMonsterRecord(GOBLIN_MONSTER_FIXTURE)?.document[DS_STAT_BLOCK_KEY] as { abilities: Ability[] }).abilities;
+  const byName = (abilities: Ability[], name: string): Ability => {
+    const found = abilities.find((ability) => ability.name === name);
+    if (!found) throw new Error(`no ability named ${name}`);
+    return found;
+  };
+
+  it('imports Ajax faithfully — 16 abilities across all four categories, each schema-valid', () => {
+    const abilities = ajaxAbilities();
+    expect(abilities).toHaveLength(16);
+    // Every ability is a well-formed stat-block Ability.
+    for (const ability of abilities) expect(abilitySchema.safeParse(ability).success).toBe(true);
+    // The four categories are all represented (the six uncategorized abilities carry no `category`).
+    const categories = abilities.map((ability) => ability.category);
+    expect(categories.filter((c) => c === 'signature')).toHaveLength(1);
+    expect(categories.filter((c) => c === 'heroic')).toHaveLength(2);
+    expect(categories.filter((c) => c === 'villain')).toHaveLength(3);
+    expect(categories.filter((c) => c === 'maliceAncestry')).toHaveLength(4);
+    expect(categories.filter((c) => c === undefined)).toHaveLength(6);
+  });
+
+  it('maps the signature ability field-by-field, composing distance/target and the multi-tier roll', () => {
+    // Blade of the Gol King: a main-action signature strike whose power roll damages *and* saps Recoveries.
+    expect(byName(ajaxAbilities(), 'Blade of the Gol King')).toEqual({
+      name: 'Blade of the Gol King',
+      type: 'main',
+      category: 'signature',
+      keywords: ['charge', 'magic', 'melee', 'strike', 'weapon'],
+      distance: 'Melee 1',
+      target: '2 creatures or objects',
+      powerRoll: {
+        characteristic: 'might',
+        t1: '16 damage; M < 4 the target loses 1d3 Recoveries',
+        t2: '22 damage; M < 5 the target loses 1d3 Recoveries',
+        t3: '26 damage; M < 6 prone and the target loses 1d3 Recoveries',
+      },
+      // The base effect prose and the malice-spend option, both enricher-resolved.
+      effect:
+        'Ajax shifts up to 2 squares between striking each target.\n\n1d3 recovery loss\n\n' +
+        '1 Malice: Ajax can strike one additional target for each Malice spent.',
+    });
+  });
+
+  it('composes a tier from all four effect kinds — damage, forced movement, and an applied condition', () => {
+    // Decree by the Jade Hand stacks holy damage, a Slide, and a hexed condition gated by potency in one tier.
+    const decree = byName(ajaxAbilities(), 'Decree by the Jade Hand');
+    expect(decree.distance).toBe('Cube 3 within 10');
+    expect(decree.target).toBe('Each enemy and object in the area');
+    expect(decree.powerRoll).toEqual({
+      characteristic: 'might',
+      t1: '11 Holy damage; Slide 2; P < 4 the target is hexed (save ends)',
+      t2: '17 Holy damage; Slide 5; P < 5 the target is hexed (save ends)',
+      t3: '21 Holy damage; Slide 8; P < 6 the target is hexed (save ends)',
+    });
+  });
+
+  it('maps a heroic ability as a flat effect with its numeric malice cost, no power roll', () => {
+    const bead = byName(ajaxAbilities(), 'Bead of Hell');
+    expect(bead.category).toBe('heroic');
+    expect(bead.malice).toBe(2);
+    expect(bead.target).toBe('Special');
+    expect(bead.powerRoll).toBeUndefined();
+    expect(bead.effect).toContain('Each enemy in the area when the bead ignites takes 20 fire damage');
+    // The label-less potency enricher resolved to its printed form inside the flat effect.
+    expect(bead.effect).toContain('A < 5, they are dazed (save ends)');
+  });
+
+  it('carries the villain category and a triggered action with its trigger text', () => {
+    const phoenix = byName(ajaxAbilities(), 'Phoenix Wing King');
+    expect(phoenix).toMatchObject({ type: 'villain', category: 'villain', distance: 'Burst 5' });
+    expect(phoenix.powerRoll?.t2).toBe('17 Fire damage; A < 5 weakened (save ends)');
+
+    const triggered = byName(ajaxAbilities(), 'Is This What They Taught You?');
+    expect(triggered.type).toBe('triggered');
+    expect(triggered.trigger).toBe('A creature within distance marks Ajax.');
+    expect(triggered.target).toBe('The triggering creature');
+  });
+
+  it('reads a reactive roll as printed — inverted tiers, no derived-data inheritance', () => {
+    // Draw Steel is a reactive malice-ancestry action: its tiers descend (26→16) and empty tiers do not inherit.
+    const drawSteel = byName(ajaxAbilities(), 'Draw Steel');
+    expect(drawSteel).toMatchObject({ category: 'maliceAncestry', malice: 10 });
+    expect(drawSteel.powerRoll).toEqual({
+      characteristic: 'might',
+      t1: '26 damage; bleeding and slowed (save ends)',
+      t2: '22 damage; bleeding (save ends)',
+      t3: '16 damage',
+    });
+  });
+
+  it('leaks no raw enricher token into any imported ability', () => {
+    expect(JSON.stringify(ajaxAbilities())).not.toMatch(/\[\[|\]\]|\{\{|@chr/);
+  });
+
+  it('imports a Goblin family, resolving applied-condition tiers through the monster potency', () => {
+    const abilities = goblinAbilities();
+    expect(abilities).toHaveLength(5);
+
+    // Spear Charge: a signature strike whose power roll rolls off Agility, damage-only tiers.
+    expect(byName(abilities, 'Spear Charge')).toMatchObject({
+      category: 'signature',
+      powerRoll: { characteristic: 'agility', t1: '3 damage', t2: '4 damage', t3: '5 damage' },
+    });
+
+    // Bury The Point: the applied bleeding condition's potency resolves against the Goblin's own potency
+    // (highest characteristic 2 → weak 0 / average 1 / strong 2), and inherits its display across the tiers.
+    expect(byName(abilities, 'Bury The Point').powerRoll).toEqual({
+      characteristic: 'agility',
+      t1: '5 damage; M < 0 bleeding (save ends)',
+      t2: '6 damage; M < 1 bleeding (save ends)',
+      t3: '7 damage; M < 2 bleeding (save ends)',
+    });
+
+    // Swamp Stink: a reactive malice action whose applied-condition tiers read as authored.
+    expect(byName(abilities, 'Swamp Stink').powerRoll).toEqual({
+      characteristic: 'might',
+      t1: '5 Poison damage; the creature is weakened until the mist disappears.',
+      t2: 'The creature is weakened until the mist disappears.',
+      t3: 'No effect.',
+    });
+
+    // A malice ancestry action with no power roll folds to a flat effect with its cost.
+    expect(byName(abilities, 'Goblin Mode')).toMatchObject({ category: 'maliceAncestry', malice: 3 });
+    expect(byName(abilities, 'Goblin Mode').powerRoll).toBeUndefined();
   });
 });
