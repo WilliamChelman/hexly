@@ -21,6 +21,7 @@
       "@hexly/command-palette-web": ["./libs/command-palette-web/src/index.ts"],
       "@hexly/command-palette-web/i18n": ["./libs/command-palette-web/src/i18n/index.ts"],
       "@hexly/command-palette-web/testing": ["./libs/command-palette-web/src/testing/index.ts"],
+      "@hexly/dice-web": ["./libs/dice-web/src/index.ts"],
       "@hexly/domain": ["./libs/domain/src/index.ts"],
       "@hexly/immer": ["./libs/immer/src/index.ts"],
       "@hexly/obsidian": ["./libs/obsidian/src/index.ts"],
