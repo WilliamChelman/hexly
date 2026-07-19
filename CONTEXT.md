@@ -45,7 +45,7 @@ The one open key→value map on an Entity — its whole authored substance, ther
 _Avoid_: Metadata (retired as the map's name — kept only as the read-only **properties** panel's UI label and the ADR-0037 name/visibility "metadata patch"); frontmatter (a projection, not a synonym); properties; attributes; custom field
 
 **Asset**:
-A binary file — typically an image, but also a PDF or other media — belonging to a World and referenced from an Entity's Content. Served by an unguessable, unauthenticated link, so possession of the link is the only access control (even for an Asset referenced from a `private` Entity).
+A binary file — typically an image, but also a PDF or other media — belonging to a World and referenced from an Entity's Content or from a **Board Surface** (an **Image** element). Served by an unguessable, unauthenticated link, so possession of the link is the only access control (even for an Asset referenced from a `private` Entity).
 _Avoid_: Attachment, file, blob, media, upload
 
 **Tag**:
@@ -53,7 +53,7 @@ A free-text label on an Entity, for flavour and informal grouping (e.g. "ruined"
 _Avoid_: Keyword, category, label
 
 **Entity Link**:
-An optional reference to an Entity by id, from a Map element (a Hex, Feature, or Region — not a Label), inline within another Entity's Content (prose), or a typed **Field** on an Entity: e.g. a settlement Feature pointing at the town's `note`, a sentence in one note linking to another `hexmap`, or a monster's `lair` Field pointing at a place. A link to a missing or inaccessible Entity renders non-navigable — a Content link shows its last-known name as a dangling label — rather than erroring. A Content link may carry an optional Link Descriptor.
+An optional reference to an Entity by id, from a Map element (a Hex, Feature, or Region — not a Label), inline within another Entity's Content (prose), a typed **Field** on an Entity, or a Board's **Embed** element: e.g. a settlement Feature pointing at the town's `note`, a sentence in one note linking to another `hexmap`, a monster's `lair` Field pointing at a place, or a Board embedding a `note` rendered in place. Most forms are merely navigable; an **Embed** additionally _renders_ its target inline by transclusion. A link to a missing or inaccessible Entity renders non-navigable — a Content link shows its last-known name as a dangling label, an Embed a dangling placeholder — rather than erroring. A Content link may carry an optional Link Descriptor.
 _Avoid_: Reference, relation, backlink
 
 **Link Descriptor**:
@@ -81,8 +81,8 @@ _Avoid_: Origin, provenance record, external id, sync key
 ## Language
 
 **Hex Map**:
-An **Entity** carrying the `core.hexmap` type — the type that defaults two Fields, the canonical **Content** Field (its lore) and the grid of hexes, overlays, regions, and labels (a Field of the `core.hex-grid` **Structured Data Type**). The grid is an infinite sparse plane — a Hex exists only where painted. Ownership, sharing, and saving are properties of the Entity, not the grid. Shipped by a bundled plugin, not by the core: an Instance without it opens a Hex Map on the generic Field view, grid and lore alike unrendered **Entity Document** values — the ordinary absent-plugin degradation.
-_Avoid_: Map document, board, canvas
+An **Entity** carrying the `core.hexmap` type — the type that defaults two Fields, the canonical **Content** Field (its lore) and the grid of hexes, overlays, regions, and labels (a Field of the `core.hex-grid` **Structured Data Type**). The grid is an infinite sparse plane — a Hex exists only where painted. Ownership, sharing, and saving are properties of the Entity, not the grid. Shipped by a bundled plugin, not by the core: an Instance without it opens a Hex Map on the generic Field view, grid and lore alike unrendered **Entity Document** values — the ordinary absent-plugin degradation. The hex-locked sibling of the free-positioned **Board**.
+_Avoid_: Map document, board (now the free-positioned sibling Entity — see **Board**), canvas
 
 **Hex**:
 A cell the user has given content to, stored at its coordinate. The map is an infinite plane, so a Hex exists _only_ where painted — there is no bounded grid of pre-existing cells. Carries exactly one terrain, plus optional content: at most one feature and an optional name.
@@ -119,6 +119,32 @@ _Avoid_: Title, caption, label
 **Label**:
 A free-positioned text element drawn on the map (a point + text + size + optional rotation), not snapped to the hex grid — used for cartographic typography like region or ocean names. Distinct from an entity's `name` field, which the renderer may draw but which is not a Label.
 _Avoid_: Text, caption, title, annotation
+
+## Board
+
+**Board**:
+An **Entity** carrying the `core.board` type — a free-positioned 2D worldbuilding surface, the sibling of the **Hex Map**. The type defaults two Fields: the canonical **Content** (its lore) and the surface at the `core.surface` key (a Field of the `core.board-surface` **Structured Data Type**), an infinite plane of **Board Elements**. Ownership, sharing, and saving are properties of the Entity, not the surface. Shipped by a bundled **Plugin** (`board`), not the core: an Instance without it opens a Board on the generic **View**, surface and lore alike unrendered **Entity Document** values — the ordinary absent-plugin degradation.
+_Avoid_: Canvas (kept only for the informal gesture-surface sense — the thing you drag on), board as a Hex Map synonym (retired — the Board is its own Entity now), scene, collage, whiteboard
+
+**Board Surface**:
+The `core.board-surface` **Structured Data Type** — a Board's substance: an infinite 2D plane, panned and zoomed by a camera, holding a z-ordered set of **Board Elements**. It **harvests** link edges (every **Embed**'s target and every inline **Entity Link** inside a **Text Block**) and searchable text (Text Block prose), and harvests no facets. Its **Vault Projection** is `frontmatter` — the whole element model serialized losslessly — while the Board's lore **Content** projects to the body.
+_Avoid_: Canvas, board (bare — the Entity is the Board; this is its surface Data Type), grid (the Hex Map's), plane
+
+**Board Element**:
+A placed thing on a **Board Surface** — the free-positioned counterpart to a **Map element**. Carries geometry (a position and a size) and an explicit **z-order** for stacking. Three kinds today: an **Image**, an **Embed**, and a **Text Block**. Selected, moved, and resized with the Board's Select **Tool**; the interactive kinds (Embed, Text Block) additionally **arm** on a click into them, as a Tool arms — one armed at a time, click-out disarms.
+_Avoid_: Item, node, card (that is the Embed's fallback rendering), widget, shape
+
+**Image**:
+A **Board Element** that displays an **Asset** — an Asset reference plus geometry. Always static (never armed). Sourced by uploading a new file (which mints a World **Asset**) or by picking an existing one. The Board Surface is a second Asset reference site beside **Content**, so Asset-usage accounting must count it.
+_Avoid_: Picture, photo, media, sprite
+
+**Embed**:
+A **Board Element** that renders another **Entity** inline by full live transclusion of a chosen **View** — `{ target Entity, View }`, the View selectable per Embed. An **Entity Link**: it emits a link edge, appears in the **World Graph**, and resolves per viewer through the access filter — an unreadable or deleted target renders as a dangling, non-navigable placeholder. Bounded by cycle detection and a configurable maximum render depth (**Instance Configuration**, default 3), past which — or when the chosen View cannot render (its Field gone, its **Plugin** disabled) — it degrades to a **card preview** (name, type icon, snippet). Static until clicked, when it **arms** for read-interaction only (pan, scroll, click-through); editing the target means opening it, never editing through the Embed.
+_Avoid_: Transclusion (the mechanism, not the element), card (the fallback rendering, not the Embed), portal, inset, iframe
+
+**Text Block**:
+A **Board Element** holding a `core.rich-content` value — rich text authored on the surface, with formatting and inline **Entity Links**, edited with the same editor as an Entity's **Content**. Static until clicked, when it **arms** its editor; click-out disarms. Its prose feeds the **Board Surface**'s searchable text and its inline links the link harvest. Distinct from a **Label** (a Hex Map's minimal cartographic typography, not rich text).
+_Avoid_: Label (the map's minimal text), note, sticky, caption, text box
 
 ## Worlds
 
@@ -202,8 +228,10 @@ Every piece of map content sits in exactly one of three placement modes:
 
 ## Editing tools
 
+These concepts are surface-agnostic — shared by every surface editor (the **Hex Map**, the **Board**) — but the _toolset_ is per-plugin: each surface Plugin supplies its own Tools. Code-sharing a surface-editor lib is a separate, later call. The terms below are illustrated with the Hex Map's toolset unless noted.
+
 **Tool**:
-A top-level editing mode armed in the palette — Select, Terrain, Feature, Label, Erase. Exactly one is armed at a time, and a canvas gesture applies it. A map opens armed with Select (its Pick Subtool). Region is _not_ a palette Tool: Regions are created in the Regions panel and their membership is painted via the Inspector's Add/Remove brush.
+A top-level editing mode armed in a surface editor's palette. Exactly one is armed at a time, and a canvas gesture applies it. The set is per-surface: a Hex Map arms Select, Terrain, Feature, Label, Erase; a Board arms Select, Image, Embed, Text. A surface opens armed with Select. (On the Hex Map, Region is _not_ a palette Tool: Regions are created in the Regions panel and their membership is painted via the Inspector's Add/Remove brush.)
 _Avoid_: Mode, brush, instrument
 
 **Subtool**:
@@ -215,7 +243,7 @@ The one non-destructive Tool, holding a **Selection** and split into two Subtool
 _Avoid_: Pointer, move tool, arrow
 
 **Selection**:
-The set of Map elements (Hexes, Features, Labels, Regions) currently picked out — zero, one, or many. Shown in the Inspector and moved together by a drag. Built by Select's clicks and modifiers; not part of the document, so never undone or persisted.
+The set of placed elements currently picked out — Map elements on a Hex Map (Hexes, Features, Labels, Regions), Board Elements on a Board — zero, one, or many. Shown in the Inspector and moved together by a drag. Built by Select's clicks and modifiers; not part of the document, so never undone or persisted.
 _Avoid_: Highlight, focus, active item
 
 **Pick**:
@@ -231,7 +259,7 @@ The Tool that deletes a whole Hex record (its terrain _and_ feature), turning th
 _Avoid_: Delete, clear, remove
 
 **Inspector**:
-The surface that shows and edits the currently selected Map element, including its Entity Link. For a Label it edits text/size/rotation/position; for a Region it edits name, color, deletion, and the Add/Remove membership direction — the _only_ place Region details are edited. Engaging a Region's Add/Remove here arms the Region membership brush on that Region — the only way to arm it.
+The surface that shows and edits the currently selected element. On a Hex Map that is a Map element, including its Entity Link: for a Label it edits text/size/rotation/position; for a Region it edits name, color, deletion, and the Add/Remove membership direction — the _only_ place Region details are edited, and engaging Add/Remove here arms the Region membership brush on that Region (the only way to arm it). On a Board it is a Board Element: geometry and z-order for all, plus an Image's Asset, an Embed's target Entity and View.
 _Avoid_: Side panel, details pane, properties
 
 **Regions panel**:

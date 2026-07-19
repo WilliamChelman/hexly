@@ -12,7 +12,12 @@ export interface ClientConfig {
   };
 }
 
-/** A single Plugin's client-visible config — `enabled` today, room for client knobs later. */
+/** A single Plugin's client-visible config — `enabled`, plus any Plugin-specific client knobs it exposes. */
 export interface ClientPluginConfig {
   enabled: boolean;
+  /**
+   * The Board's Embed transclusion depth cap (ADR-0062, `features.plugin.board.maxEmbedDepth`) — the one
+   * Plugin-specific knob crossing to the client today. Present only on the Plugin that declares it.
+   */
+  maxEmbedDepth?: number;
 }

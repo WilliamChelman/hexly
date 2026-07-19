@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, HostListener, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ImageElement, Point, Size, stackingOrder, TextElement } from '@hexly/plugin-board';
+import { EmbedElement, ImageElement, Point, Size, stackingOrder, TextElement } from '@hexly/plugin-board';
 import { BoardCamera } from '../services/board-camera';
 import { BoardStore } from '../services/board-store';
 import { DRAG_THRESHOLD } from '../utils/gesture';
 import { BoardImageComponent } from './board-image.component';
+import { BoardEmbedComponent } from './board-embed.component';
 import { TextBlockComponent } from './text-block.component';
 import { toolForHotkey } from './tools';
 
@@ -47,6 +48,8 @@ interface Rendered {
   readonly text: TextElement | null;
   /** The Image element to render in place, or null for any other kind. */
   readonly image: ImageElement | null;
+  /** The Embed element to render in place, or null for any other kind. */
+  readonly embed: EmbedElement | null;
 }
 
 /** A live drag: moving the whole selection, or resizing one element from a handle. */
@@ -79,7 +82,7 @@ type Gesture =
   selector: 'app-board-elements',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'absolute inset-0 pointer-events-none overflow-hidden' },
-  imports: [TranslocoPipe, TextBlockComponent, BoardImageComponent],
+  imports: [TranslocoPipe, TextBlockComponent, BoardImageComponent, BoardEmbedComponent],
   template: `
     @for (el of rendered(); track el.id) {
       <div
@@ -88,6 +91,7 @@ type Gesture =
         [class.is-armed]="el.armed"
         [class.is-text]="!!el.text"
         [class.is-image]="!!el.image"
+        [class.is-embed]="!!el.embed"
         [style.left.px]="el.left"
         [style.top.px]="el.top"
         [style.width.px]="el.width"
@@ -102,6 +106,9 @@ type Gesture =
         }
         @if (el.image; as image) {
           <app-board-image [element]="image" />
+        }
+        @if (el.embed; as embed) {
+          <app-board-embed [element]="embed" />
         }
         @if (el.selected && single() && !el.armed) {
           @for (h of handles; track h.dir) {
@@ -132,6 +139,11 @@ type Gesture =
     /* An Image frames its own Asset — a quiet sunken mat behind the letterboxed picture, not gold. */
     .element.is-image {
       @apply bg-surface-sunken overflow-hidden;
+      border-color: var(--color-line);
+    }
+    /* An Embed frames the transcluded View — a neutral window, its substance the target's own. */
+    .element.is-embed {
+      @apply bg-surface overflow-hidden;
       border-color: var(--color-line);
     }
     .element.is-armed {
@@ -195,6 +207,7 @@ export class BoardElementsComponent {
         armed: armed === el.id,
         text: el.kind === 'text' ? el : null,
         image: el.kind === 'image' ? el : null,
+        embed: el.kind === 'embed' ? el : null,
       };
     });
   });
@@ -224,13 +237,14 @@ export class BoardElementsComponent {
   }
 
   /**
-   * Double-click **arms** an interactive element for inline editing (CONTEXT.md → Text Block, #268): a
-   * plain click selects and can drag, a second click into it hands the pointer to its editor. Only the
-   * Text Block arms today; other kinds have no edit mode, so the double-click is inert on them.
+   * Double-click **arms** an interactive element (CONTEXT.md → Text Block/Embed, #268/#270): a plain click
+   * selects and can drag, a second click into it hands the pointer to the element — a Text Block's inline
+   * editor, or an Embed's read-interaction (pan / scroll / click-through). The static kinds (Box, Image)
+   * have no active mode, so the double-click is inert on them.
    */
   protected onElementDblClick(id: string): void {
     const element = this.store.document().elements.find((e) => e.id === id);
-    if (element?.kind !== 'text') return;
+    if (element?.kind !== 'text' && element?.kind !== 'embed') return;
     this.store.select(id, 'replace');
     this.store.arm(id);
   }

@@ -22,12 +22,16 @@
     "zoomOut": "Zoom arrière",
     "fit": "Réinitialiser la vue"
   },
+  "embed": {
+    "openTarget": "Ouvrir la cible"
+  },
   "toolPalette": {
     "tools": "Outils",
     "select": "Sélection",
     "box": "Boîte",
     "text": "Texte",
     "image": "Image",
+    "embed": "Intégration",
     "undo": "Annuler",
     "redo": "Rétablir"
   },
@@ -39,6 +43,17 @@
     "existing": "Choisir une image existante",
     "loading": "Chargement des images…",
     "empty": "Aucune image téléversée pour l’instant.",
+    "cancel": "Annuler"
+  },
+  "embedPicker": {
+    "title": "Intégrer une entité",
+    "target": "Entité à intégrer",
+    "searchPlaceholder": "Rechercher des entités…",
+    "noMatches": "Aucune entité correspondante.",
+    "chosenTarget": "Intégration de",
+    "view": "Vue à afficher",
+    "defaultView": "Vue par défaut",
+    "confirm": "Ajouter l’intégration",
     "cancel": "Annuler"
   },
   "inspector": {
@@ -54,6 +69,7 @@
     "bringForward": "Avancer",
     "sendBackward": "Reculer",
     "toBack": "Arrière-plan",
+    "embedView": "Vue intégrée",
     "deleteElement": "Supprimer l’élément",
     "multiTitle": "Sélection",
     "selectedCount": "sélectionnés",

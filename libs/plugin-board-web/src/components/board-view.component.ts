@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { BoardCamera } from '../services/board-camera';
 import { BoardImagePlacement } from '../services/board-image-placement';
+import { BoardEmbedPlacement } from '../services/board-embed-placement';
 import { BoardStore } from '../services/board-store';
 import { BoardCanvasComponent } from './board-canvas.component';
 import { BoardElementsComponent } from './board-elements.component';
@@ -26,7 +27,7 @@ import { InspectorComponent } from './inspector.component';
   selector: 'app-board-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  providers: [BoardStore, BoardCamera, BoardImagePlacement],
+  providers: [BoardStore, BoardCamera, BoardImagePlacement, BoardEmbedPlacement],
   imports: [BoardCanvasComponent, BoardElementsComponent, ToolPaletteComponent, InspectorComponent],
   template: `
     <!-- Full-bleed canvas grid; the element overlay and all side chrome float over it (ADR-0013). -->
