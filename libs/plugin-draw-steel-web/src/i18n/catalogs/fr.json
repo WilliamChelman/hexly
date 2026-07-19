@@ -13,6 +13,13 @@
   },
   "statBlock": {
     "dataType": "Bloc de stats",
+    "facet": {
+      "role": "Rôle",
+      "organization": "Organisation",
+      "level": "Niveau",
+      "ev": "VR",
+      "keywords": "Mot-clé"
+    },
     "stat": {
       "might": "Puissance",
       "agility": "Agilité",

@@ -3,6 +3,7 @@ import { entityToMarkdown } from '@hexly/obsidian';
 import { CORE_NOTE, PLUGIN_ID as CONTENT_PLUGIN_ID, tiptapContent } from '@hexly/plugin-content';
 import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { DND_MONSTER, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
+import { DS_MONSTER, PLUGIN_ID as DRAW_STEEL_PLUGIN_ID } from '@hexly/plugin-draw-steel';
 import { HexlyConfig, loadConfig } from '../config';
 import { BUNDLED_PLUGIN_CONFIGS } from './bundled-plugins';
 import { TypeFieldRegistry } from './type-field-registry';
@@ -146,6 +147,54 @@ describe('plugin enablement — uniform absence on the server', () => {
         creature_type: 'dragon',
         challenge_rating: 24,
         strength: 30,
+      });
+    });
+  });
+
+  describe('facet harvest over a Draw Steel Monster (identity dimensions, ADR-0055 / #244)', () => {
+    // A stat block carrying the five identity dimensions — plus a characteristic and stamina, never facets.
+    const doc = {
+      'draw-steel.stat_block': {
+        role: 'brute',
+        organization: 'elite',
+        level: 3,
+        ev: 12,
+        keywords: ['undead', 'humanoid'],
+        might: 2,
+        stamina: 80,
+      },
+    };
+
+    it('harvests role/organization/level/ev and one row per keyword when draw-steel is enabled — never a stat', () => {
+      const registry = new TypeFieldRegistry(allEnabled());
+      const fields = fieldsFor(registry, [DS_MONSTER]);
+      const facets = deriveDocumentState(doc, fields, registry.structuredDataTypes).fieldFacets;
+      expect(facets).toEqual([
+        { key: 'role', value: 'brute', num: null },
+        { key: 'organization', value: 'elite', num: null },
+        { key: 'level', value: '3', num: 3 },
+        { key: 'ev', value: '12', num: 12 },
+        { key: 'keywords', value: 'undead', num: null },
+        { key: 'keywords', value: 'humanoid', num: null },
+      ]);
+      // The characteristic and stamina are stats, never identity facets: neither leaks into the harvest.
+      expect(facets.some((f) => f.key === 'might' || f.key === 'stamina')).toBe(false);
+    });
+
+    it('harvests no facets when draw-steel is disabled, leaving the stat block intact as plain document', () => {
+      const registry = new TypeFieldRegistry(withDisabled(DRAW_STEEL_PLUGIN_ID));
+      const fields = fieldsFor(registry, [DS_MONSTER]);
+      // The `draw-steel.stat-block` Data Type drops from the set, so faceting simply stops (ADR-0055)…
+      expect(deriveDocumentState(doc, fields, registry.structuredDataTypes).fieldFacets).toEqual([]);
+      // …and the value is untouched — a lens that doesn't apply leaves the document readable.
+      expect(doc['draw-steel.stat_block']).toEqual({
+        role: 'brute',
+        organization: 'elite',
+        level: 3,
+        ev: 12,
+        keywords: ['undead', 'humanoid'],
+        might: 2,
+        stamina: 80,
       });
     });
   });
