@@ -1,3 +1,9 @@
+// The reference is load-bearing, not redundant: the app's angular-compiler compiles this file in a
+// context that doesn't include the lib tsconfig, so the `*.otf` ambient module (font-assets.d.ts) is
+// only visible — and the import below only typechecks — via this reference. Dropping it breaks the web
+// build/e2e with TS2307, so the triple-slash-reference lint rule is disabled for this line.
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference
+/// <reference path="./font-assets.d.ts" />
 import { fontGlyph, IconFont, IconGlyph } from '@hexly/web-ui';
 // Bundled next to the code that loads it (ADR-0007): the esbuild `file` loader emits the `.otf` as a
 // hashed asset and the import resolves to its runtime URL — no edit to the app's global asset list.
