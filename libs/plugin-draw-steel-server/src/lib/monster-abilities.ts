@@ -1,16 +1,10 @@
 /**
- * The Monsters importer's **ability transform** (#259) — the "Ajax bar". The one pure step that turns a
- * Foundry `ability` item into a stat-block {@link Ability}: the scalar/identity fields (type, category,
- * numeric malice, keywords), the composed `distance`/`target` display strings, the `trigger`, the flat
- * `effect`, and — the hard part — the multi-tier {@link PowerRoll}, whose three tier texts are re-composed
- * from the structured `power.effects` (damage / applied / other / forced) exactly as Foundry would render
- * them at display time, resolved through the one {@link foundryProseToText} converter so no `{{potency}}`/
- * `{{forced}}` token or raw HTML leaks (ADR-0060/0061).
- *
- * The Foundry system computes each effect's tier text from *derived* data — an empty tier inherits the
- * previous tier's display/damage (unless the roll is reactive), and a monster's `@potency.weak|average|
- * strong` resolves against its highest characteristic. This module replicates those two derivations so an
- * imported power roll reads as printed (≤11 / 12–16 / 17+), rather than deferring to a live Foundry pass.
+ * Transforms a Foundry `ability` item into a stat-block {@link Ability} (ADR-0060). The multi-tier
+ * {@link PowerRoll} is re-composed from the structured `power.effects` exactly as the Draw Steel system's
+ * `powerRollText` renders them — replicating its derived-data rules (per-tier potency defaults, `applied`/
+ * `forced` display inheritance, damage's `@chr`/tier-1 fallbacks) and evaluating `@potency`/`@chr` formulas
+ * as `evaluateFormula`/`simplifyRollFormula` do, so no `{{potency}}`/`{{forced}}`/`@chr` token leaks
+ * (ADR-0061).
  */
 
 import {
@@ -25,7 +19,7 @@ import {
   PowerRoll,
 } from '@hexly/plugin-draw-steel';
 import { z } from 'zod';
-import { foundryProseToText } from './foundry-prose';
+import { EnricherContext, foundryProseToText } from './foundry-prose';
 
 /** The five characteristic scores the transform reads off the block — each optional, each the potency input. */
 export type MonsterCharacteristics = Partial<Record<DsCharacteristicKey, number>>;
@@ -117,14 +111,17 @@ export function abilitiesOf(items: readonly unknown[] | undefined, characteristi
   const abilities: Ability[] = [];
   for (const raw of items ?? []) {
     const parsed = abilityItemSchema.safeParse(raw);
-    if (parsed.success && parsed.data.type === 'ability') abilities.push(abilityOf(parsed.data, potency));
+    if (parsed.success && parsed.data.type === 'ability')
+      abilities.push(abilityOf(parsed.data, potency, characteristics));
   }
   return abilities;
 }
 
 /** Map one parsed `ability` item to an {@link Ability} — optionals set only when authored, so no husk persists. */
-function abilityOf(item: AbilityItem, potency: Potency): Ability {
+function abilityOf(item: AbilityItem, potency: Potency, characteristics: MonsterCharacteristics): Ability {
   const system = item.system ?? {};
+  // `@chr` resolves against the ability's power-roll characteristic (ADR-0060), so it is ability-scoped.
+  const chr = rollCharacteristicValue(characteristics, system.power?.roll);
   const ability: Ability = {
     name: item.name ?? '',
     type: abilityType(system.type),
@@ -137,16 +134,39 @@ function abilityOf(item: AbilityItem, potency: Potency): Ability {
   // The heroic/villain/malice resource cost is the ability's `malice` — a `0` would be legitimate, so guard the type.
   if (typeof system.resource === 'number' && Number.isFinite(system.resource)) ability.malice = system.resource;
 
-  const trigger = foundryProseToText(system.trigger ?? '');
+  const trigger = foundryProseToText(system.trigger ?? '', chrContext(chr));
   if (trigger) ability.trigger = trigger;
 
-  const powerRoll = powerRollOf(system.power, potency);
+  const powerRoll = powerRollOf(system.power, potency, chr);
   if (powerRoll) ability.powerRoll = powerRoll;
 
-  const effect = abilityEffectText(system.effects);
+  const effect = abilityEffectText(system.effects, chr);
   if (effect) ability.effect = effect;
 
   return ability;
+}
+
+/**
+ * The score `@chr` resolves to: the highest of the power roll's listed characteristics — Foundry's
+ * `preparePostActorPrepData` picks the highest for a non-reactive roll, and a reactive roll leaves the key
+ * unset, so `@chr` there resolves to nothing (its only default consumer, damage tier 1, is empty when reactive).
+ */
+function rollCharacteristicValue(
+  characteristics: MonsterCharacteristics,
+  roll: { characteristics?: string[]; reactive?: boolean } | undefined,
+): number | undefined {
+  if (!roll || roll.reactive) return undefined;
+  let best: number | undefined;
+  for (const key of roll.characteristics ?? []) {
+    const value = characteristics[key as DsCharacteristicKey];
+    if (typeof value === 'number' && Number.isFinite(value) && (best === undefined || value > best)) best = value;
+  }
+  return best;
+}
+
+/** The enricher context carrying the resolved `@chr` score (as text), or empty when the roll leaves it unset. */
+function chrContext(chr: number | undefined): EnricherContext {
+  return chr === undefined ? {} : { chr: String(chr) };
 }
 
 /** The action-type enum, defaulting to `main` for the rare item with an unknown/absent type (the schema requires one). */
@@ -242,7 +262,11 @@ function targetLabel(target: NonNullable<AbilityItem['system']>['target']): stri
  * structured `power.effects`, or `undefined` when the ability has no effects (a flat-effect ability). Each
  * tier joins every effect's rendered text with "; ", exactly as the Draw Steel `powerRollText` does.
  */
-function powerRollOf(power: NonNullable<AbilityItem['system']>['power'], potency: Potency): PowerRoll | undefined {
+function powerRollOf(
+  power: NonNullable<AbilityItem['system']>['power'],
+  potency: Potency,
+  chr: number | undefined,
+): PowerRoll | undefined {
   const effects = power?.effects;
   if (!effects || Object.keys(effects).length === 0) return undefined;
 
@@ -254,7 +278,7 @@ function powerRollOf(power: NonNullable<AbilityItem['system']>['power'], potency
 
   const tier = (n: 1 | 2 | 3): string =>
     prepared
-      .map((effect) => effectTierText(effect, n, potency))
+      .map((effect) => effectTierText(effect, n, potency, chr))
       .filter((text) => text.length > 0)
       .join('; ');
 
@@ -296,16 +320,21 @@ interface ResolvedTier {
 const DEFAULT_POTENCY_VALUE = ['', '@potency.weak', '@potency.average', '@potency.strong'] as const;
 
 /**
- * Apply Foundry's derived-data rules to an effect's three tiers so the render matches a live sheet: an empty
- * potency value defaults to the tier's standard strength; an empty potency characteristic and (for a
- * non-reactive roll) an empty display/damage inherit from the previous tier. Reactive rolls never inherit —
- * their tiers are authored in full and read inverted (the roller wants to roll *low*).
+ * Apply Foundry's derived-data rules to an effect's three tiers so the render matches a live sheet, each rule
+ * matched to the effect type that owns it: an empty potency value defaults to the tier's standard strength and
+ * an empty potency characteristic inherits from the previous tier (the base class, all types); damage inherits
+ * an empty value from *tier 1* — never the previous tier — with an empty non-reactive tier 1 falling back to
+ * the system default `2 + @chr`; and only `applied`/`forced` inherit an empty display from the previous tier —
+ * `other` has no derivation, so its empty tiers stay blank. Reactive rolls never inherit (tiers are authored
+ * in full and read inverted, the roller wanting to roll *low*).
  */
 function prepareEffect(effect: PowerEffect, reactive: boolean): PreparedEffect {
   const type = effect.type ?? '';
   const raw = tierBag(effect, type);
+  const inheritsDisplay = type === 'applied' || type === 'forced';
   const tiers: (ResolvedTier | undefined)[] = [];
   let previous: ResolvedTier | undefined;
+  let tier1Value = '';
   for (const n of [1, 2, 3] as const) {
     const source = raw[`tier${n}` as const];
     if (!source) {
@@ -313,11 +342,15 @@ function prepareEffect(effect: PowerEffect, reactive: boolean): PreparedEffect {
       previous = undefined;
       continue;
     }
-    const inheritable = !reactive ? previous : undefined;
+    let value = source.value ?? '';
+    if (type === 'damage' && !value && !reactive) value = n === 1 ? '2 + @chr' : tier1Value;
+    if (n === 1) tier1Value = value;
+    let display = source.display ?? '';
+    if (!display && !reactive && inheritsDisplay) display = previous?.display ?? '';
     const resolved: ResolvedTier = {
-      value: source.value || inheritable?.value || '',
+      value,
       types: source.types ?? [],
-      display: source.display || inheritable?.display || '',
+      display,
       movement: source.movement ?? [],
       distance: source.distance ?? '',
       properties: source.properties ?? [],
@@ -336,50 +369,123 @@ function tierBag(effect: PowerEffect, type: string): NonNullable<PowerEffect['da
 }
 
 /** One effect's rendered text for a tier — dispatched by effect type, resolved through the prose converter. */
-function effectTierText(effect: PreparedEffect, n: 1 | 2 | 3, potency: Potency): string {
+function effectTierText(effect: PreparedEffect, n: 1 | 2 | 3, potency: Potency, chr: number | undefined): string {
   const tier = effect.tiers[n - 1];
   if (!tier) return '';
-  if (effect.type === 'damage') return damageText(tier, potency);
-  if (effect.type === 'forced') {
-    return foundryProseToText(tier.display, { potency: potencyString(tier, potency), forced: forcedString(tier) });
-  }
+  if (effect.type === 'damage') return damageText(tier, potency, chr);
+  const ctx: EnricherContext = { potency: potencyString(tier, potency, chr), ...chrContext(chr) };
+  if (effect.type === 'forced') return foundryProseToText(tier.display, { ...ctx, forced: forcedString(tier) });
   // `applied` and `other` are the same shape: a display line with a `{{potency}}` slot.
-  return foundryProseToText(tier.display, { potency: potencyString(tier, potency) });
+  return foundryProseToText(tier.display, ctx);
 }
 
 /**
- * A damage tier's text (e.g. "16 damage", "11 Holy damage"), dropping a zero/blank tier. A real potency
- * characteristic (rare for damage) prefixes the potency string, matching the system's `formattedPotency`.
+ * A damage tier's text (e.g. "16 damage", "11 Holy damage"), dropping a zero/blank tier. The formula is
+ * simplified as Foundry's `simplifyRollFormula` does (so `7+5` reads `12` and the `2 + @chr` default
+ * resolves); a real potency characteristic (rare for damage) prefixes the potency string.
  */
-function damageText(tier: ResolvedTier, potency: Potency): string {
-  const value = tier.value;
+function damageText(tier: ResolvedTier, potency: Potency, chr: number | undefined): string {
+  const value = simplifyFormula(tier.value, potency, chr);
+  // Guard against a genuinely zero tier — robust to a simplified arithmetic formula that `Number` alone can't read.
   if (!value || Number(value) === 0) return '';
   const damage =
     tier.types.length > 0 ? `${value} ${disjunction(tier.types.map(capitalize))} damage` : `${value} damage`;
   if (tier.potencyCharacteristic && tier.potencyCharacteristic !== 'none') {
-    const prefix = potencyString(tier, potency);
+    const prefix = potencyString(tier, potency, chr);
     if (prefix) return foundryProseToText(`${prefix} ${damage}`);
   }
   return foundryProseToText(damage);
 }
 
 /** The potency string for a tier (e.g. "M < 4"), or `''` when no characteristic gates it (matches the system). */
-function potencyString(tier: ResolvedTier, potency: Potency): string {
+function potencyString(tier: ResolvedTier, potency: Potency, chr: number | undefined): string {
   const characteristic = tier.potencyCharacteristic;
   if (!characteristic || characteristic === 'none') return '';
   const abbreviation = DS_CHARACTERISTIC_ABBREVIATIONS[characteristic as DsCharacteristicKey];
   if (!abbreviation) return '';
-  const value = resolvePotencyValue(tier.potencyValue, potency);
-  if (value === undefined) return '';
-  return `${abbreviation} < ${value}`;
+  return `${abbreviation} < ${resolvePotencyValue(tier.potencyValue, potency, chr)}`;
 }
 
-/** Resolve a tier's potency value: a `@potency.weak|average|strong` reference to the monster's number, else the literal. */
-function resolvePotencyValue(raw: string, potency: Potency): number | undefined {
-  const match = /^@potency\.(weak|average|strong)$/.exec(raw);
-  if (match) return potency[match[1] as keyof Potency];
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : undefined;
+/**
+ * Resolve a tier's potency value the way Foundry's `evaluateFormula` does: substitute `@potency.weak|average|
+ * strong` (and `@chr`) then evaluate the arithmetic (e.g. `@potency.weak+1`). A formula that still can't be
+ * resolved surfaces its raw text rather than dropping the gate — a missing potency gate silently loses a rule.
+ */
+function resolvePotencyValue(raw: string, potency: Potency, chr: number | undefined): number | string {
+  const value = evaluateArithmetic(substituteFormula(raw, potency, chr));
+  return value ?? raw.trim();
+}
+
+/**
+ * Simplify a damage formula like Foundry's `simplifyRollFormula`: resolve `@potency`/`@chr` and collapse pure
+ * arithmetic to its total (`7+5` → `12`), leaving a formula it cannot fully evaluate (e.g. dice) substituted.
+ */
+function simplifyFormula(raw: string, potency: Potency, chr: number | undefined): string {
+  if (!raw) return '';
+  const expression = substituteFormula(raw, potency, chr);
+  const value = evaluateArithmetic(expression);
+  return value !== undefined ? String(value) : expression;
+}
+
+/** Substitute the `@potency.*` and `@chr` roll-data references in a formula with their resolved numbers. */
+function substituteFormula(raw: string, potency: Potency, chr: number | undefined): string {
+  let expression = raw.replace(/@potency\.(weak|average|strong)/g, (_m, key: string) =>
+    String(potency[key as keyof Potency]),
+  );
+  if (chr !== undefined) expression = expression.replace(/@chr\b/g, String(chr));
+  return expression;
+}
+
+/**
+ * Evaluate a fully-numeric arithmetic expression (`+ - * / ( )` over numbers), or `undefined` when it is not
+ * pure arithmetic (an unresolved reference or a dice term) — the deterministic subset of Foundry's formula
+ * evaluation the pack's potency and damage formulas actually use.
+ */
+function evaluateArithmetic(expression: string): number | undefined {
+  const tokens = expression.match(/\d+\.?\d*|[+\-*/()]/g);
+  if (!tokens || tokens.join('') !== expression.replace(/\s+/g, '')) return undefined;
+  let position = 0;
+  const parseExpression = (): number | undefined => {
+    let left = parseTerm();
+    while (left !== undefined && (tokens[position] === '+' || tokens[position] === '-')) {
+      const operator = tokens[position++];
+      const right = parseTerm();
+      if (right === undefined) return undefined;
+      left = operator === '+' ? left + right : left - right;
+    }
+    return left;
+  };
+  const parseTerm = (): number | undefined => {
+    let left = parseFactor();
+    while (left !== undefined && (tokens[position] === '*' || tokens[position] === '/')) {
+      const operator = tokens[position++];
+      const right = parseFactor();
+      if (right === undefined) return undefined;
+      left = operator === '*' ? left * right : left / right;
+    }
+    return left;
+  };
+  const parseFactor = (): number | undefined => {
+    const token = tokens[position];
+    if (token === '(') {
+      position++;
+      const inner = parseExpression();
+      if (inner === undefined || tokens[position++] !== ')') return undefined;
+      return inner;
+    }
+    if (token === '+' || token === '-') {
+      position++;
+      const factor = parseFactor();
+      return factor === undefined ? undefined : token === '-' ? -factor : factor;
+    }
+    if (token !== undefined && /^\d/.test(token)) {
+      position++;
+      return Number(token);
+    }
+    return undefined;
+  };
+  const result = parseExpression();
+  return result !== undefined && position === tokens.length && Number.isFinite(result) ? result : undefined;
 }
 
 /** The forced-movement string for a tier (e.g. "Slide 2"), mirroring the system's `ForcedMovement.Display`. */
@@ -399,12 +505,13 @@ function forcedLabel(movement: string, vertical: boolean): string {
  * The flat effect text folded from the ability-level `effects` (the `base` prose and `spend` malice options,
  * in sort order), each run through the enricher-resolving converter. A `spend` entry prefixes its malice cost.
  */
-function abilityEffectText(effects: NonNullable<AbilityItem['system']>['effects']): string {
+function abilityEffectText(effects: NonNullable<AbilityItem['system']>['effects'], chr: number | undefined): string {
   if (!effects) return '';
+  const ctx = chrContext(chr);
   return Object.values(effects)
     .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
     .map((entry) => {
-      const text = foundryProseToText(entry.description ?? '');
+      const text = foundryProseToText(entry.description ?? '', ctx);
       if (entry.type === 'spend' && typeof entry.resource?.value === 'number') {
         return text ? `${entry.resource.value} Malice: ${text}` : `${entry.resource.value} Malice`;
       }

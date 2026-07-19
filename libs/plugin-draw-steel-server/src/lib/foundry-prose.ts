@@ -1,15 +1,7 @@
 /**
- * The Monsters importer's one **plain-text converter** (#258): the pure step that turns a Foundry HTML
- * field studded with Draw Steel enricher tokens into the prose a trait or biography reads. Every token the
- * Foundry client would render at display time is resolved *at import*, so an Entity Document never carries a
- * raw `[[…]]` / `{{…}}` / `@chr` token — the transform stays fixture-testable offline (ADR-0060/0061) rather
- * than deferring to a live Foundry enrich pass.
- *
- * The enricher rules mirror the Draw Steel system's own enrichers (`ds.apply`, `ds.potency`): a token with
- * an explicit `{label}` resolves to that label; a label-less `[[/apply …]]` humanizes to its condition plus
- * duration, or is dropped when it only names an effect by an id we cannot resolve here; `[[potency X N]]`
- * prints as `X < N`; and the `{{potency}}`/`{{forced}}`/`@chr` placeholders are substituted from the caller's
- * context (an ability supplies them; a trait or biography supplies none, so they drop rather than leak).
+ * Resolves a Foundry HTML field studded with Draw Steel enricher tokens down to plain prose (ADR-0060), so no
+ * raw `[[…]]`/`{{…}}`/`@chr` token survives into an Entity Document and the transform stays fixture-testable
+ * offline (ADR-0061). The enricher rules mirror the Draw Steel system's own enrichers (`ds.apply`, `ds.potency`).
  */
 
 import { Content, tiptapContent } from '@hexly/plugin-content';
@@ -129,14 +121,16 @@ function htmlToText(html: string): string {
     .replace(BLOCK, '\n\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#0*39;|&apos;|&rsquo;/gi, "'")
     .replace(/&mdash;/gi, '—')
     .replace(/&ndash;/gi, '–')
-    .replace(/&#(\d+);/g, (_m, code: string) => String.fromCodePoint(Number(code)));
+    .replace(/&#x([0-9a-f]+);/gi, (_m, code: string) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (_m, code: string) => String.fromCodePoint(Number(code)))
+    // `&amp;` decodes last so a double-encoded entity like `&amp;lt;` yields the literal `&lt;`, not `<`.
+    .replace(/&amp;/gi, '&');
   return text
     .split('\n')
     .map((line) => line.replace(/[ \t\f\v]+/g, ' ').trim())

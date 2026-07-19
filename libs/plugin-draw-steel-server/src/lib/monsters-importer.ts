@@ -1,17 +1,9 @@
 /**
- * The `draw-steel.monsters` **Importer** (ADR-0060): the near-pure producer that fetches the pinned
- * *Monsters* pack through its injected {@link MonstersFetchPort} and transforms each actor into one
- * Import Record. The reconcile lands the Records and stamps their `hexly.source`; this module only
- * fetches and transforms, so it is trivially fixture-tested (ADR-0060).
- *
- * The scalar spine landed in #257 (the five characteristics, level, EV, stamina, stability, speed, keywords,
- * free strike, and the per-type damage immunities/weaknesses). This pass adds the **structural, non-ability**
- * mapping (#258): the size token, movement types, the role→organization remap, condition immunities, the
- * `feature` items folded into `traits[]`, and the biography folded into `core.content` — every prose field
- * run through the one {@link foundryProseToText} converter so no raw enricher token leaks. The `ability` items
- * and their multi-tier power rolls fold into `abilities[]` through {@link abilitiesOf} (#259). The transform is
- * where Creator-License compliance is *baked in*, not left to a checklist
- * (ADR-0061): the actor's art (`img`) is simply never read, so it cannot leak.
+ * The `draw-steel.monsters` Importer (ADR-0060): the near-pure producer that fetches the pinned *Monsters*
+ * pack through its injected {@link MonstersFetchPort} and transforms each actor into one Import Record — the
+ * scalar spine, the structural fields, the biography, and the `feature`/`ability` items ({@link abilitiesOf}),
+ * every prose field run through {@link foundryProseToText} so no raw enricher token leaks. Creator-License
+ * compliance is baked into the transform (ADR-0061): the actor's art (`img`) is never read, so it cannot leak.
  */
 
 import {

@@ -71,6 +71,13 @@ describe('foundryProseToText — HTML structure', () => {
     expect(foundryProseToText('')).toBe('');
     expect(foundryProseToText('   ')).toBe('');
   });
+
+  it('decodes numeric and hex entities, and defers &amp; so a double-encoded entity survives', () => {
+    // Hex and decimal numeric references both resolve to the em dash.
+    expect(foundryProseToText('<p>an em&#x2014;dash and &#8212; too</p>')).toBe('an em—dash and — too');
+    // `&amp;` decodes last: `&amp;lt;` is the literal text `&lt;`, not a `<` (it must not double-decode).
+    expect(foundryProseToText('<p>&amp;lt;tag&amp;gt;</p>')).toBe('&lt;tag&gt;');
+  });
 });
 
 describe('foundryProseToContent', () => {
