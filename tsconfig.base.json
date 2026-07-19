@@ -38,6 +38,7 @@
       "@hexly/plugin-dnd/web": ["./libs/plugin-dnd-web/src/index.ts"],
       "@hexly/plugin-draw-steel": ["./libs/plugin-draw-steel/src/index.ts"],
       "@hexly/plugin-draw-steel/server": ["./libs/plugin-draw-steel-server/src/index.ts"],
+      "@hexly/plugin-draw-steel/server/testing": ["./libs/plugin-draw-steel-server/src/testing/index.ts"],
       "@hexly/plugin-draw-steel/testing": ["./libs/plugin-draw-steel-web/src/testing/index.ts"],
       "@hexly/plugin-draw-steel/web": ["./libs/plugin-draw-steel-web/src/index.ts"],
       "@hexly/plugin-hexmap": ["./libs/plugin-hexmap/src/index.ts"],
