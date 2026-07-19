@@ -64,6 +64,20 @@ _Avoid_: Relationship, relation, role, type
 A placed thing _within_ a Hex Map — a Hex, Feature, Region, or Label — that can be selected and moved, and (except a Label) can carry an Entity Link. The in-map counterpart to a top-level Entity. (Formerly called "entity" informally; renamed to free that word for the top-level type.)
 _Avoid_: Entity, item, object
 
+## Import
+
+**Importer**:
+A code-registered producer that turns an external source into **Entities** — the Draw Steel monster pack, a future bestiary or ruleset. A **Plugin** contributes one by `namespace.id` (`draw-steel.monsters`) as its single server entry point's `importers`; it only **fetches and transforms**, yielding **Import Records**, and never touches the database, provenance, or the write choke point — the framework's reconcile does. Owner-triggered, per **World**, from the generic Imports panel; the same generic panel and reconcile serve every Importer, so a Plugin adds one by shipping a `produce()` and its copy. Distinct from the **Vault** import, which mints a World of Notes from a Markdown zip.
+_Avoid_: Loader, seeder, sync, connector
+
+**Import Record**:
+An **Importer**'s unit of output: a `sourceId`, a `name`, an ordered **Entity Type** set, and an **Entity Document** — everything the framework needs to mint or update one **Entity**, and nothing about _how_ it lands. The reconcile matches Records to existing Entities by **Import Source** and upserts; a Record whose transform failed is skipped and tallied, never aborting the run.
+_Avoid_: Row, DTO, payload, seed
+
+**Import Source**:
+The provenance an **Entity** carries from the **Importer** that produced it: the reserved `hexly.source` **Entity Document** key `{ importer, sourceId, rev }` — _which_ importer owns it, its **stable** upstream id, and the pinned source revision it reflects. The source of truth for wipe-and-reimport; a Plugin absent, it is an inert `hexly.*` value like any other. Reimport is an **identity-preserving overwrite** keyed on `(importer, sourceId)` — the Entity id is reused so inbound **Entity Links** survive, and the Entity's authored edits are _not_ preserved: an imported set is a **managed reference library**, not a customization surface. Mirrored by the derived `entityImportSource` index (an **index, never a source of truth**, like the facet and link indexes) so a World can be filtered by provenance without loading a single document.
+_Avoid_: Origin, provenance record, external id, sync key
+
 ## Language
 
 **Hex Map**:
