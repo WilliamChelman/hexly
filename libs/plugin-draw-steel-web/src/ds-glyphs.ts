@@ -1,4 +1,3 @@
-/// <reference path="./font-assets.d.ts" />
 import { fontGlyph, IconFont, IconGlyph } from '@hexly/web-ui';
 // Bundled next to the code that loads it (ADR-0007): the esbuild `file` loader emits the `.otf` as a
 // hashed asset and the import resolves to its runtime URL — no edit to the app's global asset list.
