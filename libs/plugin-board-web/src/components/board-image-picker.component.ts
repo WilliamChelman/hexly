@@ -106,10 +106,12 @@ export class BoardImagePickerComponent {
   protected readonly assets = signal<AssetSummary[] | null>(null);
 
   constructor() {
-    // Fetch the existing Assets up front so the "pick" grid is ready; a failure leaves an empty grid,
-    // which reads the same as a World with no Assets — upload still works.
+    // Fetch the existing Assets up front so the "pick" grid is ready; a failure (incl. a 403 for a
+    // Viewer who can't enumerate — board review) leaves an empty grid, which reads the same as a
+    // World with no Assets — upload still works. Non-image Assets (e.g. a PDF) are filtered out: the
+    // grid renders each tile as an `<img>`, so only image mimes belong in an Image picker.
     this.assetsClient.list(this.ref.data.worldId).subscribe({
-      next: (list) => this.assets.set(list),
+      next: (list) => this.assets.set(list.filter((a) => a.mime.startsWith('image/'))),
       error: () => this.assets.set([]),
     });
   }

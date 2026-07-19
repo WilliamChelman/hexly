@@ -401,17 +401,20 @@ describe('Worlds endpoints', () => {
 
       const res = await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Map.png').expect(201);
       expect(res.body.originalFilename).toBe('Map.png');
+      // A Contributor may also browse the picker list (same contribute standing gates both, board review).
+      expect((await bob.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([res.body]);
     });
 
-    it('refuses a Viewer minting an Asset with 403 (reachable, but no contribute standing)', async () => {
+    it('refuses a Viewer listing or minting Assets with 403 (reachable, but no contribute standing)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
       const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
       addMember(world.body.id, bobId, 'viewer');
       const bob = await signIn('bob@hexly.test', 'battery staple');
 
-      // A Viewer may still browse the picker — read is reachable, only the write is gated.
-      await bob.get(`/worlds/${world.body.id}/assets`).expect(200);
+      // The picker is an editing surface and a listed URL is fetchable via the guard-less serving
+      // route, so a Viewer can neither enumerate nor mint (board review) — both are contributor-gated.
+      await bob.get(`/worlds/${world.body.id}/assets`).expect(403);
       await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Nope.png').expect(403);
     });
 
