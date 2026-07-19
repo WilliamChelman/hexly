@@ -16,13 +16,6 @@ import { TokenListComponent } from './token-list.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
   imports: [TranslocoPipe, InputComponent, SelectComponent, TokenListComponent],
-  styles: `
-    /* Muted display when unset, so the placeholder reads as a hint, not a chosen value. Beats appSelect's
-       own :host colour on specificity (element + class), no !important needed. */
-    select.is-empty {
-      color: var(--color-ink-faint);
-    }
-  `,
   template: `
     @switch (field().dataType.kind) {
       @case ('enum') {
@@ -31,7 +24,6 @@ import { TokenListComponent } from './token-list.component';
         <select
           appSelect
           class="max-w-full"
-          [class.is-empty]="!stringValue()"
           [attr.aria-invalid]="invalid() || null"
           (change)="valueChange.emit(selectValue($event))"
         >
