@@ -121,7 +121,7 @@ function ustarName(header: Uint8Array, decoder: TextDecoder): string {
   return prefix ? `${prefix}/${name}` : name;
 }
 
-/** Read a big-endian octal number field (tar stores sizes so), NUL/space-padded. */
+/** Read a tar header's ASCII-octal number field (how tar encodes sizes), NUL/space-padded. */
 function parseOctal(header: Uint8Array, offset: number, length: number): number {
   const text = trimNul(new TextDecoder().decode(header.subarray(offset, offset + length))).trim();
   return text ? parseInt(text, 8) : 0;

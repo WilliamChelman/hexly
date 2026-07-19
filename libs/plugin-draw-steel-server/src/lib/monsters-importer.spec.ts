@@ -309,3 +309,171 @@ describe('draw-steel monsters transform — abilities + power rolls', () => {
     expect(byName(abilities, 'Goblin Mode').powerRoll).toBeUndefined();
   });
 });
+
+/**
+ * Power-roll formula + tier-inheritance fidelity (PR #262 review): the derivations replicate Foundry's
+ * `simplifyRollFormula` / `evaluateFormula` and the per-effect-type `prepareDerivedData`, so no potency gate
+ * or `@chr`/arithmetic formula is lost. Synthetic abilities pin each rule against a monster of known scores.
+ */
+describe('draw-steel monsters transform — power-roll formula & inheritance fidelity', () => {
+  const charScores = (chars: Record<string, number>) =>
+    Object.fromEntries(Object.entries(chars).map(([key, value]) => [key, { value }]));
+
+  const firstAbility = (abilityItem: unknown, chars: Record<string, number> = { might: 5 }): Ability => {
+    const record = toMonsterRecord({
+      type: 'npc',
+      _id: 't1',
+      name: 'Test Monster',
+      system: { characteristics: charScores(chars) },
+      items: [abilityItem],
+    });
+    const abilities = (record?.document[DS_STAT_BLOCK_KEY] as { abilities?: Ability[] }).abilities ?? [];
+    if (!abilities[0]) throw new Error('no ability produced');
+    return abilities[0];
+  };
+
+  const powerAbility = (
+    effects: Record<string, unknown>,
+    options: { reactive?: boolean; characteristics?: string[]; abilityEffects?: Record<string, unknown> } = {},
+  ) => ({
+    name: 'Test Ability',
+    type: 'ability',
+    system: {
+      type: 'main',
+      category: 'signature',
+      keywords: [],
+      distance: { type: 'melee', primary: '1' },
+      target: { type: 'creature', value: 1, custom: '' },
+      trigger: '',
+      resource: null,
+      power: {
+        roll: { characteristics: options.characteristics ?? ['might'], reactive: options.reactive ?? false },
+        effects,
+      },
+      effects: options.abilityEffects ?? {},
+    },
+  });
+
+  it('evaluates an arithmetic potency gate (`@potency.weak+1`) instead of dropping it', () => {
+    // The Bugbear Sneak "Sucker Punch" shape: highest score 3 → weak 1 / average 2 / strong 3, each + 1.
+    const ability = powerAbility({
+      a: {
+        type: 'applied',
+        sort: 0,
+        applied: {
+          tier1: {
+            display: '{{potency}} the target is knocked prone',
+            potency: { value: '@potency.weak+1', characteristic: 'might' },
+          },
+          tier2: {
+            display: '{{potency}} the target is knocked prone',
+            potency: { value: '@potency.average+1', characteristic: 'might' },
+          },
+          tier3: {
+            display: '{{potency}} the target is knocked prone',
+            potency: { value: '@potency.strong+1', characteristic: 'might' },
+          },
+        },
+      },
+    });
+    expect(firstAbility(ability, { might: 3 }).powerRoll).toMatchObject({
+      t1: 'M < 2 the target is knocked prone',
+      t2: 'M < 3 the target is knocked prone',
+      t3: 'M < 4 the target is knocked prone',
+    });
+  });
+
+  it('does not inherit an `other` effect display across empty tiers', () => {
+    // Aeolyxria "Experimental Treasure": an `other` effect has no derived-data inheritance — t2/t3 stay blank.
+    const ability = powerAbility({
+      o: {
+        type: 'other',
+        sort: 0,
+        other: {
+          tier1: {
+            display: 'the target regains 10 stamina',
+            potency: { value: '@potency.weak', characteristic: 'none' },
+          },
+          tier2: { display: '', potency: { value: '@potency.average', characteristic: 'none' } },
+          tier3: { display: '', potency: { value: '@potency.strong', characteristic: 'none' } },
+        },
+      },
+    });
+    expect(firstAbility(ability).powerRoll).toMatchObject({
+      t1: 'the target regains 10 stamina',
+      t2: '',
+      t3: '',
+    });
+  });
+
+  it('inherits an empty damage tier from tier 1 — not the previous tier', () => {
+    const ability = powerAbility({
+      d: {
+        type: 'damage',
+        sort: 0,
+        damage: {
+          tier1: { value: '5', types: [], potency: { value: '@potency.weak', characteristic: 'none' } },
+          tier2: { value: '8', types: [], potency: { value: '@potency.average', characteristic: 'none' } },
+          tier3: { value: '', types: [], potency: { value: '@potency.strong', characteristic: 'none' } },
+        },
+      },
+    });
+    // Foundry `#defaultDamageValue` case 3 returns tier1.value, so the empty t3 reads 5, not the authored t2 8.
+    expect(firstAbility(ability).powerRoll).toMatchObject({ t1: '5 damage', t2: '8 damage', t3: '5 damage' });
+  });
+
+  it('defaults an empty non-reactive tier-1 damage to the system `2 + @chr`', () => {
+    const ability = powerAbility({
+      d: {
+        type: 'damage',
+        sort: 0,
+        damage: {
+          tier1: { value: '', types: [], potency: { value: '@potency.weak', characteristic: 'none' } },
+          tier2: { value: '', types: [], potency: { value: '@potency.average', characteristic: 'none' } },
+          tier3: { value: '', types: [], potency: { value: '@potency.strong', characteristic: 'none' } },
+        },
+      },
+    });
+    // @chr resolves to the might score (5); the default `2 + @chr` simplifies to 7, inherited across tiers.
+    expect(firstAbility(ability, { might: 5 }).powerRoll).toMatchObject({
+      t1: '7 damage',
+      t2: '7 damage',
+      t3: '7 damage',
+    });
+  });
+
+  it('simplifies an arithmetic damage formula (`7+5` → `12 damage`)', () => {
+    // The Kobold Centurion "Firetail Pilum" shape: a stored `7+5` must read as its total.
+    const ability = powerAbility({
+      d: {
+        type: 'damage',
+        sort: 0,
+        damage: {
+          tier1: { value: '7+5', types: ['fire'], potency: { value: '@potency.weak', characteristic: 'none' } },
+        },
+      },
+    });
+    expect(firstAbility(ability).powerRoll?.t1).toBe('12 Fire damage');
+  });
+
+  it('resolves `@chr` in tier and ability-effect prose through the production path', () => {
+    const ability = powerAbility(
+      {
+        a: {
+          type: 'applied',
+          sort: 0,
+          applied: {
+            tier1: {
+              display: 'the target takes @chr extra damage',
+              potency: { value: '@potency.weak', characteristic: 'none' },
+            },
+          },
+        },
+      },
+      { abilityEffects: { base: { type: 'base', sort: 0, description: '<p>Deals @chr damage.</p>' } } },
+    );
+    const resolved = firstAbility(ability, { might: 5 });
+    expect(resolved.powerRoll?.t1).toBe('the target takes 5 extra damage');
+    expect(resolved.effect).toBe('Deals 5 damage.');
+  });
+});
