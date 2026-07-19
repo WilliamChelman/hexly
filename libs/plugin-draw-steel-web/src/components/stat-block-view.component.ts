@@ -247,14 +247,14 @@ import { AbilitiesSectionComponent } from './abilities-section.component';
           }
         </div>
 
-        <!-- Traits (#245), then the active Abilities section (#246) — the printed-card order. -->
-        <ds-traits-section [value]="value('traits')" [writable]="edit()" (valueChange)="setByKey('traits', $event)" />
+        <!-- Active Abilities (#246), then the passive Traits section (#245) — abilities lead the card. -->
         <ds-abilities-section
           [value]="value('abilities')"
           [writable]="edit()"
           [characteristics]="characteristics()"
           (valueChange)="setByKey('abilities', $event)"
         />
+        <ds-traits-section [value]="value('traits')" [writable]="edit()" (valueChange)="setByKey('traits', $event)" />
 
         <p class="my-3 text-xs text-ink-muted">{{ 'drawSteel.monster.loreHint' | transloco }}</p>
       </div>

@@ -14,13 +14,13 @@ import { Trait } from '@hexly/plugin-draw-steel';
   host: { class: 'contents' },
   imports: [TranslocoPipe, ButtonComponent, InputComponent, TextareaComponent],
   template: `
-    <section class="border-b border-line py-3" data-testid="section-traits">
+    <section class="border-b border-line py-3 last:border-b-0" data-testid="section-traits">
       <h3 class="m-0 mb-1 text-sm font-semibold text-sea">{{ 'drawSteel.statBlock.section.traits' | transloco }}</h3>
 
       @if (writable()) {
         <div class="flex flex-col gap-3">
           <!-- Tracked by index: a trait has no stable key and may be blank or duplicate. -->
-          @for (trait of traits(); track $index) {
+          @for (trait of traits(); track $index; let first = $first; let last = $last) {
             <div class="rounded border border-line bg-surface-sunken p-2" [attr.data-testid]="'trait-' + $index">
               <div class="flex items-center gap-2">
                 <input
@@ -31,6 +31,34 @@ import { Trait } from '@hexly/plugin-draw-steel';
                   [placeholder]="'drawSteel.statBlock.traitName' | transloco"
                   (input)="setName($index, $event)"
                 />
+                <button
+                  type="button"
+                  appButton
+                  variant="ghost"
+                  size="sm"
+                  icon
+                  data-testid="trait-move-up"
+                  [disabled]="first"
+                  [title]="'drawSteel.statBlock.moveUp' | transloco"
+                  [attr.aria-label]="'drawSteel.statBlock.moveUp' | transloco"
+                  (click)="moveTrait($index, -1)"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  appButton
+                  variant="ghost"
+                  size="sm"
+                  icon
+                  data-testid="trait-move-down"
+                  [disabled]="last"
+                  [title]="'drawSteel.statBlock.moveDown' | transloco"
+                  [attr.aria-label]="'drawSteel.statBlock.moveDown' | transloco"
+                  (click)="moveTrait($index, 1)"
+                >
+                  ↓
+                </button>
                 <button
                   type="button"
                   appButton
@@ -96,6 +124,15 @@ export class TraitsSectionComponent {
   /** Emitting `[]` for the last trait lets the View clear the key (no `{ traits: [] }` husk). */
   protected removeTrait(index: number): void {
     this.valueChange.emit(this.traits().filter((_, i) => i !== index));
+  }
+
+  /** Swap a trait with its neighbour to reorder within the section; a no-op past either end. */
+  protected moveTrait(index: number, delta: number): void {
+    const next = [...this.traits()];
+    const target = index + delta;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    this.valueChange.emit(next);
   }
 
   protected setName(index: number, event: Event): void {

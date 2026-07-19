@@ -47,6 +47,8 @@
     "traitName": "Nom du trait",
     "traitEffect": "Effet",
     "removeTrait": "Retirer le trait",
+    "moveUp": "Monter",
+    "moveDown": "Descendre",
     "noTraits": "Aucun trait",
     "addAbility": "Ajouter une capacité",
     "removeAbility": "Retirer la capacité",
