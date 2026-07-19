@@ -1,4 +1,5 @@
 import {
+  DS_ABILITY_TYPE_OPTIONS,
   DS_CHARACTERISTIC_KEYS,
   DS_DEFENCE_KEYS,
   DS_IDENTITY_KEYS,
@@ -128,6 +129,119 @@ describe('draw-steel.stat-block data type', () => {
     expect(statBlockSchema.parse({ traits: [{ name: 'Crafty', effect: 'x', extra: true }] })).toEqual({
       traits: [{ name: 'Crafty', effect: 'x' }],
     });
+  });
+
+  it('accepts an Ability with and without a power roll, and rejects a malformed ability/tier shape (#246)', () => {
+    // A rolling ability: type + display distance/target + its three flat tier texts.
+    expect(
+      statBlockSchema.safeParse({
+        abilities: [
+          {
+            name: 'Cleave',
+            type: 'main',
+            cost: 'Signature',
+            keywords: ['melee', 'weapon'],
+            distance: 'Melee 1',
+            target: 'One creature',
+            powerRoll: { characteristic: 'might', t1: '2 damage', t2: '5 damage', t3: '8 damage; push 1' },
+          },
+        ],
+      }).success,
+    ).toBe(true);
+    // An effect-only ability (no power roll) is equally well-formed, and a triggered one may carry a trigger.
+    expect(
+      statBlockSchema.safeParse({
+        abilities: [
+          {
+            name: 'Watchful',
+            type: 'triggered',
+            keywords: [],
+            distance: 'Self',
+            target: 'Self',
+            trigger: 'An enemy moves adjacent',
+            effect: 'The creature shifts 1.',
+          },
+        ],
+      }).success,
+    ).toBe(true);
+    // The empty list and a freshly-added blank ability (blank strings, a valid default type) both parse.
+    expect(statBlockSchema.safeParse({ abilities: [] }).success).toBe(true);
+    expect(
+      statBlockSchema.safeParse({ abilities: [{ name: '', type: 'main', keywords: [], distance: '', target: '' }] })
+        .success,
+    ).toBe(true);
+    // A malformed ability — an out-of-set type, a missing required field, or a bare string where a record belongs.
+    expect(
+      statBlockSchema.safeParse({
+        abilities: [{ name: 'X', type: 'ultimate', keywords: [], distance: '', target: '' }],
+      }).success,
+    ).toBe(false);
+    expect(
+      statBlockSchema.safeParse({ abilities: [{ name: 'X', keywords: [], distance: '', target: '' }] }).success,
+    ).toBe(false);
+    expect(statBlockSchema.safeParse({ abilities: ['Cleave'] }).success).toBe(false);
+    // A malformed tier shape — a non-string tier, a bad characteristic, or a missing tier — is rejected.
+    expect(
+      statBlockSchema.safeParse({
+        abilities: [
+          {
+            name: 'X',
+            type: 'main',
+            keywords: [],
+            distance: '',
+            target: '',
+            powerRoll: { characteristic: 'might', t1: 1, t2: 'a', t3: 'b' },
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      statBlockSchema.safeParse({
+        abilities: [
+          {
+            name: 'X',
+            type: 'main',
+            keywords: [],
+            distance: '',
+            target: '',
+            powerRoll: { characteristic: 'luck', t1: 'a', t2: 'b', t3: 'c' },
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      statBlockSchema.safeParse({
+        abilities: [
+          {
+            name: 'X',
+            type: 'main',
+            keywords: [],
+            distance: '',
+            target: '',
+            powerRoll: { characteristic: 'might', t1: 'a', t2: 'b' },
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    // Unknown keys inside an ability are stripped, mirroring the block itself.
+    expect(
+      statBlockSchema.parse({
+        abilities: [{ name: 'Cleave', type: 'main', keywords: [], distance: '', target: '', extra: true }],
+      }),
+    ).toEqual({ abilities: [{ name: 'Cleave', type: 'main', keywords: [], distance: '', target: '' }] });
+  });
+
+  it('pins the ability-type enum from ds.CONFIG source keys (#246)', () => {
+    expect(DS_ABILITY_TYPE_OPTIONS).toEqual([
+      'main',
+      'maneuver',
+      'freeManeuver',
+      'triggered',
+      'freeTriggered',
+      'move',
+      'none',
+      'villain',
+    ]);
   });
 
   it('strips an unknown top-level key rather than carrying it into the block', () => {
