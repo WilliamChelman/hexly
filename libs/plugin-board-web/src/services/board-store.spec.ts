@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { BoardElement, BoardSurface, emptyBoardSurface, TextElement } from '@hexly/plugin-board';
+import { BoardElement, BoardSurface, emptyBoardSurface, ImageElement, TextElement } from '@hexly/plugin-board';
 import { emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { BoardStore } from './board-store';
 import { FakeEntitySession, provideBoardStoreTesting } from '../testing/entity-session.fake';
@@ -338,6 +338,64 @@ describe('BoardStore Text Block', () => {
 
     // No commit fired, so the document reference is untouched.
     expect(store.document()).toBe(before);
+  });
+});
+
+describe('BoardStore Image', () => {
+  // Both Image sources — uploading a file and picking an existing Asset — resolve to a served capability
+  // URL the UI hands to addImage; from the store's view they are one path, so these drive it with a URL.
+  const UPLOADED_URL = '/assets/w1/aaa.png';
+  const PICKED_URL = '/assets/w1/bbb.jpg';
+
+  it('adds an Image from an uploaded Asset on top, at the clicked geometry, and selects it', () => {
+    const store = makeStore();
+    const box = store.addElement({ x: 0, y: 0 });
+    const id = store.addImage({ x: 40, y: 60 }, UPLOADED_URL);
+
+    const element = store.document().elements.find((e) => e.id === id) as ImageElement | undefined;
+    expect(element?.kind).toBe('image');
+    expect(element?.assetUrl).toBe(UPLOADED_URL);
+    expect(element?.position).toEqual({ x: 40, y: 60 });
+    expect(element?.size).toEqual({ width: 240, height: 180 });
+    // Lands above the pre-existing box, and is the current selection.
+    const boxZ = store.document().elements.find((e) => e.id === box)?.z ?? 0;
+    expect(element?.z).toBeGreaterThan(boxZ);
+    expect(store.selectedElement()?.id).toBe(id);
+  });
+
+  it('adds an Image from a picked existing Asset the same way (both sources funnel through addImage)', () => {
+    const store = makeStore();
+    const id = store.addImage({ x: 5, y: 5 }, PICKED_URL);
+
+    const element = store.document().elements.find((e) => e.id === id) as ImageElement | undefined;
+    expect(element?.kind).toBe('image');
+    expect(element?.assetUrl).toBe(PICKED_URL);
+  });
+
+  it('never arms an Image — it is always static, so a click only ever selects/moves it', () => {
+    const store = makeStore();
+    const id = store.addImage({ x: 0, y: 0 }, UPLOADED_URL);
+    // Unlike a Text Block, adding an Image leaves nothing armed.
+    expect(store.armed()).toBeNull();
+    // Selecting it (the click path) still arms nothing.
+    store.select(id);
+    expect(store.armed()).toBeNull();
+  });
+
+  it('moves and resizes an Image like any element, and drops it on undo', () => {
+    const store = makeStore();
+    const id = store.addImage({ x: 0, y: 0 }, UPLOADED_URL);
+
+    store.move(id, { x: 12, y: 34 });
+    store.resize(id, { width: 320, height: 200 });
+    const element = store.document().elements[0] as ImageElement;
+    expect(element.position).toEqual({ x: 12, y: 34 });
+    expect(element.size).toEqual({ width: 320, height: 200 });
+
+    store.deleteElement(id);
+    expect(store.document().elements).toEqual([]);
+    store.undo();
+    expect((store.document().elements[0] as ImageElement).assetUrl).toBe(UPLOADED_URL);
   });
 });
 

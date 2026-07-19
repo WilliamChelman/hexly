@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, HostListener, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Point, Size, stackingOrder, TextElement } from '@hexly/plugin-board';
+import { ImageElement, Point, Size, stackingOrder, TextElement } from '@hexly/plugin-board';
 import { BoardCamera } from '../services/board-camera';
 import { BoardStore } from '../services/board-store';
 import { DRAG_THRESHOLD } from '../utils/gesture';
+import { BoardImageComponent } from './board-image.component';
 import { TextBlockComponent } from './text-block.component';
 import { toolForHotkey } from './tools';
 
@@ -44,6 +45,8 @@ interface Rendered {
   readonly armed: boolean;
   /** The Text Block element to render in place, or null for any other kind (Box, Image, Embed). */
   readonly text: TextElement | null;
+  /** The Image element to render in place, or null for any other kind. */
+  readonly image: ImageElement | null;
 }
 
 /** A live drag: moving the whole selection, or resizing one element from a handle. */
@@ -76,7 +79,7 @@ type Gesture =
   selector: 'app-board-elements',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'absolute inset-0 pointer-events-none overflow-hidden' },
-  imports: [TranslocoPipe, TextBlockComponent],
+  imports: [TranslocoPipe, TextBlockComponent, BoardImageComponent],
   template: `
     @for (el of rendered(); track el.id) {
       <div
@@ -84,6 +87,7 @@ type Gesture =
         [class.is-selected]="el.selected"
         [class.is-armed]="el.armed"
         [class.is-text]="!!el.text"
+        [class.is-image]="!!el.image"
         [style.left.px]="el.left"
         [style.top.px]="el.top"
         [style.width.px]="el.width"
@@ -95,6 +99,9 @@ type Gesture =
       >
         @if (el.text; as text) {
           <app-board-text-block [element]="text" />
+        }
+        @if (el.image; as image) {
+          <app-board-image [element]="image" />
         }
         @if (el.selected && single() && !el.armed) {
           @for (h of handles; track h.dir) {
@@ -120,6 +127,11 @@ type Gesture =
     /* A Text Block reads as paper carrying prose, not a gold placeholder; armed, it invites a caret. */
     .element.is-text {
       @apply bg-surface-raised;
+      border-color: var(--color-line);
+    }
+    /* An Image frames its own Asset — a quiet sunken mat behind the letterboxed picture, not gold. */
+    .element.is-image {
+      @apply bg-surface-sunken overflow-hidden;
       border-color: var(--color-line);
     }
     .element.is-armed {
@@ -182,6 +194,7 @@ export class BoardElementsComponent {
         selected: selected.has(el.id),
         armed: armed === el.id,
         text: el.kind === 'text' ? el : null,
+        image: el.kind === 'image' ? el : null,
       };
     });
   });

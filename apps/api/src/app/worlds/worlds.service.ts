@@ -1,5 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CreateWorldRequest, MemberRole, PublicLink, WorldDetail, WorldMember, WorldSummary } from '@hexly/domain';
+import {
+  AssetSummary,
+  CreateWorldRequest,
+  MemberRole,
+  PublicLink,
+  WorldDetail,
+  WorldMember,
+  WorldSummary,
+} from '@hexly/domain';
 import { and, asc, count, eq, inArray, ne } from 'drizzle-orm';
 import { AssetsService } from '../assets/assets.service';
 import { AclSetResult, gate, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
@@ -316,6 +324,44 @@ export class WorldsService {
       .all();
     for (const e of shared) this.bus.emitEntityChange(e.id);
     return { status: 'ok', value: null };
+  }
+
+  /**
+   * The World's stored Assets, for a picker (#269, ADR-0034): the Image element and Content
+   * reference a World Asset by its capability URL. Reachable-gated — any member may browse the
+   * World's Assets; unreachable ≡ 404.
+   */
+  listAssets(userId: string, id: string): AssetSummary[] | 'not-found' {
+    if (!worldAccess(this.db, userId).decideMeta(id)?.reachable) return 'not-found';
+    return this.assets.list(id);
+  }
+
+  /**
+   * Mint a new World Asset from an upload (#269, ADR-0034), returning it as an {@link AssetSummary}
+   * the author can reference. Contributor-gated (owner ∨ contributor ∨ Superadmin) — authoring an
+   * Asset is Entity-creation-shaped, not a World management power: unreachable → 404,
+   * reachable-but-not-contributor → 403. The stored `hash`/`deduped` never leave the service; the
+   * summary is refetched by URL so its `mime` is the row's canonical value, not a re-derivation.
+   */
+  uploadAsset(
+    userId: string,
+    id: string,
+    filename: string,
+    bytes: Uint8Array,
+  ): AssetSummary | 'not-found' | 'forbidden' {
+    const meta = worldAccess(this.db, userId).decideMeta(id);
+    if (!meta?.reachable) return 'not-found';
+    if (!meta.canContribute) return 'forbidden';
+    const { url } = this.assets.store(id, filename, bytes);
+    // Refetch by URL so mime is the persisted row's value (a dedup returns the FIRST store's row).
+    return (
+      this.assets.list(id).find((a) => a.url === url) ?? {
+        url,
+        originalFilename: filename,
+        mime: 'application/octet-stream',
+        size: bytes.length,
+      }
+    );
   }
 
   /**

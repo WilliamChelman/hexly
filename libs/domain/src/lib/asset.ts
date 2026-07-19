@@ -9,6 +9,22 @@ export function assetUrl(worldId: string, hash: string, ext: string): string {
   return `/assets/${worldId}/${hash}${ext}`;
 }
 
+/**
+ * A stored World Asset as the browser sees it: the served capability {@link assetUrl} an author
+ * references (from Content, or a Board Image element — #269), plus the metadata a picker shows. The
+ * `url` is the only load-bearing field a reference stores; the rest label the row in a chooser.
+ */
+export interface AssetSummary {
+  /** The served capability URL — the string an Image element or Content `src` holds. */
+  readonly url: string;
+  /** The human-readable name the Asset was uploaded/imported under, for display in a picker. */
+  readonly originalFilename: string;
+  /** The Asset's content type (`image/png`, `application/pdf`, …). */
+  readonly mime: string;
+  /** The Asset's size in bytes. */
+  readonly size: number;
+}
+
 /** A sha256 digest, lowercase base-16 — the content address an Asset is stored and served under. */
 const ASSET_URL = /^\/assets\/[^/]+\/([0-9a-f]{64})(\.[^/.]+)?$/;
 

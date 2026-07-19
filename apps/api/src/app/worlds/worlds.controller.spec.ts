@@ -1,8 +1,12 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { DB, Db, createDb } from '../db/db';
+import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from '../entities/entities.module';
@@ -13,14 +17,20 @@ describe('Worlds endpoints', () => {
   let app: INestApplication;
   let db: Db;
   let adaId: string;
+  let assetsDir: string;
 
   beforeEach(async () => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
+    // A throwaway Assets root, so the upload endpoint's bytes never litter the repo (the default
+    // resolves beside `hexly.db`, i.e. under the source tree for a `:memory:` DB).
+    assetsDir = mkdtempSync(join(tmpdir(), 'hexly-worlds-assets-'));
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule, AuthModule, WorldsModule, EntitiesModule],
     })
       .overrideProvider(DB)
       .useValue(db)
+      .overrideProvider(ASSETS_DIR)
+      .useValue(assetsDir)
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -34,6 +44,7 @@ describe('Worlds endpoints', () => {
 
   afterEach(async () => {
     await app.close();
+    rmSync(assetsDir, { recursive: true, force: true });
   });
 
   async function signIn(email: string, password: string) {
@@ -350,6 +361,76 @@ describe('Worlds endpoints', () => {
       .expect(403);
     // The pins stayed empty — a refused PATCH writes nothing.
     expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.pinnedEntityIds).toEqual([]);
+  });
+
+  describe('World Assets (#269, ADR-0034)', () => {
+    /** A tiny valid-enough PNG; only its bytes' identity matters for the content address. */
+    const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
+    /** Add `userId` to `worldId` with the given member role (Owners come from world creation). */
+    function addMember(worldId: string, userId: string, role: 'contributor' | 'viewer') {
+      db.$client
+        .prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, ?)`)
+        .run(worldId, userId, role);
+    }
+
+    it('uploads a file, minting an Asset the author can reference, and lists it', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+
+      // A fresh World carries no Assets.
+      expect((await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([]);
+
+      const res = await ada.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201);
+      expect(res.body).toEqual({
+        url: expect.stringMatching(new RegExp(`^/assets/${world.body.id}/[0-9a-f]{64}\\.png$`)),
+        originalFilename: 'Portrait.png',
+        mime: 'image/png',
+        size: PNG.length,
+      });
+      // The picker now surfaces the minted Asset.
+      expect((await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([res.body]);
+    });
+
+    it('lets a Contributor mint an Asset (Entity-creation-shaped, not a management power)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      addMember(world.body.id, bobId, 'contributor');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      const res = await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Map.png').expect(201);
+      expect(res.body.originalFilename).toBe('Map.png');
+    });
+
+    it('refuses a Viewer minting an Asset with 403 (reachable, but no contribute standing)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      addMember(world.body.id, bobId, 'viewer');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      // A Viewer may still browse the picker — read is reachable, only the write is gated.
+      await bob.get(`/worlds/${world.body.id}/assets`).expect(200);
+      await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Nope.png').expect(403);
+    });
+
+    it('404s an unreachable World on both list and upload (existence never leaks, ADR-0004)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      await bob.get(`/worlds/${world.body.id}/assets`).expect(404);
+      await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Portrait.png').expect(404);
+    });
+
+    it('400s an upload with no file part', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+
+      await ada.post(`/worlds/${world.body.id}/assets`).expect(400);
+    });
   });
 
   it('refuses every World route without a session cookie', async () => {

@@ -20,6 +20,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import {
   addMemberRequestSchema,
   addOwnerRequestSchema,
+  AssetSummary,
   AuthUser,
   AvailableType,
   createUserDefinedTypeRequestSchema,
@@ -55,6 +56,9 @@ interface UploadedZip {
   originalname: string;
   buffer: Buffer;
 }
+
+/** An uploaded Asset file shares the multer shape a vault upload uses (#269). */
+type UploadedAsset = UploadedZip;
 
 /**
  * The World REST surface (ADR-0024). Every route is guarded; World Owners are
@@ -144,6 +148,37 @@ export class WorldsController {
     const graph = this.graphs.graph(user.id, id);
     if (!graph) throw new NotFoundException();
     return graph;
+  }
+
+  /**
+   * The World's stored Assets, for a picker (#269, ADR-0034): a Board Image element (and Content)
+   * references a World Asset by its capability URL. Reachable-gated (any member); unreachable → 404.
+   */
+  @Get(':id/assets')
+  assets(@CurrentUser() user: AuthUser, @Param('id') id: string): AssetSummary[] {
+    const result = this.worlds.listAssets(user.id, id);
+    if (result === 'not-found') throw new NotFoundException();
+    return result;
+  }
+
+  /**
+   * Upload a file, minting a new World Asset in one step (#269, ADR-0034), returning its
+   * {@link AssetSummary} for the author to reference. Contributor-gated in the service: unreachable
+   * → 404, reachable-but-not-contributor → 403, no file → 400. Multer buffers the upload in memory
+   * (size cap set instance-wide via MulterModule, ADR-0036).
+   */
+  @Post(':id/assets')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadAsset(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @UploadedFile() file: UploadedAsset | undefined,
+  ): AssetSummary {
+    if (!file) throw new BadRequestException();
+    const result = this.worlds.uploadAsset(user.id, id, file.originalname, file.buffer);
+    if (result === 'not-found') throw new NotFoundException();
+    if (result === 'forbidden') throw new ForbiddenException();
+    return result;
   }
 
   // A partial update of the Owner-curated fields: `name` (rename) and/or `pinnedEntityIds`

@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { Inject, Injectable } from '@nestjs/common';
-import { assetUrl } from '@hexly/domain';
-import { and, eq } from 'drizzle-orm';
+import { AssetSummary, assetUrl } from '@hexly/domain';
+import { and, asc, eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { assets } from '../db/schema';
 
@@ -131,6 +131,32 @@ export class AssetsService {
         });
     }
     return out;
+  }
+
+  /**
+   * Every stored Asset for a World as an {@link AssetSummary} — the picker source a Board Image or
+   * Content references (#269, ADR-0034). Metadata only (no disk read): the capability URL plus the
+   * `mime`/`size`/`originalFilename` the row already carries. Ordered by `createdAt` then `hash`
+   * for a stable list.
+   */
+  list(worldId: string): AssetSummary[] {
+    return this.db
+      .select({
+        hash: assets.hash,
+        originalFilename: assets.originalFilename,
+        mime: assets.mime,
+        size: assets.size,
+      })
+      .from(assets)
+      .where(eq(assets.worldId, worldId))
+      .orderBy(asc(assets.createdAt), asc(assets.hash))
+      .all()
+      .map((row) => ({
+        url: assetUrl(worldId, row.hash, extname(row.originalFilename).toLowerCase()),
+        originalFilename: row.originalFilename,
+        mime: row.mime,
+        size: row.size,
+      }));
   }
 
   /** Remove a World's entire Asset folder (its rows cascade away with the World). Best-effort: a missing folder is fine. */
