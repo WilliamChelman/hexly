@@ -134,7 +134,7 @@ export class CommandPaletteComponent {
   // than replay a stale bootstrap-time result.
   private readonly parsed = computed(() => ({
     open: this.open(),
-    ...parseCommandQuery(this.text()),
+    ...parseCommandQuery(this.text(), this.registry.prefixes()),
   }));
 
   protected readonly sections = toSignal(

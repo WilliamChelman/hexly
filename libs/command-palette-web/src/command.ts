@@ -27,10 +27,18 @@ export interface CommandProvider {
   search(query: string): Observable<readonly Command[]>;
 }
 
-export function parseCommandQuery(text: string): {
+/**
+ * Route a query to the longest registered prefix it starts with, empty being
+ * the always-present fallback, so no Provider hard-codes the set (ADR-0059).
+ */
+export function parseCommandQuery(
+  text: string,
+  prefixes: readonly string[],
+): {
   prefix: string;
   query: string;
 } {
-  if (text.startsWith('>')) return { prefix: '>', query: text.slice(1) };
-  return { prefix: '', query: text };
+  const match = prefixes.filter((p) => p !== '' && text.startsWith(p)).sort((a, b) => b.length - a.length)[0];
+  if (match === undefined) return { prefix: '', query: text };
+  return { prefix: match, query: text.slice(match.length) };
 }
