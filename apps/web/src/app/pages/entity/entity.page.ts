@@ -1,6 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, Injector, computed, effect, inject } from '@angular/core';
-import { NgComponentOutlet } from '@angular/common';
-import { VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -8,14 +6,16 @@ import { Observable, concat, distinctUntilChanged, ignoreElements, map, of } fro
 import { EntitySession } from './services/entity-session';
 import { EntityViewStore } from './services/entity-view-store';
 import { EntityHeaderComponent } from './components/entity-header.component';
+import { EntityViewOutletComponent } from './components/entity-view-outlet.component';
 import { ViewRegistry } from '../../entity-types/view-registry';
 import { CORE_VIEW_DEFINITIONS } from './views/core-views';
 
 /**
  * The open-Entity route (`/entities/:id`): loads the Entity into {@link EntitySession} and
  * lays out its editor — one frame for every Entity type (ADR-0022). The {@link EntityHeaderComponent}
- * docks above; the body is a single `NgComponentOutlet` over the active View's component,
- * resolved from the {@link ViewRegistry} by {@link EntityViewStore.activeView} (ADR-0048).
+ * docks above; the body is the {@link EntityViewOutletComponent} (Seam C, #264), which resolves and
+ * outlets the active View (ADR-0048) and owns the card/dangling fallbacks — one implementation shared
+ * with the Board Embed.
  *
  * Stays the routed component across `:id` changes: only the outletted body changes, never the frame.
  */
@@ -27,20 +27,17 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
   // the page in both the routed and Public Link mounts. The content View's dock stores are the
   // View's own now (ADR-0051) — provided in `ContentView`, as the map's store is in `MapView`.
   providers: [EntityViewStore],
-  imports: [EntityHeaderComponent, NgComponentOutlet, TranslocoPipe],
+  imports: [EntityHeaderComponent, EntityViewOutletComponent, TranslocoPipe],
   template: `
     @if (session.current()) {
       <div class="grid h-full" style="grid-template-rows: auto 1fr">
         <!-- Page-owned header docked above the body (ADR-0022). -->
         <app-entity-header />
         <main class="relative min-h-0">
-          <!-- The active View's component (MapView / ContentView / a plugin view),
-               resolved from the ViewRegistry — no type sniffing (ADR-0048). The frame
-               around it is already drawn, so a deferred body arrives into a live page.
-               The injector carries down the Field key of a View rendering a Field of a Structured Data Type. -->
-          @if (activeComponent(); as component) {
-            <ng-container *ngComponentOutlet="component; injector: viewInjector()" />
-          }
+          <!-- The View body — resolution, outletting, and the card/dangling fallbacks — is the
+               reusable Entity View Outlet's now (Seam C, #264), shared with the Board Embed. The page
+               drives its own route-loaded session, so it passes no target id and the default context. -->
+          <app-entity-view-outlet />
         </main>
       </div>
     } @else if (session.evicted()) {
@@ -65,37 +62,13 @@ export class EntityPage {
   protected readonly session = inject(EntitySession);
   private readonly viewStore = inject(EntityViewStore);
   private readonly views = inject(ViewRegistry);
-  private readonly injector = inject(Injector);
-
-  /** The component to outlet for the active View — absent only while a deferred body is in flight. */
-  protected readonly activeComponent = computed(() => this.views.component(this.viewStore.activeView().viewId));
-
-  /**
-   * The injector the active View's component is created in — the page's own, plus {@link VIEW_FIELD_KEY}
-   * when the View renders a Field of a Structured Data Type. A Type's own View (Content, a stat block) renders no
-   * particular Field and is handed nothing.
-   *
-   * Keyed on {@link EntityViewStore.activeFieldKey}, which settles: `NgComponentOutlet` rebuilds the
-   * component whenever this reference changes, so a recompute on every re-derived view list would tear
-   * down a live map mid-edit.
-   */
-  protected readonly viewInjector = computed(() => {
-    const fieldKey = this.viewStore.activeFieldKey();
-    return Injector.create({
-      parent: this.injector,
-      providers: fieldKey ? [{ provide: VIEW_FIELD_KEY, useValue: fieldKey }] : [],
-    });
-  });
 
   constructor() {
     // Register the core Views from the lazy entity chunk, dropping them when the page is torn down.
     // Kept out of the root ViewRegistry so the heavy view bodies (the map, TipTap) stay off the
-    // initial bundle.
+    // initial bundle. The Entity View Outlet the body mounts resolves against this root registry.
     const unregister = CORE_VIEW_DEFINITIONS.map((d) => this.views.register(d));
     inject(DestroyRef).onDestroy(() => unregister.forEach((u) => u()));
-
-    // Fetch a deferred View's body once it is the active one.
-    effect(() => this.views.fetch(this.viewStore.activeView().viewId));
 
     const route = inject(ActivatedRoute);
     this.session.watchRoute(route);
