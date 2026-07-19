@@ -46,7 +46,15 @@ import { ToasterService } from '@hexly/web-core';
           'border-l-gold-strong': toast.tone === 'info',
         }"
       >
-        <span class="flex-1">{{ toast.message }}</span>
+        <span class="flex min-w-0 flex-1 flex-col">
+          @if (toast.title) {
+            <!-- The headline pops (e.g. a roll's total); the message drops to muted supporting text. -->
+            <span class="text-lg font-semibold leading-tight tabular-nums">{{ toast.title }}</span>
+            <span class="text-xs text-ink-muted">{{ toast.message }}</span>
+          } @else {
+            {{ toast.message }}
+          }
+        </span>
         <button
           type="button"
           class="flex-none inline-flex items-center justify-center size-5 p-0 bg-transparent border-0 rounded-sm text-ink-muted text-[0.85rem] leading-none cursor-pointer hover:bg-surface-sunken hover:text-ink"
@@ -85,7 +93,9 @@ export class ToasterComponent {
       const toasts = this.toaster.toasts();
       for (const toast of toasts) {
         if (this.announced.has(toast.id)) continue;
-        this.liveAnnouncer.announce(toast.message, toast.tone === 'error' ? 'assertive' : 'polite');
+        // Read the headline first so a roll announces its total, then the working.
+        const spoken = toast.title ? `${toast.title}. ${toast.message}` : toast.message;
+        this.liveAnnouncer.announce(spoken, toast.tone === 'error' ? 'assertive' : 'polite');
       }
       this.announced = new Set(toasts.map((toast) => toast.id));
       this.syncTopLayer(toasts.length > 0);

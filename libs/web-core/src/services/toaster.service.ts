@@ -6,20 +6,25 @@ export type ToastTone = 'info' | 'success' | 'error';
 /** Which viewport edge a toast anchors to; `top` sits it near the command palette (ADR-0032). */
 export type ToastPlacement = 'top' | 'bottom';
 
-/** One transient on-screen message: a stable `id`, its `message`, `tone`, and `placement`. */
+/** One transient on-screen message: a stable `id`, its `message`, `tone`, `placement`, and optional
+ * emphasized `title`. */
 export interface Toast {
   readonly id: number;
   readonly message: string;
   readonly tone: ToastTone;
   readonly placement: ToastPlacement;
+  /** An emphasized headline shown above the message — e.g. a roll's total (issue #251). */
+  readonly title?: string;
 }
 
-/** Per-call overrides for {@link ToasterService.show}; both fall back to the toaster's defaults. */
+/** Per-call overrides for {@link ToasterService.show}; all fall back to the toaster's defaults. */
 export interface ToastOptions {
   /** How long the toast lingers before auto-dismissing; `0` keeps it until dismissed. */
   readonly durationMs?: number;
   /** The edge to anchor to; defaults to `bottom`. */
   readonly placement?: ToastPlacement;
+  /** An emphasized headline rendered above the message. */
+  readonly title?: string;
 }
 
 /** How long a toast lingers before auto-dismissing, unless overridden per call. */
@@ -49,9 +54,9 @@ export class ToasterService {
    * timer is skipped where `setTimeout` is unavailable (SSR).
    */
   show(message: string, tone: ToastTone = 'info', options: ToastOptions = {}): number {
-    const { durationMs = DEFAULT_TOAST_DURATION_MS, placement = 'bottom' } = options;
+    const { durationMs = DEFAULT_TOAST_DURATION_MS, placement = 'bottom', title } = options;
     const id = this.nextId++;
-    this._toasts.update((list) => [...list, { id, message, tone, placement }]);
+    this._toasts.update((list) => [...list, { id, message, tone, placement, title }]);
     if (durationMs > 0 && typeof setTimeout === 'function') {
       this.timers.set(
         id,
