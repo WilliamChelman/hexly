@@ -3,6 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonComponent, IconComponent, InputComponent, SelectComponent, TextareaComponent } from '@hexly/web-ui';
 import {
   Ability,
+  DS_ABILITY_CATEGORY_OPTIONS,
   DS_ABILITY_TYPE_OPTIONS,
   DS_CHARACTERISTIC_KEYS,
   DS_POWER_ROLL_TIERS,
@@ -21,7 +22,8 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
  *
  * An Ability either carries a **power roll** (a characteristic and its three flat tier texts) or a flat
  * **effect** — the edit toggle is mutually exclusive, so the printed block reads as one or the other.
- * `distance`/`target`/`cost`/`trigger` are display strings, not typed geometry.
+ * `distance`/`target`/`trigger` are display strings, not typed geometry; `malice` is a numeric resource cost
+ * and `category` the action-economy provenance the signature highlight keys off (#254).
  *
  * Storage stays render-faithful (the tiers are prose), but the read view **resolves a power roll ephemerally**
  * (#252): a {@link PowerRollDiceComponent} rolls `2d10 + the ability's characteristic` in its own bubble and
@@ -107,7 +109,7 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
                 </button>
               </div>
 
-              <div class="mt-2 grid grid-cols-2 gap-2">
+              <div class="mt-2 grid grid-cols-3 gap-2">
                 <label class="flex flex-col gap-0.5 text-2xs font-semibold uppercase tracking-wider text-ink-muted">
                   {{ 'drawSteel.statBlock.abilityType' | transloco }}
                   <select
@@ -124,13 +126,33 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
                   </select>
                 </label>
                 <label class="flex flex-col gap-0.5 text-2xs font-semibold uppercase tracking-wider text-ink-muted">
-                  {{ 'drawSteel.statBlock.abilityCost' | transloco }}
+                  {{ 'drawSteel.statBlock.abilityCategory' | transloco }}
+                  <select
+                    appSelect
+                    data-testid="ability-category"
+                    [value]="ability.category"
+                    (change)="patch($index, { category: selectVal($event) })"
+                  >
+                    <!-- A category is optional; the blank option clears it back to none. -->
+                    <option value="" [selected]="!ability.category">
+                      {{ 'drawSteel.statBlock.abilityCategoryNone' | transloco }}
+                    </option>
+                    @for (option of abilityCategories; track option) {
+                      <option [value]="option" [selected]="option === ability.category">
+                        {{ 'drawSteel.statBlock.abilityCategoryOption.' + option | transloco }}
+                      </option>
+                    }
+                  </select>
+                </label>
+                <label class="flex flex-col gap-0.5 text-2xs font-semibold uppercase tracking-wider text-ink-muted">
+                  {{ 'drawSteel.statBlock.abilityMalice' | transloco }}
                   <input
                     appInput
-                    data-testid="ability-cost"
-                    [value]="ability.cost"
-                    [placeholder]="'drawSteel.statBlock.abilityCostHint' | transloco"
-                    (input)="patch($index, { cost: inputVal($event) })"
+                    type="number"
+                    data-testid="ability-malice"
+                    [value]="ability.malice"
+                    [placeholder]="'drawSteel.statBlock.abilityMaliceHint' | transloco"
+                    (input)="patch($index, { malice: numberVal($event) })"
                   />
                 </label>
               </div>
@@ -281,8 +303,18 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
                   >
                     {{ 'drawSteel.statBlock.abilityTypeOption.' + ability.type | transloco }}
                   </span>
-                  @if (ability.cost) {
-                    <span class="text-xs font-bold text-gold-deep">{{ ability.cost }}</span>
+                  @if (ability.category) {
+                    <span class="text-xs font-bold text-gold-deep" data-testid="ability-category-read">
+                      {{ 'drawSteel.statBlock.abilityCategoryOption.' + ability.category | transloco }}
+                    </span>
+                  }
+                  @if (ability.malice != null) {
+                    <span
+                      class="inline-flex items-center gap-1 text-xs font-bold text-ember"
+                      data-testid="ability-malice-read"
+                    >
+                      <app-icon name="ds-malice" class="text-sm" />{{ ability.malice }}
+                    </span>
                   }
                 </p>
 
@@ -378,6 +410,7 @@ export class AbilitiesSectionComponent {
   protected readonly abilities = computed<UiAbility[]>(() => asAbilities(this.value()));
 
   protected readonly abilityTypes = DS_ABILITY_TYPE_OPTIONS;
+  protected readonly abilityCategories = DS_ABILITY_CATEGORY_OPTIONS;
   protected readonly characteristicKeys = DS_CHARACTERISTIC_KEYS;
   protected readonly tierKeys = DS_POWER_ROLL_TIERS;
 
@@ -406,9 +439,12 @@ export class AbilitiesSectionComponent {
 
   // --- Read-view presentation (#stat-block-oomph): the "Bestiary Spread" ability chrome. -------------
 
-  /** Main actions and signature abilities are the ones a GM reaches for first — give them the gold pop. */
+  /**
+   * Main actions and signature abilities are the ones a GM reaches for first — give them the gold pop.
+   * Signature keys off the `category` enum now, not a free-text cost string (#254).
+   */
   protected isSignature(a: UiAbility): boolean {
-    return a.type === 'main' || /signature/i.test(a.cost);
+    return a.type === 'main' || a.category === 'signature';
   }
 
   /** The ability's left accent bar — gold for signature/main, else a per-type hue. */
@@ -487,6 +523,12 @@ export class AbilitiesSectionComponent {
     return (event.target as HTMLSelectElement).value;
   }
 
+  /** An emptied number input clears the field (`undefined`); otherwise it becomes a real `number` (#254). */
+  protected numberVal(event: Event): number | undefined {
+    const raw = (event.target as HTMLInputElement).value;
+    return raw === '' ? undefined : Number(raw);
+  }
+
   protected characteristicVal(event: Event): PowerRoll['characteristic'] {
     return (event.target as HTMLSelectElement).value as PowerRoll['characteristic'];
   }
@@ -497,11 +539,15 @@ export class AbilitiesSectionComponent {
   }
 }
 
-/** The always-present UI shape the editor binds to — every slot filled so a control never binds `undefined`. */
+/**
+ * The always-present UI shape the editor binds to — every string slot filled so a control never binds
+ * `undefined`. `malice` is the exception: a number|undefined so an empty malice input reads as unset (#254).
+ */
 interface UiAbility {
   name: string;
   type: string;
-  cost: string;
+  category: string;
+  malice: number | undefined;
   keywords: string[];
   distance: string;
   target: string;
@@ -511,7 +557,17 @@ interface UiAbility {
 }
 
 function emptyAbility(): UiAbility {
-  return { name: '', type: 'main', cost: '', keywords: [], distance: '', target: '', trigger: '', effect: '' };
+  return {
+    name: '',
+    type: 'main',
+    category: '',
+    malice: undefined,
+    keywords: [],
+    distance: '',
+    target: '',
+    trigger: '',
+    effect: '',
+  };
 }
 
 function emptyPowerRoll(): PowerRoll {
@@ -527,7 +583,8 @@ function toStored(ui: UiAbility): Ability {
     distance: ui.distance,
     target: ui.target,
   };
-  if (ui.cost) out.cost = ui.cost;
+  if (ui.category) out.category = ui.category as Ability['category'];
+  if (typeof ui.malice === 'number' && Number.isFinite(ui.malice)) out.malice = ui.malice;
   if (ui.trigger) out.trigger = ui.trigger;
   if (ui.powerRoll) out.powerRoll = ui.powerRoll;
   else if (ui.effect) out.effect = ui.effect;
@@ -542,7 +599,8 @@ function asAbilities(value: unknown): UiAbility[] {
     .map((item) => ({
       name: str(item['name']),
       type: str(item['type']) || 'main',
-      cost: str(item['cost']),
+      category: str(item['category']),
+      malice: num(item['malice']),
       keywords: strArray(item['keywords']),
       distance: str(item['distance']),
       target: str(item['target']),
@@ -567,6 +625,11 @@ function asPowerRoll(value: unknown): PowerRoll | undefined {
 
 function str(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+/** A stored numeric field coerced to the UI shape; a non-number (or absent) reads as unset (#254). */
+function num(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function strArray(value: unknown): string[] {

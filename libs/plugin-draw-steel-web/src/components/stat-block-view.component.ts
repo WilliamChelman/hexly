@@ -318,8 +318,8 @@ export class StatBlockViewComponent {
   /** The gate the value controls render behind: editable only when the caller *may* edit and *is* editing. */
   protected readonly edit = computed(() => this.writable() && this.editing());
 
-  /** The stat strip's keys, in printed-card order — a size token then the four numeric defences. */
-  protected readonly stripKeys = ['size', 'speed', 'stamina', 'stability', 'free_strike'] as const;
+  /** The stat strip's keys, in printed-card order — a size token then the numeric defences (save/turns, #254). */
+  protected readonly stripKeys = ['size', 'speed', 'stamina', 'stability', 'save', 'turns', 'free_strike'] as const;
   protected readonly characteristicKeys = DS_CHARACTERISTIC_KEYS;
 
   /**
@@ -419,6 +419,8 @@ export class StatBlockViewComponent {
     const editing = this.edit();
     const rows = this.stripKeys.map((key) => this.railRow(key));
     if (editing || this.listText('movement_types')) rows.push(this.railRow('movement_types'));
+    // Condition immunities append only when set (read) so the rail stays tight, always render in edit (#254).
+    if (editing || this.listText('condition_immunities')) rows.push(this.railRow('condition_immunities'));
     if (this.isMinion() && (editing || this.text('with_captain'))) rows.push(this.railRow('with_captain'));
     return rows;
   }
@@ -429,9 +431,18 @@ export class StatBlockViewComponent {
       key,
       labelKey: this.label(key),
       value:
-        key === 'movement_types' ? this.listText(key) : key === 'with_captain' ? this.text(key) : this.display(key),
+        key === 'movement_types' || key === 'condition_immunities'
+          ? this.listText(key)
+          : key === 'with_captain'
+            ? this.text(key)
+            : this.display(key),
       icon: SPEC_ICONS[key],
-      placeholderKey: key === 'movement_types' ? 'drawSteel.statBlock.addMovement' : '',
+      placeholderKey:
+        key === 'movement_types'
+          ? 'drawSteel.statBlock.addMovement'
+          : key === 'condition_immunities'
+            ? 'drawSteel.statBlock.addCondition'
+            : '',
     };
   }
 
@@ -483,8 +494,11 @@ const SPEC_ICONS: Record<string, string> = {
   speed: 'ds-speed',
   stamina: 'ds-stamina',
   stability: 'ds-stability',
+  save: 'ds-save',
+  turns: 'ds-turns',
   free_strike: 'ds-free-strike',
   movement_types: 'ds-movement',
+  condition_immunities: 'ds-condition',
   with_captain: 'ds-captain',
 };
 

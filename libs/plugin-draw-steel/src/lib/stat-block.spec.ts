@@ -1,6 +1,8 @@
 import {
+  DS_ABILITY_CATEGORY_OPTIONS,
   DS_ABILITY_TYPE_OPTIONS,
   DS_CHARACTERISTIC_KEYS,
+  DS_CONDITION_OPTIONS,
   DS_DEFENCE_KEYS,
   DS_IDENTITY_KEYS,
   DS_MAP_KEYS,
@@ -101,6 +103,30 @@ describe('draw-steel.stat-block data type', () => {
     // The damage maps and the movement list parse as nested/enum-checked values, and size as a token.
     expect(statBlockSchema.safeParse({ immunities: { fire: 5 }, movement_types: ['fly', 'climb'] }).success).toBe(true);
     expect(statBlockSchema.safeParse({ size: '1S' }).success).toBe(true);
+    // The action-economy defences #254 lands: numeric save/turns and a closed condition-immunity list.
+    expect(statBlockSchema.safeParse({ save: 4, turns: 2 }).success).toBe(true);
+    expect(statBlockSchema.safeParse({ condition_immunities: ['frightened', 'prone'] }).success).toBe(true);
+  });
+
+  it('rejects a mistyped save/turns or an out-of-set condition immunity (forward-only gate, #254)', () => {
+    expect(statBlockSchema.safeParse({ save: 'high' }).success).toBe(false);
+    expect(statBlockSchema.safeParse({ turns: 'two' }).success).toBe(false);
+    // A condition outside the pinned Draw Steel set is rejected — the list is closed like movement.
+    expect(statBlockSchema.safeParse({ condition_immunities: ['stunned'] }).success).toBe(false);
+  });
+
+  it('pins the condition-immunity vocabulary from ds.CONFIG source keys (#254)', () => {
+    expect(DS_CONDITION_OPTIONS).toEqual([
+      'bleeding',
+      'dazed',
+      'frightened',
+      'grabbed',
+      'prone',
+      'restrained',
+      'slowed',
+      'taunted',
+      'weakened',
+    ]);
   });
 
   it('rejects a mistyped stat — a string where a number belongs, an out-of-enum role (forward-only gate)', () => {
@@ -139,7 +165,7 @@ describe('draw-steel.stat-block data type', () => {
           {
             name: 'Cleave',
             type: 'main',
-            cost: 'Signature',
+            category: 'signature',
             keywords: ['melee', 'weapon'],
             distance: 'Melee 1',
             target: 'One creature',
@@ -242,6 +268,39 @@ describe('draw-steel.stat-block data type', () => {
       'none',
       'villain',
     ]);
+  });
+
+  it('carries an optional numeric malice and an ability category distinct from type (#254)', () => {
+    // A villain action spending 3 Malice, categorised — both optional slots, distinct from `type`.
+    expect(
+      statBlockSchema.safeParse({
+        abilities: [
+          { name: 'Doom', type: 'villain', category: 'villain', malice: 3, keywords: [], distance: '', target: '' },
+        ],
+      }).success,
+    ).toBe(true);
+    // Malice is a number, not the old free-text cost string — a string is rejected by the forward-only gate.
+    expect(
+      statBlockSchema.safeParse({
+        abilities: [{ name: 'X', type: 'main', malice: '3 Malice', keywords: [], distance: '', target: '' }],
+      }).success,
+    ).toBe(false);
+    // Category is a closed enum — an out-of-set value is rejected.
+    expect(
+      statBlockSchema.safeParse({
+        abilities: [{ name: 'X', type: 'main', category: 'ultimate', keywords: [], distance: '', target: '' }],
+      }).success,
+    ).toBe(false);
+    // The retired `cost` string is an unknown key now — stripped, not carried into the ability.
+    expect(
+      statBlockSchema.parse({
+        abilities: [{ name: 'X', type: 'main', cost: 'Signature', keywords: [], distance: '', target: '' }],
+      }),
+    ).toEqual({ abilities: [{ name: 'X', type: 'main', keywords: [], distance: '', target: '' }] });
+  });
+
+  it('pins the ability-category enum (#254)', () => {
+    expect(DS_ABILITY_CATEGORY_OPTIONS).toEqual(['signature', 'heroic', 'villain', 'maliceAncestry']);
   });
 
   it('strips an unknown top-level key rather than carrying it into the block', () => {

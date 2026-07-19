@@ -75,6 +75,25 @@ export const DS_DAMAGE_TYPE_OPTIONS = [
 export type DsDamageType = (typeof DS_DAMAGE_TYPE_OPTIONS)[number];
 
 /**
+ * The conditions a creature may be immune to — the item type of the `condition_immunities` list. Pinned
+ * from `ds.CONFIG.conditions` (the Draw Steel repo, branch `1.1.x`) as its lowercase source keys, so a
+ * later importer (#254) maps one-to-one and the View shows them raw, mirroring {@link DS_DAMAGE_TYPE_OPTIONS}.
+ */
+export const DS_CONDITION_OPTIONS = [
+  'bleeding',
+  'dazed',
+  'frightened',
+  'grabbed',
+  'prone',
+  'restrained',
+  'slowed',
+  'taunted',
+  'weakened',
+] as const;
+
+export type DsCondition = (typeof DS_CONDITION_OPTIONS)[number];
+
+/**
  * An Ability's action type — its slot in the turn economy. Pinned from `ds.CONFIG.abilityTypes` (the
  * Draw Steel repo, branch `1.1.x`) as its lowercase source keys, so an import maps one-to-one and the
  * View shows them raw. `main` is the printed "Main Action"; `none`/`move` round out the source set.
@@ -91,6 +110,16 @@ export const DS_ABILITY_TYPE_OPTIONS = [
 ] as const;
 
 export type DsAbilityType = (typeof DS_ABILITY_TYPE_OPTIONS)[number];
+
+/**
+ * An Ability's **category** — its provenance in the action economy, distinct from its {@link DsAbilityType}
+ * turn slot (#254): a `signature` action, a `heroic` (resource-spending) ability, a `villain` action, or a
+ * `maliceAncestry` ability. Pinned for the monster importer; the View reads it raw and drives the signature
+ * highlight off it, not off a free-text cost string.
+ */
+export const DS_ABILITY_CATEGORY_OPTIONS = ['signature', 'heroic', 'villain', 'maliceAncestry'] as const;
+
+export type DsAbilityCategory = (typeof DS_ABILITY_CATEGORY_OPTIONS)[number];
 
 /** The five characteristics, in the order a stat block prints them. */
 export const DS_CHARACTERISTIC_KEYS = ['might', 'agility', 'reason', 'intuition', 'presence'] as const;
@@ -117,8 +146,14 @@ export const DS_DEFENCE_KEYS = [
   'stamina',
   'stability',
   'speed',
+  // The saving-throw threshold and the extra-turn count a solo/leader fields (#254) — numeric defences.
+  'save',
+  'turns',
   'free_strike',
   'movement_types',
+  // The conditions the creature shrugs off — a closed enum list ({@link DS_CONDITION_OPTIONS}, #254),
+  // rendered as its own rail row like movement.
+  'condition_immunities',
   // The minion captain bonus rides this block on the card, so it partitions here beside movement — a
   // free-text line (`+1 damage bonus to strikes`), rendered only for a `minion` organization.
   'with_captain',
@@ -185,12 +220,15 @@ export function resolveTier(total: number): DsTierKey {
  * Ability either rolls (its {@link PowerRoll} three tiers) or states a flat `effect` — both optional, so a
  * malformed power roll is caught while an effect-only ability is equally well-formed. `name`/`distance`/
  * `target`/`keywords` are required (blank-tolerant, like {@link traitSchema}) so an added ability parses;
- * `cost`/`trigger` are absent until authored. `type` is a required enum from {@link DS_ABILITY_TYPE_OPTIONS}.
+ * `malice`/`category`/`trigger` are absent until authored. `type` is a required enum from
+ * {@link DS_ABILITY_TYPE_OPTIONS}; `category` ({@link DS_ABILITY_CATEGORY_OPTIONS}, #254) is the distinct
+ * action-economy provenance the View's signature highlight keys off, and `malice` its numeric resource cost.
  */
 export const abilitySchema = z.object({
   name: z.string(),
   type: z.enum(DS_ABILITY_TYPE_OPTIONS),
-  cost: z.string().optional(),
+  category: z.enum(DS_ABILITY_CATEGORY_OPTIONS).optional(),
+  malice: z.number().finite().optional(),
   keywords: z.array(z.string()),
   distance: z.string(),
   target: z.string(),
@@ -221,7 +259,12 @@ export const statBlockSchema = z
     size: z.enum(DS_SIZE_OPTIONS),
     stability: z.number().finite(),
     speed: z.number().finite(),
+    // The saving-throw threshold and the extra-turn count (#254).
+    save: z.number().finite(),
+    turns: z.number().finite(),
     movement_types: z.array(z.enum(DS_MOVEMENT_TYPE_OPTIONS)),
+    // The conditions the creature is immune to — a closed enum list ({@link DS_CONDITION_OPTIONS}, #254).
+    condition_immunities: z.array(z.enum(DS_CONDITION_OPTIONS)),
     free_strike: z.number().finite(),
     // Minion-only free text ("+1 damage bonus to strikes"); the View gates its render on `organization`.
     with_captain: z.string(),
@@ -331,8 +374,14 @@ export const DS_STAT_FIELDS: readonly Field[] = [
   stat('stamina', 'Stamina', { kind: 'number' }),
   stat('stability', 'Stability', { kind: 'number' }),
   stat('speed', 'Speed', { kind: 'number' }),
+  stat('save', 'Save', { kind: 'number' }),
+  stat('turns', 'Turns', { kind: 'number' }),
   stat('free_strike', 'Free strike', { kind: 'number' }),
   stat('movement_types', 'Movement', { kind: 'list', of: { kind: 'enum', options: [...DS_MOVEMENT_TYPE_OPTIONS] } }),
+  stat('condition_immunities', 'Condition immunities', {
+    kind: 'list',
+    of: { kind: 'enum', options: [...DS_CONDITION_OPTIONS] },
+  }),
   stat('with_captain', 'With Captain', { kind: 'string' }),
   // Characteristics (the grid prints the abbreviation; this label is the row fallback / catalog anchor).
   ...DS_CHARACTERISTIC_KEYS.map((key) => stat(key, capitalize(key), { kind: 'number' })),
