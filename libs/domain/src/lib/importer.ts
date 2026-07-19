@@ -94,8 +94,10 @@ export interface Importer {
   /** This Importer's `namespace.id` — the `importer` an {@link ImportSource} names (`draw-steel.monsters`). */
   readonly id: string;
   /**
-   * The Importer's human copy for the generic Imports panel (CONTEXT.md → Importer). Optional — the
-   * panel falls back to the {@link id} — so a Plugin adds an Importer by shipping a `produce()` alone.
+   * The Importer's **transloco key** for the generic Imports panel (CONTEXT.md → Importer), resolved
+   * `| transloco` client-side (`MONSTERS_IMPORTER_LABEL`), not literal copy. Optional — the registry
+   * falls back to the {@link id}, which renders untranslated — so a Plugin adds an Importer by shipping
+   * a `produce()` alone.
    */
   readonly label?: string;
   /** Fetch and transform the source into an {@link ImportProduction}; the reconcile lands it. */
@@ -109,7 +111,31 @@ export interface Importer {
  */
 export interface ImporterSummary {
   readonly id: string;
+  /** The {@link Importer.label} transloco key, or the `id` when the Importer ships none (renders untranslated). */
   readonly label: string;
+  /**
+   * The last-known imported state for this `(world, importer)`, derived from the `entityImportSource`
+   * provenance index rather than the in-process job — so the panel's last-run line survives an API
+   * restart (#260). Omitted when the Importer owns no Entity in the World.
+   */
+  readonly lastImported?: ImportedState;
+}
+
+/**
+ * What the provenance index still records for one `(world, importer)` (#260): the Entities the Importer
+ * owns and the revision they carry — the durable half of a run summary, readable long after the
+ * in-process job that produced it is gone.
+ */
+export interface ImportedState {
+  /** How many Entities the Importer currently owns in the World. */
+  readonly entityCount: number;
+  /**
+   * The pinned source `rev` those Entities reflect. Stored per row; when a half-applied reimport leaves
+   * rows disagreeing, the most common one wins — the revision the bulk of the set is at.
+   */
+  readonly rev: string;
+  /** The newest `updatedAt` across the owned Entities — when the set was last written — or null if unknown. */
+  readonly updatedAt: number | null;
 }
 
 /** The body of `POST /worlds/:worldId/importers/:importerId/run`: the {@link Visibility} landed Entities take. */

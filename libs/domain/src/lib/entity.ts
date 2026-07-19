@@ -49,6 +49,21 @@ export const entityDocumentSchema = z.record(z.string(), z.unknown());
 export const HEXLY_METADATA_PREFIX = 'hexly.';
 
 /**
+ * A copy of `doc` with every reserved `hexly.*` key removed — the shape a **user-facing** write may
+ * persist. The reserved namespace is system-owned provenance (import stamps, source paths, ADR-0060);
+ * a user's create/save seed can neither forge nor overwrite it, so it is stripped on the way in while
+ * the system writes that mint it are untouched.
+ */
+export function stripReservedKeys(doc: EntityDocument): EntityDocument {
+  return Object.fromEntries(Object.entries(doc).filter(([key]) => !key.startsWith(HEXLY_METADATA_PREFIX)));
+}
+
+/** The reserved `hexly.*` subset of `doc` — the system-owned provenance a user edit must preserve, not drop (ADR-0060). */
+export function reservedKeys(doc: EntityDocument): EntityDocument {
+  return Object.fromEntries(Object.entries(doc).filter(([key]) => key.startsWith(HEXLY_METADATA_PREFIX)));
+}
+
+/**
  * The reserved key a vault export stamps an Entity's ordered Type set under, and import reads back
  * — no author document key records the types.
  */

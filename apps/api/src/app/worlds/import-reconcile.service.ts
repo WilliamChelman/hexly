@@ -2,6 +2,7 @@ import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import {
   HEXLY_SOURCE_KEY,
   Importer,
+  ImportedState,
   ImporterErrorCode,
   ImporterSummary,
   ImportRecord,
@@ -15,7 +16,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import { worldAccess } from '../acl/world-access';
 import { DB, Db } from '../db/db';
-import { entityImportSource } from '../db/schema';
+import { entities, entityImportSource } from '../db/schema';
 import { EntityWrites, ImportOverwrite, InsertEntityInput } from '../entities/entity-writes';
 import { ImporterRegistry } from './importer-registry';
 
@@ -40,8 +41,11 @@ const IDLE: ImportRunSummary = {
 /** Hand the event loop back between chunks, so a run's synchronous writes are not all this process does. */
 const yieldToEventLoop = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
-/** How the owner-gated import surface refuses: unreachable World ≡ missing, reachable-but-not-Owner ≡ 403. */
-export type ImportGate = 'not-found' | 'forbidden' | 'no-such-importer';
+/**
+ * How the owner-gated import surface refuses a call: unreachable World ≡ missing (404),
+ * reachable-but-not-Owner ≡ 403, or no such Importer (404). A refusal union, not just the owner gate.
+ */
+export type ImportRefusal = 'not-found' | 'forbidden' | 'no-such-importer';
 
 /** One reconcile operation, resolved up front off the diff and then applied in chunks. */
 type ReconcileOp =
@@ -50,20 +54,17 @@ type ReconcileOp =
   | { kind: 'delete'; id: string };
 
 /**
- * The generic, importer-agnostic import reconcile (ADR-0060) — the framework half every Importer
- * inherits. Owns each World's one import run: it fetches an {@link Importer}'s production up front (off
- * the DB, continue-on-error with skips tallied), diffs it against the `entityImportSource` provenance
- * index for `(world, importer)`, then applies create/update/delete in `seq`-bumping chunks that each
- * commit and yield (the Reindex batching pattern, ADR-0046). Upsert reuses the existing Entity id so
- * inbound links and grants survive; a `sourceId` that vanished upstream is deleted; every landed Entity
- * is stamped `hexly.source`. A second run for a World while one is in flight is refused (409).
- *
- * Job state lives on this singleton keyed by World, not a table — each chunk commits, so a restart
- * forgets an unfinished run whose done chunks are already on disk.
+ * The generic, importer-agnostic import reconcile (ADR-0060): diffs an {@link Importer}'s production
+ * against the `entityImportSource` index for `(world, importer)` and applies create/update/delete in
+ * `seq`-bumping chunks that each commit and yield (ADR-0046). One run or remove at a time per World —
+ * a second is a 409. Job state lives on this singleton keyed by World, so a restart forgets an
+ * unfinished run whose committed chunks are already on disk.
  */
 @Injectable()
 export class ImportReconcileService {
   private readonly jobs = new Map<string, ImportRunSummary>();
+  /** Worlds with an in-flight {@link remove} — it yields between chunks, so a run and a remove must serialize. */
+  private readonly removing = new Set<string>();
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -71,14 +72,22 @@ export class ImportReconcileService {
     private readonly registry: ImporterRegistry,
   ) {}
 
-  /** The Importers available for a World — whatever the enabled Plugins registered. Owner-gated. */
-  list(userId: string, worldId: string): ImporterSummary[] | ImportGate {
+  /**
+   * The Importers available for a World — whatever the enabled Plugins registered — each carrying the
+   * last-known imported state the provenance index still records, so the panel's last-run line survives
+   * an API restart (#260). Owner-gated.
+   */
+  list(userId: string, worldId: string): ImporterSummary[] | ImportRefusal {
     const gate = this.gate(userId, worldId);
-    return gate ?? this.registry.list();
+    if (gate) return gate;
+    return this.registry.list().map((summary) => {
+      const lastImported = this.lastImported(worldId, summary.id);
+      return lastImported ? { ...summary, lastImported } : summary;
+    });
   }
 
   /** Where the World's import run stands — the poll target. Owner-gated; idle before any run. */
-  status(userId: string, worldId: string): ImportRunSummary | ImportGate {
+  status(userId: string, worldId: string): ImportRunSummary | ImportRefusal {
     const gate = this.gate(userId, worldId);
     return gate ?? this.jobs.get(worldId) ?? IDLE;
   }
@@ -88,12 +97,13 @@ export class ImportReconcileService {
    * behind the response — the client follows it by polling {@link status}. Owner-gated; a 409 when a
    * run is already in flight for this World. `run` never rejects: it lands every fault in the job.
    */
-  start(userId: string, worldId: string, importerId: string, visibility: Visibility): ImportRunSummary | ImportGate {
+  start(userId: string, worldId: string, importerId: string, visibility: Visibility): ImportRunSummary | ImportRefusal {
     const gate = this.gate(userId, worldId);
     if (gate) return gate;
     const importer = this.registry.get(importerId);
     if (!importer) return 'no-such-importer';
-    if (this.jobs.get(worldId)?.status === 'running')
+    // One reconcile at a time per World: a run in flight, or a remove mid-yield, refuses a start (409).
+    if (this.jobs.get(worldId)?.status === 'running' || this.removing.has(worldId))
       throw new ConflictException({ code: ImporterErrorCode.ImportRunning });
     this.jobs.set(worldId, { ...IDLE, importer: importerId, status: 'running', startedAt: Date.now() });
     // Deliberately not awaited: the reconcile outlives the request that asked for it.
@@ -105,14 +115,30 @@ export class ImportReconcileService {
    * Remove an Importer's whole set from a World: delete every Entity the provenance index attributes
    * to `(world, importer)`, with no recreate. Owner-gated; hand-authored Entities are untouched
    * because the delete is keyed by the derived `entityImportSource` index alone.
+   *
+   * Refused with a 409 while a run is in flight for this World (or another remove is): the run yields
+   * between chunks, so an interleaved delete would evict the Entities it has committed so far and leave
+   * a half-imported World behind a "succeeded" run. Held under {@link removing} for the same reason —
+   * this loop yields between chunks too, so a concurrent start must see it.
    */
-  remove(userId: string, worldId: string, importerId: string): ImportGate | 'ok' {
+  async remove(userId: string, worldId: string, importerId: string): Promise<ImportRefusal | 'ok'> {
     const gate = this.gate(userId, worldId);
     if (gate) return gate;
     if (!this.registry.get(importerId)) return 'no-such-importer';
-    const ids = this.ownedEntityIds(worldId, importerId);
-    // Chunked like the reconcile: a large bestiary deletes without pinning the event loop in one commit.
-    for (let i = 0; i < ids.length; i += CHUNK_SIZE) this.writes.importDelete(ids.slice(i, i + CHUNK_SIZE));
+    if (this.jobs.get(worldId)?.status === 'running' || this.removing.has(worldId))
+      throw new ConflictException({ code: ImporterErrorCode.ImportRunning });
+    this.removing.add(worldId);
+    try {
+      const ids = this.provenanceRows(worldId, importerId).map((row) => row.entityId);
+      // Chunked and yielding between commits (ADR-0046): a large bestiary deletes without pinning the
+      // event loop, and the yields are what oblige a run to serialize against it.
+      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+        this.writes.importDelete(ids.slice(i, i + CHUNK_SIZE));
+        await yieldToEventLoop();
+      }
+    } finally {
+      this.removing.delete(worldId);
+    }
     return 'ok';
   }
 
@@ -172,7 +198,7 @@ export class ImportReconcileService {
     records: readonly ImportRecord[],
     visibility: Visibility,
   ): { ops: ReconcileOp[]; skipped: ImportSkip[]; total: number } {
-    const existing = this.existingBySourceId(worldId, importer);
+    const existing = new Map(this.provenanceRows(worldId, importer).map((row) => [row.sourceId, row.entityId]));
     const seen = new Set<string>();
     const ops: ReconcileOp[] = [];
     const skipped: ImportSkip[] = [];
@@ -222,26 +248,38 @@ export class ImportReconcileService {
     return { ...document, [HEXLY_SOURCE_KEY]: { importer, sourceId, rev } };
   }
 
-  /** The provenance index for `(world, importer)` as `sourceId → entityId` — the reconcile's upsert-match map. */
-  private existingBySourceId(worldId: string, importer: string): Map<string, string> {
-    return new Map(
-      this.db
-        .select({ sourceId: entityImportSource.sourceId, entityId: entityImportSource.entityId })
-        .from(entityImportSource)
-        .where(and(eq(entityImportSource.worldId, worldId), eq(entityImportSource.importer, importer)))
-        .all()
-        .map((row) => [row.sourceId, row.entityId]),
-    );
-  }
-
-  /** Every Entity id `(world, importer)` owns, off the provenance index — the Remove/prune target. */
-  private ownedEntityIds(worldId: string, importer: string): string[] {
+  /**
+   * The provenance index rows for `(world, importer)` as `{ sourceId, entityId }` — the reconcile's
+   * upsert-match source (keyed by `sourceId`) and the Remove/prune target (its `entityId`s) alike.
+   */
+  private provenanceRows(worldId: string, importer: string): { sourceId: string; entityId: string }[] {
     return this.db
-      .select({ entityId: entityImportSource.entityId })
+      .select({ sourceId: entityImportSource.sourceId, entityId: entityImportSource.entityId })
       .from(entityImportSource)
       .where(and(eq(entityImportSource.worldId, worldId), eq(entityImportSource.importer, importer)))
-      .all()
-      .map((row) => row.entityId);
+      .all();
+  }
+
+  /**
+   * The last-known imported state for `(world, importer)` from the provenance index (#260), or undefined
+   * when the Importer owns nothing here. Read off the durable index, not the in-process job, so it
+   * outlives a restart. Joins `entities` for the freshest `updatedAt` — when the set was last written.
+   */
+  private lastImported(worldId: string, importer: string): ImportedState | undefined {
+    const rows = this.db
+      .select({ rev: entityImportSource.rev, updatedAt: entities.updatedAt })
+      .from(entityImportSource)
+      .innerJoin(entities, eq(entities.id, entityImportSource.entityId))
+      .where(and(eq(entityImportSource.worldId, worldId), eq(entityImportSource.importer, importer)))
+      .all();
+    if (rows.length === 0) return undefined;
+    // Rows can disagree mid-reimport (chunks apply the new rev one at a time); the most common wins —
+    // the revision the bulk of the set is at.
+    const tally = new Map<string, number>();
+    for (const { rev } of rows) tally.set(rev, (tally.get(rev) ?? 0) + 1);
+    const rev = [...tally.entries()].reduce((best, entry) => (entry[1] > best[1] ? entry : best))[0];
+    const updatedAt = rows.reduce((max, row) => Math.max(max, row.updatedAt), 0);
+    return { entityCount: rows.length, rev, updatedAt };
   }
 
   /** Owner gate (ADR-0037): unreachable ≡ missing → 404 (ADR-0004), reachable-but-not-Owner → 403. */

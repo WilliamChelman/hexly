@@ -770,7 +770,12 @@ describe('EntityWrites', () => {
         expect(importSourceOf('Broken')).toEqual([]);
       });
 
-      it('rewrites the row when the stamp changes, and prunes it when the stamp clears (self-pruning)', () => {
+      /**
+       * A user edit is untrusted (ADR-0060): `hexly.*` is system-owned provenance, so an edit can
+       * neither forge/change the stamp nor drop it — the incoming copy is stripped and the stored one
+       * restored. Only the reconcile's system writes re-stamp or prune it.
+       */
+      it('preserves the stamp across a user edit — a forged or cleared hexly.source is ignored', () => {
         const row = writes.insert({
           ownerId: ADA,
           worldId: WORLD,
@@ -780,19 +785,21 @@ describe('EntityWrites', () => {
           document: { 'hexly.source': SOURCE },
         });
 
+        // A forged rev on the incoming document is stripped; the stored stamp stands.
         writes.mutate(ADA, row.id, {
           kind: 'edit',
           version: row.version,
           document: { 'hexly.source': { ...SOURCE, rev: 'sha-def' } },
         });
-        expect(importSourceOf('Goblin')).toEqual([{ worldId: WORLD, ...SOURCE, rev: 'sha-def' }]);
+        expect(importSourceOf('Goblin')).toEqual([{ worldId: WORLD, ...SOURCE }]);
 
+        // Nor can a plain body edit clear it — editing an imported Entity never orphans its provenance.
         writes.mutate(ADA, row.id, {
           kind: 'edit',
           version: rowOf(row.id).version,
           document: { 'core.content': emptyContent() },
         });
-        expect(importSourceOf('Goblin')).toEqual([]);
+        expect(importSourceOf('Goblin')).toEqual([{ worldId: WORLD, ...SOURCE }]);
       });
 
       it('cascades the provenance row away when the Entity is deleted', () => {

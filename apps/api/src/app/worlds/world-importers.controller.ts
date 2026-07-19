@@ -14,7 +14,7 @@ import {
 import { AuthUser, ImporterSummary, ImportRunSummary, runImportRequestSchema } from '@hexly/domain';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
-import { ImportGate, ImportReconcileService } from './import-reconcile.service';
+import { ImportRefusal, ImportReconcileService } from './import-reconcile.service';
 
 /**
  * The per-World import surface (ADR-0060) — the generic, importer-agnostic feature mounted under the
@@ -61,17 +61,17 @@ export class WorldImportersController {
   /** Remove an Importer's whole set from this World (no recreate). Hand-authored Entities are left intact. */
   @Delete('importers/:importerId')
   @HttpCode(204)
-  remove(
+  async remove(
     @CurrentUser() user: AuthUser,
     @Param('worldId') worldId: string,
     @Param('importerId') importerId: string,
-  ): void {
-    const result = this.imports.remove(user.id, worldId, importerId);
+  ): Promise<void> {
+    const result = await this.imports.remove(user.id, worldId, importerId);
     if (result !== 'ok') this.unwrap(result);
   }
 
   /** Map a gate outcome to its HTTP exception, or pass the value through. */
-  private unwrap<T>(result: T | ImportGate): T {
+  private unwrap<T>(result: T | ImportRefusal): T {
     if (result === 'not-found' || result === 'no-such-importer') throw new NotFoundException();
     if (result === 'forbidden') throw new ForbiddenException();
     return result as T;
