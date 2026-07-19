@@ -12,7 +12,14 @@ import {
 import { NgComponentOutlet } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { isStructuredDataType } from '@hexly/domain';
-import { ViewInstance, VIEW_FIELD_KEY, viewInstanceKey } from '@hexly/web-entity';
+import {
+  DEFAULT_ENTITY_RENDER_CONTEXT,
+  ENTITY_RENDER_CONTEXT,
+  EntityRenderContext,
+  ViewInstance,
+  VIEW_FIELD_KEY,
+  viewInstanceKey,
+} from '@hexly/web-entity';
 import { IconComponent, IconName } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
 import { EntityViewStore } from '../services/entity-view-store';
@@ -20,22 +27,9 @@ import { ViewRegistry } from '../../../entity-types/view-registry';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { PluginRegistry } from '../../../entity-types/plugin-registry';
 
-/**
- * The render context an {@link EntityViewOutletComponent} carries down the transclusion chain
- * (ADR-0062): the ancestor Entity-id chain that bounds cycles, plus the current nesting depth and
- * the configurable cap past which an Embed degrades to a card preview.
- */
-export interface EntityRenderContext {
-  /** The Entity-id chain from the root to this outlet's parent — a target already in it is a cycle. */
-  readonly ancestorIds: readonly string[];
-  /** This outlet's nesting depth; the root page renders at 0. */
-  readonly depth: number;
-  /** The nesting cap: at or past it, the outlet degrades to the card preview (ADR-0062, default 3). */
-  readonly maxDepth: number;
-}
-
-/** The top-of-page context: no ancestors, depth 0, and the ADR-0062 default cap — so the page never degrades. */
-export const DEFAULT_ENTITY_RENDER_CONTEXT: EntityRenderContext = { ancestorIds: [], depth: 0, maxDepth: 3 };
+// The render-context contract now lives in `web-entity` so a plugin that renders an Embed (the Board) can
+// advance and pass it without importing the app (ADR-0048, #270). Re-exported for existing app callers.
+export { DEFAULT_ENTITY_RENDER_CONTEXT, type EntityRenderContext } from '@hexly/web-entity';
 
 /** What the outlet resolves to render: the chosen View, the card fallback, or the dangling placeholder. */
 type OutletMode = 'view' | 'card' | 'dangling';
@@ -194,7 +188,12 @@ export class EntityViewOutletComponent {
     const fieldKey = this.viewStore.activeFieldKey();
     return Injector.create({
       parent: this.injector,
-      providers: fieldKey ? [{ provide: VIEW_FIELD_KEY, useValue: fieldKey }] : [],
+      providers: [
+        // The context this outlet renders at, so a transcluded surface's own Embeds read where they sit
+        // and advance it by one level (ADR-0062, #270).
+        { provide: ENTITY_RENDER_CONTEXT, useValue: this.renderContext() },
+        ...(fieldKey ? [{ provide: VIEW_FIELD_KEY, useValue: fieldKey }] : []),
+      ],
     });
   });
 

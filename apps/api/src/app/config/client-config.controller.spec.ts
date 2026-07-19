@@ -50,6 +50,14 @@ describe('ClientConfigController', () => {
     expect(controller.getConfig().plugins).toEqual({ dnd: { enabled: true } });
   });
 
+  it('crosses a Plugin-declared client knob (the Board `maxEmbedDepth`) alongside `enabled`', async () => {
+    const controller = await controllerFor(
+      configWith({ board: { enabled: true, maxEmbedDepth: 5 } as never }, 'core.board'),
+    );
+
+    expect(controller.getConfig().plugins).toEqual({ board: { enabled: true, maxEmbedDepth: 5 } });
+  });
+
   it('carries whatever `entities.defaultType` the config resolved, verbatim', async () => {
     const controller = await controllerFor(configWith({}, 'world.deity'));
 

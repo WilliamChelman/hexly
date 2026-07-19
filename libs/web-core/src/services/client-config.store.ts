@@ -9,7 +9,7 @@ import {
   Signal,
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { ClientConfig } from '@hexly/domain';
+import { ClientConfig, ClientPluginConfig } from '@hexly/domain';
 
 /**
  * The browser's end of the client config channel (ADR-0052, Seam 4): the enabled-Plugin set and default
@@ -28,11 +28,17 @@ export class ClientConfigStore {
   private readonly injector = inject(Injector);
 
   private readonly enabledSignal = signal<ReadonlySet<string>>(new Set());
+  private readonly configsSignal = signal<Readonly<Record<string, ClientPluginConfig>>>({});
   private readonly defaultTypeSignal = signal<string | undefined>(undefined);
   private readonly loadedSignal = signal(false);
 
   /** The enabled bundled Plugins' ids; empty until {@link init} resolves. */
   readonly enabledPlugins: Signal<ReadonlySet<string>> = this.enabledSignal.asReadonly();
+
+  /** A bundled Plugin's client-visible config (its `enabled` state and any whitelisted knobs), or `undefined` until {@link init} resolves. */
+  pluginConfig(id: string): ClientPluginConfig | undefined {
+    return this.configsSignal()[id];
+  }
 
   /** The Type id the "New" button mints by default; `undefined` until {@link init} resolves. */
   readonly defaultType: Signal<string | undefined> = this.defaultTypeSignal.asReadonly();
@@ -51,6 +57,7 @@ export class ClientConfigStore {
         .filter(([, plugin]) => plugin.enabled)
         .map(([id]) => id);
       this.enabledSignal.set(new Set(enabledIds));
+      this.configsSignal.set(config.plugins);
       this.defaultTypeSignal.set(config.entities.defaultType);
       this.loadedSignal.set(true);
     } catch {

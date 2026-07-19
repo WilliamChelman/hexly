@@ -1,5 +1,12 @@
 import { TestBed } from '@angular/core/testing';
-import { BoardElement, BoardSurface, emptyBoardSurface, ImageElement, TextElement } from '@hexly/plugin-board';
+import {
+  BoardElement,
+  BoardSurface,
+  EmbedElement,
+  emptyBoardSurface,
+  ImageElement,
+  TextElement,
+} from '@hexly/plugin-board';
 import { emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { BoardStore } from './board-store';
 import { FakeEntitySession, provideBoardStoreTesting } from '../testing/entity-session.fake';
@@ -396,6 +403,72 @@ describe('BoardStore Image', () => {
     expect(store.document().elements).toEqual([]);
     store.undo();
     expect((store.document().elements[0] as ImageElement).assetUrl).toBe(UPLOADED_URL);
+  });
+});
+
+describe('BoardStore Embed elements', () => {
+  it('adds an Embed targeting an Entity and the chosen View, on top and selected', () => {
+    const store = makeStore();
+    const box = store.addElement({ x: 0, y: 0 });
+    const id = store.addEmbed({ x: 40, y: 40 }, 'note-1', 'core.view.map:core.grid');
+
+    const element = store.document().elements.find((e) => e.id === id) as EmbedElement | undefined;
+    expect(element?.kind).toBe('embed');
+    expect(element?.targetEntityId).toBe('note-1');
+    expect(element?.viewInstance).toBe('core.view.map:core.grid');
+    // Lands above the pre-existing box, and is the current selection.
+    const boxZ = store.document().elements.find((e) => e.id === box)?.z ?? 0;
+    expect(element?.z).toBeGreaterThan(boxZ);
+    expect(store.selectedElement()?.id).toBe(id);
+  });
+
+  it("defaults an Embed's View to the target's default (empty key) when none is given", () => {
+    const store = makeStore();
+    const id = store.addEmbed({ x: 0, y: 0 }, 'note-1');
+
+    expect((store.document().elements[0] as EmbedElement).viewInstance).toBe('');
+    expect(store.document().elements[0].id).toBe(id);
+  });
+
+  it('never arms an Embed on placement — it is static until a click arms its read-interaction', () => {
+    const store = makeStore();
+    store.addEmbed({ x: 0, y: 0 }, 'note-1');
+    expect(store.armed()).toBeNull();
+  });
+
+  it('arms and disarms an Embed like the single armed element (one at a time)', () => {
+    const store = makeStore();
+    const a = store.addEmbed({ x: 0, y: 0 }, 'note-1');
+    const b = store.addEmbed({ x: 80, y: 0 }, 'note-2');
+
+    store.arm(a);
+    expect(store.armed()).toBe(a);
+    // Arming the second Embed disarms the first — at most one armed, mirroring the single armed Tool.
+    store.arm(b);
+    expect(store.armed()).toBe(b);
+    store.disarm();
+    expect(store.armed()).toBeNull();
+  });
+
+  it("re-points an Embed's chosen View through setEmbedView, as one undoable step", () => {
+    const store = makeStore();
+    const id = store.addEmbed({ x: 0, y: 0 }, 'note-1');
+
+    store.setEmbedView(id, 'core.view.content');
+    expect((store.document().elements[0] as EmbedElement).viewInstance).toBe('core.view.content');
+
+    store.undo();
+    expect((store.document().elements[0] as EmbedElement).viewInstance).toBe('');
+  });
+
+  it('setEmbedView is a no-op (no undo step) for a non-embed element', () => {
+    const store = makeStore();
+    const box = store.addElement({ x: 0, y: 0 });
+    const before = store.document();
+
+    store.setEmbedView(box, 'core.view.content');
+    // The document is untouched, and no undo step was recorded beyond the box placement.
+    expect(store.document()).toBe(before);
   });
 });
 

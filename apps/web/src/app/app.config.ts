@@ -23,7 +23,9 @@ import { WEB_ENTITY_TRANSLATIONS, COLLAB_TRANSLATIONS } from '@hexly/web-entity/
 import { ADMIN_TRANSLATIONS } from '@hexly/admin-web/i18n';
 import { COMMAND_PALETTE_TRANSLATIONS } from '@hexly/command-palette-web/i18n';
 import { DICE_TRANSLATIONS } from '@hexly/dice-web/i18n';
-import { ENTITY_TYPES } from '@hexly/web-entity';
+import { ENTITY_TYPES, ENTITY_VIEW_OUTLET } from '@hexly/web-entity';
+import { EntityEmbedHostComponent } from './pages/entity/components/entity-embed-host.component';
+import { provideEntityViewChoices } from './entity-types/entity-view-choices.provider';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginBoard } from '@hexly/plugin-board/web';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
@@ -82,6 +84,10 @@ export const appConfig: ApplicationConfig = {
     provideBuiltInCommands(),
     // The read contract a lib injects to ask what Entity Types exist (ADR-0048).
     { provide: ENTITY_TYPES, useExisting: TypeRegistry },
+    // The Entity View Outlet host a plugin transcludes another Entity through, and the resolver naming a
+    // target's afforded Views — the seams the Board's Embed consumes without importing the app (ADR-0062, #270).
+    { provide: ENTITY_VIEW_OUTLET, useValue: EntityEmbedHostComponent },
+    provideEntityViewChoices(),
     // Which plugins this build bundles, web side (ADR-0048, ADR-0050) — the twin of the API's list
     // in `bundled-plugins.ts`. Bundled means compiled-in: a plugin joins by shipping a lib and being
     // named here. Each provider carries that plugin's types, views, structured data-types, and copy.

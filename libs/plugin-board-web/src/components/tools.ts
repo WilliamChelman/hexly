@@ -28,16 +28,21 @@ const TEXT_PATH = 'M6 6h12M12 6v12';
 /** A framed-picture glyph for the Image tool — a frame, a sun, and a mountain, stroked in the 24-box viewBox. */
 const IMAGE_PATH = 'M4 5h16v14H4z M8 10a1.3 1.3 0 1 0 .01 0 M5 18l4-5 3 3 4-5 4 4';
 
+/** A window-into-another glyph for the Embed tool — a frame with a smaller inset frame, in the 24-box viewBox. */
+const EMBED_PATH = 'M4 4h16v16H4z M9 9h8v8H9z';
+
 /**
  * The top-level Tools, in palette order: the non-destructive Select first (the boot default), the
- * minimal Box placement Tool (Seam B, #267), the Text Block Tool (#268), then the Image Tool (#269).
- * The visible name is resolved at the UI layer from the stable `id` (`board.toolPalette.<id>`, ADR-0014).
+ * minimal Box placement Tool (Seam B, #267), the Text Block Tool (#268), the Image Tool (#269), then the
+ * Embed Tool (#270). The visible name is resolved at the UI layer from the stable `id`
+ * (`board.toolPalette.<id>`, ADR-0014).
  */
 export const TOOLS: readonly ToolDef[] = [
   { id: 'select', hotkey: 'v', glyph: { icon: 'select' } },
   { id: 'box', hotkey: 'b', glyph: { path: BOX_PATH } },
   { id: 'text', hotkey: 't', glyph: { path: TEXT_PATH } },
   { id: 'image', hotkey: 'i', glyph: { path: IMAGE_PATH } },
+  { id: 'embed', hotkey: 'e', glyph: { path: EMBED_PATH } },
 ];
 
 /** The Tool a keyboard key arms, or undefined for a non-hotkey key. Case-insensitive. */

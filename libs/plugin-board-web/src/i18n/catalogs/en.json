@@ -22,12 +22,16 @@
     "zoomOut": "Zoom out",
     "fit": "Reset view"
   },
+  "embed": {
+    "openTarget": "Open target"
+  },
   "toolPalette": {
     "tools": "Tools",
     "select": "Select",
     "box": "Box",
     "text": "Text",
     "image": "Image",
+    "embed": "Embed",
     "undo": "Undo",
     "redo": "Redo"
   },
@@ -39,6 +43,17 @@
     "existing": "Choose existing",
     "loading": "Loading images…",
     "empty": "No images uploaded yet.",
+    "cancel": "Cancel"
+  },
+  "embedPicker": {
+    "title": "Embed an entity",
+    "target": "Entity to embed",
+    "searchPlaceholder": "Search entities…",
+    "noMatches": "No matching entities.",
+    "chosenTarget": "Embedding",
+    "view": "View to render",
+    "defaultView": "Default view",
+    "confirm": "Add embed",
     "cancel": "Cancel"
   },
   "inspector": {
@@ -54,6 +69,7 @@
     "bringForward": "Forward",
     "sendBackward": "Backward",
     "toBack": "To back",
+    "embedView": "Embedded view",
     "deleteElement": "Delete element",
     "multiTitle": "Selection",
     "selectedCount": "selected",

@@ -29,9 +29,10 @@ export type { SelectMode } from './board-selection';
  * Tool, #267). `select` is the non-destructive picker a Board opens on; `box` places the minimal static
  * element; `text` places a **Text Block** (#268); `image` places an **Image** displaying a World Asset
  * (#269) — its click opens a source chooser (upload / pick) before the element lands, so unlike Box/Text
- * the canvas does not place it synchronously.
+ * the canvas does not place it synchronously; `embed` places an **Embed** transcluding another Entity
+ * (#270) — like Image, its click opens a target chooser before the element lands.
  */
-export type ToolId = 'select' | 'box' | 'text' | 'image';
+export type ToolId = 'select' | 'box' | 'text' | 'image' | 'embed';
 
 /** The world-pixel size a freshly-placed Box is drawn at, before it is resized. */
 export const DEFAULT_BOX_SIZE: Size = { width: 160, height: 120 };
@@ -41,6 +42,9 @@ export const DEFAULT_TEXT_SIZE: Size = { width: 240, height: 120 };
 
 /** The world-pixel size a freshly-placed Image is drawn at, before it is resized to frame its Asset. */
 export const DEFAULT_IMAGE_SIZE: Size = { width: 240, height: 180 };
+
+/** The world-pixel size a freshly-placed Embed is drawn at — a generous window onto the transcluded View. */
+export const DEFAULT_EMBED_SIZE: Size = { width: 360, height: 260 };
 
 /**
  * The Board editor's store: tools, selection, and undo/redo over the surface. The document is the value
@@ -250,6 +254,39 @@ export class BoardStore {
       assetUrl,
     });
     return id;
+  }
+
+  /**
+   * Add an **Embed** at world `position` transcluding `targetEntityId` through the View named by
+   * `viewInstance` (CONTEXT.md → Embed, ADR-0062, #270). `viewInstance` is the View-instance key
+   * (`core.view.map:core.grid`); `''` selects the target's default View. Placed on top and selected, but
+   * **never armed**: an Embed is static until a click arms its read-interaction — the placement click only
+   * selects/moves it. Returns the new id.
+   */
+  addEmbed(position: Point, targetEntityId: string, viewInstance = ''): string {
+    const id = mintId();
+    this.place({
+      id,
+      kind: 'embed',
+      position: { x: position.x, y: position.y },
+      size: { ...DEFAULT_EMBED_SIZE },
+      z: 0,
+      targetEntityId,
+      viewInstance,
+    });
+    return id;
+  }
+
+  /**
+   * Re-point an **Embed** at View `viewInstance` (the Inspector's per-Embed View pick, ADR-0062), as one
+   * undoable step. A no-op for a missing id or a non-embed element, so a stray call never corrupts another
+   * kind.
+   */
+  setEmbedView(id: string, viewInstance: string): void {
+    this.commit((surface) => {
+      const element = surface.elements.find((e) => e.id === id);
+      if (element?.kind === 'embed') element.viewInstance = viewInstance;
+    });
   }
 
   /**

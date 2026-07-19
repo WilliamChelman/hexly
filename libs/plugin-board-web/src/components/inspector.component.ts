@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { ENTITY_VIEW_CHOICES, EntityViewChoice, viewInstanceKey } from '@hexly/web-entity';
 import { ButtonComponent, EyebrowComponent, FieldComponent, InputComponent } from '@hexly/web-ui';
 import { BoardStore } from '../services/board-store';
 import { inputValue } from '../utils/input-value';
@@ -82,6 +83,23 @@ const Z_ACTIONS = [
             }
           </div>
         </div>
+
+        <!-- An Embed's chosen View (ADR-0062): re-pick which of the target's Views the Embed transcludes. -->
+        @if (element.kind === 'embed') {
+          <div appField [label]="'board.inspector.embedView' | transloco">
+            <select
+              class="view-select"
+              data-testid="embed-view-select"
+              [value]="element.viewInstance"
+              (change)="onEmbedView(element.id, $event)"
+            >
+              <option value="">{{ 'board.embedPicker.defaultView' | transloco }}</option>
+              @for (choice of embedChoices(); track choice.key) {
+                <option [value]="choice.key">{{ choice.label }}</option>
+              }
+            </select>
+          </div>
+        }
       </div>
 
       <div class="flex gap-2 mt-auto pt-2">
@@ -147,13 +165,44 @@ const Z_ACTIONS = [
     .leaf::after {
       @apply bottom-1.5 right-1.5 border-l-0 border-t-0;
     }
+    .view-select {
+      @apply w-full rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink;
+      @apply focus-visible:border-gold outline-none;
+    }
   `,
 })
 export class InspectorComponent {
   protected readonly store = inject(BoardStore);
+  private readonly viewChoices = inject(ENTITY_VIEW_CHOICES, { optional: true });
 
   /** The z-order actions for the template `@for`. */
   protected readonly zActions = Z_ACTIONS;
+
+  /** The selected Embed's target id, or `null` when the selection isn't a single Embed — the choices key. */
+  private readonly embedTargetId = computed(() => {
+    const element = this.store.selectedElement();
+    return element?.kind === 'embed' ? element.targetEntityId : null;
+  });
+
+  /** The selected Embed target's afforded Views (beyond its default), resolved across the seam for the View picker. */
+  protected readonly embedChoices = signal<readonly (EntityViewChoice & { key: string })[]>([]);
+
+  constructor() {
+    // Reload the View options whenever the selected Embed's target changes; a non-Embed selection clears them.
+    effect(() => {
+      const targetId = this.embedTargetId();
+      this.embedChoices.set([]);
+      if (!targetId) return;
+      this.viewChoices?.(targetId).subscribe((choices) =>
+        this.embedChoices.set(choices.map((choice) => ({ ...choice, key: viewInstanceKey(choice.view) }))),
+      );
+    });
+  }
+
+  /** Re-point the selected Embed at the picked View (`''` = the target's default View). */
+  protected onEmbedView(id: string, event: Event): void {
+    this.store.setEmbedView(id, inputValue(event));
+  }
 
   // Each geometry handler reads the *current* selected element, not the one bound at last render: a
   // second field edited before change detection re-runs must compose with the first, not clobber it
