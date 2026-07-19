@@ -13,10 +13,12 @@ import { InspectorComponent } from './inspector.component';
  * The `core.view.board` renderer (ADR-0048, *Views* amendment): the full-bleed board surface with its
  * floating tool palette and Inspector dock (#267, Seam B).
  *
- * The canvas grid is a read affordance (pan/zoom); the element overlay and every editing dock are gated
- * on {@link ENTITY_SESSION.writable}, so a read-only opener sees the plane but no editing chrome
- * (ADR-0037), mirroring the Hex Map View. `display:contents` so the canvas and floating chrome position
- * against the entity page's `<main>`.
+ * The canvas grid is a read affordance (pan/zoom) and the element overlay renders for every session —
+ * a read-only opener and an Embed's transclusion (ADR-0062) must see the Board's *content*, not a bare
+ * grid, or nested Embeds never mount. Only the editing docks (tool palette, Inspector) and the overlay's
+ * editing gestures are gated on {@link ENTITY_SESSION.writable} (ADR-0037), mirroring the Hex Map View
+ * whose content canvas renders outside the writable gate. `display:contents` so the canvas and floating
+ * chrome position against the entity page's `<main>`.
  *
  * Provides the route-scoped {@link BoardStore} (the surface document + tools + selection) and
  * {@link BoardCamera} (the shared pan/zoom the canvas and element overlay both read); both inject the
@@ -32,10 +34,11 @@ import { InspectorComponent } from './inspector.component';
   template: `
     <!-- Full-bleed canvas grid; the element overlay and all side chrome float over it (ADR-0013). -->
     <app-board-canvas class="absolute inset-0" />
+    <!-- The Board Element layer renders for every session (ADR-0062): read-only for a non-writable opener
+         or an Embed's transclusion (no picks/drags/resizes), interactive when writable. Empty-plane
+         presses fall through to the canvas below (its host is pointer-events-none, each box re-enables it). -->
+    <app-board-elements [readOnly]="!session.writable()" />
     @if (session.writable()) {
-      <!-- The interactive Board Element layer: picks, drags, resizes; empty-plane presses fall through
-           to the canvas below (its host is pointer-events-none, each element box re-enables it). -->
-      <app-board-elements />
       <app-board-tool-palette class="absolute top-3 left-3 z-[1]" />
       <!--
         Right dock: the Inspector as a flex row, no hand-computed offsets (ADR-0013). pointer-events-none

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, HostListener, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, HostListener, inject, input, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EmbedElement, ImageElement, Point, Size, stackingOrder, TextElement } from '@hexly/plugin-board';
 import { BoardCamera } from '../services/board-camera';
@@ -77,6 +77,12 @@ type Gesture =
  * release, so the whole gesture is one undo step. The host is `pointer-events-none` and each element box
  * re-enables the pointer, so a press on empty plane falls through to the canvas below (pan / place /
  * deselect).
+ *
+ * Set {@link readOnly} for a read-only viewer or an Embed's live transclusion (ADR-0037/0062): the layer
+ * still draws every element (so a transcluded Board shows its content, not a bare grid, and nested Embeds
+ * mount), but affords no editing — no select/drag/resize, no arm, and no keyboard mutation. The Embed's
+ * own open-target affordance is unaffected (it owns its pointer). This mirrors the Hex Map View, whose
+ * content canvas renders outside the writable gate and whose editing chrome alone is gated.
  */
 @Component({
   selector: 'app-board-elements',
@@ -87,6 +93,7 @@ type Gesture =
     @for (el of rendered(); track el.id) {
       <div
         class="element"
+        [class.is-readonly]="readOnly()"
         [class.is-selected]="el.selected"
         [class.is-armed]="el.armed"
         [class.is-text]="!!el.text"
@@ -110,7 +117,7 @@ type Gesture =
         @if (el.embed; as embed) {
           <app-board-embed [element]="embed" />
         }
-        @if (el.selected && single() && !el.armed) {
+        @if (!readOnly() && el.selected && single() && !el.armed) {
           @for (h of handles; track h.dir) {
             <span
               class="handle {{ h.at }}"
@@ -130,6 +137,11 @@ type Gesture =
       @apply absolute pointer-events-auto rounded-sm cursor-move;
       background: color-mix(in srgb, var(--color-gold-soft) 55%, transparent);
       border: 1px solid var(--color-line-strong);
+    }
+    /* Read-only (a read-only viewer or an Embed's transclusion, ADR-0037/0062): the element renders its
+       content but affords no move — no drag, no handles, no selection chrome. */
+    .element.is-readonly {
+      @apply cursor-default;
     }
     /* A Text Block reads as paper carrying prose, not a gold placeholder; armed, it invites a caret. */
     .element.is-text {
@@ -163,6 +175,12 @@ type Gesture =
 export class BoardElementsComponent {
   private readonly cam = inject(BoardCamera);
   private readonly store = inject(BoardStore);
+
+  /**
+   * Read-only rendering (ADR-0037/0062): the elements draw but afford no editing — no select/drag/resize,
+   * no arm, no keyboard mutation. Drives a read-only viewer and an Embed's transclusion off one component.
+   */
+  readonly readOnly = input(false);
 
   protected readonly handles = HANDLES;
 
@@ -215,6 +233,8 @@ export class BoardElementsComponent {
   // ---- Element press: pick, then arm a move ---------------------------------
 
   protected onElementDown(id: string, event: PointerEvent): void {
+    // Read-only: no pick/move gesture, and no stopPropagation, so the press is inert (ADR-0062).
+    if (this.readOnly()) return;
     if (event.button !== 0) return;
     // An armed Text Block owns the pointer for typing and text selection: let the press reach its editor
     // and start no move gesture — dragging requires disarming first (CONTEXT.md → Text Block, #268).
@@ -243,6 +263,7 @@ export class BoardElementsComponent {
    * have no active mode, so the double-click is inert on them.
    */
   protected onElementDblClick(id: string): void {
+    if (this.readOnly()) return; // no arming a transcluded/read-only element (ADR-0062).
     const element = this.store.document().elements.find((e) => e.id === id);
     if (element?.kind !== 'text' && element?.kind !== 'embed') return;
     this.store.select(id, 'replace');
@@ -252,6 +273,7 @@ export class BoardElementsComponent {
   // ---- Handle press: resize -------------------------------------------------
 
   protected onHandleDown(id: string, dir: Corner, event: PointerEvent): void {
+    if (this.readOnly()) return; // handles never render read-only, but guard the entry too.
     if (event.button !== 0) return;
     event.stopPropagation();
     (event.target as Element).setPointerCapture?.(event.pointerId);
@@ -322,6 +344,9 @@ export class BoardElementsComponent {
    */
   @HostListener('window:keydown', ['$event'])
   protected onKeydown(event: KeyboardEvent): void {
+    // Read-only: no delete/undo/tool shortcuts. Load-bearing for an Embed — this is a window-level
+    // listener, so a transcluded read-only board must not mutate its store off the outer page's keys.
+    if (this.readOnly()) return;
     if (isEditableTarget(event.target)) return;
 
     if (event.metaKey || event.ctrlKey) {

@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
-import { ENTITY_VIEW_CHOICES, EntitySearchPickerComponent, EntityViewChoice, viewInstanceKey } from '@hexly/web-entity';
+import { ENTITY_VIEW_CHOICES, EntitySearchPickerComponent } from '@hexly/web-entity';
 import { ButtonComponent, DialogComponent, DialogRef } from '@hexly/web-ui';
+import { keyedViewChoices, KeyedViewChoice } from '../utils/embed-view-choices';
 
 /** What the picker is launched with: the World whose Entities it searches. */
 export interface EmbedPickerData {
@@ -118,16 +120,23 @@ export class BoardEmbedPickerComponent {
   /** The chosen View's instance key; `''` is the target's default View. */
   protected readonly viewKey = signal('');
   /** The target's afforded Views (beyond its default), resolved across the seam. */
-  protected readonly choices = signal<readonly (EntityViewChoice & { key: string })[]>([]);
+  protected readonly choices = signal<readonly KeyedViewChoice[]>([]);
+
+  /** The in-flight View-choices request, cancelled on a re-pick and on teardown (ADR-0062). */
+  private choicesSub: Subscription | null = null;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.choicesSub?.unsubscribe());
+  }
 
   /** Adopt the picked target and load its View choices; the View resets to the target's default. */
   protected onPick(entity: EntitySummary): void {
     this.target.set(entity);
     this.viewKey.set('');
     this.choices.set([]);
-    this.viewChoices?.(entity.id).subscribe((choices) => {
-      this.choices.set(choices.map((choice) => ({ ...choice, key: viewInstanceKey(choice.view) })));
-    });
+    // Cancel a prior in-flight request so a rapid re-pick can't paint the earlier target's Views.
+    this.choicesSub?.unsubscribe();
+    this.choicesSub = keyedViewChoices(this.viewChoices, entity.id).subscribe((choices) => this.choices.set(choices));
   }
 
   /** Close with the chosen target and View — what the Embed Tool places an element from. */

@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ENTITY_VIEW_CHOICES, EntityViewChoice, viewInstanceKey } from '@hexly/web-entity';
+import { ENTITY_VIEW_CHOICES } from '@hexly/web-entity';
 import { ButtonComponent, EyebrowComponent, FieldComponent, InputComponent } from '@hexly/web-ui';
 import { BoardStore } from '../services/board-store';
 import { inputValue } from '../utils/input-value';
+import { keyedViewChoices, KeyedViewChoice } from '../utils/embed-view-choices';
 
 /** The z-order actions, as the Inspector's stacking controls — each dispatches a pure reordering. */
 const Z_ACTIONS = [
@@ -185,17 +186,18 @@ export class InspectorComponent {
   });
 
   /** The selected Embed target's afforded Views (beyond its default), resolved across the seam for the View picker. */
-  protected readonly embedChoices = signal<readonly (EntityViewChoice & { key: string })[]>([]);
+  protected readonly embedChoices = signal<readonly KeyedViewChoice[]>([]);
 
   constructor() {
-    // Reload the View options whenever the selected Embed's target changes; a non-Embed selection clears them.
-    effect(() => {
+    // Reload the View options whenever the selected Embed's target changes; a non-Embed selection clears
+    // them. `onCleanup` cancels the prior in-flight request on a target change, so an out-of-order
+    // response never paints Embed A's Views under Embed B (ADR-0062).
+    effect((onCleanup) => {
       const targetId = this.embedTargetId();
       this.embedChoices.set([]);
       if (!targetId) return;
-      this.viewChoices?.(targetId).subscribe((choices) =>
-        this.embedChoices.set(choices.map((choice) => ({ ...choice, key: viewInstanceKey(choice.view) }))),
-      );
+      const sub = keyedViewChoices(this.viewChoices, targetId).subscribe((choices) => this.embedChoices.set(choices));
+      onCleanup(() => sub.unsubscribe());
     });
   }
 

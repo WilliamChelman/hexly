@@ -111,6 +111,73 @@ describe('BoardElements rendering', () => {
   });
 });
 
+describe('BoardElements read-only (ADR-0062 transclusion / read-only viewer)', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [BoardElementsComponent, provideTranslocoTesting(BOARD_TEST_CATALOGS)],
+      providers: [...provideBoardStoreTesting(), BoardCamera],
+    }).compileComponents();
+  });
+
+  function setup() {
+    const store = TestBed.inject(BoardStore);
+    const fixture = TestBed.createComponent(BoardElementsComponent);
+    fixture.componentRef.setInput('readOnly', true);
+    fixture.detectChanges();
+    return { store, fixture };
+  }
+
+  it('still renders every element (content, not a bare grid)', () => {
+    const { store, fixture } = setup();
+    const id = store.addElement({ x: 30, y: 40 });
+    fixture.detectChanges();
+    const box = fixture.nativeElement.querySelector(`[data-testid=element-${id}]`) as HTMLElement;
+    expect(box).not.toBeNull();
+    expect(box.classList.contains('is-readonly')).toBe(true);
+  });
+
+  it('shows no resize handles even on a single selected element', () => {
+    const { store, fixture } = setup();
+    store.addElement({ x: 0, y: 0 }); // selected on add
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid=handle-nw]')).toBeNull();
+  });
+
+  it('does not arm a Text Block on double-click', () => {
+    const { store, fixture } = setup();
+    const id = store.addText({ x: 0, y: 0 });
+    store.disarm();
+    fixture.detectChanges();
+
+    const box = fixture.nativeElement.querySelector(`[data-testid=element-${id}]`) as HTMLElement;
+    box.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    expect(store.armed()).toBeNull();
+  });
+
+  it('ignores mutation keys — a window keydown cannot delete or reorder a transcluded board', () => {
+    const { store, fixture } = setup();
+    const id = store.addElement({ x: 0, y: 0 });
+    fixture.detectChanges();
+
+    press('Delete');
+    expect(store.document().elements.find((e) => e.id === id)).toBeDefined();
+  });
+
+  it('does not start a move gesture on an element press', () => {
+    const { store, fixture } = setup();
+    const id = store.addElement({ x: 0, y: 0 });
+    fixture.detectChanges();
+    const box = fixture.nativeElement.querySelector(`[data-testid=element-${id}]`) as HTMLElement;
+
+    box.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 0, clientY: 0, bubbles: true }));
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 100, clientY: 100, bubbles: true }));
+    window.dispatchEvent(new PointerEvent('pointerup', { clientX: 100, clientY: 100, bubbles: true }));
+
+    // The element never moved: no gesture was armed by the read-only press.
+    expect(store.document().elements.find((e) => e.id === id)?.position).toEqual({ x: 0, y: 0 });
+  });
+});
+
 describe('BoardElements keyboard', () => {
   let store: BoardStore;
 
