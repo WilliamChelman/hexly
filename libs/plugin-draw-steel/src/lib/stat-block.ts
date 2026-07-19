@@ -160,6 +160,26 @@ export const powerRollSchema = z.object({
 export type PowerRoll = z.infer<typeof powerRollSchema>;
 
 /**
+ * The three power-roll tiers, in printed order: the `key` its stored tier text rides ({@link PowerRoll}), the
+ * printed `band`, and the inclusive `max` a resolved total falls under. Draw Steel owns this mapping (the dice
+ * lib stays generic, CONTEXT.md → Dice); one source of truth so the printed band and the read-time
+ * {@link resolveTier} can never drift (#252). `max: Infinity` makes the top tier the open-ended catch-all.
+ */
+export const DS_POWER_ROLL_TIERS = [
+  { key: 't1', band: '≤11', max: 11 },
+  { key: 't2', band: '12–16', max: 16 },
+  { key: 't3', band: '17+', max: Infinity },
+] as const;
+
+export type DsTierKey = (typeof DS_POWER_ROLL_TIERS)[number]['key'];
+
+/** Band a resolved power-roll total to its {@link DS_POWER_ROLL_TIERS} tier — `≤11`/`12–16`/`17+` (#252). */
+export function resolveTier(total: number): DsTierKey {
+  return (DS_POWER_ROLL_TIERS.find((tier) => total <= tier.max) ?? DS_POWER_ROLL_TIERS[DS_POWER_ROLL_TIERS.length - 1])
+    .key;
+}
+
+/**
  * An active **Ability** — a signature action, maneuver, or triggered/villain action. Render-faithful
  * structured data (#246): `distance`/`target` are display strings this pass, not typed geometry, and an
  * Ability either rolls (its {@link PowerRoll} three tiers) or states a flat `effect` — both optional, so a

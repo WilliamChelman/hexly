@@ -1,5 +1,5 @@
 import { EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
-import { LucideSwords } from '@lucide/angular';
+import { LucideDices, LucideSwords } from '@lucide/angular';
 import { providePlugin } from '@hexly/web-entity';
 import { lucideGlyph, provideIcons } from '@hexly/web-ui';
 import { PLUGIN_ID, DS_STAT_BLOCK, DS_STAT_BLOCK_FIELD, STAT_BLOCK_DATA_TYPE } from '@hexly/plugin-draw-steel';
@@ -15,9 +15,10 @@ import { DS_TYPE_DEFINITIONS, DS_VIEW_STAT_BLOCK } from './draw-steel-types';
  */
 export function providePluginDrawSteel(): EnvironmentProviders {
   return makeEnvironmentProviders([
-    // The `swords` glyph the monster type wears (#242): a bundled plugin dresses its type in a Lucide
-    // glyph web-ui's core vocabulary omits by registering it here, not by editing web-ui (ADR-0007).
-    provideIcons([lucideGlyph('swords', LucideSwords)]),
+    // The `swords` glyph the monster type wears (#242) and the `dices` glyph the read-view power-roll
+    // button wears (#252): a bundled plugin dresses itself in Lucide glyphs web-ui's core vocabulary
+    // omits by registering them here, not by editing web-ui (ADR-0007).
+    provideIcons([lucideGlyph('swords', LucideSwords), lucideGlyph('dices', LucideDices)]),
     providePlugin({
       id: PLUGIN_ID,
       types: DS_TYPE_DEFINITIONS,
