@@ -22,6 +22,7 @@ import {
 import { WEB_ENTITY_TRANSLATIONS, COLLAB_TRANSLATIONS } from '@hexly/web-entity/i18n';
 import { ADMIN_TRANSLATIONS } from '@hexly/admin-web/i18n';
 import { COMMAND_PALETTE_TRANSLATIONS } from '@hexly/command-palette-web/i18n';
+import { DICE_TRANSLATIONS } from '@hexly/dice-web/i18n';
 import { ENTITY_TYPES } from '@hexly/web-entity';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
@@ -59,6 +60,8 @@ export const appConfig: ApplicationConfig = {
       // The palette's section labels and Command copy are read from Providers (services), where no
       // pipe of the palette lib is guaranteed to trigger the scope's load (ADR-0049).
       COMMAND_PALETTE_TRANSLATIONS,
+      // The dice Provider reads its section/roll/hint copy imperatively too (ADR-0049).
+      DICE_TRANSLATIONS,
     ),
     // ICU MessageFormat transpiler: count-aware plural keys (e.g. the hex count)
     // resolve per the active locale's plural rules. It delegates {{…}} to the

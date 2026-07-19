@@ -1,0 +1,5 @@
+{
+  "section": "Dice",
+  "roll": "Roll {{expression}}",
+  "invalid": "Not a valid dice expression"
+}

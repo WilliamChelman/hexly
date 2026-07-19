@@ -2,3 +2,6 @@
 export * from './dice';
 export * from './parse';
 export * from './evaluate';
+export * from './format';
+// Palette rolling (issue #251): the `/r ` Command Provider, formatting a Roll through the toaster.
+export * from './dice-commands';
