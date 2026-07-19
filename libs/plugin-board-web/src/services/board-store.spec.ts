@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { BoardElement, BoardSurface, emptyBoardSurface } from '@hexly/plugin-board';
+import { BoardElement, BoardSurface, emptyBoardSurface, TextElement } from '@hexly/plugin-board';
+import { emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { BoardStore } from './board-store';
 import { FakeEntitySession, provideBoardStoreTesting } from '../testing/entity-session.fake';
 
@@ -290,6 +291,53 @@ describe('BoardStore element operations', () => {
     expect(store.document().elements.map((e) => e.id)).not.toContain(b);
     // a stays selected.
     expect(store.selectedElement()?.id).toBe(a);
+  });
+});
+
+describe('BoardStore Text Block', () => {
+  it('adds a Text Block: an empty core.rich-content element on top, selected and armed to type into', () => {
+    const store = makeStore();
+    const box = store.addElement({ x: 0, y: 0 });
+    const id = store.addText({ x: 20, y: 30 });
+
+    const element = store.document().elements.find((e) => e.id === id) as TextElement | undefined;
+    expect(element?.kind).toBe('text');
+    expect(element?.position).toEqual({ x: 20, y: 30 });
+    // The same empty `core.rich-content` value an Entity's Content opens on.
+    expect(element?.content).toEqual(emptyContent());
+    // Lands above the pre-existing box.
+    const boxZ = store.document().elements.find((e) => e.id === box)?.z ?? 0;
+    expect(element?.z).toBeGreaterThan(boxZ);
+    // Selected and armed so the author writes in it at once (the first inline-edit consumer of arm/disarm).
+    expect(store.selectedElement()?.id).toBe(id);
+    expect(store.armed()).toBe(id);
+  });
+
+  it('commits new prose into a Text Block as one undoable step', () => {
+    const store = makeStore();
+    const id = store.addText({ x: 0, y: 0 });
+    const prose = tiptapContent({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hail' }] }],
+    });
+
+    store.setContent(id, prose);
+    expect((store.document().elements[0] as TextElement).content).toEqual(prose);
+
+    store.undo();
+    expect((store.document().elements[0] as TextElement).content).toEqual(emptyContent());
+  });
+
+  it('ignores setContent for a missing element or a non-text kind — records no undo step', () => {
+    const store = makeStore();
+    const box = store.addElement({ x: 0, y: 0 });
+    const before = store.document();
+
+    store.setContent(box, tiptapContent({ type: 'doc', content: [] }));
+    store.setContent('missing', tiptapContent({ type: 'doc', content: [] }));
+
+    // No commit fired, so the document reference is untouched.
+    expect(store.document()).toBe(before);
   });
 });
 

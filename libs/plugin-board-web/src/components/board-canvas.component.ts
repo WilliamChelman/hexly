@@ -40,10 +40,10 @@ const DOT_RADIUS = 1;
  * (`BoardElementsComponent`); both read the same route-scoped {@link BoardCamera}, so grid and elements
  * pan and zoom in lockstep.
  *
- * Tool-aware (#267): with the Box Tool armed, a primary click on empty plane places the minimal element
- * at the clicked world point; with Select armed, a primary click on empty plane clears the selection.
- * The overlay's element boxes are `pointer-events-auto`, so a click that lands on an element never
- * reaches this canvas — only empty-plane gestures do.
+ * Tool-aware (#267, #268): with a placement Tool armed (Box, Text), a primary click on empty plane
+ * places that Tool's element at the clicked world point; with Select armed, a primary click on empty
+ * plane clears the selection. The overlay's element boxes are `pointer-events-auto`, so a click that
+ * lands on an element never reaches this canvas — only empty-plane gestures do.
  */
 @Component({
   selector: 'app-board-canvas',
@@ -147,9 +147,12 @@ export class BoardCanvasComponent {
     (event.target as Element).setPointerCapture?.(event.pointerId);
     const world = this.toWorld(event);
 
-    // Box Tool: a primary click on empty plane places the minimal element and selects it. No pan.
-    if (event.button === 0 && this.store.tool() === 'box') {
-      this.store.addElement(world);
+    // A placement Tool (Box, Text): a primary click on empty plane places its element at the clicked
+    // world point and selects it — no pan. Select is the only non-placing Tool.
+    const tool = this.store.tool();
+    if (event.button === 0 && tool !== 'select') {
+      if (tool === 'text') this.store.addText(world);
+      else this.store.addElement(world);
       this.activePointerId = null;
       (event.target as Element).releasePointerCapture?.(event.pointerId);
       return;

@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { tiptapContent } from '@hexly/plugin-content';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { BOARD_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { BoardStore } from '../services/board-store';
@@ -48,6 +49,50 @@ describe('BoardElements rendering', () => {
 
     const b = store.addElement({ x: 50, y: 0 });
     store.selectMany([b, store.document().elements[0].id]); // two selected → no handles
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid=handle-nw]')).toBeNull();
+  });
+
+  it('renders a Text Block’s prose in place, static (read-only) until armed', () => {
+    const { store, fixture } = setup();
+    const id = store.addText({ x: 0, y: 0 });
+    store.setContent(
+      id,
+      tiptapContent({
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Whisperwood' }] }],
+      }),
+    );
+    // addText arms the new block; disarm so the static (read-only) face renders.
+    store.disarm();
+    fixture.detectChanges();
+
+    const box = fixture.nativeElement.querySelector(`[data-testid=element-${id}]`) as HTMLElement;
+    expect(box.classList.contains('is-text')).toBe(true);
+    expect(box.textContent).toContain('Whisperwood');
+  });
+
+  it('double-clicking a Text Block arms it for inline editing (#268)', () => {
+    const { store, fixture } = setup();
+    const id = store.addText({ x: 0, y: 0 });
+    store.disarm();
+    fixture.detectChanges();
+
+    const box = fixture.nativeElement.querySelector(`[data-testid=element-${id}]`) as HTMLElement;
+    box.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+
+    // Assert the store state without re-rendering: mounting the live editor needs the full content
+    // harness; the arm itself is what this seam owns.
+    expect(store.armed()).toBe(id);
+  });
+
+  it('hides the resize handles on an armed element — it must be disarmed before resizing (#268)', () => {
+    const { store, fixture } = setup();
+    const id = store.addElement({ x: 0, y: 0 }); // a Box, selected → handles show
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid=handle-nw]')).not.toBeNull();
+
+    store.arm(id);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[data-testid=handle-nw]')).toBeNull();
   });
