@@ -104,6 +104,27 @@ describe('CommandRegistry', () => {
     ]);
   });
 
+  it('exposes the distinct prefixes of its registered providers', () => {
+    expect(registry.prefixes()).toEqual([]);
+
+    registry.register(provider(''));
+    registry.register(provider('>'));
+    // A second provider on an existing prefix must not duplicate it.
+    registry.register(provider('>'));
+    registry.register(provider('/r '));
+
+    expect(registry.prefixes()).toEqual(['', '>', '/r ']);
+  });
+
+  it('drops a prefix once its last provider unregisters', () => {
+    const unregister = registry.register(provider('/r '));
+    registry.register(provider(''));
+    expect(registry.prefixes()).toEqual(['/r ', '']);
+
+    unregister();
+    expect(registry.prefixes()).toEqual(['']);
+  });
+
   it("seeds a new query with the provider's previous results (no blank between queries)", () => {
     const results = new Subject<Command[]>();
     // One provider whose emissions the test drives; it ignores the query text.

@@ -234,6 +234,24 @@ _Avoid_: Quick open, search bar, spotlight
 A single invocable entry in the Command Palette — e.g. creating a Note, or navigating to a matched Entity or World. Distinct from a Tool: invoking a Command may arm a Tool, but a Command is not itself one.
 _Avoid_: Action, shortcut
 
+**Command Prefix**:
+The leading marker that routes a Command Palette query to the **Command Providers** bound to it — empty is Quick Open (Entity/World search), `>` is Show Commands, `/r ` is a **Roll**. Many-to-one: several Providers may answer one prefix. A query routes to the **longest** registered prefix it starts with, so multi-character prefixes coexist with single-character ones and no provider hard-codes the set.
+_Avoid_: Sigil, trigger, mode key
+
+## Dice
+
+**Roll**:
+An ephemeral evaluation of a **Dice Expression** into a **Roll Result** — a live, in-session action, **never persisted**: it writes nothing to an **Entity Document**, adds no server surface, and vanishes on reload. Raised two ways: from the **Command Palette** under the `/r ` **Command Prefix**, or from a context button (today, a Draw Steel **Power Roll**, which resolves ephemerally while its stored tiers stay render-faithful prose — Hexly rolls, but never stores the roll).
+_Avoid_: Throw, dice throw (informal only), roll record, roll log (nothing is logged)
+
+**Dice Expression**:
+The notation a **Roll** evaluates: dice terms (`NdM`) combined with arithmetic (`+ - * /` and parentheses, division flooring) and per-term modifiers (keep/drop highest-lowest, exploding, reroll). Parsed forward-only — invalid text yields a typed error surfaced to the user, never a throw.
+_Avoid_: Formula, dice string, notation (bare)
+
+**Roll Result**:
+The structured outcome of a **Roll** — the per-die faces, per-term subtotals, and the numeric total. Presented ephemerally: flashed through the toaster for a palette Roll, or in an anchored bubble for a button Roll. Any reading beyond the total (a Draw Steel tier band) belongs to the caller, not the Roll.
+_Avoid_: Outcome, score, value
+
 ## Entity Browser
 
 **Entity Browser**:

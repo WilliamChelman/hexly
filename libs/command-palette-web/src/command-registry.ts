@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 import { Observable, combineLatest, map, of, startWith, tap } from 'rxjs';
 import { Command, CommandProvider } from './command';
 
@@ -18,6 +18,12 @@ export class CommandRegistry {
   // Each Provider's most recent results, seeding the next query so the list
   // never blanks between keystrokes. Bounded by the small Provider count.
   private readonly lastResults = new Map<CommandProvider, readonly Command[]>();
+
+  /**
+   * The distinct prefixes registered Providers answer, so the parser can route
+   * to the longest match without hard-coding the set (ADR-0059).
+   */
+  readonly prefixes = computed<readonly string[]>(() => [...new Set(this.providers().map((p) => p.prefix))]);
 
   register(provider: CommandProvider): () => void {
     this.providers.update((list) => [...list, provider]);
