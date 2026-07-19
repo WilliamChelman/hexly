@@ -7,11 +7,11 @@ import {
   BoardSurface,
   emptyBoardSurface,
   ImageElement,
-  moveElement,
+  pointSchema,
   removeElement,
-  resizeElement,
   sendBackward,
   sendToBack,
+  sizeSchema,
   stackingOrder,
 } from './board-surface';
 
@@ -45,14 +45,25 @@ describe('Box element (minimal static element, #267)', () => {
     expect(parsed.success && parsed.data.elements[0].kind).toBe('box');
   });
 
-  it('flows through the shared geometry and z-order helpers like any element', () => {
+  it('flows through the shared z-order helpers like any element', () => {
     let surface = addElement(addElement(emptyBoardSurface(), box('a')), box('b'));
-    surface = moveElement(surface, 'a', { x: 4, y: 6 });
-    surface = resizeElement(surface, 'a', { width: 30, height: 40 });
-    expect(stackingOrder(surface).map((e) => e.id)).toEqual(['a', 'b']);
-    const a = surface.elements.find((e) => e.id === 'a');
-    expect(a?.position).toEqual({ x: 4, y: 6 });
-    expect(a?.size).toEqual({ width: 30, height: 40 });
+    surface = bringToFront(surface, 'a');
+    expect(stackingOrder(surface).map((e) => e.id)).toEqual(['b', 'a']);
+  });
+});
+
+describe('geometry schemas reject non-finite values (data-loss guard)', () => {
+  // A non-finite coordinate/extent survives in memory but `JSON.stringify(Infinity) === "null"`, so it
+  // persists as `null` and fails the reload parse — the whole board would open empty (ADR-0062, #267).
+  it('rejects a non-finite point', () => {
+    expect(pointSchema.safeParse({ x: Infinity, y: 0 }).success).toBe(false);
+    expect(pointSchema.safeParse({ x: 0, y: Number.NaN }).success).toBe(false);
+    expect(pointSchema.safeParse({ x: 4, y: -6 }).success).toBe(true);
+  });
+
+  it('rejects a non-finite size', () => {
+    expect(sizeSchema.safeParse({ width: Infinity, height: 10 }).success).toBe(false);
+    expect(sizeSchema.safeParse({ width: 10, height: 20 }).success).toBe(true);
   });
 });
 
@@ -73,28 +84,11 @@ describe('Board element helpers (#263)', () => {
     expect(order(surface)).toEqual(['a', 'b']);
   });
 
-  it('moves and resizes an element, leaving others untouched', () => {
-    let surface = addElement(addElement(emptyBoardSurface(), image('a')), image('b'));
-    surface = moveElement(surface, 'a', { x: 5, y: 7 });
-    surface = resizeElement(surface, 'a', { width: 20, height: 30 });
-    const a = surface.elements.find((element) => element.id === 'a');
-    const b = surface.elements.find((element) => element.id === 'b');
-    expect(a?.position).toEqual({ x: 5, y: 7 });
-    expect(a?.size).toEqual({ width: 20, height: 30 });
-    expect(b?.position).toEqual({ x: 0, y: 0 });
-  });
-
   it('removes an element, and is a no-op on an unknown id', () => {
     let surface = addElement(addElement(emptyBoardSurface(), image('a')), image('b'));
     surface = removeElement(surface, 'a');
     expect(surface.elements.map((element) => element.id)).toEqual(['b']);
     expect(removeElement(surface, 'missing')).toEqual(surface);
-  });
-
-  it('is a no-op when moving/resizing an unknown id', () => {
-    const surface = addElement(emptyBoardSurface(), image('a'));
-    expect(moveElement(surface, 'missing', { x: 1, y: 1 })).toEqual(surface);
-    expect(resizeElement(surface, 'missing', { width: 1, height: 1 })).toEqual(surface);
   });
 
   describe('z-order reordering', () => {
@@ -129,6 +123,16 @@ describe('Board element helpers (#263)', () => {
       const surface = stacked('a', 'b');
       expect(bringForward(surface, 'missing')).toEqual(surface);
       expect(sendToBack(surface, 'missing')).toEqual(surface);
+    });
+
+    it('returns the input document by reference when order and dense-z are already correct', () => {
+      // A boundary action (bringToFront on the top element, sendToBack on the bottom) changes nothing;
+      // the identical reference lets a caller (the store's commit) record no undo step / autosave.
+      const surface = stacked('a', 'b', 'c');
+      expect(bringToFront(surface, 'c')).toBe(surface);
+      expect(sendToBack(surface, 'a')).toBe(surface);
+      expect(bringForward(surface, 'c')).toBe(surface);
+      expect(sendBackward(surface, 'a')).toBe(surface);
     });
   });
 });

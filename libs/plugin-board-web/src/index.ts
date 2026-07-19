@@ -6,6 +6,6 @@
  * Export nothing component-bound: `app.config.ts` imports this file, so anything exported here ships on
  * the initial bundle. The canvas, its chrome, and the store behind them are reachable only through the
  * `loadComponent` inside the provider, and so live in the board View's own chunk. A spec wanting the
- * real store takes it from `@hexly/plugin-board/testing`.
+ * real store reaches it by relative path (the plugin's own specs do), never through this production barrel.
  */
 export { providePluginBoard } from './provide-plugin-board';

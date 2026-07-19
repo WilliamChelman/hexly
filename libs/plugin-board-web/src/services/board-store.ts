@@ -315,8 +315,14 @@ export class BoardStore {
     if (committed) this.trackSelectionOnLastEdit();
   }
 
-  /** Move element `id` to world `position`; a no-op (no undo step) if there is no such element. */
+  /**
+   * Move element `id` to world `position`; a no-op (no undo step) if there is no such element, or the
+   * position is non-finite. The Inspector can send `Number('1e400') === Infinity`, which serializes to
+   * `null` and fails the reload parse (whole-board loss), so the store is the deep guard — symmetric with
+   * {@link resize}'s size guard.
+   */
   move(id: string, position: Point): void {
+    if (!isFinitePoint(position)) return;
     this.commit((surface) => {
       const element = surface.elements.find((e) => e.id === id);
       if (element) element.position = { x: position.x, y: position.y };
@@ -342,7 +348,7 @@ export class BoardStore {
    * size is non-positive.
    */
   setGeometry(id: string, position: Point, size: Size): void {
-    if (!isPositiveSize(size)) return;
+    if (!isFinitePoint(position) || !isPositiveSize(size)) return;
     this.commit((surface) => {
       const element = surface.elements.find((e) => e.id === id);
       if (element) {
@@ -358,6 +364,7 @@ export class BoardStore {
    * rides the move for free (the elements keep their ids). Returns whether a step was recorded.
    */
   moveSelected(delta: Point): boolean {
+    if (!isFinitePoint(delta)) return false;
     if (delta.x === 0 && delta.y === 0) return false;
     const ids = new Set(this.sel.selectedIds());
     if (ids.size === 0) return false;
@@ -543,6 +550,11 @@ function isObject(value: unknown): value is object {
 /** Whether both dimensions are positive and finite — the guard `sizeSchema` enforces at rest. */
 function isPositiveSize(size: Size): boolean {
   return Number.isFinite(size.width) && Number.isFinite(size.height) && size.width > 0 && size.height > 0;
+}
+
+/** Whether both coordinates are finite — the guard `pointSchema` enforces at rest (a non-finite persists as `null`). */
+function isFinitePoint(point: Point): boolean {
+  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }
 
 /**

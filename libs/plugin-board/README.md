@@ -7,10 +7,9 @@ that composes it. The free-positioned 2D sibling of the **Hex Map**, built the s
 Two entry points, because a plugin's halves have different consumers:
 
 - `@hexly/plugin-board` — framework-free: the surface document (`boardSurfaceSchema` and its three
-  Board Element kinds — Image, Embed, Text Block), the pure element/z-order helpers (add, move, resize,
-  bring-forward/backward, to-front/back), the pure Embed cycle/depth resolution (`resolveEmbedRender`),
-  the `core.board-surface` data-type (its schema, its empty plane, its edge/text harvesters), and the
-  `core.board` `defineType()`. The API names it in `bundled-plugins.ts` and from that alone gets surface
+  Board Element kinds — Image, Embed, Text Block), the pure element/z-order helpers (add, remove,
+  bring-forward/backward, to-front/back), the `core.board-surface` data-type (its schema, its empty
+  plane, its edge/text harvesters), and the `core.board` `defineType()`. The API names it in `bundled-plugins.ts` and from that alone gets surface
   validation, edge-harvesting, and vault projection — `apps/api` carries no board-specific code. Must
   never see Angular.
 - `@hexly/plugin-board/web` — the Angular half (a later seam): the canvas, the tool palette, the

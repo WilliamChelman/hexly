@@ -18,7 +18,7 @@ import { z } from 'zod';
  * The Board plugin's `features.plugin.board` schema (ADR-0052, ADR-0062): the base `{ enabled }` plus
  * `maxEmbedDepth`, the ceiling on **Embed** transclusion depth. A positive integer, default 3 — so
  * `features.plugin.board.maxEmbedDepth` is a real Instance-Configuration knob the `-web` half threads
- * into `resolveEmbedRender`.
+ * into the Entity View Outlet's render context (`EntityRenderContext.maxDepth`), which bounds transclusion.
  */
 export const boardConfigSchema: PluginConfigSchema = basePluginConfigSchema.extend({
   maxEmbedDepth: z.number().int().positive().default(DEFAULT_MAX_EMBED_DEPTH),

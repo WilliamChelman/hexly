@@ -11,11 +11,15 @@
 import { contentSchema } from '@hexly/plugin-content';
 import { z } from 'zod';
 
+// Coordinates and extents are `.finite()`: a non-finite value (a bad inspector entry, `1e400`) survives
+// in memory but `JSON.stringify(Infinity) === "null"`, so it persists as `null` and fails the reload
+// parse — the whole board would open empty and be overwritten. Rejecting it here bars it from a surface at
+// rest regardless of caller.
 /** A point in world/pixel space — an element's top-left anchor on the plane. */
-export const pointSchema = z.object({ x: z.number(), y: z.number() });
+export const pointSchema = z.object({ x: z.number().finite(), y: z.number().finite() });
 
 /** An element's drawn extent in world pixels; both dimensions must be positive. */
-export const sizeSchema = z.object({ width: z.number().positive(), height: z.number().positive() });
+export const sizeSchema = z.object({ width: z.number().positive().finite(), height: z.number().positive().finite() });
 
 /**
  * The fields every Board Element shares (CONTEXT.md → Board Element): a stable `id` the editor mints,
@@ -132,16 +136,6 @@ export function removeElement(surface: BoardSurface, id: string): BoardSurface {
   return { ...surface, elements: surface.elements.filter((element) => element.id !== id) };
 }
 
-/** Replace the `id` element's position; a no-op if none has it. */
-export function moveElement(surface: BoardSurface, id: string, position: Point): BoardSurface {
-  return mapElement(surface, id, (element) => ({ ...element, position }));
-}
-
-/** Replace the `id` element's size; a no-op if none has it. */
-export function resizeElement(surface: BoardSurface, id: string, size: Size): BoardSurface {
-  return mapElement(surface, id, (element) => ({ ...element, size }));
-}
-
 /** The elements in stacking order, bottom (lowest `z`) first; ties break by insertion order (stable sort). */
 export function stackingOrder(surface: BoardSurface): BoardElement[] {
   return [...surface.elements].sort((a, b) => a.z - b.z);
@@ -167,15 +161,12 @@ export function sendToBack(surface: BoardSurface, id: string): BoardSurface {
   return reorder(surface, id, (order, index) => [order[index], ...without(order, index)]);
 }
 
-/** Replace the `id` element via `fn`, preserving array order; a no-op if none has it. */
-function mapElement(surface: BoardSurface, id: string, fn: (element: BoardElement) => BoardElement): BoardSurface {
-  return { ...surface, elements: surface.elements.map((element) => (element.id === id ? fn(element) : element)) };
-}
-
 /**
  * Reposition the `id` element within the stacking order via `move`, then renumber every element's `z` to
  * its new rank (0-based). Renumbering keeps `z` a dense, gap-free integer sequence so repeated reorders
- * never drift; a no-op (same document) if none has the id, or the move leaves the order unchanged.
+ * never drift; a no-op — the input document, by reference — if none has the id, or the move leaves the
+ * order unchanged with `z` already dense (so a boundary action like `bringToFront` on the top element
+ * records no undo step / autosave through Immer, whose diff would otherwise see freshly-rebuilt objects).
  */
 function reorder(
   surface: BoardSurface,
@@ -187,6 +178,7 @@ function reorder(
   if (index === -1) return surface;
   const moved = move(order, index);
   const rankById = new Map(moved.map((element, rank) => [element.id, rank]));
+  if (surface.elements.every((element) => rankById.get(element.id) === element.z)) return surface;
   return {
     ...surface,
     elements: surface.elements.map((element) => ({ ...element, z: rankById.get(element.id) ?? element.z })),

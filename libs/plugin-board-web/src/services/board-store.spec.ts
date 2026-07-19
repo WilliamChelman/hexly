@@ -218,6 +218,30 @@ describe('BoardStore element operations', () => {
     expect(store.document().elements[0].position).toEqual({ x: 5, y: 7 });
   });
 
+  it('refuses a non-finite position, recording no undo step (a bad inspector entry)', () => {
+    const store = makeStore();
+    const a = store.addElement({ x: 5, y: 7 });
+    const undoBefore = store.canUndo();
+
+    // `Number('1e400') === Infinity`, which serializes to `null` and fails the reload parse (whole-board
+    // loss) — the store rejects it before it can reach the document, symmetric with the size guard.
+    store.move(a, { x: Infinity, y: 0 });
+    expect(store.document().elements[0].position).toEqual({ x: 5, y: 7 });
+    expect(store.canUndo()).toBe(undoBefore);
+
+    store.setGeometry(a, { x: Number.NaN, y: 0 }, { width: 50, height: 50 });
+    expect(store.document().elements[0].position).toEqual({ x: 5, y: 7 });
+    expect(store.canUndo()).toBe(undoBefore);
+  });
+
+  it('refuses a non-finite delta for the whole selection', () => {
+    const store = makeStore();
+    const a = store.addElement({ x: 0, y: 0 });
+    store.select(a);
+    expect(store.moveSelected({ x: Infinity, y: 0 })).toBe(false);
+    expect(store.document().elements[0].position).toEqual({ x: 0, y: 0 });
+  });
+
   it('resizes a single element, refusing a non-positive size', () => {
     const store = makeStore();
     const a = store.addElement({ x: 0, y: 0 });
@@ -507,6 +531,15 @@ describe('BoardStore z-order', () => {
     store.bringForward('missing');
     // canUndo is unchanged — the pure helper no-oped, so commit recorded nothing.
     expect(store.canUndo()).toBe(undoBefore);
+  });
+
+  it('records no undo step for a boundary reorder (bringToFront on the top element)', () => {
+    const store = makeStore();
+    const [a, b, c] = addThreeBoxes(store);
+    const undoBefore = store.canUndo();
+    store.toFront(c); // already on top: order and dense-z unchanged, so the doc is not dirtied
+    expect(store.canUndo()).toBe(undoBefore);
+    expect(stackOrder(store)).toEqual([a, b, c]);
   });
 
   it('renumbers z to a dense 0-based sequence after a reorder', () => {
