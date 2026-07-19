@@ -84,7 +84,10 @@ describe('StatBlockView (draw-steel)', () => {
   }
 
   it('prints the card from one grouped value, with translated labels and the echoed name', () => {
-    const { el } = render({ role: 'brute', organization: 'elite', level: 3, might: 2, keywords: ['angulotl'] }, false);
+    const { el } = render(
+      { role: 'brute', organization: 'elite', level: 3, might: 2, keywords: ['angulotl'], immunities: { poison: 5 } },
+      false,
+    );
 
     // The name rides the band, echoed from the Entity (authored in the page header, read-only here).
     expect(el.querySelector('[data-testid=stat-block-name]')?.textContent).toContain('Angulotl Cleaver');
@@ -92,10 +95,10 @@ describe('StatBlockView (draw-steel)', () => {
     expect(el.querySelector('[data-testid=stat-block-identity]')?.textContent).toContain('Level 3 Elite Brute');
     // The keyword flavour line joins for legibility.
     expect(el.querySelector('[data-testid=stat-keywords]')?.textContent).toContain('angulotl');
-    // The plugin ships its own copy (ADR-0049): a strip label, the immunity section header, and the lore
-    // hint all resolve — not the raw key a missing scope would print.
+    // The plugin ships its own copy (ADR-0049): a spec-rail label, a damage-type label on the immunity
+    // chip, and the lore hint all resolve — not the raw key a missing scope would print.
     expect(el.textContent).toContain('Stamina');
-    expect(el.textContent).toContain('Immunity');
+    expect(el.textContent).toContain('Poison');
     expect(el.textContent).toContain('Switch to the Note view');
     // The characteristic prints signed (Draw Steel convention) beside its language-neutral badge letter.
     expect(el.querySelector('[data-testid=stat-might]')?.textContent).toContain('+2');

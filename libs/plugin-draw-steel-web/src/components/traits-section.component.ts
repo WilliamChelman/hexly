@@ -1,21 +1,26 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ButtonComponent, InputComponent, TextareaComponent } from '@hexly/web-ui';
+import { ButtonComponent, IconComponent, InputComponent, TextareaComponent } from '@hexly/web-ui';
 import { Trait } from '@hexly/plugin-draw-steel';
 
 /**
  * The passive **Traits** section of the {@link StatBlockViewComponent} (#245). A lens, like the rest of the
  * card: it holds no list — it reads the raw `traits` value and emits the next `Trait[]` for the View to
  * write back (an empty array clears the key).
+ *
+ * The read view is the "Bestiary Spread" prose block (#stat-block-oomph): each trait flows as `name. effect`
+ * under a serif, glyph-marked heading; the edit view keeps the stacked control cards.
  */
 @Component({
   selector: 'ds-traits-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [TranslocoPipe, ButtonComponent, InputComponent, TextareaComponent],
+  imports: [TranslocoPipe, ButtonComponent, InputComponent, TextareaComponent, IconComponent],
   template: `
     <section class="border-b border-line py-3 last:border-b-0" data-testid="section-traits">
-      <h3 class="m-0 mb-1 text-sm font-semibold text-sea">{{ 'drawSteel.statBlock.section.traits' | transloco }}</h3>
+      <h3 class="m-0 mb-2 flex items-center gap-1.5 font-serif text-lg font-bold italic text-gold-deep">
+        <app-icon name="ds-trait" class="text-base not-italic" />{{ 'drawSteel.statBlock.section.traits' | transloco }}
+      </h3>
 
       @if (writable()) {
         <div class="flex flex-col gap-3">
@@ -92,16 +97,14 @@ import { Trait } from '@hexly/plugin-draw-steel';
         </div>
       } @else {
         @if (traits().length) {
-          <dl class="m-0 flex flex-col gap-1.5 text-sm">
+          <div class="space-y-1.5 text-[15px] leading-relaxed">
             @for (trait of traits(); track $index) {
-              <div [attr.data-testid]="'trait-' + $index">
-                <dt class="inline font-semibold text-ink">{{ trait.name || '—' }}</dt>
-                @if (trait.effect) {
-                  <dd class="m-0 inline text-ink-muted">— {{ trait.effect }}</dd>
-                }
-              </div>
+              <p class="m-0" [attr.data-testid]="'trait-' + $index">
+                <span class="font-semibold text-ink-strong">{{ trait.name || '—' }}.</span>
+                <span class="text-ink">{{ trait.effect }}</span>
+              </p>
             }
-          </dl>
+          </div>
         } @else {
           <p class="m-0 text-sm italic text-ink-faint">{{ 'drawSteel.statBlock.noTraits' | transloco }}</p>
         }
