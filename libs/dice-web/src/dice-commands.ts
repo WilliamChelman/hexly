@@ -53,13 +53,13 @@ export class DiceCommands implements CommandProvider {
       {
         id: 'dice-roll',
         label: this.transloco.translate('dice.roll', { expression }),
-        // Re-evaluate on each run, so pressing Enter again produces a fresh Roll (issue #251). Anchor
-        // it to the top, where the palette sat, and let it linger (issue #251 follow-up).
-        run: () =>
-          void this.toaster.show(formatRoll(expression, evaluate(ast, this.rng)), 'info', {
-            placement: 'top',
-            durationMs: DICE_TOAST_DURATION_MS,
-          }),
+        // Re-evaluate on each run, so pressing Enter again produces a fresh Roll (issue #251). The
+        // total headlines the toast; the breakdown is its detail. Anchor it to the top, where the
+        // palette sat, and let it linger (issue #251 follow-up).
+        run: () => {
+          const { total, detail } = formatRoll(expression, evaluate(ast, this.rng));
+          this.toaster.show(detail, 'info', { title: total, placement: 'top', durationMs: DICE_TOAST_DURATION_MS });
+        },
       },
     ]);
   }

@@ -2,7 +2,7 @@ import { RollResult } from './dice';
 import { formatRoll } from './format';
 
 describe('formatRoll', () => {
-  it("shows each dice term's faces alongside the total", () => {
+  it('headlines the total and details the faces behind it', () => {
     const result: RollResult = {
       total: 14,
       terms: [
@@ -18,7 +18,7 @@ describe('formatRoll', () => {
         },
       ],
     };
-    expect(formatRoll('2d10 + 3', result)).toBe('2d10 + 3 → 2d10: 7, 4 = 14');
+    expect(formatRoll('2d10 + 3', result)).toEqual({ total: '14', detail: '2d10 + 3 → 2d10: 7, 4' });
   });
 
   it('parenthesises dropped dice so a keep/drop is legible', () => {
@@ -38,7 +38,7 @@ describe('formatRoll', () => {
         },
       ],
     };
-    expect(formatRoll('3d6kh2', result)).toBe('3d6kh2 → 3d6: 6, (2), 9 = 15');
+    expect(formatRoll('3d6kh2', result)).toEqual({ total: '15', detail: '3d6kh2 → 3d6: 6, (2), 9' });
   });
 
   it('joins multiple dice terms in source order', () => {
@@ -61,11 +61,11 @@ describe('formatRoll', () => {
         },
       ],
     };
-    expect(formatRoll('d20 + d4', result)).toBe('d20 + d4 → 1d20: 8; 1d4: 4 = 12');
+    expect(formatRoll('d20 + d4', result)).toEqual({ total: '12', detail: 'd20 + d4 → 1d20: 8; 1d4: 4' });
   });
 
-  it('drops the breakdown for a term-free arithmetic expression', () => {
+  it('details just the expression for a term-free arithmetic roll', () => {
     const result: RollResult = { total: 5, terms: [] };
-    expect(formatRoll('2 + 3', result)).toBe('2 + 3 = 5');
+    expect(formatRoll('2 + 3', result)).toEqual({ total: '5', detail: '2 + 3' });
   });
 });

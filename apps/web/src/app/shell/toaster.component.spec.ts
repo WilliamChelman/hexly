@@ -53,6 +53,17 @@ describe('Toaster', () => {
     expect(bottom.textContent).not.toContain('2d6 = 7');
   });
 
+  it('renders a title as an emphasized headline above the message', () => {
+    TestBed.inject(ToasterService).show('2d20+3 → 2d20: 14, 17', 'info', { durationMs: 0, title: '34' });
+
+    const fixture = render();
+    const toast = fixture.nativeElement.querySelector('.toast');
+    expect(toast.textContent).toContain('34');
+    expect(toast.textContent).toContain('2d20+3 → 2d20: 14, 17');
+    // The total announces first, then the working.
+    expect(announce).toHaveBeenCalledWith('34. 2d20+3 → 2d20: 14, 17', 'polite');
+  });
+
   it('marks an error toast with its tone class', () => {
     TestBed.inject(ToasterService).show('Move blocked', 'error', { durationMs: 0 });
 
