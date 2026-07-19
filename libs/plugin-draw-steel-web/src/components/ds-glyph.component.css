@@ -1,0 +1,18 @@
+/*
+ * The bundled Draw Steel Glyphs font, declared next to the code that uses it (Approach A).
+ * An external stylesheet, not inline styles, so the builder resolves `url()` against this
+ * file's own directory and emits the `.otf` as a hashed served asset — no app-level wiring.
+ */
+@font-face {
+  font-family: 'Draw Steel Glyphs';
+  font-style: normal;
+  font-weight: 400;
+  /* An icon font: block briefly rather than flash the wrong fallback character (FOUT). */
+  font-display: block;
+  src: url('../assets/fonts/DrawSteelGlyphs-Regular.otf') format('opentype');
+}
+
+.ds-glyph {
+  font-family: 'Draw Steel Glyphs';
+  line-height: 1;
+}
