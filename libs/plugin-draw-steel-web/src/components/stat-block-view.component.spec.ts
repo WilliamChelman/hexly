@@ -7,6 +7,8 @@ import { produceWithPatches } from '@hexly/immer';
 import { ENTITY_SESSION, EntitySession, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { DS_STAT_BLOCK_KEY, DS_STAT_FIELDS } from '@hexly/plugin-draw-steel';
+import { DICE_RNG, Rng } from '@hexly/dice-web';
+import { DICE_TEST_CATALOGS } from '@hexly/dice-web/testing';
 import { DS_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { StatBlockViewComponent } from './stat-block-view.component';
 
@@ -37,14 +39,24 @@ describe('StatBlockView (draw-steel)', () => {
     };
   }
 
-  /** Render the View over a stat block seeded at {@link DS_STAT_BLOCK_KEY} — the key the page injects. */
-  function render(block: Record<string, unknown>, writable = true, name = 'Angulotl Cleaver') {
+  /** An RNG that replays `values` in order, then keeps yielding the last — the seam a power-roll spec seeds. */
+  const scripted = (values: readonly number[]): Rng => {
+    let cursor = 0;
+    return () => values[Math.min(cursor++, values.length - 1)];
+  };
+
+  /**
+   * Render the View over a stat block seeded at {@link DS_STAT_BLOCK_KEY} — the key the page injects. A seeded
+   * `rng` makes a read-view power roll deterministic (#252); the dice catalogs feed the bubble's own copy.
+   */
+  function render(block: Record<string, unknown>, writable = true, name = 'Angulotl Cleaver', rng?: Rng) {
     const session = fakeSession(block, writable, name);
     TestBed.configureTestingModule({
-      imports: [StatBlockViewComponent, provideTranslocoTesting(DS_TEST_CATALOGS)],
+      imports: [StatBlockViewComponent, provideTranslocoTesting(DS_TEST_CATALOGS, DICE_TEST_CATALOGS)],
       providers: [
         { provide: ENTITY_SESSION, useValue: session },
         { provide: VIEW_FIELD_KEY, useValue: DS_STAT_BLOCK_KEY },
+        ...(rng ? [{ provide: DICE_RNG, useValue: rng }] : []),
         provideHttpClient(),
         provideHttpClientTesting(),
       ],
@@ -236,6 +248,140 @@ describe('StatBlockView (draw-steel)', () => {
     );
     expect(el.querySelector('[data-testid=ability-add]')).toBeNull();
     expect(el.querySelector('[data-testid=ability-0] [data-testid=ability-name]')).toBeNull();
+  });
+
+  // --- Read-view ephemeral power-roll resolution (#252) --------------------------------------------
+
+  /** A read-view monster with one rolling ability keyed on `characteristic`, seeded for a deterministic Roll. */
+  function withRoll(characteristic: string, block: Record<string, unknown>, rng: Rng) {
+    return render(
+      {
+        ...block,
+        abilities: [
+          {
+            name: 'Cleave',
+            type: 'main',
+            keywords: [],
+            distance: '',
+            target: '',
+            powerRoll: { characteristic, t1: 'a', t2: 'b', t3: 'c' },
+          },
+        ],
+      },
+      false,
+      'Angulotl Cleaver',
+      rng,
+    );
+  }
+
+  const rollBtn = (el: HTMLElement) => el.querySelector('[data-testid=ability-roll]') as HTMLButtonElement;
+
+  it('shows a roll button on a read-view power roll, absent on a flat-effect ability (#252)', () => {
+    const { el } = render(
+      {
+        abilities: [
+          {
+            name: 'Cleave',
+            type: 'main',
+            keywords: [],
+            distance: '',
+            target: '',
+            powerRoll: { characteristic: 'might', t1: 'a', t2: 'b', t3: 'c' },
+          },
+          {
+            name: 'Watchful',
+            type: 'triggered',
+            keywords: [],
+            distance: '',
+            target: '',
+            effect: 'The creature shifts 1.',
+          },
+        ],
+      },
+      false,
+    );
+    expect(el.querySelector('[data-testid=ability-0] [data-testid=ability-roll]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=ability-1] [data-testid=ability-roll]')).toBeNull();
+  });
+
+  it('hides the roll button in edit mode — rolling is a read-view affordance (#252)', () => {
+    const { fixture, el } = render({
+      abilities: [
+        {
+          name: 'Cleave',
+          type: 'main',
+          keywords: [],
+          distance: '',
+          target: '',
+          powerRoll: { characteristic: 'might', t1: 'a', t2: 'b', t3: 'c' },
+        },
+      ],
+    }); // writable, non-empty → opens on the read card, roll button present
+    expect(rollBtn(el)).not.toBeNull();
+    startEditing(el, fixture);
+    expect(el.querySelector('[data-testid=ability-roll]')).toBeNull();
+  });
+
+  it('rolls 2d10 + the characteristic, bubbles the total + tier, and highlights that tier row (#252)', () => {
+    // might 2; two 6-faces → 2d10 = 12, + 2 = 14 → Tier 2 (12–16).
+    const { fixture, el } = withRoll('might', { might: 2 }, scripted([0.5, 0.5]));
+    rollBtn(el).click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid=ability-roll-bubble]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=ability-roll-total]')?.textContent).toContain('14');
+    expect(el.querySelector('[data-testid=ability-roll-tier]')?.textContent).toContain('Tier 2');
+    // The matching tier row highlights in place; the others do not.
+    expect(el.querySelector('[data-testid=ability-tier-t2]')?.getAttribute('data-active')).toBe('true');
+    expect(el.querySelector('[data-testid=ability-tier-t1]')?.getAttribute('data-active')).toBeNull();
+    expect(el.querySelector('[data-testid=ability-tier-t3]')?.getAttribute('data-active')).toBeNull();
+  });
+
+  it('rolls + 0 when the characteristic has no value on the block (#252)', () => {
+    // No agility on the block; faces 1 and 10 → 2d10 = 11, + 0 = 11 → Tier 1 (≤11).
+    const { fixture, el } = withRoll('agility', {}, scripted([0.0, 0.95]));
+    rollBtn(el).click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid=ability-roll-total]')?.textContent).toContain('11');
+    expect(el.querySelector('[data-testid=ability-tier-t1]')?.getAttribute('data-active')).toBe('true');
+  });
+
+  it('keeps the bubble across change detection, replaces it on re-roll, and clears it on dismiss (#252)', () => {
+    // First click: 6,6 → 14 (Tier 2). Second click: 10,10 → 22 (Tier 3).
+    const { fixture, el } = withRoll('might', { might: 2 }, scripted([0.5, 0.5, 0.9, 0.9]));
+    rollBtn(el).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=ability-roll-total]')?.textContent).toContain('14');
+
+    // Sticky across an unrelated change-detection pass.
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=ability-roll-bubble]')).not.toBeNull();
+
+    // A re-roll replaces the previous bubble in one click — one bubble, not two.
+    rollBtn(el).click();
+    fixture.detectChanges();
+    expect(el.querySelectorAll('[data-testid=ability-roll-bubble]').length).toBe(1);
+    expect(el.querySelector('[data-testid=ability-roll-total]')?.textContent).toContain('22');
+    expect(el.querySelector('[data-testid=ability-tier-t3]')?.getAttribute('data-active')).toBe('true');
+
+    // Explicit dismiss clears the bubble and its highlight.
+    (el.querySelector('[data-testid=ability-roll-dismiss]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=ability-roll-bubble]')).toBeNull();
+    expect(el.querySelector('[data-testid=ability-tier-t3]')?.getAttribute('data-active')).toBeNull();
+  });
+
+  it('clears the bubble on an outside click (#252)', () => {
+    const { fixture, el } = withRoll('might', { might: 2 }, scripted([0.5, 0.5]));
+    rollBtn(el).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=ability-roll-bubble]')).not.toBeNull();
+
+    // A click anywhere outside the button/bubble dismisses it (the document listener).
+    document.body.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=ability-roll-bubble]')).toBeNull();
   });
 
   it('shows the minion-only lines (EV suffix, With Captain) for a minion', () => {

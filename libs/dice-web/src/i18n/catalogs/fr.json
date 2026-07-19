@@ -1,5 +1,8 @@
 {
   "section": "Dés",
   "roll": "Lancer {{expression}}",
-  "invalid": "Expression de dés invalide"
+  "invalid": "Expression de dés invalide",
+  "rollAction": "Lancer",
+  "rollResult": "Résultat du jet",
+  "dismiss": "Fermer"
 }

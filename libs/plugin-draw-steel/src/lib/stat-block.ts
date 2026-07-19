@@ -144,9 +144,11 @@ export const traitSchema = z.object({
 export type Trait = z.infer<typeof traitSchema>;
 
 /**
- * An Ability's **power roll** — render-faithful, not resolvable: a characteristic plus the three flat tier
- * texts a printed block reads (`t1` ≤11 / `t2` 12–16 / `t3` 17+). Hexly never rolls; the tiers are prose.
- * Required strings so a freshly-toggled power roll is well-formed, while a non-string tier is rejected (#246).
+ * An Ability's **power roll** — a characteristic plus the three flat tier texts a printed block reads
+ * (`t1` ≤11 / `t2` 12–16 / `t3` 17+). *Storage* stays render-faithful prose: the tiers are text, never a
+ * resolved number. At *read* time a Power Roll can now be **resolved ephemerally** (#252) — `2d10 + the
+ * characteristic`, banded to a tier — but that Roll writes nothing back here (CONTEXT.md → Dice). Required
+ * strings so a freshly-toggled power roll is well-formed, while a non-string tier is rejected (#246).
  */
 export const powerRollSchema = z.object({
   characteristic: z.enum(DS_CHARACTERISTIC_KEYS),
