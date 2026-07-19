@@ -29,6 +29,8 @@
       "@hexly/obsidian": ["./libs/obsidian/src/index.ts"],
       "@hexly/plugin-board": ["./libs/plugin-board/src/index.ts"],
       "@hexly/plugin-board/server": ["./libs/plugin-board-server/src/index.ts"],
+      "@hexly/plugin-board/testing": ["./libs/plugin-board-web/src/testing/index.ts"],
+      "@hexly/plugin-board/web": ["./libs/plugin-board-web/src/index.ts"],
       "@hexly/plugin-content": ["./libs/plugin-content/src/index.ts"],
       "@hexly/plugin-content/i18n": ["./libs/plugin-content-web/src/i18n/index.ts"],
       "@hexly/plugin-content/server": ["./libs/plugin-content-server/src/index.ts"],

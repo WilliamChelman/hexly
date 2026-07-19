@@ -25,6 +25,7 @@ import { COMMAND_PALETTE_TRANSLATIONS } from '@hexly/command-palette-web/i18n';
 import { DICE_TRANSLATIONS } from '@hexly/dice-web/i18n';
 import { ENTITY_TYPES } from '@hexly/web-entity';
 import { providePluginContent } from '@hexly/plugin-content/web';
+import { providePluginBoard } from '@hexly/plugin-board/web';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginDrawSteel } from '@hexly/plugin-draw-steel/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
@@ -86,6 +87,7 @@ export const appConfig: ApplicationConfig = {
     // named here. Each provider carries that plugin's types, views, structured data-types, and copy.
     providePluginContent(),
     providePluginHexmap(),
+    providePluginBoard(),
     providePluginDnd(),
     providePluginDrawSteel(),
   ],

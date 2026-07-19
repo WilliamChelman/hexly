@@ -1,0 +1,21 @@
+{
+  "dataType": {
+    "surface": "Surface de tableau"
+  },
+  "eyebrow": "Tableau",
+  "titleLabel": "Titre du tableau",
+  "rename": "Renommer le tableau",
+  "editorLabel": "Notes du tableau",
+  "create": "Créer un tableau",
+  "untitled": "Tableau sans titre",
+  "view": {
+    "surface": "Tableau"
+  },
+  "canvas": {
+    "label": "Surface de tableau",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom avant",
+    "zoomOut": "Zoom arrière",
+    "fit": "Réinitialiser la vue"
+  }
+}
