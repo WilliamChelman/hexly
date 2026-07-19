@@ -27,6 +27,7 @@ import {
   PublicLink,
   entityLinkConstraints,
   SaveEntityRequest,
+  stripReservedKeys,
   tagsSchema,
   validateFields,
   visibilitySchema,
@@ -488,8 +489,10 @@ export class EntitiesService {
     const fields = this.worldTypeFields.effectiveFields(worldId, req.types, req.document);
     const minted = emptyEntityDocument(fields, this.typeFields.structuredDataTypes);
     // Initial document seeds over the minted defaults. Ungated: like an import, a create establishes
-    // at-rest data (the Field gate is save-only).
-    const doc: EntityDocument = req.document ? { ...minted, ...req.document } : minted;
+    // at-rest data (the Field gate is save-only). The seed is stripped of the reserved `hexly.*`
+    // namespace first: provenance is system-owned, so a create may not forge a `hexly.source` stamp
+    // (ADR-0060) — only the reconcile mints it.
+    const doc: EntityDocument = req.document ? { ...minted, ...stripReservedKeys(req.document) } : minted;
     const row = this.writes.insert({
       ownerId,
       worldId,

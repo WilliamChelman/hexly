@@ -10,6 +10,8 @@ import {
   ReindexFailure,
   Visibility,
   deriveDocumentState,
+  reservedKeys,
+  stripReservedKeys,
 } from '@hexly/domain';
 import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-access';
@@ -576,13 +578,22 @@ export class EntityWrites {
     // clobbered by a save that never touched the name. The derivation runs over the effective set — the
     // save's type set when it carries it, else the stored one, with attachments derived from the document
     // itself (ADR-0048, ADR-0054, ADR-0057).
-    const derived = change.document && this.derive(change.document, change.types ?? row.types, row.worldId);
+    //
+    // `hexly.*` is system-owned provenance (ADR-0060): a user edit may neither forge nor drop it. Strip
+    // the incoming copy and restore the stored one — so a forged `hexly.source` never materialises a
+    // provenance row (nor 500s on the unique index), and editing an imported Entity keeps its stamp
+    // rather than orphaning it.
+    const document =
+      change.document !== undefined
+        ? { ...stripReservedKeys(change.document), ...reservedKeys(JSON.parse(row.document) as EntityDocument) }
+        : undefined;
+    const derived = document && this.derive(document, change.types ?? row.types, row.worldId);
     const set = {
       ...(change.name !== undefined && { name: change.name }),
       ...(change.tags !== undefined && { tags: [...change.tags] }),
       ...(change.types !== undefined && { types: [...change.types] }),
       ...(change.document !== undefined && {
-        document: JSON.stringify(change.document),
+        document: JSON.stringify(document),
         contentText: derived?.searchText,
       }),
       ...(change.version !== undefined && { version: change.version + 1 }),

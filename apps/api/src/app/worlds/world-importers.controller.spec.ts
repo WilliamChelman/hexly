@@ -187,6 +187,95 @@ describe('World importers', () => {
     expect(db.select().from(entityImportSource).where(eq(entityImportSource.worldId, world)).all()).toHaveLength(0);
   });
 
+  it('surfaces the last-known imported state on the list, off the provenance index (#260)', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+
+    // Before any run the Importer owns nothing, so the field is omitted.
+    const before = (await ada.get(`/worlds/${world}/importers`).expect(200)).body;
+    expect(before.find((e: { id: string }) => e.id === STUB_ID).lastImported).toBeUndefined();
+
+    production = { rev: 'rev-7', records: [record('goblin', 'Goblin'), record('spider', 'Spider')] };
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await pollUntilDone(ada, world);
+
+    // The panel can now show "N Entities at rev-7" without an in-process job — it survives a restart.
+    const after = (await ada.get(`/worlds/${world}/importers`).expect(200)).body;
+    const entry = after.find((e: { id: string }) => e.id === STUB_ID);
+    expect(entry.lastImported).toMatchObject({ entityCount: 2, rev: 'rev-7' });
+    expect(entry.lastImported.updatedAt).toEqual(expect.any(Number));
+  });
+
+  it('strips a forged hexly.source on create — no provenance row, no unique-index 500', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    production = { rev: 'rev-1', records: [record('goblin', 'Goblin')] };
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await pollUntilDone(ada, world);
+    const goblin = await entityByName(ada, world, 'Goblin');
+
+    // A hand-authored Note forging the goblin's exact stamp would collide on the `(world, importer,
+    // sourceId)` unique index and 500 — unless the reserved key is stripped on the way in.
+    const created = await ada
+      .post('/entities')
+      .send({
+        name: 'Impostor',
+        types: ['core.note'],
+        worldId: world,
+        document: {
+          'core.content': emptyContent(),
+          [HEXLY_SOURCE_KEY]: { importer: STUB_ID, sourceId: 'goblin', rev: 'forged' },
+        },
+      })
+      .expect(201);
+
+    // The stamp never persisted: the Impostor carries none, and the only provenance row is the goblin's.
+    const detail = (await ada.get(`/entities/${created.body.id}`).expect(200)).body;
+    expect(detail.document[HEXLY_SOURCE_KEY]).toBeUndefined();
+    const rows = db.select().from(entityImportSource).where(eq(entityImportSource.worldId, world)).all();
+    expect(rows).toEqual([expect.objectContaining({ entityId: goblin.id, sourceId: 'goblin' })]);
+  });
+
+  it("preserves an imported Entity's stamp across a user edit and ignores a tampered one", async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    production = { rev: 'rev-1', records: [record('goblin', 'Goblin')] };
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await pollUntilDone(ada, world);
+    const goblin = await entityByName(ada, world, 'Goblin');
+
+    // Ada saves the goblin back with a tampered stamp; the edit strips it and restores the stored one,
+    // so provenance is neither forged nor orphaned by an author's edit (ADR-0060).
+    await ada
+      .put(`/entities/${goblin.id}`)
+      .send({
+        version: goblin.detail.version,
+        tags: [],
+        document: {
+          ...goblin.detail.document,
+          [HEXLY_SOURCE_KEY]: { importer: STUB_ID, sourceId: 'goblin', rev: 'HACKED' },
+        },
+      })
+      .expect(200);
+
+    const after = (await ada.get(`/entities/${goblin.id}`).expect(200)).body;
+    expect(after.document[HEXLY_SOURCE_KEY]).toEqual({ importer: STUB_ID, sourceId: 'goblin', rev: 'rev-1' });
+    const rows = db.select().from(entityImportSource).where(eq(entityImportSource.entityId, goblin.id)).all();
+    expect(rows).toEqual([expect.objectContaining({ sourceId: 'goblin', rev: 'rev-1' })]);
+  });
+
+  it('refuses a Remove while a run is in flight (409)', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    // Park the run inside produce, so it is still in flight when the DELETE arrives.
+    gate = new Promise<void>(() => undefined);
+    production = { rev: 'rev-1', records: [record('goblin', 'Goblin')] };
+
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    const removed = await ada.delete(`/worlds/${world}/importers/${STUB_ID}`).expect(409);
+    expect(removed.body.code).toBe('import-running');
+  });
+
   it('refuses a second run while one is in flight (409)', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
