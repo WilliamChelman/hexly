@@ -19,8 +19,8 @@ const scripted = (values: readonly number[]): Rng => {
 /** Parse then evaluate — asserts the end-to-end external behaviour of an expression. */
 function roll(expression: string, rng: Rng): RollResult {
   const result = parse(expression);
-  if (!result.ok) throw new Error(`expected "${expression}" to parse: ${result.error.message}`);
-  return evaluate(result.ast, rng);
+  if (result.isErr()) throw new Error(`expected "${expression}" to parse: ${result.error.message}`);
+  return evaluate(result.value, rng);
 }
 
 describe('evaluate', () => {

@@ -4,25 +4,25 @@ import { parse } from './parse';
 /** The typed error code for an expression `parse` should reject. */
 function errorCode(expression: string): DiceErrorCode | 'unexpectedly-ok' {
   const result = parse(expression);
-  return result.ok ? 'unexpectedly-ok' : result.error.code;
+  return result.isErr() ? result.error.code : 'unexpectedly-ok';
 }
 
 describe('parse', () => {
   it('accepts a bare NdM term', () => {
     const result = parse('2d6');
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.ast).toEqual({ type: 'dice', count: 2, sides: 6, modifiers: [] });
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value).toEqual({ type: 'dice', count: 2, sides: 6, modifiers: [] });
   });
 
   it('accepts an implicit single die (dM)', () => {
     const result = parse('d20');
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.ast).toMatchObject({ type: 'dice', count: 1, sides: 20 });
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value).toMatchObject({ type: 'dice', count: 1, sides: 20 });
   });
 
   it('never throws — invalid input comes back as a typed error, not an exception', () => {
     expect(() => parse('%%%')).not.toThrow();
-    expect(parse('%%%').ok).toBe(false);
+    expect(parse('%%%').isErr()).toBe(true);
   });
 
   it('reports an empty expression', () => {
