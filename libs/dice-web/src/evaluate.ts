@@ -1,18 +1,9 @@
 import { Comparator, DiceAst, DiceNode, DiceTermResult, DieRoll, RerollModifier, Rng, RollResult } from './dice';
 
-/**
- * Bounds explosion and reroll chains so a Roll never runs away (issue #249) —
- * e.g. `1d6r<6` or `1d6!` under an adversarial RNG stops after this many
- * additional rolls per die rather than looping forever.
- */
+/** Caps explosion/reroll chains per die so a Roll never runs away (issue #249). */
 export const CHAIN_LIMIT = 100;
 
-/**
- * Evaluate a parsed Dice Expression into a Roll Result under `rng`. Pure: same
- * AST and same RNG sequence yield the same result, so it is testable without
- * Angular DI. Division floors to a whole number; interpretation beyond the total
- * belongs to the caller.
- */
+/** Evaluate a Dice Expression under `rng`. Division floors to a whole number. */
 export function evaluate(ast: DiceAst, rng: Rng): RollResult {
   const terms: DiceTermResult[] = [];
   const total = evalNode(ast, rng, terms);
@@ -65,8 +56,7 @@ function rollOneDie(sides: number, rng: Rng, explode: boolean, reroll: RerollMod
   let face = rollFace(sides, rng);
   faces.push(face);
 
-  // Reroll replaces the base roll while it matches; explosion rolls are fresh
-  // max-triggered rolls and are not themselves rerolled.
+  // Reroll applies to the base roll only; explosion rolls are never rerolled.
   if (reroll) {
     let guard = 0;
     while (matches(face, reroll.comparator, reroll.value) && guard < CHAIN_LIMIT) {
@@ -91,7 +81,6 @@ function rollOneDie(sides: number, rng: Rng, explode: boolean, reroll: RerollMod
   return { faces, value, dropped: false };
 }
 
-/** Marks dice dropped per keep/drop modifiers, ranking by each die's value. */
 function applyKeepDrop(node: DiceNode, dice: DieRoll[]): void {
   for (const mod of node.modifiers) {
     if (mod.kind !== 'keep' && mod.kind !== 'drop') continue;

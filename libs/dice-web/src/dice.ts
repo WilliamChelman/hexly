@@ -1,22 +1,13 @@
 import { InjectionToken } from '@angular/core';
 import { Result } from 'neverthrow';
 
-/**
- * The pure dice engine's contracts (issue #249): the parsed Dice Expression AST,
- * the Roll Result shape, and the RNG seam. The engine turns any supported Dice
- * Expression into a Roll Result under a caller-supplied RNG; interpretation
- * beyond the total (e.g. Draw Steel tier bands) belongs to the caller, not here
- * (CONTEXT.md — Dice: Roll, Dice Expression, Roll Result).
- */
+// Pure dice engine contracts (issue #249). Interpretation beyond the total is
+// the caller's, not the engine's (CONTEXT.md — Dice).
 
-/** A random source returning a float in `[0, 1)` — the shape of `Math.random`. */
+/** A float in `[0, 1)` — the shape of `Math.random`. */
 export type Rng = () => number;
 
-/**
- * The RNG every Roll draws from. Defaults to `Math.random`; callers and tests
- * override it to make a Roll deterministic. `evaluate` also takes an `Rng`
- * directly so the engine is testable without Angular DI.
- */
+/** Overridable to make a Roll deterministic; `evaluate` takes an `Rng` directly, so the engine is testable without DI. */
 export const DICE_RNG = new InjectionToken<Rng>('DICE_RNG', {
   providedIn: 'root',
   factory: () => Math.random,
@@ -31,7 +22,6 @@ export interface NumberNode {
   readonly value: number;
 }
 
-/** An `NdM` term with its per-term modifiers (keep/drop, explode, reroll). */
 export interface DiceNode {
   readonly type: 'dice';
   readonly count: number;
@@ -53,21 +43,18 @@ export interface NegateNode {
 
 export type DiceModifier = KeepDropModifier | ExplodeModifier | RerollModifier;
 
-/** `kh`/`kl`/`dh`/`dl` — keep or drop `count` dice from the high or low end. */
 export interface KeepDropModifier {
   readonly kind: 'keep' | 'drop';
   readonly end: 'high' | 'low';
   readonly count: number;
 }
 
-/** `!` — a die showing its max face rolls again, bounded by a depth guard. */
 export interface ExplodeModifier {
   readonly kind: 'explode';
 }
 
 export type Comparator = '<' | '<=' | '>' | '>=' | '=';
 
-/** `r<N` etc. — reroll a die while it matches, bounded by a depth guard. */
 export interface RerollModifier {
   readonly kind: 'reroll';
   readonly comparator: Comparator;
@@ -78,28 +65,23 @@ export interface RerollModifier {
 
 export type DiceErrorCode = 'empty' | 'syntax' | 'invalid-dice' | 'unbalanced-parens' | 'trailing-input';
 
-/** Invalid input yields one of these, surfaced to the user — never a throw. */
 export interface DiceError {
   readonly code: DiceErrorCode;
   readonly message: string;
-  /** 0-based index into the source where parsing failed, when known. */
+  /** 0-based source index, when known. */
   readonly position?: number;
 }
 
-/** `ok` carries the parsed AST; `err` carries a typed {@link DiceError} — parsing never throws. */
+/** Parsing never throws — failures come back as a typed {@link DiceError}. */
 export type ParseResult = Result<DiceAst, DiceError>;
 
 // --- Roll Result --------------------------------------------------------------
 
 export interface DieRoll {
-  /**
-   * Every raw face this die produced, in order — discarded reroll faces and
-   * explosion faces included, so the Roll Result stays fully inspectable.
-   */
+  /** Every raw face rolled, discarded rerolls and explosions included — so faces may exceed `value`. */
   readonly faces: readonly number[];
-  /** The die's net contribution: its accepted face plus any explosion faces. */
+  /** Accepted face plus explosions — not the sum of `faces`, which retains discarded rerolls. */
   readonly value: number;
-  /** True when keep/drop excluded this die from its term's subtotal. */
   readonly dropped: boolean;
 }
 
@@ -113,9 +95,6 @@ export interface DiceTermResult {
 
 export interface RollResult {
   readonly total: number;
-  /**
-   * Every dice term evaluated, in left-to-right source order. Number literals
-   * and arithmetic carry no faces, so only dice terms appear here.
-   */
+  /** Dice terms only, in source order — literals and arithmetic carry no faces. */
   readonly terms: readonly DiceTermResult[];
 }
