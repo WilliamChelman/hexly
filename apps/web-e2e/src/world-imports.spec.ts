@@ -1,5 +1,8 @@
 import { enterLibrary, expect, test } from './fixtures';
 import { TEST_GRANTEE } from './test-user';
+// The pretty-URL codec (ADR-0042), imported by path like the other framework-free e2e utils in
+// fixtures.ts: `enterLibrary` yields the URL's `slug-base62` segment, but the API keys on the raw id.
+import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 /**
  * The generic World Imports panel (ADR-0060), end-to-end on a single origin (ADR-0009). The Draw
@@ -36,12 +39,28 @@ test('a World Owner runs the fixture-backed Draw Steel import and sees the run s
   await expect(page.getByTestId(MONSTERS_STATUS)).toContainText('2 entities', { timeout: 15_000 });
 });
 
-test('a non-Owner does not see the Imports trigger', async ({ page, browser }) => {
-  // The Owner's session yields a World to point a second, non-Owner user at.
-  const worldId = await enterLibrary(page);
+test('a reachable non-Owner cannot import: no run trigger in the UI, and the server refuses a direct run', async ({
+  page,
+  browser,
+}) => {
+  // The Owner's session yields a World, and grants the second user *reach* into it as a Viewer — the
+  // interesting boundary is a reader who is still not an Owner (403), not a stranger who can't see the
+  // World at all (404). The Access section is Settings' default pane.
+  const worldSeg = await enterLibrary(page);
+  const worldId = idFromSegment(worldSeg); // the raw id the API keys on, decoded from the pretty segment
+  await page.goto(`/w/${worldSeg}/settings`);
+  // Owner-set and member-set share `add-select`/`add` testids, so scope to the member controls.
+  const memberAdd = page.locator('app-member-set');
+  await memberAdd.getByTestId('add-select').selectOption({ label: TEST_GRANTEE.displayName });
+  await memberAdd.getByTestId('add-role').selectOption('viewer');
+  const memberAdded = page.waitForResponse(
+    (r) => /\/api\/worlds\/[\w-]+\/members$/.test(r.url()) && r.request().method() === 'POST' && r.ok(),
+  );
+  await memberAdd.getByTestId('add').click();
+  await memberAdded;
 
-  // A second seeded user, in their own cookie-less context (overriding the project's authenticated
-  // default), logs in through the real UI and opens the same World's Settings.
+  // The Viewer logs in through the real UI, in their own cookie-less context (overriding the project's
+  // authenticated default).
   const otherContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const other = await otherContext.newPage();
   await other.goto('/login');
@@ -50,15 +69,20 @@ test('a non-Owner does not see the Imports trigger', async ({ page, browser }) =
   await other.getByRole('button', { name: 'Sign in' }).click();
   await expect(other).toHaveTitle(/Worlds/);
 
-  // Reach the imports section if the owner-only Settings even renders for a non-Owner; whether it
-  // does or bounces to the Index, the point holds: the import trigger is owner-gated (ADR-0039,
-  // ADR-0060) and never reaches a non-Owner.
-  await other.goto(`/w/${worldId}/settings`);
-  const importsNav = other.getByTestId('settings-nav-imports');
-  if (await importsNav.isVisible().catch(() => false)) {
-    await importsNav.click();
-  }
+  // The Settings shell renders for any reader, but every Importer surface is Owner-gated server-side
+  // (ADR-0039, ADR-0060): the panel's list load is refused, so it settles on its empty state and
+  // affords no run trigger. Reach it and positively establish both facts.
+  await other.goto(`/w/${worldSeg}/settings`);
+  await other.getByTestId('settings-nav-imports').click();
+  await expect(other.getByText('No importers available.')).toBeVisible();
   await expect(other.getByTestId(MONSTERS_RUN)).toHaveCount(0);
+
+  // The UI gate is only cosmetic, so prove the boundary at the API: a direct run from the Viewer's own
+  // session (its context's cookies) is refused with 403 — reachable, but not an Owner (ADR-0060).
+  const refused = await otherContext.request.post(`/api/worlds/${worldId}/importers/draw-steel.monsters/run`, {
+    data: { visibility: 'shared' },
+  });
+  expect(refused.status()).toBe(403);
 
   await otherContext.close();
 });

@@ -389,6 +389,7 @@
     "remove": "Supprimer",
     "running": "Import en cours…",
     "lastRun": "Révision {{rev}} · {{count}} entités · {{date}}",
+    "lastRunFailed": "Le dernier import a échoué. Réessayez.",
     "imported": "{{count}} entités importées.",
     "removed": "Ensemble importé supprimé.",
     "loadError": "Impossible de charger les importateurs de ce monde.",
