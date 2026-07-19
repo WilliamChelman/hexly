@@ -11,6 +11,16 @@ import { ButtonComponent, SelectComponent } from '@hexly/web-ui';
 const IMPORT_POLL_MS = 1000;
 
 /**
+ * A row's status line, either a live in-process run or the durable last-imported state (#260). `failed`
+ * carries no detail — it renders its own distinct copy; `succeeded` carries the revision, count, and date
+ * the line shows, sourced from the in-process job or the provenance-index summary interchangeably.
+ */
+type ImporterStatusLine =
+  | { readonly kind: 'running' }
+  | { readonly kind: 'failed' }
+  | { readonly kind: 'succeeded'; readonly rev: string | null; readonly count: number; readonly date: number | null };
+
+/**
  * The generic World-Owner Imports panel (ADR-0060): it lists whatever {@link Importer}s the enabled
  * Plugins registered for this World and, per row, offers Import/Reimport, Remove, and a
  * shared/private Visibility. Importer-agnostic — the label is the summary's transloco key piped
@@ -28,22 +38,32 @@ const IMPORT_POLL_MS = 1000;
         <li class="importer-row" [attr.data-testid]="'importer-' + imp.id">
           <div class="importer-meta">
             <span class="importer-name">{{ imp.label | transloco }}</span>
-            @if (lastRunFor(imp.id); as run) {
-              <span class="importer-status" [attr.data-testid]="'importer-status-' + imp.id">
-                {{
-                  'imports.lastRun'
-                    | transloco
-                      : {
-                          rev: shortRev(run.rev),
-                          count: run.created + run.updated,
-                          date: run.finishedAt ? (run.finishedAt | hexlyDate) : '',
-                        }
-                }}
-              </span>
-            } @else if (runningFor(imp.id)) {
-              <span class="importer-status" [attr.data-testid]="'importer-running-' + imp.id">
-                {{ 'imports.running' | transloco }}
-              </span>
+            @if (statusFor(imp); as st) {
+              @switch (st.kind) {
+                @case ('running') {
+                  <span class="importer-status" [attr.data-testid]="'importer-running-' + imp.id">
+                    {{ 'imports.running' | transloco }}
+                  </span>
+                }
+                @case ('failed') {
+                  <span class="importer-status is-failed" [attr.data-testid]="'importer-error-' + imp.id">
+                    {{ 'imports.lastRunFailed' | transloco }}
+                  </span>
+                }
+                @case ('succeeded') {
+                  <span class="importer-status" [attr.data-testid]="'importer-status-' + imp.id">
+                    {{
+                      'imports.lastRun'
+                        | transloco
+                          : {
+                              rev: shortRev(st.rev),
+                              count: st.count,
+                              date: st.date ? (st.date | hexlyDate) : '',
+                            }
+                    }}
+                  </span>
+                }
+              }
             }
           </div>
 
@@ -68,7 +88,7 @@ const IMPORT_POLL_MS = 1000;
             [disabled]="running()"
             (click)="run(imp.id)"
           >
-            {{ (hasRun(imp.id) ? 'imports.reimport' : 'imports.import') | transloco }}
+            {{ (hasRun(imp) ? 'imports.reimport' : 'imports.import') | transloco }}
           </button>
           <button
             appButton
@@ -103,6 +123,10 @@ const IMPORT_POLL_MS = 1000;
     .importer-status {
       @apply text-2xs text-ink-muted tabular-nums;
     }
+    /* A failed run reads as failed, not as an empty success line (#262 review). */
+    .importer-status.is-failed {
+      @apply text-ember;
+    }
     .importer-empty {
       @apply py-1 text-sm text-ink-muted;
     }
@@ -125,14 +149,19 @@ export class WorldImportsPanelComponent implements OnInit {
   /** The server's word, not a local latch — a reload mid-run still finds one importer busy. */
   protected readonly running = computed(() => this.status()?.status === 'running');
 
+  /** Set once a user-initiated run establishes live state, so a slow initial GET can't rewind it (#262 review). */
+  private runEstablished = false;
+
   ngOnInit(): void {
-    this.worlds.importers(this.id()).subscribe({
-      next: (list) => this.importers.set(list),
-      error: () => this.error('imports.loadError'),
-    });
+    this.loadImporters();
     // A reconcile outlives the page that started it — rejoin one already running, and seed the last-run line.
     this.worlds.importStatus(this.id()).subscribe({
-      next: (job) => this.follow(job),
+      // A user-initiated run may resolve before this initial GET; a late `idle` must not rewind the
+      // live state it established, or the controls re-enable mid-run (#262 review).
+      next: (job) => {
+        if (this.runEstablished) return;
+        this.follow(job);
+      },
       // A status fetch failing shouldn't blank the whole panel; the list still renders and a run re-seeds it.
       error: () => undefined,
     });
@@ -147,22 +176,26 @@ export class WorldImportsPanelComponent implements OnInit {
     this.visibility.update((all) => ({ ...all, [importerId]: value }));
   }
 
-  /** The finished run to show on this row, or `undefined` — only the last-run importer carries a status line. */
-  protected lastRunFor(importerId: string): ImportRunSummary | undefined {
+  /**
+   * The status line for one row: a live in-process run for this Importer wins, else the durable
+   * last-imported line derived from the provenance index on the list payload — so the line survives
+   * an API restart (#260) and a failed run reads as failed, not as an empty success line (#262 review).
+   */
+  protected statusFor(imp: ImporterSummary): ImporterStatusLine | null {
     const job = this.status();
-    return job && job.importer === importerId && (job.status === 'succeeded' || job.status === 'failed')
-      ? job
-      : undefined;
+    if (job && job.importer === imp.id && job.status !== 'idle') {
+      if (job.status === 'succeeded') {
+        return { kind: 'succeeded', rev: job.rev, count: job.created + job.updated, date: job.finishedAt };
+      }
+      return { kind: job.status };
+    }
+    const last = imp.lastImported;
+    return last ? { kind: 'succeeded', rev: last.rev, count: last.entityCount, date: last.updatedAt } : null;
   }
 
-  protected runningFor(importerId: string): boolean {
-    const job = this.status();
-    return job?.status === 'running' && job.importer === importerId;
-  }
-
-  /** Whether this World has an import run on record for this Importer — flips the action to Reimport. */
-  protected hasRun(importerId: string): boolean {
-    return this.status()?.importer === importerId;
+  /** Whether this World has an imported set on record for this Importer — flips the action to Reimport. */
+  protected hasRun(imp: ImporterSummary): boolean {
+    return this.status()?.importer === imp.id || imp.lastImported !== undefined;
   }
 
   /** A git-short rev for the status line; the stamp is a full commit SHA (ADR-0061), unwieldy in full. */
@@ -174,7 +207,11 @@ export class WorldImportsPanelComponent implements OnInit {
   protected run(importerId: string): void {
     if (this.running()) return;
     this.worlds.runImport(this.id(), importerId, this.visibilityFor(importerId)).subscribe({
-      next: (job) => this.follow(job),
+      // The run is now the live state; a still-in-flight initial GET must not rewind it (#262 review).
+      next: (job) => {
+        this.runEstablished = true;
+        this.follow(job);
+      },
       error: (err: unknown) => this.error(this.runErrorKey(err)),
     });
   }
@@ -186,6 +223,8 @@ export class WorldImportsPanelComponent implements OnInit {
       next: () => {
         // The set is gone; drop any status line that named it so the row reads clean.
         if (this.status()?.importer === importerId) this.status.set(null);
+        // Re-read so the durable last-imported line (from the provenance index) clears too (#260).
+        this.loadImporters();
         this.toaster.show(this.transloco.translate('imports.removed'), 'success');
       },
       error: () => this.error('imports.removeError'),
@@ -210,7 +249,11 @@ export class WorldImportsPanelComponent implements OnInit {
       .subscribe({
         next: (j) => {
           this.status.set(j);
-          if (j.status !== 'running') this.announce(j);
+          if (j.status !== 'running') {
+            this.announce(j);
+            // The run settled; re-read so each row's durable last-imported line reflects it (#260).
+            this.loadImporters();
+          }
         },
         error: () => {
           // The reconcile may well be fine; this panel just lost sight of it. Free the controls.
@@ -233,6 +276,14 @@ export class WorldImportsPanelComponent implements OnInit {
   private runErrorKey(err: unknown): string {
     const code = err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
     return code === ImporterErrorCode.ImportRunning ? 'imports.runningError' : 'imports.runError';
+  }
+
+  /** (Re)load the Importer list — its rows carry the durable last-imported line (#260). */
+  private loadImporters(): void {
+    this.worlds.importers(this.id()).subscribe({
+      next: (list) => this.importers.set(list),
+      error: () => this.error('imports.loadError'),
+    });
   }
 
   private error(key: string): void {

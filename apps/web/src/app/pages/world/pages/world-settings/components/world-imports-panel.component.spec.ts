@@ -2,7 +2,7 @@ import { provideTranslocoTesting } from '../../../../../../testing/transloco-tes
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { HttpErrorResponse } from '@angular/common/http';
-import { of, throwError } from 'rxjs';
+import { map, of, throwError, timer } from 'rxjs';
 import { ImporterSummary, ImportRunSummary } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
 import { MockWorldsClient } from '@hexly/web-core/testing';
@@ -67,6 +67,11 @@ describe('WorldImportsPanel', () => {
     return fixture.debugElement.query(By.css(`[data-testid="${testid}"]`)).nativeElement as HTMLElement;
   }
 
+  /** Whether a `data-testid` is present at all — for asserting a line renders (or doesn't). */
+  function has(testid: string): boolean {
+    return fixture.debugElement.query(By.css(`[data-testid="${testid}"]`)) !== null;
+  }
+
   function click(testid: string): void {
     el(testid).click();
     fixture.detectChanges();
@@ -126,6 +131,62 @@ describe('WorldImportsPanel', () => {
     const line = el('importer-status-draw-steel.monsters').textContent ?? '';
     expect(line).toContain('abcdef1'); // short rev
     expect(line).toContain('4'); // created + updated
+  });
+
+  it('renders the durable last-imported line from the list payload, surviving an API restart (#260)', () => {
+    // No in-process run this process has seen, but the provenance index still records the set.
+    worlds.importers.mockReturnValue(
+      of<ImporterSummary[]>([
+        { ...monsters, lastImported: { entityCount: 4, rev: 'abcdef1234567890', updatedAt: Date.UTC(2026, 0, 2) } },
+      ]),
+    );
+    render();
+
+    const line = el('importer-status-draw-steel.monsters').textContent ?? '';
+    expect(line).toContain('abcdef1'); // short rev, from the index, not an in-process job
+    expect(line).toContain('4'); // owned entity count
+    // A set on record flips the action to Reimport even with no in-process run.
+    expect(el('importer-run-draw-steel.monsters').textContent).toContain('Reimport');
+  });
+
+  it('renders a distinct failure line for a failed run, not an empty success line (#262 review)', () => {
+    worlds.importStatus.mockReturnValue(
+      of(runSummary({ importer: monsters.id, status: 'failed', error: 'fetch threw' })),
+    );
+    render();
+
+    expect(has('importer-error-draw-steel.monsters')).toBe(true);
+    expect(has('importer-status-draw-steel.monsters')).toBe(false); // never the success key
+  });
+
+  it('refreshes the importer list after a run settles, so each row’s durable line updates (#260)', () => {
+    worlds.runImport.mockReturnValue(of(runSummary({ importer: monsters.id, status: 'running' })));
+    worlds.importStatus
+      .mockReturnValueOnce(of(runSummary())) // idle on load
+      .mockReturnValue(of(runSummary({ importer: monsters.id, status: 'succeeded', created: 2, updated: 0 })));
+    render();
+    expect(worlds.importers).toHaveBeenCalledTimes(1); // the initial load
+
+    click('importer-run-draw-steel.monsters');
+    advance(POLL_MS);
+
+    expect(worlds.importers).toHaveBeenCalledTimes(2); // re-read once the run settled
+  });
+
+  it('ignores a stale initial status resolving after a run has started, keeping controls disabled (#262 review)', () => {
+    // The initial GET is slow and answers `idle` only after the run POST has already established the
+    // live running state; letting it through would re-enable the button mid-run.
+    worlds.importStatus
+      .mockReturnValueOnce(timer(50).pipe(map(() => runSummary()))) // late idle
+      .mockReturnValue(of(runSummary({ importer: monsters.id, status: 'running' }))); // polls: still running
+    worlds.runImport.mockReturnValue(of(runSummary({ importer: monsters.id, status: 'running' })));
+    render();
+
+    click('importer-run-draw-steel.monsters');
+    advance(50); // the stale initial GET resolves now — it must not rewind the live state
+    fixture.detectChanges();
+
+    expect((el('importer-run-draw-steel.monsters') as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('disables the controls while a reconcile is in flight, and rejoins one running on load', () => {

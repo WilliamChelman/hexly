@@ -389,6 +389,7 @@
     "remove": "Remove",
     "running": "Importing…",
     "lastRun": "Revision {{rev}} · {{count}} entities · {{date}}",
+    "lastRunFailed": "Last import failed. Try again.",
     "imported": "Imported {{count}} entities.",
     "removed": "Removed the imported set.",
     "loadError": "Couldn't load this world's importers.",
