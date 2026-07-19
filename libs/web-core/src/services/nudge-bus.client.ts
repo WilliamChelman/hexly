@@ -3,6 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { EMPTY, Observable, Subject, catchError, filter } from 'rxjs';
 import { ConnectionReady, FollowSignal, InterestRef, NudgeDelta } from '@hexly/domain';
 
+import { safeJsonParse } from '../utils/safe';
+
 /**
  * The client half of the live-follow nudge bus. Opens one multiplexed SSE stream
  * (`GET /api/events`) for the whole tab, captures the `connectionId` its first frame
@@ -99,7 +101,9 @@ export class NudgeBusClient {
       // A `ready` while we already hold a connectionId is a *gap reconnect* on the same
       // EventSource (native auto-reconnect), not the first handshake — the mint differs each open.
       const reconnected = this.connectionId !== null;
-      this.connectionId = (JSON.parse((e as MessageEvent).data) as ConnectionReady).connectionId;
+      const ready = safeJsonParse<ConnectionReady>((e as MessageEvent).data);
+      if (ready.isErr()) return; // malformed handshake: ignore rather than throw in the listener
+      this.connectionId = ready.value.connectionId;
       this.scheduleDeclare(); // flush interest gathered before the id arrived
       // Reconcile the gap: no server replay, so pulse each watched ref `stale` and let the follower
       // refetch. Not on the first connect — the follower already loaded its state on open.
@@ -108,8 +112,10 @@ export class NudgeBusClient {
       }
     });
     this.source.addEventListener('nudge', (e) => {
-      const delta = JSON.parse((e as MessageEvent).data) as NudgeDelta;
-      for (const entry of delta) this.nudges.next(entry);
+      // Drop a malformed frame rather than let the throw tear down the listener.
+      safeJsonParse<NudgeDelta>((e as MessageEvent).data).map((delta) => {
+        for (const entry of delta) this.nudges.next(entry);
+      });
     });
   }
 

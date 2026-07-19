@@ -30,5 +30,6 @@ export * from './services/world.store';
 export * from './services/worlds.client';
 export * from './utils/pretty-id';
 export * from './utils/routes';
+export * from './utils/safe';
 export * from './utils/search-entities';
 export * from './utils/wheel-gesture';
