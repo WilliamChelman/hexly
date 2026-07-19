@@ -18,6 +18,7 @@ import { StatControlComponent } from './stat-control.component';
         [field]="field()"
         [value]="value()"
         [invalid]="invalid()"
+        [compact]="compact()"
         [placeholderKey]="placeholderKey()"
         (valueChange)="valueChange.emit($event)"
       />
@@ -32,6 +33,8 @@ export class StatSlotComponent {
   readonly value = input<unknown>();
   readonly writable = input(false);
   readonly invalid = input(false);
+  /** Render the writable control as the tighter, spinner-less `appInput` — for a cramped grid cell. */
+  readonly compact = input(false);
   /** Print a positive number with a leading `+` — the Draw Steel characteristic convention (`+2`, `0`, `-1`). */
   readonly signed = input(false);
   /** Forwarded to a `list` control for its add-placeholder key (movement, keywords). */

@@ -39,6 +39,7 @@ import { TokenListComponent } from './token-list.component';
         <input
           appInput
           type="number"
+          [attr.compact]="compact() ? '' : null"
           [value]="stringValue()"
           [attr.aria-invalid]="invalid() || null"
           (input)="valueChange.emit(numberValue($event))"
@@ -70,6 +71,8 @@ export class StatControlComponent {
   /** The Field's raw block value — a lens, never copied. */
   readonly value = input<unknown>();
   readonly invalid = input(false);
+  /** Render the tighter, spinner-less `appInput` — for a single digit in a cramped grid cell (characteristics). */
+  readonly compact = input(false);
   /** The transloco key a `list` Field's add control shows as its placeholder. */
   readonly placeholderKey = input('');
   readonly valueChange = output<unknown>();

@@ -6,6 +6,12 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
  * participation and a11y. A void element, hence no template. See ADR-0007.
  *
  *   <input appInput value="The Reach of Aldermoor" />
+ *
+ * The `compact` variant trims the padding, centres the text, and drops the
+ * number spinners so a single digit stays legible in a tight grid cell (the
+ * stat-block characteristic squares) — the default padding clips it there.
+ *
+ *   <input appInput compact type="number" />
  */
 @Component({
   selector: 'input[appInput]',
@@ -22,6 +28,17 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
     }
     :host(:focus-visible) {
       @apply border-gold;
+    }
+    :host([compact]) {
+      @apply px-1 py-1 text-center;
+      /* Drop the spinners (Firefox) so the value, not the stepper, owns the width. */
+      appearance: textfield;
+    }
+    /* Drop the spinners (WebKit/Blink) for the same reason. */
+    :host([compact])::-webkit-inner-spin-button,
+    :host([compact])::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
     }
   `,
 })
