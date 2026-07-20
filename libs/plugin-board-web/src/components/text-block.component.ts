@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TextElement } from '@hexly/plugin-board';
-import { ContentDisplayComponent, ContentEditorComponent } from '@hexly/plugin-content/editor';
+import { ContentEditorComponent } from '@hexly/plugin-content/editor';
 import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { BoardStore } from '../services/board-store';
 import { TextBlockSession, TEXT_CONTENT_KEY } from '../services/text-block-session';
@@ -10,10 +10,11 @@ import { TextBlockSession, TEXT_CONTENT_KEY } from '../services/text-block-sessi
  * A **Text Block** Board Element (#268): rich text authored on the surface, static until its Text Block
  * arms, then edited in place with the *same editor as an Entity's Content* (CONTEXT.md → Text Block).
  *
- * Two faces, switched by {@link BoardStore.armed}: when this block is armed it mounts the full
- * {@link ContentEditorComponent} — familiar formatting, the slash menu, inline **Entity Links** — over a
- * {@link TextBlockSession} that folds edits back into this element; otherwise it shows the read-only
- * {@link ContentDisplayComponent}. The host is `pointer-events` gated so a static block's presses fall
+ * One renderer for both faces: the {@link ContentEditorComponent} — familiar formatting, the slash menu,
+ * inline **Entity Links** — over a {@link TextBlockSession} that folds edits back into this element,
+ * `editable` only while armed and static (read-only) otherwise. A single renderer is what keeps the read
+ * and edit faces pixel-identical (live link names, descriptors, spacing); the former read-only twin drifted
+ * from the editor on each of those. The host is `pointer-events` gated so a static block's presses fall
  * through to the element box (select / drag / resize), and an armed block captures them for typing —
  * which is why arm/disarm gates dragging: the two never contend for the pointer.
  *
@@ -28,22 +29,17 @@ import { TextBlockSession, TEXT_CONTENT_KEY } from '../services/text-block-sessi
     class: 'block w-full h-full overflow-auto text-ink text-sm',
     '[class.pointer-events-none]': '!armed()',
   },
-  imports: [ContentEditorComponent, ContentDisplayComponent, TranslocoPipe],
+  imports: [ContentEditorComponent, TranslocoPipe],
   providers: [
     TextBlockSession,
     { provide: ENTITY_SESSION, useExisting: TextBlockSession },
     { provide: VIEW_FIELD_KEY, useValue: TEXT_CONTENT_KEY },
   ],
   template: `
-    @if (armed()) {
-      <app-content-editor class="tb-editor" [ariaLabel]="'board.canvas.textBlock' | transloco" />
-    } @else {
-      <app-content-display
-        class="tb-display px-2 py-1"
-        [content]="element().content"
-        [ariaLabel]="'board.canvas.textBlock' | transloco"
-      />
-    }
+    <!-- One Content renderer for both faces (#268): the same editor, editable only while armed — static
+         otherwise, when it mirrors the block's prose read-only. A single renderer keeps read and edit
+         pixel-identical (live Entity-Link names, descriptors, spacing) with no drift between two paths. -->
+    <app-content-editor class="tb-editor" [editable]="armed()" [ariaLabel]="'board.canvas.textBlock' | transloco" />
   `,
   // Neutralise the Content editor's page chrome (its min-height, border, and reading padding) so it fits
   // the Text Block's box instead of a note's reading column; the box supplies the frame and scroll.

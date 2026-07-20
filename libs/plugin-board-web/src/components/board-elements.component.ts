@@ -39,8 +39,11 @@ interface Rendered {
   readonly id: string;
   readonly left: number;
   readonly top: number;
+  /** The element's **world** size (its content's natural dimensions); the box scales it by {@link scale}. */
   readonly width: number;
   readonly height: number;
+  /** The camera zoom the content is CSS-scaled by, so prose/images/nested embeds zoom with the box. */
+  readonly scale: number;
   readonly selected: boolean;
   /** Whether this element is the armed one — its editor is live, so drag/resize is suppressed on it. */
   readonly armed: boolean;
@@ -101,22 +104,35 @@ type Gesture =
         [class.is-embed]="!!el.embed"
         [style.left.px]="el.left"
         [style.top.px]="el.top"
-        [style.width.px]="el.width"
-        [style.height.px]="el.height"
+        [style.width.px]="el.width * el.scale"
+        [style.height.px]="el.height * el.scale"
         [attr.data-testid]="'element-' + el.id"
         [attr.aria-label]="'board.canvas.element' | transloco"
         (pointerdown)="onElementDown(el.id, $event)"
         (dblclick)="onElementDblClick(el.id)"
       >
-        @if (el.text; as text) {
-          <app-board-text-block [element]="text" />
-        }
-        @if (el.image; as image) {
-          <app-board-image [element]="image" />
-        }
-        @if (el.embed; as embed) {
-          <app-board-embed [element]="embed" />
-        }
+        <!-- Content wrapper at the element's *world* size, scaled by the camera zoom (origin top-left).
+             The scaled footprint equals the box's screen size, so the box's chrome (border, selection
+             outline, handles) stays crisp in screen space while the prose/image/embed inside zooms.
+             Applied only when it isn't 1, so an unzoomed board carries no transform at all. A Text Block's
+             inline editor popups are position:fixed and would be trapped by this transform; they escape it
+             by rendering at <body> (appBodyPortal), so they stay anchored to the caret at any zoom. -->
+        <div
+          class="content"
+          [style.width.px]="el.width"
+          [style.height.px]="el.height"
+          [style.scale]="el.scale === 1 ? null : el.scale"
+        >
+          @if (el.text; as text) {
+            <app-board-text-block [element]="text" />
+          }
+          @if (el.image; as image) {
+            <app-board-image [element]="image" />
+          }
+          @if (el.embed; as embed) {
+            <app-board-embed [element]="embed" />
+          }
+        </div>
         @if (!readOnly() && el.selected && single() && !el.armed) {
           @for (h of handles; track h.dir) {
             <span
@@ -137,6 +153,11 @@ type Gesture =
       @apply absolute pointer-events-auto rounded-sm cursor-move;
       background: color-mix(in srgb, var(--color-gold-soft) 55%, transparent);
       border: 1px solid var(--color-line-strong);
+    }
+    /* World-sized content scaled by the camera zoom from the box's top-left, so its scaled footprint
+       fills the screen-sized box exactly (see the template). Origin top-left is what aligns them. */
+    .content {
+      transform-origin: 0 0;
     }
     /* Read-only (a read-only viewer or an Embed's transclusion, ADR-0037/0062): the element renders its
        content but affords no move — no drag, no handles, no selection chrome. */
@@ -219,8 +240,12 @@ export class BoardElementsComponent {
         id: el.id,
         left: screen.x,
         top: screen.y,
-        width: size.width * camera.zoom,
-        height: size.height * camera.zoom,
+        // World size, not screen size: the box's *content* renders at these dimensions and a CSS
+        // `scale` on the inner wrapper zooms it, so text/images/nested embeds scale with the box rather
+        // than reflowing into a shrunken frame at native size (the reported bug).
+        width: size.width,
+        height: size.height,
+        scale: camera.zoom,
         selected: selected.has(el.id),
         armed: armed === el.id,
         text: el.kind === 'text' ? el : null,

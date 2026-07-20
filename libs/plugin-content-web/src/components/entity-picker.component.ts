@@ -7,6 +7,7 @@ import {
   ListboxComponent,
   ListboxEmptyComponent,
   ListboxOptionComponent,
+  BodyPortalDirective,
 } from '@hexly/web-ui';
 
 /** What the `@`/`/link` suggestion plugin hands the picker on open/update. */
@@ -20,10 +21,11 @@ export type EntityPickerProps = ListboxProps<EntitySummary>;
 @Component({
   selector: 'app-entity-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, ListboxComponent, ListboxOptionComponent, ListboxEmptyComponent],
+  imports: [TranslocoPipe, ListboxComponent, ListboxOptionComponent, ListboxEmptyComponent, BodyPortalDirective],
   template: `
     @if (visible()) {
       <app-listbox
+        appBodyPortal
         testid="entity-picker"
         [ariaLabel]="'editor.entityPicker.label' | transloco"
         [activeItemId]="activeItemId()"

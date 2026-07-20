@@ -11,6 +11,10 @@ describe('SlashMenu', () => {
     }).compileComponents();
   });
 
+  // The menu teleports to <body>, and these specs don't tear their fixtures down; clear any leftover so a
+  // popup from one test can't leak into the next test's document-level query.
+  afterEach(() => document.body.querySelectorAll('[data-testid=slash-menu]').forEach((n) => n.remove()));
+
   function open(items: SlashItem[] = SLASH_ITEMS) {
     const fixture = TestBed.createComponent(SlashMenuComponent);
     const menu = fixture.componentInstance;
@@ -24,15 +28,14 @@ describe('SlashMenu', () => {
     return { fixture, menu, command };
   }
 
-  const el = (fixture: { nativeElement: HTMLElement }) => fixture.nativeElement;
+  // The menu is teleported to <body> (BodyPortalDirective) so it escapes any `transform` ancestor (the
+  // Board's zoomed Text Block); it lives on the document, not under the fixture root.
+  const menuEl = () => document.body.querySelector('[data-testid=slash-menu]');
 
   it('renders an option per item with its localized label', () => {
-    const { fixture } = open([
-      SLASH_ITEMS.find((i) => i.id === 'heading1')!,
-      SLASH_ITEMS.find((i) => i.id === 'bulletList')!,
-    ]);
+    open([SLASH_ITEMS.find((i) => i.id === 'heading1')!, SLASH_ITEMS.find((i) => i.id === 'bulletList')!]);
 
-    const text = el(fixture).textContent ?? '';
+    const text = menuEl()?.textContent ?? '';
     expect(text).toContain('Heading 1');
     expect(text).toContain('Bullet list');
   });
@@ -41,7 +44,7 @@ describe('SlashMenu', () => {
     const fixture = TestBed.createComponent(SlashMenuComponent);
     fixture.detectChanges();
 
-    expect(el(fixture).querySelector('[data-testid=slash-menu]')).toBeNull();
+    expect(menuEl()).toBeNull();
   });
 
   it('moves the active option with ArrowDown and selects it on Enter', () => {
@@ -71,13 +74,13 @@ describe('SlashMenu', () => {
     fixture.detectChanges();
 
     expect(command).not.toHaveBeenCalled();
-    expect(el(fixture).querySelector('[data-testid=slash-menu]')).toBeNull();
+    expect(menuEl()).toBeNull();
   });
 
   it('selects an option when it is clicked', () => {
-    const { fixture, command } = open();
+    const { command } = open();
 
-    (el(fixture).querySelector('[data-testid=slash-item-blockquote]') as HTMLElement).click();
+    (menuEl()!.querySelector('[data-testid=slash-item-blockquote]') as HTMLElement).click();
 
     expect(command).toHaveBeenCalledWith(SLASH_ITEMS.find((i) => i.id === 'blockquote'));
   });
@@ -99,6 +102,6 @@ describe('SlashMenu', () => {
     });
     fixture.detectChanges();
 
-    expect(el(fixture).textContent ?? '').toContain('Heading 1');
+    expect(menuEl()?.textContent ?? '').toContain('Heading 1');
   });
 });
