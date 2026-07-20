@@ -1,0 +1,52 @@
+diff --git a/v4/classic/external.cjs b/v4/classic/external.cjs
+index ee133825d44ab44b86dd8aef6bd985653ebde06c..ae6769faf43379dd8ecebe8af99994db78235042 100644
+--- a/v4/classic/external.cjs
++++ b/v4/classic/external.cjs
+@@ -60,7 +60,7 @@ var json_schema_processors_js_1 = require("../core/json-schema-processors.cjs");
+ Object.defineProperty(exports, "toJSONSchema", { enumerable: true, get: function () { return json_schema_processors_js_1.toJSONSchema; } });
+ var from_json_schema_js_1 = require("./from-json-schema.cjs");
+ Object.defineProperty(exports, "fromJSONSchema", { enumerable: true, get: function () { return from_json_schema_js_1.fromJSONSchema; } });
+-exports.locales = __importStar(require("../locales/index.cjs"));
++// patched (hexly): locales namespace re-export removed (see external.js).
+ // iso
+ // must be exported from top-level
+ // https://github.com/colinhacks/zod/issues/4491
+diff --git a/v4/classic/external.js b/v4/classic/external.js
+index 9567900bbb57099481c0ea5864fbf697d62021a5..a1b7c1f5e91bcb5d2ce06d636054ef82db0f548c 100644
+--- a/v4/classic/external.js
++++ b/v4/classic/external.js
+@@ -11,7 +11,7 @@ config(en());
+ export { globalRegistry, registry, config, $output, $input, $brand, clone, regexes, treeifyError, prettifyError, formatError, flattenError, TimePrecision, util, NEVER, } from "../core/index.js";
+ export { toJSONSchema } from "../core/json-schema-processors.js";
+ export { fromJSONSchema } from "./from-json-schema.js";
+-export * as locales from "../locales/index.js";
++// patched (hexly): locales namespace re-export removed — esbuild cannot tree-shake it and it adds ~190kB of unused translations to the web initial bundle. Default `en` config above is untouched.
+ // iso
+ // must be exported from top-level
+ // https://github.com/colinhacks/zod/issues/4491
+diff --git a/v4/core/index.cjs b/v4/core/index.cjs
+index c3fa303104a191d142a5212f69e7954cba3606a7..f3ef45e47c8ec3adfb9b4dec880f5339f419704e 100644
+--- a/v4/core/index.cjs
++++ b/v4/core/index.cjs
+@@ -35,7 +35,7 @@ __exportStar(require("./checks.cjs"), exports);
+ __exportStar(require("./versions.cjs"), exports);
+ exports.util = __importStar(require("./util.cjs"));
+ exports.regexes = __importStar(require("./regexes.cjs"));
+-exports.locales = __importStar(require("../locales/index.cjs"));
++// patched (hexly): locales namespace re-export removed (see classic/external.js).
+ __exportStar(require("./registries.cjs"), exports);
+ __exportStar(require("./doc.cjs"), exports);
+ __exportStar(require("./api.cjs"), exports);
+diff --git a/v4/core/index.js b/v4/core/index.js
+index d334515bf004600f2e55ff85e3730f1b2f2ff703..e3dae0f2280aa338d489aa309d59d6cac5ba1755 100644
+--- a/v4/core/index.js
++++ b/v4/core/index.js
+@@ -6,7 +6,7 @@ export * from "./checks.js";
+ export * from "./versions.js";
+ export * as util from "./util.js";
+ export * as regexes from "./regexes.js";
+-export * as locales from "../locales/index.js";
++// patched (hexly): locales namespace re-export removed (see classic/external.js).
+ export * from "./registries.js";
+ export * from "./doc.js";
+ export * from "./api.js";
