@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  zod@4.4.3:
+    hash: eef6441d01f916dcf7b9697f7e9fb04307e55d10f5e1aafb1b49a6a00b92bfda
+    path: patches/zod@4.4.3.patch
+
 importers:
 
   .:
@@ -139,7 +144,7 @@ importers:
         version: 2.9.0
       zod:
         specifier: ^4.4.3
-        version: 4.4.3
+        version: 4.4.3(patch_hash=eef6441d01f916dcf7b9697f7e9fb04307e55d10f5e1aafb1b49a6a00b92bfda)
     devDependencies:
       '@angular-devkit/core':
         specifier: ~21.2.0
@@ -21132,6 +21137,6 @@ snapshots:
 
   zod@4.3.6: {}
 
-  zod@4.4.3: {}
+  zod@4.4.3(patch_hash=eef6441d01f916dcf7b9697f7e9fb04307e55d10f5e1aafb1b49a6a00b92bfda): {}
 
   zwitch@2.0.4: {}
