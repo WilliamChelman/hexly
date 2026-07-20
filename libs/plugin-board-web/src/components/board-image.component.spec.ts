@@ -7,7 +7,15 @@ import { BoardImageComponent } from './board-image.component';
 
 /** A minimal Image element pointing at `assetUrl`. */
 function imageElement(assetUrl: string): ImageElement {
-  return { id: 'img', kind: 'image', position: { x: 0, y: 0 }, size: { width: 240, height: 180 }, z: 0, assetUrl };
+  return {
+    id: 'img',
+    kind: 'image',
+    position: { x: 0, y: 0 },
+    size: { width: 240, height: 180 },
+    z: 0,
+    assetUrl,
+    lockRatio: false,
+  };
 }
 
 describe('BoardImage', () => {

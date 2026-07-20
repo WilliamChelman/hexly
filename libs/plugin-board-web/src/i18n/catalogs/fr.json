@@ -25,6 +25,15 @@
   "embed": {
     "openTarget": "Ouvrir la cible"
   },
+  "controls": {
+    "resize": "Redimensionner",
+    "fitWidth": "Ajuster la largeur",
+    "fitHeight": "Ajuster la hauteur",
+    "fitBoth": "Ajuster les deux",
+    "fitImage": "Ajuster à l’image",
+    "lockRatio": "Verrouiller les proportions",
+    "order": "Ordre d’empilement"
+  },
   "toolPalette": {
     "tools": "Outils",
     "select": "Sélection",

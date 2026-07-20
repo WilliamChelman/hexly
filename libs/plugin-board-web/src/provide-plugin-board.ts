@@ -1,5 +1,19 @@
 import { EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
-import { LucideFrame, LucideImage, LucideSquare } from '@lucide/angular';
+import {
+  LucideArrowDown,
+  LucideArrowDownToLine,
+  LucideArrowUp,
+  LucideArrowUpToLine,
+  LucideFrame,
+  LucideImage,
+  LucideLayers,
+  LucideLock,
+  LucideLockOpen,
+  LucideScaling,
+  LucideSquare,
+  LucideUnfoldHorizontal,
+  LucideUnfoldVertical,
+} from '@lucide/angular';
 import { providePlugin } from '@hexly/web-entity';
 import { lucideGlyph, provideIcons } from '@hexly/web-ui';
 import { BOARD_SURFACE_DATA_TYPE, CORE_BOARD_SURFACE, PLUGIN_ID, SURFACE_FIELD } from '@hexly/plugin-board';
@@ -27,6 +41,18 @@ export function providePluginBoard(): EnvironmentProviders {
       lucideGlyph('board-box', LucideSquare),
       lucideGlyph('board-image', LucideImage),
       lucideGlyph('board-embed', LucideFrame),
+      // The selection-control glyphs: the resize-menu trigger and its per-axis fits, the Image
+      // aspect-ratio lock's on/off faces, and the stacking-order menu trigger with its four moves.
+      lucideGlyph('board-resize', LucideScaling),
+      lucideGlyph('board-fit-width', LucideUnfoldHorizontal),
+      lucideGlyph('board-fit-height', LucideUnfoldVertical),
+      lucideGlyph('board-lock-ratio', LucideLock),
+      lucideGlyph('board-lock-ratio-open', LucideLockOpen),
+      lucideGlyph('board-stack', LucideLayers),
+      lucideGlyph('board-to-front', LucideArrowUpToLine),
+      lucideGlyph('board-forward', LucideArrowUp),
+      lucideGlyph('board-backward', LucideArrowDown),
+      lucideGlyph('board-to-back', LucideArrowDownToLine),
     ]),
     providePlugin({
       id: PLUGIN_ID,

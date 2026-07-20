@@ -16,7 +16,13 @@ const surface = (elements: BoardElement[]): BoardSurface => ({ elements });
 
 const geometry = { position: { x: 0, y: 0 }, size: { width: 100, height: 100 }, z: 0 } as const;
 
-const image = (id: string, assetUrl: string): ImageElement => ({ id, kind: 'image', assetUrl, ...geometry });
+const image = (id: string, assetUrl: string): ImageElement => ({
+  id,
+  kind: 'image',
+  assetUrl,
+  lockRatio: false,
+  ...geometry,
+});
 const embed = (id: string, targetEntityId: string): EmbedElement => ({
   id,
   kind: 'embed',

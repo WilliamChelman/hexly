@@ -25,6 +25,15 @@
   "embed": {
     "openTarget": "Open target"
   },
+  "controls": {
+    "resize": "Resize",
+    "fitWidth": "Fit width",
+    "fitHeight": "Fit height",
+    "fitBoth": "Fit both",
+    "fitImage": "Fit to image",
+    "lockRatio": "Lock aspect ratio",
+    "order": "Stacking order"
+  },
   "toolPalette": {
     "tools": "Tools",
     "select": "Select",

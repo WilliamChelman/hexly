@@ -51,6 +51,10 @@ export const imageElementSchema = z.object({
   kind: z.literal('image'),
   /** The served capability URL of the World Asset this element displays. */
   assetUrl: z.string(),
+  // Whether resize-handle drags keep the picture's aspect ratio (CONTEXT.md → Image, the selection
+  // controls). A property of the element, so it survives reload/undo; `.default(false)` keeps every
+  // pre-existing surface (no such field) parsing, defaulting the lock off.
+  lockRatio: z.boolean().default(false),
 });
 
 /**
