@@ -1,7 +1,15 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { ActivatedRoute, provideRouter } from '@angular/router';
+import { of } from 'rxjs';
 import { addElement, emptyBoardSurface } from '@hexly/plugin-board';
+import { EntityNameResolver } from '@hexly/plugin-content/web';
+import { CONTENT_EDITOR_TEST_CATALOGS } from '@hexly/plugin-content/testing';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { BOARD_TEST_CATALOGS } from '../i18n/test-catalogs';
+import { BoardCamera } from '../services/board-camera';
+import { BoardStore } from '../services/board-store';
 import { FakeEntitySession, provideBoardStoreTesting } from '../testing/entity-session.fake';
 import { BoardViewComponent } from './board-view.component';
 
@@ -14,8 +22,20 @@ import { BoardViewComponent } from './board-view.component';
 describe('BoardView', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [BoardViewComponent, provideTranslocoTesting(BOARD_TEST_CATALOGS)],
-      providers: provideBoardStoreTesting(),
+      imports: [
+        BoardViewComponent,
+        provideTranslocoTesting({ ...BOARD_TEST_CATALOGS, ...CONTENT_EDITOR_TEST_CATALOGS }),
+      ],
+      providers: [
+        ...provideBoardStoreTesting(),
+        // The armed Text Block mounts the reused Content editor; these are its ambient dependencies
+        // (mirrors the ContentEditor/TextBlock spec harnesses).
+        EntityNameResolver,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { fragment: of(null) } },
+      ],
     }).compileComponents();
   });
 
@@ -62,5 +82,71 @@ describe('BoardView', () => {
     expect(el.querySelector('[data-testid=handle-nw]')).toBeNull();
     expect(el.querySelector('app-board-tool-palette')).toBeNull();
     expect(el.querySelector('app-board-inspector')).toBeNull();
+  });
+
+  /**
+   * Wheel pan/zoom is delegated from the View host so it catches wheels over *both* layers — the canvas
+   * grid and the DOM element overlay (its boxes are `pointer-events-auto`, so a wheel over one never
+   * reaches the canvas' own listener, the reported bug). Two regions keep the wheel: the floating chrome
+   * and an armed element's interactive content.
+   */
+  describe('wheel pan/zoom', () => {
+    function wheel(target: Element, init: WheelEventInit): void {
+      target.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, ...init }));
+    }
+
+    /** Resolve a required element, asserting it is present so a missing target never masks a false green. */
+    function query(fixture: ReturnType<typeof render>, selector: string): Element {
+      const el = (fixture.nativeElement as HTMLElement).querySelector(selector);
+      expect(el).not.toBeNull();
+      return el as Element;
+    }
+
+    it('pans the camera on a wheel over an element box (a sibling-overlay box, not the canvas)', () => {
+      seedOneElement();
+      const fixture = render();
+      const cam = fixture.debugElement.injector.get(BoardCamera);
+      const before = cam.camera();
+
+      wheel(query(fixture, '[data-testid=element-e1]'), { deltaX: 0, deltaY: 100 });
+
+      // Plain scroll pans: scrolling down moves content up, so the offset drops by the delta.
+      expect(cam.camera().offset.y).toBe(before.offset.y - 100);
+    });
+
+    it('zooms the camera on ctrl+wheel over an element box', () => {
+      seedOneElement();
+      const fixture = render();
+      const cam = fixture.debugElement.injector.get(BoardCamera);
+
+      wheel(query(fixture, '[data-testid=element-e1]'), { deltaY: -100, ctrlKey: true });
+
+      // Ctrl+wheel up zooms in past the identity scale.
+      expect(cam.camera().zoom).toBeGreaterThan(1);
+    });
+
+    it('leaves the camera untouched for a wheel inside an armed Text Block editor', () => {
+      const fixture = render();
+      const store = fixture.debugElement.injector.get(BoardStore);
+      const id = store.addText({ x: 0, y: 0 }); // addText arms the new block
+      fixture.detectChanges();
+      const cam = fixture.debugElement.injector.get(BoardCamera);
+      const before = cam.camera();
+
+      wheel(query(fixture, `[data-testid=element-${id}] app-board-text-block`), { deltaY: 100 });
+
+      // Same camera instance — the guard never called through, so the editor keeps the wheel.
+      expect(cam.camera()).toBe(before);
+    });
+
+    it('leaves the camera untouched for a wheel over the Inspector', () => {
+      const fixture = render();
+      const cam = fixture.debugElement.injector.get(BoardCamera);
+      const before = cam.camera();
+
+      wheel(query(fixture, 'app-board-inspector'), { deltaY: 100, ctrlKey: true });
+
+      expect(cam.camera()).toBe(before);
+    });
   });
 });
