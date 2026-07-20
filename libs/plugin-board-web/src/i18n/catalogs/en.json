@@ -14,13 +14,20 @@
   "canvas": {
     "label": "Board surface",
     "element": "Board element",
+    "elementBox": "Box element",
+    "elementText": "Text block element",
+    "elementImage": "Image element",
+    "elementEmbed": "Embed element",
     "textBlock": "Text block",
     "image": "Image",
     "missingAsset": "Missing image",
+    "imageLoading": "Loading image…",
+    "imageRetry": "Retry",
     "zoom": "Zoom",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
-    "fit": "Reset view"
+    "fit": "Fit content",
+    "resetZoom": "Reset zoom to 100%"
   },
   "embed": {
     "openTarget": "Open target"

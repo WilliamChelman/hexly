@@ -14,13 +14,20 @@
   "canvas": {
     "label": "Surface de tableau",
     "element": "Élément de tableau",
+    "elementBox": "Élément boîte",
+    "elementText": "Élément bloc de texte",
+    "elementImage": "Élément image",
+    "elementEmbed": "Élément intégration",
     "textBlock": "Bloc de texte",
     "image": "Image",
     "missingAsset": "Image manquante",
+    "imageLoading": "Chargement de l’image…",
+    "imageRetry": "Réessayer",
     "zoom": "Zoom",
     "zoomIn": "Zoom avant",
     "zoomOut": "Zoom arrière",
-    "fit": "Réinitialiser la vue"
+    "fit": "Ajuster au contenu",
+    "resetZoom": "Réinitialiser le zoom à 100 %"
   },
   "embed": {
     "openTarget": "Ouvrir la cible"

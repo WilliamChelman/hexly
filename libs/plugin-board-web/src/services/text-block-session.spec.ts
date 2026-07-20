@@ -57,4 +57,20 @@ describe('TextBlockSession', () => {
     const afterUndo = store.document().elements.find((e) => e.id === id);
     expect(afterUndo?.kind === 'text' && afterUndo.content).toEqual(emptyContent());
   });
+
+  it('ticks its exposed loadGeneration on a board undo, so the live editor re-seeds', () => {
+    const { store, session } = makeSession();
+    const id = store.addText({ x: 0, y: 0 });
+    session.setTarget(id);
+    const before = session.loadGeneration();
+
+    store.setContent(id, prose('The Keep'));
+    // A commit is no replay: re-seeding here would rebuild the editor mid-typing and drop the caret.
+    expect(session.loadGeneration()).toBe(before);
+
+    store.undo();
+    // The document reverted under the still-mounted editor; without this tick its next debounced commit
+    // would push the pre-undo prose back — silently un-undoing (the reported bug).
+    expect(session.loadGeneration()).not.toBe(before);
+  });
 });

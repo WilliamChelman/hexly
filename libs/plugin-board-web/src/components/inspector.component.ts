@@ -2,8 +2,9 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } 
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ENTITY_VIEW_CHOICES } from '@hexly/web-entity';
 import { ButtonComponent, EyebrowComponent, FieldComponent, InputComponent } from '@hexly/web-ui';
+import { BoardElement } from '@hexly/plugin-board';
 import { BoardStore } from '../services/board-store';
-import { inputValue } from '../utils/input-value';
+import { inputNumber, inputValue } from '../utils/input-value';
 import { keyedViewChoices, KeyedViewChoice } from '../utils/embed-view-choices';
 
 /** The z-order actions, as the Inspector's stacking controls — each dispatches a pure reordering. */
@@ -38,10 +39,26 @@ const Z_ACTIONS = [
       <div class="leaf">
         <div class="flex gap-3">
           <div appField class="flex-1 min-w-0" [label]="'board.inspector.x' | transloco">
-            <input appInput type="number" data-testid="element-x" [value]="element.position.x" (change)="onX($event)" />
+            <input
+              appInput
+              type="number"
+              data-testid="element-x"
+              [value]="round(element.position.x)"
+              (focus)="onGeometryFocus(element.id)"
+              (blur)="onGeometryBlur()"
+              (change)="onX($event)"
+            />
           </div>
           <div appField class="flex-1 min-w-0" [label]="'board.inspector.y' | transloco">
-            <input appInput type="number" data-testid="element-y" [value]="element.position.y" (change)="onY($event)" />
+            <input
+              appInput
+              type="number"
+              data-testid="element-y"
+              [value]="round(element.position.y)"
+              (focus)="onGeometryFocus(element.id)"
+              (blur)="onGeometryBlur()"
+              (change)="onY($event)"
+            />
           </div>
         </div>
 
@@ -52,7 +69,9 @@ const Z_ACTIONS = [
               type="number"
               min="1"
               data-testid="element-width"
-              [value]="element.size.width"
+              [value]="round(element.size.width)"
+              (focus)="onGeometryFocus(element.id)"
+              (blur)="onGeometryBlur()"
               (change)="onWidth($event)"
             />
           </div>
@@ -62,7 +81,9 @@ const Z_ACTIONS = [
               type="number"
               min="1"
               data-testid="element-height"
-              [value]="element.size.height"
+              [value]="round(element.size.height)"
+              (focus)="onGeometryFocus(element.id)"
+              (blur)="onGeometryBlur()"
               (change)="onHeight($event)"
             />
           </div>
@@ -85,21 +106,27 @@ const Z_ACTIONS = [
           </div>
         </div>
 
-        <!-- An Embed's chosen View (ADR-0062): re-pick which of the target's Views the Embed transcludes. -->
+        <!-- An Embed's chosen View (ADR-0062): re-pick which of the target's Views the Embed transcludes.
+             Rendered only once the choices resolve: painted sooner, the select could only show the default
+             option — misreporting a non-default viewInstance, and a "confirming" change would silently
+             re-point the Embed at ''. The pick rides [selected] on each option, not [value] on the select:
+             a value binding applies before the @for creates its options, so it can never land on a
+             not-yet-rendered choice. -->
         @if (element.kind === 'embed') {
-          <div appField [label]="'board.inspector.embedView' | transloco">
-            <select
-              class="view-select"
-              data-testid="embed-view-select"
-              [value]="element.viewInstance"
-              (change)="onEmbedView(element.id, $event)"
-            >
-              <option value="">{{ 'board.embedPicker.defaultView' | transloco }}</option>
-              @for (choice of embedChoices(); track choice.key) {
-                <option [value]="choice.key">{{ choice.label }}</option>
-              }
-            </select>
-          </div>
+          @if (embedChoices(); as choices) {
+            <div appField [label]="'board.inspector.embedView' | transloco">
+              <select class="view-select" data-testid="embed-view-select" (change)="onEmbedView(element.id, $event)">
+                <option value="" [selected]="element.viewInstance === ''">
+                  {{ 'board.embedPicker.defaultView' | transloco }}
+                </option>
+                @for (choice of choices; track choice.key) {
+                  <option [value]="choice.key" [selected]="choice.key === element.viewInstance">
+                    {{ choice.label }}
+                  </option>
+                }
+              </select>
+            </div>
+          }
         }
       </div>
 
@@ -185,8 +212,19 @@ export class InspectorComponent {
     return element?.kind === 'embed' ? element.targetEntityId : null;
   });
 
-  /** The selected Embed target's afforded Views (beyond its default), resolved across the seam for the View picker. */
-  protected readonly embedChoices = signal<readonly KeyedViewChoice[]>([]);
+  /**
+   * The selected Embed target's afforded Views (beyond its default), resolved across the seam for the
+   * View picker; `null` while the request is in flight, so the template can withhold the select until
+   * the loaded options can actually represent the Embed's `viewInstance`.
+   */
+  protected readonly embedChoices = signal<readonly KeyedViewChoice[] | null>(null);
+
+  /**
+   * The id of the element whose geometry field is being edited, captured when the field takes focus.
+   * `change` fires at blur — *after* a canvas pointerdown may have re-pointed the selection — so reading
+   * `selectedElement()` at event time would land the pending value on the newly selected element.
+   */
+  private editingId: string | null = null;
 
   constructor() {
     // Reload the View options whenever the selected Embed's target changes; a non-Embed selection clears
@@ -194,7 +232,7 @@ export class InspectorComponent {
     // response never paints Embed A's Views under Embed B (ADR-0062).
     effect((onCleanup) => {
       const targetId = this.embedTargetId();
-      this.embedChoices.set([]);
+      this.embedChoices.set(null);
       if (!targetId) return;
       const sub = keyedViewChoices(this.viewChoices, targetId).subscribe((choices) => this.embedChoices.set(choices));
       onCleanup(() => sub.unsubscribe());
@@ -206,30 +244,91 @@ export class InspectorComponent {
     this.store.setEmbedView(id, inputValue(event));
   }
 
-  // Each geometry handler reads the *current* selected element, not the one bound at last render: a
-  // second field edited before change detection re-runs must compose with the first, not clobber it
-  // with a stale sibling coordinate.
+  protected onGeometryFocus(id: string): void {
+    this.editingId = id;
+  }
+
+  protected onGeometryBlur(): void {
+    // `change` fires before `blur`, so a pending commit has already consumed the captured id.
+    this.editingId = null;
+  }
+
+  /** Geometry for display: at most 2 decimals — a drag can leave 10+, which overflows the field. Commits keep the full typed precision. */
+  protected round(value: number): number {
+    return Math.round(value * 100) / 100;
+  }
+
+  // Each geometry handler resolves its target through `editingTarget()` — the element the user typed
+  // into, at its *current* state — so a second field edited before change detection re-runs composes
+  // with the first instead of clobbering it with a stale sibling coordinate.
   protected onX(event: Event): void {
-    const current = this.store.selectedElement();
-    if (current) this.store.move(current.id, { x: Number(inputValue(event)), y: current.position.y });
+    this.commitGeometry(
+      event,
+      (element) => element.position.x,
+      (element, x) => this.store.move(element.id, { x, y: element.position.y }),
+    );
   }
 
   protected onY(event: Event): void {
-    const current = this.store.selectedElement();
-    if (current) this.store.move(current.id, { x: current.position.x, y: Number(inputValue(event)) });
+    this.commitGeometry(
+      event,
+      (element) => element.position.y,
+      (element, y) => this.store.move(element.id, { x: element.position.x, y }),
+    );
   }
 
   protected onWidth(event: Event): void {
-    const current = this.store.selectedElement();
-    if (current) this.store.resize(current.id, { width: Number(inputValue(event)), height: current.size.height });
+    this.commitGeometry(
+      event,
+      (element) => element.size.width,
+      (element, width) => this.store.resize(element.id, { width, height: element.size.height }),
+      1,
+    );
   }
 
   protected onHeight(event: Event): void {
-    const current = this.store.selectedElement();
-    if (current) this.store.resize(current.id, { width: current.size.width, height: Number(inputValue(event)) });
+    this.commitGeometry(
+      event,
+      (element) => element.size.height,
+      (element, height) => this.store.resize(element.id, { width: element.size.width, height }),
+      1,
+    );
   }
 
   protected onZ(id: string, action: (typeof Z_ACTIONS)[number]['id']): void {
     this.store[action](id);
+  }
+
+  /**
+   * Commit one geometry field. Empty, non-finite, or below-`min` input commits nothing and the field
+   * reverts to the model — a typed negative used to clamp to the `min="1"` floor, leaving a 1px sliver
+   * element nobody asked for; reverting treats it like a cleared field (the store's finiteness/positivity
+   * guards remain the deep guard). The input is then rewritten from the model, because the `[value]`
+   * binding won't repaint a rejected entry on its own — the model didn't change — and the field would
+   * keep lying.
+   */
+  private commitGeometry(
+    event: Event,
+    read: (element: BoardElement) => number,
+    apply: (element: BoardElement, value: number) => void,
+    min?: number,
+  ): void {
+    const target = this.editingTarget();
+    const typed = inputNumber(event);
+    if (target && typed !== null && (min === undefined || typed >= min)) apply(target, typed);
+    // Sync to whichever element the field is *rendering* now — after a mid-edit re-point that is the
+    // newly selected element, not the commit's target.
+    const shown = this.store.selectedElement();
+    if (shown) (event.target as HTMLInputElement).value = String(this.round(read(shown)));
+  }
+
+  /**
+   * The element a pending geometry commit targets: the one captured at focus if it still exists (it may
+   * no longer be the selection — the commit must follow the user's edit, not the re-pointed selection),
+   * else the current selection (a change with no preceding focus, e.g. programmatic).
+   */
+  private editingTarget(): BoardElement | null {
+    const id = this.editingId ?? this.store.selectedElement()?.id;
+    return id ? (this.store.document().elements.find((e) => e.id === id) ?? null) : null;
   }
 }

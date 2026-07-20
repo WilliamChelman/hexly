@@ -175,6 +175,30 @@ describe('BoardStore', () => {
   });
 });
 
+describe('BoardStore history generation', () => {
+  it('ticks on every undo and redo, so a live editor re-seeds from the reverted document', () => {
+    const store = makeStore();
+    expect(store.historyGeneration()).toBe(0);
+
+    store.commit((draft) => draft.elements.push(textElement('a', 0)));
+    // An edit is not a replay — bumping here would re-seed (and jump the caret of) the editor that
+    // just committed.
+    expect(store.historyGeneration()).toBe(0);
+
+    store.undo();
+    expect(store.historyGeneration()).toBe(1);
+    store.redo();
+    expect(store.historyGeneration()).toBe(2);
+  });
+
+  it('does not tick for an undo/redo with nothing to replay', () => {
+    const store = makeStore();
+    store.undo();
+    store.redo();
+    expect(store.historyGeneration()).toBe(0);
+  });
+});
+
 describe('BoardStore tool arming', () => {
   it('opens armed with Select so the first gesture is non-destructive', () => {
     expect(makeStore().tool()).toBe('select');

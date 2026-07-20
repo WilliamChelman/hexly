@@ -4,64 +4,65 @@ import { Point } from '@hexly/plugin-board';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { DialogRef, DialogService } from '@hexly/web-ui';
 import { BoardStore } from './board-store';
-import { BoardImagePlacement } from './board-image-placement';
-import { ImagePickerData } from '../components/board-image-picker.component';
+import { BoardEmbedPlacement } from './board-embed-placement';
+import { EmbedChoice, EmbedPickerData } from '../components/board-embed-picker.component';
 
-/** Records the addImage / armTool calls the placement funnels through. */
+/** Records the addEmbed / armTool calls the placement funnels through. */
 class FakeStore {
-  readonly added: { position: Point; url: string }[] = [];
+  readonly added: { position: Point; targetEntityId: string; viewInstance: string }[] = [];
   readonly toolArms: string[] = [];
-  addImage(position: Point, url: string): string {
-    this.added.push({ position, url });
-    return 'img';
+  addEmbed(position: Point, targetEntityId: string, viewInstance: string): string {
+    this.added.push({ position, targetEntityId, viewInstance });
+    return 'em';
   }
   armTool(id: string): void {
     this.toolArms.push(id);
   }
 }
 
-/** A DialogService whose `open` hands back a controllable ref, so a spec drives the picker's outcome. */
+/** A DialogService whose `open` hands back a controllable ref, so a spec drives the chooser's outcome. */
 class FakeDialogService {
-  opened: { component: Type<unknown>; data: unknown; ref: DialogRef<ImagePickerData, string> }[] = [];
+  opened: { component: Type<unknown>; data: unknown; ref: DialogRef<EmbedPickerData, EmbedChoice> }[] = [];
   open<Data, Result>(component: Type<unknown>, data?: Data): DialogRef<Data, Result> {
-    const ref = new DialogRef<ImagePickerData, string>(data as ImagePickerData);
+    const ref = new DialogRef<EmbedPickerData, EmbedChoice>(data as EmbedPickerData);
     this.opened.push({ component, data, ref });
     return ref as unknown as DialogRef<Data, Result>;
   }
-  lastRef(): DialogRef<ImagePickerData, string> {
+  lastRef(): DialogRef<EmbedPickerData, EmbedChoice> {
     return this.opened[this.opened.length - 1].ref;
   }
 }
 
-describe('BoardImagePlacement', () => {
+describe('BoardEmbedPlacement', () => {
   let dialogs: FakeDialogService;
   let store: FakeStore;
   const worldId = signal<string | null>('w1');
 
-  function setup(): BoardImagePlacement {
+  function setup(): BoardEmbedPlacement {
     dialogs = new FakeDialogService();
     store = new FakeStore();
     TestBed.configureTestingModule({
       providers: [
-        BoardImagePlacement,
+        BoardEmbedPlacement,
         { provide: DialogService, useValue: dialogs },
         { provide: BoardStore, useValue: store },
         { provide: ENTITY_SESSION, useValue: { current: () => (worldId() ? { worldId: worldId() } : null) } },
       ],
     });
-    return TestBed.inject(BoardImagePlacement);
+    return TestBed.inject(BoardEmbedPlacement);
   }
 
-  it('opens the source chooser for the current World and places an Image at the chosen URL', () => {
+  it('opens the target chooser for the current World and places an Embed at the confirmed choice', () => {
     worldId.set('w1');
     const placement = setup();
 
     placement.place({ x: 12, y: 34 });
     expect(dialogs.opened[0].data).toEqual({ worldId: 'w1' });
 
-    // A choice (upload or pick both close with a URL) lands an Image at the clicked point.
-    dialogs.lastRef().close('/assets/w1/pick.png');
-    expect(store.added).toEqual([{ position: { x: 12, y: 34 }, url: '/assets/w1/pick.png' }]);
+    dialogs.lastRef().close({ targetEntityId: 'note-1', viewInstance: 'core.view.map:core.grid' });
+    expect(store.added).toEqual([
+      { position: { x: 12, y: 34 }, targetEntityId: 'note-1', viewInstance: 'core.view.map:core.grid' },
+    ]);
     // A successful placement keeps the armed Tool sticky — repeat placement stays one click away.
     expect(store.toolArms).toEqual([]);
   });
@@ -71,10 +72,10 @@ describe('BoardImagePlacement', () => {
     const placement = setup();
 
     placement.place({ x: 0, y: 0 });
-    dialogs.lastRef().close(); // cancelled → no URL
+    dialogs.lastRef().close(); // cancelled → no choice
 
     expect(store.added).toEqual([]);
-    // Without the re-arm, the still-armed Image Tool reopens the just-dismissed dialog on the next click.
+    // Without the re-arm, the still-armed Embed Tool reopens the just-dismissed dialog on the next click.
     expect(store.toolArms).toEqual(['select']);
   });
 
@@ -82,8 +83,8 @@ describe('BoardImagePlacement', () => {
     worldId.set('w1');
     setup();
     // The service is route-scoped; a child environment injector stands in for the departing route.
-    const env = createEnvironmentInjector([BoardImagePlacement], TestBed.inject(EnvironmentInjector));
-    const placement = env.get(BoardImagePlacement);
+    const env = createEnvironmentInjector([BoardEmbedPlacement], TestBed.inject(EnvironmentInjector));
+    const placement = env.get(BoardEmbedPlacement);
     placement.place({ x: 0, y: 0 });
     let completed = false;
     dialogs.lastRef().closed.subscribe({ complete: () => (completed = true) });
@@ -95,7 +96,7 @@ describe('BoardImagePlacement', () => {
     expect(store.added).toEqual([]);
   });
 
-  it('is a no-op with no resolved World — nowhere to mint an Asset', () => {
+  it('is a no-op with no resolved World — nowhere to scope the target search', () => {
     worldId.set(null);
     const placement = setup();
 

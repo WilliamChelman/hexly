@@ -1,6 +1,18 @@
-import { ChangeDetectionStrategy, Component, computed, HostListener, inject, input, signal } from '@angular/core';
+import {
+  afterRenderEffect,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  ElementRef,
+  HostListener,
+  inject,
+  input,
+  signal,
+  viewChildren,
+} from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EmbedElement, ImageElement, Point, Size, stackingOrder, TextElement } from '@hexly/plugin-board';
+import { isInteractiveTarget, ShortcutService } from '@hexly/web-core';
 import { BoardCamera } from '../services/board-camera';
 import { BoardStore } from '../services/board-store';
 import { DRAG_THRESHOLD } from '../utils/gesture';
@@ -8,7 +20,7 @@ import { BoardImageComponent } from './board-image.component';
 import { BoardEmbedComponent } from './board-embed.component';
 import { BoardElementControlsComponent } from './board-element-controls.component';
 import { TextBlockComponent } from './text-block.component';
-import { toolForHotkey } from './tools';
+import { TOOLS, toolForHotkey } from './tools';
 
 /** A resize handle's compass direction — the edge(s) it drags. A closed union, like {@link ToolId}. */
 export type Corner = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -35,6 +47,26 @@ const HANDLES: readonly Handle[] = [
 /** Smallest a resize may shrink an element, in world pixels — a positive floor `sizeSchema` demands. */
 const MIN_SIZE = 20;
 
+/** The per-kind aria-label keys, so assistive tech hears an element's kind (en/fr catalogs, ADR-0014). */
+const ELEMENT_LABEL_KEYS: Readonly<Record<string, string>> = {
+  box: 'board.canvas.elementBox',
+  text: 'board.canvas.elementText',
+  image: 'board.canvas.elementImage',
+  embed: 'board.canvas.elementEmbed',
+};
+
+/** World pixels an arrow key nudges the selection — Shift multiplies it tenfold. */
+const NUDGE_STEP = 1;
+const NUDGE_STEP_SHIFT = 10;
+
+/** The world direction each arrow key nudges in, keyed by lowercase `event.key`. */
+const NUDGE_DIRECTION: Readonly<Record<string, Point>> = {
+  arrowleft: { x: -1, y: 0 },
+  arrowright: { x: 1, y: 0 },
+  arrowup: { x: 0, y: -1 },
+  arrowdown: { x: 0, y: 1 },
+};
+
 /** One element resolved for the DOM: its screen-space box, its selection/armed state, and its content. */
 interface Rendered {
   readonly id: string;
@@ -54,13 +86,32 @@ interface Rendered {
   readonly image: ImageElement | null;
   /** The Embed element to render in place, or null for any other kind. */
   readonly embed: EmbedElement | null;
+  /** The box's per-kind aria-label key — a screen reader hears *what* the element is, not just "element". */
+  readonly labelKey: string;
 }
 
-/** A live drag: moving the whole selection, or resizing one element from a handle. */
+/**
+ * A live drag — moving the whole selection, resizing one element from a handle, or a middle-button pan.
+ * Every kind pins `pointerId` (only its own pointer's events drive or end it — a second touch mid-drag
+ * must not hijack the gesture, mirroring the canvas's `foreignPointer`) and move/resize freeze `zoom` at
+ * the press: dividing by the *live* zoom would snap the element under a stationary pointer if a pinch
+ * lands mid-drag.
+ */
 type Gesture =
-  | { kind: 'move'; startX: number; startY: number; id: string; group: boolean; moved: boolean }
+  | {
+      kind: 'move';
+      pointerId: number;
+      zoom: number;
+      startX: number;
+      startY: number;
+      id: string;
+      group: boolean;
+      moved: boolean;
+    }
   | {
       kind: 'resize';
+      pointerId: number;
+      zoom: number;
       startX: number;
       startY: number;
       id: string;
@@ -68,7 +119,9 @@ type Gesture =
       origin: { position: Point; size: Size };
       /** The width/height to hold constant (a ratio-locked Image), or undefined for a free resize. */
       lockAspect?: number;
-    };
+    }
+  /** Middle-button pan started over an element box — the grid's pan affordance, kept alive over content. */
+  | { kind: 'pan'; pointerId: number; lastX: number; lastY: number };
 
 /**
  * The Board Elements overlay: the DOM layer above the canvas grid that draws each Board Element as a
@@ -110,7 +163,7 @@ type Gesture =
         [style.width.px]="el.width * el.scale"
         [style.height.px]="el.height * el.scale"
         [attr.data-testid]="'element-' + el.id"
-        [attr.aria-label]="'board.canvas.element' | transloco"
+        [attr.aria-label]="el.labelKey | transloco"
         (pointerdown)="onElementDown(el.id, $event)"
         (dblclick)="onElementDblClick(el.id)"
       >
@@ -158,6 +211,9 @@ type Gesture =
   styles: `
     @reference '#app-styles.css';
 
+    /* Element boxes must stay z-index: auto — the floating chrome (palette, Inspector, zoom control)
+       relies on its z-[1] beating tree order in the board View's stacking context (see the canvas host's
+       deliberately-not-isolate note); any z-index here would paint boxes over the chrome's controls. */
     .element {
       @apply absolute pointer-events-auto rounded-sm cursor-move;
       background: color-mix(in srgb, var(--color-gold-soft) 55%, transparent);
@@ -205,6 +261,8 @@ type Gesture =
 export class BoardElementsComponent {
   private readonly cam = inject(BoardCamera);
   private readonly store = inject(BoardStore);
+  private readonly shortcuts = inject(ShortcutService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /**
    * Read-only rendering (ADR-0037/0062): the elements draw but afford no editing — no select/drag/resize,
@@ -213,6 +271,9 @@ export class BoardElementsComponent {
   readonly readOnly = input(false);
 
   protected readonly handles = HANDLES;
+
+  /** The mounted Text Blocks, looked up by element id when arming must move focus into an editor. */
+  private readonly textBlocks = viewChildren(TextBlockComponent);
 
   /** A live move offset in world pixels, applied to every selected element as a preview. */
   private readonly moveDelta = signal<Point | null>(null);
@@ -224,6 +285,29 @@ export class BoardElementsComponent {
 
   /** The active gesture; a plain field, not a signal — it gates the gesture, never the render. */
   private gesture: Gesture | null = null;
+
+  /**
+   * Whether a gesture is in flight, mirrored reactively for the board View: it must stop forwarding
+   * wheels to the camera mid-drag, or the pan/zoom would move the board under the frozen gesture math.
+   */
+  private readonly _gestureActive = signal(false);
+  readonly gestureActive = this._gestureActive.asReadonly();
+
+  constructor() {
+    this.registerShortcuts();
+
+    // Focus follows arming (any path: double-click, or the Text Tool's addText which arms on placement).
+    // Without it focus stays on <body>, so the next Backspace would ride the surface layer and delete the
+    // just-opened element, and a caret needs a third click. afterRenderEffect, not effect: the editor
+    // turns editable during this CD pass and the viewChildren query settles with the render.
+    afterRenderEffect(() => {
+      const armed = this.store.armed();
+      if (armed === null || this.readOnly()) return;
+      this.textBlocks()
+        .find((block) => block.element().id === armed)
+        ?.focus();
+    });
+  }
 
   /**
    * Every element resolved to a screen-space box in stacking order (bottom first, so the DOM paint order
@@ -260,6 +344,7 @@ export class BoardElementsComponent {
         text: el.kind === 'text' ? el : null,
         image: el.kind === 'image' ? el : null,
         embed: el.kind === 'embed' ? el : null,
+        labelKey: ELEMENT_LABEL_KEYS[el.kind] ?? 'board.canvas.elementBox',
       };
     });
   });
@@ -269,12 +354,24 @@ export class BoardElementsComponent {
   protected onElementDown(id: string, event: PointerEvent): void {
     // Read-only: no pick/move gesture, and no stopPropagation, so the press is inert (ADR-0062).
     if (this.readOnly()) return;
-    if (event.button !== 0) return;
-    // An armed Text Block owns the pointer for typing and text selection: let the press reach its editor
-    // and start no move gesture — dragging requires disarming first (CONTEXT.md → Text Block, #268).
+    // A press while a gesture is live is a second pointer (multi-touch): the first keeps the gesture.
+    if (this.gesture !== null) return;
+    // An armed element owns the pointer for its interaction (typing, an Embed's read-interaction): let
+    // every press reach it and start no gesture — dragging requires disarming first (CONTEXT.md → #268).
     if (this.store.armed() === id) return;
+    // Middle button pans, exactly as it does on the grid — an element box must not be a dead spot in the
+    // pan surface. Nothing to commit: the camera moves live and the release is inert.
+    if (event.button === 1) {
+      event.stopPropagation();
+      (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
+      this.setGesture({ kind: 'pan', pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY });
+      return;
+    }
+    if (event.button !== 0) return;
     event.stopPropagation();
-    (event.target as Element).setPointerCapture?.(event.pointerId);
+    // Capture on the box (currentTarget), not event.target: the press may land on a child that unmounts
+    // mid-gesture, and a removed capture element silently drops the rest of the drag.
+    (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
 
     const modifier = event.shiftKey || event.metaKey || event.ctrlKey;
     const alreadySelected = this.store.selectedIds().includes(id);
@@ -287,7 +384,16 @@ export class BoardElementsComponent {
     }
     // Arm the move only if the pressed element ended up selected (a toggle-off leaves nothing to drag).
     if (!this.store.selectedIds().includes(id)) return;
-    this.gesture = { kind: 'move', startX: event.clientX, startY: event.clientY, id, group, moved: false };
+    this.setGesture({
+      kind: 'move',
+      pointerId: event.pointerId,
+      zoom: this.cam.zoom(),
+      startX: event.clientX,
+      startY: event.clientY,
+      id,
+      group,
+      moved: false,
+    });
   }
 
   /**
@@ -308,23 +414,29 @@ export class BoardElementsComponent {
 
   protected onHandleDown(id: string, dir: Corner, event: PointerEvent): void {
     if (this.readOnly()) return; // handles never render read-only, but guard the entry too.
+    if (this.gesture !== null) return; // a second pointer must not overwrite a live gesture.
     if (event.button !== 0) return;
     event.stopPropagation();
-    (event.target as Element).setPointerCapture?.(event.pointerId);
+    // Capture on the element box, not the handle span: handles unmount if the selection flips mid-drag,
+    // and a removed capture element drops the pointer stream; the box outlives the gesture.
+    const box = (event.currentTarget as Element).closest('.element') ?? (event.currentTarget as Element);
+    box.setPointerCapture?.(event.pointerId);
     const element = this.store.document().elements.find((e) => e.id === id);
     if (!element) return;
     // A ratio-locked Image holds its current aspect through the drag; every other element resizes freely.
     const lockAspect =
       element.kind === 'image' && element.lockRatio ? element.size.width / element.size.height : undefined;
-    this.gesture = {
+    this.setGesture({
       kind: 'resize',
+      pointerId: event.pointerId,
+      zoom: this.cam.zoom(),
       startX: event.clientX,
       startY: event.clientY,
       id,
       dir,
       origin: { position: { ...element.position }, size: { ...element.size } },
       lockAspect,
-    };
+    });
   }
 
   // ---- Global drag tracking -------------------------------------------------
@@ -332,10 +444,23 @@ export class BoardElementsComponent {
   @HostListener('document:pointermove', ['$event'])
   protected onPointerMove(event: PointerEvent): void {
     const gesture = this.gesture;
-    if (!gesture) return;
-    const zoom = this.cam.camera().zoom;
-    const worldDx = (event.clientX - gesture.startX) / zoom;
-    const worldDy = (event.clientY - gesture.startY) / zoom;
+    if (!gesture || event.pointerId !== gesture.pointerId) return; // foreign pointer: not this gesture's.
+    // No button held means the pointerup was lost (released outside the window, a missed capture):
+    // abandon rather than rubber-band the element around on plain hover until the next click.
+    if (event.buttons === 0) {
+      this.clearGesture();
+      return;
+    }
+    if (gesture.kind === 'pan') {
+      this.cam.panBy(event.clientX - gesture.lastX, event.clientY - gesture.lastY);
+      gesture.lastX = event.clientX;
+      gesture.lastY = event.clientY;
+      return;
+    }
+    // The zoom frozen at the press, not the live camera: a pinch mid-drag must not snap the element
+    // under a stationary pointer (the View also stops forwarding wheels while a gesture is live).
+    const worldDx = (event.clientX - gesture.startX) / gesture.zoom;
+    const worldDy = (event.clientY - gesture.startY) / gesture.zoom;
 
     if (gesture.kind === 'move') {
       if (Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) >= DRAG_THRESHOLD) {
@@ -353,7 +478,7 @@ export class BoardElementsComponent {
   @HostListener('document:pointerup', ['$event'])
   protected onPointerUp(event: PointerEvent): void {
     const gesture = this.gesture;
-    if (!gesture) return;
+    if (!gesture || event.pointerId !== gesture.pointerId) return; // a foreign pointer ends nothing.
     (event.target as Element).releasePointerCapture?.(event.pointerId);
 
     if (gesture.kind === 'move') {
@@ -364,15 +489,17 @@ export class BoardElementsComponent {
         // A plain click that never dragged collapses the set to the pressed element.
         this.store.select(gesture.id, 'replace');
       }
-    } else {
+    } else if (gesture.kind === 'resize') {
       const preview = this.resizePreview();
       if (preview) this.store.setGeometry(gesture.id, preview.position, preview.size);
     }
+    // A pan commits nothing — the camera already moved live.
     this.clearGesture();
   }
 
-  @HostListener('document:pointercancel')
-  protected onPointerCancel(): void {
+  @HostListener('document:pointercancel', ['$event'])
+  protected onPointerCancel(event: PointerEvent): void {
+    if (!this.gesture || event.pointerId !== this.gesture.pointerId) return;
     // Abandon the gesture without committing — a cancelled drag never lands at a stale destination.
     this.clearGesture();
   }
@@ -380,39 +507,143 @@ export class BoardElementsComponent {
   // ---- Keyboard -------------------------------------------------------------
 
   /**
-   * Delete/Backspace removes the selection, Escape clears it, `v`/`b` arm Tools, Cmd/Ctrl+Z undoes /
-   * redoes. Suppressed while a text field is focused, so a keystroke meant for an input never leaks.
+   * The board's keyboard contract, as `surface`-layer registrations on the app's one shortcut
+   * dispatcher (ADR-0063) — so a modal picker or a focused text field suppresses them wholesale, and
+   * exact modifier matching keeps Alt/Ctrl-chords from re-arming Tools. Delete/Backspace removes the
+   * selection, Cmd/Ctrl+Z / Shift+Z undoes/redoes (plus Ctrl+Y, the Windows/Linux redo), letters arm
+   * Tools, arrows nudge the selection, and Escape unwinds one layer of mode at a time.
+   *
+   * Every registration is gated on `!readOnly()` — load-bearing for an Embed: the dispatcher is
+   * window-level, so a transcluded read-only board must not mutate its store off the outer page's keys.
+   * Every *mutating* shortcut is additionally gated on no live gesture: an undo mid-resize would be
+   * clobbered by the pending commit replaying a pre-undo origin on release. Delete/Backspace also falls
+   * through behind a focused control ({@link isInteractiveTarget}), mirroring the map canvas.
+   *
+   * Registered in the constructor's injection context, so they unregister with the component.
    */
-  @HostListener('window:keydown', ['$event'])
-  protected onKeydown(event: KeyboardEvent): void {
-    // Read-only: no delete/undo/tool shortcuts. Load-bearing for an Embed — this is a window-level
-    // listener, so a transcluded read-only board must not mutate its store off the outer page's keys.
-    if (this.readOnly()) return;
-    if (isEditableTarget(event.target)) return;
+  private registerShortcuts(): void {
+    const writable = () => !this.readOnly();
+    const idle = () => !this.readOnly() && this.gesture === null;
 
-    if (event.metaKey || event.ctrlKey) {
-      if (event.key.toLowerCase() !== 'z') return;
-      event.preventDefault();
-      if (event.shiftKey) this.store.redo();
-      else this.store.undo();
-      return;
-    }
+    // Escape unwinds exactly one layer per press, strongest claim first:
+    // (1) a live drag/resize — cancel it, committing nothing and leaving the selection (a multi-select
+    //     mid-move survives; the release after a cancel is inert);
+    // (2) an armed element — disarm only, keeping the selection;
+    // (3) an armed placement Tool — back to Select, so an armed placement can be abandoned;
+    // (4) nothing else claimed — clear the selection.
+    this.shortcuts.register({
+      layer: 'surface',
+      keys: 'escape',
+      when: writable,
+      handler: () => {
+        if (this.cancelGesture()) return;
+        if (this.store.armed() !== null) {
+          this.store.disarm();
+          return;
+        }
+        if (this.store.tool() !== 'select') {
+          this.store.armTool('select');
+          return;
+        }
+        this.store.deselect();
+      },
+    });
 
-    if (event.key === 'Escape') {
-      this.store.deselect();
-      return;
-    }
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      event.preventDefault();
-      this.store.delete();
-      return;
-    }
-    const tool = toolForHotkey(event.key);
-    if (tool) this.store.armTool(tool);
+    // Escape from *inside* the armed editor (the `editable` layer): disarm, keep the selection, and
+    // hand focus back to the surface — without the blur, focus stays in the now read-only editor and
+    // every subsequent key keeps riding the editable layer. This used to be impossible: the old
+    // handler bailed on editable targets, mouse-trapping authors in edit mode. Claimed only while the
+    // focused editable actually sits inside this board's host: the dispatcher is window-level, so an
+    // armed block must not hijack Escape from a foreign text field (disarming it, blurring the field,
+    // and preventDefaulting the keydown out from under whoever owns that field).
+    this.shortcuts.register({
+      layer: 'editable',
+      keys: 'escape',
+      when: () => !this.readOnly() && this.store.armed() !== null,
+      handler: () => {
+        if (!this.host.nativeElement.contains(document.activeElement)) return false;
+        this.store.disarm();
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        return;
+      },
+    });
+
+    this.shortcuts.register({
+      layer: 'surface',
+      keys: ['delete', 'backspace'],
+      when: idle,
+      handler: (event) => {
+        // Suppressed behind any focused control (palette/Inspector buttons, links), mirroring the map
+        // canvas: the destructive shortcut belongs to the surface, never to a focused button.
+        if (isInteractiveTarget(event.target)) return false;
+        this.store.delete();
+        return;
+      },
+    });
+
+    this.shortcuts.register({ layer: 'surface', keys: 'mod+z', when: idle, handler: () => this.store.undo() });
+    this.shortcuts.register({
+      layer: 'surface',
+      keys: ['mod+shift+z', 'ctrl+y'],
+      when: idle,
+      handler: () => this.store.redo(),
+    });
+
+    this.shortcuts.register({
+      layer: 'surface',
+      keys: TOOLS.map((t) => t.hotkey),
+      when: idle,
+      handler: (event) => {
+        const tool = toolForHotkey(event.key);
+        if (!tool) return false;
+        this.store.armTool(tool);
+        return;
+      },
+    });
+
+    // Arrows nudge the whole selection by 1 world px, 10 with Shift — one store.moveSelected per press,
+    // so each press is one undo step (coalescing a held key into one step is deliberately not done).
+    // Falls through when nothing is selected, so the board never eats arrows meant for someone else.
+    this.shortcuts.register({
+      layer: 'surface',
+      keys: [
+        'arrowleft',
+        'arrowright',
+        'arrowup',
+        'arrowdown',
+        'shift+arrowleft',
+        'shift+arrowright',
+        'shift+arrowup',
+        'shift+arrowdown',
+      ],
+      when: idle,
+      handler: (event) => {
+        if (this.store.selectedIds().length === 0) return false;
+        const direction = NUDGE_DIRECTION[event.key.toLowerCase()];
+        if (!direction) return false;
+        const step = event.shiftKey ? NUDGE_STEP_SHIFT : NUDGE_STEP;
+        this.store.moveSelected({ x: direction.x * step, y: direction.y * step });
+        return;
+      },
+    });
+  }
+
+  /** Track the gesture and its reactive mirror together — every gesture start funnels here. */
+  private setGesture(gesture: Gesture): void {
+    this.gesture = gesture;
+    this._gestureActive.set(true);
+  }
+
+  /** Abandon the live gesture without committing or touching the selection; false if none was live. */
+  private cancelGesture(): boolean {
+    if (this.gesture === null) return false;
+    this.clearGesture();
+    return true;
   }
 
   private clearGesture(): void {
     this.gesture = null;
+    this._gestureActive.set(false);
     this.moveDelta.set(null);
     this.resizePreview.set(null);
   }
@@ -480,12 +711,4 @@ function constrainToAspect(dir: Corner, width: number, height: number, aspect: n
     w = h * aspect;
   }
   return { width: w, height: h };
-}
-
-/** Whether `target` is a text input the user is typing into — so shortcuts don't hijack its keys. */
-function isEditableTarget(target: EventTarget | null): boolean {
-  const el = target as HTMLElement | null;
-  if (!el) return false;
-  const tag = el.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
 }

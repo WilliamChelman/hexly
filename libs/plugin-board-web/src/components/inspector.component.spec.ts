@@ -79,6 +79,83 @@ describe('Board Inspector single-element editing', () => {
     expect(element?.size).toEqual({ width: 250, height: 90 });
   });
 
+  it('lands a pending geometry edit on the element it was typed into, not a newly selected one', () => {
+    const store = TestBed.inject(BoardStore);
+    const { id: a, fixture } = withSelectedBox(store, { x: 40, y: -20 });
+
+    // The user focuses A's X field and types 500...
+    const x = field(fixture, 'element-x');
+    x.dispatchEvent(new Event('focus'));
+    x.value = '500';
+    // ...then clicks element B on the canvas: pointerdown re-points the selection, and only then does
+    // the field blur and raise `change`.
+    const b = store.addElement({ x: 50, y: 0 });
+    x.dispatchEvent(new Event('change'));
+
+    const byId = (id: string) => store.document().elements.find((e) => e.id === id);
+    expect(byId(b)?.position).toEqual({ x: 50, y: 0 }); // B must not jump to the pending 500
+    expect(byId(a)?.position).toEqual({ x: 500, y: -20 }); // the typed value follows the edited element
+    expect(x.value).toBe('50'); // and the field re-syncs to the element it now renders
+  });
+
+  it('reverts the field instead of committing when it is emptied', () => {
+    const store = TestBed.inject(BoardStore);
+    const { id, fixture } = withSelectedBox(store, { x: 40, y: -20 });
+
+    const x = field(fixture, 'element-x');
+    x.dispatchEvent(new Event('focus'));
+    x.value = ''; // Number('') === 0 — an empty field must not commit x=0
+    x.dispatchEvent(new Event('change'));
+
+    expect(store.document().elements.find((e) => e.id === id)?.position.x).toBe(40);
+    expect(x.value).toBe('40');
+  });
+
+  it('reverts the field when the store rejects a non-finite entry', () => {
+    const store = TestBed.inject(BoardStore);
+    const { id, fixture } = withSelectedBox(store, { x: 40, y: -20 });
+
+    const x = field(fixture, 'element-x');
+    x.dispatchEvent(new Event('focus'));
+    x.value = '1e400'; // Number('1e400') === Infinity — nothing commits, so [value] alone would leave it painted
+    x.dispatchEvent(new Event('change'));
+
+    expect(store.document().elements.find((e) => e.id === id)?.position.x).toBe(40);
+    expect(x.value).toBe('40');
+  });
+
+  it('reverts a non-positive width to the model instead of clamping to a 1px sliver', () => {
+    const store = TestBed.inject(BoardStore);
+    const { id, fixture } = withSelectedBox(store);
+
+    const w = field(fixture, 'element-width');
+    w.dispatchEvent(new Event('focus'));
+    w.value = '-50';
+    w.dispatchEvent(new Event('change'));
+
+    // Out-of-range commits nothing, matching the cleared-field behavior — clamping used to leave a
+    // 1px sliver element.
+    expect(store.document().elements.find((e) => e.id === id)?.size).toEqual({ width: 160, height: 120 });
+    expect(w.value).toBe('160');
+  });
+
+  it('rounds displayed geometry to two decimals but commits full typed precision', () => {
+    const store = TestBed.inject(BoardStore);
+    const { id, fixture } = withSelectedBox(store, { x: -740.33501460766, y: 0.5 });
+
+    // A drag can leave 10+ decimals; painted raw they overflow the field.
+    expect(field(fixture, 'element-x').value).toBe('-740.34');
+    expect(field(fixture, 'element-y').value).toBe('0.5');
+
+    const x = field(fixture, 'element-x');
+    x.dispatchEvent(new Event('focus'));
+    x.value = '10.123456';
+    x.dispatchEvent(new Event('change'));
+
+    expect(store.document().elements.find((e) => e.id === id)?.position.x).toBe(10.123456);
+    expect(x.value).toBe('10.12');
+  });
+
   it('reorders the element via the stacking controls', () => {
     const store = TestBed.inject(BoardStore);
     const a = store.addElement({ x: 0, y: 0 });
@@ -143,6 +220,22 @@ describe('Board Inspector Embed view choices', () => {
       (o as HTMLElement).textContent?.trim(),
     );
   }
+
+  it("withholds the select until choices load, then reflects the Embed's non-default View", () => {
+    const store = TestBed.inject(BoardStore);
+    store.addEmbed({ x: 0, y: 0 }, 'target-a', 'core.view.map:core.grid');
+    const fixture = render();
+
+    // While the choices are in flight there is no select: painted sooner it could only show the default
+    // option, and a "confirming" change would silently re-point the Embed at ''.
+    expect(fixture.nativeElement.querySelector('[data-testid=embed-view-select]')).toBeNull();
+
+    subjects.get('target-a')?.next([{ view: { viewId: 'core.view.map', fieldKey: 'core.grid' }, label: 'Map' }]);
+    fixture.detectChanges();
+
+    const select = fixture.nativeElement.querySelector('[data-testid=embed-view-select]') as HTMLSelectElement;
+    expect(select.value).toBe('core.view.map:core.grid');
+  });
 
   it('drops a stale response when the selected Embed target changes (out-of-order)', () => {
     const store = TestBed.inject(BoardStore);

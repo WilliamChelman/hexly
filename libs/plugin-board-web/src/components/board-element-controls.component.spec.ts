@@ -113,6 +113,36 @@ describe('BoardElementControls', () => {
     expect(host.style.top).toBe('60px');
   });
 
+  describe('flip near the viewport top', () => {
+    it('lifts above the element’s top edge when there is room (no flip)', () => {
+      setup();
+      render(imageElement()); // top 60 — above the flip threshold, the strip lifts as usual.
+      expect((fixture.nativeElement as HTMLElement).classList).not.toContain('is-flipped');
+    });
+
+    it('flips below the element’s top edge when the lifted strip would clip out of the overlay', () => {
+      setup();
+      render(imageElement());
+      // Within the strip's own height + margin of the viewport top, the lift would cross the overlay's
+      // overflow-hidden edge — the strip drops below the element's top edge instead.
+      ref.setInput('top', 10);
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).classList).toContain('is-flipped');
+    });
+
+    it('tracks the threshold as the element moves — flipping on and back off', () => {
+      setup();
+      render(imageElement());
+      ref.setInput('top', 0);
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).classList).toContain('is-flipped');
+
+      ref.setInput('top', 120);
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).classList).not.toContain('is-flipped');
+    });
+  });
+
   describe('for an Image', () => {
     it('shows the fit, ratio-lock, and stacking-order controls, not the Embed resize menu', () => {
       setup();

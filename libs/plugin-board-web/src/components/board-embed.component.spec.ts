@@ -144,4 +144,18 @@ describe('BoardEmbed', () => {
     expect(href).toContain('w1');
     expect(href).toContain('note-2');
   });
+
+  it('reveals the open affordance from the containing element box’s hover, not the host’s', () => {
+    setup();
+    render();
+    // The reveal is pure CSS and jsdom cannot hover, so pin the load-bearing selector: the un-armed host
+    // is pointer-events-none and never hovers itself, so the rule must key off the ancestor `.element`
+    // box (via :host-context, whose emulated shim keeps `.element:hover` in the compiled selector).
+    const styles = Array.from(document.head.querySelectorAll('style'))
+      .map((s) => s.textContent ?? '')
+      .join('\n');
+    const revealRule = styles.split('}').find((rule) => rule.includes('.element:hover'));
+    expect(revealRule).toBeDefined();
+    expect(revealRule).toContain('open-target');
+  });
 });

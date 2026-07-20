@@ -1,3 +1,4 @@
+import { ShortcutService } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -46,6 +47,76 @@ describe('CommandPalette', () => {
     dispatchCmdK();
     fixture.detectChanges();
     expect(dialogEl(fixture).open).toBe(false);
+  });
+
+  it('opens while focus is in a text field — the chord is registered inEditable', () => {
+    const fixture = render();
+    const outside = document.createElement('input');
+    document.body.appendChild(outside);
+    outside.focus();
+
+    outside.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }));
+    fixture.detectChanges();
+
+    const opened = dialogEl(fixture).open;
+    outside.remove();
+    expect(opened).toBe(true);
+  });
+
+  it('stays closed while a modal shortcut scope is held', () => {
+    const fixture = render();
+
+    const pop = TestBed.inject(ShortcutService).pushModalScope();
+    dispatchCmdK();
+    fixture.detectChanges();
+    const openedBehindModal = dialogEl(fixture).open;
+    pop();
+
+    expect(openedBehindModal).toBe(false);
+  });
+
+  it('holds the modal scope while open, suppressing surface shortcuts under the overlay', () => {
+    // The palette's dialog claims the keyboard like any declarative dialog (ADR-0063, amendment);
+    // its Cmd/Ctrl+K toggle survives via the modal-layer twin registration.
+    const handler = vi.fn();
+    const unregister = TestBed.inject(ShortcutService).register({ layer: 'surface', keys: 'escape', handler });
+    const fixture = render();
+    dispatchCmdK();
+    fixture.detectChanges();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(handler).not.toHaveBeenCalled();
+
+    dispatchCmdK(); // the modal-layer toggle still closes it
+    fixture.detectChanges();
+    expect(dialogEl(fixture).open).toBe(false);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(handler).toHaveBeenCalledOnce();
+    unregister();
+  });
+
+  it('leaves Escape from its own input un-defaulted, so the native cancel closes the dialog', () => {
+    // Nothing may preventDefault the keydown: doing so cancels the native <dialog> "cancel" and the
+    // palette would be stuck open (a surface's Escape used to do exactly that).
+    const fixture = render();
+    dispatchCmdK();
+    fixture.detectChanges();
+
+    const input: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="command-palette-input"]');
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    input.dispatchEvent(escape);
+    expect(escape.defaultPrevented).toBe(false);
+
+    // jsdom's <dialog> has no native cancel path, so simulate what the browser does next: close().
+    dialogEl(fixture).close();
+    fixture.detectChanges();
+    expect(dialogEl(fixture).open).toBe(false);
+
+    // The close event synced the palette's own state, so the next chord re-opens rather than fighting it.
+    dispatchCmdK();
+    fixture.detectChanges();
+    expect(dialogEl(fixture).open).toBe(true);
   });
 
   it("renders a registered provider's matching commands as the query changes", () => {

@@ -67,6 +67,7 @@ export class BoardViewComponent {
   protected readonly session = inject(ENTITY_SESSION);
 
   private readonly canvas = viewChild.required(BoardCanvasComponent);
+  private readonly elements = viewChild.required(BoardElementsComponent);
 
   /**
    * Pan/zoom the board from a wheel/pinch gesture. The listener sits on this host — the shared ancestor
@@ -81,17 +82,43 @@ export class BoardViewComponent {
    * cancelable, so Angular's non-passive `(wheel)` binding cancels it — mirroring the Hex Map, whose
    * `(wheel)` lives on its real `<canvas>` box.
    *
-   * Two regions keep the wheel to themselves, so it neither pans nor zooms the board: the floating chrome
-   * (tool palette, Inspector, zoom control — the Inspector must scroll), and an *armed* element's
-   * interactive content (a Text Block's live editor, an Embed's transclusion — scrolling inside it must
-   * not move the board, CONTEXT.md → Text Block/Embed). Both are a `closest()` containment test; not
-   * calling through leaves the native scroll and `preventDefault` to that inner content.
+   * The camera is frozen while an element gesture (drag/resize) is in flight: the overlay's world math
+   * snapshots the zoom at the press, so a pan/zoom mid-drag would move the board under the frozen
+   * gesture. The wheel is swallowed (preventDefault, no camera) rather than left to bubble, or a
+   * mid-drag pinch would zoom the whole page.
+   *
+   * Two regions keep the *plain* wheel to themselves, so it neither pans nor zooms the board: the
+   * floating chrome (tool palette, Inspector, zoom control, and the selected element's control strip —
+   * the Inspector must scroll, and the strip must not pan the board out from under its buttons), and an
+   * *armed* element's interactive content (a Text Block's live editor, an Embed's transclusion —
+   * scrolling inside it must not move the board, CONTEXT.md → Text Block/Embed). Both are a `closest()`
+   * containment test; not calling through leaves the native scroll and `preventDefault` to that inner
+   * content. Ctrl/⌘+wheel is a zoom intent and is forwarded from both regions — returning without
+   * preventDefault would let a pinch over the chrome or the armed editor zoom the whole page, the exact
+   * 08bdd28 symptom.
+   *
+   * Every path that consumes the wheel (the mid-gesture swallow and the forward to the canvas) also
+   * `stopPropagation()`s: a surface that handled a wheel must not let it drive an ancestor surface's
+   * camera too — a Board transcluded into a Board would zoom both. The exempted paths deliberately
+   * leave the event alone, bubbling and all, so the inner content's native scroll keeps working.
    */
   protected onWheel(event: WheelEvent): void {
-    const target = event.target as HTMLElement | null;
-    if (target?.closest('app-board-tool-palette, app-board-inspector, app-board-zoom-control, .element.is-armed')) {
+    if (this.elements().gestureActive()) {
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
+    const target = event.target as HTMLElement | null;
+    const zoomIntent = event.ctrlKey || event.metaKey;
+    if (
+      !zoomIntent &&
+      target?.closest(
+        'app-board-tool-palette, app-board-inspector, app-board-zoom-control, app-board-element-controls, .element.is-armed',
+      )
+    ) {
+      return;
+    }
+    event.stopPropagation();
     this.canvas().onWheel(event);
   }
 }

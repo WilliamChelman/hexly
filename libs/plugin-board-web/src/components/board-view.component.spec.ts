@@ -87,8 +87,9 @@ describe('BoardView', () => {
   /**
    * Wheel pan/zoom is delegated from the View host so it catches wheels over *both* layers — the canvas
    * grid and the DOM element overlay (its boxes are `pointer-events-auto`, so a wheel over one never
-   * reaches the canvas' own listener, the reported bug). Two regions keep the wheel: the floating chrome
-   * and an armed element's interactive content.
+   * reaches the canvas' own listener, the reported bug). Two regions keep the *plain* wheel: the floating
+   * chrome and an armed element's interactive content; Ctrl/⌘+wheel (a pinch) is a zoom intent and is
+   * forwarded from both.
    */
   describe('wheel pan/zoom', () => {
     function wheel(target: Element, init: WheelEventInit): void {
@@ -146,7 +147,7 @@ describe('BoardView', () => {
       expect(cam.camera().zoom).toBeGreaterThan(1);
     });
 
-    it('leaves the camera untouched for a wheel inside an armed Text Block editor', () => {
+    it('leaves the camera untouched for a *plain* wheel inside an armed Text Block editor', () => {
       const fixture = render();
       const store = fixture.debugElement.injector.get(BoardStore);
       const id = store.addText({ x: 0, y: 0 }); // addText arms the new block
@@ -156,18 +157,110 @@ describe('BoardView', () => {
 
       wheel(query(fixture, `[data-testid=element-${id}] app-board-text-block`), { deltaY: 100 });
 
-      // Same camera instance — the guard never called through, so the editor keeps the wheel.
+      // Same camera instance — the guard never called through, so the editor keeps the plain scroll.
       expect(cam.camera()).toBe(before);
     });
 
-    it('leaves the camera untouched for a wheel over the Inspector', () => {
+    it('zooms the board on Ctrl/⌘+wheel over an armed element — a pinch while editing must not zoom the page', () => {
+      const fixture = render();
+      const store = fixture.debugElement.injector.get(BoardStore);
+      const id = store.addText({ x: 0, y: 0 }); // armed
+      fixture.detectChanges();
+      const cam = fixture.debugElement.injector.get(BoardCamera);
+
+      // Returning without preventDefault here was the exact 08bdd28 symptom: the armed exemption covers
+      // only the plain scroll; a zoom intent is forwarded (and cancelled) like anywhere else.
+      const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100, ctrlKey: true });
+      query(fixture, `[data-testid=element-${id}] app-board-text-block`).dispatchEvent(event);
+
+      expect(cam.camera().zoom).toBeGreaterThan(1);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('leaves the camera untouched for a *plain* wheel over the Inspector — it must scroll natively', () => {
       const fixture = render();
       const cam = fixture.debugElement.injector.get(BoardCamera);
       const before = cam.camera();
 
-      wheel(query(fixture, 'app-board-inspector'), { deltaY: 100, ctrlKey: true });
+      wheel(query(fixture, 'app-board-inspector'), { deltaY: 100 });
 
       expect(cam.camera()).toBe(before);
+    });
+
+    it('zooms the board on Ctrl/⌘+wheel over the chrome — a pinch over the Inspector must not zoom the page', () => {
+      const fixture = render();
+      const cam = fixture.debugElement.injector.get(BoardCamera);
+
+      // The chrome exemption used to return without preventDefault for every wheel; the zoom intent is
+      // now forwarded (and cancelled) exactly like over an armed element.
+      const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100, ctrlKey: true });
+      query(fixture, 'app-board-inspector').dispatchEvent(event);
+
+      expect(cam.camera().zoom).toBeGreaterThan(1);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('stops propagation of a handled wheel, so an outer board (board-in-board) never rides the gesture', () => {
+      seedOneElement();
+      const fixture = render();
+      const reachedWindow = vi.fn();
+      window.addEventListener('wheel', reachedWindow);
+
+      // Forwarded-to-canvas wheels must die here: transcluded into another Board, the outer View's
+      // listener would otherwise zoom its camera off the same pinch.
+      wheel(query(fixture, '[data-testid=element-e1]'), { deltaY: -100, ctrlKey: true });
+      window.removeEventListener('wheel', reachedWindow);
+
+      expect(reachedWindow).not.toHaveBeenCalled();
+    });
+
+    it('lets an exempted plain wheel keep bubbling — the inner content owns its native scroll', () => {
+      const fixture = render();
+      const reachedWindow = vi.fn();
+      window.addEventListener('wheel', reachedWindow);
+
+      wheel(query(fixture, 'app-board-inspector'), { deltaY: 100 });
+      window.removeEventListener('wheel', reachedWindow);
+
+      expect(reachedWindow).toHaveBeenCalledOnce();
+    });
+
+    it('leaves the camera untouched for a wheel over the selected element’s control strip', () => {
+      const fixture = render();
+      const store = fixture.debugElement.injector.get(BoardStore);
+      store.addText({ x: 0, y: 0 });
+      store.disarm(); // selected single Text Block → the floating controls render
+      fixture.detectChanges();
+      const cam = fixture.debugElement.injector.get(BoardCamera);
+      const before = cam.camera();
+
+      // Scrolling over the strip used to pan the board out from under its buttons.
+      wheel(query(fixture, 'app-board-element-controls'), { deltaY: 100 });
+
+      expect(cam.camera()).toBe(before);
+    });
+
+    it('swallows the wheel entirely while an element gesture is in flight', () => {
+      seedOneElement();
+      const fixture = render();
+      const cam = fixture.debugElement.injector.get(BoardCamera);
+      const before = cam.camera();
+      const boxEl = query(fixture, '[data-testid=element-e1]');
+
+      // Start a live move gesture on the element…
+      boxEl.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true, button: 0, buttons: 1, clientX: 0, clientY: 0 }),
+      );
+      document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, buttons: 1, clientX: 20, clientY: 0 }));
+
+      // …then wheel: the overlay's world math froze the zoom at the press, so the camera must not move
+      // under the drag — and the event is cancelled so a mid-drag pinch can't zoom the page either.
+      const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100, ctrlKey: true });
+      boxEl.dispatchEvent(event);
+
+      expect(cam.camera()).toBe(before);
+      expect(event.defaultPrevented).toBe(true);
+      document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: 20, clientY: 0 }));
     });
   });
 });

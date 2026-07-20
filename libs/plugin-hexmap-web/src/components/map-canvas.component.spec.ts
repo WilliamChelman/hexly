@@ -1,16 +1,17 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
+import { ShortcutService } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { HEXMAP_TEST_CATALOGS } from '../i18n/test-catalogs';
-import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
+import { FakeEntitySession, provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { HexMapStore } from '../services/hexmap-store';
 import { MapCanvasComponent } from './map-canvas.component';
 
 /**
  * The keyboard contract of the map surface: letters arm top-level Tools, `1`–`9` pick the armed
  * Tool's nth Subtool, undo/redo stay on Cmd/Ctrl+Z, and every binding is suppressed while a text
- * field is focused. The handler is a `window:keydown` host listener, so the events are dispatched
- * on the window.
+ * field is focused. The bindings are `surface`-layer registrations on the real ShortcutService
+ * (ADR-0063), whose one listener is on the window — so the events are dispatched on the window.
  */
 describe('MapCanvas keyboard', () => {
   let store: HexMapStore;
@@ -144,6 +145,54 @@ describe('MapCanvas keyboard', () => {
     expect(survived).toBe(true);
   });
 
+  it('ignores Alt/Ctrl/Cmd+letter chords — a modifier chord must not re-arm a tool', () => {
+    store.armTool('erase');
+
+    // e.g. Alt+T (a Windows menu chord, or a macOS dead-key) reaching the surface
+    // used to re-arm Terrain; exact modifier matching keeps 't' meaning bare 't'.
+    press('t', { altKey: true });
+    press('t', { ctrlKey: true });
+    press('t', { metaKey: true });
+
+    expect(store.tool()).toBe('erase');
+  });
+
+  it('suppresses every surface shortcut while a modal shortcut scope is held', () => {
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+
+    // Backspace behind a modal picker used to delete the selection under it,
+    // and Escape cleared the selection while closing the dialog.
+    const pop = TestBed.inject(ShortcutService).pushModalScope();
+    press('Backspace');
+    press('Escape');
+    pop();
+
+    expect('0,0' in store.document().hexes).toBe(true);
+    expect(store.selection()).not.toBeNull();
+  });
+
+  it('leaves every registration inert while the session is not writable (ADR-0062 transclusion)', () => {
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    store.armTool('erase');
+    TestBed.inject(FakeEntitySession).setWritable(false);
+
+    // A hexmap View embedded read-only in a Board shares the window-level dispatcher: its keys must
+    // fall through (`when:` semantics), never mutate the invisible embedded map's store.
+    const backspace = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true });
+    window.dispatchEvent(backspace);
+    press('t');
+    press('3');
+    press('z', { ctrlKey: true });
+    press('Escape');
+
+    expect(backspace.defaultPrevented).toBe(false); // fell through rather than being eaten
+    expect('0,0' in store.document().hexes).toBe(true);
+    expect(store.selection()).not.toBeNull();
+    expect(store.tool()).toBe('erase');
+  });
+
   it('suppresses tool hotkeys while a text field is focused', () => {
     // Arm a non-default Tool first so this proves suppression rather than the
     // cold-start default: a 't' that leaked through would arm Terrain, flipping
@@ -160,6 +209,32 @@ describe('MapCanvas keyboard', () => {
     const armed = store.tool();
     input.remove();
     expect(armed).toBe('erase');
+  });
+});
+
+describe('MapCanvas wheel', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [MapCanvasComponent, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
+      providers: provideHexMapStoreTesting(),
+    }).compileComponents();
+  });
+
+  it('stops propagation of a handled wheel, so an outer surface never rides the same gesture', () => {
+    const fixture = TestBed.createComponent(MapCanvasComponent);
+    fixture.detectChanges();
+    const canvas = fixture.nativeElement.querySelector('canvas') as HTMLCanvasElement;
+    const reachedWindow = vi.fn();
+    window.addEventListener('wheel', reachedWindow);
+
+    // A pinch over a map transcluded into a Board (ADR-0062) used to zoom both cameras: the inner
+    // canvas handled the wheel, then let it bubble to the Board View's forwarding listener.
+    const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100, ctrlKey: true });
+    canvas.dispatchEvent(event);
+    window.removeEventListener('wheel', reachedWindow);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(reachedWindow).not.toHaveBeenCalled();
   });
 });
 

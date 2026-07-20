@@ -14,12 +14,13 @@ import {
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Point } from '@hexly/plugin-board';
 import { isTrackpadWheel, ThemeService, wheelDeltaPixels } from '@hexly/web-core';
-import { Camera } from '../utils/camera';
+import { ENTITY_SESSION } from '@hexly/web-entity';
+import { Camera, fitCamera } from '../utils/camera';
 import { DRAG_THRESHOLD } from '../utils/gesture';
-import { BoardCamera } from '../services/board-camera';
+import { BoardCamera, MIN_ZOOM } from '../services/board-camera';
 import { BoardImagePlacement } from '../services/board-image-placement';
 import { BoardEmbedPlacement } from '../services/board-embed-placement';
-import { BoardStore } from '../services/board-store';
+import { BoardStore, ToolId } from '../services/board-store';
 import { ZoomControlComponent } from './zoom-control.component';
 
 /** Multiplier applied per zoom-button press. */
@@ -34,6 +35,32 @@ const ZOOM_SENSITIVITY_MOUSE = 0.002;
 const GRID_SPACING = 48;
 /** A grid dot's drawn radius in screen pixels, held roughly constant across zoom. */
 const DOT_RADIUS = 1;
+/** Screen-pixel breathing room fit-to-content leaves around the framed elements. */
+const FIT_PADDING = 64;
+/** Fit-to-content's zoom ceiling: fitting one small element must not blow the view up past 100%. */
+const FIT_MAX_ZOOM = 1;
+
+/**
+ * What a completed empty-plane click (a primary press that never crossed {@link DRAG_THRESHOLD}) does.
+ * Pure, so the click policy is testable apart from the pointer plumbing:
+ *
+ * - Select: clear the selection — the empty plane has nothing to pick.
+ * - A placement Tool while an element is armed: only deselect (which disarms). "Click away to finish"
+ *   an armed Text Block must not place the next block in the same gesture — under a sticky Tool that
+ *   cascades forever (#268); the *next* click places.
+ * - A placement Tool, nothing armed: place — but only while the session is writable (ADR-0037).
+ *   `writable` is a live signal that can flip mid-session; the editing chrome hides, and the canvas
+ *   must not keep mutating through the hidden palette's leftover Tool. Deselect stays available
+ *   read-only: it touches transient UI state, never the document.
+ */
+export function emptyPlaneClickAction(
+  tool: ToolId,
+  armedElement: string | null,
+  writable: boolean,
+): 'deselect' | 'place' | 'none' {
+  if (tool === 'select' || armedElement !== null) return 'deselect';
+  return writable ? 'place' : 'none';
+}
 
 /**
  * The live board surface's background layer: an infinite, pannable, zoomable plane on a Canvas
@@ -44,10 +71,12 @@ const DOT_RADIUS = 1;
  * (`BoardElementsComponent`); both read the same route-scoped {@link BoardCamera}, so grid and elements
  * pan and zoom in lockstep.
  *
- * Tool-aware (#267, #268): with a placement Tool armed (Box, Text), a primary click on empty plane
- * places that Tool's element at the clicked world point; with Select armed, a primary click on empty
- * plane clears the selection. The overlay's element boxes are `pointer-events-auto`, so a click that
- * lands on an element never reaches this canvas — only empty-plane gestures do.
+ * Tool-aware (#267, #268): a primary *click* on empty plane — a press released within
+ * {@link DRAG_THRESHOLD} — applies the armed Tool on pointerup, at the world point the press started:
+ * a placement Tool (Box, Text, Image, Embed) places its element there, Select clears the selection
+ * (see {@link emptyPlaneClickAction} for the armed-element and read-only exceptions). Placement waits
+ * for the release so the click-vs-drag split applies to every Tool: a left-drag always pans, whatever
+ * is armed, and a cancelled Image/Embed chooser is not reopened by the pan that follows.
  */
 @Component({
   selector: 'app-board-canvas',
@@ -68,13 +97,16 @@ const DOT_RADIUS = 1;
       (pointerleave)="onPointerLeave($event)"
     ></canvas>
 
-    <!-- Zoom/reset controls, bottom-right. -->
+    <!-- Zoom/fit controls, bottom-right. z-[1] lifts the cluster above the sibling element overlay —
+         the same stacking the palette and Inspector get in the board View — or an element box painted
+         over this corner steals the buttons' clicks. -->
     <app-board-zoom-control
-      class="absolute right-4 bottom-4"
+      class="absolute right-4 bottom-4 z-[1]"
       [percent]="zoomPercent()"
       (zoomIn)="zoomByStep(1)"
       (zoomOut)="zoomByStep(-1)"
-      (fit)="recenter()"
+      (resetZoom)="resetZoom()"
+      (fit)="fitContent()"
     />
   `,
   styles: `
@@ -82,10 +114,13 @@ const DOT_RADIUS = 1;
 
     /*
       No position of its own — the shell positions it full-bleed, and omitting it lets the shell's
-      inline 'absolute inset-0' win. 'isolation' makes the host the containing block for the overlays.
+      inline 'absolute inset-0' win; that 'absolute' already makes the host the containing block for
+      the overlays. Deliberately NOT 'isolate': the zoom control's z-[1] must outrank the sibling
+      element overlay's boxes in the board View's stacking context, and an isolated host would trap
+      it beneath them.
     */
     :host {
-      @apply overflow-hidden isolate;
+      @apply overflow-hidden;
       background:
         radial-gradient(110% 85% at 50% -6%, var(--color-canvas-glow), transparent 60%),
         linear-gradient(165deg, var(--color-canvas-bg), var(--color-canvas-mat));
@@ -99,6 +134,8 @@ export class BoardCanvasComponent {
   private readonly store = inject(BoardStore);
   private readonly imagePlacement = inject(BoardImagePlacement);
   private readonly embedPlacement = inject(BoardEmbedPlacement);
+  /** The central session; its live `writable()` gates every placing gesture (ADR-0037). */
+  private readonly session = inject(ENTITY_SESSION);
 
   /** Whether an empty-space pan drag is in progress — drives the grab/grabbing cursor. */
   protected readonly panning = signal(false);
@@ -109,7 +146,8 @@ export class BoardCanvasComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   private ctx: CanvasRenderingContext2D | null = null;
-  private readonly dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+  /** The live devicePixelRatio — not captured once: {@link trackDevicePixelRatio} re-reads it per monitor. */
+  private dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
   private width = 0;
   private height = 0;
   private dotColor = 'rgba(0,0,0,0.18)';
@@ -117,8 +155,9 @@ export class BoardCanvasComponent {
 
   /**
    * The active empty-plane press. `moved` flips once the pointer crosses {@link DRAG_THRESHOLD} — a
-   * press that never moves is a click (place/deselect), one that moves is a pan. `button` decides which
-   * button owns the gesture; `world` is the down point, where a Box lands.
+   * press that never moves is a click (place/deselect, applied on release), one that moves is a pan.
+   * `button` decides which button owns the gesture; `world` is the down point, captured at the press so
+   * a placed element lands where the press *started*, not wherever sub-threshold jitter released it.
    */
   private press: { button: number; moved: boolean; start: Point; last: Point; world: Point } | null = null;
   private activePointerId: number | null = null;
@@ -141,6 +180,7 @@ export class BoardCanvasComponent {
       this.ctx = canvas.getContext('2d');
       this.refreshTheme();
       this.observeSize(canvas);
+      this.trackDevicePixelRatio(canvas);
     });
   }
 
@@ -150,25 +190,10 @@ export class BoardCanvasComponent {
     if (event.button !== 0 && event.button !== 1) return;
     this.activePointerId = event.pointerId;
     (event.target as Element).setPointerCapture?.(event.pointerId);
-    const world = this.toWorld(event);
-
-    // A placement Tool (Box, Text, Image, Embed): a primary click on empty plane places its element at the
-    // clicked world point and selects it — no pan. Select is the only non-placing Tool. Image and Embed
-    // can't place synchronously (they need an Asset URL / target choice first), so they route to their
-    // async choosers instead.
-    const tool = this.store.tool();
-    if (event.button === 0 && tool !== 'select') {
-      if (tool === 'text') this.store.addText(world);
-      else if (tool === 'image') this.imagePlacement.place(world);
-      else if (tool === 'embed') this.embedPlacement.place(world);
-      else this.store.addElement(world);
-      this.activePointerId = null;
-      (event.target as Element).releasePointerCapture?.(event.pointerId);
-      return;
-    }
-
+    // Every press starts as a potential pan; whether it *clicks* (place/deselect) is decided on release,
+    // once the drag threshold has had its say — see onPointerUp.
     const start = { x: event.clientX, y: event.clientY };
-    this.press = { button: event.button, moved: false, start, last: start, world };
+    this.press = { button: event.button, moved: false, start, last: start, world: this.toWorld(event) };
   }
 
   protected onPointerMove(event: PointerEvent): void {
@@ -190,12 +215,26 @@ export class BoardCanvasComponent {
     if (this.foreignPointer(event)) return;
     (event.target as Element).releasePointerCapture?.(event.pointerId);
     const press = this.press;
-    // A primary click that never became a pan clears the selection under the Select Tool — the empty
-    // plane has nothing to pick.
-    if (press && press.button === 0 && !press.moved && this.store.tool() === 'select') {
-      this.store.deselect();
-    }
     this.endPress();
+    // Only a primary press that never became a pan is a click; what it does — place under a placement
+    // Tool, deselect under Select or to finish an armed element, nothing read-only — is the pure
+    // {@link emptyPlaneClickAction} policy.
+    if (!press || press.button !== 0 || press.moved) return;
+    const action = emptyPlaneClickAction(this.store.tool(), this.store.armed(), this.session.writable());
+    if (action === 'deselect') this.store.deselect();
+    else if (action === 'place') this.placeAt(this.store.tool(), press.world);
+  }
+
+  /**
+   * Place the armed Tool's element at world point `world` (the press's down point). Image and Embed
+   * can't place synchronously (they need an Asset URL / target choice first), so they route to their
+   * async choosers instead; Box and Text land at once and select.
+   */
+  private placeAt(tool: ToolId, world: Point): void {
+    if (tool === 'text') this.store.addText(world);
+    else if (tool === 'image') this.imagePlacement.place(world);
+    else if (tool === 'embed') this.embedPlacement.place(world);
+    else this.store.addElement(world);
   }
 
   /** A pointer the OS/browser took away mid-gesture: end the pan where it stands, nothing to commit. */
@@ -228,8 +267,14 @@ export class BoardCanvasComponent {
       const factor = Math.exp(-wheelDeltaPixels(event.deltaY, event, canvas.clientHeight) * sensitivity);
       this.cam.zoomAround(this.localPoint(canvas, event), factor);
     } else {
-      const dx = wheelDeltaPixels(event.deltaX, event, canvas.clientWidth);
-      const dy = wheelDeltaPixels(event.deltaY, event, canvas.clientHeight);
+      let dx = wheelDeltaPixels(event.deltaX, event, canvas.clientWidth);
+      let dy = wheelDeltaPixels(event.deltaY, event, canvas.clientHeight);
+      // Shift+wheel scrolls horizontally. Firefox swaps the axes in the event itself; Chrome/Safari
+      // leave the delta on Y, so swap only when the event still reads vertical — never double-swap.
+      if (event.shiftKey && dx === 0) {
+        dx = dy;
+        dy = 0;
+      }
       // Scrolling down/right moves the content up/left, like scrolling a page.
       this.cam.panBy(-dx, -dy);
     }
@@ -243,11 +288,29 @@ export class BoardCanvasComponent {
     this.cam.zoomAround(centre, direction === 1 ? ZOOM_STEP : 1 / ZOOM_STEP);
   }
 
-  /** Re-centre the world origin in the viewport at zoom 1. */
-  protected recenter(): void {
+  /**
+   * Frame the Board's content (the cluster's fit action): every element's world box centred in the
+   * viewport with {@link FIT_PADDING} of breathing room, zoom clamped to the camera bounds and capped
+   * at 100% — content far from the origin stays reachable, unlike the old reset-to-origin. An empty
+   * board has nothing to frame, so it keeps the original reset: world origin centred at zoom 1.
+   */
+  protected fitContent(): void {
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas) return;
-    this.cam.set(Camera.initial().panBy(canvas.clientWidth / 2, canvas.clientHeight / 2));
+    const viewport = { width: canvas.clientWidth, height: canvas.clientHeight };
+    const fitted = fitCamera(this.store.document().elements, viewport, {
+      padding: FIT_PADDING,
+      minZoom: MIN_ZOOM,
+      maxZoom: FIT_MAX_ZOOM,
+    });
+    this.cam.set(fitted ?? Camera.initial().panBy(viewport.width / 2, viewport.height / 2));
+  }
+
+  /** Snap the zoom back to exactly 100% about the viewport centre — the world point there stays put. */
+  protected resetZoom(): void {
+    const canvas = this.canvasRef()?.nativeElement;
+    if (!canvas) return;
+    this.cam.set(this.cam.camera().zoomTo({ x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 }, 1));
   }
 
   private endPress(): void {
@@ -309,29 +372,53 @@ export class BoardCanvasComponent {
     }
   }
 
-  private observeSize(canvas: HTMLCanvasElement): void {
-    const apply = () => {
-      const width = canvas.clientWidth;
-      const height = canvas.clientHeight;
-      if (width === 0 || height === 0) return;
-      this.width = width;
-      this.height = height;
-      canvas.width = Math.round(width * this.dpr);
-      canvas.height = Math.round(height * this.dpr);
-      if (!this.centred) {
-        this.centred = true;
-        // Open with the world origin at the viewport centre, so a fresh Board lands mid-plane.
-        this.cam.set(Camera.initial().panBy(width / 2, height / 2));
-      } else {
-        this.renderFrame();
-      }
-    };
+  /** Size the backing store to the CSS box at the current {@link dpr}, then repaint (or first-centre). */
+  private applySize(canvas: HTMLCanvasElement): void {
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    if (width === 0 || height === 0) return;
+    this.width = width;
+    this.height = height;
+    canvas.width = Math.round(width * this.dpr);
+    canvas.height = Math.round(height * this.dpr);
+    if (!this.centred) {
+      this.centred = true;
+      // Open with the world origin at the viewport centre, so a fresh Board lands mid-plane.
+      this.cam.set(Camera.initial().panBy(width / 2, height / 2));
+    } else {
+      this.renderFrame();
+    }
+  }
 
-    apply();
+  private observeSize(canvas: HTMLCanvasElement): void {
+    this.applySize(canvas);
     if (typeof ResizeObserver !== 'undefined') {
-      const observer = new ResizeObserver(apply);
+      const observer = new ResizeObserver(() => this.applySize(canvas));
       observer.observe(canvas);
       this.destroyRef.onDestroy(() => observer.disconnect());
     }
+  }
+
+  /**
+   * Follow the window across monitors: devicePixelRatio has no change event of its own, so listen on a
+   * `(resolution: …dppx)` media query pinned to the *current* ratio — it fires exactly once, when the
+   * ratio stops matching (a different-DPI screen). Re-read the ratio, resize the backing store (else the
+   * dot grid renders blurry at the new density), and re-arm a fresh query for the new ratio.
+   */
+  private trackDevicePixelRatio(canvas: HTMLCanvasElement): void {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    let query: MediaQueryList | null = null;
+    const onChange = (): void => {
+      this.dpr = window.devicePixelRatio || 1;
+      this.applySize(canvas);
+      arm();
+    };
+    const arm = (): void => {
+      query?.removeEventListener('change', onChange);
+      query = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+      query.addEventListener('change', onChange);
+    };
+    arm();
+    this.destroyRef.onDestroy(() => query?.removeEventListener('change', onChange));
   }
 }

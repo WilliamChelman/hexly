@@ -410,6 +410,15 @@ export class ContentEditorComponent {
     });
   }
 
+  /**
+   * Focus the editing surface, placing the caret at the end of the doc. For hosts that arm the editor
+   * programmatically (a Board Text Block on double-click, #268): without an explicit focus the keyboard
+   * stays on `<body>` and surface-layer shortcuts (Backspace!) keep firing over the "open" editor.
+   */
+  focus(): void {
+    this.editor()?.commands.focus('end');
+  }
+
   /** Buffer a TipTap `update` and arm the debounce; a doc value-equal to the baseline is normalisation, not an edit (#164). */
   private onDocChanged(json: JSONContent): void {
     // ponytail: JSON.stringify equality — ProseMirror JSON has deterministic key order, so this is
