@@ -4,9 +4,9 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { IconComponent } from '@hexly/web-ui';
 
 /**
- * The board surface's zoom cluster: zoom out, level, zoom in, reset-view. Purely presentational; the
- * canvas owns the camera (ADR-0003) and wires the actions (ADR-0007). The free-positioned twin of the
- * Hex Map's zoom control.
+ * The board surface's zoom cluster: zoom out, level (a button — clicking it resets the zoom to 100%),
+ * zoom in, fit-to-content. Purely presentational; the canvas owns the camera (ADR-0003) and wires the
+ * actions (ADR-0007). The free-positioned twin of the Hex Map's zoom control.
  */
 @Component({
   selector: 'app-board-zoom-control',
@@ -21,7 +21,16 @@ import { IconComponent } from '@hexly/web-ui';
     <button type="button" class="zbtn" [attr.aria-label]="'board.canvas.zoomOut' | transloco" (click)="zoomOut.emit()">
       <app-icon name="minus" [size]="16" />
     </button>
-    <span class="lvl">{{ percent() }}%</span>
+    <!-- The readout doubles as the way back to exactly 100% now that "fit" frames content instead. -->
+    <button
+      type="button"
+      class="lvl"
+      [attr.aria-label]="'board.canvas.resetZoom' | transloco"
+      [title]="'board.canvas.resetZoom' | transloco"
+      (click)="resetZoom.emit()"
+    >
+      {{ percent() }}%
+    </button>
     <button type="button" class="zbtn" [attr.aria-label]="'board.canvas.zoomIn' | transloco" (click)="zoomIn.emit()">
       <app-icon name="plus" [size]="16" />
     </button>
@@ -48,7 +57,14 @@ import { IconComponent } from '@hexly/web-ui';
       @apply bg-gold-soft text-gold;
     }
     .lvl {
-      @apply min-w-[3.4em] text-center font-mono text-2xs tracking-[0.02em] text-ink;
+      @apply min-w-[3.4em] h-7 border-0 bg-transparent text-center font-mono text-2xs tracking-[0.02em]
+        text-ink rounded-md cursor-pointer;
+      transition:
+        background-color var(--dur-fast) var(--ease-out),
+        color var(--dur-fast) var(--ease-out);
+    }
+    .lvl:hover {
+      @apply bg-gold-soft text-gold;
     }
     .div {
       @apply w-px h-4 bg-line;
@@ -64,6 +80,7 @@ export class ZoomControlComponent {
   readonly zoomIn = output<void>();
   readonly zoomOut = output<void>();
   readonly fit = output<void>();
+  readonly resetZoom = output<void>();
 
   protected readonly groupLabel = toSignal(this.transloco.selectTranslate('board.canvas.zoom'), {
     initialValue: '',

@@ -146,6 +146,15 @@ export class BoardStore {
   readonly canUndo = this._canUndo.asReadonly();
   readonly canRedo = this._canRedo.asReadonly();
 
+  /**
+   * Ticks on every {@link undo}/{@link redo} that replayed an edit. Live editors that keep their own
+   * document (a Text Block's TipTap instance) re-seed off it: a board undo reverts `element.content`
+   * under the armed editor, and without a re-seed the next keystroke would re-commit the reverted prose,
+   * silently un-undoing (see TextBlockSession).
+   */
+  private readonly _historyGeneration = signal(0);
+  readonly historyGeneration = this._historyGeneration.asReadonly();
+
   constructor() {
     // Reset on a *fresh* load, not on our own edits (ADR-0048): the session bumps loadGeneration only
     // when a new Entity is adopted or the canvas is cleared for a route swap. Undo patches and selection
@@ -496,6 +505,7 @@ export class BoardStore {
     this.session.applyPatches(edit.undo);
     this.sel.restore(edit.selectionBefore);
     this.redoStack.push(edit);
+    this._historyGeneration.update((g) => g + 1);
     this.syncHistory();
   }
 
@@ -506,6 +516,7 @@ export class BoardStore {
     this.session.applyPatches(edit.redo);
     this.sel.restore(edit.selectionAfter);
     this.undoStack.push(edit);
+    this._historyGeneration.update((g) => g + 1);
     this.syncHistory();
   }
 

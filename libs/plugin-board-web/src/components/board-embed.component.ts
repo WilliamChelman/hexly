@@ -46,7 +46,7 @@ import { BoardStore } from '../services/board-store';
     }
     <!-- Open the target Entity: the un-armed Embed's click-through (editing means opening the target). A real
          anchor, so ctrl/cmd-click opens the target in a new tab; always pointer-interactive, so it works
-         whether or not the Embed is armed. -->
+         whether or not the Embed is armed. Revealed by hovering the containing element box (see styles). -->
     @if (targetLink(); as link) {
       <a
         appButton
@@ -70,7 +70,13 @@ import { BoardStore } from '../services/board-store';
     .open-target {
       @apply absolute top-1 right-1 z-[1] pointer-events-auto opacity-0 transition-opacity;
     }
-    :host(:hover) .open-target,
+    /* Reveal on the *element box's* hover, not the host's: the un-armed host is pointer-events-none, so
+       it never hovers itself — the box above the canvas owns the pointer, including in a read-only
+       transclusion where this link is the only chrome. Quiet on box hover, full on the link itself. */
+    :host-context(.element:hover) .open-target {
+      @apply opacity-60;
+    }
+    .open-target:hover,
     .open-target:focus-visible {
       @apply opacity-100;
     }

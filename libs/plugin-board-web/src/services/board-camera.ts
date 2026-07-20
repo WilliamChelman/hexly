@@ -3,8 +3,8 @@ import { Point } from '@hexly/plugin-board';
 import { Camera } from '../utils/camera';
 
 /** Clamp the zoom so neither the dot cull nor the element layer draws at an unbounded scale. */
-const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 4;
+export const MIN_ZOOM = 0.25;
+export const MAX_ZOOM = 4;
 
 /**
  * The Board's viewport transform, lifted out of the canvas so the surface's two layers share one
@@ -24,7 +24,7 @@ export class BoardCamera {
   /** The zoom scale, as a convenience for consumers sizing world extents into screen pixels. */
   readonly zoom = computed(() => this._camera().zoom);
 
-  /** Replace the camera outright — used to centre the world origin on first layout. */
+  /** Replace the camera outright — first-layout centring and the fit/reset actions, which compute a whole camera. */
   set(camera: Camera): void {
     this._camera.set(camera);
   }
@@ -34,12 +34,16 @@ export class BoardCamera {
     this._camera.update((c) => c.panBy(dx, dy));
   }
 
-  /** Zoom by `factor` about a fixed screen `anchor` (the cursor), clamped to the zoom bounds. */
+  /**
+   * Zoom by `factor` about a fixed screen `anchor` (the cursor). The resulting zoom is *clamped* to the
+   * bounds, not rejected: a step that overshoots still lands exactly on the bound (so repeated presses
+   * reach 400%/25%), re-anchored so the world point under the cursor stays put. A non-finite or
+   * non-positive input is dropped outright — NaN slips through `<` comparisons and would corrupt the
+   * camera for good.
+   */
   zoomAround(anchor: Point, factor: number): void {
-    this._camera.update((c) => {
-      const next = c.zoomAt(anchor, factor);
-      return next.zoom < MIN_ZOOM || next.zoom > MAX_ZOOM ? c : next;
-    });
+    if (!Number.isFinite(factor) || factor <= 0 || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return;
+    this._camera.update((c) => c.zoomTo(anchor, Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, c.zoom * factor))));
   }
 
   /** Where a world point lands on screen under the current camera. */

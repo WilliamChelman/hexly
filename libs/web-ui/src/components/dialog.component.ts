@@ -1,13 +1,16 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   booleanAttribute,
   effect,
+  inject,
   input,
   output,
   viewChild,
 } from '@angular/core';
+import { ShortcutService } from '@hexly/web-core';
 import { PanelComponent } from './panel.component';
 
 /** Process-wide counter for unique heading ids, so aria-labelledby always resolves. */
@@ -46,7 +49,7 @@ let nextDialogId = 0;
       class="m-auto w-[min(28rem,calc(100vw-2rem))] flex-col gap-4 p-8 open:flex"
       [style.margin-top]="align() === 'top' ? '10vh' : null"
       [attr.aria-labelledby]="heading() ? titleId : null"
-      (close)="closed.emit()"
+      (close)="onClose()"
       (click)="onClick($event)"
     >
       @if (heading(); as h) {
@@ -94,13 +97,40 @@ export class DialogComponent {
   // would resolve to the Panel component instance instead of the native element.
   private readonly dialog = viewChild.required('dialog', { read: ElementRef });
 
+  private readonly shortcuts = inject(ShortcutService);
+  /** The pop for the modal scope held while open; null while closed (see the constructor). */
+  private popModalScope: (() => void) | null = null;
+
   constructor() {
     // Sync the imperative <dialog> to the declarative input. Guarded against the
     // element's current state so re-runs don't double-open or fight a native close.
+    //
+    // A declaratively-mounted dialog claims the keyboard like a DialogService one
+    // (ADR-0063, amendment): without the scope, a surface's Escape registration
+    // preventDefaults the keydown, which cancels the native <dialog> "cancel" —
+    // Escape could never close a dialog opened over a board/hexmap. Held per open
+    // cycle: pushed on showModal, popped on the native close (any path) and, for a
+    // destroy-while-open, by the DestroyRef hook (the pop is idempotent).
     effect(() => {
       const el = this.dialog().nativeElement as HTMLDialogElement;
-      if (this.open() && !el.open) el.showModal();
-      else if (!this.open() && el.open) el.close();
+      if (this.open() && !el.open) {
+        el.showModal();
+        this.popModalScope ??= this.shortcuts.pushModalScope();
+      } else if (!this.open() && el.open) {
+        el.close();
+      }
     });
+    inject(DestroyRef).onDestroy(() => this.releaseModalScope());
+  }
+
+  /** Native close (Escape, backdrop, or programmatic): release the keyboard, then tell the caller. */
+  protected onClose(): void {
+    this.releaseModalScope();
+    this.closed.emit();
+  }
+
+  private releaseModalScope(): void {
+    this.popModalScope?.();
+    this.popModalScope = null;
   }
 }

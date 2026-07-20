@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, viewChild } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TextElement } from '@hexly/plugin-board';
 import { ContentEditorComponent } from '@hexly/plugin-content/editor';
@@ -57,6 +57,7 @@ export class TextBlockComponent {
 
   private readonly store = inject(BoardStore);
   private readonly session = inject(TextBlockSession);
+  private readonly editor = viewChild(ContentEditorComponent);
 
   /** Whether this Text Block is the armed element — the one flip between static display and live editing. */
   protected readonly armed = computed(() => this.store.armed() === this.element().id);
@@ -65,5 +66,14 @@ export class TextBlockComponent {
     // Bind the adapter to this element's id up front — long before a click can arm it — so the editor
     // seeds from and commits to the right Text Block, and a flush-on-disarm still lands (see TextBlockSession).
     effect(() => this.session.setTarget(this.element().id));
+  }
+
+  /**
+   * Focus the live editor, caret at the end. Called by the elements overlay when this block arms:
+   * arming without moving focus left the keyboard on `<body>`, so the very next Backspace hit the
+   * surface layer and deleted the whole element out from under the "open" editor.
+   */
+  focus(): void {
+    this.editor()?.focus();
   }
 }

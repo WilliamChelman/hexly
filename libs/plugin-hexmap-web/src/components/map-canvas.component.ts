@@ -6,7 +6,6 @@ import {
   DestroyRef,
   effect,
   ElementRef,
-  HostListener,
   inject,
   signal,
   untracked,
@@ -26,10 +25,18 @@ import {
   rectFromCorners,
   regionById,
 } from '@hexly/plugin-hexmap';
-import { ThemeService, ToasterService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
+import {
+  ShortcutService,
+  ThemeService,
+  ToasterService,
+  isInteractiveTarget,
+  isTrackpadWheel,
+  wheelDeltaPixels,
+} from '@hexly/web-core';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { terrainKey } from '../utils/catalog-keys';
 import { HexMapStore, SelectMode } from '../services/hexmap-store';
-import { toolForHotkey } from './tools';
+import { TOOLS, toolForHotkey } from './tools';
 import { CoordReadoutComponent } from './coord-readout.component';
 import { ZoomControlComponent } from './zoom-control.component';
 import { Camera } from '../utils/camera';
@@ -210,6 +217,9 @@ export class MapCanvasComponent {
 
   private readonly theme = inject(ThemeService);
   private readonly store = inject(HexMapStore);
+  private readonly shortcuts = inject(ShortcutService);
+  /** The route-scoped session; `writable()` gates every keyboard mutation (ADR-0037/0062). */
+  private readonly session = inject(ENTITY_SESSION);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
@@ -255,6 +265,93 @@ export class MapCanvasComponent {
       if (!canvas) return;
       this.renderer = new Canvas2dMapRenderer(canvas, this.layout);
       this.observeSize(canvas);
+    });
+
+    this.registerShortcuts();
+  }
+
+  /**
+   * Keyboard: letters arm Tools, `1`–`9` pick Subtools, Delete/Backspace remove
+   * the selection, Escape cancels a drag (or clears the selection), Cmd/Ctrl+Z
+   * undoes/redoes. All on the `surface` layer (ADR-0063), so the shortcut
+   * dispatcher suppresses them behind a modal or a focused text field.
+   *
+   * Every registration is gated on {@link ENTITY_SESSION.writable} — load-bearing
+   * for an Embed: the dispatcher is window-level, so a hexmap View transcluded
+   * read-only into a Board (ADR-0062) must not eat the outer page's keys or
+   * mutate the invisible embedded map's store. `when:` (not a handler bail), so
+   * gated keys fall through to whoever owns the page.
+   *
+   * Registered in the constructor's injection context, so they unregister with
+   * the component's DestroyRef.
+   */
+  private registerShortcuts(): void {
+    const writable = () => this.session.writable();
+
+    // Escape aborts a pending Select gesture without committing; `resetGesture`
+    // releases the owner so a still-held pointer can neither resume the
+    // cancelled gesture nor wedge the canvas. With nothing pending, Escape
+    // clears the selection instead.
+    this.shortcuts.register({
+      layer: 'surface',
+      keys: 'escape',
+      when: writable,
+      handler: () => {
+        if (this.cancelDrag()) this.resetGesture();
+        else this.store.deselect();
+      },
+    });
+
+    // Both ⌘ and Ctrl on every platform (not `mod`) — the surface's historic contract.
+    this.shortcuts.register({
+      layer: 'surface',
+      keys: ['ctrl+z', 'meta+z'],
+      when: writable,
+      handler: () => this.store.undo(),
+    });
+    this.shortcuts.register({
+      layer: 'surface',
+      keys: ['ctrl+shift+z', 'meta+shift+z'],
+      when: writable,
+      handler: () => this.store.redo(),
+    });
+
+    this.shortcuts.register({
+      layer: 'surface',
+      keys: ['delete', 'backspace'],
+      when: writable,
+      handler: (event) => {
+        // Suppressed behind any focused control, so the destructive shortcut
+        // belongs only to the canvas (the dispatcher's editable gate covers
+        // text fields; this also covers buttons/links/selects).
+        if (isInteractiveTarget(event.target)) return false;
+        // Mid-gesture, abort it rather than deleting behind it — otherwise the
+        // origin is erased while the gesture stays armed and the move silently
+        // no-ops on release. Handling also `preventDefault`s, keeping a stray
+        // Backspace from triggering browser back-navigation.
+        if (this.cancelDrag()) this.resetGesture();
+        else this.store.deleteSelected();
+        return;
+      },
+    });
+
+    this.shortcuts.register({
+      layer: 'surface',
+      keys: TOOLS.map((t) => t.hotkey),
+      when: writable,
+      handler: (event) => {
+        const tool = toolForHotkey(event.key);
+        if (!tool) return false;
+        this.store.armTool(tool);
+        return;
+      },
+    });
+
+    this.shortcuts.register({
+      layer: 'surface',
+      keys: ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
+      when: writable,
+      handler: (event) => this.store.armSubtoolByIndex(Number(event.key)),
     });
   }
 
@@ -660,92 +757,12 @@ export class MapCanvasComponent {
     return pending;
   }
 
-  /**
-   * Keyboard: letters arm Tools, `1`–`9` pick Subtools, Delete/Backspace remove
-   * the selection, Escape cancels a drag (or clears the selection), Cmd/Ctrl+Z
-   * undoes/redoes. All suppressed while a text field is focused.
-   */
-  @HostListener('window:keydown', ['$event'])
-  protected onKeydown(event: KeyboardEvent): void {
-    // Don't hijack keystrokes meant for a text field (a label/rename input) — a
-    // "5" or "t" typed there must not arm a tool.
-    if (this.isEditableTarget(event.target)) return;
-
-    // Escape aborts a pending Select gesture without committing; `resetGesture`
-    // releases the owner so a still-held pointer can neither resume the
-    // cancelled gesture nor wedge the canvas. With nothing pending, Escape
-    // clears the selection instead.
-    if (event.key === 'Escape') {
-      if (this.cancelDrag()) {
-        event.preventDefault();
-        this.resetGesture();
-      } else {
-        this.store.deselect();
-      }
-      return;
-    }
-
-    if (event.metaKey || event.ctrlKey) {
-      if (event.key.toLowerCase() !== 'z') return;
-      event.preventDefault();
-      if (event.shiftKey) this.store.redo();
-      else this.store.undo();
-      return;
-    }
-
-    // Suppressed behind any focused control, so the destructive shortcut
-    // belongs only to the canvas.
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      if (this.isInteractiveTarget(event.target)) return;
-      // `preventDefault` keeps a stray Backspace from triggering browser
-      // back-navigation when no field is focused.
-      event.preventDefault();
-      // Mid-gesture, abort it rather than deleting behind it — otherwise the
-      // origin is erased while the gesture stays armed and the move silently
-      // no-ops on release.
-      if (this.cancelDrag()) this.resetGesture();
-      else this.store.deleteSelected();
-      return;
-    }
-
-    const tool = toolForHotkey(event.key);
-    if (tool) {
-      this.store.armTool(tool);
-      return;
-    }
-    if (event.key >= '1' && event.key <= '9') {
-      this.store.armSubtoolByIndex(Number(event.key));
-    }
-  }
-
-  /** Whether `target` is a text input the user is typing into. */
-  private isEditableTarget(target: EventTarget | null): boolean {
-    const el = target as HTMLElement | null;
-    if (!el) return false;
-    const tag = el.tagName;
-    return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
-  }
-
-  /**
-   * Whether `target` is a focusable UI control rather than the bare canvas/body,
-   * so Delete/Backspace pressed behind a focused control never deletes the selection.
-   */
-  private isInteractiveTarget(target: EventTarget | null): boolean {
-    const el = target as HTMLElement | null;
-    if (!el || !el.tagName) return false;
-    const tag = el.tagName;
-    return (
-      tag === 'BUTTON' ||
-      tag === 'A' ||
-      tag === 'SELECT' ||
-      tag === 'INPUT' ||
-      tag === 'TEXTAREA' ||
-      el.isContentEditable
-    );
-  }
-
   protected onWheel(event: WheelEvent): void {
     event.preventDefault();
+    // This surface consumed the wheel, so it must not also drive an ancestor
+    // surface's camera — transcluded into a Board (ADR-0062), a pinch over the
+    // embedded map would otherwise zoom both cameras at once.
+    event.stopPropagation();
     // A trackpad pinch arrives as a wheel event with ctrlKey set; Ctrl/Cmd+wheel
     // zooms about the cursor, plain scroll pans both axes.
     const el = event.currentTarget as HTMLElement;

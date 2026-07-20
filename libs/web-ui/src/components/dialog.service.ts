@@ -7,6 +7,7 @@ import {
   createComponent,
   inject,
 } from '@angular/core';
+import { ShortcutService } from '@hexly/web-core';
 import { Observable, Subject } from 'rxjs';
 
 /**
@@ -42,9 +43,14 @@ export class DialogRef<Data = unknown, Result = unknown> {
 export class DialogService {
   private readonly appRef = inject(ApplicationRef);
   private readonly environmentInjector = inject(EnvironmentInjector);
+  private readonly shortcuts = inject(ShortcutService);
 
   open<Data = unknown, Result = unknown>(component: Type<unknown>, data?: Data): DialogRef<Data, Result> {
     const ref = new DialogRef<Data, Result>(data as Data);
+    // A modal owns the keyboard while it is up (ADR-0063): surface/global
+    // shortcuts must not fire behind it (Backspace deleting the selection
+    // behind a picker; Escape closing the dialog and clearing the selection).
+    const popModalScope = this.shortcuts.pushModalScope();
     // We remove the <dialog> element ourselves on close, which skips the native focus restoration —
     // so capture the caller's focus (e.g. the Command Palette input) and hand it back afterwards.
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -62,6 +68,7 @@ export class DialogService {
     ref.closed.subscribe(() => {
       this.appRef.detachView(componentRef.hostView);
       componentRef.destroy();
+      popModalScope();
       previouslyFocused?.focus?.();
     });
 

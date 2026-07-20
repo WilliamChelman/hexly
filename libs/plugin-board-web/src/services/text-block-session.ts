@@ -20,10 +20,10 @@ export const TEXT_CONTENT_KEY = 'core.content';
  * undoable board step and rides the surface's save.
  *
  * Provided per Text Block and bound (via {@link setTarget}) to that block's id — *not* read off
- * {@link BoardStore.armed}: the editor flushes its last pending edit as it is destroyed on disarm, by
- * which point `armed` is already null, so routing on a stable target is what keeps the final keystrokes.
- * It delegates permission and save-registration to the real board session (injected `skipSelf`), the
- * central store every board View edits (ADR-0048).
+ * {@link BoardStore.armed}: the editor stays mounted after a disarm (one renderer serves both faces,
+ * #268) and its debounced commit can still flush then, by which point `armed` is already null — routing
+ * on a stable target is what keeps the final keystrokes. It delegates permission and save-registration
+ * to the real board session (injected `skipSelf`), the central store every board View edits (ADR-0048).
  */
 @Injectable()
 export class TextBlockSession implements EntitySession {
@@ -45,8 +45,14 @@ export class TextBlockSession implements EntitySession {
   /** Delegates to the real session — the embedded editor is mounted only when the board is writable. */
   readonly writable = this.base.writable;
 
-  /** Never ticks: a fresh editor is created each time a Text Block arms, so it seeds once on mount. */
-  readonly loadGeneration = signal(0).asReadonly();
+  /**
+   * The editor re-seeds when this ticks. Folds the real session's load generation (a fresh Entity
+   * adoption) together with the store's {@link BoardStore.historyGeneration} (a board undo/redo): an
+   * undo reverts `element.content` while the live editor still holds the pre-undo prose, and without a
+   * re-seed its next debounced commit would silently un-undo. Both counters only ever increment, so
+   * their sum changes whenever either does.
+   */
+  readonly loadGeneration = computed(() => this.base.loadGeneration() + this.store.historyGeneration());
 
   /** Unused by the Content editor; delegated so the interface is honoured. */
   readonly current = this.base.current;

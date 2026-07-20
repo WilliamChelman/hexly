@@ -1,5 +1,6 @@
 import { ApplicationRef, Component, inject } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { ShortcutService } from '@hexly/web-core';
 import { DialogRef, DialogService } from './dialog.service';
 
 /** A standalone stand-in for a real dialog: reads its seed from the ref and can close with a result. */
@@ -51,5 +52,19 @@ describe('DialogService', () => {
 
     expect(document.activeElement).toBe(opener);
     opener.remove();
+  });
+
+  it('holds a modal shortcut scope while open, so surface shortcuts cannot fire behind it (ADR-0063)', () => {
+    const handler = vi.fn();
+    TestBed.inject(ShortcutService).register({ layer: 'surface', keys: 'backspace', handler });
+    const press = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', cancelable: true }));
+
+    const ref = service.open(TestDialogComponent);
+    press();
+    expect(handler).not.toHaveBeenCalled();
+
+    ref.close();
+    press();
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 });

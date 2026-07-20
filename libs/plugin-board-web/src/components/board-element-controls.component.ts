@@ -36,6 +36,13 @@ const Z_ACTIONS: readonly ZAction[] = [
 ];
 
 /**
+ * The screen `top` under which the lifted strip would cross the overlay's `overflow-hidden` top edge and
+ * clip out of reach: the strip's height (sm buttons + p-1 + border, ~40px) plus its lift margin. Below it
+ * the strip flips under the element's top edge instead.
+ */
+const FLIP_THRESHOLD = 48;
+
+/**
  * The floating control strip above a selected Image, Embed, or Text Block (CONTEXT.md → Image/Embed/Text
  * Block): a small toolbar anchored to the element's top-left in screen space, carrying the actions dragging
  * can't express. Related actions collapse into drop-down menus (`appMenuTrigger`, a trailing caret marks
@@ -44,7 +51,9 @@ const Z_ACTIONS: readonly ZAction[] = [
  *
  * Rendered as a *sibling* of the element box in the overlay, never a child — an Image/Embed box is
  * `overflow-hidden`, which would clip a toolbar floated above its top edge. So it takes the box's screen
- * {@link left}/{@link top} as inputs and lifts itself above with a transform.
+ * {@link left}/{@link top} as inputs and lifts itself above with a transform — except near the viewport
+ * top, where the *overlay's* own `overflow-hidden` would clip the lifted strip away: under
+ * {@link FLIP_THRESHOLD} it flips below the element's top edge (over the content) so it stays reachable.
  *
  * **Embed** — the open-target link (also the un-armed Embed's own click-through, kept there for the
  * read-only transclusion that has no selection toolbar), plus the shared *resize* menu.
@@ -79,6 +88,7 @@ const Z_ACTIONS: readonly ZAction[] = [
   // or deselect (the strip sits above the canvas), so it swallows pointerdown and each button owns its click.
   host: {
     class: 'controls',
+    '[class.is-flipped]': 'flipped()',
     '[style.left.px]': 'left()',
     '[style.top.px]': 'top()',
     '(pointerdown)': '$event.stopPropagation()',
@@ -193,6 +203,11 @@ const Z_ACTIONS: readonly ZAction[] = [
       /* Lift the strip clear of the element's top edge; the anchor is the box's top-left in screen space. */
       transform: translateY(calc(-100% - var(--spacing) * 2));
     }
+    /* Near the viewport top the lift would push the strip into the overlay's overflow-hidden clip
+       (FLIP_THRESHOLD) — drop it just below the element's top edge instead. */
+    :host(.controls.is-flipped) {
+      transform: translateY(calc(var(--spacing) * 2));
+    }
     /* A menu row's glyph + label. */
     .row {
       @apply flex items-center gap-2;
@@ -215,6 +230,9 @@ export class BoardElementControlsComponent {
 
   /** The stacking-order moves for the order menu's `@for`. */
   protected readonly zActions = Z_ACTIONS;
+
+  /** Whether the strip renders below the element's top edge — no room to lift above (FLIP_THRESHOLD). */
+  protected readonly flipped = computed(() => this.top() < FLIP_THRESHOLD);
 
   /** Whether the Image's aspect-ratio lock is on — drives the toggle's pressed face. */
   protected readonly locked = computed(() => {

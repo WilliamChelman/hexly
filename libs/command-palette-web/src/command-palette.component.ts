@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
-  HostListener,
   InjectionToken,
   computed,
   effect,
@@ -17,6 +16,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { of, switchMap } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { ShortcutService } from '@hexly/web-core';
 import { ButtonComponent, DialogComponent, InputComponent } from '@hexly/web-ui';
 import { Command, CommandProvider, parseCommandQuery } from './command';
 import { CommandRegistry, CommandSection } from './command-registry';
@@ -120,6 +120,7 @@ export const COMMAND_PROVIDERS = new InjectionToken<readonly CommandProvider[]>(
 export class CommandPaletteComponent {
   private readonly registry = inject(CommandRegistry);
   private readonly router = inject(Router);
+  private readonly shortcuts = inject(ShortcutService);
   private readonly builtIns = inject(COMMAND_PROVIDERS, { optional: true }) ?? [];
   // read: ElementRef — #search also hosts appInput, so a bare query would
   // resolve to the Input component instead of the native element.
@@ -178,6 +179,27 @@ export class CommandPaletteComponent {
     // The Palette mounts once for the app's lifetime, so there's nothing to unregister.
     for (const provider of this.builtIns) this.registry.register(provider);
 
+    // Both ⌘K and Ctrl+K, on every platform (not `mod`) — the palette's historic
+    // contract. `inEditable` keeps it reachable mid-typing. Global layer, so any
+    // held modal scope (including the palette's own dialog) suppresses it.
+    this.shortcuts.register({
+      layer: 'global',
+      keys: ['ctrl+k', 'meta+k'],
+      inEditable: true,
+      handler: () => this.open.update((v) => !v),
+    });
+    // The palette's dialog holds the modal scope while open (ADR-0063, amendment),
+    // which silences the global registration above — this modal-layer twin, gated
+    // on the palette being open, keeps the chord a toggle both ways. It never
+    // opens the palette over someone else's modal: `when` requires open().
+    this.shortcuts.register({
+      layer: 'modal',
+      keys: ['ctrl+k', 'meta+k'],
+      inEditable: true,
+      when: () => this.open(),
+      handler: () => this.open.set(false),
+    });
+
     // A new query invalidates the previous pick — land back on the top result.
     effect(() => {
       this.text();
@@ -199,14 +221,6 @@ export class CommandPaletteComponent {
         });
       }
     });
-  }
-
-  @HostListener('window:keydown', ['$event'])
-  protected onGlobalKeydown(event: KeyboardEvent): void {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-      event.preventDefault();
-      this.open.update((v) => !v);
-    }
   }
 
   protected onDialogClosed(): void {
