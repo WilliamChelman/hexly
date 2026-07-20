@@ -102,6 +102,27 @@ describe('BoardView', () => {
       return el as Element;
     }
 
+    /**
+     * The wheel listener's host must be a real full-bleed box, never `display:contents` (the 08bdd28
+     * regression): a boxless host takes the bubbled wheel as non-cancelable, so `preventDefault()` is
+     * dropped and a trackpad pinch zooms the whole page. jsdom can't observe passivity, so this locks in
+     * the layout choice that keeps the wheel cancelable in a real browser.
+     */
+    it('mounts on a real full-bleed box, not display:contents (08bdd28 regression guard)', () => {
+      const host = render().nativeElement as HTMLElement;
+      expect(host.classList.contains('contents')).toBe(false);
+      expect(host.classList.contains('absolute')).toBe(true);
+      expect(host.classList.contains('inset-0')).toBe(true);
+    });
+
+    it('cancels the wheel default over an element box, so a pinch never zooms the page', () => {
+      seedOneElement();
+      const fixture = render();
+      const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100, ctrlKey: true });
+      query(fixture, '[data-testid=element-e1]').dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
     it('pans the camera on a wheel over an element box (a sibling-overlay box, not the canvas)', () => {
       seedOneElement();
       const fixture = render();

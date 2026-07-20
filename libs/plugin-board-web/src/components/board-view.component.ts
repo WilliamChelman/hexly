@@ -17,8 +17,11 @@ import { InspectorComponent } from './inspector.component';
  * a read-only opener and an Embed's transclusion (ADR-0062) must see the Board's *content*, not a bare
  * grid, or nested Embeds never mount. Only the editing docks (tool palette, Inspector) and the overlay's
  * editing gestures are gated on {@link ENTITY_SESSION.writable} (ADR-0037), mirroring the Hex Map View
- * whose content canvas renders outside the writable gate. `display:contents` so the canvas and floating
- * chrome position against the entity page's `<main>`.
+ * whose content canvas renders outside the writable gate. A real full-bleed box (`absolute inset-0`),
+ * not `display:contents`: this host carries the wheel listener, and a boxless host receives the bubbled
+ * wheel as non-cancelable, so `preventDefault()` is silently dropped and a pinch zooms the whole page
+ * (the 08bdd28 regression) — see {@link onWheel}. It fills the entity page's positioned `<main>`, so the
+ * canvas and floating chrome position against it exactly as they did against `<main>`.
  *
  * Provides the route-scoped {@link BoardStore} (the surface document + tools + selection) and
  * {@link BoardCamera} (the shared pan/zoom the canvas and element overlay both read); both inject the
@@ -28,7 +31,7 @@ import { InspectorComponent } from './inspector.component';
 @Component({
   selector: 'app-board-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'contents', '(wheel)': 'onWheel($event)' },
+  host: { class: 'absolute inset-0', '(wheel)': 'onWheel($event)' },
   providers: [BoardStore, BoardCamera, BoardImagePlacement, BoardEmbedPlacement],
   imports: [BoardCanvasComponent, BoardElementsComponent, ToolPaletteComponent, InspectorComponent],
   template: `
@@ -52,8 +55,8 @@ import { InspectorComponent } from './inspector.component';
     }
   `,
   styles: `
-    /* display:contents leaves the palette a descendant of the entity page's positioned <main>, so 100%
-       resolves there. The palette's max-height is the one property with no faithful utility. */
+    /* The host is a full-bleed box filling <main>, so 100% resolves to the surface height. The palette's
+       max-height is the one property with no faithful utility. */
     app-board-tool-palette {
       max-height: calc(100% - 2 * calc(var(--spacing) * 3));
     }
@@ -71,6 +74,12 @@ export class BoardViewComponent {
    * overlay's element boxes are `pointer-events-auto`, so a wheel over one targets the box and would
    * otherwise never reach the canvas' own listener (the reported bug). The math stays in
    * {@link BoardCanvasComponent}, which owns the surface rect the zoom anchors against.
+   *
+   * The host must be a real box (see the class doc): on a `display:contents` host the bubbled wheel is
+   * non-cancelable, so `BoardCanvasComponent.onWheel`'s `preventDefault()` no-ops and a trackpad pinch
+   * zooms the whole page instead of the board (the 08bdd28 regression). A real box keeps the wheel
+   * cancelable, so Angular's non-passive `(wheel)` binding cancels it — mirroring the Hex Map, whose
+   * `(wheel)` lives on its real `<canvas>` box.
    *
    * Two regions keep the wheel to themselves, so it neither pans nor zooms the board: the floating chrome
    * (tool palette, Inspector, zoom control — the Inspector must scroll), and an *armed* element's
