@@ -13,7 +13,7 @@
  */
 
 import { defineField, defineStructuredDataType, Field, HarvestedFacet, StructuredDataTypeId } from '@hexly/domain';
-import { z } from 'zod';
+import * as z from 'zod';
 
 /** The `namespace.datatype.name` kind naming the stat-block data-type — what marks the `draw-steel.field.stat-block` Field structured. */
 export const DS_STAT_BLOCK: StructuredDataTypeId = 'draw-steel.datatype.stat-block';

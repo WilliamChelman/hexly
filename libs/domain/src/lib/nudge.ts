@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 /**
  * The live-follow nudge bus. A single server→client SSE stream carries *nudges* —

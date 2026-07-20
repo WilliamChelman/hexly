@@ -9,7 +9,7 @@
  */
 
 import { richContentSchema } from '@hexly/plugin-content';
-import { z } from 'zod';
+import * as z from 'zod';
 
 // Coordinates and extents are `.finite()`: a non-finite value (a bad inspector entry, `1e400`) survives
 // in memory but `JSON.stringify(Infinity) === "null"`, so it persists as `null` and fails the reload

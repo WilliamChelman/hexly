@@ -13,7 +13,7 @@
  * take a {@link StructuredDataTypeSet} as a parameter. The domain grows no mutable registry.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import type { EntityEdge } from './entity-edges';
 import type { FieldDataType } from './field';
 import { KindedId, kindedIdRegex } from './kinded-id';

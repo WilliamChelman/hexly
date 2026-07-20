@@ -18,7 +18,7 @@ import {
   DsCharacteristicKey,
   PowerRoll,
 } from '@hexly/plugin-draw-steel';
-import { z } from 'zod';
+import * as z from 'zod';
 import { EnricherContext, foundryProseToText } from './foundry-prose';
 
 /** The five characteristic scores the transform reads off the block — each optional, each the potency input. */

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 import { deriveDocumentState, DocumentDerivedState } from './derive-document-state';
 import {
   defineField,

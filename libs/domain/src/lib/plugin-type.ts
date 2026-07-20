@@ -6,7 +6,7 @@
  * forward-only validation and faceting, the web adds the chrome and Views.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { entityTypeSchema, nameSchema } from './entity';
 import { fieldRefsSchema } from './field-id';
 

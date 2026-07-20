@@ -4,7 +4,7 @@
  * in its own table.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { ENTITY_LIST_MAX_LIMIT, nameSchema } from './entity';
 
 /**

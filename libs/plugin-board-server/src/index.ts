@@ -12,7 +12,7 @@ import {
   PLUGIN_ID,
   SURFACE_FIELD,
 } from '@hexly/plugin-board';
-import { z } from 'zod';
+import * as z from 'zod';
 
 /**
  * The Board plugin's `features.plugin.board` schema (ADR-0052, ADR-0062): the base `{ enabled }` plus

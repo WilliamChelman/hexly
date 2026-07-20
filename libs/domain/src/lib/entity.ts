@@ -4,7 +4,7 @@
  * a type declares **Fields**, and nothing here knows what any of them hold.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { FieldDataType, EntityDocument } from './field';
 import { kindedIdRegex } from './kinded-id';
 

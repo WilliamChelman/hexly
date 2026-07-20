@@ -6,7 +6,7 @@
  * neither knows the View keyspace nor resolves one.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { kindedIdRegex } from './kinded-id';
 
 /** A View id, opaque here: it resolves against the web's registry, and an unregistered one is inert. */

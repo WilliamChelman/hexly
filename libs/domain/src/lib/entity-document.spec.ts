@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 import { emptyEntityDocument, withFieldDefaults } from './entity-document';
 import { entityDocumentSchema } from './entity';
 import { Field, fieldSchemaSchema } from './field';

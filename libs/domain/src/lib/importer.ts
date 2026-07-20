@@ -8,7 +8,7 @@
  * that mirrors it to the derived `entityImportSource` index live host-side.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { EntityType, HEXLY_METADATA_PREFIX, visibilitySchema } from './entity';
 import { EntityDocument } from './field';
 import { kindedIdRegex } from './kinded-id';

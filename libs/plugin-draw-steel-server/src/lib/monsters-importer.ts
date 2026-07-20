@@ -22,7 +22,7 @@ import {
 } from '@hexly/plugin-draw-steel';
 import { CONTENT_FIELD } from '@hexly/plugin-content';
 import { ImportContext, Importer, ImportProduction, ImportRecord } from '@hexly/domain';
-import { z } from 'zod';
+import * as z from 'zod';
 import { foundryProseToContent, foundryProseToText } from './foundry-prose';
 import { abilitiesOf, MonsterCharacteristics } from './monster-abilities';
 import { MONSTERS_PINNED_SHA, MonstersFetchPort } from './monster-fetch-port';

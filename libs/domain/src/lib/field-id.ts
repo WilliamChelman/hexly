@@ -5,7 +5,7 @@
  * value, so `entity.ts` must not, in turn, need a value out of `field.ts`.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { kindedIdRegex } from './kinded-id';
 
 /**

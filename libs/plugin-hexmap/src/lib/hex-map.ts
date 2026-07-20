@@ -4,7 +4,7 @@
  * and an absent key is Void.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { Axial } from './coordinates';
 
 /** The document key for a coordinate: `"q,r"`, so the hex Record is plain JSON. */

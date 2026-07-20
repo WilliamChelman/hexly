@@ -4,7 +4,7 @@
  * a code-registered Plugin type.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { entityTypeSchema, nameSchema } from './entity';
 import { dedupedFieldIdsSchema, fieldRefsSchema } from './field-id';
 import { ViewPlacement, viewPlacementSchema } from './view-placement';
