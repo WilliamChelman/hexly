@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, viewChild } from '@angular/core';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { BoardCamera } from '../services/board-camera';
 import { BoardImagePlacement } from '../services/board-image-placement';
@@ -28,7 +28,7 @@ import { InspectorComponent } from './inspector.component';
 @Component({
   selector: 'app-board-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'contents' },
+  host: { class: 'contents', '(wheel)': 'onWheel($event)' },
   providers: [BoardStore, BoardCamera, BoardImagePlacement, BoardEmbedPlacement],
   imports: [BoardCanvasComponent, BoardElementsComponent, ToolPaletteComponent, InspectorComponent],
   template: `
@@ -62,4 +62,27 @@ import { InspectorComponent } from './inspector.component';
 export class BoardViewComponent {
   /** The central session; `writable()` gates the editing chrome (ADR-0037/0048). */
   protected readonly session = inject(ENTITY_SESSION);
+
+  private readonly canvas = viewChild.required(BoardCanvasComponent);
+
+  /**
+   * Pan/zoom the board from a wheel/pinch gesture. The listener sits on this host — the shared ancestor
+   * of the canvas grid and the DOM element overlay — so it catches wheels over *both* layers; the
+   * overlay's element boxes are `pointer-events-auto`, so a wheel over one targets the box and would
+   * otherwise never reach the canvas' own listener (the reported bug). The math stays in
+   * {@link BoardCanvasComponent}, which owns the surface rect the zoom anchors against.
+   *
+   * Two regions keep the wheel to themselves, so it neither pans nor zooms the board: the floating chrome
+   * (tool palette, Inspector, zoom control — the Inspector must scroll), and an *armed* element's
+   * interactive content (a Text Block's live editor, an Embed's transclusion — scrolling inside it must
+   * not move the board, CONTEXT.md → Text Block/Embed). Both are a `closest()` containment test; not
+   * calling through leaves the native scroll and `preventDefault` to that inner content.
+   */
+  protected onWheel(event: WheelEvent): void {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('app-board-tool-palette, app-board-inspector, app-board-zoom-control, .element.is-armed')) {
+      return;
+    }
+    this.canvas().onWheel(event);
+  }
 }

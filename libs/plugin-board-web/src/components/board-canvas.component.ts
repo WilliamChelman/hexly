@@ -38,7 +38,9 @@ const DOT_RADIUS = 1;
 /**
  * The live board surface's background layer: an infinite, pannable, zoomable plane on a Canvas
  * (ADR-0003, #263). It draws the reference dot grid and owns the empty-space gestures — dragging pans,
- * the wheel/cluster zoom. The Board Elements render in the DOM overlay above it
+ * the cluster zoom. Wheel/pinch pan-zoom is delegated from the board View's host (so a wheel over an
+ * element box in the sibling overlay still reaches this camera, ADR-0062) into the public {@link onWheel}.
+ * The Board Elements render in the DOM overlay above it
  * (`BoardElementsComponent`); both read the same route-scoped {@link BoardCamera}, so grid and elements
  * pan and zoom in lockstep.
  *
@@ -64,7 +66,6 @@ const DOT_RADIUS = 1;
       (pointerup)="onPointerUp($event)"
       (pointercancel)="onPointerCancel($event)"
       (pointerleave)="onPointerLeave($event)"
-      (wheel)="onWheel($event)"
     ></canvas>
 
     <!-- Zoom/reset controls, bottom-right. -->
@@ -209,18 +210,26 @@ export class BoardCanvasComponent {
     this.endPress();
   }
 
-  protected onWheel(event: WheelEvent): void {
+  /**
+   * Pan/zoom from a wheel gesture. Public because the wheel listener lives on the board View's host, not
+   * this canvas: the DOM element overlay is a sibling layer above the canvas, so a wheel over an element
+   * box never reaches the canvas — the shared ancestor catches wheels from both layers and delegates the
+   * math here (ADR-0062, board-view.component.ts). Anchors zoom about the cursor using this canvas' own
+   * full-bleed rect, so the anchor is correct wherever the event originated.
+   */
+  onWheel(event: WheelEvent): void {
+    const canvas = this.canvasRef()?.nativeElement;
+    if (!canvas) return;
     event.preventDefault();
-    const el = event.currentTarget as HTMLElement;
     // A trackpad pinch arrives as a wheel event with ctrlKey set; Ctrl/Cmd+wheel zooms about the
     // cursor, plain scroll pans both axes.
     if (event.ctrlKey || event.metaKey) {
       const sensitivity = isTrackpadWheel(event) ? ZOOM_SENSITIVITY_TOUCHPAD : ZOOM_SENSITIVITY_MOUSE;
-      const factor = Math.exp(-wheelDeltaPixels(event.deltaY, event, el.clientHeight) * sensitivity);
-      this.cam.zoomAround(this.localPoint(event), factor);
+      const factor = Math.exp(-wheelDeltaPixels(event.deltaY, event, canvas.clientHeight) * sensitivity);
+      this.cam.zoomAround(this.localPoint(canvas, event), factor);
     } else {
-      const dx = wheelDeltaPixels(event.deltaX, event, el.clientWidth);
-      const dy = wheelDeltaPixels(event.deltaY, event, el.clientHeight);
+      const dx = wheelDeltaPixels(event.deltaX, event, canvas.clientWidth);
+      const dy = wheelDeltaPixels(event.deltaY, event, canvas.clientHeight);
       // Scrolling down/right moves the content up/left, like scrolling a page.
       this.cam.panBy(-dx, -dy);
     }
@@ -252,15 +261,15 @@ export class BoardCanvasComponent {
     return this.activePointerId !== null && event.pointerId !== this.activePointerId;
   }
 
-  /** Cursor position in the canvas's local CSS-pixel space. */
-  private localPoint(event: PointerEvent | WheelEvent): Point {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  /** Cursor position in the canvas's local CSS-pixel space, relative to `el`'s rect. */
+  private localPoint(el: HTMLElement, event: PointerEvent | WheelEvent): Point {
+    const rect = el.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }
 
   /** Cursor position in world space under the current camera. */
   private toWorld(event: PointerEvent): Point {
-    return this.cam.screenToWorld(this.localPoint(event));
+    return this.cam.screenToWorld(this.localPoint(event.currentTarget as HTMLElement, event));
   }
 
   /** Re-read the themed dot colour from the canvas's resolved styles (ADR-0007/0020). */
