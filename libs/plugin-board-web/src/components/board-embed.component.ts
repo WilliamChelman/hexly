@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { NgComponentOutlet } from '@angular/common';
-import { Router } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { ButtonComponent, IconComponent } from '@hexly/web-ui';
 import { DEFAULT_MAX_EMBED_DEPTH, EmbedElement } from '@hexly/plugin-board';
 import { ClientConfigStore, entityRoute } from '@hexly/web-core';
 import {
@@ -38,39 +39,40 @@ import { BoardStore } from '../services/board-store';
     class: 'block w-full h-full overflow-hidden relative bg-surface-sunken',
     '[class.pointer-events-none]': '!armed()',
   },
-  imports: [NgComponentOutlet, TranslocoPipe],
+  imports: [NgComponentOutlet, RouterLink, ButtonComponent, IconComponent, TranslocoPipe],
   template: `
     @if (outlet) {
       <ng-container *ngComponentOutlet="outlet; inputs: outletInputs()" />
     }
-    <!-- Open the target Entity: the un-armed Embed's click-through (editing means opening the target). Always
-         pointer-interactive, so it works whether or not the Embed is armed. -->
-    <button
-      type="button"
-      class="open-target"
-      data-testid="embed-open-target"
-      [attr.aria-label]="'board.embed.openTarget' | transloco"
-      (pointerdown)="$event.stopPropagation()"
-      (click)="openTarget($event)"
-    >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-        <path d="M14 5h5v5M19 5l-8 8M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
-      </svg>
-    </button>
+    <!-- Open the target Entity: the un-armed Embed's click-through (editing means opening the target). A real
+         anchor, so ctrl/cmd-click opens the target in a new tab; always pointer-interactive, so it works
+         whether or not the Embed is armed. -->
+    @if (targetLink(); as link) {
+      <a
+        appButton
+        variant="ghost"
+        size="sm"
+        icon
+        class="open-target"
+        data-testid="embed-open-target"
+        [routerLink]="link"
+        [attr.aria-label]="'board.embed.openTarget' | transloco"
+        (pointerdown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation()"
+      >
+        <app-icon name="external-link" [size]="16" />
+      </a>
+    }
   `,
   styles: `
     @reference '#app-styles.css';
 
     .open-target {
-      @apply absolute top-1 right-1 z-[1] flex items-center justify-center w-6 h-6 rounded-md pointer-events-auto;
-      @apply text-ink-muted bg-surface/80 border border-line opacity-0 transition-opacity;
-      @apply hover:text-ink hover:border-gold focus-visible:opacity-100 outline-none;
+      @apply absolute top-1 right-1 z-[1] pointer-events-auto opacity-0 transition-opacity;
     }
-    :host(:hover) .open-target {
+    :host(:hover) .open-target,
+    .open-target:focus-visible {
       @apply opacity-100;
-    }
-    .open-target svg {
-      @apply w-4 h-4;
     }
   `,
 })
@@ -81,7 +83,6 @@ export class BoardEmbedComponent {
   private readonly store = inject(BoardStore);
   private readonly session = inject(ENTITY_SESSION);
   private readonly clientConfig = inject(ClientConfigStore);
-  private readonly router = inject(Router);
   private readonly parentContext = inject(ENTITY_RENDER_CONTEXT, { optional: true }) ?? DEFAULT_ENTITY_RENDER_CONTEXT;
 
   /** The app-bound Entity View Outlet host; absent only if the app never bound the seam (never in the shipped build). */
@@ -112,11 +113,13 @@ export class BoardEmbedComponent {
     renderContext: this.outletContext(),
   }));
 
-  /** Navigate to the target Entity — the un-armed Embed's click-through (CONTEXT.md → Embed). */
-  protected openTarget(event: Event): void {
-    event.stopPropagation();
+  /**
+   * The route to the target Entity — the un-armed Embed's click-through (CONTEXT.md → Embed), as a real
+   * `routerLink` so ctrl/cmd-click opens it in a new tab. Null (affordance hidden) until both ids resolve.
+   */
+  protected readonly targetLink = computed(() => {
     const targetId = this.element().targetEntityId;
     const worldId = this.session.current()?.worldId;
-    if (worldId && targetId) void this.router.navigate(entityRoute(worldId, targetId));
-  }
+    return worldId && targetId ? entityRoute(worldId, targetId) : null;
+  });
 }

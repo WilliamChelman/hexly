@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
+import { IconComponent } from '@hexly/web-ui';
 import { ImageElement } from '@hexly/plugin-board';
 
 /**
@@ -16,14 +17,11 @@ import { ImageElement } from '@hexly/plugin-board';
   selector: 'app-board-image',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block w-full h-full pointer-events-none select-none' },
+  imports: [IconComponent],
   template: `
     @if (missing()) {
       <div class="placeholder" role="img" [attr.aria-label]="missingLabel()" [attr.data-testid]="'image-placeholder'">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
-          <path d="M4 5h16v14H4z" />
-          <path d="M8 10a1.3 1.3 0 1 0 .01 0" />
-          <path d="M5 18l4-5 3 3 4-5 4 4" />
-        </svg>
+        <app-icon name="board-image" [size]="32" />
         <span class="label">{{ missingLabel() }}</span>
       </div>
     } @else {

@@ -1,7 +1,7 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, input } from '@angular/core';
 import { ComponentRef } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { EntityDetail } from '@hexly/domain';
 import { EmbedElement, SURFACE_FIELD } from '@hexly/plugin-board';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
@@ -134,18 +134,14 @@ describe('BoardEmbed', () => {
     expect((fixture.nativeElement as HTMLElement).classList).not.toContain('pointer-events-none');
   });
 
-  it('opens the target Entity from the open affordance (editing means opening the target)', () => {
+  it('opens the target Entity from the open affordance — a real link, so ctrl-click opens a new tab', () => {
     setup();
     render();
-    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
-    (fixture.nativeElement.querySelector('[data-testid=embed-open-target]') as HTMLButtonElement).click();
-
-    expect(navigate).toHaveBeenCalledWith([
-      '/w',
-      expect.stringContaining('w1'),
-      'entities',
-      expect.stringContaining('note-2'),
-    ]);
+    // A routerLink anchor: its resolved href is the target's route, so the browser handles ctrl/cmd-click.
+    const link = fixture.nativeElement.querySelector('[data-testid=embed-open-target]') as HTMLAnchorElement;
+    const href = link.getAttribute('href');
+    expect(href).toContain('w1');
+    expect(href).toContain('note-2');
   });
 });

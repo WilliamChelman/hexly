@@ -1,12 +1,6 @@
 import { IconName } from '@hexly/web-ui';
 import { ToolId } from '../services/board-store';
 
-/**
- * A Tool's palette glyph: one of web-ui's built-in icons, or SVG path art this lib owns — web-ui's icon
- * vocabulary carries no plugin's (ADR-0050). The minimal Box uses a path so the lib stays self-contained.
- */
-export type ToolGlyph = { readonly icon: IconName } | { readonly path: string };
-
 /** One top-level Tool's identity: its stable id, keyboard hotkey, and palette glyph. */
 export interface ToolDef {
   readonly id: ToolId;
@@ -16,33 +10,23 @@ export interface ToolDef {
    * the keycap.
    */
   readonly hotkey: string;
-  readonly glyph: ToolGlyph;
+  /** The palette glyph, by name: a core web-ui icon or one the plugin registers (`provideIcons`, ADR-0050). */
+  readonly glyph: IconName;
 }
-
-/** A plain rectangle glyph for the Box tool — a 24-box outline, matching web-ui's icon viewBox. */
-const BOX_PATH = 'M4 5h16v14H4z';
-
-/** A capital "T" glyph for the Text tool — top bar plus stem, stroked in web-ui's 24-box viewBox. */
-const TEXT_PATH = 'M6 6h12M12 6v12';
-
-/** A framed-picture glyph for the Image tool — a frame, a sun, and a mountain, stroked in the 24-box viewBox. */
-const IMAGE_PATH = 'M4 5h16v14H4z M8 10a1.3 1.3 0 1 0 .01 0 M5 18l4-5 3 3 4-5 4 4';
-
-/** A window-into-another glyph for the Embed tool — a frame with a smaller inset frame, in the 24-box viewBox. */
-const EMBED_PATH = 'M4 4h16v16H4z M9 9h8v8H9z';
 
 /**
  * The top-level Tools, in palette order: the non-destructive Select first (the boot default), the
  * minimal Box placement Tool (Seam B, #267), the Text Block Tool (#268), the Image Tool (#269), then the
- * Embed Tool (#270). The visible name is resolved at the UI layer from the stable `id`
+ * Embed Tool (#270). Every glyph is a Lucide icon — the `board-*` ones registered in `providePluginBoard`,
+ * `text` reusing core `label`. The visible name is resolved at the UI layer from the stable `id`
  * (`board.toolPalette.<id>`, ADR-0014).
  */
 export const TOOLS: readonly ToolDef[] = [
-  { id: 'select', hotkey: 'v', glyph: { icon: 'select' } },
-  { id: 'box', hotkey: 'b', glyph: { path: BOX_PATH } },
-  { id: 'text', hotkey: 't', glyph: { path: TEXT_PATH } },
-  { id: 'image', hotkey: 'i', glyph: { path: IMAGE_PATH } },
-  { id: 'embed', hotkey: 'e', glyph: { path: EMBED_PATH } },
+  { id: 'select', hotkey: 'v', glyph: 'select' },
+  { id: 'box', hotkey: 'b', glyph: 'board-box' },
+  { id: 'text', hotkey: 't', glyph: 'label' },
+  { id: 'image', hotkey: 'i', glyph: 'board-image' },
+  { id: 'embed', hotkey: 'e', glyph: 'board-embed' },
 ];
 
 /** The Tool a keyboard key arms, or undefined for a non-hotkey key. Case-insensitive. */
