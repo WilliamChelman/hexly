@@ -7,7 +7,7 @@
  * (ADR-0033) is untouched — the Field only *types and surfaces* a key it never owns.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { entityTypeSchema } from './entity';
 import { fieldIdSchema } from './field-id';
 import {

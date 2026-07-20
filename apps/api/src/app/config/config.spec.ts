@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { basePluginConfigSchema } from '@hexly/domain';
-import { z } from 'zod';
+import * as z from 'zod';
 import { loadConfig, parseSize, PluginConfigContribution } from './config';
 
 const MB = 1024 * 1024;

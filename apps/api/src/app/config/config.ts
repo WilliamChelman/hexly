@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PluginConfig, PluginConfigSchema } from '@hexly/domain';
 import { parse as parseYaml } from 'yaml';
-import { z } from 'zod';
+import * as z from 'zod';
 
 /**
  * DI token for the loaded Instance Configuration (ADR-0036). Defined here, not in `config.module.ts`, so

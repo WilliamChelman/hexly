@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { defineField, defineStructuredDataType, Field } from '@hexly/domain';
-import { z } from 'zod';
+import * as z from 'zod';
 import { emptyRichContent, tiptapContent } from '@hexly/plugin-content';
 import { coordKey } from '@hexly/plugin-hexmap';
 import { and, eq } from 'drizzle-orm';

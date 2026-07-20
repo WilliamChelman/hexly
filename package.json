@@ -33,10 +33,7 @@
       "msgpackr-extract",
       "nx",
       "unrs-resolver"
-    ],
-    "patchedDependencies": {
-      "zod@4.4.3": "patches/zod@4.4.3.patch"
-    }
+    ]
   },
   "devDependencies": {
     "@angular-devkit/core": "~21.2.0",

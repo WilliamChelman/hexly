@@ -3,7 +3,7 @@
  * web panel.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { InstanceRole, instanceRolesSchema, MIN_PASSWORD_LENGTH } from './auth';
 
 /**

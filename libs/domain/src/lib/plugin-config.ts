@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 /**
  * The base per-Plugin config every Plugin's `configSchema` extends (ADR-0052). Its one knob today is

@@ -8,7 +8,7 @@
  * through the data-type the host registered, so the derive pass learns nothing about prose.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import {
   assetHashFromUrl,
   defineField,

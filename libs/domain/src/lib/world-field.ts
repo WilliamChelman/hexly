@@ -11,7 +11,7 @@
  * typed by the user (see `kinded-id.ts`).
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { fieldSchema, fieldSchemaSchema } from './field';
 import { fieldIdSchema } from './field-id';
 

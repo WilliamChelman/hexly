@@ -3,7 +3,7 @@
  * in an HttpOnly cookie, so it never appears in these payloads.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 
 /**
  * The Format Locale choices as BCP-47 tags. `Intl` can't enumerate locales, so

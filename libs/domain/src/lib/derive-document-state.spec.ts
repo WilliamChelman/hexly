@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 import { EntityDocument, Field, fieldSchemaSchema } from './field';
 import { deriveDocumentState } from './derive-document-state';
 import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
