@@ -116,7 +116,7 @@ function buildConfigSchema(plugins: readonly PluginConfigContribution[]) {
     // The Entity Type the "New" button mints by default (ADR-0052). Resolved verbatim, with no boot-time
     // validation against the enabled set — a soft client-side fallback handles absence, so this knob
     // never fails boot and stays independent of `features.plugin`.
-    entities: z.object({ defaultType: z.string().default('core.note') }).prefault({}),
+    entities: z.object({ defaultType: z.string().default('core.type.note') }).prefault({}),
   });
 }
 

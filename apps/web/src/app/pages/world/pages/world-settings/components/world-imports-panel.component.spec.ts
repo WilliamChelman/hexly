@@ -40,7 +40,7 @@ describe('WorldImportsPanel', () => {
   let fixture: ComponentFixture<WorldImportsPanelComponent>;
 
   // Draw Steel's real Importer: its label is a transloco key resolved through the plugin's web catalogs.
-  const monsters: ImporterSummary = { id: 'draw-steel.monsters', label: 'drawSteel.importer.monsters' };
+  const monsters: ImporterSummary = { id: 'draw-steel.importer.monsters', label: 'drawSteel.importer.monsters' };
 
   beforeEach(async () => {
     worlds = new MockWorldsClient();
@@ -82,7 +82,7 @@ describe('WorldImportsPanel', () => {
   it('lists the World’s importers, resolving each plugin-contributed label from its catalog', () => {
     render();
     // The Draw Steel key resolved to its localized copy — the panel itself names no plugin.
-    expect(el('importer-draw-steel.monsters').textContent).toContain('Draw Steel — Monsters');
+    expect(el('importer-draw-steel.importer.monsters').textContent).toContain('Draw Steel — Monsters');
   });
 
   it('runs the chosen importer through the World-scoped endpoint at the selected visibility', () => {
@@ -90,14 +90,14 @@ describe('WorldImportsPanel', () => {
     render();
 
     // Default visibility is shared; switch to private before running.
-    const select = el('importer-visibility-draw-steel.monsters') as HTMLSelectElement;
+    const select = el('importer-visibility-draw-steel.importer.monsters') as HTMLSelectElement;
     select.value = 'private';
     select.dispatchEvent(new Event('change'));
     fixture.detectChanges();
 
-    click('importer-run-draw-steel.monsters');
+    click('importer-run-draw-steel.importer.monsters');
 
-    expect(worlds.runImport).toHaveBeenCalledWith('w1', 'draw-steel.monsters', 'private');
+    expect(worlds.runImport).toHaveBeenCalledWith('w1', 'draw-steel.importer.monsters', 'private');
   });
 
   it('follows a run to completion and toasts the landed count', () => {
@@ -107,7 +107,7 @@ describe('WorldImportsPanel', () => {
       .mockReturnValue(of(runSummary({ importer: monsters.id, status: 'succeeded', created: 5, updated: 2 })));
     render();
 
-    click('importer-run-draw-steel.monsters');
+    click('importer-run-draw-steel.importer.monsters');
     advance(POLL_MS);
 
     expect(toaster.toasts().some((t) => t.tone === 'success' && t.message.includes('7'))).toBe(true);
@@ -128,7 +128,7 @@ describe('WorldImportsPanel', () => {
     );
     render();
 
-    const line = el('importer-status-draw-steel.monsters').textContent ?? '';
+    const line = el('importer-status-draw-steel.importer.monsters').textContent ?? '';
     expect(line).toContain('abcdef1'); // short rev
     expect(line).toContain('4'); // created + updated
   });
@@ -142,11 +142,11 @@ describe('WorldImportsPanel', () => {
     );
     render();
 
-    const line = el('importer-status-draw-steel.monsters').textContent ?? '';
+    const line = el('importer-status-draw-steel.importer.monsters').textContent ?? '';
     expect(line).toContain('abcdef1'); // short rev, from the index, not an in-process job
     expect(line).toContain('4'); // owned entity count
     // A set on record flips the action to Reimport even with no in-process run.
-    expect(el('importer-run-draw-steel.monsters').textContent).toContain('Reimport');
+    expect(el('importer-run-draw-steel.importer.monsters').textContent).toContain('Reimport');
   });
 
   it('renders a distinct failure line for a failed run, not an empty success line (#262 review)', () => {
@@ -155,8 +155,8 @@ describe('WorldImportsPanel', () => {
     );
     render();
 
-    expect(has('importer-error-draw-steel.monsters')).toBe(true);
-    expect(has('importer-status-draw-steel.monsters')).toBe(false); // never the success key
+    expect(has('importer-error-draw-steel.importer.monsters')).toBe(true);
+    expect(has('importer-status-draw-steel.importer.monsters')).toBe(false); // never the success key
   });
 
   it('refreshes the importer list after a run settles, so each row’s durable line updates (#260)', () => {
@@ -167,7 +167,7 @@ describe('WorldImportsPanel', () => {
     render();
     expect(worlds.importers).toHaveBeenCalledTimes(1); // the initial load
 
-    click('importer-run-draw-steel.monsters');
+    click('importer-run-draw-steel.importer.monsters');
     advance(POLL_MS);
 
     expect(worlds.importers).toHaveBeenCalledTimes(2); // re-read once the run settled
@@ -182,11 +182,11 @@ describe('WorldImportsPanel', () => {
     worlds.runImport.mockReturnValue(of(runSummary({ importer: monsters.id, status: 'running' })));
     render();
 
-    click('importer-run-draw-steel.monsters');
+    click('importer-run-draw-steel.importer.monsters');
     advance(50); // the stale initial GET resolves now — it must not rewind the live state
     fixture.detectChanges();
 
-    expect((el('importer-run-draw-steel.monsters') as HTMLButtonElement).disabled).toBe(true);
+    expect((el('importer-run-draw-steel.importer.monsters') as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('disables the controls while a reconcile is in flight, and rejoins one running on load', () => {
@@ -195,7 +195,7 @@ describe('WorldImportsPanel', () => {
       .mockReturnValue(of(runSummary({ importer: monsters.id, status: 'succeeded', created: 1, updated: 0 })));
     render();
 
-    expect((el('importer-run-draw-steel.monsters') as HTMLButtonElement).disabled).toBe(true);
+    expect((el('importer-run-draw-steel.importer.monsters') as HTMLButtonElement).disabled).toBe(true);
     expect(worlds.runImport).not.toHaveBeenCalled(); // It rejoined; it did not start one.
 
     advance(POLL_MS);
@@ -208,7 +208,7 @@ describe('WorldImportsPanel', () => {
     );
     render();
 
-    click('importer-run-draw-steel.monsters');
+    click('importer-run-draw-steel.importer.monsters');
 
     const toast = toaster.toasts().at(-1);
     expect(toast?.tone).toBe('error');
@@ -219,9 +219,9 @@ describe('WorldImportsPanel', () => {
     worlds.removeImporter.mockReturnValue(of(undefined));
     render();
 
-    click('importer-remove-draw-steel.monsters');
+    click('importer-remove-draw-steel.importer.monsters');
 
-    expect(worlds.removeImporter).toHaveBeenCalledWith('w1', 'draw-steel.monsters');
+    expect(worlds.removeImporter).toHaveBeenCalledWith('w1', 'draw-steel.importer.monsters');
     expect(toaster.toasts().some((t) => t.tone === 'success')).toBe(true);
   });
 

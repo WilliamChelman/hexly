@@ -11,11 +11,11 @@ const field = (id: string, kind: string): Field => ({
 
 /**
  * Stand-ins for a plugin's **Structured Data Type**s: the domain bundles none of its own (ADR-0050),
- * so a spec declares them and threads them in as a host does. `PROSE` stands for `core.rich-content`,
+ * so a spec declares them and threads them in as a host does. `PROSE` stands for `core.datatype.rich-content`,
  * which contributes text *and* descriptor-bearing links through this generic path (ADR-0051).
  */
 const BOARD = defineStructuredDataType({
-  id: 'test.board',
+  id: 'test.datatype.board',
   valueSchema: z.object({ tiles: z.array(z.object({ entityId: z.string(), name: z.string().optional() })) }),
   empty: () => ({ tiles: [] }),
   harvestEdges: (board) =>
@@ -27,21 +27,21 @@ const BOARD = defineStructuredDataType({
       .trim(),
 });
 const LINKS = defineStructuredDataType({
-  id: 'test.links',
+  id: 'test.datatype.links',
   valueSchema: z.array(z.object({ entityId: z.string(), descriptor: z.string().nullish() })),
   empty: () => [],
   harvestEdges: (links) =>
     links.map((l) => ({ targetKind: 'entity' as const, targetId: l.entityId, descriptor: l.descriptor ?? null })),
 });
 const PROSE = defineStructuredDataType({
-  id: 'test.prose',
+  id: 'test.datatype.prose',
   valueSchema: z.object({ text: z.string() }),
   empty: () => ({ text: '' }),
   extractText: (prose) => prose.text,
 });
 /** A structured data-type harvesting a facet dimension (ADR-0055). */
 const STATBLOCK = defineStructuredDataType({
-  id: 'test.statblock',
+  id: 'test.datatype.stat-block',
   valueSchema: z.object({ cr: z.number() }),
   empty: () => ({ cr: 0 }),
   facetDimensions: [{ key: 'cr', label: 'CR', dataType: { kind: 'number' } }],
@@ -49,10 +49,10 @@ const STATBLOCK = defineStructuredDataType({
 });
 
 const DATA_TYPES = structuredDataTypeSet([BOARD, LINKS, PROSE, STATBLOCK]);
-const boardField = field('board', 'test.board');
-const linksField = field('links', 'test.links');
-const proseField = field('prose', 'test.prose');
-const statField = field('stats', 'test.statblock');
+const boardField = field('board', 'test.datatype.board');
+const linksField = field('links', 'test.datatype.links');
+const proseField = field('prose', 'test.datatype.prose');
+const statField = field('stats', 'test.datatype.stat-block');
 
 const derive = (doc: EntityDocument, fields: readonly Field[] = [], dataTypes = DATA_TYPES) =>
   deriveDocumentState(doc, fields, dataTypes);
@@ -129,7 +129,7 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
     });
 
     it('harvests nothing when the kind is unregistered or the set is empty', () => {
-      const typo = field('board', 'test.bord');
+      const typo = field('board', 'test.datatype.bord');
       expect(derive(board(), [boardField], NO_STRUCTURED_DATA_TYPES).edges).toEqual([]);
       expect(derive(board(), [typo]).edges).toEqual([]);
     });
@@ -196,7 +196,7 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
   });
 
   describe('importSource: the reserved hexly.source key (ADR-0060)', () => {
-    const SOURCE = { importer: 'draw-steel.monsters', sourceId: 'goblin', rev: 'sha-abc' };
+    const SOURCE = { importer: 'draw-steel.importer.monsters', sourceId: 'goblin', rev: 'sha-abc' };
 
     it('surfaces a well-formed Import Source, needing neither Fields nor data-types', () => {
       expect(derive({ 'hexly.source': SOURCE }, []).importSource).toEqual(SOURCE);
@@ -208,7 +208,7 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
 
     /** Forward-only: an ill-shaped stamp reads as un-stamped, never throws. */
     it('is null when the stamp is malformed', () => {
-      expect(derive({ 'hexly.source': { importer: 'draw-steel.monsters' } }, []).importSource).toBeNull();
+      expect(derive({ 'hexly.source': { importer: 'draw-steel.importer.monsters' } }, []).importSource).toBeNull();
     });
   });
 

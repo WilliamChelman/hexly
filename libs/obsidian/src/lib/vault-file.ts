@@ -2,7 +2,7 @@
  * The vault ⇆ EntityDocument layer (ADR-0033, ADR-0051). `libs/obsidian` keeps the file walk, the YAML
  * frontmatter, and the marker convention, and resolves each Field's **Vault Projection** off the
  * **StructuredDataTypeSet the host hands it** — it does *not* import `@hexly/plugin-content`. A body
- * Field's Markdown↔value conversion lives behind its data-type's projection (`core.rich-content`'s
+ * Field's Markdown↔value conversion lives behind its data-type's projection (`core.datatype.rich-content`'s
  * converter, the grid's frontmatter default), so one hard-coded body is never traded for another.
  */
 

@@ -6,7 +6,7 @@ import { createEntity, enterLibrary, expect, flushSave, savedGrid, test } from '
  */
 test('paints a hex, saves, and the hex survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
-  const mapId = await createEntity(page, 'core.hexmap');
+  const mapId = await createEntity(page, 'core.type.hex-map');
 
   // A map opens armed with Select, so a stray click never paints (issue #27).
   await page.getByRole('img', { name: 'Hex map' }).click();

@@ -63,7 +63,7 @@ test('an owner toggles a note to shared and the Visibility facet reflects it', a
 test('creating a map opens the map editor, not the note view', async ({ page }) => {
   await enterLibrary(page);
 
-  await createEntity(page, 'core.hexmap');
+  await createEntity(page, 'core.type.hex-map');
 
   // Editor chrome present (harmonized header — ADR-0022).
   await expect(page.getByTestId('title')).toBeVisible();

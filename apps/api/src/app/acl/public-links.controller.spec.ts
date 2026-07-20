@@ -65,7 +65,7 @@ describe('Public links', () => {
     return (
       await owner
         .post('/entities')
-        .send({ name, types: ['core.note'], worldId })
+        .send({ name, types: ['core.type.note'], worldId })
         .expect(201)
     ).body.id;
   }

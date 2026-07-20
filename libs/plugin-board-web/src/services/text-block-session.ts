@@ -1,21 +1,21 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { EntityDocument } from '@hexly/domain';
-import { Content, emptyContent } from '@hexly/plugin-content';
+import { RichContent, emptyRichContent } from '@hexly/plugin-content';
 import { ENTITY_SESSION, EntitySession, LiveEditor, Patch } from '@hexly/web-entity';
 import { BoardStore } from './board-store';
 
 /**
- * The EntityDocument key the embedded Content editor reads and writes — a private slot inside this
+ * The EntityDocument key the embedded RichContent editor reads and writes — a private slot inside this
  * adapter, never the board's own document. A Text Block's prose is not a top-level Entity Field; it
  * lives inside a Board Element, so the editor is handed a one-key synthetic body and its writes are
  * routed back into the armed element (see {@link TextBlockSession}).
  */
-export const TEXT_CONTENT_KEY = 'core.content';
+export const TEXT_CONTENT_KEY = 'core.field.content';
 
 /**
- * The {@link EntitySession} a **Text Block**'s embedded Content editor sees (#268) — the seam that lets a
- * Board reuse the *same editor as an Entity's Content* without that editor knowing it edits a Board
- * Element. It presents the armed Text Block's `core.rich-content` value as a one-Field body, and folds
+ * The {@link EntitySession} a **Text Block**'s embedded RichContent editor sees (#268) — the seam that lets a
+ * Board reuse the *same editor as an Entity's RichContent* without that editor knowing it edits a Board
+ * Element. It presents the armed Text Block's `core.datatype.rich-content` value as a one-Field body, and folds
  * the editor's debounced commits back through {@link BoardStore.setContent}, so a prose edit is one
  * undoable board step and rides the surface's save.
  *
@@ -54,11 +54,11 @@ export class TextBlockSession implements EntitySession {
    */
   readonly loadGeneration = computed(() => this.base.loadGeneration() + this.store.historyGeneration());
 
-  /** Unused by the Content editor; delegated so the interface is honoured. */
+  /** Unused by the RichContent editor; delegated so the interface is honoured. */
   readonly current = this.base.current;
 
   /**
-   * Route the editor's full-doc commit into the target Text Block. The editor assigns a fresh Content at
+   * Route the editor's full-doc commit into the target Text Block. The editor assigns a fresh RichContent at
    * {@link TEXT_CONTENT_KEY}; {@link BoardStore.setContent} makes that one undoable board edit. Patches
    * are irrelevant — TipTap owns its own history (ADR-0051) — so an empty patch set is returned.
    */
@@ -66,11 +66,11 @@ export class TextBlockSession implements EntitySession {
     const id = this._target();
     const body: EntityDocument = { [TEXT_CONTENT_KEY]: this.targetContent() };
     recipe(body);
-    if (id) this.store.setContent(id, body[TEXT_CONTENT_KEY] as Content);
+    if (id) this.store.setContent(id, body[TEXT_CONTENT_KEY] as RichContent);
     return { redo: [], undo: [] };
   }
 
-  /** The Content editor keeps its own history and never replays patches through the session — a no-op. */
+  /** The RichContent editor keeps its own history and never replays patches through the session — a no-op. */
   applyPatches(): void {
     /* no-op: TipTap owns the Text Block's edit history (ADR-0051). */
   }
@@ -81,9 +81,9 @@ export class TextBlockSession implements EntitySession {
   }
 
   /** The target element's prose, or an empty document when it is gone or not text-shaped. */
-  private targetContent(): Content {
+  private targetContent(): RichContent {
     const id = this._target();
     const element = id ? this.store.document().elements.find((e) => e.id === id) : undefined;
-    return element?.kind === 'text' ? element.content : emptyContent();
+    return element?.kind === 'text' ? element.content : emptyRichContent();
   }
 }

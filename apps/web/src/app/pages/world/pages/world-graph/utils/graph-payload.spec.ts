@@ -7,7 +7,7 @@ function world(nodes: string[], edges: string[] = []): WorldGraph {
     nodes: nodes.map((name) => ({
       id: name.toLowerCase(),
       name,
-      types: ['core.note'],
+      types: ['core.type.note'],
     })),
     edges: edges.map((e) => {
       const [left, target] = e.split('>');

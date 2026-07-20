@@ -1,5 +1,5 @@
 /**
- * The `draw-steel.monsters` Importer (ADR-0060): the near-pure producer that fetches the pinned *Monsters*
+ * The `draw-steel.importer.monsters` Importer (ADR-0060): the near-pure producer that fetches the pinned *Monsters*
  * pack through its injected {@link MonstersFetchPort} and transforms each actor into one Import Record — the
  * scalar spine, the structural fields, the biography, and the `feature`/`ability` items ({@link abilitiesOf}),
  * every prose field run through {@link foundryProseToText} so no raw enricher token leaks. Creator-License
@@ -28,7 +28,7 @@ import { abilitiesOf, MonsterCharacteristics } from './monster-abilities';
 import { MONSTERS_PINNED_SHA, MonstersFetchPort } from './monster-fetch-port';
 
 /** This Importer's `namespace.id` — the `importer` an Import Source names, and its key in the registry. */
-export const MONSTERS_IMPORTER_ID = 'draw-steel.monsters';
+export const MONSTERS_IMPORTER_ID = 'draw-steel.importer.monsters';
 
 /**
  * The Importer's copy for the generic Imports panel (ADR-0060) — a transloco key, not literal text, so
@@ -45,7 +45,7 @@ export const MONSTERS_IMPORTER_LABEL = 'drawSteel.importer.monsters';
 export const MONSTERS_REV = MONSTERS_PINNED_SHA;
 
 /**
- * Build the `draw-steel.monsters` Importer over a fetch port (ADR-0060). The port is a constructor
+ * Build the `draw-steel.importer.monsters` Importer over a fetch port (ADR-0060). The port is a constructor
  * dependency, not a `produce` argument, so the composition root wires the real
  * {@link githubTarballFetchPort} while a test wires {@link fixtureFetchPort} — the whole pipe is then
  * exercised offline.
@@ -137,7 +137,7 @@ type RawMonster = z.infer<typeof rawMonsterSchema>;
 /**
  * Transform one raw actor document into an Import Record, or `null` when it is not a parseable npc actor.
  * Maps the scalar spine (#257) plus the structural, non-ability fields (#258) into a {@link StatBlock}, and
- * folds the biography into `core.content` — omitting that field entirely when the biography is empty. `img`
+ * folds the biography into `core.field.content` — omitting that field entirely when the biography is empty. `img`
  * is intentionally absent from the output — the actor's art never crosses into the Entity Document (ADR-0061).
  */
 export function toMonsterRecord(raw: unknown): ImportRecord | null {
@@ -148,7 +148,7 @@ export function toMonsterRecord(raw: unknown): ImportRecord | null {
 
   const document: Record<string, unknown> = { [DS_STAT_BLOCK_KEY]: statBlockOf(actor) };
   // Biography + director notes → prose, but only when there is any: an empty biography contributes no
-  // `core.content` field at all (#258), rather than an empty document the reconcile would still land.
+  // `core.field.content` field at all (#258), rather than an empty document the reconcile would still land.
   const content = foundryProseToContent(joinProse(actor.system?.biography));
   if (content) document[CONTENT_FIELD.id] = content;
 

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Importer, ImporterSummary } from '@hexly/domain';
+import { Importer, importerIdSchema, ImporterSummary } from '@hexly/domain';
 import { HEXLY_CONFIG, HexlyConfig } from '../config';
 import { enabledPluginImporters } from '../entities/bundled-plugins';
 
@@ -15,11 +15,12 @@ export class ImporterRegistry {
   private readonly byId = new Map<string, Importer>();
 
   constructor(@Inject(HEXLY_CONFIG) config: HexlyConfig) {
-    for (const importer of enabledPluginImporters(config)) this.byId.set(importer.id, importer);
+    for (const importer of enabledPluginImporters(config)) this.register(importer);
   }
 
   /** Register (or replace) an Importer, for a test-injected stub or a late contribution. Returns an unregister fn. */
   register(importer: Importer): () => void {
+    importerIdSchema.parse(importer.id);
     this.byId.set(importer.id, importer);
     return () => this.byId.delete(importer.id);
   }

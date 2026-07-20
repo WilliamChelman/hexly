@@ -18,7 +18,7 @@ import {
   isStructuredKind,
   slugifyFieldSegment,
   UpdateWorldFieldRequest,
-  USER_FIELD_NAMESPACE,
+  worldFieldSegment,
 } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
 import { ButtonComponent, InputComponent } from '@hexly/web-ui';
@@ -172,7 +172,7 @@ export class WorldFieldFormComponent {
     return field
       ? {
           editingId: field.id,
-          segment: field.id.slice(`${USER_FIELD_NAMESPACE}.`.length),
+          segment: worldFieldSegment(field.id),
           segmentEdited: true,
           label: field.label,
           kind: field.dataType.kind,

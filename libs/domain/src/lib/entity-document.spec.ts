@@ -12,7 +12,7 @@ const field = (id: string, kind: string): Field => ({
 
 /** A stand-in for a plugin's Structured Data Type — the domain bundles none of its own. */
 const BOARD = defineStructuredDataType({
-  id: 'test.board',
+  id: 'test.datatype.board',
   valueSchema: z.object({ tiles: z.record(z.string(), z.string()) }),
   empty: () => ({ tiles: {} }),
 });
@@ -97,11 +97,11 @@ describe('withFieldDefaults', () => {
     // The EntityDocument writer clears a key whose value reads as emptied, so minting must not go through
     // it: a plugin whose `empty()` is `[]` still gets its default.
     const timeline = defineStructuredDataType({
-      id: 'test.timeline',
+      id: 'test.datatype.timeline',
       valueSchema: z.array(z.object({ at: z.string() })),
       empty: () => [],
     });
-    const events = field('events', 'test.timeline');
+    const events = field('events', 'test.datatype.timeline');
 
     const body = emptyEntityDocument([events], structuredDataTypeSet([timeline]));
 

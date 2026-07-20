@@ -21,11 +21,15 @@
     "edited": "Edited {{date}}",
     "type": {
       "core": {
-        "note": "Note",
-        "hexmap": "Map"
+        "type": {
+          "note": "Note",
+          "hex-map": "Map"
+        }
       },
       "dnd": {
-        "monster": "Monster"
+        "type": {
+          "monster": "Monster"
+        }
       }
     },
     "loadErrorTitle": "Couldn't load your library.",

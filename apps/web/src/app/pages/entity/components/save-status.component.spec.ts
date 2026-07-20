@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import { EntityDetail, EntitySaveOutcome } from '@hexly/domain';
-import { emptyContent } from '@hexly/plugin-content';
+import { emptyRichContent } from '@hexly/plugin-content';
 import { coordKey, CORE_HEXMAP, HEX_GRID_FIELD, HexMap } from '@hexly/plugin-hexmap';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { EntitiesClient } from '@hexly/web-core';
@@ -20,7 +20,7 @@ describe('SaveStatus', () => {
   let entities: MockEntitiesClient;
   let fixture: ComponentFixture<SaveStatusComponent>;
 
-  const content = emptyContent();
+  const content = emptyRichContent();
   const bodyOf = (grid: HexMap) => ({ content, grid });
   const forestAt00: HexMap = {
     hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },

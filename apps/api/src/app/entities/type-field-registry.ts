@@ -25,7 +25,7 @@ interface RegisteredType {
 /**
  * The API-side registry of every code-registered Entity Type — its default Field ids and label
  * (ADR-0048, ADR-0054). Seeded at startup from the enabled bundled plugins; the domain declares no
- * Entity Type of its own now, so even `core.note` arrives as a bundled plugin type (ADR-0051). A
+ * Entity Type of its own now, so even `core.type.note` arrives as a bundled plugin type (ADR-0051). A
  * disabled Plugin is filtered from the seed and {@link structuredDataTypes} alike (ADR-0052).
  *
  * An unregistered type resolves to `undefined` ("no Fields", never a throw). A World's user-defined

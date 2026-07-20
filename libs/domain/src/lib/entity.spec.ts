@@ -39,26 +39,26 @@ describe('entityDocumentSchema (the body is the EntityDocument map, ADR-0051)', 
 describe('entityListQuerySchema Facet params (#155)', () => {
   it('normalizes a single Facet value to an array (a lone query param arrives as a string)', () => {
     const parsed = entityListQuerySchema.parse({
-      type: 'core.note',
+      type: 'core.type.note',
       tag: 'deity',
       visibility: 'shared',
     });
-    expect(parsed.type).toEqual(['core.note']);
+    expect(parsed.type).toEqual(['core.type.note']);
     expect(parsed.tag).toEqual(['deity']);
     expect(parsed.visibility).toEqual(['shared']);
   });
 
   it('keeps repeated Facet values as an array (OR within a category)', () => {
     const parsed = entityListQuerySchema.parse({
-      type: ['core.note', 'dnd.monster'],
+      type: ['core.type.note', 'dnd.type.monster'],
       tag: ['deity', 'ruined'],
     });
-    expect(parsed.type).toEqual(['core.note', 'dnd.monster']);
+    expect(parsed.type).toEqual(['core.type.note', 'dnd.type.monster']);
     expect(parsed.tag).toEqual(['deity', 'ruined']);
   });
 
   it('rejects a malformed type or visibility value at the boundary (ADR-0001)', () => {
-    // The type set is open, but a filter value must still be a `namespace.id` key, not bare flavour.
+    // The type set is open, but a filter value must still be a `namespace.type.name` key, not bare flavour.
     expect(() => entityListQuerySchema.parse({ type: 'spreadsheet' })).toThrow();
     expect(() => entityListQuerySchema.parse({ visibility: 'public' })).toThrow();
   });
@@ -75,20 +75,20 @@ describe('createEntityRequestSchema', () => {
   it('accepts a request that names and types the entity', () => {
     const parsed = createEntityRequestSchema.parse({
       name: 'The Reach of Aldermoor',
-      types: ['dnd.monster'],
+      types: ['dnd.type.monster'],
     });
 
     expect(parsed.name).toBe('The Reach of Aldermoor');
-    expect(parsed.types).toEqual(['dnd.monster']);
+    expect(parsed.types).toEqual(['dnd.type.monster']);
   });
 
   it('de-duplicates the ordered type set, keeping the primary first', () => {
     expect(
       createEntityRequestSchema.parse({
         name: 'Aldermoor',
-        types: ['dnd.monster', 'core.note', 'dnd.monster'],
+        types: ['dnd.type.monster', 'core.type.note', 'dnd.type.monster'],
       }).types,
-    ).toEqual(['dnd.monster', 'core.note']);
+    ).toEqual(['dnd.type.monster', 'core.type.note']);
   });
 
   it('rejects a create with no types — every Entity has a primary type', () => {
@@ -99,7 +99,7 @@ describe('createEntityRequestSchema', () => {
     expect(
       createEntityRequestSchema.parse({
         name: 'Aldermoor',
-        types: ['core.note'],
+        types: ['core.type.note'],
       }).tags,
     ).toEqual([]);
   });
@@ -108,7 +108,7 @@ describe('createEntityRequestSchema', () => {
     expect(
       createEntityRequestSchema.parse({
         name: 'Aldermoor',
-        types: ['core.note'],
+        types: ['core.type.note'],
         tags: ['kingdom', 'kingdom', 'coast'],
       }).tags,
     ).toEqual(['kingdom', 'coast']);
@@ -119,13 +119,13 @@ describe('createEntityRequestSchema', () => {
     expect(
       createEntityRequestSchema.parse({
         name: '  Aldermoor  ',
-        types: ['core.note'],
+        types: ['core.type.note'],
       }).name,
     ).toBe('Aldermoor');
-    expect(() => createEntityRequestSchema.parse({ name: '   ', types: ['core.note'] })).toThrow();
+    expect(() => createEntityRequestSchema.parse({ name: '   ', types: ['core.type.note'] })).toThrow();
   });
 
-  it('rejects a malformed type id — a type is a `namespace.id` key, not bare flavour', () => {
+  it('rejects a malformed type id — a type is a `namespace.type.name` key, not bare flavour', () => {
     expect(() => createEntityRequestSchema.parse({ name: 'x', types: ['spreadsheet'] })).toThrow();
   });
 
@@ -134,11 +134,11 @@ describe('createEntityRequestSchema', () => {
     expect(
       createEntityRequestSchema.parse({
         name: 'x',
-        types: ['core.note'],
+        types: ['core.type.note'],
         worldId: 'w1',
       }).worldId,
     ).toBe('w1');
-    expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).worldId).toBeUndefined();
+    expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.type.note'] }).worldId).toBeUndefined();
   });
 
   // ADR-0057: a create no longer carries a `fields` set — an attachment is a namespaced document key,
@@ -147,12 +147,12 @@ describe('createEntityRequestSchema', () => {
   it('carries an optional initial EntityDocument map for a picked type’s required Fields (#189)', () => {
     const parsed = createEntityRequestSchema.parse({
       name: 'Balthazar',
-      types: ['dnd.monster'],
+      types: ['dnd.type.monster'],
       document: { cr: 5 },
     });
     expect(parsed.document).toEqual({ cr: 5 });
     // Omitted document parses to undefined (a blank map, minted server-side).
-    expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).document).toBeUndefined();
+    expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.type.note'] }).document).toBeUndefined();
   });
 });
 
@@ -204,9 +204,9 @@ describe('saveEntityRequestSchema', () => {
         document: body,
         version: 1,
         tags: [],
-        types: ['core.note'],
+        types: ['core.type.note'],
       }).types,
-    ).toEqual(['core.note']);
+    ).toEqual(['core.type.note']);
     expect(saveEntityRequestSchema.parse({ document: body, version: 1, tags: [] })).not.toHaveProperty('types');
   });
 
@@ -216,7 +216,7 @@ describe('saveEntityRequestSchema', () => {
       document: body,
       version: 1,
       tags: [],
-      fields: ['world.element'],
+      fields: ['world.field.element'],
     });
     expect(parsed).not.toHaveProperty('fields');
   });

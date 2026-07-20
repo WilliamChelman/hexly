@@ -28,10 +28,10 @@ import { AbilitiesSectionComponent } from './abilities-section.component';
 import { dsIcon } from '../ds-glyphs';
 
 /**
- * The `draw-steel.stat-block` data-type's View (`draw-steel.view.stat-block`, ADR-0055): the Draw Steel
+ * The `draw-steel.datatype.stat-block` data-type's View (`draw-steel.view.stat-block`, ADR-0055): the Draw Steel
  * stat-block card over one grouped **Structured Data Type** value. It renders whichever stat-block Field
  * placed it, reading that Field's EntityDocument key from {@link VIEW_FIELD_KEY} — so a monster's
- * `stat_block`, or the key of a `draw-steel.stat-block` Field attached to any other type, is edited here.
+ * `draw-steel.field.stat-block`, or the key of a `draw-steel.datatype.stat-block` Field attached to any other type, is edited here.
  *
  * One card, edited in place (not two layouts): the **Bestiary Spread** — a serif header band with an EV
  * plate, a left spec-sheet rail whose stats carry Lucide glyphs, the M·A·R·I·P characteristic glyphs,
@@ -42,7 +42,7 @@ import { dsIcon } from '../ds-glyphs';
  * line) and immunity/weakness become the compact per-type editor, so every flat stat stays settable.
  *
  * The block is the Entity's only stat-authoring surface (the create dialog collects scalar required Fields
- * only, and a `draw-steel.stat-block` Field is structured), so every flat stat must have a slot in the edit
+ * only, and a `draw-steel.datatype.stat-block` Field is structured), so every flat stat must have a slot in the edit
  * form — an unrendered one would be unsettable.
  */
 @Component({
@@ -294,7 +294,7 @@ export class StatBlockViewComponent {
 
   /**
    * The stat-block Field this View renders — {@link DS_STAT_BLOCK_FIELD} re-keyed to {@link VIEW_FIELD_KEY},
-   * so it lenses whichever document key the placing Field named (a monster's `stat_block`, or an
+   * so it lenses whichever document key the placing Field named (a monster's `draw-steel.field.stat-block`, or an
    * attachment's own key). The whole block is one value at that key (ADR-0055).
    */
   private readonly field_: Field = { ...DS_STAT_BLOCK_FIELD, id: inject(VIEW_FIELD_KEY) };

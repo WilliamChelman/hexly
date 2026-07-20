@@ -376,7 +376,7 @@ export class EntitySession implements EntitySessionPort {
 
   /**
    * Replace the live type set, `types[0]` primary (#189). {@link withFieldDefaults} mints the
-   * defaults the new set's Fields declare — so adding `core.hexmap` gives the map View an empty
+   * defaults the new set's Fields declare — so adding `core.type.hex-map` gives the map View an empty
    * plane at `grid` to open on (ADR-0050). Additive: dropping a type never strips its values.
    */
   setTypes(types: readonly EntityType[]): void {

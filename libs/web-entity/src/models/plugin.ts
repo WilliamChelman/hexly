@@ -21,7 +21,7 @@ export interface WebPlugin {
   readonly views?: readonly ViewDefinition[];
   /**
    * The data-types a **Field of a Structured Data Type** of this plugin's types names by `kind` — the grid behind
-   * `core.hexmap`'s `grid` Field (ADR-0050). The web composes its resolved set from these.
+   * `core.type.hex-map`'s `grid` Field (ADR-0050). The web composes its resolved set from these.
    */
   readonly dataTypes?: readonly StructuredDataType[];
   /** Eager, because a type's chrome labels are transloco keys (ADR-0049). */

@@ -11,6 +11,6 @@
  * (mirrors `@hexly/plugin-hexmap/web`). A spec wanting a dock component takes it from its own file.
  */
 export { providePluginContent } from './provide-plugin-content';
-export { CORE_VIEW_CONTENT } from './content-types';
+export { CORE_VIEW_RICH_CONTENT } from './content-types';
 export { EntityNameResolver } from './services/entity-name-resolver';
 export { RIGHT_DOCK_PANELS, type RightPanel } from './services/right-dock';

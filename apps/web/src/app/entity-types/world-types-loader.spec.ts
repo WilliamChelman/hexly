@@ -7,27 +7,32 @@ import { AvailableType, defineField } from '@hexly/domain';
 import { WorldTypesLoader } from './world-types-loader';
 import { TypeRegistry } from './type-registry';
 import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
-import { CORE_VIEW_CONTENT } from '@hexly/plugin-content/web';
+import { CORE_VIEW_RICH_CONTENT } from '@hexly/plugin-content/web';
 
 describe('WorldTypesLoader', () => {
   // A World's own Fields, resolved through the registry by the ids a type references (ADR-0054).
   const domainField = defineField({
-    id: 'world.domain',
+    id: 'world.field.domain',
     label: 'Domain',
     dataType: { kind: 'string' },
     facetable: true,
   });
   /** A World Owner's own **Field of a Structured Data Type**: a grid on the type they defined, no code (#201). */
   const battlemapField = defineField({
-    id: 'world.battlemap',
+    id: 'world.field.battle-map',
     label: 'Battlemap',
-    dataType: { kind: 'core.hex-grid' },
+    dataType: { kind: 'core.datatype.hex-grid' },
   });
 
-  const deity: AvailableType = { id: 'world.deity', label: 'Deity', source: 'user', fieldRefs: ['world.domain'] };
+  const deity: AvailableType = {
+    id: 'world.type.deity',
+    label: 'Deity',
+    source: 'user',
+    fieldRefs: ['world.field.domain'],
+  };
   // A plugin-source type as the API reports it. The web already knows its plugin types from code, so
   // the loader must ignore these rows rather than re-register a view-less copy over the real one.
-  const monster: AvailableType = { id: 'test.monster', label: 'Monster', source: 'plugin', fieldRefs: [] };
+  const monster: AvailableType = { id: 'test.type.monster', label: 'Monster', source: 'plugin', fieldRefs: [] };
 
   let worldId: ReturnType<typeof signal<string | null>>;
   let availableTypes: ReturnType<typeof vi.fn>;
@@ -56,32 +61,32 @@ describe('WorldTypesLoader', () => {
     worldId.set('w1');
     TestBed.flushEffects();
 
-    const def = registry.get('world.deity');
+    const def = registry.get('world.type.deity');
     expect(def?.labelText).toBe('Deity');
     // No authored order, and no prose Field: the type affords its generic Field view alone (ADR-0051).
     // Prose is a Field of a Structured Data Type now, so a deity gets a content View only when it declares one.
     expect(def?.views).toEqual([CORE_VIEW_FIELDS]);
     // Its Fields resolve, so the generic view and facets pick them up.
-    expect(registry.resolveFields(['world.deity']).map((f) => f.id)).toEqual(['world.domain']);
+    expect(registry.resolveFields(['world.type.deity']).map((f) => f.id)).toEqual(['world.field.domain']);
   });
 
   it('defaults the View of a Field of a Structured Data Type to *last*, so a deity with a battlemap still opens on its Fields', () => {
-    availableTypes.mockReturnValue(of([{ ...deity, fieldRefs: ['world.domain', 'world.battlemap'] }]));
+    availableTypes.mockReturnValue(of([{ ...deity, fieldRefs: ['world.field.domain', 'world.field.battle-map'] }]));
     worldId.set('w1');
     TestBed.flushEffects();
 
-    expect(registry.get('world.deity')?.views).toEqual([CORE_VIEW_FIELDS, { field: 'world.battlemap' }]);
+    expect(registry.get('world.type.deity')?.views).toEqual([CORE_VIEW_FIELDS, { field: 'world.field.battle-map' }]);
   });
 
   it('projects the author’s own View order verbatim, so "Show as a view" can drop one', () => {
     // The toggle, off: the `battlemap` Field is still referenced, but places no View.
     availableTypes.mockReturnValue(
-      of([{ ...deity, fieldRefs: ['world.battlemap'], views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT] }]),
+      of([{ ...deity, fieldRefs: ['world.field.battle-map'], views: [CORE_VIEW_FIELDS, CORE_VIEW_RICH_CONTENT] }]),
     );
     worldId.set('w1');
     TestBed.flushEffects();
 
-    expect(registry.get('world.deity')?.views).toEqual([CORE_VIEW_FIELDS, CORE_VIEW_CONTENT]);
+    expect(registry.get('world.type.deity')?.views).toEqual([CORE_VIEW_FIELDS, CORE_VIEW_RICH_CONTENT]);
   });
 
   it('never registers a plugin-source type — those register in code', () => {
@@ -89,18 +94,18 @@ describe('WorldTypesLoader', () => {
     worldId.set('w1');
     TestBed.flushEffects();
 
-    expect(registry.get('test.monster')).toBeUndefined();
+    expect(registry.get('test.type.monster')).toBeUndefined();
   });
 
   it('drops the previous World’s user types on a World change (no cross-World leak)', () => {
     availableTypes.mockReturnValue(of([deity]));
     worldId.set('w1');
     TestBed.flushEffects();
-    expect(registry.get('world.deity')).toBeTruthy();
+    expect(registry.get('world.type.deity')).toBeTruthy();
 
     availableTypes.mockReturnValue(of<AvailableType[]>([]));
     worldId.set('w2');
     TestBed.flushEffects();
-    expect(registry.get('world.deity')).toBeUndefined();
+    expect(registry.get('world.type.deity')).toBeUndefined();
   });
 });

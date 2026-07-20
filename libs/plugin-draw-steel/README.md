@@ -1,7 +1,7 @@
 # plugin-draw-steel
 
 The bundled **Draw Steel** plugin (CONTEXT.md → Type Definition, ADR-0048/0058): the
-`draw-steel.monster` Entity Type and the stat-block View that renders it — a sibling of `plugin-dnd`
+`draw-steel.type.monster` Entity Type and the stat-block View that renders it — a sibling of `plugin-dnd`
 with the same three-part shape. The stat block is now whole: the numeric/identity spine (#243), the
 Browser facet harvest (#244), the passive **Traits** (#245), and the **Abilities** with their
 render-faithful **Power Roll** tiers (#246). The block reuses the framework's Entity, Entity Type,
@@ -11,8 +11,8 @@ its values intact when the operator disables the Plugin (ADR-0052/0055, root `CO
 
 Three entry points, because a plugin's halves have different consumers:
 
-- `@hexly/plugin-draw-steel` — framework-free: the `draw-steel.monster` type, the
-  `draw-steel.stat-block` Structured Data Type and its Zod `valueSchema`, its Field, and the per-stat
+- `@hexly/plugin-draw-steel` — framework-free: the `draw-steel.type.monster` type, the
+  `draw-steel.datatype.stat-block` Structured Data Type and its Zod `valueSchema`, its Field, and the per-stat
   render descriptors. The API imports this to validate a Monster, and must never see Angular.
 - `@hexly/plugin-draw-steel/server` — exposes exactly one `serverPluginDrawSteel()`, the mirror of the
   web provider. It names the type, the stat-block Field, and the Data Type; it never imports Angular.
@@ -59,7 +59,7 @@ import will later read.
 
 ## Stat-block shape and stance
 
-The `draw-steel.stat-block` **Structured Data Type** is one value in the EntityDocument, three bands the
+The `draw-steel.datatype.stat-block` **Structured Data Type** is one value in the EntityDocument, three bands the
 View lays out in printed-card order:
 
 1. **Identity** — `level`, `role`, `organization`, `ev`, `keywords`, `size`. The first five **harvest**

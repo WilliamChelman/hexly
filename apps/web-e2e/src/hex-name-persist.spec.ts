@@ -8,7 +8,7 @@ import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from '
  */
 test('names a painted hex in the Inspector, and the name survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
-  const mapId = await createEntity(page, 'core.hexmap');
+  const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 

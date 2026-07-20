@@ -1,7 +1,7 @@
 /**
- * `dnd.stat-block` — the D&D stat block as a **Structured Data Type** (CONTEXT.md → Structured Data
- * Type, ADR-0055). The whole block is one value in the EntityDocument map; `dnd.monster` declares it at
- * the `stat_block` key beside its prose, and any type or Entity may attach the one Field to auto-afford
+ * `dnd.datatype.stat-block` — the D&D stat block as a **Structured Data Type** (CONTEXT.md → Structured Data
+ * Type, ADR-0055). The whole block is one value in the EntityDocument map; `dnd.type.monster` declares it at
+ * the `dnd.field.stat-block` key beside its prose, and any type or Entity may attach the one Field to auto-afford
  * the stat-block View (ADR-0054).
  *
  * The first consumer of the harvest capability (#234/#235): it declares three `facetDimensions` and
@@ -15,14 +15,14 @@
 import { defineField, defineStructuredDataType, Field, HarvestedFacet, StructuredDataTypeId } from '@hexly/domain';
 import { z } from 'zod';
 
-/** The `namespace.id` kind naming the stat-block data-type — what marks the `dnd.stat_block` Field structured. */
-export const DND_STAT_BLOCK: StructuredDataTypeId = 'dnd.stat-block';
+/** The `namespace.datatype.name` kind naming the stat-block data-type — what marks the `dnd.field.stat-block` Field structured. */
+export const DND_STAT_BLOCK: StructuredDataTypeId = 'dnd.datatype.stat-block';
 
 /** The stat-block Field's namespaced identifier — its `id`, and (ADR-0056) the EntityDocument key it lenses. */
-export const DND_STAT_BLOCK_FIELD_ID = 'dnd.stat_block';
+export const DND_STAT_BLOCK_FIELD_ID = 'dnd.field.stat-block';
 
 /**
- * The EntityDocument key the whole block projects to — nested under `dnd.stat_block:` in exported
+ * The EntityDocument key the whole block projects to — nested under `dnd.field.stat-block:` in exported
  * frontmatter (ADR-0055). Equal to the Field's `id` now (ADR-0056): a Field has one namespaced
  * identifier that is the slot it lenses.
  */
@@ -147,7 +147,7 @@ export const STAT_BLOCK_DATA_TYPE = defineStructuredDataType({
 
 /**
  * The registered stat-block **Plugin Field** ({@link defineField}, ADR-0054) — the reuse handle a type
- * references (`dnd.monster`) or an Entity attaches. Not `required`: an absent block opens empty and the
+ * references (`dnd.type.monster`) or an Entity attaches. Not `required`: an absent block opens empty and the
  * first edit mints one. Never *directly* facetable — the blob has no discrete values to count; its Data
  * Type harvests the facet dimensions instead (ADR-0055). Its `labelKey` labels the View toggle a `{ field }`
  * placement affords.

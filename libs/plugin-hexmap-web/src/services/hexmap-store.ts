@@ -108,13 +108,13 @@ export type MoveOutcome = 'moved' | 'blocked' | 'noop';
 
 /**
  * The Hex Map editor: tools, selection, and undo/redo over the grid. The document is the value of a
- * `core.hex-grid` Field of a Structured Data Type (ADR-0050), at that Field's key in the central
+ * `core.datatype.hex-grid` Field of a Structured Data Type (ADR-0050), at that Field's key in the central
  * {@link EntitySession}'s EntityDocument map: reads project off `session.body`, edits go through
  * `session.mutate` (Immer, patches captured), and undo pushes those inverse patches back through
  * `session.applyPatches`. Nothing may mutate the document directly, or undo breaks.
  *
  * *Which* Field is {@link VIEW_FIELD_KEY}, provided by the entity page — not necessarily
- * `core.hexmap`'s `grid`; one store drives one View over its own slice of the body.
+ * `core.type.hex-map`'s `grid`; one store drives one View over its own slice of the body.
  *
  * Route-scoped (not `providedIn: 'root'`): it injects the route-scoped {@link ENTITY_SESSION}, so it
  * lives and dies with the open Entity.
@@ -127,7 +127,7 @@ export class HexMapStore {
    * The Field this store's grid lives at — the grid data-type's Field, re-keyed to whichever Field the
    * active map View renders. Only the `id` (== the document key it lenses, ADR-0056) varies.
    *
-   * Required, with no default: falling back to `core.hexmap`'s `grid` would make a mis-wired host
+   * Required, with no default: falling back to `core.type.hex-map`'s `grid` would make a mis-wired host
    * *paint the wrong map* rather than fail.
    */
   private readonly field: Field = { ...HEX_GRID_FIELD, id: inject(VIEW_FIELD_KEY) };

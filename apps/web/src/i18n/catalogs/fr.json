@@ -21,11 +21,15 @@
     "edited": "Modifié le {{date}}",
     "type": {
       "core": {
-        "note": "Note",
-        "hexmap": "Carte"
+        "type": {
+          "note": "Note",
+          "hex-map": "Carte"
+        }
       },
       "dnd": {
-        "monster": "Monstre"
+        "type": {
+          "monster": "Monstre"
+        }
       }
     },
     "loadErrorTitle": "Impossible de charger votre bibliothèque.",

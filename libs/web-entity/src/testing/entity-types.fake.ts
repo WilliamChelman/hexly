@@ -8,7 +8,7 @@ import { TypeDefinition, TypeLabels } from '../models/type-definition';
  * The note type id, inlined rather than imported: it ships from `@hexly/plugin-content` now (ADR-0051),
  * and `web-entity` cannot depend on a plugin that itself depends on `web-entity` (a project cycle).
  */
-const CORE_NOTE = 'core.note';
+const CORE_NOTE = 'core.type.note';
 
 /**
  * A minimal {@link EntityTypes} over a spec-declared set of types. Names and chrome resolve as the real
@@ -36,7 +36,7 @@ export class FakeEntityTypes implements EntityTypes {
   }
 
   chromeLabel(type: string | null | undefined, key: keyof TypeLabels): string {
-    // Resolve as the real registry does: an unregistered id falls back to `core.note`'s chrome, so
+    // Resolve as the real registry does: an unregistered id falls back to `core.type.note`'s chrome, so
     // the header always has *something* to draw (`TypeRegistry.resolve`). A spec whose set omits the
     // note gets the raw lookup rather than a fallback the app would never take.
     const def = this.get(type) ?? this.get(CORE_NOTE);

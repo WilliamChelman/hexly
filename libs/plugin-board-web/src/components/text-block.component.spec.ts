@@ -7,7 +7,7 @@ import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { Editor } from '@tiptap/core';
 import { TextElement } from '@hexly/plugin-board';
-import { Content } from '@hexly/plugin-content';
+import { RichContent } from '@hexly/plugin-content';
 import { ContentEditorComponent } from '@hexly/plugin-content/editor';
 import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
@@ -18,7 +18,7 @@ import { FakeEntitySession, provideBoardStoreTesting } from '../testing/entity-s
 import { TextBlockComponent } from './text-block.component';
 
 /**
- * Proves the Board Text Block reuses the *same editor as an Entity's Content* (#268): armed, it mounts
+ * Proves the Board Text Block reuses the *same editor as an Entity's RichContent* (#268): armed, it mounts
  * the real {@link ContentEditorComponent} over the adapter session and folds edits back into the store.
  */
 describe('TextBlockComponent', () => {
@@ -27,7 +27,7 @@ describe('TextBlockComponent', () => {
       imports: [provideTranslocoTesting({ ...BOARD_TEST_CATALOGS, ...CONTENT_EDITOR_TEST_CATALOGS })],
       providers: [
         ...provideBoardStoreTesting(),
-        // The reused Content editor's ambient dependencies (mirrors the ContentEditor spec harness).
+        // The reused RichContent editor's ambient dependencies (mirrors the ContentEditor spec harness).
         EntityNameResolver,
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -49,7 +49,7 @@ describe('TextBlockComponent', () => {
     return { store, id, fixture };
   }
 
-  it('renders one Content editor, editable only while armed (#268)', () => {
+  it('renders one RichContent editor, editable only while armed (#268)', () => {
     const { store, fixture } = setup();
 
     const editor = fixture.debugElement.query(By.directive(ContentEditorComponent)).componentInstance as {
@@ -77,7 +77,7 @@ describe('TextBlockComponent', () => {
     TestBed.inject(FakeEntitySession).editors.forEach((e) => e.flushPendingCommit());
 
     const element = store.document().elements.find((e) => e.id === id);
-    const snapshot = element?.kind === 'text' ? (element.content as Content).snapshot : null;
+    const snapshot = element?.kind === 'text' ? (element.content as RichContent).snapshot : null;
     expect(JSON.stringify(snapshot)).toContain('Hail');
   });
 });

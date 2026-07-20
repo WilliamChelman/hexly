@@ -2,6 +2,7 @@ export * from './lib/health';
 export * from './lib/auth';
 export * from './lib/admin';
 export * from './lib/errors';
+export * from './lib/kinded-id';
 export * from './lib/entity';
 export * from './lib/entity-document';
 export * from './lib/field-id';

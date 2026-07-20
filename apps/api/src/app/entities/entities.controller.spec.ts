@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { defineField, defineStructuredDataType, Field } from '@hexly/domain';
 import { z } from 'zod';
-import { emptyContent, tiptapContent } from '@hexly/plugin-content';
+import { emptyRichContent, tiptapContent } from '@hexly/plugin-content';
 import { coordKey } from '@hexly/plugin-hexmap';
 import { and, eq } from 'drizzle-orm';
 import { DB, Db, createDb } from '../db/db';
@@ -35,8 +35,8 @@ function registerType(registry: TypeFieldRegistry, typeId: string, fields: reado
 /** A Hex Map Entity Document: prose at `content`, grid at `grid` (ADR-0051). */
 function hexmapBody(hexes: Record<string, unknown> = {}) {
   return {
-    'core.content': emptyContent(),
-    'core.grid': { hexes, regions: [], labels: [] },
+    'core.field.content': emptyRichContent(),
+    'core.field.grid': { hexes, regions: [], labels: [] },
   };
 }
 
@@ -45,7 +45,7 @@ const emptyHexmapBody = hexmapBody();
 
 /**
  * A World-authored scalar enum Field — the attach fixture the retired `dnd.size` used to be (ADR-0055).
- * The server slugs `world.size` from the segment and pins the document key to it (ADR-0056).
+ * The server slugs `world.field.size` from the segment and pins the document key to it (ADR-0056).
  */
 const SIZE_FIELD = {
   segment: 'size',
@@ -120,14 +120,14 @@ describe('Entities endpoints', () => {
 
     const res = await ada
       .post('/entities')
-      .send({ name: 'The Reach of Aldermoor', types: ['core.hexmap'] })
+      .send({ name: 'The Reach of Aldermoor', types: ['core.type.hex-map'] })
       .expect(201);
 
     expect(res.body).toEqual({
       id: expect.any(String),
       worldId: expect.any(String),
       name: 'The Reach of Aldermoor',
-      types: ['core.hexmap'],
+      types: ['core.type.hex-map'],
       tags: [],
       visibility: 'private',
       version: 1,
@@ -139,16 +139,16 @@ describe('Entities endpoints', () => {
     });
   });
 
-  it('creates a note as Content-only — it declares no Fields, so it mints no EntityDocument', async () => {
+  it('creates a note as RichContent-only — it declares no Fields, so it mints no EntityDocument', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
 
     const res = await ada
       .post('/entities')
-      .send({ name: 'Lady Aldermoor', types: ['core.note'] })
+      .send({ name: 'Lady Aldermoor', types: ['core.type.note'] })
       .expect(201);
 
-    expect(res.body.types).toEqual(['core.note']);
-    expect(res.body.document).toEqual({ 'core.content': emptyContent() });
+    expect(res.body.types).toEqual(['core.type.note']);
+    expect(res.body.document).toEqual({ 'core.field.content': emptyRichContent() });
   });
 
   it('seeds a multi-type create’s initial EntityDocument into the minted body (#189)', async () => {
@@ -158,15 +158,15 @@ describe('Entities endpoints', () => {
     // picked type's required Fields — seeded straight into the body's EntityDocument map.
     const res = await ada
       .post('/entities')
-      .send({ name: 'Balthazar', types: ['core.note', 'core.hexmap'], document: { role: 'lich' } })
+      .send({ name: 'Balthazar', types: ['core.type.note', 'core.type.hex-map'], document: { role: 'lich' } })
       .expect(201);
 
-    expect(res.body.types).toEqual(['core.note', 'core.hexmap']);
-    // The collected EntityDocument seeds over the minted defaults, not in place of them. `core.note` and
-    // `core.hexmap` both reference the prose Field, but the effective set dedupes it to one (ADR-0051).
+    expect(res.body.types).toEqual(['core.type.note', 'core.type.hex-map']);
+    // The collected EntityDocument seeds over the minted defaults, not in place of them. `core.type.note` and
+    // `core.type.hex-map` both reference the prose Field, but the effective set dedupes it to one (ADR-0051).
     expect(res.body.document).toEqual({
-      'core.content': emptyContent(),
-      'core.grid': { hexes: {}, regions: [], labels: [] },
+      'core.field.content': emptyRichContent(),
+      'core.field.grid': { hexes: {}, regions: [], labels: [] },
       role: 'lich',
     });
   });
@@ -176,7 +176,7 @@ describe('Entities endpoints', () => {
 
     const res = await ada
       .post('/entities')
-      .send({ name: '  The Whisperwood  ', types: ['core.note'] })
+      .send({ name: '  The Whisperwood  ', types: ['core.type.note'] })
       .expect(201);
 
     expect(res.body.name).toBe('The Whisperwood');
@@ -192,30 +192,30 @@ describe('Entities endpoints', () => {
     const worldId = (await ada.get('/worlds').expect(200)).body[0].id;
     await ada.post(`/worlds/${worldId}/fields`).send(SIZE_FIELD).expect(201);
 
-    // Attach `world.size` empty: its `null` key persists the attachment before a value is chosen.
+    // Attach `world.field.size` empty: its `null` key persists the attachment before a value is chosen.
     const created = await ada
       .post('/entities')
-      .send({ name: 'Ealdred', types: ['core.note'], document: { 'world.size': null }, worldId })
+      .send({ name: 'Ealdred', types: ['core.type.note'], document: { 'world.field.size': null }, worldId })
       .expect(201);
-    expect(created.body.document).toEqual({ 'core.content': emptyContent(), 'world.size': null });
+    expect(created.body.document).toEqual({ 'core.field.content': emptyRichContent(), 'world.field.size': null });
 
     const loaded = await ada.get(`/entities/${created.body.id}`).expect(200);
-    expect(loaded.body.document['world.size']).toBeNull();
+    expect(loaded.body.document['world.field.size']).toBeNull();
 
     // A typed save (carrying `types`) fills the value; validation runs over the effective set, so the
     // enum is checked though no type declares `size` (story 15).
     await ada
       .put(`/entities/${created.body.id}`)
       .send({
-        document: { 'core.content': emptyContent(), 'world.size': 'Large' },
+        document: { 'core.field.content': emptyRichContent(), 'world.field.size': 'Large' },
         version: created.body.version,
         tags: [],
-        types: ['core.note'],
+        types: ['core.type.note'],
       })
       .expect(200);
 
     const reloaded = await ada.get(`/entities/${created.body.id}`).expect(200);
-    expect(reloaded.body.document['world.size']).toBe('Large');
+    expect(reloaded.body.document['world.field.size']).toBe('Large');
   });
 
   /**
@@ -230,17 +230,17 @@ describe('Entities endpoints', () => {
 
     const created = await ada
       .post('/entities')
-      .send({ name: 'Ealdred', types: ['core.note'], document: { 'world.size': null }, worldId })
+      .send({ name: 'Ealdred', types: ['core.type.note'], document: { 'world.field.size': null }, worldId })
       .expect(201);
 
     // `size` is an enum; a value outside its options fails the effective-set validation.
     await ada
       .put(`/entities/${created.body.id}`)
       .send({
-        document: { 'core.content': emptyContent(), 'world.size': 'Colossal' },
+        document: { 'core.field.content': emptyRichContent(), 'world.field.size': 'Colossal' },
         version: created.body.version,
         tags: [],
-        types: ['core.note'],
+        types: ['core.type.note'],
       })
       .expect(400);
   });
@@ -254,14 +254,14 @@ describe('Entities endpoints', () => {
     // Bob has no World of his own, so nothing is creatable → 404 NoWritableWorld.
     await bob
       .post('/entities')
-      .send({ name: 'Premature', types: ['core.note'], worldId })
+      .send({ name: 'Premature', types: ['core.type.note'], worldId })
       .expect(404);
 
     // Ada grants Bob Contributor standing in her World; now he may author there.
     await ada.post(`/worlds/${worldId}/members`).send({ userId: bobId, role: 'contributor' }).expect(200);
     const res = await bob
       .post('/entities')
-      .send({ name: 'Bob’s Note', types: ['core.note'], worldId })
+      .send({ name: 'Bob’s Note', types: ['core.type.note'], worldId })
       .expect(201);
 
     expect(res.body.worldId).toBe(worldId);
@@ -281,7 +281,7 @@ describe('Entities endpoints', () => {
     // No worldId → defaults to Bob's OWN World (B), never Ada's (A) despite A being older and creatable.
     const res = await bob
       .post('/entities')
-      .send({ name: 'Bob’s Note', types: ['core.note'] })
+      .send({ name: 'Bob’s Note', types: ['core.type.note'] })
       .expect(201);
     expect(res.body.worldId).toBe(worldB);
     expect(res.body.worldId).not.toBe(worldA);
@@ -289,8 +289,8 @@ describe('Entities endpoints', () => {
 
   it('lists the owner’s entities as an envelope of summaries, last page → nextCursor null', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
-    await ada.post('/entities').send({ name: 'Lady A', types: ['core.note'] });
+    await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.hex-map'] });
+    await ada.post('/entities').send({ name: 'Lady A', types: ['core.type.note'] });
 
     const res = await ada.get('/entities').expect(200);
 
@@ -306,7 +306,7 @@ describe('Entities endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const names = ['A', 'B', 'C', 'D', 'E', 'F'];
     for (const name of names) {
-      await ada.post('/entities').send({ name, types: ['core.note'] });
+      await ada.post('/entities').send({ name, types: ['core.type.note'] });
     }
 
     // Walk list two-at-a-time via nextCursor.
@@ -333,28 +333,28 @@ describe('Entities endpoints', () => {
 
   it('filters by case-insensitive name (q) and by type, composing the two', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    await ada.post('/entities').send({ name: 'Aldermoor Keep', types: ['core.hexmap'] });
-    await ada.post('/entities').send({ name: 'Aldermoor Town', types: ['core.note'] });
-    await ada.post('/entities').send({ name: 'The Whisperwood', types: ['core.note'] });
+    await ada.post('/entities').send({ name: 'Aldermoor Keep', types: ['core.type.hex-map'] });
+    await ada.post('/entities').send({ name: 'Aldermoor Town', types: ['core.type.note'] });
+    await ada.post('/entities').send({ name: 'The Whisperwood', types: ['core.type.note'] });
 
     const byName = await ada.get('/entities').query({ q: 'aldermoor' }).expect(200);
     expect(byName.body.items.map((e: { name: string }) => e.name).sort()).toEqual(['Aldermoor Keep', 'Aldermoor Town']);
 
-    const byType = await ada.get('/entities').query({ type: 'core.note' }).expect(200);
+    const byType = await ada.get('/entities').query({ type: 'core.type.note' }).expect(200);
     expect(byType.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
       'Aldermoor Town',
       'The Whisperwood',
     ]);
 
-    const both = await ada.get('/entities').query({ q: 'aldermoor', type: 'core.note' }).expect(200);
+    const both = await ada.get('/entities').query({ q: 'aldermoor', type: 'core.type.note' }).expect(200);
     expect(both.body.items.map((e: { name: string }) => e.name)).toEqual(['Aldermoor Town']);
   });
 
   it('returns exactly the requested owner-owned summaries when ids is given', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const a = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
-    await ada.post('/entities').send({ name: 'The Whisperwood', types: ['core.note'] });
-    const c = await ada.post('/entities').send({ name: 'Lady A', types: ['core.note'] });
+    const a = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.hex-map'] });
+    await ada.post('/entities').send({ name: 'The Whisperwood', types: ['core.type.note'] });
+    const c = await ada.post('/entities').send({ name: 'Lady A', types: ['core.type.note'] });
 
     // ids silently drops unknown ids (picker's display-resolve path).
     const res = await ada
@@ -369,7 +369,7 @@ describe('Entities endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const seeded = await ada
       .post('/entities')
-      .send({ name: 'In Seeded World', types: ['core.note'] })
+      .send({ name: 'In Seeded World', types: ['core.type.note'] })
       .expect(201);
     const worldA = seeded.body.worldId;
 
@@ -378,7 +378,7 @@ describe('Entities endpoints', () => {
       .post('/entities')
       .send({
         name: 'In Second World',
-        types: ['core.note'],
+        types: ['core.type.note'],
         worldId: worldB.body.id,
       })
       .expect(201);
@@ -392,7 +392,7 @@ describe('Entities endpoints', () => {
 
   it('attaches Rights to list summaries only when the caller opts in (ADR-0039)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.note'] });
+    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.note'] });
     const worldId = created.body.worldId;
 
     // Opted in: each summary carries the caller's Rights (Owner → all five verbs).
@@ -407,7 +407,7 @@ describe('Entities endpoints', () => {
 
   it('loads an entity by id with its full body', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
+    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.hex-map'] });
 
     const res = await ada.get(`/entities/${created.body.id}`).expect(200);
 
@@ -428,7 +428,7 @@ describe('Entities endpoints', () => {
 
   it('saves the body against the current version and bumps the version', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
+    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.hex-map'] });
     const painted = hexmapBody({ [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } });
 
     const res = await ada
@@ -446,9 +446,9 @@ describe('Entities endpoints', () => {
 
   it('persists an entity’s tags through a version-checked save', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Lady A', types: ['core.note'] });
+    const created = await ada.post('/entities').send({ name: 'Lady A', types: ['core.type.note'] });
     const id = created.body.id;
-    const body = { 'core.content': emptyContent() };
+    const body = { 'core.field.content': emptyRichContent() };
 
     const res = await ada
       .put(`/entities/${id}`)
@@ -464,9 +464,9 @@ describe('Entities endpoints', () => {
 
   it('normalizes tags on save: trims, lower-cases, drops duplicates, rejects blanks', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Lady A', types: ['core.note'] });
+    const created = await ada.post('/entities').send({ name: 'Lady A', types: ['core.type.note'] });
     const id = created.body.id;
-    const body = { 'core.content': emptyContent() };
+    const body = { 'core.field.content': emptyRichContent() };
 
     const res = await ada
       .put(`/entities/${id}`)
@@ -484,25 +484,25 @@ describe('Entities endpoints', () => {
       .expect(400);
   });
 
-  it('round-trips an opaque Content snapshot through a save untouched', async () => {
+  it('round-trips an opaque RichContent snapshot through a save untouched', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Lady A', types: ['core.note'] });
+    const created = await ada.post('/entities').send({ name: 'Lady A', types: ['core.type.note'] });
     // Editor-defined snapshot; domain has no knowledge of it (ADR-0019).
     const snapshot = {
       type: 'doc',
       content: [{ type: 'futureBlock', attrs: { z: [1] } }],
     };
-    const body = { 'core.content': { format: 'tiptap-v1', snapshot } };
+    const body = { 'core.field.content': { format: 'tiptap-v1', snapshot } };
 
     await ada.put(`/entities/${created.body.id}`).send({ document: body, version: 1, tags: [] }).expect(200);
 
     const reloaded = await ada.get(`/entities/${created.body.id}`).expect(200);
-    expect(reloaded.body.document['core.content'].snapshot).toEqual(snapshot);
+    expect(reloaded.body.document['core.field.content'].snapshot).toEqual(snapshot);
   });
 
   it('rejects a save built on a stale version with 409 and keeps the entity intact', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
+    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.hex-map'] });
     const id = created.body.id;
     const first = hexmapBody({ [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } });
 
@@ -525,80 +525,84 @@ describe('Entities endpoints', () => {
   describe('the forward-only Field gate on active typed edits', () => {
     // A plugin-style type declaring a required string Field and an optional number Field.
     beforeEach(() => {
-      registerType(app.get(TypeFieldRegistry), 'test.beast', [
-        defineField({ id: 'test.name', label: 'Name', dataType: { kind: 'string' }, required: true }),
-        defineField({ id: 'test.cr', label: 'Challenge Rating', dataType: { kind: 'number' } }),
+      registerType(app.get(TypeFieldRegistry), 'test.type.beast', [
+        defineField({ id: 'test.field.name', label: 'Name', dataType: { kind: 'string' }, required: true }),
+        defineField({ id: 'test.field.cr', label: 'Challenge Rating', dataType: { kind: 'number' } }),
       ]);
     });
 
     const bodyWith = (metadata?: Record<string, unknown>) => ({
-      'core.content': emptyContent(),
+      'core.field.content': emptyRichContent(),
       ...metadata,
     });
 
     it('rejects a typed edit that omits a required Field', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['core.note'] });
+      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['core.type.note'] });
 
       const res = await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: bodyWith({ 'test.cr': 10 }),
+          document: bodyWith({ 'test.field.cr': 10 }),
           version: 1,
           tags: [],
-          types: ['test.beast'],
+          types: ['test.type.beast'],
         })
         .expect(400);
       expect(res.body.code).toBe('invalid-fields');
       expect(res.body.data.fields).toContainEqual({
-        key: 'test.name',
+        key: 'test.field.name',
         code: 'required',
       });
     });
 
     it('rejects a typed edit whose Field value mismatches its data-type', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['core.note'] });
+      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['core.type.note'] });
 
       const res = await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: bodyWith({ 'test.name': 'Aboleth', 'test.cr': 'huge' }),
+          document: bodyWith({ 'test.field.name': 'Aboleth', 'test.field.cr': 'huge' }),
           version: 1,
           tags: [],
-          types: ['test.beast'],
+          types: ['test.type.beast'],
         })
         .expect(400);
-      expect(res.body.data.fields).toContainEqual({ key: 'test.cr', code: 'type' });
+      expect(res.body.data.fields).toContainEqual({ key: 'test.field.cr', code: 'type' });
     });
 
     it('accepts a typed edit that satisfies the type’s Fields, keeping values in the EntityDocument map', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['core.note'] });
+      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['core.type.note'] });
 
       const res = await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: bodyWith({ 'test.name': 'Aboleth', 'test.cr': 10 }),
+          document: bodyWith({ 'test.field.name': 'Aboleth', 'test.field.cr': 10 }),
           version: 1,
           tags: [],
-          types: ['test.beast'],
+          types: ['test.type.beast'],
         })
         .expect(200);
-      expect(res.body.types).toEqual(['test.beast']);
-      expect(res.body.document).toEqual({ 'core.content': emptyContent(), 'test.name': 'Aboleth', 'test.cr': 10 });
+      expect(res.body.types).toEqual(['test.type.beast']);
+      expect(res.body.document).toEqual({
+        'core.field.content': emptyRichContent(),
+        'test.field.name': 'Aboleth',
+        'test.field.cr': 10,
+      });
     });
 
     it('accepts a plain body save that omits types — data at rest is never retroactively invalidated', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       // A typed Entity carrying EntityDocument that would fail the gate; a plain edit (no `types`) is
       // tolerated, so an unrelated body change never strands the Entity on its malformed Fields.
-      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['test.beast'] });
+      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['test.type.beast'] });
 
       await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: bodyWith({ 'test.cr': 'still wrong' }),
+          document: bodyWith({ 'test.field.cr': 'still wrong' }),
           version: 1,
           tags: [],
         })
@@ -607,7 +611,7 @@ describe('Entities endpoints', () => {
 
     it('never validates the same malformed body via import or at rest — the gate is edit-only', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['test.beast'] });
+      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['test.type.beast'] });
       const worldId = created.body.worldId;
 
       // Import: bulk-inserted EntityDocument never faces the gate (ADR-0033), whatever it holds — a typed
@@ -617,25 +621,28 @@ describe('Entities endpoints', () => {
         worldId,
         id: 'imported-beast',
         name: 'Kraken',
-        types: ['test.beast'],
+        types: ['test.type.beast'],
         tags: [],
-        document: bodyWith({ 'test.cr': 'wrong' }),
+        document: bodyWith({ 'test.field.cr': 'wrong' }),
       });
       await ada.get('/entities/imported-beast').expect(200);
 
       // At rest: corrupt the stored EntityDocument directly, then confirm a read never validates it.
       db.update(entities)
-        .set({ document: JSON.stringify(bodyWith({ 'test.cr': 'wrong at rest' })) })
+        .set({ document: JSON.stringify(bodyWith({ 'test.field.cr': 'wrong at rest' })) })
         .where(eq(entities.id, created.body.id))
         .run();
       const loaded = await ada.get(`/entities/${created.body.id}`).expect(200);
-      expect(loaded.body.document).toEqual({ 'core.content': emptyContent(), 'test.cr': 'wrong at rest' });
+      expect(loaded.body.document).toEqual({
+        'core.field.content': emptyRichContent(),
+        'test.field.cr': 'wrong at rest',
+      });
     });
   });
 
   it('renames an entity without disturbing its body or version', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Untitled', types: ['core.hexmap'] });
+    const created = await ada.post('/entities').send({ name: 'Untitled', types: ['core.type.hex-map'] });
     const id = created.body.id;
     const painted = hexmapBody({ [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } });
     await ada.put(`/entities/${id}`).send({ document: painted, version: 1, tags: [] }).expect(200);
@@ -649,7 +656,7 @@ describe('Entities endpoints', () => {
 
   it('deletes an entity so it can no longer be loaded', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
+    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.hex-map'] });
 
     await ada.delete(`/entities/${created.body.id}`).expect(204);
 
@@ -667,7 +674,7 @@ describe('Entities endpoints', () => {
     // A note named after the World is the old Home shape — now an ordinary, deletable Note.
     const note = await ada
       .post('/entities')
-      .send({ name: 'Ada', types: ['core.note'] })
+      .send({ name: 'Ada', types: ['core.type.note'] })
       .expect(201);
 
     await ada.delete(`/entities/${note.body.id}`).expect(204);
@@ -676,7 +683,7 @@ describe('Entities endpoints', () => {
 
   it('never lets another user reach an entity they do not own', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
+    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.hex-map'] });
     const id = created.body.id;
 
     await seedUserWithWorld('bob@hexly.test', 'battery staple', 'Bob');
@@ -697,11 +704,11 @@ describe('Entities endpoints', () => {
 
   it('stays owner-scoped under ids/q/type — another owner’s entity never surfaces', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const adas = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
+    const adas = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.hex-map'] });
 
     await seedUserWithWorld('bob@hexly.test', 'battery staple', 'Bob');
     const bob = await signIn('bob@hexly.test', 'battery staple');
-    await bob.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
+    await bob.post('/entities').send({ name: 'Aldermoor', types: ['core.type.hex-map'] });
 
     const byId = await bob
       .get('/entities')
@@ -709,7 +716,7 @@ describe('Entities endpoints', () => {
       .expect(200);
     expect(byId.body.items).toEqual([]);
 
-    const byQ = await bob.get('/entities').query({ q: 'aldermoor', type: 'core.hexmap' }).expect(200);
+    const byQ = await bob.get('/entities').query({ q: 'aldermoor', type: 'core.type.hex-map' }).expect(200);
     expect(byQ.body.items).toHaveLength(1);
     expect(byQ.body.items.map((e: { id: string }) => e.id)).not.toContain(adas.body.id);
   });
@@ -725,11 +732,11 @@ describe('Entities endpoints', () => {
   });
 
   describe('descriptor vocabulary index (#96)', () => {
-    // A note body whose Content carries an entityLink per descriptor — the server
+    // A note body whose RichContent carries an entityLink per descriptor — the server
     // harvests the vocabulary from *this*, not from a separate field (ADR-0023/0035).
     function bodyWithDescriptors(...descriptors: string[]) {
       return {
-        'core.content': tiptapContent({
+        'core.field.content': tiptapContent({
           type: 'doc',
           content: [
             {
@@ -745,11 +752,11 @@ describe('Entities endpoints', () => {
     }
 
     async function newNote(agent: Awaited<ReturnType<typeof signIn>>, name = 'Lady A') {
-      const res = await agent.post('/entities').send({ name, types: ['core.note'] });
+      const res = await agent.post('/entities').send({ name, types: ['core.type.note'] });
       return res.body.id as string;
     }
 
-    it('serves the owner’s DISTINCT descriptors harvested from the saved Content, folding case', async () => {
+    it('serves the owner’s DISTINCT descriptors harvested from the saved RichContent, folding case', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const id = await newNote(ada);
 
@@ -784,7 +791,7 @@ describe('Entities endpoints', () => {
       expect(res.body).toEqual(['rival', 'spouse']);
     });
 
-    it('self-prunes: a later save whose Content dropped a link drops it from the vocabulary', async () => {
+    it('self-prunes: a later save whose RichContent dropped a link drops it from the vocabulary', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const id = await newNote(ada);
 
@@ -859,10 +866,10 @@ describe('Entities endpoints', () => {
 
   describe('tag vocabulary', () => {
     async function saveTags(agent: Awaited<ReturnType<typeof signIn>>, tags: string[], name = 'Lady A') {
-      const created = await agent.post('/entities').send({ name, types: ['core.note'] });
+      const created = await agent.post('/entities').send({ name, types: ['core.type.note'] });
       await agent
         .put(`/entities/${created.body.id}`)
-        .send({ document: { 'core.content': emptyContent() }, version: 1, tags })
+        .send({ document: { 'core.field.content': emptyRichContent() }, version: 1, tags })
         .expect(200);
     }
 
@@ -888,11 +895,11 @@ describe('Entities endpoints', () => {
   });
 
   describe('full-text search (ADR-0035)', () => {
-    // A note whose Content prose carries `text`, saved at version 1.
+    // A note whose RichContent prose carries `text`, saved at version 1.
     async function noteWithProse(agent: Awaited<ReturnType<typeof signIn>>, name: string, text: string) {
-      const created = await agent.post('/entities').send({ name, types: ['core.note'] });
+      const created = await agent.post('/entities').send({ name, types: ['core.type.note'] });
       const document = {
-        'core.content': tiptapContent({
+        'core.field.content': tiptapContent({
           type: 'doc',
           content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
         }),
@@ -903,7 +910,7 @@ describe('Entities endpoints', () => {
 
     const names = (res: { body: { items: { name: string }[] } }) => res.body.items.map((e) => e.name).sort();
 
-    it('matches an entity by a word inside its Content prose', async () => {
+    it('matches an entity by a word inside its RichContent prose', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       await noteWithProse(ada, 'Lady A', 'She rules the sunken citadel beneath the waves.');
       await noteWithProse(ada, 'Lord B', 'He commands the northern watchtowers.');
@@ -913,16 +920,16 @@ describe('Entities endpoints', () => {
     });
 
     /**
-     * A **Field of a Structured Data Type**'s text feeds the same index the prose does (#205), so `core.hex-grid`
+     * A **Field of a Structured Data Type**'s text feeds the same index the prose does (#205), so `core.datatype.hex-grid`
      * makes a Hex Map findable by what is painted on it — under the `q` the Browser already sends.
      */
     it('matches a Hex Map by one of its Hex names, and by one of its Region names', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const created = await ada.post('/entities').send({ name: 'The Reach', types: ['core.hexmap'] });
+      const created = await ada.post('/entities').send({ name: 'The Reach', types: ['core.type.hex-map'] });
       await noteWithProse(ada, 'Decoy', 'A note that names no place at all.');
       const document = {
-        'core.content': emptyContent(),
-        'core.grid': {
+        'core.field.content': emptyRichContent(),
+        'core.field.grid': {
           hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'grass', name: 'Ashford' } },
           regions: [{ id: 'r1', name: 'The Kingdom of Avalon', color: '#aabbcc', hexes: {} }],
           labels: [],
@@ -937,12 +944,12 @@ describe('Entities endpoints', () => {
     it('matches by name, by tag, and by prose — all case-insensitively', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       // Distinct match surfaces: one hit per query word, no cross-contamination.
-      await ada.post('/entities').send({ name: 'Whisperwood', types: ['core.note'] }); // name
-      const tagged = await ada.post('/entities').send({ name: 'Keep', types: ['core.note'] });
+      await ada.post('/entities').send({ name: 'Whisperwood', types: ['core.type.note'] }); // name
+      const tagged = await ada.post('/entities').send({ name: 'Keep', types: ['core.type.note'] });
       await ada
         .put(`/entities/${tagged.body.id}`)
         .send({
-          document: { 'core.content': emptyContent() },
+          document: { 'core.field.content': emptyRichContent() },
           version: 1,
           tags: ['Deity'],
         })
@@ -970,7 +977,7 @@ describe('Entities endpoints', () => {
       // 'Dragon' matches on its name once; 'Bestiary' says dragon five times in its
       // body. Unweighted bm25 would float Bestiary up on raw frequency — the name
       // weight is what makes the entity *called* Dragon win.
-      await ada.post('/entities').send({ name: 'Dragon', types: ['core.note'] });
+      await ada.post('/entities').send({ name: 'Dragon', types: ['core.type.note'] });
       await noteWithProse(ada, 'Bestiary', 'dragon dragon dragon dragon dragon');
 
       const res = await ada.get('/entities').query({ q: 'dragon' }).expect(200);
@@ -979,8 +986,8 @@ describe('Entities endpoints', () => {
 
     it('falls back to newest-first order when no query is given', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      await ada.post('/entities').send({ name: 'First', types: ['core.note'] });
-      const second = await ada.post('/entities').send({ name: 'Second', types: ['core.note'] });
+      await ada.post('/entities').send({ name: 'First', types: ['core.type.note'] });
+      const second = await ada.post('/entities').send({ name: 'Second', types: ['core.type.note'] });
       // Both POSTs can land in the same millisecond, tying updatedAt — then the sort
       // falls to its `id asc` cursor tiebreak (ADR-0025), a random UUID, and the order
       // of First/Second is a coin flip. Bump Second so it's unambiguously newest.
@@ -1002,12 +1009,12 @@ describe('Entities endpoints', () => {
       const id = await noteWithProse(ada, 'Ledger', 'The alpha rune glows.');
       expect(await found('alpha')).toEqual(['Ledger']);
 
-      // Edit Content → re-findable under the new text, gone under the old.
+      // Edit RichContent → re-findable under the new text, gone under the old.
       await ada
         .put(`/entities/${id}`)
         .send({
           document: {
-            'core.content': tiptapContent({
+            'core.field.content': tiptapContent({
               type: 'doc',
               content: [
                 {
@@ -1075,13 +1082,13 @@ describe('Entities endpoints', () => {
       const worldB = await ada.post('/worlds').send({ name: 'Second' }).expect(201);
       const inB = await ada
         .post('/entities')
-        .send({ name: 'In B', types: ['core.note'], worldId: worldB.body.id })
+        .send({ name: 'In B', types: ['core.type.note'], worldId: worldB.body.id })
         .expect(201);
       await ada
         .put(`/entities/${inB.body.id}`)
         .send({
           document: {
-            'core.content': tiptapContent({
+            'core.field.content': tiptapContent({
               type: 'doc',
               content: [
                 {
@@ -1129,13 +1136,13 @@ describe('Entities endpoints', () => {
 
   describe('faceted filtering (#155)', () => {
     async function note(agent: Awaited<ReturnType<typeof signIn>>, name: string) {
-      return (await agent.post('/entities').send({ name, types: ['core.note'] })).body.id as string;
+      return (await agent.post('/entities').send({ name, types: ['core.type.note'] })).body.id as string;
     }
     // Tags ride the version-checked save (#72) — set them by saving.
     async function tag(agent: Awaited<ReturnType<typeof signIn>>, id: string, ...tags: string[]) {
       await agent
         .put(`/entities/${id}`)
-        .send({ document: { 'core.content': emptyContent() }, version: 1, tags })
+        .send({ document: { 'core.field.content': emptyRichContent() }, version: 1, tags })
         .expect(200);
     }
     // No sharing UI ships with #155, so flip Visibility straight in the column.
@@ -1188,7 +1195,8 @@ describe('Entities endpoints', () => {
       await tag(ada, target, 'deity');
       share(target);
       // Decoys, each failing exactly one active constraint.
-      const wrongType = (await ada.post('/entities').send({ name: 'Temple Map', types: ['core.hexmap'] })).body.id;
+      const wrongType = (await ada.post('/entities').send({ name: 'Temple Map', types: ['core.type.hex-map'] })).body
+        .id;
       await ada
         .put(`/entities/${wrongType}`)
         .send({ document: emptyHexmapBody, version: 1, tags: ['deity'] })
@@ -1207,7 +1215,7 @@ describe('Entities endpoints', () => {
         .get('/entities')
         .query({
           q: 'temple',
-          type: 'core.note',
+          type: 'core.type.note',
           tag: 'deity',
           visibility: 'shared',
         })
@@ -1227,15 +1235,15 @@ describe('Entities endpoints', () => {
       const grove = await note(ada, 'Grove');
       await tag(ada, grove, 'nature', 'deity');
       const worldId = (await ada.get(`/entities/${grove}`)).body.worldId;
-      await ada.post('/entities').send({ name: 'Map', types: ['core.hexmap'] });
+      await ada.post('/entities').send({ name: 'Map', types: ['core.type.hex-map'] });
       share(temple);
 
       const res = await ada.get('/entities/facets').query({ worldId }).expect(200);
 
       // Temple + Grove = 2 notes; Map = 1 hexmap.
       expect(byValue(res.body.type)).toEqual([
-        { value: 'core.hexmap', count: 1 },
-        { value: 'core.note', count: 2 },
+        { value: 'core.type.hex-map', count: 1 },
+        { value: 'core.type.note', count: 2 },
       ]);
       // Temple + Grove carry 'deity'; only Grove carries 'nature'.
       expect(byValue(res.body.tag)).toEqual([
@@ -1256,13 +1264,13 @@ describe('Entities endpoints', () => {
       const grove = await note(ada, 'Grove');
       await tag(ada, grove, 'nature');
       const worldId = (await ada.get(`/entities/${grove}`)).body.worldId;
-      const battle = (await ada.post('/entities').send({ name: 'Battlemap', types: ['core.hexmap'] })).body.id;
+      const battle = (await ada.post('/entities').send({ name: 'Battlemap', types: ['core.type.hex-map'] })).body.id;
       await ada
         .put(`/entities/${battle}`)
         .send({ document: emptyHexmapBody, version: 1, tags: ['combat'] })
         .expect(200);
 
-      const res = await ada.get('/entities/facets').query({ worldId, type: 'core.note' }).expect(200);
+      const res = await ada.get('/entities/facets').query({ worldId, type: 'core.type.note' }).expect(200);
 
       // Tag counts drill down to notes only: 'combat' (hexmap-only) drops to zero
       // and is omitted; 'deity'/'nature' remain.
@@ -1273,8 +1281,8 @@ describe('Entities endpoints', () => {
       // The Type facet ignores its own active selection, so it still lists the
       // sibling 'hexmap' you could switch to (each narrowed by everything else).
       expect(byValue(res.body.type)).toEqual([
-        { value: 'core.hexmap', count: 1 },
-        { value: 'core.note', count: 2 },
+        { value: 'core.type.hex-map', count: 1 },
+        { value: 'core.type.note', count: 2 },
       ]);
     });
 
@@ -1285,12 +1293,12 @@ describe('Entities endpoints', () => {
       const worldA = (await ada.get(`/entities/${adaNote}`)).body.worldId;
       // Ada's second World — its tags must not bleed into worldA's counts.
       const worldB = (await ada.post('/worlds').send({ name: 'Second' }).expect(201)).body.id;
-      const inB = (await ada.post('/entities').send({ name: 'B Temple', types: ['core.note'], worldId: worldB })).body
-        .id;
+      const inB = (await ada.post('/entities').send({ name: 'B Temple', types: ['core.type.note'], worldId: worldB }))
+        .body.id;
       await ada
         .put(`/entities/${inB}`)
         .send({
-          document: { 'core.content': emptyContent() },
+          document: { 'core.field.content': emptyRichContent() },
           version: 1,
           tags: ['otherworld'],
         })
@@ -1336,34 +1344,34 @@ describe('Entities endpoints', () => {
     // A plugin-style type declaring two facetable Fields — an enum and a number — plus a
     // non-facetable one, registered the same way a bundled plugin (or a World-defined type) would.
     beforeEach(() => {
-      registerType(app.get(TypeFieldRegistry), 'test.beast', [
+      registerType(app.get(TypeFieldRegistry), 'test.type.beast', [
         defineField({
-          id: 'test.alignment',
+          id: 'test.field.alignment',
           label: 'Alignment',
           dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
           facetable: true,
         }),
         defineField({
-          id: 'test.cr',
+          id: 'test.field.cr',
           label: 'Challenge Rating',
           dataType: { kind: 'number' },
           facetable: true,
         }),
         defineField({
-          id: 'test.discovered',
+          id: 'test.field.discovered',
           label: 'Discovered',
           dataType: { kind: 'date' },
           facetable: true,
         }),
         defineField({
-          id: 'test.senses',
+          id: 'test.field.senses',
           label: 'Senses',
           dataType: { kind: 'list', of: { kind: 'string' } },
           facetable: true,
         }),
         // Declared but not facetable — never surfaces as a Field facet.
         defineField({
-          id: 'test.secret',
+          id: 'test.field.secret',
           label: 'Secret',
           dataType: { kind: 'string' },
           facetable: false,
@@ -1371,17 +1379,17 @@ describe('Entities endpoints', () => {
       ]);
     });
 
-    // Create a beast Entity carrying typed EntityDocument: a typed save (`types: ['test.beast']`) is the
+    // Create a beast Entity carrying typed EntityDocument: a typed save (`types: ['test.type.beast']`) is the
     // active edit that both satisfies the forward-only gate and materialises the Field facets.
     async function beast(agent: Awaited<ReturnType<typeof signIn>>, name: string, metadata: Record<string, unknown>) {
-      const created = await agent.post('/entities').send({ name, types: ['core.note'] });
+      const created = await agent.post('/entities').send({ name, types: ['core.type.note'] });
       await agent
         .put(`/entities/${created.body.id}`)
         .send({
-          document: { 'core.content': emptyContent(), ...metadata },
+          document: { 'core.field.content': emptyRichContent(), ...metadata },
           version: 1,
           tags: [],
-          types: ['test.beast'],
+          types: ['test.type.beast'],
         })
         .expect(200);
       return created.body.id as string;
@@ -1401,11 +1409,11 @@ describe('Entities endpoints', () => {
     it('surfaces a facetable Field by presence in the result set, no active Type filter needed (#231)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const kobold = await beast(ada, 'Kobold', {
-        'test.alignment': 'lawful-good',
-        'test.cr': 1,
-        'test.secret': 'hidden',
+        'test.field.alignment': 'lawful-good',
+        'test.field.cr': 1,
+        'test.field.secret': 'hidden',
       });
-      await beast(ada, 'Aboleth', { 'test.alignment': 'chaotic-evil', 'test.cr': 10 });
+      await beast(ada, 'Aboleth', { 'test.field.alignment': 'chaotic-evil', 'test.field.cr': 10 });
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
 
       // No active Type filter: Field facets surface by presence, universal facets present as always.
@@ -1413,8 +1421,8 @@ describe('Entities endpoints', () => {
       const fields = res.body.fields as FieldFacetBody[];
       // Only Fields the result set carries values for surface — `discovered`/`senses` are declared
       // facetable but unset, so they never appear; the non-facetable `secret` never appears either.
-      expect(fields.map((f) => f.key).sort()).toEqual(['test.alignment', 'test.cr']);
-      const alignment = fields.find((f) => f.key === 'test.alignment')!;
+      expect(fields.map((f) => f.key).sort()).toEqual(['test.field.alignment', 'test.field.cr']);
+      const alignment = fields.find((f) => f.key === 'test.field.alignment')!;
       expect(alignment.label).toBe('Alignment');
       expect(alignment.dataType).toEqual({ kind: 'enum', options: ['lawful-good', 'chaotic-evil'] });
       expect(byValue(alignment.values)).toEqual([
@@ -1428,76 +1436,76 @@ describe('Entities endpoints', () => {
 
     it('surfaces one Field facet across the whole browse, whatever types its entities hold (#231)', async () => {
       // A second type reusing the same `alignment` Field (ADR-0054): its Entities carry the key too.
-      registerType(app.get(TypeFieldRegistry), 'test.spirit', [
+      registerType(app.get(TypeFieldRegistry), 'test.type.spirit', [
         defineField({
-          id: 'test.alignment',
+          id: 'test.field.alignment',
           label: 'Alignment',
           dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
           facetable: true,
         }),
       ]);
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const kobold = await beast(ada, 'Kobold', { 'test.alignment': 'lawful-good', 'test.cr': 1 });
+      const kobold = await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
       // A spirit (a different type) carrying the same Field, saved as an active typed edit.
-      const spirit = await ada.post('/entities').send({ name: 'Wisp', types: ['core.note'] });
+      const spirit = await ada.post('/entities').send({ name: 'Wisp', types: ['core.type.note'] });
       await ada
         .put(`/entities/${spirit.body.id}`)
         .send({
-          document: { 'core.content': emptyContent(), 'test.alignment': 'lawful-good' },
+          document: { 'core.field.content': emptyRichContent(), 'test.field.alignment': 'lawful-good' },
           version: 1,
           tags: [],
-          types: ['test.spirit'],
+          types: ['test.type.spirit'],
         })
         .expect(200);
 
       // No Type filter: the single `alignment` facet counts both types' Entities together.
       const res = await ada.get('/entities/facets').query({ worldId }).expect(200);
-      const alignment = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'test.alignment')!;
+      const alignment = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'test.field.alignment')!;
       expect(alignment).toBeDefined();
       expect(byValue(alignment.values)).toEqual([{ value: 'lawful-good', count: 2 }]);
     });
 
     it('keeps an actively-filtered Field on the rail even when its selected value matches nothing (drill-down)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const kobold = await beast(ada, 'Kobold', { 'test.alignment': 'lawful-good', 'test.cr': 1 });
-      await beast(ada, 'Sphinx', { 'test.alignment': 'lawful-good', 'test.cr': 11 });
+      const kobold = await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
+      await beast(ada, 'Sphinx', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 11 });
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
 
       // Filter to a value no Entity carries: like the universal facets, `alignment` drops its own filter
       // when counting, so it stays on the rail listing the value you *could* switch to — not vanishing.
       const res = await ada
         .get('/entities/facets')
-        .query({ worldId, field: 'test.alignment:eq:chaotic-evil' })
+        .query({ worldId, field: 'test.field.alignment:eq:chaotic-evil' })
         .expect(200);
-      const alignment = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'test.alignment')!;
+      const alignment = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'test.field.alignment')!;
       expect(alignment).toBeDefined();
       expect(byValue(alignment.values)).toEqual([{ value: 'lawful-good', count: 2 }]);
     });
 
     it('filters the list by an enum Field value (membership)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      await beast(ada, 'Kobold', { 'test.alignment': 'lawful-good', 'test.cr': 1 });
-      await beast(ada, 'Aboleth', { 'test.alignment': 'chaotic-evil', 'test.cr': 10 });
+      await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
+      await beast(ada, 'Aboleth', { 'test.field.alignment': 'chaotic-evil', 'test.field.cr': 10 });
 
       const res = await ada
         .get('/entities')
-        .query({ type: 'test.beast', field: 'test.alignment:eq:lawful-good' })
+        .query({ type: 'test.type.beast', field: 'test.field.alignment:eq:lawful-good' })
         .expect(200);
       expect(names(res)).toEqual(['Kobold']);
     });
 
     it('ORs multiple values within one enum Field', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      await beast(ada, 'Kobold', { 'test.alignment': 'lawful-good', 'test.cr': 1 });
-      await beast(ada, 'Aboleth', { 'test.alignment': 'chaotic-evil', 'test.cr': 10 });
-      await beast(ada, 'Sphinx', { 'test.alignment': 'lawful-good', 'test.cr': 11 });
+      await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
+      await beast(ada, 'Aboleth', { 'test.field.alignment': 'chaotic-evil', 'test.field.cr': 10 });
+      await beast(ada, 'Sphinx', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 11 });
 
       const res = await ada
         .get('/entities')
         .query({
-          type: 'test.beast',
-          field: ['test.alignment:eq:chaotic-evil', 'test.alignment:eq:lawful-good'],
+          type: 'test.type.beast',
+          field: ['test.field.alignment:eq:chaotic-evil', 'test.field.alignment:eq:lawful-good'],
         })
         .expect(200);
       expect(names(res)).toEqual(['Aboleth', 'Kobold', 'Sphinx']);
@@ -1505,18 +1513,21 @@ describe('Entities endpoints', () => {
 
     it('filters the list by a numeric Field range, comparing as a number not a string', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      await beast(ada, 'Kobold', { 'test.alignment': 'lawful-good', 'test.cr': 1 });
-      await beast(ada, 'Sphinx', { 'test.alignment': 'lawful-good', 'test.cr': 5 });
-      await beast(ada, 'Aboleth', { 'test.alignment': 'chaotic-evil', 'test.cr': 10 });
+      await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
+      await beast(ada, 'Sphinx', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 5 });
+      await beast(ada, 'Aboleth', { 'test.field.alignment': 'chaotic-evil', 'test.field.cr': 10 });
 
       // cr >= 5: a string compare would drop '10' (< '5' lexically); the numeric `num` keeps it.
-      const gte = await ada.get('/entities').query({ type: 'test.beast', field: 'test.cr:gte:5' }).expect(200);
+      const gte = await ada
+        .get('/entities')
+        .query({ type: 'test.type.beast', field: 'test.field.cr:gte:5' })
+        .expect(200);
       expect(names(gte)).toEqual(['Aboleth', 'Sphinx']);
 
       // A bounded range ANDs the two bounds.
       const range = await ada
         .get('/entities')
-        .query({ type: 'test.beast', field: ['test.cr:gte:5', 'test.cr:lte:9'] })
+        .query({ type: 'test.type.beast', field: ['test.field.cr:gte:5', 'test.field.cr:lte:9'] })
         .expect(200);
       expect(names(range)).toEqual(['Sphinx']);
     });
@@ -1524,25 +1535,25 @@ describe('Entities endpoints', () => {
     it('filters the list by list-membership on a list Field', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       await beast(ada, 'Kobold', {
-        'test.alignment': 'lawful-good',
-        'test.cr': 1,
-        'test.senses': ['darkvision'],
+        'test.field.alignment': 'lawful-good',
+        'test.field.cr': 1,
+        'test.field.senses': ['darkvision'],
       });
       await beast(ada, 'Aboleth', {
-        'test.alignment': 'chaotic-evil',
-        'test.cr': 10,
-        'test.senses': ['darkvision', 'truesight'],
+        'test.field.alignment': 'chaotic-evil',
+        'test.field.cr': 10,
+        'test.field.senses': ['darkvision', 'truesight'],
       });
       await beast(ada, 'Sphinx', {
-        'test.alignment': 'lawful-good',
-        'test.cr': 11,
-        'test.senses': ['truesight'],
+        'test.field.alignment': 'lawful-good',
+        'test.field.cr': 11,
+        'test.field.senses': ['truesight'],
       });
 
       // Membership matches any Entity whose list contains the value.
       const res = await ada
         .get('/entities')
-        .query({ type: 'test.beast', field: 'test.senses:eq:truesight' })
+        .query({ type: 'test.type.beast', field: 'test.field.senses:eq:truesight' })
         .expect(200);
       expect(names(res)).toEqual(['Aboleth', 'Sphinx']);
     });
@@ -1550,26 +1561,26 @@ describe('Entities endpoints', () => {
     it('filters the list by a date Field range (lexical ISO compare)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       await beast(ada, 'Kobold', {
-        'test.alignment': 'lawful-good',
-        'test.cr': 1,
-        'test.discovered': '2020-01-01',
+        'test.field.alignment': 'lawful-good',
+        'test.field.cr': 1,
+        'test.field.discovered': '2020-01-01',
       });
       await beast(ada, 'Sphinx', {
-        'test.alignment': 'lawful-good',
-        'test.cr': 11,
-        'test.discovered': '2023-06-15',
+        'test.field.alignment': 'lawful-good',
+        'test.field.cr': 11,
+        'test.field.discovered': '2023-06-15',
       });
       await beast(ada, 'Aboleth', {
-        'test.alignment': 'chaotic-evil',
-        'test.cr': 10,
-        'test.discovered': '2026-12-31',
+        'test.field.alignment': 'chaotic-evil',
+        'test.field.cr': 10,
+        'test.field.discovered': '2026-12-31',
       });
 
       const res = await ada
         .get('/entities')
         .query({
-          type: 'test.beast',
-          field: ['test.discovered:gte:2022-01-01', 'test.discovered:lte:2025-01-01'],
+          type: 'test.type.beast',
+          field: ['test.field.discovered:gte:2022-01-01', 'test.field.discovered:lte:2025-01-01'],
         })
         .expect(200);
       expect(names(res)).toEqual(['Sphinx']);
@@ -1578,24 +1589,24 @@ describe('Entities endpoints', () => {
     it('surfaces the date and list Field facets with their data-type for the rail’s control', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const kobold = await beast(ada, 'Kobold', {
-        'test.alignment': 'lawful-good',
-        'test.cr': 1,
-        'test.discovered': '2020-01-01',
-        'test.senses': ['darkvision', 'truesight'],
+        'test.field.alignment': 'lawful-good',
+        'test.field.cr': 1,
+        'test.field.discovered': '2020-01-01',
+        'test.field.senses': ['darkvision', 'truesight'],
       });
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
 
-      const res = await ada.get('/entities/facets').query({ worldId, type: 'test.beast' }).expect(200);
+      const res = await ada.get('/entities/facets').query({ worldId, type: 'test.type.beast' }).expect(200);
       const fields = res.body.fields as {
         key: string;
         dataType: { kind: string };
         values: { value: string; count: number }[];
       }[];
-      expect(fields.find((f) => f.key === 'test.discovered')!.dataType).toEqual({
+      expect(fields.find((f) => f.key === 'test.field.discovered')!.dataType).toEqual({
         kind: 'date',
       });
       // A list Field explodes to one facet value per item.
-      expect(byValue(fields.find((f) => f.key === 'test.senses')!.values).map((v) => v.value)).toEqual([
+      expect(byValue(fields.find((f) => f.key === 'test.field.senses')!.values).map((v) => v.value)).toEqual([
         'darkvision',
         'truesight',
       ]);
@@ -1603,15 +1614,15 @@ describe('Entities endpoints', () => {
 
     it('ANDs a Field filter across different keys and with the universal facets', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      await beast(ada, 'Kobold', { 'test.alignment': 'lawful-good', 'test.cr': 1 });
-      await beast(ada, 'Sphinx', { 'test.alignment': 'lawful-good', 'test.cr': 11 });
-      await beast(ada, 'Aboleth', { 'test.alignment': 'chaotic-evil', 'test.cr': 10 });
+      await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
+      await beast(ada, 'Sphinx', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 11 });
+      await beast(ada, 'Aboleth', { 'test.field.alignment': 'chaotic-evil', 'test.field.cr': 10 });
 
       const res = await ada
         .get('/entities')
         .query({
-          type: 'test.beast',
-          field: ['test.alignment:eq:lawful-good', 'test.cr:gte:5'],
+          type: 'test.type.beast',
+          field: ['test.field.alignment:eq:lawful-good', 'test.field.cr:gte:5'],
         })
         .expect(200);
       expect(names(res)).toEqual(['Sphinx']);
@@ -1620,28 +1631,28 @@ describe('Entities endpoints', () => {
     it('drills Field-facet value counts down against the other active constraints', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const kobold = await beast(ada, 'Kobold', {
-        'test.alignment': 'lawful-good',
-        'test.cr': 1,
+        'test.field.alignment': 'lawful-good',
+        'test.field.cr': 1,
       });
-      await beast(ada, 'Sphinx', { 'test.alignment': 'lawful-good', 'test.cr': 11 });
-      await beast(ada, 'Aboleth', { 'test.alignment': 'chaotic-evil', 'test.cr': 10 });
+      await beast(ada, 'Sphinx', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 11 });
+      await beast(ada, 'Aboleth', { 'test.field.alignment': 'chaotic-evil', 'test.field.cr': 10 });
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
 
       const res = await ada
         .get('/entities/facets')
-        .query({ worldId, type: 'test.beast', field: 'test.cr:gte:5' })
+        .query({ worldId, type: 'test.type.beast', field: 'test.field.cr:gte:5' })
         .expect(200);
       const fields = res.body.fields as {
         key: string;
         values: { value: string; count: number }[];
       }[];
       // The `alignment` facet is narrowed by the active `cr >= 5`: only Sphinx + Aboleth qualify.
-      expect(byValue(fields.find((f) => f.key === 'test.alignment')!.values)).toEqual([
+      expect(byValue(fields.find((f) => f.key === 'test.field.alignment')!.values)).toEqual([
         { value: 'chaotic-evil', count: 1 },
         { value: 'lawful-good', count: 1 },
       ]);
       // But the `cr` facet ignores its own filter (drill-down), so it still lists every value.
-      expect(byValue(fields.find((f) => f.key === 'test.cr')!.values)).toEqual([
+      expect(byValue(fields.find((f) => f.key === 'test.field.cr')!.values)).toEqual([
         { value: '1', count: 1 },
         { value: '10', count: 1 },
         { value: '11', count: 1 },
@@ -1651,8 +1662,8 @@ describe('Entities endpoints', () => {
     it('recomputes Field facets on the shared derive path so a re-save keeps them fresh', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const id = await beast(ada, 'Kobold', {
-        'test.alignment': 'lawful-good',
-        'test.cr': 1,
+        'test.field.alignment': 'lawful-good',
+        'test.field.cr': 1,
       });
       const worldId = (await ada.get(`/entities/${id}`)).body.worldId;
 
@@ -1661,19 +1672,19 @@ describe('Entities endpoints', () => {
         .put(`/entities/${id}`)
         .send({
           document: {
-            'core.content': emptyContent(),
-            'test.alignment': 'chaotic-evil',
-            'test.cr': 7,
+            'core.field.content': emptyRichContent(),
+            'test.field.alignment': 'chaotic-evil',
+            'test.field.cr': 7,
           },
           version: 2,
           tags: [],
-          types: ['test.beast'],
+          types: ['test.type.beast'],
         })
         .expect(200);
 
-      const res = await ada.get('/entities/facets').query({ worldId, type: 'test.beast' }).expect(200);
+      const res = await ada.get('/entities/facets').query({ worldId, type: 'test.type.beast' }).expect(200);
       const alignment = (res.body.fields as { key: string; values: { value: string }[] }[]).find(
-        (f) => f.key === 'test.alignment',
+        (f) => f.key === 'test.field.alignment',
       )!;
       expect(alignment.values.map((v) => v.value)).toEqual(['chaotic-evil']);
     });
@@ -1682,24 +1693,25 @@ describe('Entities endpoints', () => {
   describe('Harvested facet dimensions surface as Facets (#235, ADR-0055)', () => {
     // A fixture harvesting Structured Data Type — no D&D dependency, so this ticket verifies on its own.
     // Its `fx_*` dimension keys are fixture-only so they claim keys no bundled plugin Field holds: a
-    // dimension surfaces where no scalar Field is behind it. The `fixture.disposition` dimension key
+    // dimension surfaces where no scalar Field is behind it. The `fixture.field.disposition` dimension key
     // deliberately collides with a scalar enum Field the type also declares (its id), to prove
     // scalar-wins for the label/control.
     const STAT_BLOCK = defineStructuredDataType({
-      id: 'fixture.stat-block',
+      id: 'fixture.datatype.stat-block',
       valueSchema: z.object({ size: z.string(), threat: z.number(), disposition: z.string() }).partial(),
       empty: () => ({}),
       facetDimensions: [
         { key: 'fx_size', labelKey: 'fixture.facets.size', dataType: { kind: 'enum', options: ['tiny', 'huge'] } },
         { key: 'fx_threat', labelKey: 'fixture.facets.threat', dataType: { kind: 'number' } },
-        // Shares the `fixture.disposition` key with the scalar Field below — the scalar wins the label/control.
-        { key: 'fixture.disposition', labelKey: 'fixture.facets.disposition', dataType: { kind: 'string' } },
+        // Shares the `fixture.field.disposition` key with the scalar Field below — the scalar wins the label/control.
+        { key: 'fixture.field.disposition', labelKey: 'fixture.facets.disposition', dataType: { kind: 'string' } },
       ],
       harvestFacets: (v: { size?: string; threat?: number; disposition?: string }) => {
         const rows: { key: string; value: string; num: number | null }[] = [];
         if (v.size !== undefined) rows.push({ key: 'fx_size', value: v.size, num: null });
         if (v.threat !== undefined) rows.push({ key: 'fx_threat', value: String(v.threat), num: v.threat });
-        if (v.disposition !== undefined) rows.push({ key: 'fixture.disposition', value: v.disposition, num: null });
+        if (v.disposition !== undefined)
+          rows.push({ key: 'fixture.field.disposition', value: v.disposition, num: null });
         return rows;
       },
     });
@@ -1707,16 +1719,16 @@ describe('Entities endpoints', () => {
     beforeEach(() => {
       const registry = app.get(TypeFieldRegistry);
       registry.registerStructuredDataType(STAT_BLOCK);
-      // A type carrying the structured `fixture.stat` Field plus a scalar `fixture.disposition` Field sharing that key.
-      registerType(registry, 'fixture.creature', [
+      // A type carrying the structured `fixture.field.stat` Field plus a scalar `fixture.field.disposition` Field sharing that key.
+      registerType(registry, 'fixture.type.creature', [
         defineField({
-          id: 'fixture.stat',
+          id: 'fixture.field.stat',
           label: 'Stat Block',
-          dataType: { kind: 'fixture.stat-block' },
+          dataType: { kind: 'fixture.datatype.stat-block' },
           facetable: false,
         }),
         defineField({
-          id: 'fixture.disposition',
+          id: 'fixture.field.disposition',
           label: 'Disposition',
           dataType: { kind: 'enum', options: ['friendly', 'hostile'] },
           facetable: true,
@@ -1732,14 +1744,14 @@ describe('Entities endpoints', () => {
       stat: { size?: string; threat?: number; disposition?: string },
       extra: Record<string, unknown> = {},
     ) {
-      const created = await agent.post('/entities').send({ name, types: ['core.note'] });
+      const created = await agent.post('/entities').send({ name, types: ['core.type.note'] });
       await agent
         .put(`/entities/${created.body.id}`)
         .send({
-          document: { 'core.content': emptyContent(), 'fixture.stat': stat, ...extra },
+          document: { 'core.field.content': emptyRichContent(), 'fixture.field.stat': stat, ...extra },
           version: 1,
           tags: [],
-          types: ['fixture.creature'],
+          types: ['fixture.type.creature'],
         })
         .expect(200);
       return created.body.id as string;
@@ -1776,12 +1788,17 @@ describe('Entities endpoints', () => {
 
     it('resolves a key claimed by both a scalar Field and a dimension to the scalar (scalar wins, #235)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      // The scalar `fixture.disposition` value and the stat block both feed the `fixture.disposition` key.
-      const kobold = await creature(ada, 'Kobold', { disposition: 'hostile' }, { 'fixture.disposition': 'friendly' });
+      // The scalar `fixture.field.disposition` value and the stat block both feed the `fixture.field.disposition` key.
+      const kobold = await creature(
+        ada,
+        'Kobold',
+        { disposition: 'hostile' },
+        { 'fixture.field.disposition': 'friendly' },
+      );
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
 
       const res = await ada.get('/entities/facets').query({ worldId }).expect(200);
-      const disposition = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'fixture.disposition')!;
+      const disposition = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'fixture.field.disposition')!;
       // Scalar wins the label/control: its authored label and enum data-type, and no i18n key.
       expect(disposition.label).toBe('Disposition');
       expect(disposition.labelKey).toBeUndefined();
@@ -1838,11 +1855,11 @@ describe('Entities endpoints', () => {
   describe('Entity-Link Fields (#190)', () => {
     // A monster type whose `lair` is a facetable, target-type-constrained Entity Link at a place.
     beforeEach(() => {
-      registerType(app.get(TypeFieldRegistry), 'test.monster', [
+      registerType(app.get(TypeFieldRegistry), 'test.type.monster', [
         defineField({
-          id: 'test.lair',
+          id: 'test.field.lair',
           label: 'Lair',
-          dataType: { kind: 'entityLink', targetTypes: ['world.place'] },
+          dataType: { kind: 'entityLink', targetTypes: ['world.type.place'] },
           facetable: true,
         }),
       ]);
@@ -1854,7 +1871,7 @@ describe('Entities endpoints', () => {
     async function place(agent: Awaited<ReturnType<typeof signIn>>, name: string) {
       const created = await agent
         .post('/entities')
-        .send({ name, types: ['world.place'] })
+        .send({ name, types: ['world.type.place'] })
         .expect(201);
       return created.body.id as string;
     }
@@ -1867,13 +1884,13 @@ describe('Entities endpoints', () => {
     ) {
       const created = await agent
         .post('/entities')
-        .send({ name, types: ['core.note'] })
+        .send({ name, types: ['core.type.note'] })
         .expect(201);
       const res = await agent.put(`/entities/${created.body.id}`).send({
-        document: { 'core.content': emptyContent(), ...(link ? { 'test.lair': link } : {}) },
+        document: { 'core.field.content': emptyRichContent(), ...(link ? { 'test.field.lair': link } : {}) },
         version: 1,
         tags: [],
-        types: ['test.monster'],
+        types: ['test.type.monster'],
       });
       return { id: created.body.id as string, res };
     }
@@ -1890,7 +1907,7 @@ describe('Entities endpoints', () => {
       // "all monsters whose lair is in the Whisperwood" — an eq filter on the target id.
       const res = await ada
         .get('/entities')
-        .query({ type: 'test.monster', field: `test.lair:eq:${whisperwood}` })
+        .query({ type: 'test.type.monster', field: `test.field.lair:eq:${whisperwood}` })
         .expect(200);
       expect(names(res)).toEqual(['Aboleth']);
     });
@@ -1901,14 +1918,14 @@ describe('Entities endpoints', () => {
       const { id } = await monster(ada, 'Aboleth', { entityId: whisperwood, label: 'The Whisperwood' });
       const worldId = (await ada.get(`/entities/${id}`)).body.worldId;
 
-      const res = await ada.get('/entities/facets').query({ worldId, type: 'test.monster' }).expect(200);
+      const res = await ada.get('/entities/facets').query({ worldId, type: 'test.type.monster' }).expect(200);
       const lair = (
         res.body.fields as {
           key: string;
           dataType: { kind: string };
           values: { value: string; label?: string; count: number }[];
         }[]
-      ).find((f) => f.key === 'test.lair')!;
+      ).find((f) => f.key === 'test.field.lair')!;
       expect(lair.dataType.kind).toBe('entityLink');
       // The facet value is the stable target id; the label is the target's live name for the rail.
       expect(lair.values).toEqual([{ value: whisperwood, label: 'The Whisperwood', count: 1 }]);
@@ -1923,25 +1940,25 @@ describe('Entities endpoints', () => {
 
       // The dangling facet value keeps no label (the target resolves to no row).
       const worldId = (await ada.get(`/entities/${id}`)).body.worldId;
-      const facets = await ada.get('/entities/facets').query({ worldId, type: 'test.monster' }).expect(200);
+      const facets = await ada.get('/entities/facets').query({ worldId, type: 'test.type.monster' }).expect(200);
       const lair = (facets.body.fields as { key: string; values: { value: string; label?: string }[] }[]).find(
-        (f) => f.key === 'test.lair',
+        (f) => f.key === 'test.field.lair',
       )!;
       expect(lair.values).toEqual([{ value: 'ghost-place', count: 1 }]);
     });
 
     it('enforces the target-type constraint on an active typed edit — a resolvable off-type target is rejected', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      // A note is a real, readable Entity, but not a `world.place`.
+      // A note is a real, readable Entity, but not a `world.type.place`.
       const note = await ada
         .post('/entities')
-        .send({ name: 'Just a Note', types: ['core.note'] })
+        .send({ name: 'Just a Note', types: ['core.type.note'] })
         .expect(201);
       const { res } = await monster(ada, 'Aboleth', { entityId: note.body.id, label: 'Just a Note' });
 
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('invalid-fields');
-      expect(res.body.data.fields).toContainEqual({ key: 'test.lair', code: 'type' });
+      expect(res.body.data.fields).toContainEqual({ key: 'test.field.lair', code: 'type' });
     });
 
     it('never leaks a private target’s name through the link facet label (ADR-0046)', async () => {
@@ -1957,32 +1974,32 @@ describe('Entities endpoints', () => {
       app.get(WorldsService).addMember(adaId, worldId, bobId, 'contributor');
       const bob = await signIn('bob@hexly.test', 'battery staple');
 
-      const res = await bob.get('/entities/facets').query({ worldId, type: 'test.monster' }).expect(200);
+      const res = await bob.get('/entities/facets').query({ worldId, type: 'test.type.monster' }).expect(200);
       const lair = (
         res.body.fields as { key: string; values: { value: string; label?: string; count: number }[] }[]
-      ).find((f) => f.key === 'test.lair')!;
+      ).find((f) => f.key === 'test.field.lair')!;
       // Bob sees a link exists (the readable monster), but the private target's name never resolves.
       expect(lair.values).toEqual([{ value: whisperwood, count: 1 }]);
     });
   });
 
   /**
-   * The bundled `dnd.monster` plugin. Nothing here registers a type: the plugin declares it in code and
+   * The bundled `dnd.type.monster` plugin. Nothing here registers a type: the plugin declares it in code and
    * {@link TypeFieldRegistry} seeds it at startup.
    */
-  describe('the bundled dnd.monster plugin type', () => {
+  describe('the bundled dnd.type.monster plugin type', () => {
     /** Typed-save a monster whose stat block is the given value — an active typed edit, so the gate applies. */
     async function saveMonster(agent: Awaited<ReturnType<typeof signIn>>, statBlock: Record<string, unknown>) {
       const created = await agent
         .post('/entities')
-        .send({ name: 'Aboleth', types: ['core.note'] })
+        .send({ name: 'Aboleth', types: ['core.type.note'] })
         .expect(201);
       const res = await agent.put(`/entities/${created.body.id}`).send({
         // The stat block is one grouped value at `stat_block` now (ADR-0055), not thirteen top-level keys.
-        document: { 'core.content': emptyContent(), 'dnd.stat_block': statBlock },
+        document: { 'core.field.content': emptyRichContent(), 'dnd.field.stat-block': statBlock },
         version: 1,
         tags: [],
-        types: ['dnd.monster'],
+        types: ['dnd.type.monster'],
       });
       return { id: created.body.id as string, worldId: created.body.worldId as string, res };
     }
@@ -1994,7 +2011,7 @@ describe('Entities endpoints', () => {
       const illTyped = await saveMonster(ada, { challenge_rating: '24' });
       expect(illTyped.res.status).toBe(400);
       expect(illTyped.res.body.code).toBe('invalid-fields');
-      expect(illTyped.res.body.data.fields).toContainEqual({ key: 'dnd.stat_block', code: 'type' });
+      expect(illTyped.res.body.data.fields).toContainEqual({ key: 'dnd.field.stat-block', code: 'type' });
 
       // An unknown size is not one of the enum options the block admits.
       const badSize = await saveMonster(ada, { size: 'Colossal' });
@@ -2015,7 +2032,7 @@ describe('Entities endpoints', () => {
 
       const facets = await ada
         .get('/entities/facets')
-        .query({ worldId: dragon.worldId, type: 'dnd.monster' })
+        .query({ worldId: dragon.worldId, type: 'dnd.type.monster' })
         .expect(200);
       const keys = (facets.body.fields as { key: string }[]).map((f) => f.key);
       expect(keys).toEqual(['size', 'creature_type', 'challenge_rating']);
@@ -2040,7 +2057,7 @@ describe('Entities endpoints', () => {
 
       const listed = await ada.get(`/worlds/${worldId}/types`).expect(200);
       expect(listed.body).toContainEqual(
-        expect.objectContaining({ id: 'dnd.monster', label: 'Monster', source: 'plugin' }),
+        expect.objectContaining({ id: 'dnd.type.monster', label: 'Monster', source: 'plugin' }),
       );
     });
   });
@@ -2051,7 +2068,7 @@ describe('Entities endpoints', () => {
     await request(server).get('/entities').expect(401);
     await request(server)
       .post('/entities')
-      .send({ name: 'X', types: ['core.note'] })
+      .send({ name: 'X', types: ['core.type.note'] })
       .expect(401);
     await request(server).get('/entities/any').expect(401);
     await request(server).put('/entities/any').send({ document: emptyHexmapBody, version: 1 }).expect(401);
@@ -2061,7 +2078,7 @@ describe('Entities endpoints', () => {
 
   it('surfaces an out-of-band corrupted tags column as a 500, like a bad type or document', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
+    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.hex-map'] });
     const id = created.body.id;
 
     // Corruption must surface 500, not serve malformed data (ADR-0001).
@@ -2076,16 +2093,16 @@ describe('Entities endpoints', () => {
 
   it('rejects malformed bodies with 400, not a server error', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
+    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.hex-map'] });
     const id = created.body.id;
 
     await ada
       .post('/entities')
-      .send({ name: '', types: ['core.note'] })
+      .send({ name: '', types: ['core.type.note'] })
       .expect(400);
     await ada
       .post('/entities')
-      .send({ name: '   ', types: ['core.note'] })
+      .send({ name: '   ', types: ['core.type.note'] })
       .expect(400);
     await ada
       .post('/entities')
@@ -2093,14 +2110,14 @@ describe('Entities endpoints', () => {
       .expect(400);
     await ada.put(`/entities/${id}`).send({ document: emptyHexmapBody }).expect(400);
     // A typed save is an active typed edit, so its Fields are gated: an off-palette terrain fails
-    // the `core.hex-grid` value schema like any other ill-typed Field.
+    // the `core.datatype.hex-grid` value schema like any other ill-typed Field.
     await ada
       .put(`/entities/${id}`)
       .send({
         document: hexmapBody({ '0,0': { terrain: 'lava' } }),
         version: 1,
         tags: [],
-        types: ['core.hexmap'],
+        types: ['core.type.hex-map'],
       })
       .expect(400);
     await ada.patch(`/entities/${id}`).send({ name: '' }).expect(400);
@@ -2111,38 +2128,45 @@ describe('Entities endpoints', () => {
     // plain body edit, so garbage at `grid` stores and reads back as-is. The editor opens it as an
     // empty plane and the first edit overwrites it.
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
+    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.hex-map'] });
     const id = created.body.id;
 
     await ada
       .put(`/entities/${id}`)
-      .send({ document: { 'core.content': emptyContent(), 'core.grid': 'not-a-grid' }, version: 1, tags: [] })
+      .send({
+        document: { 'core.field.content': emptyRichContent(), 'core.field.grid': 'not-a-grid' },
+        version: 1,
+        tags: [],
+      })
       .expect(200);
 
     const reloaded = await ada.get(`/entities/${id}`).expect(200);
-    expect(reloaded.body.document).toEqual({ 'core.content': emptyContent(), 'core.grid': 'not-a-grid' });
+    expect(reloaded.body.document).toEqual({
+      'core.field.content': emptyRichContent(),
+      'core.field.grid': 'not-a-grid',
+    });
   });
 
   it('tolerates a malformed prose value at rest on an untyped save, rather than 500ing on read (ADR-0051)', async () => {
     // Prose is a Structured Data Type like the grid now: a plain body edit (no `types`) stores garbage at
     // `content` as-is, and a read never 500s — the editor opens it as an empty document.
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/entities').send({ name: 'Lady Aldermoor', types: ['core.note'] });
+    const created = await ada.post('/entities').send({ name: 'Lady Aldermoor', types: ['core.type.note'] });
     const id = created.body.id;
 
     await ada
       .put(`/entities/${id}`)
-      .send({ document: { 'core.content': 'not-a-doc' }, version: 1, tags: [] })
+      .send({ document: { 'core.field.content': 'not-a-doc' }, version: 1, tags: [] })
       .expect(200);
 
     const reloaded = await ada.get(`/entities/${id}`).expect(200);
-    expect(reloaded.body.document).toEqual({ 'core.content': 'not-a-doc' });
+    expect(reloaded.body.document).toEqual({ 'core.field.content': 'not-a-doc' });
   });
 
   describe('Entity Visibility & read access (ADR-0037, #160)', () => {
     it('lets a World member read a shared entity they do not own', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const note = await ada.post('/entities').send({ name: 'The Citadel', types: ['core.note'] });
+      const note = await ada.post('/entities').send({ name: 'The Citadel', types: ['core.type.note'] });
       setVisibility(note.body.id, 'shared');
 
       const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
@@ -2158,7 +2182,7 @@ describe('Entities endpoints', () => {
 
     it('grants an entity-level Editor read+edit only — not delete, set-visibility, or manage (ADR-0039)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const note = await ada.post('/entities').send({ name: 'Shared Draft', types: ['core.note'] });
+      const note = await ada.post('/entities').send({ name: 'Shared Draft', types: ['core.type.note'] });
 
       // An outsider (not a World member) handed an Editor grant on this one note (#161).
       // The grant pierces `private`, so the Entity is left at the create default.
@@ -2174,7 +2198,7 @@ describe('Entities endpoints', () => {
 
     it('gives a World Owner of a shared Entity the curate verbs but not manage (ADR-0039)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const note = await ada.post('/entities').send({ name: 'Town Lore', types: ['core.note'] });
+      const note = await ada.post('/entities').send({ name: 'Town Lore', types: ['core.type.note'] });
       setVisibility(note.body.id, 'shared');
 
       // Bob owns the shared Entity; Ada owns the World it lives in.
@@ -2189,7 +2213,7 @@ describe('Entities endpoints', () => {
 
     it('denies a World member a private entity they do not own — 404, no existence leak', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const secret = await ada.post('/entities').send({ name: 'Unrevealed Lore', types: ['core.note'] });
+      const secret = await ada.post('/entities').send({ name: 'Unrevealed Lore', types: ['core.type.note'] });
       // Left private (the create default).
 
       const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
@@ -2201,7 +2225,7 @@ describe('Entities endpoints', () => {
 
     it('denies a World Owner another member’s private entity — private is absolute', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const created = await ada.post('/entities').send({ name: 'Bob’s Diary', types: ['core.note'] });
+      const created = await ada.post('/entities').send({ name: 'Bob’s Diary', types: ['core.type.note'] });
 
       // Bob is a contributor who owns a private Entity in Ada's World; Ada owns the World.
       const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
@@ -2216,8 +2240,8 @@ describe('Entities endpoints', () => {
 
     it('scopes the list and facet counts to canRead — shared surface only, no private leak', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const shared = await ada.post('/entities').send({ name: 'Shared Keep', types: ['core.note'] });
-      await ada.post('/entities').send({ name: 'Private Vault', types: ['core.note'] }); // stays private
+      const shared = await ada.post('/entities').send({ name: 'Shared Keep', types: ['core.type.note'] });
+      await ada.post('/entities').send({ name: 'Private Vault', types: ['core.type.note'] }); // stays private
       setVisibility(shared.body.id, 'shared');
       const worldId = shared.body.worldId;
 
@@ -2239,7 +2263,7 @@ describe('Entities endpoints', () => {
 
     it('lets an Owner toggle an Entity’s visibility via PATCH, either direction', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const note = await ada.post('/entities').send({ name: 'Reveal Me', types: ['core.note'] });
+      const note = await ada.post('/entities').send({ name: 'Reveal Me', types: ['core.type.note'] });
       expect(note.body.visibility).toBe('private'); // New Entities default private.
 
       const shown = await ada.patch(`/entities/${note.body.id}`).send({ visibility: 'shared' }).expect(200);
@@ -2255,7 +2279,7 @@ describe('Entities endpoints', () => {
       // visibility flips like any other, in either direction.
       const note = await ada
         .post('/entities')
-        .send({ name: 'Ada', types: ['core.note'] })
+        .send({ name: 'Ada', types: ['core.type.note'] })
         .expect(201);
 
       const shared = await ada.patch(`/entities/${note.body.id}`).send({ visibility: 'shared' }).expect(200);
@@ -2266,7 +2290,7 @@ describe('Entities endpoints', () => {
 
     it('lets a World Owner edit a shared Entity they don’t own, but denies a plain member (403)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse'); // World Owner
-      const hall = await ada.post('/entities').send({ name: 'Shared Hall', types: ['core.note'] });
+      const hall = await ada.post('/entities').send({ name: 'Shared Hall', types: ['core.type.note'] });
       setVisibility(hall.body.id, 'shared');
       const worldId = hall.body.worldId;
 
@@ -2280,7 +2304,7 @@ describe('Entities endpoints', () => {
       app.get(WorldsService).addMember(adaId, worldId, carolId, 'contributor');
       const carol = await signIn('carol@hexly.test', 'purple monkey');
 
-      const doc = { 'core.content': emptyContent() };
+      const doc = { 'core.field.content': emptyRichContent() };
       // The World Owner curates the shared surface: editing another's shared Entity → 200.
       await ada.put(`/entities/${hall.body.id}`).send({ document: doc, version: 1, tags: [] }).expect(200);
 
@@ -2290,7 +2314,7 @@ describe('Entities endpoints', () => {
 
     it('lets a World Owner rename and re-hide a shared Entity — and then loses all access once it’s private', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse'); // World Owner
-      const hall = await ada.post('/entities').send({ name: 'Shared Hall', types: ['core.note'] });
+      const hall = await ada.post('/entities').send({ name: 'Shared Hall', types: ['core.type.note'] });
       setVisibility(hall.body.id, 'shared');
       const worldId = hall.body.worldId;
 
@@ -2320,8 +2344,8 @@ describe('Entities endpoints', () => {
 
     it('lets a World Owner delete a shared Entity they don’t own; a plain member can’t (403), a private one is unreachable (404)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse'); // World Owner
-      const ruin = await ada.post('/entities').send({ name: 'Shared Ruin', types: ['core.note'] });
-      const cache = await ada.post('/entities').send({ name: 'Private Cache', types: ['core.note'] });
+      const ruin = await ada.post('/entities').send({ name: 'Shared Ruin', types: ['core.type.note'] });
+      const cache = await ada.post('/entities').send({ name: 'Private Cache', types: ['core.type.note'] });
       setVisibility(ruin.body.id, 'shared'); // cache stays private
       const worldId = ruin.body.worldId;
 
@@ -2345,7 +2369,7 @@ describe('Entities endpoints', () => {
 
     it('does not report a metadata patch as saved when the write lands 0 rows (concurrent flip)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse'); // World Owner
-      const hall = await ada.post('/entities').send({ name: 'Shared Hall', types: ['core.note'] });
+      const hall = await ada.post('/entities').send({ name: 'Shared Hall', types: ['core.type.note'] });
       setVisibility(hall.body.id, 'shared');
       const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
       app.get(WorldsService).addMember(adaId, hall.body.worldId, bobId, 'contributor');
@@ -2379,7 +2403,7 @@ describe('Entities endpoints', () => {
 
     it('confines owner-set management to the Entity’s Owners — reachable non-owner 403, non-reader 404', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse'); // World Owner
-      const hall = await ada.post('/entities').send({ name: 'Shared Hall', types: ['core.note'] });
+      const hall = await ada.post('/entities').send({ name: 'Shared Hall', types: ['core.type.note'] });
       setVisibility(hall.body.id, 'shared');
       const worldId = hall.body.worldId;
 

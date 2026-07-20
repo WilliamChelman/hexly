@@ -15,7 +15,7 @@ import {
   Size,
   SURFACE_FIELD,
 } from '@hexly/plugin-board';
-import { Content, emptyContent } from '@hexly/plugin-content';
+import { RichContent, emptyRichContent } from '@hexly/plugin-content';
 import { Patch } from '@hexly/immer';
 import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { BoardSelection } from './board-selection';
@@ -48,7 +48,7 @@ export const DEFAULT_EMBED_SIZE: Size = { width: 360, height: 260 };
 
 /**
  * The Board editor's store: tools, selection, and undo/redo over the surface. The document is the value
- * of a `core.board-surface` **Field of a Structured Data Type** (ADR-0050), at that Field's key in the
+ * of a `core.datatype.board-surface` **Field of a Structured Data Type** (ADR-0050), at that Field's key in the
  * central {@link EntitySession}'s EntityDocument map. The free-positioned twin of `HexMapStore` (#263),
  * built the same way: reads project off `session.doc()`, edits go through `session.mutate` (Immer,
  * patches captured), and undo pushes those inverse patches back through `session.applyPatches`. Nothing
@@ -70,7 +70,7 @@ export class BoardStore {
    * The Field this store's surface lives at — the surface data-type's Field, re-keyed to whichever
    * Field the active board View renders. Only the `id` (== the document key it lenses, ADR-0056) varies.
    *
-   * Required, with no default: falling back to `core.surface` would make a mis-wired host edit the
+   * Required, with no default: falling back to `core.field.surface` would make a mis-wired host edit the
    * wrong document rather than fail.
    */
   private readonly field: Field = { ...SURFACE_FIELD, id: inject(VIEW_FIELD_KEY) };
@@ -226,8 +226,8 @@ export class BoardStore {
   }
 
   /**
-   * Add a **Text Block** at world `position` — an empty `core.rich-content` value edited with the same
-   * editor as an Entity's Content (CONTEXT.md → Text Block, #268). Placed on top and selected like any
+   * Add a **Text Block** at world `position` — an empty `core.datatype.rich-content` value edited with the same
+   * editor as an Entity's RichContent (CONTEXT.md → Text Block, #268). Placed on top and selected like any
    * element, then **armed** so the author writes in it at once: the Text Block is the first inline-edit
    * consumer of the arm/disarm machinery #267 stood up. Returns the new id.
    */
@@ -239,7 +239,7 @@ export class BoardStore {
       position: { x: position.x, y: position.y },
       size: { ...DEFAULT_TEXT_SIZE },
       z: 0,
-      content: emptyContent(),
+      content: emptyRichContent(),
     });
     this.arm(id);
     return id;
@@ -269,7 +269,7 @@ export class BoardStore {
   /**
    * Add an **Embed** at world `position` transcluding `targetEntityId` through the View named by
    * `viewInstance` (CONTEXT.md → Embed, ADR-0062, #270). `viewInstance` is the View-instance key
-   * (`core.view.map:core.grid`); `''` selects the target's default View. Placed on top and selected, but
+   * (`core.view.map:core.field.grid`); `''` selects the target's default View. Placed on top and selected, but
    * **never armed**: an Embed is static until a click arms its read-interaction — the placement click only
    * selects/moves it. Returns the new id.
    */
@@ -316,7 +316,7 @@ export class BoardStore {
    * undoable step. A no-op — no undo step — for a missing id or a non-text element, so a stray call from
    * a mis-wired host never corrupts a Box or Image.
    */
-  setContent(id: string, content: Content): void {
+  setContent(id: string, content: RichContent): void {
     this.commit((surface) => {
       const element = surface.elements.find((e) => e.id === id);
       if (element?.kind === 'text') element.content = content;

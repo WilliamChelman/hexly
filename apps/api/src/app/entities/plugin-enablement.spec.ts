@@ -45,8 +45,8 @@ describe('plugin enablement — uniform absence on the server', () => {
     });
 
     it('drops a disabled Plugin’s Types — its default Field ids no longer resolve', () => {
-      expect(new TypeFieldRegistry(allEnabled()).typeFieldRefs('core.hexmap')).toBeDefined();
-      expect(new TypeFieldRegistry(withDisabled(HEXMAP_PLUGIN_ID)).typeFieldRefs('core.hexmap')).toBeUndefined();
+      expect(new TypeFieldRegistry(allEnabled()).typeFieldRefs('core.type.hex-map')).toBeDefined();
+      expect(new TypeFieldRegistry(withDisabled(HEXMAP_PLUGIN_ID)).typeFieldRefs('core.type.hex-map')).toBeUndefined();
     });
   });
 
@@ -67,33 +67,33 @@ describe('plugin enablement — uniform absence on the server', () => {
   describe('the registry composes the Plugin Field resolver', () => {
     it('resolves a Plugin Field id → its definition when its Plugin is enabled', () => {
       const registry = new TypeFieldRegistry(allEnabled());
-      expect(registry.fieldResolver('core.grid')).toMatchObject({
-        id: 'core.grid',
+      expect(registry.fieldResolver('core.field.grid')).toMatchObject({
+        id: 'core.field.grid',
         dataType: { kind: CORE_HEX_GRID },
       });
       // The content plugin owns the prose Field; the hexmap and dnd types reference it by id.
-      expect(registry.fieldResolver('core.content')?.id).toBe('core.content');
-      // The thirteen scalar stat Fields retired: dnd contributes the one `dnd.stat-block` Field now (ADR-0055).
-      expect(registry.fieldResolver('dnd.stat_block')?.id).toBe('dnd.stat_block');
+      expect(registry.fieldResolver('core.field.content')?.id).toBe('core.field.content');
+      // The thirteen scalar stat Fields retired: dnd contributes the one `dnd.datatype.stat-block` Field now (ADR-0055).
+      expect(registry.fieldResolver('dnd.field.stat-block')?.id).toBe('dnd.field.stat-block');
     });
 
     it('drops a disabled Plugin’s Fields — a reference degrades to a plain value', () => {
       const registry = new TypeFieldRegistry(withDisabled(HEXMAP_PLUGIN_ID));
-      expect(registry.fieldResolver('core.grid')).toBeUndefined();
-      // `core.content` is owned by the (still-enabled) content plugin, so the hexmap type's other
+      expect(registry.fieldResolver('core.field.grid')).toBeUndefined();
+      // `core.field.content` is owned by the (still-enabled) content plugin, so the hexmap type's other
       // reference still resolves.
-      expect(registry.fieldResolver('core.content')?.id).toBe('core.content');
+      expect(registry.fieldResolver('core.field.content')?.id).toBe('core.field.content');
     });
 
     it('resolves nothing for an unknown id', () => {
-      expect(new TypeFieldRegistry(allEnabled()).fieldResolver('world.nope')).toBeUndefined();
+      expect(new TypeFieldRegistry(allEnabled()).fieldResolver('world.field.nope')).toBeUndefined();
     });
   });
 
   describe('derive over an Entity carrying a disabled Plugin’s Field of a Structured Data Type', () => {
     // A grid value with a Hex Entity Link and a Hex name — the edge and text a Hex Map contributes.
     const doc = {
-      'core.grid': {
+      'core.field.grid': {
         hexes: { '0,0': { terrain: 'grass', name: 'Ashford', entityId: 'ashford-note' } },
         regions: [],
         labels: [],
@@ -102,7 +102,7 @@ describe('plugin enablement — uniform absence on the server', () => {
 
     it('harvests the grid’s edges and search text when hexmap is enabled', () => {
       const registry = new TypeFieldRegistry(allEnabled());
-      const fields = fieldsFor(registry, ['core.hexmap']);
+      const fields = fieldsFor(registry, ['core.type.hex-map']);
       const state = deriveDocumentState(doc, fields, registry.structuredDataTypes);
       expect(state.edges).toContainEqual({
         targetKind: 'entity',
@@ -114,7 +114,7 @@ describe('plugin enablement — uniform absence on the server', () => {
 
     it('harvests no edges and no derived search text when hexmap is disabled', () => {
       const registry = new TypeFieldRegistry(withDisabled(HEXMAP_PLUGIN_ID));
-      const fields = fieldsFor(registry, ['core.hexmap']);
+      const fields = fieldsFor(registry, ['core.type.hex-map']);
       const state = deriveDocumentState(doc, fields, registry.structuredDataTypes);
       expect(state.edges).toEqual([]);
       expect(state.searchText).toBe('');
@@ -123,7 +123,9 @@ describe('plugin enablement — uniform absence on the server', () => {
 
   describe('facet harvest over an Entity carrying a disabled Plugin’s Field of a Structured Data Type (ADR-0055)', () => {
     // A stat block carrying the three harvested dimensions — plus an ability score that is never a facet.
-    const doc = { 'dnd.stat_block': { size: 'Huge', creature_type: 'dragon', challenge_rating: 24, strength: 30 } };
+    const doc = {
+      'dnd.field.stat-block': { size: 'Huge', creature_type: 'dragon', challenge_rating: 24, strength: 30 },
+    };
 
     it('harvests the stat block’s dimensions when dnd is enabled — never its ability scores', () => {
       const registry = new TypeFieldRegistry(allEnabled());
@@ -139,10 +141,10 @@ describe('plugin enablement — uniform absence on the server', () => {
     it('harvests no facets when dnd is disabled, leaving the stat block intact as plain document', () => {
       const registry = new TypeFieldRegistry(withDisabled(DND_PLUGIN_ID));
       const fields = fieldsFor(registry, [DND_MONSTER]);
-      // The `dnd.stat-block` Data Type drops from the set, so faceting simply stops (ADR-0055)…
+      // The `dnd.datatype.stat-block` Data Type drops from the set, so faceting simply stops (ADR-0055)…
       expect(deriveDocumentState(doc, fields, registry.structuredDataTypes).fieldFacets).toEqual([]);
       // …and the value is untouched — a lens that doesn't apply leaves the document readable.
-      expect(doc['dnd.stat_block']).toEqual({
+      expect(doc['dnd.field.stat-block']).toEqual({
         size: 'Huge',
         creature_type: 'dragon',
         challenge_rating: 24,
@@ -155,7 +157,7 @@ describe('plugin enablement — uniform absence on the server', () => {
     // A FULL block — scalars, Traits (#245), Abilities (#246) — so the disabled case proves the whole
     // value survives intact, not just the scalars (ADR-0052).
     const doc = {
-      'draw-steel.stat_block': {
+      'draw-steel.field.stat-block': {
         role: 'brute',
         organization: 'elite',
         level: 3,
@@ -196,10 +198,10 @@ describe('plugin enablement — uniform absence on the server', () => {
     it('harvests no facets when draw-steel is disabled, leaving the stat block intact as plain document', () => {
       const registry = new TypeFieldRegistry(withDisabled(DRAW_STEEL_PLUGIN_ID));
       const fields = fieldsFor(registry, [DS_MONSTER]);
-      // The `draw-steel.stat-block` Data Type drops from the set, so faceting simply stops (ADR-0055)…
+      // The `draw-steel.datatype.stat-block` Data Type drops from the set, so faceting simply stops (ADR-0055)…
       expect(deriveDocumentState(doc, fields, registry.structuredDataTypes).fieldFacets).toEqual([]);
       // …and the whole block is untouched — a lens that doesn't apply leaves the document readable (ADR-0052).
-      expect(doc['draw-steel.stat_block']).toEqual({
+      expect(doc['draw-steel.field.stat-block']).toEqual({
         role: 'brute',
         organization: 'elite',
         level: 3,
@@ -224,7 +226,7 @@ describe('plugin enablement — uniform absence on the server', () => {
 
   describe('vault export of an Entity carrying a disabled Plugin’s Field of a Structured Data Type', () => {
     const doc = {
-      'core.content': tiptapContent({
+      'core.field.content': tiptapContent({
         type: 'doc',
         content: [{ type: 'paragraph', content: [{ type: 'text', text: 'The lore of Ashford' }] }],
       }),
@@ -249,12 +251,12 @@ describe('plugin enablement — uniform absence on the server', () => {
     });
 
     it('writes the content Field as a raw document value when content is disabled', () => {
-      // `core.note` is unregistered now, so the `core.content` key resolves to no Field and stays opaque —
+      // `core.type.note` is unregistered now, so the `core.field.content` key resolves to no Field and stays opaque —
       // exactly a build that never bundled the content Plugin: the value rides the frontmatter raw
       // rather than projecting to the body.
       const markdown = toMarkdown(new TypeFieldRegistry(withDisabled(CONTENT_PLUGIN_ID)));
       expect(markdown.startsWith('---')).toBe(true);
-      expect(markdown).toContain('core.content:');
+      expect(markdown).toContain('core.field.content:');
     });
   });
 });

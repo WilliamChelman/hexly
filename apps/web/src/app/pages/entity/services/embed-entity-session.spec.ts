@@ -11,7 +11,7 @@ function detail(over: Partial<EntityDetail> = {}): EntityDetail {
     id: 'note-1',
     worldId: 'w1',
     name: 'A note',
-    types: ['core.note'],
+    types: ['core.type.note'],
     document: { 'core.body': { text: 'v1' } },
     seq: 1,
     ...over,

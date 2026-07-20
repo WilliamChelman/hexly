@@ -1,6 +1,6 @@
 /**
- * `core.board` — the Board Entity Type (CONTEXT.md → Board, #263). Its surface **Field of a Structured
- * Data Type** at the `core.surface` key is what makes an Entity a Board; it declares the canonical prose
+ * `core.type.board` — the Board Entity Type (CONTEXT.md → Board, #263). Its surface **Field of a Structured
+ * Data Type** at the `core.field.surface` key is what makes an Entity a Board; it declares the canonical prose
  * {@link CONTENT_FIELD} beside it, so a Board carries lore like any other Entity (ADR-0051). The
  * free-positioned sibling of the Hex Map, and built the same way.
  *
@@ -13,11 +13,11 @@ import { CONTENT_FIELD } from '@hexly/plugin-content';
 import { SURFACE_FIELD } from './board-surface-type';
 
 /** The Board's Entity Type id. */
-export const CORE_BOARD = 'core.board';
+export const CORE_BOARD = 'core.type.board';
 
 /**
  * The Board type. `label` is the untranslated fallback; the web resolves the name through transloco.
- * References the prose (`core.content`) and surface (`core.surface`) Fields by id (`fieldRefs`,
+ * References the prose (`core.field.content`) and surface (`core.field.surface`) Fields by id (`fieldRefs`,
  * ADR-0054) — the sole Field declaration. The surface View is the Board's default (user story 5), which
  * the `-web` half declares.
  */

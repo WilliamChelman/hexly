@@ -11,7 +11,7 @@ import { createEntity, enterLibrary, expect, test } from './fixtures';
  */
 test('a plugin’s scoped copy follows a language switch: the map editor flips to French', async ({ page }) => {
   await enterLibrary(page);
-  await createEntity(page, 'core.hexmap');
+  await createEntity(page, 'core.type.hex-map');
 
   // App copy read through `translateSignal`, which prefixes its key with any injected scope — so a
   // lib's scope reaching this injector would render the raw 'dnd.entityTags.addPlaceholder'

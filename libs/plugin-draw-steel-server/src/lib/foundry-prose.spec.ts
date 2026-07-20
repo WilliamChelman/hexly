@@ -88,7 +88,7 @@ describe('foundryProseToContent', () => {
     expect(extractText(content)).toContain('Now a tyrant.');
   });
 
-  it('is undefined for empty prose, so an empty biography yields no core.content', () => {
+  it('is undefined for empty prose, so an empty biography yields no core.field.content', () => {
     expect(foundryProseToContent('<p></p>')).toBeUndefined();
     expect(foundryProseToContent('')).toBeUndefined();
   });

@@ -12,7 +12,7 @@ import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from '
 /** A new map, opened in its editor; returns the canvas locator and the map id. */
 async function newMap(page: import('@playwright/test').Page) {
   await enterLibrary(page);
-  const mapId = await createEntity(page, 'core.hexmap');
+  const mapId = await createEntity(page, 'core.type.hex-map');
   const canvas = page.getByRole('img', { name: 'Hex map' });
   return { canvas, mapId };
 }

@@ -1,11 +1,11 @@
 import { TypeDefinition, ViewId } from '@hexly/web-entity';
-import { CORE_VIEW_CONTENT } from '@hexly/plugin-content/web';
+import { CORE_VIEW_RICH_CONTENT } from '@hexly/plugin-content/web';
 import { DND_MONSTER_TYPE, DND_STAT_BLOCK_KEY } from '@hexly/plugin-dnd';
 
 /**
  * The stat-block View. View ids live in the plugin's own `dnd.view.*` sub-namespace, a keyspace away
- * from the type id (`dnd.monster`), the Field data-type id (`dnd.stat-block`), and the Field id
- * (`dnd.stat_block`) (ADR-0050).
+ * from the type id (`dnd.type.monster`), the Field data-type id (`dnd.datatype.stat-block`), and the Field id
+ * (`dnd.field.stat-block`) (ADR-0050).
  */
 export const DND_VIEW_STAT_BLOCK: ViewId = 'dnd.view.stat-block';
 
@@ -23,9 +23,9 @@ export const DND_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     // References the prose and stat-block Fields by id (ADR-0054); `fields` kept for the World Types editor.
     fieldRefs: DND_MONSTER_TYPE.fieldRefs,
     icon: 'skull',
-    // The stat block placed by its `{ field }` — the `dnd.stat-block` data-type's View, labelled by the
+    // The stat block placed by its `{ field }` — the `dnd.datatype.stat-block` data-type's View, labelled by the
     // Field (ADR-0055) — then the content View by id, so a monster opens on its stats with a Note toggle.
-    views: [{ field: DND_STAT_BLOCK_KEY }, CORE_VIEW_CONTENT],
+    views: [{ field: DND_STAT_BLOCK_KEY }, CORE_VIEW_RICH_CONTENT],
     // The tertiary role from the palette (docs/design/identity.md). Not `--color-ember`, which is
     // Danger.
     graphColorToken: '--color-astra',

@@ -41,7 +41,7 @@ import { EntityViewOutletComponent } from './entity-view-outlet.component';
 export class EntityEmbedHostComponent {
   /** The Embed's target Entity — the outlet drives its own fetch on it. */
   readonly entityId = input<string | null>(null);
-  /** The chosen View's instance key (`core.view.map:core.grid`); `''` selects the target's default View. */
+  /** The chosen View's instance key (`core.view.map:core.field.grid`); `''` selects the target's default View. */
   readonly viewKey = input<string>('');
   /** The transclusion bounds this Embed sits at (ADR-0062). */
   readonly renderContext = input<EntityRenderContext>(DEFAULT_ENTITY_RENDER_CONTEXT);

@@ -24,13 +24,13 @@ describe('WorldTypesPanel', () => {
 
   // The World's registered Fields the picker offers, resolved by id through the registry.
   const domainField = defineField({
-    id: 'world.domain',
+    id: 'world.field.domain',
     label: 'Domain',
     dataType: { kind: 'string' },
     facetable: true,
   });
   const battlemapField = defineField({
-    id: 'world.battlemap',
+    id: 'world.field.battle-map',
     label: 'Battlemap',
     dataType: { kind: CORE_HEX_GRID },
   });
@@ -38,8 +38,8 @@ describe('WorldTypesPanel', () => {
   beforeEach(async () => {
     worlds = new MockWorldsClient();
     worlds.availableTypes.mockReturnValue(of<AvailableType[]>([]));
-    worlds.createType.mockReturnValue(of({ id: 'world.deity', label: 'Deity', fieldRefs: [] }));
-    worlds.updateType.mockReturnValue(of({ id: 'world.deity', label: 'Deity', fieldRefs: [] }));
+    worlds.createType.mockReturnValue(of({ id: 'world.type.deity', label: 'Deity', fieldRefs: [] }));
+    worlds.updateType.mockReturnValue(of({ id: 'world.type.deity', label: 'Deity', fieldRefs: [] }));
     worlds.fields.mockReturnValue(of([domainField, battlemapField]));
     await TestBed.configureTestingModule({
       imports: [WorldTypesPanelComponent, provideTranslocoTesting()],
@@ -87,21 +87,21 @@ describe('WorldTypesPanel', () => {
 
   it('offers the World’s registered Fields as a reference checklist', () => {
     click('type-new');
-    expect(fixture.debugElement.query(By.css('[data-testid="field-ref-world.domain"]'))).toBeTruthy();
-    expect(fixture.debugElement.query(By.css('[data-testid="field-ref-world.battlemap"]'))).toBeTruthy();
+    expect(fixture.debugElement.query(By.css('[data-testid="field-ref-world.field.domain"]'))).toBeTruthy();
+    expect(fixture.debugElement.query(By.css('[data-testid="field-ref-world.field.battle-map"]'))).toBeTruthy();
   });
 
   it('references a Field and posts the type carrying its id, defaulting the generic Field view', () => {
     click('type-new');
     type('type-id-input', 'deity');
     type('type-name-input', 'Deity');
-    click('field-ref-checkbox-world.domain');
+    click('field-ref-checkbox-world.field.domain');
     submit();
 
     expect(worlds.createType).toHaveBeenCalledWith('w1', {
-      id: 'world.deity',
+      id: 'world.type.deity',
       label: 'Deity',
-      fieldRefs: ['world.domain'],
+      fieldRefs: ['world.field.domain'],
       // A string Field places no View; a type with no Structured Data Type Field opens on its Fields (ADR-0051).
       views: [CORE_VIEW_FIELDS],
     });
@@ -111,15 +111,15 @@ describe('WorldTypesPanel', () => {
     click('type-new');
     type('type-id-input', 'deity');
     type('type-name-input', 'Deity');
-    click('field-ref-checkbox-world.battlemap');
+    click('field-ref-checkbox-world.field.battle-map');
     submit();
 
     expect(worlds.createType).toHaveBeenCalledWith('w1', {
-      id: 'world.deity',
+      id: 'world.type.deity',
       label: 'Deity',
-      fieldRefs: ['world.battlemap'],
+      fieldRefs: ['world.field.battle-map'],
       // "Show as a view" defaults on, and the grid's View sits *after* the generic Field view.
-      views: [CORE_VIEW_FIELDS, { field: 'world.battlemap' }],
+      views: [CORE_VIEW_FIELDS, { field: 'world.field.battle-map' }],
     });
   });
 
@@ -127,19 +127,19 @@ describe('WorldTypesPanel', () => {
     click('type-new');
     type('type-id-input', 'deity');
     type('type-name-input', 'Deity');
-    click('field-ref-checkbox-world.battlemap');
-    expect(checked('field-show-as-view-world.battlemap')).toBe(true);
-    click('field-show-as-view-world.battlemap');
+    click('field-ref-checkbox-world.field.battle-map');
+    expect(checked('field-show-as-view-world.field.battle-map')).toBe(true);
+    click('field-show-as-view-world.field.battle-map');
     submit();
 
     const [, req] = worlds.createType.mock.calls[0];
-    expect(req.fieldRefs).toEqual(['world.battlemap']);
+    expect(req.fieldRefs).toEqual(['world.field.battle-map']);
     expect(req.views).toEqual([CORE_VIEW_FIELDS]);
   });
 
   it('mints a new World Field from the inline modal, then references it', () => {
     const element = defineField({
-      id: 'world.element',
+      id: 'world.field.element',
       label: 'Element',
       dataType: { kind: 'string' },
     });
@@ -153,7 +153,7 @@ describe('WorldTypesPanel', () => {
     click('newfield-save');
 
     // No client-chosen id/key: the label drives the `element` segment, and the server derives
-    // `world.element` (ADR-0056).
+    // `world.field.element` (ADR-0056).
     expect(worlds.createField).toHaveBeenCalledWith('w1', {
       segment: 'element',
       label: 'Element',
@@ -178,10 +178,10 @@ describe('WorldTypesPanel', () => {
     worlds.availableTypes.mockReturnValue(
       of<AvailableType[]>([
         {
-          id: 'world.deity',
+          id: 'world.type.deity',
           label: 'Deity',
           source: 'user',
-          fieldRefs: ['world.battlemap'],
+          fieldRefs: ['world.field.battle-map'],
           views: [CORE_VIEW_FIELDS],
         },
       ]),
@@ -189,10 +189,10 @@ describe('WorldTypesPanel', () => {
     fixture.componentInstance.ngOnInit();
     fixture.detectChanges();
 
-    click('edit-world.deity');
+    click('edit-world.type.deity');
     // The grid Field is referenced (checked)…
-    expect(checked('field-ref-checkbox-world.battlemap')).toBe(true);
+    expect(checked('field-ref-checkbox-world.field.battle-map')).toBe(true);
     // …but its View is not placed in the stored order, so "Show as a view" reads back off.
-    expect(checked('field-show-as-view-world.battlemap')).toBe(false);
+    expect(checked('field-show-as-view-world.field.battle-map')).toBe(false);
   });
 });

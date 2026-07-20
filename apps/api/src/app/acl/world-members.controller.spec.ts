@@ -63,7 +63,7 @@ describe('World members', () => {
     return (
       await owner
         .post('/entities')
-        .send({ name: 'Lady Mara', types: ['core.note'], worldId })
+        .send({ name: 'Lady Mara', types: ['core.type.note'], worldId })
         .expect(201)
     ).body.id;
   }

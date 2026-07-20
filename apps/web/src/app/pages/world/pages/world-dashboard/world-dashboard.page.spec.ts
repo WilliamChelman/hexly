@@ -18,7 +18,7 @@ import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { WorldDashboardPage } from './world-dashboard.page';
 
-function summary(id: string, name = id, type: EntityType = 'core.note', updatedAt = 1): EntitySummary {
+function summary(id: string, name = id, type: EntityType = 'core.type.note', updatedAt = 1): EntitySummary {
   return {
     id,
     worldId: 'w1',
@@ -108,7 +108,7 @@ describe('WorldDashboard', () => {
   ) {
     entities.list.mockImplementation((o) => {
       if (o?.ids) return of(page(opts.pinResolve ?? []));
-      return of(page(o?.type?.includes('core.hexmap') ? (opts.maps ?? []) : (opts.recents ?? [])));
+      return of(page(o?.type?.includes('core.type.hex-map') ? (opts.maps ?? []) : (opts.recents ?? [])));
     });
     entities.facets.mockReturnValue(of(opts.facets ?? { type: [], tag: [], visibility: [], fields: [] }));
     fixture = TestBed.createComponent(WorldDashboardPage);
@@ -223,11 +223,11 @@ describe('WorldDashboard', () => {
   it('renders the World’s Hex Maps, fetched with a type=hexmap filter', () => {
     const el = render({
       recents: [summary('n1', 'A note')],
-      maps: [summary('m1', 'The Reach', 'core.hexmap')],
+      maps: [summary('m1', 'The Reach', 'core.type.hex-map')],
     });
 
     // The maps list is a distinct, filtered read.
-    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1', type: ['core.hexmap'] }));
+    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1', type: ['core.type.hex-map'] }));
     expect($(el, '[data-testid=map-m1]')?.textContent).toContain('The Reach');
   });
 
@@ -236,8 +236,8 @@ describe('WorldDashboard', () => {
       recents: [summary('e1')],
       facets: {
         type: [
-          { value: 'core.note', count: 3 },
-          { value: 'core.hexmap', count: 1 },
+          { value: 'core.type.note', count: 3 },
+          { value: 'core.type.hex-map', count: 1 },
         ],
         tag: [],
         visibility: [],
@@ -246,8 +246,8 @@ describe('WorldDashboard', () => {
     });
 
     expect(entities.facets).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1' }));
-    expect($(el, '[data-testid="count-type-core.note"]')?.textContent).toContain('3');
-    expect($(el, '[data-testid="count-type-core.hexmap"]')?.textContent).toContain('1');
+    expect($(el, '[data-testid="count-type-core.type.note"]')?.textContent).toContain('3');
+    expect($(el, '[data-testid="count-type-core.type.hex-map"]')?.textContent).toContain('1');
   });
 
   it('links to the full Entity Browser', () => {
@@ -281,7 +281,7 @@ describe('WorldDashboard', () => {
 
     ($(el, '[data-testid=new-default-entity]') as HTMLButtonElement).click();
 
-    expect(entities.create).toHaveBeenCalledWith(expect.any(String), ['core.note'], 'w1');
+    expect(entities.create).toHaveBeenCalledWith(expect.any(String), ['core.type.note'], 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'new1']);
   });
 });

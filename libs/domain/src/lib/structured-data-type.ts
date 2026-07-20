@@ -4,10 +4,10 @@
  * `entityLink`…), which is a form control over a small value, a structured one is a *document*: a
  * value with its own schema, its own link-edge harvesting, and its own searchable text.
  *
- * A data-type is structured _iff_ its kind is a `namespace.id` id — no boolean flag declares it. The
- * *shape* of a kind is validated in the domain; its *membership* is resolved in the host, so a
- * well-formed but unregistered kind (`core.gird`) fails at resolution, against the set the host
- * composes.
+ * A data-type is structured _iff_ its kind is a `namespace.datatype.name` id — no boolean flag declares
+ * it, and no built-in kind (`string`, `number`) carries the segment. The *shape* of a kind is validated
+ * in the domain; its *membership* is resolved in the host, so a well-formed but unregistered kind
+ * (`core.datatype.hex-gird`) fails at resolution, against the set the host composes.
  *
  * The set is threaded explicitly, never global: {@link validateFields} and {@link deriveDocumentState}
  * take a {@link StructuredDataTypeSet} as a parameter. The domain grows no mutable registry.
@@ -16,15 +16,16 @@
 import { z } from 'zod';
 import type { EntityEdge } from './entity-edges';
 import type { FieldDataType } from './field';
+import { KindedId, kindedIdRegex } from './kinded-id';
 
 /**
- * A structured data-type's id: a `namespace.id` key (`dnd.encounter`), mirroring the Entity Type
- * keyspace. No built-in kind (`string`, `entityLink`) carries a dot, so the two are disjoint at the
- * type level and "structured" narrows.
+ * A structured data-type's id: a `namespace.datatype.name` key (`core.datatype.hex-grid`), carrying the
+ * `datatype` kind segment (see `kinded-id.ts`). No built-in kind (`string`, `entityLink`) carries it,
+ * so the two are disjoint at the type level and "structured" narrows.
  */
-export type StructuredDataTypeId = `${string}.${string}`;
+export type StructuredDataTypeId = KindedId<'datatype'>;
 
-const NAMESPACED_ID = /^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/;
+const STRUCTURED_DATA_TYPE_ID = kindedIdRegex('datatype');
 
 /**
  * A Field's **Vault Projection** slot (CONTEXT.md → Vault Projection, ADR-0051): where its value takes
@@ -77,9 +78,9 @@ export interface VaultProjection {
 
 export const structuredDataTypeIdSchema = z.custom<StructuredDataTypeId>(
   // Exact, never trimmed: the id is a *key* — the one a Field's `kind` is looked up under — so
-  // tolerating ` core.grid ` here would register a data-type that could never be resolved.
-  (value) => typeof value === 'string' && NAMESPACED_ID.test(value),
-  { message: 'A structured data-type must be a `namespace.id` key' },
+  // tolerating ` core.datatype.hex-grid ` here would register a data-type that could never be resolved.
+  (value) => typeof value === 'string' && STRUCTURED_DATA_TYPE_ID.test(value),
+  { message: 'A structured data-type must be a `namespace.datatype.name` key' },
 );
 
 /**
@@ -137,8 +138,8 @@ export interface StructuredDataType {
   harvestFacets?(value: unknown): readonly HarvestedFacet[];
   /**
    * How this value takes its place in an exported Markdown file (CONTEXT.md → Vault Projection). The
-   * data-type supplies the default slot; a Field may override it. `core.rich-content` projects to the
-   * `body`, `core.hex-grid` to `frontmatter`. Absent when the data-type has no opinion (the vault layer
+   * data-type supplies the default slot; a Field may override it. `core.datatype.rich-content` projects to the
+   * `body`, `core.datatype.hex-grid` to `frontmatter`. Absent when the data-type has no opinion (the vault layer
    * then treats the value as ordinary frontmatter).
    */
   readonly vault?: VaultProjection;

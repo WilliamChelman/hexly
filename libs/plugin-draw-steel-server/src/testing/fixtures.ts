@@ -4,7 +4,7 @@
  * `feature` items (the trait source, #258) and the `ability` items (#259), the latter trimmed to the fields
  * the transform reads (type/category/keywords/distance/target/power/effects). Both keep an `img` so a test
  * can prove the transform never copies art into the Entity Document, and both keep an empty `biography`, so a
- * test can prove an empty biography yields no `core.content`. Only a handful are committed; the bulk pack is
+ * test can prove an empty biography yields no `core.field.content`. Only a handful are committed; the bulk pack is
  * never vendored.
  */
 
@@ -1059,7 +1059,7 @@ export const AJAX_MONSTER_FIXTURE = {
         sonic: 0,
       },
     },
-    // Empty in the real actor — so this fixture proves an empty biography yields no `core.content` (#258).
+    // Empty in the real actor — so this fixture proves an empty biography yields no `core.field.content` (#258).
     biography: { value: '<p></p>', director: '', languages: [] },
     // No condition immunities in the real Ajax; the `statuses.immunities` set is the source when present (#258).
     statuses: { immunities: [] },

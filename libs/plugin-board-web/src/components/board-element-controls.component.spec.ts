@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { EntityDetail } from '@hexly/domain';
 import { EmbedElement, ImageElement, TextElement, SURFACE_FIELD } from '@hexly/plugin-board';
-import { emptyContent } from '@hexly/plugin-content';
+import { emptyRichContent } from '@hexly/plugin-content';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { BOARD_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { FakeEntitySession, provideBoardStoreTesting } from '../testing/entity-session.fake';
@@ -43,7 +43,7 @@ function textElement(over: Partial<TextElement> = {}): TextElement {
     position: { x: 0, y: 0 },
     size: { width: 300, height: 160 },
     z: 0,
-    content: emptyContent(),
+    content: emptyRichContent(),
     ...over,
   };
 }
@@ -56,7 +56,7 @@ function boardDetail(element: AnyElement): EntityDetail {
     id: 'board-1',
     worldId: 'w1',
     name: 'A board',
-    types: ['core.board'],
+    types: ['core.type.board'],
     document: { [SURFACE_FIELD.id]: { elements: [element] } },
   } as unknown as EntityDetail;
 }

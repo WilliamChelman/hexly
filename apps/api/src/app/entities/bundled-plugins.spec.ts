@@ -56,10 +56,10 @@ describe('bundled plugin identity', () => {
   });
 
   it('associates each contributed Entity Type with the Plugin that owns it', () => {
-    // The namespace cannot answer this — `core.note` and `core.hexmap` share `core` but belong to
+    // The namespace cannot answer this — `core.type.note` and `core.type.hex-map` share `core` but belong to
     // different Plugins — so the owner is read off each plugin's id.
     expect(BUNDLED_PLUGIN_TYPE_OWNERS.get(CORE_NOTE)).toBe(CONTENT_PLUGIN_ID);
-    expect(BUNDLED_PLUGIN_TYPE_OWNERS.get('core.hexmap')).toBe(HEXMAP_PLUGIN_ID);
+    expect(BUNDLED_PLUGIN_TYPE_OWNERS.get('core.type.hex-map')).toBe(HEXMAP_PLUGIN_ID);
     expect(BUNDLED_PLUGIN_TYPE_OWNERS.get(CORE_BOARD)).toBe(BOARD_PLUGIN_ID);
     expect(BUNDLED_PLUGIN_TYPE_OWNERS.get(DND_MONSTER)).toBe(DND_PLUGIN_ID);
     expect(BUNDLED_PLUGIN_TYPE_OWNERS.get(DS_MONSTER)).toBe(DRAW_STEEL_PLUGIN_ID);
@@ -69,7 +69,7 @@ describe('bundled plugin identity', () => {
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_RICH_CONTENT)).toBe(CONTENT_PLUGIN_ID);
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_HEX_GRID)).toBe(HEXMAP_PLUGIN_ID);
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_BOARD_SURFACE)).toBe(BOARD_PLUGIN_ID);
-    // dnd now owns the `dnd.stat-block` Data Type — the first plugin-contributed harvest source (ADR-0055).
+    // dnd now owns the `dnd.datatype.stat-block` Data Type — the first plugin-contributed harvest source (ADR-0055).
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(DND_STAT_BLOCK)).toBe(DND_PLUGIN_ID);
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(DS_STAT_BLOCK)).toBe(DRAW_STEEL_PLUGIN_ID);
   });
@@ -89,12 +89,12 @@ describe('bundled Plugin Fields', () => {
     expect(ids).toContain(CONTENT_FIELD_ID);
     expect(ids).toContain(HEX_GRID_FIELD_ID);
     expect(ids).toContain(SURFACE_FIELD_ID);
-    expect(ids).toContain('dnd.stat_block');
-    expect(ids).toContain('draw-steel.stat_block');
+    expect(ids).toContain('dnd.field.stat-block');
+    expect(ids).toContain('draw-steel.field.stat-block');
   });
 
   it('declares each Field id exactly once — a plugin references another’s Field by id, never re-declares it', () => {
-    // The hexmap and dnd types both reference `core.content`, but only the content plugin declares it.
+    // The hexmap and dnd types both reference `core.field.content`, but only the content plugin declares it.
     const ids = fields().map((field) => field.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.filter((id) => id === CONTENT_FIELD_ID)).toHaveLength(1);
@@ -109,18 +109,18 @@ describe('bundled Plugin Fields', () => {
 
 /**
  * The bundled **Importer**s fold through the composition root exactly like the type, Field, and
- * data-type sets (ADR-0060). Draw Steel ships the first one — `draw-steel.monsters` (#257) — so the
+ * data-type sets (ADR-0060). Draw Steel ships the first one — `draw-steel.importer.monsters` (#257) — so the
  * enabled set surfaces it; the point is that the fold is wired and a Plugin declaring an Importer
  * surfaces it.
  */
 describe('bundled Importers', () => {
   it('folds each enabled Plugin’s contributed Importers into one set', () => {
     const importers = enabledPluginImporters(loadConfig(':memory:', BUNDLED_PLUGIN_CONFIGS));
-    expect(importers.map((importer) => importer.id)).toContain('draw-steel.monsters');
+    expect(importers.map((importer) => importer.id)).toContain('draw-steel.importer.monsters');
   });
 
   it('carries an Importer a Plugin declares through the serverPlugin normaliser', () => {
-    const importer = { id: 'test.pack', produce: async (): Promise<readonly ImportRecord[]> => [] };
+    const importer = { id: 'test.importer.pack', produce: async (): Promise<readonly ImportRecord[]> => [] };
     expect(serverPlugin({ id: 'test', importers: [importer] }).importers).toEqual([importer]);
     // A Plugin declaring none normalises to an empty set, like the other contributions.
     expect(serverPlugin({ id: 'bare' }).importers).toEqual([]);

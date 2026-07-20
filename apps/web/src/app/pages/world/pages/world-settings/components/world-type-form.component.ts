@@ -20,7 +20,8 @@ import {
   isStructuredDataType,
   slugifyFieldSegment,
   UpdateWorldFieldRequest,
-  USER_TYPE_NAMESPACE,
+  worldTypeIdFromSegment,
+  worldTypeSegment,
   worldFieldIdFromSegment,
 } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
@@ -262,7 +263,7 @@ export class WorldTypeFormComponent {
       }
       return {
         editingId: type.id,
-        slug: type.id.slice(`${USER_TYPE_NAMESPACE}.`.length),
+        slug: worldTypeSegment(type.id),
         label: type.label,
         fieldRefs: [...type.fieldRefs],
         shownAsView,
@@ -375,7 +376,7 @@ export class WorldTypeFormComponent {
     const op$ =
       d.editingId === null
         ? this.worlds.createType(this.worldId(), {
-            id: `${USER_TYPE_NAMESPACE}.${d.slug.trim()}`,
+            id: worldTypeIdFromSegment(d.slug.trim()),
             label,
             fieldRefs: d.fieldRefs,
             views,

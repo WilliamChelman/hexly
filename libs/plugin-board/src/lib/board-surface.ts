@@ -2,13 +2,13 @@
  * The Board Surface document: the free-positioned 2D plane a user composes (CONTEXT.md → Board Surface,
  * Board Element, #263). Its substance is a z-ordered set of **Board Elements**, each carrying geometry
  * (a position and a size) and an explicit integer z-order, plus kind-specific data. The value of the
- * `core.board-surface` **Structured Data Type** (see `board-surface-type.ts`).
+ * `core.datatype.board-surface` **Structured Data Type** (see `board-surface-type.ts`).
  *
  * Framework-free by construction: every mutation is a pure document transition, so the element and
  * z-order helpers are unit-testable without a browser.
  */
 
-import { contentSchema } from '@hexly/plugin-content';
+import { richContentSchema } from '@hexly/plugin-content';
 import { z } from 'zod';
 
 // Coordinates and extents are `.finite()`: a non-finite value (a bad inspector entry, `1e400`) survives
@@ -59,7 +59,7 @@ export const imageElementSchema = z.object({
 
 /**
  * An **Embed** element: geometry plus the target Entity and the chosen **View** it transcludes (ADR-0062).
- * `viewInstance` is the serialized View-instance key (`core.view.map:core.grid`) naming which View of the
+ * `viewInstance` is the serialized View-instance key (`core.view.map:core.field.grid`) naming which View of the
  * target renders in place; an empty string means "the target's default View".
  */
 export const embedElementSchema = z.object({
@@ -72,15 +72,15 @@ export const embedElementSchema = z.object({
 });
 
 /**
- * A **Text Block** element: geometry plus a `core.rich-content` value edited with the same editor as an
- * Entity's Content. Its prose feeds the Board's searchable text and its inline **Entity Links** the link
+ * A **Text Block** element: geometry plus a `core.datatype.rich-content` value edited with the same editor as an
+ * Entity's RichContent. Its prose feeds the Board's searchable text and its inline **Entity Links** the link
  * harvest (CONTEXT.md → Text Block).
  */
 export const textElementSchema = z.object({
   ...baseElementShape,
   kind: z.literal('text'),
-  /** The rich text authored on the surface — a `core.rich-content` value. */
-  content: contentSchema,
+  /** The rich text authored on the surface — a `core.datatype.rich-content` value. */
+  content: richContentSchema,
 });
 
 /** A placed thing on the surface — one of the element kinds, discriminated by `kind`. */

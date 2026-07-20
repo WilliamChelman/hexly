@@ -6,17 +6,18 @@
 
 import { z } from 'zod';
 import { FieldDataType, EntityDocument } from './field';
+import { kindedIdRegex } from './kinded-id';
 
 /**
  * A single Entity Type identity (CONTEXT.md → Entity Type): an **open**,
- * `namespace.id`-keyed string (`core.note`, `dnd.monster`, `world.deity`) — plugins and
- * Worlds extend the set, so this validates only the *shape* of an id, never an
+ * `namespace.type.name`-keyed string (`core.type.note`, `dnd.type.monster`, `world.type.deity`) —
+ * plugins and Worlds extend the set, so this validates only the *shape* of an id, never an
  * enumerated value.
  */
 export const entityTypeSchema = z
   .string()
   .trim()
-  .regex(/^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/, 'An Entity Type must be a `namespace.id` key');
+  .regex(kindedIdRegex('type'), 'An Entity Type must be a `namespace.type.name` key');
 
 /** CONTEXT.md → Entity Type. Open set, so widened to `string`. */
 export type EntityType = z.infer<typeof entityTypeSchema>;

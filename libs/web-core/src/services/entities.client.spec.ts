@@ -25,7 +25,7 @@ describe('EntitiesClient', () => {
     id: 'e1',
     worldId: 'w1',
     name: 'Aldermoor',
-    types: ['core.hexmap'],
+    types: ['core.type.hex-map'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -96,7 +96,7 @@ describe('EntitiesClient', () => {
     id: 'e1',
     worldId: 'w1',
     name: 'Aldermoor',
-    types: ['core.hexmap'],
+    types: ['core.type.hex-map'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -194,23 +194,23 @@ describe('EntitiesClient', () => {
 
   it('creates an entity by name and an ordered type set (#189)', () => {
     let created: EntityDetail | undefined;
-    client.create('Aldermoor', ['core.hexmap', 'dnd.lair']).subscribe((e) => (created = e));
+    client.create('Aldermoor', ['core.type.hex-map', 'dnd.type.lair']).subscribe((e) => (created = e));
 
     const req = http.expectOne('/api/entities');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ name: 'Aldermoor', types: ['core.hexmap', 'dnd.lair'] });
+    expect(req.request.body).toEqual({ name: 'Aldermoor', types: ['core.type.hex-map', 'dnd.type.lair'] });
     req.flush(aldermoor);
 
     expect(created).toEqual(aldermoor);
   });
 
   it('scopes a create to a World and carries initial EntityDocument when given (#189)', () => {
-    client.create('Aldermoor', ['core.hexmap'], 'w9', { cr: 5 }).subscribe();
+    client.create('Aldermoor', ['core.type.hex-map'], 'w9', { cr: 5 }).subscribe();
 
     const req = http.expectOne('/api/entities');
     expect(req.request.body).toEqual({
       name: 'Aldermoor',
-      types: ['core.hexmap'],
+      types: ['core.type.hex-map'],
       worldId: 'w9',
       document: { cr: 5 },
     });
@@ -294,13 +294,13 @@ describe('EntitiesClient', () => {
 
   it('sends the authored type set only when the save carries one (#189)', () => {
     // A type-set edit (add/remove/reorder) rides the save as an active typed edit...
-    client.save('e1', emptyHexmapBody, 1, [], ['core.hexmap', 'core.note']).subscribe();
+    client.save('e1', emptyHexmapBody, 1, [], ['core.type.hex-map', 'core.type.note']).subscribe();
     const typed = http.expectOne('/api/entities/e1');
     expect(typed.request.body).toEqual({
       document: emptyHexmapBody,
       version: 1,
       tags: [],
-      types: ['core.hexmap', 'core.note'],
+      types: ['core.type.hex-map', 'core.type.note'],
     });
     typed.flush(aldermoor);
 

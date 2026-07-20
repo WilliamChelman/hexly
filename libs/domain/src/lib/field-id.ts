@@ -6,16 +6,18 @@
  */
 
 import { z } from 'zod';
+import { kindedIdRegex } from './kinded-id';
 
 /**
- * A first-class Field `id`: a `namespace.id` key that *is* the Entity Document slot the Field lenses —
- * one identifier, the Field's single source of truth (ADR-0056). A rename touches only the `label`,
- * never this key, and no two Fields share it. Same keyspace shape as an Entity Type id.
+ * A first-class Field `id`: a `namespace.field.name` key that *is* the Entity Document slot the Field
+ * lenses — one identifier, the Field's single source of truth (ADR-0056). A rename touches only the
+ * `label`, never this key, and no two Fields share it. The `field` kind segment keeps the keyspace
+ * disjoint from Entity Type and Data Type ids (see `kinded-id.ts`).
  */
 export const fieldIdSchema = z
   .string()
   .trim()
-  .regex(/^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/, 'A Field id must be a `namespace.id` key');
+  .regex(kindedIdRegex('field'), 'A Field id must be a `namespace.field.name` key');
 
 /** A deduped list of Field ids, order preserved — the raw list a Type's `fieldRefs` or an Entity's `fields` normalizes to. */
 export const dedupedFieldIdsSchema = z.array(fieldIdSchema).transform((ids) => [...new Set(ids)]);

@@ -52,7 +52,7 @@ import { TextBlockSession, TEXT_CONTENT_KEY } from '../services/text-block-sessi
   `,
 })
 export class TextBlockComponent {
-  /** The Text Block element this renders — its `core.rich-content` value and geometry. */
+  /** The Text Block element this renders — its `core.datatype.rich-content` value and geometry. */
   readonly element = input.required<TextElement>();
 
   private readonly store = inject(BoardStore);

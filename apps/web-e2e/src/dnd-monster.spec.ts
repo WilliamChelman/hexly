@@ -10,19 +10,19 @@ import {
   test,
 } from './fixtures';
 
-/** The Hex Map's map View toggle: bound to the `grid` Field `core.hexmap` declares. */
+/** The Hex Map's map View toggle: bound to the `grid` Field `core.type.hex-map` declares. */
 const MAP_VIEW = mapViewToggle();
-/** The monster's stat-block View toggle: bound to the `dnd.stat_block` Field `dnd.monster` places (ADR-0055). */
+/** The monster's stat-block View toggle: bound to the `dnd.field.stat-block` Field `dnd.type.monster` places (ADR-0055). */
 const STAT_BLOCK_VIEW = statBlockViewToggle();
-/** The Note View toggle: `dnd.monster` places the content View by id, so it keys plain. */
+/** The Note View toggle: `dnd.type.monster` places the content View by id, so it keys plain. */
 const NOTE_VIEW = contentViewToggle();
 
-test('creates a dnd.monster, fills its stat block, and reads it back', async ({ page, request }) => {
+test('creates a dnd.type.monster, fills its stat block, and reads it back', async ({ page, request }) => {
   await enterLibrary(page);
 
   // The monster's stat block is structured now (ADR-0055), so it has no required *scalar* Field: the
   // create Command mints it blind, like a Note, and the block is filled in place. No create dialog.
-  const id = await createEntity(page, 'dnd.monster');
+  const id = await createEntity(page, 'dnd.type.monster');
   await expect(page.getByTestId('title')).toBeVisible();
 
   // One View per surface: the plugin's stat block and the rich-content Note, defaulting to the
@@ -52,13 +52,13 @@ test('creates a dnd.monster, fills its stat block, and reads it back', async ({ 
   await expect(page.getByTestId('stat-strength').locator('input')).toHaveValue('30');
   await expect(page.getByTestId('stat-size').locator('select')).toHaveValue('Huge');
 
-  // The stat block is one grouped value at the `dnd.stat_block` key of the one EntityDocument map
+  // The stat block is one grouped value at the `dnd.field.stat-block` key of the one EntityDocument map
   // (ADR-0055/0056), so an instance without the plugin keeps it intact as plain document.
   const res = await request.get(`/api/entities/${id}`);
   expect(res.ok()).toBeTruthy();
   const body = await res.json();
-  expect(body.types).toEqual(['dnd.monster']);
-  expect(body.document['dnd.stat_block']).toMatchObject({ challenge_rating: 24, strength: 30, size: 'Huge' });
+  expect(body.types).toEqual(['dnd.type.monster']);
+  expect(body.document['dnd.field.stat-block']).toMatchObject({ challenge_rating: 24, strength: 30, size: 'Huge' });
 });
 
 test('a monster’s harvested dimensions surface in the browser rail by presence, no active Type filter (#231/#236)', async ({
@@ -66,7 +66,7 @@ test('a monster’s harvested dimensions surface in the browser rail by presence
 }) => {
   await enterLibrary(page);
 
-  const id = await createEntity(page, 'dnd.monster');
+  const id = await createEntity(page, 'dnd.type.monster');
   await page.getByTestId('title').waitFor();
   await page.getByTestId('stat-challenge_rating').locator('input').fill('24');
   await page.getByTestId('stat-size').locator('select').selectOption('Huge');
@@ -83,19 +83,19 @@ test('a monster’s harvested dimensions surface in the browser rail by presence
   await expect(page.getByTestId(`open-${id}`)).toBeVisible();
 });
 
-test('a dnd.monster carrying core.hexmap offers the stat block, Note, and Map views', async ({ page }) => {
+test('a dnd.type.monster carrying core.type.hex-map offers the stat block, Note, and Map views', async ({ page }) => {
   await enterLibrary(page);
 
-  await createEntity(page, 'dnd.monster');
+  await createEntity(page, 'dnd.type.monster');
 
   // Add the hexmap type on the open Entity, which mints the empty grid its `grid` Field declares.
-  await addType(page, 'core.hexmap');
+  await addType(page, 'core.type.hex-map');
 
   await expect(page.getByTestId(STAT_BLOCK_VIEW)).toBeVisible();
   await expect(page.getByTestId(NOTE_VIEW)).toBeVisible();
   await expect(page.getByTestId(MAP_VIEW)).toBeVisible();
 
-  // `dnd.monster` is still primary, so its own View stays the default.
+  // `dnd.type.monster` is still primary, so its own View stays the default.
   await expect(page.getByTestId(STAT_BLOCK_VIEW)).toHaveAttribute('aria-pressed', 'true');
 
   // The Map view opens on the empty grid the added type's `grid` Field minted, not a blank frame.

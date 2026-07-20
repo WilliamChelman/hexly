@@ -1,7 +1,7 @@
 /**
- * `core.board-surface` — the Board's surface as a **Structured Data Type** (CONTEXT.md → Board Surface,
- * ADR-0050/0051). `core.board` declares it at the `core.surface` key, so a Board's plane lives in the one
- * EntityDocument map. Follows `core.hex-grid` exactly.
+ * `core.datatype.board-surface` — the Board's surface as a **Structured Data Type** (CONTEXT.md → Board Surface,
+ * ADR-0050/0051). `core.type.board` declares it at the `core.field.surface` key, so a Board's plane lives in the one
+ * EntityDocument map. Follows `core.datatype.hex-grid` exactly.
  */
 
 import {
@@ -15,8 +15,8 @@ import {
 import { extractText, visit } from '@hexly/plugin-content';
 import { BoardSurface, boardSurfaceSchema, emptyBoardSurface } from './board-surface';
 
-/** The `namespace.id` kind naming the surface data-type — what marks the `core.surface` Field structured. */
-export const CORE_BOARD_SURFACE: StructuredDataTypeId = 'core.board-surface';
+/** The `namespace.id` kind naming the surface data-type — what marks the `core.field.surface` Field structured. */
+export const CORE_BOARD_SURFACE: StructuredDataTypeId = 'core.datatype.board-surface';
 
 /**
  * The surface data-type. Its edges are every **Embed**'s target and every inline **Entity Link** inside a
@@ -54,13 +54,13 @@ export const BOARD_SURFACE_DATA_TYPE = defineStructuredDataType({
 });
 
 /** The surface Field's namespaced identifier — its `id`, and (ADR-0056) the EntityDocument key it lenses. */
-export const SURFACE_FIELD_ID = 'core.surface';
+export const SURFACE_FIELD_ID = 'core.field.surface';
 
 /**
- * The Field `core.board` references, and the EntityDocument slice the board editor reads and writes — a
+ * The Field `core.type.board` references, and the EntityDocument slice the board editor reads and writes — a
  * first-class **Plugin Field** ({@link defineField}, ADR-0054), the mirror of the Hex Map's grid Field.
  *
- * Its `id` (`core.surface`) *is* the EntityDocument slot it lenses — one namespaced identifier (ADR-0056).
+ * Its `id` (`core.field.surface`) *is* the EntityDocument slot it lenses — one namespaced identifier (ADR-0056).
  *
  * Not `required`: an absent surface opens as an empty plane and the first edit mints one. Never facetable
  * — a document has no discrete values to count (ADR-0050).

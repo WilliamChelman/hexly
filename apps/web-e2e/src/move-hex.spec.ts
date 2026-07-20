@@ -9,7 +9,7 @@ import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from '
  */
 test('drags a hex under Select to a new coordinate, and the move survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
-  const mapId = await createEntity(page, 'core.hexmap');
+  const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
@@ -71,7 +71,7 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
  */
 test('drags a hex onto an occupied hex and swaps the two, surviving a reload', async ({ page, request }) => {
   await enterLibrary(page);
-  const mapId = await createEntity(page, 'core.hexmap');
+  const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();
@@ -133,7 +133,7 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
  */
 test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', async ({ page }) => {
   await enterLibrary(page);
-  await createEntity(page, 'core.hexmap');
+  await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
@@ -175,7 +175,7 @@ test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', as
  */
 test('drags a multi-hex selection so the whole group moves by one offset', async ({ page, request }) => {
   await enterLibrary(page);
-  const mapId = await createEntity(page, 'core.hexmap');
+  const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();
@@ -228,7 +228,7 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
  */
 test('refuses a blocked group move, leaving every hex where it was', async ({ page, request }) => {
   await enterLibrary(page);
-  const mapId = await createEntity(page, 'core.hexmap');
+  const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();

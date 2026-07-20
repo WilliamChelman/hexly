@@ -1,7 +1,7 @@
 /**
  * The Content plugin's one entry point into the API (ADR-0053), the server mirror of
- * `providePluginContent`. It names `core.note`, the vault-enabled `core.rich-content` data-type (the
- * variant with the Markdown converter the API's vault I/O runs — ADR-0051), and declares `core.note`
+ * `providePluginContent`. It names `core.type.note`, the vault-enabled `core.datatype.rich-content` data-type (the
+ * variant with the Markdown converter the API's vault I/O runs — ADR-0051), and declares `core.type.note`
  * the default Entity Type for an unstamped import.
  *
  * Pulling the vault variant here means the ~160 kB converter toolchain loads through `/server` — the one

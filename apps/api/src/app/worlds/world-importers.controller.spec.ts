@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { HEXLY_SOURCE_KEY, ImportProduction, Importer } from '@hexly/domain';
-import { emptyContent, tiptapContent } from '@hexly/plugin-content';
+import { emptyRichContent, tiptapContent } from '@hexly/plugin-content';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
 import { ConfigModule } from '../config/config.module';
@@ -14,11 +14,16 @@ import { EntitiesModule } from '../entities/entities.module';
 import { ImporterRegistry } from './importer-registry';
 import { WorldsModule } from './worlds.module';
 
-const STUB_ID = 'test.stub';
+const STUB_ID = 'test.importer.stub';
 
 /** One fixture Import Record; `types` defaults to a bare Note so it lists like any Entity. */
 function record(sourceId: string, name: string, extra: Record<string, unknown> = {}) {
-  return { sourceId, name, types: ['core.note'], document: { 'core.content': emptyContent(), ...extra } };
+  return {
+    sourceId,
+    name,
+    types: ['core.type.note'],
+    document: { 'core.field.content': emptyRichContent(), ...extra },
+  };
 }
 
 /**
@@ -78,7 +83,7 @@ describe('World importers', () => {
     const world = await makeWorld(ada);
 
     const res = await ada.get(`/worlds/${world}/importers`).expect(200);
-    // The bundled `draw-steel.monsters` Importer is also registered at boot, so assert the stub is offered
+    // The bundled `draw-steel.importer.monsters` Importer is also registered at boot, so assert the stub is offered
     // rather than that it is the only entry.
     expect(res.body).toContainEqual({ id: STUB_ID, label: 'Stub Importer' });
   });
@@ -220,10 +225,10 @@ describe('World importers', () => {
       .post('/entities')
       .send({
         name: 'Impostor',
-        types: ['core.note'],
+        types: ['core.type.note'],
         worldId: world,
         document: {
-          'core.content': emptyContent(),
+          'core.field.content': emptyRichContent(),
           [HEXLY_SOURCE_KEY]: { importer: STUB_ID, sourceId: 'goblin', rev: 'forged' },
         },
       })
@@ -356,12 +361,12 @@ describe('World importers', () => {
     return (
       await owner
         .post('/entities')
-        .send({ name, types: ['core.note'], worldId })
+        .send({ name, types: ['core.type.note'], worldId })
         .expect(201)
     ).body.id;
   }
 
-  /** Save `id`'s Content as prose holding one `entityLink` to `targetId`. */
+  /** Save `id`'s RichContent as prose holding one `entityLink` to `targetId`. */
   async function link(owner: Agent, id: string, targetId: string): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     await owner
@@ -370,7 +375,7 @@ describe('World importers', () => {
         version: current.version,
         tags: [],
         document: {
-          'core.content': tiptapContent({
+          'core.field.content': tiptapContent({
             type: 'doc',
             content: [{ type: 'paragraph', content: [{ type: 'entityLink', attrs: { entityId: targetId } }] }],
           }),

@@ -38,36 +38,36 @@ describe('CreateCommands', () => {
     // Command — id and label alike — falls out of `types.all()` (#192, #199). Enabling the Draw Steel
     // plugin surfaces its own Monster create affordance beside dnd's (#243).
     expect(commands.map((c) => c.id)).toEqual([
-      'create-core.note',
-      'create-core.hexmap',
-      'create-dnd.monster',
-      'create-draw-steel.monster',
+      'create-core.type.note',
+      'create-core.type.hex-map',
+      'create-dnd.type.monster',
+      'create-draw-steel.type.monster',
     ]);
   });
 
   it('opens the create dialog seeded with the Draw Steel Monster type when its Command runs', async () => {
     const commands = await firstValueFrom(provider.search(''));
-    commands.find((c) => c.id === 'create-draw-steel.monster')?.run();
-    expect(open).toHaveBeenCalledWith(CreateEntityDialogComponent, { type: 'draw-steel.monster' });
+    commands.find((c) => c.id === 'create-draw-steel.type.monster')?.run();
+    expect(open).toHaveBeenCalledWith(CreateEntityDialogComponent, { type: 'draw-steel.type.monster' });
   });
 
   it('opens the create dialog seeded with the Note type when Create Note runs', async () => {
     const [createNote] = await firstValueFrom(provider.search(''));
     createNote.run();
     // The Command seeds the dialog with its type; the dialog lets the author add more (#189).
-    expect(open).toHaveBeenCalledWith(CreateEntityDialogComponent, { type: 'core.note' });
+    expect(open).toHaveBeenCalledWith(CreateEntityDialogComponent, { type: 'core.type.note' });
   });
 
   it('opens the create dialog seeded with the Map type when Create Map runs', async () => {
     const [, createMap] = await firstValueFrom(provider.search(''));
     createMap.run();
-    expect(open).toHaveBeenCalledWith(CreateEntityDialogComponent, { type: 'core.hexmap' });
+    expect(open).toHaveBeenCalledWith(CreateEntityDialogComponent, { type: 'core.type.hex-map' });
   });
 
   it('narrows to commands whose label matches the typed query, case-insensitively', async () => {
     // Matched on the *label* ("Create Map"), which is the plugin's copy now — so the palette finds a
     // plugin's Command by the words the plugin itself ships.
     const commands = await firstValueFrom(provider.search('MAP'));
-    expect(commands.map((c) => c.id)).toEqual(['create-core.hexmap']);
+    expect(commands.map((c) => c.id)).toEqual(['create-core.type.hex-map']);
   });
 });

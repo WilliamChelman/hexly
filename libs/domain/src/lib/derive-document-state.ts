@@ -5,8 +5,8 @@
  * both through this single seam, so a new derived index is a new field on {@link DocumentDerivedState},
  * never a new call site (the friction ADR-0046/0048/0051/0055 spread across three functions).
  *
- * It names no extractor of its own: prose reaches the walk as the `core.rich-content` data-type, a grid
- * as `core.hex-grid`, so a new plugin needs no change here. `doc` is the EntityDocument map, `fields` its
+ * It names no extractor of its own: prose reaches the walk as the `core.datatype.rich-content` data-type, a grid
+ * as `core.datatype.hex-grid`, so a new plugin needs no change here. `doc` is the EntityDocument map, `fields` its
  * resolved effective Field set ({@link resolveEffectiveFields}), and `dataTypes` the host-composed
  * **Structured Data Type** set (ADR-0050); a caller with no type context passes `[]` and the empty set
  * and gets an empty state.

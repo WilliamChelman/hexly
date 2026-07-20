@@ -24,7 +24,7 @@ import { BOARD_TYPE_DEFINITIONS, CORE_VIEW_BOARD } from './board-types';
  * The Board plugin's one entry point into the app (ADR-0048, ADR-0050): `app.config.ts` names this
  * and nothing else.
  *
- * An Instance that omits it still opens existing Boards: `core.board` becomes an unregistered type, so
+ * An Instance that omits it still opens existing Boards: `core.type.board` becomes an unregistered type, so
  * the Entity affords its Content and the generic Field view, and the surface stays put as plain
  * EntityDocument (the absent-plugin degradation of ADR-0048).
  *
@@ -57,12 +57,12 @@ export function providePluginBoard(): EnvironmentProviders {
     providePlugin({
       id: PLUGIN_ID,
       types: BOARD_TYPE_DEFINITIONS,
-      // Declares the surface Field (ADR-0054); the prose `core.content` it references is the content plugin's.
+      // Declares the surface Field (ADR-0054); the prose `core.field.content` it references is the content plugin's.
       fields: [SURFACE_FIELD],
       views: [
         {
           id: CORE_VIEW_BOARD,
-          // The `core.board-surface` data-type's View, not the `core.board` type's: it renders whichever
+          // The `core.datatype.board-surface` data-type's View, not the `core.type.board` type's: it renders whichever
           // surface Field placed it, and takes its toggle's label from that Field — hence no toggle copy
           // of its own (ADR-0050).
           dataType: CORE_BOARD_SURFACE,

@@ -6,13 +6,13 @@ import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { EntityDetail, WorldDetail, WorldVerb } from '@hexly/domain';
-import { emptyContent } from '@hexly/plugin-content';
+import { emptyRichContent } from '@hexly/plugin-content';
 import { CORE_HEXMAP, HEX_GRID_FIELD } from '@hexly/plugin-hexmap';
 import { MockEntitiesClient, MockWorldsClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
 import { EntitiesClient, WorldsClient, ActiveWorld, UserDirectoryClient, AuthClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
 import { CORE_VIEW_MAP, ENTITY_SESSION, viewInstanceKey, OwnerSetComponent } from '@hexly/web-entity';
-import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
+import { CORE_VIEW_RICH_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { EntityViewStore } from '../services/entity-view-store';
 import { ViewRegistry } from '../../../entity-types/view-registry';
 import { CORE_VIEW_DEFINITIONS } from '../views/core-views';
@@ -57,7 +57,7 @@ describe('EntityHeader', () => {
     updatedAt: 1,
     // The default opener is an Owner — full Rights (ADR-0039): writable and can manage sharing.
     rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
-    document: { content: emptyContent(), grid: { hexes: {}, regions: [], labels: [] } },
+    document: { content: emptyRichContent(), grid: { hexes: {}, regions: [], labels: [] } },
   };
 
   /** Open an entity through the real session so the header has one to show/save. */
@@ -332,7 +332,7 @@ describe('EntityHeader', () => {
     expect(title.textContent?.trim()).toBe('Save');
   });
 
-  // Map/Note toggle (#75): a hexmap carries both a grid and a Content body, so the header switches
+  // Map/Note toggle (#75): a hexmap carries both a grid and a RichContent body, so the header switches
   // between the two editor surfaces. The map View is the grid *Field*'s, so its button is keyed and
   // labelled by that Field (ADR-0050).
   it('offers a Map/Note view toggle for a hexmap, with the Map active by default', () => {
@@ -341,7 +341,7 @@ describe('EntityHeader', () => {
     fixture.detectChanges();
 
     const map = fixture.nativeElement.querySelector(`[data-testid="${MAP_VIEW_KEY}"]`) as HTMLButtonElement;
-    const noteBtn = fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement;
+    const noteBtn = fixture.nativeElement.querySelector('[data-testid="core.view.rich-content"]') as HTMLButtonElement;
     expect(map).not.toBeNull();
     expect(noteBtn).not.toBeNull();
     // Labelled from the Field it renders, and still translated: the grid Field ships copy, so its
@@ -358,23 +358,23 @@ describe('EntityHeader', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector(`[data-testid="${MAP_VIEW_KEY}"]`)).toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-testid="core.view.content"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="core.view.rich-content"]')).toBeNull();
     // The title is still editable — a note can be renamed too.
     expect(fixture.nativeElement.textContent).toContain('Lady Mara');
   });
 
-  it('switches to the Content view when Note is clicked', () => {
+  it('switches to the RichContent view when Note is clicked', () => {
     open(aldermoor);
     const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
-    (fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement).click();
+    (fixture.nativeElement.querySelector('[data-testid="core.view.rich-content"]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     // The store is the single owner of the active-View choice (shared with the page body).
-    expect(TestBed.inject(EntityViewStore).activeView()).toEqual({ viewId: CORE_VIEW_CONTENT });
+    expect(TestBed.inject(EntityViewStore).activeView()).toEqual({ viewId: CORE_VIEW_RICH_CONTENT });
     expect(
-      (fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement).getAttribute(
+      (fixture.nativeElement.querySelector('[data-testid="core.view.rich-content"]') as HTMLButtonElement).getAttribute(
         'aria-pressed',
       ),
     ).toBe('true');
@@ -454,12 +454,12 @@ describe('EntityHeader', () => {
 
     const nav = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
-    (fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement).click();
+    (fixture.nativeElement.querySelector('[data-testid="core.view.rich-content"]') as HTMLButtonElement).click();
     // Persisted as the View's key (replaceUrl — a view flip is not a navigation).
     expect(nav).toHaveBeenCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { view: CORE_VIEW_CONTENT },
+        queryParams: { view: CORE_VIEW_RICH_CONTENT },
         replaceUrl: true,
       }),
     );

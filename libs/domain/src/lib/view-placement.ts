@@ -7,9 +7,10 @@
  */
 
 import { z } from 'zod';
+import { kindedIdRegex } from './kinded-id';
 
 /** A View id, opaque here: it resolves against the web's registry, and an unregistered one is inert. */
-const viewIdSchema = z.string().regex(/^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/, 'A View id must be a `namespace.id` key');
+const viewIdSchema = z.string().regex(kindedIdRegex('view'), 'A View id must be a `namespace.view.name` key');
 
 /** A reference to one of the declaring type's own Fields, by the EntityDocument key it types. */
 const fieldViewPlacementSchema = z.object({ field: z.string().trim().min(1) });

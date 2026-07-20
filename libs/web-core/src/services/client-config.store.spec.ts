@@ -28,13 +28,13 @@ describe('ClientConfigStore', () => {
   it('fetches GET /api/config and exposes the enabled-Plugin set and default type', async () => {
     await initWith({
       plugins: { content: { enabled: true }, hexmap: { enabled: false }, dnd: { enabled: true } },
-      entities: { defaultType: 'core.note' },
+      entities: { defaultType: 'core.type.note' },
     });
 
     expect([...store.enabledPlugins()].sort()).toEqual(['content', 'dnd']);
     expect(store.isPluginEnabled('content')).toBe(true);
     expect(store.isPluginEnabled('hexmap')).toBe(false);
-    expect(store.defaultType()).toBe('core.note');
+    expect(store.defaultType()).toBe('core.type.note');
   });
 
   it('starts empty before init resolves, so a read before boot sees no enabled set', () => {

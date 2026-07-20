@@ -16,7 +16,7 @@ function summary(over: Partial<EntitySummary>): EntitySummary {
     id: E1,
     worldId: W1,
     name: 'Aldermoor',
-    types: ['core.note'],
+    types: ['core.type.note'],
     tags: [],
     visibility: 'private',
     version: 1,

@@ -1,6 +1,6 @@
 # Draw Steel Creator License notice
 
-The `draw-steel.monsters` importer imports the _Monsters_ pack, which is © MCDM Productions, LLC and used
+The `draw-steel.importer.monsters` importer imports the _Monsters_ pack, which is © MCDM Productions, LLC and used
 under the **Draw Steel Creator License** (ADR-0061). The content is fetched at import time from a pinned
 commit of the [MetaMorphic-Digital/draw-steel](https://github.com/MetaMorphic-Digital/draw-steel) repo,
 transformed, and discarded — it is not vendored into this repository or the deployed artifact. All art

@@ -83,19 +83,21 @@ export type StructuredDataTypeRef = z.infer<typeof structuredDataTypeRefSchema>;
 
 /**
  * The Field data-type: a built-in, or a plugin-contributed structured one — an **open** set, since a
- * kind is structured *iff* it is namespaced (ADR-0050). A kind that is neither a built-in literal nor
- * `namespace.id`-shaped is rejected here, where the Field is declared.
+ * kind is structured *iff* it carries the `datatype` kind segment (ADR-0050). A kind that is neither a
+ * built-in literal nor `namespace.datatype.name`-shaped is rejected here, where the Field is declared.
  */
 export const fieldDataTypeSchema = z.union([builtInDataTypeSchema, structuredDataTypeRefSchema]);
 
 export type FieldDataType = z.infer<typeof fieldDataTypeSchema>;
 
 /**
- * Whether a data-type *kind* is structured: no built-in kind carries a dot, so the dot is the mark
- * (ADR-0050). Takes a bare kind, for a caller holding one loose (a `<select>`'s string value).
+ * Whether a data-type *kind* is structured: no built-in kind carries the `datatype` segment, so the
+ * segment is the mark (ADR-0050) — and a Field or Type id passed here by mistake reads unstructured
+ * rather than slipping through on its dot. Takes a bare kind, for a caller holding one loose (a
+ * `<select>`'s string value).
  */
 export function isStructuredKind(kind: string): kind is StructuredDataTypeId {
-  return kind.includes('.');
+  return kind.split('.')[1] === 'datatype';
 }
 
 /** Whether a Field's data-type is structured — {@link isStructuredKind}, narrowing the data-type. */

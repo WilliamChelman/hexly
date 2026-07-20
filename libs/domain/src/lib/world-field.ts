@@ -6,8 +6,9 @@
  * forward-only: a deleted World Field simply stops resolving, leaving its document values as plain values
  * rather than erroring.
  *
- * Its `world.<segment>` id is auto-slugged from the `label` on create and frozen (ADR-0056): renaming is
- * label-only, and no re-key path exists.
+ * Its `world.field.<segment>` id is auto-slugged from the `label` on create and frozen (ADR-0056):
+ * renaming is label-only, and no re-key path exists. The `field` kind segment is minted here, never
+ * typed by the user (see `kinded-id.ts`).
  */
 
 import { z } from 'zod';
@@ -15,8 +16,8 @@ import { fieldSchema, fieldSchemaSchema } from './field';
 import { fieldIdSchema } from './field-id';
 
 /**
- * The namespace a World-defined Field id lives under (`world.element`). Reserved, so a World Owner can
- * never shadow a Plugin field id (`dnd.size`, `core.content`). World *scoping* is by storage
+ * The namespace a World-defined Field id lives under (`world.field.element`). Reserved, so a World Owner can
+ * never shadow a Plugin field id (`dnd.field.size`, `core.field.content`). World *scoping* is by storage
  * (`worldId`), not this namespace — the same split {@link USER_TYPE_NAMESPACE} draws for user-defined
  * types.
  */
@@ -51,14 +52,19 @@ export function slugifyFieldSegment(raw: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-/** Build the frozen `world.<segment>` id (== document key) from an editable segment (ADR-0056). */
+/** Build the frozen `world.field.<segment>` id (== document key) from an editable segment (ADR-0056). */
 export function worldFieldIdFromSegment(segment: string): string {
-  return `${USER_FIELD_NAMESPACE}.${slugifyFieldSegment(segment)}`;
+  return `${USER_FIELD_NAMESPACE}.field.${slugifyFieldSegment(segment)}`;
+}
+
+/** The editable segment of a `world.field.<segment>` id — the inverse of {@link worldFieldIdFromSegment}, for form prefill. */
+export function worldFieldSegment(id: string): string {
+  return id.slice(`${USER_FIELD_NAMESPACE}.field.`.length);
 }
 
 /**
  * POST /worlds/:id/fields (ADR-0056): the Field body plus an editable `segment`, never a client-chosen
- * id/key — the server derives `world.<segment>` and returns the resolved Field.
+ * id/key — the server derives `world.field.<segment>` and returns the resolved Field.
  */
 export const createWorldFieldRequestSchema = fieldSchemaSchema.extend({
   segment: z

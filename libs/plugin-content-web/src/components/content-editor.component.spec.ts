@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { EntityDetail } from '@hexly/domain';
-import { Content, CONTENT_FORMAT, tiptapContent } from '@hexly/plugin-content';
+import { RichContent, CONTENT_FORMAT, tiptapContent } from '@hexly/plugin-content';
 import { Editor } from '@tiptap/core';
 import { FakeEntitySession, provideFakeEntitySession } from '@hexly/web-entity/testing';
 import { VIEW_FIELD_KEY } from '@hexly/web-entity';
@@ -20,7 +20,7 @@ const noteDetail = (name: string): EntityDetail => ({
   id: 'n1',
   worldId: 'w1',
   name,
-  types: ['core.note'],
+  types: ['core.type.note'],
   tags: [],
   visibility: 'private',
   version: 1,
@@ -28,7 +28,7 @@ const noteDetail = (name: string): EntityDetail => ({
   createdAt: 1,
   updatedAt: 1,
   rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
-  document: { 'core.content': { format: CONTENT_FORMAT, snapshot: {} } },
+  document: { 'core.field.content': { format: CONTENT_FORMAT, snapshot: {} } },
 });
 
 // Drives ContentEditor via ENTITY_SESSION — the same central store the app binds (ADR-0051): a load
@@ -45,7 +45,7 @@ describe('ContentEditor', () => {
   const noteWithProse = (text: string): EntityDetail => ({
     ...note('Lady Mara'),
     document: {
-      'core.content': {
+      'core.field.content': {
         format: CONTENT_FORMAT,
         snapshot: {
           type: 'doc',
@@ -76,7 +76,7 @@ describe('ContentEditor', () => {
   }
 
   // The EntityDocument key the editor renders, read from VIEW_FIELD_KEY (ADR-0051). `undefined` (the
-  // default, and what most tests use) leaves the editor on its canonical `core.content` fallback; a test
+  // default, and what most tests use) leaves the editor on its canonical `core.field.content` fallback; a test
   // exercising a second prose Field sets it before create().
   let viewFieldKey: string | undefined;
 
@@ -110,7 +110,7 @@ describe('ContentEditor', () => {
     adopt(TestBed.inject(FakeEntitySession), {
       ...note('Lady Mara'),
       document: {
-        'core.content': {
+        'core.field.content': {
           format: CONTENT_FORMAT,
           snapshot: {
             type: 'doc',
@@ -147,7 +147,7 @@ describe('ContentEditor', () => {
     adopt(TestBed.inject(FakeEntitySession), {
       ...note('Lady Mara'),
       document: {
-        'core.content': {
+        'core.field.content': {
           format: CONTENT_FORMAT,
           snapshot: {
             type: 'doc',
@@ -232,7 +232,7 @@ describe('ContentEditor', () => {
     const fixture = create();
     const first = editorOf(fixture);
 
-    // A conflict reload / Entity swap re-seeds with the server's stored Content.
+    // A conflict reload / Entity swap re-seeds with the server's stored RichContent.
     adopt(session, noteWithProse('Reseeded prose.'));
     fixture.detectChanges();
     const second = editorOf(fixture);
@@ -265,7 +265,7 @@ describe('ContentEditor', () => {
 
     // The user edits: the editor commits the new prose into the body (no loadGeneration tick).
     session.mutate((body) => {
-      body['core.content'] = tiptapContent({
+      body['core.field.content'] = tiptapContent({
         type: 'doc',
         content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Edited prose.' }] }],
       });
@@ -310,12 +310,12 @@ describe('ContentEditor', () => {
     session.editors.forEach((editor) => editor.flushPendingCommit());
 
     expect(spy).toHaveBeenCalled();
-    expect(JSON.stringify((session.doc()['core.content'] as Content).snapshot)).toContain('!');
+    expect(JSON.stringify((session.doc()['core.field.content'] as RichContent).snapshot)).toContain('!');
   });
 
   it('reads and writes the Field named by VIEW_FIELD_KEY, not the canonical content key (ADR-0051)', () => {
     // A World type's second prose Field (`secrets`) is edited by this same component, placed by
-    // `{ field: 'secrets' }` — so the editor seeds from and commits to that key, leaving `core.content` be.
+    // `{ field: 'secrets' }` — so the editor seeds from and commits to that key, leaving `core.field.content` be.
     viewFieldKey = 'secrets';
     const session = TestBed.inject(FakeEntitySession);
     session.loadDoc({
@@ -331,10 +331,10 @@ describe('ContentEditor', () => {
     const surface = fixture.nativeElement.querySelector('[data-testid=note-content]') as HTMLElement;
     expect(surface.textContent).toContain('GM only.');
 
-    // An edit commits back into `secrets`; the canonical `core.content` is never touched.
+    // An edit commits back into `secrets`; the canonical `core.field.content` is never touched.
     editorOf(fixture).commands.insertContent('!');
     session.editors.forEach((editor) => editor.flushPendingCommit());
-    expect(JSON.stringify((session.doc()['secrets'] as Content).snapshot)).toContain('!');
-    expect(session.doc()['core.content']).toBeUndefined();
+    expect(JSON.stringify((session.doc()['secrets'] as RichContent).snapshot)).toContain('!');
+    expect(session.doc()['core.field.content']).toBeUndefined();
   });
 });
