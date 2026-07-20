@@ -428,6 +428,33 @@ describe('BoardStore Image', () => {
     store.undo();
     expect((store.document().elements[0] as ImageElement).assetUrl).toBe(UPLOADED_URL);
   });
+
+  it('starts an Image with its aspect-ratio lock off', () => {
+    const store = makeStore();
+    const id = store.addImage({ x: 0, y: 0 }, UPLOADED_URL);
+    expect((store.document().elements.find((e) => e.id === id) as ImageElement).lockRatio).toBe(false);
+  });
+
+  it('toggles the aspect-ratio lock through setLockRatio, as one undoable step', () => {
+    const store = makeStore();
+    const id = store.addImage({ x: 0, y: 0 }, UPLOADED_URL);
+
+    store.setLockRatio(id, true);
+    expect((store.document().elements[0] as ImageElement).lockRatio).toBe(true);
+
+    store.undo();
+    expect((store.document().elements[0] as ImageElement).lockRatio).toBe(false);
+  });
+
+  it('setLockRatio is a no-op (no undo step) for a non-image element', () => {
+    const store = makeStore();
+    const box = store.addElement({ x: 0, y: 0 });
+    const undoBefore = store.canUndo();
+    store.setLockRatio(box, true);
+    // The box grew no spurious field, and the stray call recorded nothing to undo.
+    expect(store.canUndo()).toBe(undoBefore);
+    expect((store.document().elements[0] as Record<string, unknown>)['lockRatio']).toBeUndefined();
+  });
 });
 
 describe('BoardStore Embed elements', () => {

@@ -283,4 +283,31 @@ describe('resizeGeometry', () => {
     expect(size.height).toBe(20);
     expect(position).toEqual({ x: 90, y: 80 }); // right(110)-20, bottom(100)-20
   });
+
+  describe('with a locked aspect ratio', () => {
+    // A 2:1 origin (100×50), so the derived dimension is easy to read off.
+    const ratioOrigin = { position: { x: 10, y: 20 }, size: { width: 100, height: 50 } };
+
+    it('derives the height from the width on a corner drag, holding the ratio', () => {
+      const { position, size } = resizeGeometry(ratioOrigin, 'se', 100, 0, 2);
+      // Width follows the pointer (200); height derives to keep 2:1; top-left stays anchored.
+      expect(size).toEqual({ width: 200, height: 100 });
+      expect(position).toEqual({ x: 10, y: 20 });
+    });
+
+    it('derives the width from the height on a vertical edge, re-anchoring the moved edge', () => {
+      const { position, size } = resizeGeometry(ratioOrigin, 'n', 0, -50, 2);
+      // Dragging the north edge up by 50 makes height 100; width derives to 200 to hold 2:1.
+      expect(size).toEqual({ width: 200, height: 100 });
+      // The north edge re-anchors against the corrected height (bottom=70 stays put); x is unchanged.
+      expect(position).toEqual({ x: 10, y: -30 });
+    });
+
+    it('keeps both dimensions on the ratio when one would breach the floor', () => {
+      const { size } = resizeGeometry(ratioOrigin, 'se', -95, 0, 2);
+      // Collapsing the width would drive the derived height (10) below the 20px floor; the height pins at
+      // 20 and the width re-derives to 40 — the smallest box still on the 2:1 ratio.
+      expect(size).toEqual({ width: 40, height: 20 });
+    });
+  });
 });

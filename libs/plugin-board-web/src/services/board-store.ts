@@ -252,6 +252,7 @@ export class BoardStore {
       size: { ...DEFAULT_IMAGE_SIZE },
       z: 0,
       assetUrl,
+      lockRatio: false,
     });
     return id;
   }
@@ -286,6 +287,18 @@ export class BoardStore {
     this.commit((surface) => {
       const element = surface.elements.find((e) => e.id === id);
       if (element?.kind === 'embed') element.viewInstance = viewInstance;
+    });
+  }
+
+  /**
+   * Toggle an **Image**'s aspect-ratio lock (the selection controls, CONTEXT.md → Image), as one undoable
+   * step. A no-op — no undo step — for a missing id or a non-image element, so a stray call never grows a
+   * spurious field on another kind.
+   */
+  setLockRatio(id: string, lock: boolean): void {
+    this.commit((surface) => {
+      const element = surface.elements.find((e) => e.id === id);
+      if (element?.kind === 'image') element.lockRatio = lock;
     });
   }
 

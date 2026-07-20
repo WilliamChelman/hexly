@@ -20,6 +20,7 @@ const image = (id: string, z = 0): ImageElement => ({
   id,
   kind: 'image',
   assetUrl: `https://assets/${id}.png`,
+  lockRatio: false,
   position: { x: 0, y: 0 },
   size: { width: 10, height: 10 },
   z,

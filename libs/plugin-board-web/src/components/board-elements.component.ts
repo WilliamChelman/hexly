@@ -6,6 +6,7 @@ import { BoardStore } from '../services/board-store';
 import { DRAG_THRESHOLD } from '../utils/gesture';
 import { BoardImageComponent } from './board-image.component';
 import { BoardEmbedComponent } from './board-embed.component';
+import { BoardElementControlsComponent } from './board-element-controls.component';
 import { TextBlockComponent } from './text-block.component';
 import { toolForHotkey } from './tools';
 
@@ -65,6 +66,8 @@ type Gesture =
       id: string;
       dir: Corner;
       origin: { position: Point; size: Size };
+      /** The width/height to hold constant (a ratio-locked Image), or undefined for a free resize. */
+      lockAspect?: number;
     };
 
 /**
@@ -91,7 +94,7 @@ type Gesture =
   selector: 'app-board-elements',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'absolute inset-0 pointer-events-none overflow-hidden' },
-  imports: [TranslocoPipe, TextBlockComponent, BoardImageComponent, BoardEmbedComponent],
+  imports: [TranslocoPipe, TextBlockComponent, BoardImageComponent, BoardEmbedComponent, BoardElementControlsComponent],
   template: `
     @for (el of rendered(); track el.id) {
       <div
@@ -144,6 +147,12 @@ type Gesture =
           }
         }
       </div>
+      <!-- The selection control strip for an Image/Embed/Text Block (CONTEXT.md → Image/Embed/Text Block):
+           a sibling of the box, not a child — an Image/Embed box is overflow-hidden and would clip a toolbar
+           floated above its top edge. Boxes (no kind-specific controls) show none. -->
+      @if (!readOnly() && el.selected && single() && (el.image || el.embed || el.text)) {
+        <app-board-element-controls [element]="(el.image ?? el.embed ?? el.text)!" [left]="el.left" [top]="el.top" />
+      }
     }
   `,
   styles: `
@@ -304,6 +313,9 @@ export class BoardElementsComponent {
     (event.target as Element).setPointerCapture?.(event.pointerId);
     const element = this.store.document().elements.find((e) => e.id === id);
     if (!element) return;
+    // A ratio-locked Image holds its current aspect through the drag; every other element resizes freely.
+    const lockAspect =
+      element.kind === 'image' && element.lockRatio ? element.size.width / element.size.height : undefined;
     this.gesture = {
       kind: 'resize',
       startX: event.clientX,
@@ -311,6 +323,7 @@ export class BoardElementsComponent {
       id,
       dir,
       origin: { position: { ...element.position }, size: { ...element.size } },
+      lockAspect,
     };
   }
 
@@ -331,7 +344,10 @@ export class BoardElementsComponent {
       if (gesture.moved) this.moveDelta.set({ x: worldDx, y: worldDy });
       return;
     }
-    this.resizePreview.set({ id: gesture.id, ...resizeGeometry(gesture.origin, gesture.dir, worldDx, worldDy) });
+    this.resizePreview.set({
+      id: gesture.id,
+      ...resizeGeometry(gesture.origin, gesture.dir, worldDx, worldDy, gesture.lockAspect),
+    });
   }
 
   @HostListener('document:pointerup', ['$event'])
@@ -405,13 +421,17 @@ export class BoardElementsComponent {
 /**
  * The new position/size a resize handle `dir` yields, given the element's `origin` geometry and the
  * world-space drag delta. The edge opposite each dragged edge stays fixed, and neither dimension shrinks
- * below {@link MIN_SIZE}. Pure — unit-testable without a DOM.
+ * below {@link MIN_SIZE}. With `lockAspect` (width/height) the result holds that ratio — a corner and the
+ * horizontal edges track the pointer's width and derive the height, a vertical edge tracks height and
+ * derives width — then the dragged edges re-anchor against the corrected size. Pure — unit-testable
+ * without a DOM.
  */
 export function resizeGeometry(
   origin: { position: Point; size: Size },
   dir: Corner,
   worldDx: number,
   worldDy: number,
+  lockAspect?: number,
 ): { position: Point; size: Size } {
   let { x } = origin.position;
   let { y } = origin.position;
@@ -429,7 +449,37 @@ export function resizeGeometry(
     y = Math.min(origin.position.y + worldDy, bottom - MIN_SIZE);
     height = bottom - y;
   }
+
+  if (lockAspect && lockAspect > 0) {
+    ({ width, height } = constrainToAspect(dir, width, height, lockAspect));
+    // Re-anchor the dragged edges against the aspect-corrected size, so the opposite edge stays put.
+    if (dir.includes('w')) x = right - width;
+    if (dir.includes('n')) y = bottom - height;
+  }
   return { position: { x, y }, size: { width, height } };
+}
+
+/**
+ * Fold `width`/`height` onto the `aspect` (width/height): a vertical-only edge drives from height, every
+ * other handle (corners and horizontal edges) drives from width. Whichever dimension would fall below
+ * {@link MIN_SIZE} pins there and re-derives the other, so neither can undercut the floor.
+ */
+function constrainToAspect(dir: Corner, width: number, height: number, aspect: number): Size {
+  const horizontal = dir.includes('e') || dir.includes('w');
+  const vertical = dir.includes('n') || dir.includes('s');
+  let w = width;
+  let h = height;
+  if (vertical && !horizontal) w = height * aspect;
+  else h = width / aspect;
+  if (w < MIN_SIZE) {
+    w = MIN_SIZE;
+    h = w / aspect;
+  }
+  if (h < MIN_SIZE) {
+    h = MIN_SIZE;
+    w = h * aspect;
+  }
+  return { width: w, height: h };
 }
 
 /** Whether `target` is a text input the user is typing into — so shortcuts don't hijack its keys. */
