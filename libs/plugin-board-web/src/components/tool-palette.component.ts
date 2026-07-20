@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { IconButtonComponent, IconComponent, IconPathComponent, PanelComponent, RuleComponent } from '@hexly/web-ui';
+import { IconButtonComponent, IconComponent, PanelComponent, RuleComponent } from '@hexly/web-ui';
 import { BoardStore } from '../services/board-store';
 import { TOOLS } from './tools';
 
@@ -16,7 +16,7 @@ import { TOOLS } from './tools';
   selector: 'app-board-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex items-start gap-2' },
-  imports: [IconButtonComponent, IconComponent, IconPathComponent, PanelComponent, RuleComponent, TranslocoPipe],
+  imports: [IconButtonComponent, IconComponent, PanelComponent, RuleComponent, TranslocoPipe],
   template: `
     <div
       class="flex flex-col gap-2 p-2 min-h-0 max-h-full overflow-y-auto"
@@ -35,11 +35,7 @@ import { TOOLS } from './tools';
           [attr.data-testid]="'tool-' + t.id"
           (click)="store.armTool(t.id)"
         >
-          @if (t.icon; as icon) {
-            <app-icon [name]="icon" [size]="20" />
-          } @else if (t.path; as path) {
-            <app-icon-path [d]="path" [size]="20" />
-          }
+          <app-icon [name]="t.glyph" [size]="20" />
         </button>
       }
 
@@ -71,12 +67,10 @@ import { TOOLS } from './tools';
 export class ToolPaletteComponent {
   protected readonly store = inject(BoardStore);
 
-  // Keycap is the hotkey upper-cased for display. The glyph is flattened to its two cases — a built-in
-  // icon, or this lib's own path art — because a template cannot narrow a union.
+  // Keycap is the hotkey upper-cased for display; the glyph is an icon name drawn by `<app-icon>`.
   protected readonly tools = TOOLS.map((t) => ({
     id: t.id,
-    icon: 'icon' in t.glyph ? t.glyph.icon : undefined,
-    path: 'path' in t.glyph ? t.glyph.path : undefined,
+    glyph: t.glyph,
     key: t.hotkey.toUpperCase(),
   }));
 }
