@@ -28,7 +28,7 @@ test('a World Owner runs the fixture-backed Draw Steel import and sees the run s
   // polls the reconcile home (ADR-0060), so arm the response wait before the click.
   const started = page.waitForResponse(
     (r) =>
-      /\/api\/worlds\/[\w-]+\/importers\/draw-steel\.monsters\/run$/.test(r.url()) &&
+      /\/api\/worlds\/[\w-]+\/importers\/draw-steel\.importer\.monsters\/run$/.test(r.url()) &&
       r.request().method() === 'POST' &&
       r.status() === 202,
   );
