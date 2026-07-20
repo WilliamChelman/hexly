@@ -1,7 +1,13 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { SlashItem } from '../models/slash-menu-items';
-import { ListboxController, ListboxProps, ListboxEmptyComponent, ListboxOptionComponent } from '@hexly/web-ui';
+import {
+  ListboxController,
+  ListboxProps,
+  ListboxEmptyComponent,
+  ListboxOptionComponent,
+  BodyPortalDirective,
+} from '@hexly/web-ui';
 
 /** What the slash suggestion plugin hands the menu on open/update. */
 export type SlashMenuProps = ListboxProps<SlashItem>;
@@ -14,10 +20,11 @@ export type SlashMenuProps = ListboxProps<SlashItem>;
 @Component({
   selector: 'app-slash-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, ListboxOptionComponent, ListboxEmptyComponent],
+  imports: [TranslocoPipe, ListboxOptionComponent, ListboxEmptyComponent, BodyPortalDirective],
   template: `
     @if (visible()) {
       <ul
+        appBodyPortal
         role="listbox"
         data-testid="slash-menu"
         [attr.aria-label]="'editor.slashMenu.label' | transloco"

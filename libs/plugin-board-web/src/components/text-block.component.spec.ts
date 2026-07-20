@@ -49,17 +49,21 @@ describe('TextBlockComponent', () => {
     return { store, id, fixture };
   }
 
-  it('mounts the Content editor when armed and shows the static display when not', () => {
+  it('renders one Content editor, editable only while armed (#268)', () => {
     const { store, fixture } = setup();
 
-    // addText armed the block → the live editor is mounted.
+    const editor = fixture.debugElement.query(By.directive(ContentEditorComponent)).componentInstance as {
+      editor: () => Editor | null;
+    };
+    // addText armed the block → the same editor is mounted and editable.
     expect(fixture.nativeElement.querySelector('[data-testid=note-content]')).not.toBeNull();
+    expect(editor.editor()!.isEditable).toBe(true);
 
     store.disarm();
     fixture.detectChanges();
-    // Disarmed → the read-only display renders, the editor is gone.
-    expect(fixture.nativeElement.querySelector('[data-testid=note-content]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('app-content-display')).not.toBeNull();
+    // Disarmed → the *same* editor stays mounted but turns read-only (no separate display component).
+    expect(fixture.nativeElement.querySelector('[data-testid=note-content]')).not.toBeNull();
+    expect(editor.editor()!.isEditable).toBe(false);
   });
 
   it('commits prose typed into the armed editor back into the Text Block through the store', () => {

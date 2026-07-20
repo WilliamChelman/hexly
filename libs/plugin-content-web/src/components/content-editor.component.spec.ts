@@ -210,9 +210,11 @@ describe('ContentEditor', () => {
     await new Promise((resolve) => setTimeout(resolve));
     fixture.detectChanges();
 
-    const menu = fixture.nativeElement.querySelector('[data-testid=slash-menu]');
+    // The slash menu is a caret-anchored popup teleported to <body> (BodyPortalDirective), so it escapes
+    // any `transform` ancestor (the Board's zoomed Text Block); query the document, not the fixture root.
+    const menu = document.body.querySelector('[data-testid=slash-menu]');
     expect(menu).not.toBeNull();
-    expect(menu.textContent).toContain('Heading 1');
+    expect(menu!.textContent).toContain('Heading 1');
   });
 
   it('mounts the formatting bubble menu', () => {

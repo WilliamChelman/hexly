@@ -1,9 +1,16 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { ActivatedRoute, provideRouter } from '@angular/router';
+import { of } from 'rxjs';
 import { tiptapContent } from '@hexly/plugin-content';
+import { CONTENT_EDITOR_TEST_CATALOGS } from '@hexly/plugin-content/testing';
+import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { BOARD_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { BoardStore } from '../services/board-store';
 import { BoardCamera } from '../services/board-camera';
+import { Camera } from '../utils/camera';
 import { provideBoardStoreTesting } from '../testing/entity-session.fake';
 import { BoardElementsComponent, resizeGeometry } from './board-elements.component';
 
@@ -11,11 +18,24 @@ function press(key: string, init: KeyboardEventInit = {}): void {
   window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...init }));
 }
 
+// A Text Block now renders the real Content editor for both faces (#268), so any test that mounts one
+// needs the editor's ambient deps — mirrors the TextBlock/ContentEditor harnesses.
+const contentEditorHarness = () => [
+  EntityNameResolver,
+  provideHttpClient(),
+  provideHttpClientTesting(),
+  provideRouter([]),
+  { provide: ActivatedRoute, useValue: { fragment: of(null) } },
+];
+
 describe('BoardElements rendering', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [BoardElementsComponent, provideTranslocoTesting(BOARD_TEST_CATALOGS)],
-      providers: [...provideBoardStoreTesting(), BoardCamera],
+      imports: [
+        BoardElementsComponent,
+        provideTranslocoTesting({ ...BOARD_TEST_CATALOGS, ...CONTENT_EDITOR_TEST_CATALOGS }),
+      ],
+      providers: [...provideBoardStoreTesting(), BoardCamera, ...contentEditorHarness()],
     }).compileComponents();
   });
 
@@ -38,6 +58,25 @@ describe('BoardElements rendering', () => {
     expect(box.style.top).toBe('40px');
     expect(box.style.width).toBe('160px');
     expect(box.style.height).toBe('120px');
+  });
+
+  it('scales content by the camera zoom while sizing the box in screen space', () => {
+    const { store, fixture } = setup();
+    const cam = TestBed.inject(BoardCamera);
+    const id = store.addElement({ x: 0, y: 0 });
+    cam.set(Camera.initial().zoomAt({ x: 0, y: 0 }, 2)); // zoom 2×, world origin fixed at screen origin
+    fixture.detectChanges();
+
+    const box = fixture.nativeElement.querySelector(`[data-testid=element-${id}]`) as HTMLElement;
+    // Box is screen-sized (world 160×120 × zoom 2)…
+    expect(box.style.width).toBe('320px');
+    expect(box.style.height).toBe('240px');
+    // …while the content wrapper stays world-sized and carries the scale, so the prose/image/embed
+    // inside zooms with the box instead of reflowing at native size.
+    const content = box.querySelector('.content') as HTMLElement;
+    expect(content.style.width).toBe('160px');
+    expect(content.style.height).toBe('120px');
+    expect(content.style.scale).toBe('2');
   });
 
   it('shows resize handles only on a single selected element', () => {
@@ -114,8 +153,11 @@ describe('BoardElements rendering', () => {
 describe('BoardElements read-only (ADR-0062 transclusion / read-only viewer)', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [BoardElementsComponent, provideTranslocoTesting(BOARD_TEST_CATALOGS)],
-      providers: [...provideBoardStoreTesting(), BoardCamera],
+      imports: [
+        BoardElementsComponent,
+        provideTranslocoTesting({ ...BOARD_TEST_CATALOGS, ...CONTENT_EDITOR_TEST_CATALOGS }),
+      ],
+      providers: [...provideBoardStoreTesting(), BoardCamera, ...contentEditorHarness()],
     }).compileComponents();
   });
 
@@ -183,8 +225,11 @@ describe('BoardElements keyboard', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [BoardElementsComponent, provideTranslocoTesting(BOARD_TEST_CATALOGS)],
-      providers: [...provideBoardStoreTesting(), BoardCamera],
+      imports: [
+        BoardElementsComponent,
+        provideTranslocoTesting({ ...BOARD_TEST_CATALOGS, ...CONTENT_EDITOR_TEST_CATALOGS }),
+      ],
+      providers: [...provideBoardStoreTesting(), BoardCamera, ...contentEditorHarness()],
     }).compileComponents();
     const fixture = TestBed.createComponent(BoardElementsComponent);
     fixture.detectChanges();

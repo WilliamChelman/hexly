@@ -1,18 +1,24 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CartoucheComponent,
   ChipComponent,
   CoordComponent,
+  DialogComponent,
+  DotComponent,
   EyebrowComponent,
   FieldComponent,
   IconButtonComponent,
   IconComponent,
   InputComponent,
   KbdComponent,
+  ListboxOptionComponent,
+  PageHeaderComponent,
   PanelComponent,
+  RuleComponent,
   SelectComponent,
   SwatchComponent,
   TextareaComponent,
@@ -36,15 +42,21 @@ interface TypeRow {
     RouterLink,
     TranslocoPipe,
     ButtonComponent,
+    ButtonGroupComponent,
     CartoucheComponent,
     ChipComponent,
     CoordComponent,
+    DialogComponent,
+    DotComponent,
     SelectComponent,
     EyebrowComponent,
     FieldComponent,
     InputComponent,
     IconButtonComponent,
     IconComponent,
+    ListboxOptionComponent,
+    PageHeaderComponent,
+    RuleComponent,
     SwatchComponent,
     KbdComponent,
     PanelComponent,
@@ -161,8 +173,22 @@ interface TypeRow {
               <button appButton danger>
                 {{ 'styleguide.clearHex' | transloco }}
               </button>
+            </div>
+            <div class="specimen-row">
               <button appButton size="sm">
                 {{ 'styleguide.small' | transloco }}
+              </button>
+              <button appButton variant="primary" size="sm">
+                {{ 'styleguide.smallPrimary' | transloco }}
+              </button>
+              <button appButton active>
+                {{ 'styleguide.activeState' | transloco }}
+              </button>
+              <button appButton variant="ghost" danger>
+                {{ 'styleguide.ghostDanger' | transloco }}
+              </button>
+              <button appButton icon [attr.aria-label]="'styleguide.addRegion' | transloco">
+                <app-icon name="plus" [size]="18" />
               </button>
             </div>
           </figure>
@@ -204,6 +230,14 @@ interface TypeRow {
               >
                 <app-icon name="undo" [size]="20" />
               </button>
+              <button
+                appIconButton
+                size="sm"
+                [title]="'styleguide.iconSettings' | transloco"
+                [attr.aria-label]="'styleguide.iconSettings' | transloco"
+              >
+                <app-icon name="settings" [size]="16" />
+              </button>
             </div>
           </figure>
 
@@ -240,6 +274,169 @@ interface TypeRow {
                   <option>Ocean</option>
                 </select>
               </label>
+            </div>
+          </figure>
+
+          <figure class="specimen" appPanel>
+            <figcaption appEyebrow>
+              {{ 'styleguide.buttonGroup' | transloco }}
+            </figcaption>
+            <div class="specimen-row">
+              <div appButtonGroup [attr.aria-label]="'styleguide.viewLabel' | transloco">
+                <button appButton variant="ghost" size="sm" active aria-pressed="true">
+                  {{ 'styleguide.viewMap' | transloco }}
+                </button>
+                <button appButton variant="ghost" size="sm" aria-pressed="false">
+                  {{ 'styleguide.viewNote' | transloco }}
+                </button>
+                <button appButton variant="ghost" size="sm" aria-pressed="false">
+                  {{ 'styleguide.viewGraph' | transloco }}
+                </button>
+              </div>
+            </div>
+          </figure>
+
+          <figure class="specimen" appPanel>
+            <figcaption appEyebrow>
+              {{ 'styleguide.eyebrows' | transloco }}
+            </figcaption>
+            <div class="specimen-col">
+              <span appEyebrow>{{ 'styleguide.eyebrowPlain' | transloco }}</span>
+              <span appEyebrow mark>{{ 'styleguide.eyebrowMarked' | transloco }}</span>
+            </div>
+          </figure>
+
+          <figure class="specimen" appPanel>
+            <figcaption appEyebrow>
+              {{ 'styleguide.cartouche' | transloco }}
+            </figcaption>
+            <div class="specimen-row">
+              <span class="text-2xl text-gold" appCartouche>Hexly</span>
+            </div>
+          </figure>
+
+          <figure class="specimen" appPanel>
+            <figcaption appEyebrow>
+              {{ 'styleguide.swatches' | transloco }}
+            </figcaption>
+            <div class="specimen-row">
+              @for (s of terrain; track s.token) {
+                <span appSwatch [style.background]="'var(' + s.token + ')'" [title]="s.nameKey | transloco"></span>
+              }
+            </div>
+          </figure>
+
+          <figure class="specimen" appPanel>
+            <figcaption appEyebrow>
+              {{ 'styleguide.dots' | transloco }}
+            </figcaption>
+            <div class="specimen-row">
+              <span class="inline-flex items-center gap-2 text-sm text-ink-muted">
+                <span appDot></span>{{ 'styleguide.dotIdle' | transloco }}
+              </span>
+              <span class="inline-flex items-center gap-2 text-sm text-ink-muted">
+                <span appDot positive></span>{{ 'styleguide.dotHealthy' | transloco }}
+              </span>
+            </div>
+          </figure>
+
+          <figure class="specimen" appPanel>
+            <figcaption appEyebrow>
+              {{ 'styleguide.rule' | transloco }}
+            </figcaption>
+            <div class="specimen-col text-sm text-ink-muted">
+              <span>{{ 'styleguide.ruleBefore' | transloco }}</span>
+              <hr appRule />
+              <span>{{ 'styleguide.ruleAfter' | transloco }}</span>
+            </div>
+          </figure>
+
+          <figure class="specimen" appPanel>
+            <figcaption appEyebrow>
+              {{ 'styleguide.panels' | transloco }}
+            </figcaption>
+            <div class="specimen-row">
+              <span class="specimen-panel" appPanel>{{ 'styleguide.panelDefault' | transloco }}</span>
+              <span class="specimen-panel" appPanel raised>{{ 'styleguide.panelRaised' | transloco }}</span>
+              <span class="specimen-panel" appPanel flush>{{ 'styleguide.panelFlush' | transloco }}</span>
+            </div>
+          </figure>
+
+          <figure class="specimen" appPanel>
+            <figcaption appEyebrow>
+              {{ 'styleguide.listbox' | transloco }}
+            </figcaption>
+            <ul
+              role="listbox"
+              [attr.aria-label]="'styleguide.fieldTerrain' | transloco"
+              class="w-full max-w-64 overflow-auto rounded-md border border-line bg-surface py-1 shadow-2"
+            >
+              <li appListboxOption optionId="sg-lb-1" testid="sg-lb-1" [selected]="false">Grassland</li>
+              <li appListboxOption optionId="sg-lb-2" testid="sg-lb-2" [selected]="true">Whisperwood</li>
+              <li appListboxOption optionId="sg-lb-3" testid="sg-lb-3" [selected]="false">Mountains</li>
+              <li appListboxOption optionId="sg-lb-4" testid="sg-lb-4" [selected]="false">Ocean</li>
+            </ul>
+          </figure>
+
+          <figure class="specimen is-wide" appPanel>
+            <figcaption appEyebrow>
+              {{ 'styleguide.pageHeader' | transloco }}
+            </figcaption>
+            <div class="rounded-md overflow-hidden border border-line">
+              <app-page-header>
+                <app-icon pageHeaderLeading name="logo" [size]="24" />
+                <span pageHeaderTitle class="font-display text-md text-ink-strong">The Reach of Aldermoor</span>
+                <button
+                  pageHeaderActions
+                  appIconButton
+                  size="sm"
+                  [title]="'styleguide.iconSettings' | transloco"
+                  [attr.aria-label]="'styleguide.iconSettings' | transloco"
+                >
+                  <app-icon name="settings" [size]="16" />
+                </button>
+                <button pageHeaderActions appButton variant="primary" size="sm">
+                  {{ 'styleguide.shareMap' | transloco }}
+                </button>
+              </app-page-header>
+            </div>
+          </figure>
+
+          <figure class="specimen" appPanel>
+            <figcaption appEyebrow>
+              {{ 'styleguide.dialog' | transloco }}
+            </figcaption>
+            <div class="specimen-row">
+              <button appButton danger (click)="dialogOpen.set(true)">
+                {{ 'styleguide.dialogTrigger' | transloco }}
+              </button>
+            </div>
+            <app-dialog
+              [open]="dialogOpen()"
+              [heading]="'styleguide.dialogHeading' | transloco"
+              (closed)="dialogOpen.set(false)"
+            >
+              <p class="text-sm text-ink-muted">{{ 'styleguide.dialogBody' | transloco }}</p>
+              <button dialogFooter appButton (click)="dialogOpen.set(false)">
+                {{ 'common.cancel' | transloco }}
+              </button>
+              <button dialogFooter appButton danger (click)="dialogOpen.set(false)">
+                {{ 'styleguide.dialogConfirm' | transloco }}
+              </button>
+            </app-dialog>
+          </figure>
+
+          <figure class="specimen is-wide" appPanel>
+            <figcaption appEyebrow>
+              {{ 'styleguide.icons' | transloco }}
+            </figcaption>
+            <div class="icongrid">
+              @for (name of coreIcons; track name) {
+                <figure class="iconcard">
+                  <app-icon [name]="name" [size]="22" />
+                  <code>{{ name }}</code>
+                </figure>
+              }
             </div>
           </figure>
         </div>
@@ -344,11 +541,30 @@ interface TypeRow {
     .specimen {
       @apply flex flex-col gap-4 p-4 m-0;
     }
+    /* Specimens that don't tile neatly in a 280px column — page header, icon grid. */
+    .specimen.is-wide {
+      grid-column: 1 / -1;
+    }
     .specimen-row {
       @apply flex flex-wrap items-center gap-3;
     }
     .specimen-col {
       @apply flex flex-col gap-3;
+    }
+    .specimen-panel {
+      @apply flex items-center justify-center p-3 text-2xs text-ink-muted;
+      min-width: 5rem;
+    }
+
+    .icongrid {
+      @apply grid gap-3;
+      grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+    }
+    .iconcard {
+      @apply flex flex-col items-center gap-2 m-0 p-3 rounded-md border border-line-faint text-ink;
+    }
+    .iconcard code {
+      @apply font-mono text-2xs text-ink-faint;
     }
 
     .guide-foot {
@@ -429,4 +645,45 @@ export class StyleguidePage {
   protected readonly spacing = [1, 2, 3, 4, 6, 8, 12];
 
   protected readonly radii = ['--radius-sm', '--radius-md', '--radius-lg', '--radius-xl'];
+
+  /** Drives the live dialog specimen. */
+  protected readonly dialogOpen = signal(false);
+
+  /** Every glyph web-ui ships (the two bespoke plus the Lucide-backed core), for the icon gallery. */
+  protected readonly coreIcons: readonly string[] = [
+    'logo',
+    'region',
+    'check',
+    'chevrons',
+    'chevron-down',
+    'close',
+    'dashboard',
+    'pencil',
+    'spinner',
+    'more',
+    'outline',
+    'link',
+    'external-link',
+    'erase',
+    'fit',
+    'graph',
+    'label',
+    'library',
+    'palette',
+    'marquee',
+    'minus',
+    'moon',
+    'plus',
+    'redo',
+    'select',
+    'settings',
+    'share',
+    'sun',
+    'terrain',
+    'undo',
+    'upload',
+    'download',
+    'user',
+    'globe',
+  ];
 }

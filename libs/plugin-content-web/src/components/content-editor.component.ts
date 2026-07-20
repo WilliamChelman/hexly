@@ -274,6 +274,15 @@ export class ContentEditorComponent {
   /** The editor's accessible name, localized by the caller (ADR-0014). */
   readonly ariaLabel = input.required<string>();
 
+  /**
+   * Whether the surface accepts edits, independent of write permission — a Board Text Block is editable
+   * only while *armed*, though its board is writable (#268). ANDed with {@link EntitySession.writable}, so
+   * a read-only opener stays static regardless (ADR-0037). Defaults true: a note is governed by writable
+   * alone. When false the editor renders its content read-only and mirrors it reactively (see below) —
+   * the static-preview role a separate read-only component used to fill before this became the one renderer.
+   */
+  readonly editable = input(true);
+
   private readonly slashMenu = viewChild(SlashMenuComponent);
   private readonly entityPicker = viewChild(EntityPickerComponent);
   private readonly descriptorPicker = viewChild(DescriptorPickerComponent);
@@ -316,15 +325,34 @@ export class ContentEditorComponent {
       editor.view.dom.setAttribute('aria-label', this.ariaLabel());
     });
 
-    // A read-only opener (canWrite:false, ADR-0037) can't edit the prose — so autosave
-    // never fires and the session never hits a 403. Reacts to the editor swap and writable.
+    // A read-only opener (canWrite:false, ADR-0037) or a host that withholds editing (an un-armed Board
+    // Text Block, #268) can't edit the prose — so autosave never fires and the session never hits a 403.
+    // Reacts to the editor swap, the {@link editable} intent, and writable.
     effect(() => {
       const editor = this.editor();
       if (!editor) return;
       // emitUpdate=false: setEditable defaults to firing an `update`, which would push the
       // editor's current prose back into the session and clobber a just-adopted re-seed before
       // the seed effect reads it (Reseeded → Original race). Toggling editability isn't an edit.
-      editor.setEditable(this.session.writable(), false);
+      editor.setEditable(this.editable() && this.session.writable(), false);
+    });
+
+    // Static face (an un-armed Board Text Block, or a read-only opener): mirror the bound content
+    // reactively. The seed effect below fires only on a loadGeneration tick and deliberately ignores
+    // content echoes to protect an author's caret — but a static surface has no caret and must reflect an
+    // external change (a board undo of the block's prose, #268). Gated on !editable so a live author's
+    // edits are never overwritten, and deduped against `committed` so a re-seed or an unrelated document
+    // change doesn't reset the render. `committed` is set *before* setContent so its `update` (should the
+    // build emit one) reads value-equal and commits nothing.
+    effect(() => {
+      const editor = this.editor();
+      if (!editor || this.editable()) return;
+      const snapshot = (this.session.doc()[this.fieldKey] as Content | undefined)?.snapshot;
+      const doc = isDocSnapshot(snapshot) ? snapshot : { type: 'doc', content: [] };
+      const serialized = JSON.stringify(doc);
+      if (serialized === this.committed) return;
+      this.committed = serialized;
+      editor.commands.setContent(doc);
     });
 
     // Seed only when loadGeneration ticks (fresh load, reload, swap) — and on first mount. Never on
