@@ -7,8 +7,8 @@ import { serverPlugin, ServerPlugin } from '@hexly/domain';
 import { PLUGIN_ID, DND_MONSTER_TYPE, DND_STAT_BLOCK_FIELD, STAT_BLOCK_DATA_TYPE } from '@hexly/plugin-dnd';
 
 export function serverPluginDnd(): ServerPlugin {
-  // Declares the `dnd.stat-block` structured Field and its Data Type — the source the API's facet
-  // harvest reads its dimensions from (ADR-0055). The prose `core.content` it also references is the
+  // Declares the `dnd.datatype.stat-block` structured Field and its Data Type — the source the API's facet
+  // harvest reads its dimensions from (ADR-0055). The prose `core.field.content` it also references is the
   // content plugin's, folded from there.
   return serverPlugin({
     id: PLUGIN_ID,

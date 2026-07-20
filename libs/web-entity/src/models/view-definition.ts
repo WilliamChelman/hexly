@@ -4,8 +4,8 @@ import { ViewId } from '../utils/view-instance';
 
 /**
  * A **View** id — an open, `core.view.*`-style namespaced key identifying a togglable renderer+editor
- * an Entity affords (ADR-0048). Its own keyspace, distinct from Entity Type ids (`core.note`) and from
- * the Field data-type ids a **Field of a Structured Data Type** names (`core.hex-grid`).
+ * an Entity affords (ADR-0048). Its own keyspace, distinct from Entity Type ids (`core.type.note`) and from
+ * the Field data-type ids a **Field of a Structured Data Type** names (`core.datatype.hex-grid`).
  */
 export type { ViewId };
 
@@ -24,8 +24,8 @@ export const CORE_VIEW_FIELDS = 'core.view.fields';
  * contributes outright, or a reference to one of *its own* Fields, whose data-type contributes the
  * View (ADR-0050).
  *
- * A Type thereby **places** a Structured Data Type's View in its own order — `core.hexmap` declares
- * `[{ field: 'core.grid' }, CORE_VIEW_CONTENT]`, placing its grid by `{ field }` and the content View by id
+ * A Type thereby **places** a Structured Data Type's View in its own order — `core.type.hex-map` declares
+ * `[{ field: 'core.field.grid' }, CORE_VIEW_RICH_CONTENT]`, placing its grid by `{ field }` and the content View by id
  * (ADR-0051). A User-defined type's list is data: persisted, and validated at the trust boundary.
  */
 export type { ViewPlacement };
@@ -72,7 +72,7 @@ export type ViewDefinition = {
        */
       readonly labelKey?: string;
       /**
-       * The **Structured Data Type** this View renders (`core.hex-grid`, `core.rich-content`): a
+       * The **Structured Data Type** this View renders (`core.datatype.hex-grid`, `core.datatype.rich-content`): a
        * Type places one of its Fields, the Field names its data-type by `kind`, and the kind resolves
        * here. The web half of a data-type's declaration; the framework-free half
        * ({@link StructuredDataType}) carries no View.

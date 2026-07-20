@@ -13,7 +13,7 @@ import {
   statBlockSchema,
 } from './stat-block';
 
-describe('dnd.stat-block data type', () => {
+describe('dnd.datatype.stat-block data type', () => {
   it('is a structured Data Type whose Field is never directly facetable (ADR-0055)', () => {
     expect(STAT_BLOCK_DATA_TYPE.id).toBe(DND_STAT_BLOCK);
     expect(DND_STAT_BLOCK_FIELD.dataType).toEqual({ kind: DND_STAT_BLOCK });

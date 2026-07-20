@@ -223,18 +223,18 @@ describe('Board Inspector Embed view choices', () => {
 
   it("withholds the select until choices load, then reflects the Embed's non-default View", () => {
     const store = TestBed.inject(BoardStore);
-    store.addEmbed({ x: 0, y: 0 }, 'target-a', 'core.view.map:core.grid');
+    store.addEmbed({ x: 0, y: 0 }, 'target-a', 'core.view.map:core.field.grid');
     const fixture = render();
 
     // While the choices are in flight there is no select: painted sooner it could only show the default
     // option, and a "confirming" change would silently re-point the Embed at ''.
     expect(fixture.nativeElement.querySelector('[data-testid=embed-view-select]')).toBeNull();
 
-    subjects.get('target-a')?.next([{ view: { viewId: 'core.view.map', fieldKey: 'core.grid' }, label: 'Map' }]);
+    subjects.get('target-a')?.next([{ view: { viewId: 'core.view.map', fieldKey: 'core.field.grid' }, label: 'Map' }]);
     fixture.detectChanges();
 
     const select = fixture.nativeElement.querySelector('[data-testid=embed-view-select]') as HTMLSelectElement;
-    expect(select.value).toBe('core.view.map:core.grid');
+    expect(select.value).toBe('core.view.map:core.field.grid');
   });
 
   it('drops a stale response when the selected Embed target changes (out-of-order)', () => {
@@ -245,8 +245,8 @@ describe('Board Inspector Embed view choices', () => {
     fixture.detectChanges();
 
     // Responses land out of order: B (current) then A (stale, already cancelled).
-    subjects.get('target-b')?.next([{ view: { viewId: 'core.view.map', fieldKey: 'core.grid' }, label: 'Map' }]);
-    subjects.get('target-a')?.next([{ view: { viewId: 'core.view.content' }, label: 'Content' }]);
+    subjects.get('target-b')?.next([{ view: { viewId: 'core.view.map', fieldKey: 'core.field.grid' }, label: 'Map' }]);
+    subjects.get('target-a')?.next([{ view: { viewId: 'core.view.rich-content' }, label: 'Content' }]);
     fixture.detectChanges();
 
     const shown = labels(fixture);

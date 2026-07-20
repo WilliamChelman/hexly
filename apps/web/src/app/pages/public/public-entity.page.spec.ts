@@ -7,7 +7,7 @@ import { BehaviorSubject, EMPTY, Observable, of, throwError } from 'rxjs';
 import { EntityDetail } from '@hexly/domain';
 import { CONTENT_FORMAT, CORE_NOTE } from '@hexly/plugin-content';
 import { ENTITY_TYPES } from '@hexly/web-entity';
-import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
+import { CORE_VIEW_RICH_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { ViewRegistry } from '../../entity-types/view-registry';
 import { TypeRegistry } from '../../entity-types/type-registry';
 import { EntitiesClient, PublicClient, Watched } from '@hexly/web-core';
@@ -48,7 +48,7 @@ describe('PublicEntityPage', () => {
     fixture = TestBed.createComponent(PublicEntityPage);
     fixture.detectChanges();
     // The reused EntityPage outlets the content plugin's View, fetched on activation (ADR-0051).
-    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }

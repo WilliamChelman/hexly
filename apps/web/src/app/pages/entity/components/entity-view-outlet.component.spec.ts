@@ -10,7 +10,7 @@ import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntitiesClient, ActiveWorld } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { CORE_VIEW_MAP, ENTITY_SESSION, ENTITY_TYPES, viewInstanceKey } from '@hexly/web-entity';
-import { CORE_VIEW_CONTENT, providePluginContent, EntityNameResolver } from '@hexly/plugin-content/web';
+import { CORE_VIEW_RICH_CONTENT, providePluginContent, EntityNameResolver } from '@hexly/plugin-content/web';
 import { EntitySession } from '../services/entity-session';
 import { EntityViewStore } from '../services/entity-view-store';
 import { TypeRegistry } from '../../../entity-types/type-registry';
@@ -28,7 +28,7 @@ const hexmapDetail = (): EntityDetail => ({
   ...noteDetail('The Reach of Aldermoor'),
   id: 'm1',
   types: [CORE_HEXMAP],
-  document: { 'core.grid': { hexes: {}, regions: [], labels: [] } },
+  document: { 'core.field.grid': { hexes: {}, regions: [], labels: [] } },
 });
 
 // The Seam C contract (#264): resolve-and-render, card degradation, dangling placeholder.
@@ -87,7 +87,7 @@ describe('EntityViewOutlet', () => {
   it('resolves the target by id and renders its chosen View chrome-free', async () => {
     const fixture = mount(noteDetail('Lady Mara'));
     // The content View is the content plugin's, fetched on activation rather than named (ADR-0051).
-    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;

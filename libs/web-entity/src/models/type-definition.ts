@@ -49,8 +49,8 @@ export interface TypeDefinition {
    *
    * An entry is either a {@link ViewId} the type contributes outright, or a reference to one of the
    * type's referenced {@link fieldRefs} Fields, whose **Structured Data Type** contributes the View
-   * (ADR-0050) — named by the EntityDocument `key` that Field lenses: `core.hexmap` declares
-   * `[{ field: 'core.grid' }, CORE_VIEW_CONTENT]`, its grid placed by Field, its prose View by id (ADR-0051).
+   * (ADR-0050) — named by the EntityDocument `key` that Field lenses: `core.type.hex-map` declares
+   * `[{ field: 'core.field.grid' }, CORE_VIEW_RICH_CONTENT]`, its grid placed by Field, its prose View by id (ADR-0051).
    * A `{ field }` entry naming a Field the type's effective set lacks, or one whose data-type this build
    * does not register (its plugin is absent), contributes nothing.
    */

@@ -14,7 +14,7 @@ test('the rail navigates, exposes account controls, and pages own their headers'
   await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await createEntity(page, 'core.hexmap');
+  await createEntity(page, 'core.type.hex-map');
   await expect(page.getByTestId('title')).toBeVisible();
   await expect(page.getByTestId('save-status')).toBeVisible();
   // Share now lives in the entity actions overflow menu.

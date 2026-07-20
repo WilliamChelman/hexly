@@ -4,7 +4,7 @@ import { ClientConfigStore } from '@hexly/web-core';
 import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { CORE_RICH_CONTENT, PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
 import { DND_MONSTER, DND_STAT_BLOCK, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
-import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
+import { CORE_VIEW_RICH_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { DND_VIEW_STAT_BLOCK, providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { CORE_VIEW_FIELDS, CORE_VIEW_MAP } from '@hexly/web-entity';
@@ -48,18 +48,18 @@ describe('PluginRegistry', () => {
       });
       const plugins = TestBed.inject(PluginRegistry);
 
-      expect(plugins.fieldResolver('core.content')?.id).toBe('core.content');
-      expect(plugins.fieldResolver('core.grid')?.id).toBe('core.grid');
-      // The thirteen scalar stat Fields retired: dnd contributes the one `dnd.stat-block` Field now (ADR-0055).
-      expect(plugins.fieldResolver('dnd.stat_block')?.id).toBe('dnd.stat_block');
+      expect(plugins.fieldResolver('core.field.content')?.id).toBe('core.field.content');
+      expect(plugins.fieldResolver('core.field.grid')?.id).toBe('core.field.grid');
+      // The thirteen scalar stat Fields retired: dnd contributes the one `dnd.datatype.stat-block` Field now (ADR-0055).
+      expect(plugins.fieldResolver('dnd.field.stat-block')?.id).toBe('dnd.field.stat-block');
     });
 
     it('resolves nothing for an absent plugin’s Field — dropped from the effective set, value left intact', () => {
       TestBed.configureTestingModule({ providers: [providePluginContent(), providePluginDnd()] });
       const plugins = TestBed.inject(PluginRegistry);
 
-      expect(plugins.fieldResolver('core.content')).toBeDefined();
-      expect(plugins.fieldResolver('core.grid')).toBeUndefined(); // hexmap not composed
+      expect(plugins.fieldResolver('core.field.content')).toBeDefined();
+      expect(plugins.fieldResolver('core.field.grid')).toBeUndefined(); // hexmap not composed
     });
   });
 
@@ -82,12 +82,12 @@ describe('PluginRegistry', () => {
     });
 
     it('gates a Type/View by its owning Plugin, and never gates an ownerless contribution', () => {
-      expect(plugins.isTypeActive('core.note')).toBe(true);
+      expect(plugins.isTypeActive('core.type.note')).toBe(true);
       expect(plugins.isTypeActive(DND_MONSTER)).toBe(false);
       // A World's user-defined Type has no owning Plugin, so it is never gated.
-      expect(plugins.isTypeActive('world.deity')).toBe(true);
+      expect(plugins.isTypeActive('world.type.deity')).toBe(true);
 
-      expect(plugins.isViewActive(CORE_VIEW_CONTENT)).toBe(true);
+      expect(plugins.isViewActive(CORE_VIEW_RICH_CONTENT)).toBe(true);
       expect(plugins.isViewActive(DND_VIEW_STAT_BLOCK)).toBe(false);
       // The app-owned generic Field View has no owner either.
       expect(plugins.isViewActive(CORE_VIEW_FIELDS)).toBe(true);
@@ -101,24 +101,24 @@ describe('PluginRegistry', () => {
     });
 
     it('degrades an attached Field of a disabled Plugin: the resolver drops it, leaving its value plain (ADR-0054)', () => {
-      // A `dnd.stat_block` an Entity attached directly bypasses the Type layer, so the Field resolver
+      // A `dnd.field.stat-block` an Entity attached directly bypasses the Type layer, so the Field resolver
       // must gate it by its owning Plugin — else a disabled dnd would still type the value.
-      expect(plugins.isFieldActive('dnd.stat_block')).toBe(false);
-      expect(plugins.fieldResolver('dnd.stat_block')).toBeUndefined();
+      expect(plugins.isFieldActive('dnd.field.stat-block')).toBe(false);
+      expect(plugins.fieldResolver('dnd.field.stat-block')).toBeUndefined();
       // A still-enabled Plugin's Field resolves as ever; an ownerless (World-defined) id is never gated.
-      expect(plugins.fieldResolver('core.content')?.id).toBe('core.content');
-      expect(plugins.isFieldActive('world.element')).toBe(true);
+      expect(plugins.fieldResolver('core.field.content')?.id).toBe('core.field.content');
+      expect(plugins.isFieldActive('world.field.element')).toBe(true);
 
       enabled.set(new Set([CONTENT_PLUGIN_ID, HEXMAP_PLUGIN_ID, DND_PLUGIN_ID]));
-      expect(plugins.fieldResolver('dnd.stat_block')?.id).toBe('dnd.stat_block');
+      expect(plugins.fieldResolver('dnd.field.stat-block')?.id).toBe('dnd.field.stat-block');
     });
 
     it('fieldDefinition resolves a disabled Plugin’s Field regardless of enablement — so a detach can still clear its key (#229)', () => {
       // The enablement-gated resolver drops it, but detach needs the key to clear the value even
       // when the owning Plugin is off — only a build that never bundled the Field leaves an orphan.
-      expect(plugins.fieldResolver('dnd.stat_block')).toBeUndefined();
-      expect(plugins.fieldDefinition('dnd.stat_block')?.id).toBe('dnd.stat_block');
-      expect(plugins.fieldDefinition('pathfinder.nonesuch')).toBeUndefined();
+      expect(plugins.fieldResolver('dnd.field.stat-block')).toBeUndefined();
+      expect(plugins.fieldDefinition('dnd.field.stat-block')?.id).toBe('dnd.field.stat-block');
+      expect(plugins.fieldDefinition('pathfinder.field.nonesuch')).toBeUndefined();
     });
   });
 
@@ -128,7 +128,7 @@ describe('PluginRegistry', () => {
       TestBed.configureTestingModule({ providers: [providePluginContent(), providePluginDnd()] });
       const plugins = TestBed.inject(PluginRegistry);
       expect(plugins.isTypeActive(DND_MONSTER)).toBe(true);
-      expect(plugins.isViewActive(CORE_VIEW_CONTENT)).toBe(true);
+      expect(plugins.isViewActive(CORE_VIEW_RICH_CONTENT)).toBe(true);
     });
   });
 });

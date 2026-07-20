@@ -10,17 +10,27 @@ import { dedupedFieldIdsSchema, fieldRefsSchema } from './field-id';
 import { ViewPlacement, viewPlacementSchema } from './view-placement';
 
 /**
- * The namespace a user-defined type id lives under (`world.deity`). Reserved, so a World Owner can
- * never shadow a plugin id (`core.note`, `dnd.monster`). World *scoping* is by storage (`worldId`),
+ * The namespace a user-defined type id lives under (`world.type.deity`). Reserved, so a World Owner can
+ * never shadow a plugin id (`core.type.note`, `dnd.type.monster`). World *scoping* is by storage (`worldId`),
  * not this namespace.
  */
 export const USER_TYPE_NAMESPACE = 'world';
 
-/** A user-defined type id: a `namespace.id` key forced into the reserved `world.` namespace. */
+/** A user-defined type id: a `namespace.type.name` key forced into the reserved `world.` namespace. */
 export const userDefinedTypeIdSchema = entityTypeSchema.refine(
   (id) => id.startsWith(`${USER_TYPE_NAMESPACE}.`),
   `A user-defined type id must be in the \`${USER_TYPE_NAMESPACE}.\` namespace`,
 );
+
+/** Build a `world.type.<segment>` id from an editable segment — the `type` kind segment is minted, never typed (see `kinded-id.ts`). */
+export function worldTypeIdFromSegment(segment: string): string {
+  return `${USER_TYPE_NAMESPACE}.type.${segment}`;
+}
+
+/** The editable segment of a `world.type.<segment>` id — the inverse of {@link worldTypeIdFromSegment}, for form prefill. */
+export function worldTypeSegment(id: string): string {
+  return id.slice(`${USER_TYPE_NAMESPACE}.type.`.length);
+}
 
 /**
  * A user-defined type's ordered {@link ViewPlacement} list (ADR-0050). A well-formed id this build

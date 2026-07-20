@@ -4,7 +4,7 @@
  * offline (ADR-0061). The enricher rules mirror the Draw Steel system's own enrichers (`ds.apply`, `ds.potency`).
  */
 
-import { Content, tiptapContent } from '@hexly/plugin-content';
+import { RichContent, tiptapContent } from '@hexly/plugin-content';
 import { DS_CONDITION_OPTIONS, DsCondition } from '@hexly/plugin-draw-steel';
 
 /**
@@ -42,11 +42,11 @@ export function foundryProseToText(html: string, ctx: EnricherContext = {}): str
 }
 
 /**
- * Fold a Foundry HTML field into a Content value's hand-built prose paragraphs (#258) — one paragraph node
+ * Fold a Foundry HTML field into a RichContent value's hand-built prose paragraphs (#258) — one paragraph node
  * per source paragraph, hard line breaks preserved. Returns `undefined` when the prose is empty, so an empty
- * biography contributes no `core.content` at all rather than an empty document.
+ * biography contributes no `core.field.content` at all rather than an empty document.
  */
-export function foundryProseToContent(html: string, ctx: EnricherContext = {}): Content | undefined {
+export function foundryProseToContent(html: string, ctx: EnricherContext = {}): RichContent | undefined {
   const text = foundryProseToText(html, ctx);
   if (!text) return undefined;
   const paragraphs = text.split('\n\n').map((block) => ({

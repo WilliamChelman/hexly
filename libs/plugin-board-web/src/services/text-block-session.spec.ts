@@ -1,6 +1,6 @@
 import { Injector } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { emptyContent, tiptapContent, type Content } from '@hexly/plugin-content';
+import { emptyRichContent, tiptapContent, type RichContent } from '@hexly/plugin-content';
 import { EntityDocument } from '@hexly/domain';
 import { BoardStore } from './board-store';
 import { TextBlockSession, TEXT_CONTENT_KEY } from './text-block-session';
@@ -17,7 +17,7 @@ function makeSession(): { store: BoardStore; session: TextBlockSession } {
   return { store, session: child.get(TextBlockSession) };
 }
 
-const prose = (text: string): Content =>
+const prose = (text: string): RichContent =>
   tiptapContent({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] });
 
 describe('TextBlockSession', () => {
@@ -37,7 +37,7 @@ describe('TextBlockSession', () => {
   it('opens on an empty document when nothing is bound', () => {
     const { session } = makeSession();
 
-    expect(session.doc()).toEqual({ [TEXT_CONTENT_KEY]: emptyContent() });
+    expect(session.doc()).toEqual({ [TEXT_CONTENT_KEY]: emptyRichContent() });
   });
 
   it('folds the editor’s commit back into the bound Text Block as one undoable board step', () => {
@@ -45,7 +45,7 @@ describe('TextBlockSession', () => {
     const id = store.addText({ x: 0, y: 0 });
     session.setTarget(id);
 
-    // The reused Content editor commits by assigning a fresh value at the content key.
+    // The reused RichContent editor commits by assigning a fresh value at the content key.
     session.mutate((body: EntityDocument) => {
       body[TEXT_CONTENT_KEY] = prose('The Keep');
     });
@@ -55,7 +55,7 @@ describe('TextBlockSession', () => {
 
     store.undo();
     const afterUndo = store.document().elements.find((e) => e.id === id);
-    expect(afterUndo?.kind === 'text' && afterUndo.content).toEqual(emptyContent());
+    expect(afterUndo?.kind === 'text' && afterUndo.content).toEqual(emptyRichContent());
   });
 
   it('ticks its exposed loadGeneration on a board undo, so the live editor re-seeds', () => {

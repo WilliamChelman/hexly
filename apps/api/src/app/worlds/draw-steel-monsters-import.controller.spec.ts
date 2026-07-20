@@ -15,7 +15,7 @@ import { ImporterRegistry } from './importer-registry';
 import { WorldsModule } from './worlds.module';
 
 /**
- * The real `draw-steel.monsters` Importer (#257, ADR-0060/0061), driven end-to-end through the generic
+ * The real `draw-steel.importer.monsters` Importer (#257, ADR-0060/0061), driven end-to-end through the generic
  * import endpoint with its fetch port backed by the committed Ajax + Goblin fixtures — so the whole pipe
  * (produce → reconcile → provenance) runs offline, never touching GitHub. The boot-time Importer uses the
  * real codeload port; each test re-registers a fixture- or failure-backed one under the same id.
@@ -45,7 +45,7 @@ describe('Draw Steel monsters import', () => {
     await app.close();
   });
 
-  it('offers draw-steel.monsters in the Importer list for a World', async () => {
+  it('offers draw-steel.importer.monsters in the Importer list for a World', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     const res = await ada.get(`/worlds/${world}/importers`).expect(200);
@@ -53,7 +53,7 @@ describe('Draw Steel monsters import', () => {
     expect(res.body).toContainEqual({ id: MONSTERS_IMPORTER_ID, label: 'drawSteel.importer.monsters' });
   });
 
-  it('imports the fixture monsters as draw-steel.monster Entities with stat fields and provenance', async () => {
+  it('imports the fixture monsters as draw-steel.type.monster Entities with stat fields and provenance', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     // Override the boot-time codeload port with the fixture-backed one — no network.

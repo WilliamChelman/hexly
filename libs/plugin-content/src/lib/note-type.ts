@@ -1,5 +1,5 @@
 /**
- * `core.note` — the Note Entity Type. It declares exactly one Field, the canonical
+ * `core.type.note` — the Note Entity Type. It declares exactly one Field, the canonical
  * {@link CONTENT_FIELD}: a Note is nothing but its prose (ADR-0051).
  *
  * The id keeps the `core.` namespace though it ships from a plugin lib: a namespace names who owns the
@@ -10,7 +10,7 @@ import { defineType, PluginTypeDefinition } from '@hexly/domain';
 import { CONTENT_FIELD } from './rich-content';
 
 /** The Note's Entity Type id. */
-export const CORE_NOTE = 'core.note';
+export const CORE_NOTE = 'core.type.note';
 
 /**
  * The Note type. `label` is the untranslated fallback; the web resolves the name through transloco.

@@ -1,5 +1,11 @@
-import { tiptapContent } from './content';
-import { CONTENT_FIELD, CORE_RICH_CONTENT, RICH_CONTENT_DATA_TYPE } from './rich-content';
+import {
+  CONTENT_FIELD,
+  CORE_RICH_CONTENT,
+  RICH_CONTENT_DATA_TYPE,
+  richContentSchema,
+  emptyRichContent,
+  tiptapContent,
+} from './rich-content';
 
 /** The prose value holding the given `entityLink` attrs, wrapped in a paragraph. */
 function prose(...links: Record<string, unknown>[]) {
@@ -11,9 +17,9 @@ function prose(...links: Record<string, unknown>[]) {
 
 const harvest = (value: unknown) => RICH_CONTENT_DATA_TYPE.harvestEdges?.(value) ?? [];
 
-describe('core.rich-content data-type (ADR-0051)', () => {
-  it('declares the canonical content Field at the `core.content` key', () => {
-    expect(CONTENT_FIELD.id).toBe('core.content');
+describe('core.datatype.rich-content data-type (ADR-0051)', () => {
+  it('declares the canonical content Field at the `core.field.content` key', () => {
+    expect(CONTENT_FIELD.id).toBe('core.field.content');
     expect(CONTENT_FIELD.dataType).toEqual({ kind: CORE_RICH_CONTENT });
     expect(CONTENT_FIELD.facetable).toBe(false);
   });
@@ -100,5 +106,59 @@ describe('core.rich-content data-type (ADR-0051)', () => {
     it('contributes nothing from a value at rest it cannot parse', () => {
       expect(RICH_CONTENT_DATA_TYPE.extractText?.('garbage')).toBe('');
     });
+  });
+});
+
+describe('richContentSchema', () => {
+  it('round-trips an arbitrary snapshot untouched — the seam never inspects it', () => {
+    // ADR-0019: RichContent is opaque behind the format tag; parse/serialize must round-trip it exactly.
+    const snapshot = {
+      type: 'doc',
+      content: [{ type: 'weirdFutureBlock', attrs: { x: [1, 2, { y: true }] } }],
+    };
+    const envelope = { format: 'tiptap-v1' as const, snapshot };
+
+    const parsed = richContentSchema.parse(envelope);
+
+    expect(parsed).toEqual(envelope);
+    expect(JSON.parse(JSON.stringify(parsed))).toEqual(envelope);
+  });
+
+  it('round-trips a tiptap-v2 snapshot untouched — dual-read across the format bump (ADR-0023)', () => {
+    // v2 is additive over v1; a reader loads either losslessly with no transform.
+    const envelope = {
+      format: 'tiptap-v2' as const,
+      snapshot: {
+        type: 'doc',
+        content: [{ type: 'entityLink', attrs: { entityId: 'e1' } }],
+      },
+    };
+
+    expect(richContentSchema.parse(envelope)).toEqual(envelope);
+  });
+
+  it('round-trips a tiptap-v3 snapshot untouched — the Obsidian-import schema bump (ADR-0033)', () => {
+    // v3 is additive over v2 (callout/image/table/taskList/highlight, entityLink display/heading).
+    const envelope = {
+      format: 'tiptap-v3' as const,
+      snapshot: {
+        type: 'doc',
+        content: [{ type: 'callout', attrs: { type: 'note', title: 'Beware' }, content: [] }],
+      },
+    };
+
+    expect(richContentSchema.parse(envelope)).toEqual(envelope);
+  });
+
+  it('stamps a fresh snapshot with the tiptap-v3 write format (ADR-0033)', () => {
+    expect(tiptapContent({ type: 'doc', content: [] }).format).toBe('tiptap-v3');
+  });
+
+  it('mints an empty document at the tiptap-v3 write format', () => {
+    expect(emptyRichContent()).toEqual({ format: 'tiptap-v3', snapshot: { type: 'doc', content: [] } });
+  });
+
+  it('rejects an envelope tagged with an unknown format', () => {
+    expect(() => richContentSchema.parse({ format: 'markdown-v9', snapshot: {} })).toThrow();
   });
 });

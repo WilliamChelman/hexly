@@ -8,20 +8,20 @@ import {
 } from './world-field';
 
 const elementField = {
-  id: 'world.element',
+  id: 'world.field.element',
   label: 'Element',
   dataType: { kind: 'enum' as const, options: ['fire', 'ice', 'water'] },
 };
 
 describe('userDefinedFieldIdSchema', () => {
   it('accepts a `world.`-namespaced id', () => {
-    expect(userDefinedFieldIdSchema.parse('world.element')).toBe('world.element');
+    expect(userDefinedFieldIdSchema.parse('world.field.element')).toBe('world.field.element');
   });
 
   it('rejects a plugin/core namespace and a bare id', () => {
-    expect(userDefinedFieldIdSchema.safeParse('dnd.size').success).toBe(false);
-    expect(userDefinedFieldIdSchema.safeParse('core.content').success).toBe(false);
-    // A bare `world` (no `.id`) is not a valid `namespace.id` key at all.
+    expect(userDefinedFieldIdSchema.safeParse('dnd.field.size').success).toBe(false);
+    expect(userDefinedFieldIdSchema.safeParse('core.field.content').success).toBe(false);
+    // A bare `world` (no kind/name segments) is not a valid `namespace.field.name` key at all.
     expect(userDefinedFieldIdSchema.safeParse('world').success).toBe(false);
   });
 });
@@ -36,9 +36,10 @@ describe('slugifyFieldSegment / worldFieldIdFromSegment', () => {
     expect(slugifyFieldSegment('elan-vital')).toBe('elan-vital');
   });
 
-  it('prepends the reserved `world.` namespace to the slug', () => {
-    expect(worldFieldIdFromSegment('Element')).toBe('world.element');
-    expect(worldFieldIdFromSegment('elemental affinity')).toBe('world.elemental-affinity');
+  it('prepends the reserved `world.` namespace and the minted `field` kind segment to the slug', () => {
+    expect(worldFieldIdFromSegment('Element')).toBe('world.field.element');
+    expect(worldFieldIdFromSegment('elemental affinity')).toBe('world.field.elemental-affinity');
+    expect(worldFieldIdFromSegment('Élan vital')).toBe('world.field.elan-vital');
   });
 });
 
@@ -53,7 +54,7 @@ describe('worldFieldSchema', () => {
   });
 
   it('rejects a non-`world.` id and a bare id', () => {
-    expect(worldFieldSchema.safeParse({ ...elementField, id: 'dnd.element' }).success).toBe(false);
+    expect(worldFieldSchema.safeParse({ ...elementField, id: 'dnd.field.element' }).success).toBe(false);
     expect(worldFieldSchema.safeParse({ ...elementField, id: 'element' }).success).toBe(false);
   });
 });

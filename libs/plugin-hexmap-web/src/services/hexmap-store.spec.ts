@@ -7,7 +7,7 @@ import { FakeEntitySession, provideFakeEntitySession, provideHexMapStoreTesting 
 let session: FakeEntitySession;
 
 beforeEach(() => {
-  // Binds the store to `core.hexmap`'s own `grid` Field, as the entity page's outlet does in the app.
+  // Binds the store to `core.type.hex-map`'s own `grid` Field, as the entity page's outlet does in the app.
   TestBed.configureTestingModule({ providers: provideHexMapStoreTesting() });
   session = TestBed.inject(FakeEntitySession);
 });
@@ -2535,7 +2535,7 @@ describe('HexMapStore forward-only grid (ADR-0050)', () => {
   it.each([
     ['garbage', 'not-a-grid'],
     ['a grid whose hexes are ill-typed', { hexes: { '0,0': 7 }, regions: [], labels: [] }],
-    ['no grid at all (a Note that gained core.hexmap with no mint)', undefined],
+    ['no grid at all (a Note that gained core.type.hex-map with no mint)', undefined],
   ])('opens %s as an empty plane rather than erroring', (_case, raw) => {
     const store = makeStore();
 
@@ -2609,7 +2609,7 @@ describe('HexMapStore bound to a Field', () => {
 
   it('reads and writes the EntityDocument slice its Field key names, leaving every other grid alone', () => {
     const store = makeStore();
-    // The body carries a painted grid at `core.hexmap`'s own `grid` key; this store renders a
+    // The body carries a painted grid at `core.type.hex-map`'s own `grid` key; this store renders a
     // *different* Field, so it sees none of it — an unpainted plane, not the world map.
     reload({ ...emptyHexMap(), hexes: { '0,0': { terrain: 'ocean' } } });
     expect(store.document().hexes).toEqual({});

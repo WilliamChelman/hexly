@@ -9,30 +9,30 @@ import {
   test,
 } from './fixtures';
 
-/** The attached stat block's View toggle, keyed by the `dnd.stat_block` Field the attachment carries (ADR-0055). */
+/** The attached stat block's View toggle, keyed by the `dnd.field.stat-block` Field the attachment carries (ADR-0055). */
 const STAT_BLOCK_VIEW = statBlockViewToggle();
 /** The note's own content View, placed by id — keys plain. */
 const NOTE_VIEW = contentViewToggle();
 
 /**
  * A Field of a **Structured Data Type** attached *directly* to a non-monster auto-affords its View
- * (#236, ADR-0054/0055): a plain `core.note` carrying an instance-attached `dnd.stat-block` Field affords
+ * (#236, ADR-0054/0055): a plain `core.type.note` carrying an instance-attached `dnd.datatype.stat-block` Field affords
  * the stat-block View, editing the inner value at its one document key via `VIEW_FIELD_KEY`. The sibling
  * of `attached-grid.spec.ts` — here the structured value is a stat block, not a grid, and its harvested
  * dimensions surface as rail Facets that drill down against siblings.
  */
-test('attaches dnd.stat-block to a note, affords its View, and browses its stats as Facets', async ({
+test('attaches dnd.datatype.stat-block to a note, affords its View, and browses its stats as Facets', async ({
   page,
   request,
 }) => {
   await enterLibrary(page);
-  const id = await createEntity(page, 'core.note');
+  const id = await createEntity(page, 'core.type.note');
   await expect(page.getByTestId('title')).toBeVisible();
   // A plain note affords its Content View alone — no stat block yet.
   await expect(page.getByTestId(STAT_BLOCK_VIEW)).toHaveCount(0);
 
-  // Attach the `dnd.stat-block` Field — the note's type never named it (CONTEXT.md → Entity).
-  await attachField(page, 'dnd.stat_block');
+  // Attach the `dnd.datatype.stat-block` Field — the note's type never named it (CONTEXT.md → Entity).
+  await attachField(page, 'dnd.field.stat-block');
 
   // The attachment auto-affords the stat-block View, appended after the note's Content View (ADR-0054).
   await expect(page.getByTestId(NOTE_VIEW)).toBeVisible();
@@ -48,11 +48,11 @@ test('attaches dnd.stat-block to a note, affords its View, and browses its stats
 
   await flushSave(page);
 
-  // The whole block round-trips as one grouped value at the `dnd.stat_block` key — that key's presence
+  // The whole block round-trips as one grouped value at the `dnd.field.stat-block` key — that key's presence
   // in the document *is* the attachment (ADR-0057), so there is no separate `fields[]` to check.
   const res = await request.get(`/api/entities/${id}`);
   const detail = await res.json();
-  expect(detail.document['dnd.stat_block']).toMatchObject({
+  expect(detail.document['dnd.field.stat-block']).toMatchObject({
     size: 'Large',
     creature_type: 'aberration',
     challenge_rating: 10,

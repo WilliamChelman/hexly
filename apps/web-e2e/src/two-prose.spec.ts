@@ -2,14 +2,14 @@ import type { APIRequestContext, Page } from '@playwright/test';
 import { contentViewToggle, createEntity, authorWorldType, enterLibrary, expect, flushSave, test } from './fixtures';
 
 /** A prose View is bound to the Field it renders (ADR-0051), so each of the Saint's two afford their own. */
-const CONTENT_VIEW = contentViewToggle('world.content');
-const SECRETS_VIEW = contentViewToggle('world.secrets');
+const CONTENT_VIEW = contentViewToggle('world.field.content');
+const SECRETS_VIEW = contentViewToggle('world.field.secrets');
 
 const LORE = 'Lady Mara rules the northern reach.';
 const SECRET = 'The assassin lives in the cellar.';
 
 /**
- * The twin of `two-grids.spec.ts` for prose: a user-defined type declaring two `core.rich-content`
+ * The twin of `two-grids.spec.ts` for prose: a user-defined type declaring two `core.datatype.rich-content`
  * Fields affords two content Views. What is asserted here is not that undo works (the unit specs cover
  * that) but that there are two of it — each View has its own editor and its own history, over its own
  * Field's slice, exactly as #202 gave one Entity two grids.
@@ -19,7 +19,7 @@ test('an Entity with two prose Fields affords two content Views, each with its o
   request,
 }) => {
   const worldId = await enterLibrary(page);
-  // A distinct type id (`world.saint`, not `two-grids`' `world.deity`): the reset clears Entities but
+  // A distinct type id (`world.type.saint`, not `two-grids`' `world.type.deity`): the reset clears Entities but
   // not a World's authored types, so a type this spec shares with another would carry that one's Fields.
   // Prose is a Field of a Structured Data Type like the grid — added from the kind picker, at the key and under the
   // name the World Owner chose; two of them coexist as two Fields of the one EntityDocument.
@@ -27,13 +27,13 @@ test('an Entity with two prose Fields affords two content Views, each with its o
     id: 'saint',
     name: 'Saint',
     fields: [
-      { segment: 'content', label: 'Content', kind: 'core.rich-content' },
-      { segment: 'secrets', label: 'Secrets', kind: 'core.rich-content' },
+      { segment: 'content', label: 'Content', kind: 'core.datatype.rich-content' },
+      { segment: 'secrets', label: 'Secrets', kind: 'core.datatype.rich-content' },
     ],
   });
 
   await enterLibrary(page);
-  const entityId = await createEntity(page, 'world.saint');
+  const entityId = await createEntity(page, 'world.type.saint');
 
   // Two prose toggles, each named for its Field — which is what tells the public lore from the secret.
   await expect(page.getByTestId(CONTENT_VIEW)).toHaveText('Content');
@@ -80,11 +80,11 @@ test('an Entity with two prose Fields affords two content Views, each with its o
 
   // Two Fields of the one EntityDocument, each holding the prose typed on its own View (ADR-0051).
   const doc = await savedDocument(request, entityId);
-  expect(JSON.stringify(doc['world.content'].snapshot)).toContain(LORE);
-  expect(JSON.stringify(doc['world.secrets'].snapshot)).toContain(SECRET);
+  expect(JSON.stringify(doc['world.field.content'].snapshot)).toContain(LORE);
+  expect(JSON.stringify(doc['world.field.secrets'].snapshot)).toContain(SECRET);
   // Distinct keys: the secret is not in the public body, nor the lore in the secret.
-  expect(JSON.stringify(doc['world.content'].snapshot)).not.toContain('assassin');
-  expect(JSON.stringify(doc['world.secrets'].snapshot)).not.toContain('Lady Mara');
+  expect(JSON.stringify(doc['world.field.content'].snapshot)).not.toContain('assassin');
+  expect(JSON.stringify(doc['world.field.secrets'].snapshot)).not.toContain('Lady Mara');
 });
 
 /** Focus the open editor and rewind its history — TipTap keeps its own undo (ADR-0051); extra presses no-op. */

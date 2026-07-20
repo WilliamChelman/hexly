@@ -6,14 +6,14 @@ import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 /**
  * The generic World Imports panel (ADR-0060), end-to-end on a single origin (ADR-0009). The Draw
- * Steel `draw-steel.monsters` Importer's codeload fetch port (ADR-0061) is swapped for its committed
+ * Steel `draw-steel.importer.monsters` Importer's codeload fetch port (ADR-0061) is swapped for its committed
  * Ajax + Goblin fixtures under the e2e opt-in (`E2eFixtureImporters`), so a real run stays offline
  * and deterministic: two fixtures land as two Entities and the run summary reports them.
  */
 
-const MONSTERS_ROW = 'importer-draw-steel.monsters';
-const MONSTERS_RUN = 'importer-run-draw-steel.monsters';
-const MONSTERS_STATUS = 'importer-status-draw-steel.monsters';
+const MONSTERS_ROW = 'importer-draw-steel.importer.monsters';
+const MONSTERS_RUN = 'importer-run-draw-steel.importer.monsters';
+const MONSTERS_STATUS = 'importer-status-draw-steel.importer.monsters';
 
 test('a World Owner runs the fixture-backed Draw Steel import and sees the run summary', async ({ page }) => {
   const worldId = await enterLibrary(page);
@@ -79,7 +79,7 @@ test('a reachable non-Owner cannot import: no run trigger in the UI, and the ser
 
   // The UI gate is only cosmetic, so prove the boundary at the API: a direct run from the Viewer's own
   // session (its context's cookies) is refused with 403 — reachable, but not an Owner (ADR-0060).
-  const refused = await otherContext.request.post(`/api/worlds/${worldId}/importers/draw-steel.monsters/run`, {
+  const refused = await otherContext.request.post(`/api/worlds/${worldId}/importers/draw-steel.importer.monsters/run`, {
     data: { visibility: 'shared' },
   });
   expect(refused.status()).toBe(403);

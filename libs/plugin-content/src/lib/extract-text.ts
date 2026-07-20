@@ -1,11 +1,11 @@
-/** Plain-text extraction from an Entity's Content, for full-text search (ADR-0035). */
+/** Plain-text extraction from an Entity's RichContent, for full-text search (ADR-0035). */
 
 import { joinSearchText } from '@hexly/domain';
-import { Content } from './content';
+import { RichContent } from './rich-content';
 import { visit } from './content-node';
 
 /** The Content's searchable prose. An unknown format tag yields `''`. */
-export function extractText(content: Content): string {
+export function extractText(content: RichContent): string {
   if (!content.format.startsWith('tiptap-')) return '';
   const parts: string[] = [];
   visit(content.snapshot, (node) => {

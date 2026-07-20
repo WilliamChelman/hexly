@@ -10,7 +10,7 @@ import {
 } from './fixtures';
 
 /** The deity's own grid: its `battlemap` Field, not the Hex Map's `grid` — one View per Field. */
-const BATTLEMAP_VIEW = mapViewToggle('world.battlemap');
+const BATTLEMAP_VIEW = mapViewToggle('world.field.battle-map');
 
 /**
  * A World Owner gives a type they authored in the World's settings a map, code-lessly: the map
@@ -20,26 +20,26 @@ const BATTLEMAP_VIEW = mapViewToggle('world.battlemap');
 test('a World Owner gives a user-defined type a map, and painting it persists', async ({ page, request }) => {
   const worldId = await enterLibrary(page);
 
-  // Author `world.deity` with a `domain` string and a `battlemap` hex-grid — the map plugin's
+  // Author `world.type.deity` with a `domain` string and a `battlemap` hex-grid — the map plugin's
   // data-type, offered beside `string` and `enum`, and the whole ceremony.
   await authorWorldType(page, worldId, {
     id: 'deity',
     name: 'Deity',
     fields: [
       { segment: 'domain', label: 'Domain' },
-      { segment: 'battlemap', label: 'Battlemap', kind: 'core.hex-grid' },
+      { segment: 'battle-map', label: 'Battlemap', kind: 'core.datatype.hex-grid' },
     ],
   });
 
   // "Show as a view" defaulted to on, and stayed on through the save — which is what affords the
   // View toggled below.
-  await page.getByTestId('edit-world.deity').click();
-  await expect(page.getByTestId('field-show-as-view-world.battlemap')).toBeChecked();
+  await page.getByTestId('edit-world.type.deity').click();
+  await expect(page.getByTestId('field-show-as-view-world.field.battle-map')).toBeChecked();
   await page.getByTestId('type-cancel').click();
 
   // The type reaches the "New" menu like a plugin's: the registry does not care who authored one.
   await enterLibrary(page);
-  const deityId = await createEntity(page, 'world.deity');
+  const deityId = await createEntity(page, 'world.type.deity');
   await expect(page.getByTestId('title')).toBeVisible();
 
   // It opens on its Fields, not its map — what the type's view order buys, and why a Field's View is
@@ -48,8 +48,8 @@ test('a World Owner gives a user-defined type a map, and painting it persists', 
   await expect(page.getByTestId('core.view.fields')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId(BATTLEMAP_VIEW)).toHaveAttribute('aria-pressed', 'false');
   // A grid is a document, not a form row: it is edited on its View, never in the Fields form.
-  await expect(page.getByTestId('field-world.domain')).toBeVisible();
-  await expect(page.getByTestId('field-world.battlemap')).toHaveCount(0);
+  await expect(page.getByTestId('field-world.field.domain')).toBeVisible();
+  await expect(page.getByTestId('field-world.field.battle-map')).toHaveCount(0);
 
   // Its toggle is labelled by the Field, which is what tells one grid from another.
   await expect(page.getByTestId(BATTLEMAP_VIEW)).toHaveText('Battlemap');
@@ -70,6 +70,6 @@ test('a World Owner gives a user-defined type a map, and painting it persists', 
   await expect(page.getByTestId(BATTLEMAP_VIEW)).toHaveAttribute('aria-pressed', 'true');
 
   // And it persisted where a Field's value lives: the Entity's EntityDocument, at the key its author chose.
-  const grid = await savedGrid(request, deityId, 'world.battlemap');
+  const grid = await savedGrid(request, deityId, 'world.field.battle-map');
   expect(Object.values(grid.hexes)).toEqual([{ terrain: 'ocean' }]);
 });

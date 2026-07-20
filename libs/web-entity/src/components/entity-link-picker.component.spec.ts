@@ -33,7 +33,7 @@ function codeType(id: string, fieldRefs: readonly string[] = []): TypeDefinition
 
 /** A World-defined type: an authored name, no copy to translate, and no bespoke view (#191). */
 const deity: TypeDefinition = {
-  id: 'world.deity' as TypeDefinition['id'],
+  id: 'world.type.deity' as TypeDefinition['id'],
   icon: 'label',
   labelText: 'Deity',
   views: [CORE_VIEW_FIELDS],
@@ -42,7 +42,7 @@ const deity: TypeDefinition = {
 
 /** A required Field the monster references — it cannot be minted blind, so create-and-link never offers the type. */
 const crField = defineField({
-  id: 'dnd.cr',
+  id: 'dnd.field.cr',
   label: 'Challenge Rating',
   dataType: { kind: 'number' },
   required: true,
@@ -50,14 +50,14 @@ const crField = defineField({
 });
 
 /** A type whose referenced Field is **required**: create-and-link never offers it. */
-const monster: TypeDefinition = codeType('dnd.monster', [crField.id]);
+const monster: TypeDefinition = codeType('dnd.type.monster', [crField.id]);
 
 function summary(id: string, name: string): EntitySummary {
   return {
     id,
     worldId: 'w1',
     name,
-    types: ['core.note'],
+    types: ['core.type.note'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -92,7 +92,10 @@ describe('EntityLinkPicker', () => {
         provideRouter([]),
         // Note, Map, a World's own Deity, and a Monster whose CR is required — the registry the app
         // composes, as a lib reads it. The picker never learns which of these is which.
-        ...provideEntityTypesTesting([codeType('core.note'), codeType('core.hexmap'), deity, monster], [crField]),
+        ...provideEntityTypesTesting(
+          [codeType('core.type.note'), codeType('core.type.hex-map'), deity, monster],
+          [crField],
+        ),
         {
           provide: EntitiesClient,
           useValue: {
@@ -221,9 +224,9 @@ describe('EntityLinkPicker', () => {
 
       // Core, plugin, and World-defined types sit on the same footing; the testid derives from the
       // type id, so the next plugin's create affordance needs no new code here.
-      expect(byId(fixture, 'entity-link-create-core.note')).not.toBeNull();
-      expect(byId(fixture, 'entity-link-create-core.hexmap')).not.toBeNull();
-      expect(byId(fixture, 'entity-link-create-world.deity')?.textContent).toContain('Deity');
+      expect(byId(fixture, 'entity-link-create-core.type.note')).not.toBeNull();
+      expect(byId(fixture, 'entity-link-create-core.type.hex-map')).not.toBeNull();
+      expect(byId(fixture, 'entity-link-create-world.type.deity')?.textContent).toContain('Deity');
     });
 
     it('leaves out a type with a required Field — it cannot be minted blind', () => {
@@ -231,9 +234,9 @@ describe('EntityLinkPicker', () => {
       click(fixture, 'entity-link-pick');
       fixture.detectChanges();
 
-      // dnd.monster's CR is required (#187): creating one blind would land the author on an Entity
+      // dnd.type.monster's CR is required (#187): creating one blind would land the author on an Entity
       // that cannot be saved, and there is no room mid-pick for the dialog that collects it.
-      expect(byId(fixture, 'entity-link-create-dnd.monster')).toBeNull();
+      expect(byId(fixture, 'entity-link-create-dnd.type.monster')).toBeNull();
     });
 
     it('creates an Entity of the chosen type and links it in one flow', () => {
@@ -242,14 +245,15 @@ describe('EntityLinkPicker', () => {
 
       click(fixture, 'entity-link-pick');
       fixture.detectChanges();
-      click(fixture, 'entity-link-create-core.note');
+      click(fixture, 'entity-link-create-core.type.note');
       fixture.detectChanges();
 
       // Blank query → the type's own untitled label (its `untitled` chrome key), never a branch on id.
-      expect(createdCalls).toEqual([{ name: 'core.note.untitled', type: 'core.note' }]);
+      // The fixture's codeType derives that key from the type id, so it echoes `core.type.note.untitled`.
+      expect(createdCalls).toEqual([{ name: 'core.type.note.untitled', type: 'core.type.note' }]);
       expect(fixture.componentInstance.linked()).toBe('n-new');
       // Resolved locally, so the new name shows without a server round trip.
-      expect(byId(fixture, 'entity-link-name')?.textContent).toContain('core.note.untitled');
+      expect(byId(fixture, 'entity-link-name')?.textContent).toContain('core.type.note.untitled');
     });
 
     it('names the created Entity after the typed search query', () => {
@@ -262,10 +266,10 @@ describe('EntityLinkPicker', () => {
       search.value = 'Ironhold';
       search.dispatchEvent(new Event('input'));
       fixture.detectChanges();
-      click(fixture, 'entity-link-create-core.hexmap');
+      click(fixture, 'entity-link-create-core.type.hex-map');
       fixture.detectChanges();
 
-      expect(createdCalls).toEqual([{ name: 'Ironhold', type: 'core.hexmap' }]);
+      expect(createdCalls).toEqual([{ name: 'Ironhold', type: 'core.type.hex-map' }]);
       expect(fixture.componentInstance.linked()).toBe('iron');
     });
   });

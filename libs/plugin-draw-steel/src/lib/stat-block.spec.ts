@@ -15,7 +15,7 @@ import {
   statBlockSchema,
 } from './stat-block';
 
-describe('draw-steel.stat-block data type', () => {
+describe('draw-steel.datatype.stat-block data type', () => {
   it('is a structured Data Type whose Field is never directly facetable (ADR-0055)', () => {
     expect(STAT_BLOCK_DATA_TYPE.id).toBe(DS_STAT_BLOCK);
     expect(DS_STAT_BLOCK_FIELD.dataType).toEqual({ kind: DS_STAT_BLOCK });

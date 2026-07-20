@@ -1,8 +1,8 @@
 import { TypeDefinition, ViewId } from '@hexly/web-entity';
-import { CORE_VIEW_CONTENT } from '@hexly/plugin-content/web';
+import { CORE_VIEW_RICH_CONTENT } from '@hexly/plugin-content/web';
 import { CORE_BOARD_TYPE, SURFACE_FIELD } from '@hexly/plugin-board';
 
-/** The surface View's id — the renderer the `core.board-surface` data-type contributes (ADR-0050). */
+/** The surface View's id — the renderer the `core.datatype.board-surface` data-type contributes (ADR-0050). */
 export const CORE_VIEW_BOARD: ViewId = 'core.view.board';
 
 /**
@@ -12,7 +12,7 @@ export const CORE_VIEW_BOARD: ViewId = 'core.view.board';
  *
  * Views are ordered surface first, Content second, so a Board opens on its plane with a lore toggle
  * beside it — the surface View is the Board's **default** (user story 5). The surface View is placed by
- * its `core.surface` Field (`{ field }`), the content View by id (ADR-0050, ADR-0051).
+ * its `core.field.surface` Field (`{ field }`), the content View by id (ADR-0050, ADR-0051).
  *
  * Must import no component: {@link providePluginBoard} seeds the root registry at startup, and the
  * canvas hangs off that provider's `loadComponent`.
@@ -23,7 +23,7 @@ export const BOARD_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     // References the prose and surface Fields by id (ADR-0054); `fields` kept for the World Types editor.
     fieldRefs: CORE_BOARD_TYPE.fieldRefs,
     icon: 'dashboard',
-    views: [{ field: SURFACE_FIELD.id }, CORE_VIEW_CONTENT],
+    views: [{ field: SURFACE_FIELD.id }, CORE_VIEW_RICH_CONTENT],
     graphColorToken: '--color-gold',
     // A plugin ships translated copy, so its chrome is transloco keys (ADR-0049) — unlike a
     // user-defined type, whose every label is its one authored name (#191).

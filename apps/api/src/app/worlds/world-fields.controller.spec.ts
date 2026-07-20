@@ -49,16 +49,16 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
   }
 
   // The create payload (ADR-0056): a segment + Field body, never a client-chosen id or key — the server
-  // slugs `world.<segment>` and pins the document key to it.
+  // slugs `world.field.<segment>` and pins the document key to it.
   const elementField = {
     segment: 'element',
     label: 'Element',
     dataType: { kind: 'enum', options: ['fire', 'ice', 'water'] },
     facetable: true,
   };
-  // The resolved Field the server derives and returns — its id (== the document key it lenses) is `world.element`.
+  // The resolved Field the server derives and returns — its id (== the document key it lenses) is `world.field.element`.
   const resolvedElement = {
-    id: 'world.element',
+    id: 'world.field.element',
     label: 'Element',
     dataType: { kind: 'enum', options: ['fire', 'ice', 'water'] },
     required: false,
@@ -74,25 +74,25 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
       expect(created.body).toEqual(resolvedElement);
 
       const listed = await ada.get(`/worlds/${world}/fields`).expect(200);
-      expect(listed.body).toContainEqual(expect.objectContaining({ id: 'world.element' }));
+      expect(listed.body).toContainEqual(expect.objectContaining({ id: 'world.field.element' }));
 
       // Re-body wholesale: the id/key is immutable (a path param), so the body carries no key — renaming
       // is label-only, and the document key stays pinned to the id.
       const rebodied = await ada
-        .patch(`/worlds/${world}/fields/world.element`)
+        .patch(`/worlds/${world}/fields/world.field.element`)
         .send({ label: 'Elemental affinity', dataType: { kind: 'string' } })
         .expect(200);
       expect(rebodied.body).toEqual({
-        id: 'world.element',
+        id: 'world.field.element',
         label: 'Elemental affinity',
         dataType: { kind: 'string' },
         required: false,
         facetable: false,
       });
 
-      await ada.delete(`/worlds/${world}/fields/world.element`).expect(204);
+      await ada.delete(`/worlds/${world}/fields/world.field.element`).expect(204);
       const empty = await ada.get(`/worlds/${world}/fields`).expect(200);
-      expect(empty.body.some((f: { id: string }) => f.id === 'world.element')).toBe(false);
+      expect(empty.body.some((f: { id: string }) => f.id === 'world.field.element')).toBe(false);
     });
 
     it('derives the `world.` id/key from the segment, ignoring any client-sent id/key (ADR-0056)', async () => {
@@ -105,11 +105,11 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
           segment: 'Elemental Affinity',
           label: 'Affinity',
           dataType: { kind: 'string' },
-          id: 'dnd.evil',
+          id: 'dnd.field.evil',
           key: 'x',
         })
         .expect(201);
-      expect(created.body).toMatchObject({ id: 'world.elemental-affinity' });
+      expect(created.body).toMatchObject({ id: 'world.field.elemental-affinity' });
     });
 
     it('rejects a segment that slugs to no key (400)', async () => {
@@ -127,17 +127,17 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
       await ada.post(`/worlds/${world}/fields`).send(elementField).expect(201);
 
       const rebodied = await ada
-        .patch(`/worlds/${world}/fields/world.element`)
-        .send({ label: 'Renamed', dataType: { kind: 'string' }, key: 'sneaky', id: 'world.other' })
+        .patch(`/worlds/${world}/fields/world.field.element`)
+        .send({ label: 'Renamed', dataType: { kind: 'string' }, key: 'sneaky', id: 'world.field.other' })
         .expect(200);
-      expect(rebodied.body).toMatchObject({ id: 'world.element' });
+      expect(rebodied.body).toMatchObject({ id: 'world.field.element' });
     });
 
     it('refuses a second Field whose derived slug collides with an existing one (409)', async () => {
       const ada = await signIn('ada@hexly.test');
       const world = await makeWorld(ada);
       await ada.post(`/worlds/${world}/fields`).send(elementField).expect(201);
-      // A differently-cased/spaced segment that slugs to the same `world.element` still collides.
+      // A differently-cased/spaced segment that slugs to the same `world.field.element` still collides.
       await ada
         .post(`/worlds/${world}/fields`)
         .send({ segment: 'Element', label: 'Other', dataType: { kind: 'string' } })
@@ -148,10 +148,10 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
       const ada = await signIn('ada@hexly.test');
       const world = await makeWorld(ada);
       await ada
-        .patch(`/worlds/${world}/fields/world.ghost`)
+        .patch(`/worlds/${world}/fields/world.field.ghost`)
         .send({ label: 'G', dataType: { kind: 'string' } })
         .expect(404);
-      await ada.delete(`/worlds/${world}/fields/world.ghost`).expect(404);
+      await ada.delete(`/worlds/${world}/fields/world.field.ghost`).expect(404);
     });
 
     it('refuses a Field naming a data-type this build does not register (400)', async () => {
@@ -159,10 +159,10 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
       const world = await makeWorld(ada);
       const res = await ada
         .post(`/worlds/${world}/fields`)
-        // A well-formed but unregistered kind (the sibling world-types spec's `core.hex-gird` trick).
-        .send({ segment: 'map', label: 'Map', dataType: { kind: 'core.hex-gird' } })
+        // A well-formed but unregistered kind (the sibling world-types spec's `core.datatype.hex-gird` trick).
+        .send({ segment: 'map', label: 'Map', dataType: { kind: 'core.datatype.hex-gird' } })
         .expect(400);
-      expect(res.body.data.fields).toContainEqual({ key: 'world.map', code: 'unknown-data-type' });
+      expect(res.body.data.fields).toContainEqual({ key: 'world.field.map', code: 'unknown-data-type' });
     });
 
     it('refuses a non-Owner member the CRUD, while letting them read the Field set', async () => {
@@ -175,16 +175,16 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
       const bob = await signIn('bob@hexly.test');
 
       const listed = await bob.get(`/worlds/${world}/fields`).expect(200);
-      expect(listed.body).toContainEqual(expect.objectContaining({ id: 'world.element' }));
+      expect(listed.body).toContainEqual(expect.objectContaining({ id: 'world.field.element' }));
       await bob
         .post(`/worlds/${world}/fields`)
         .send({ ...elementField, segment: 'other' })
         .expect(403);
       await bob
-        .patch(`/worlds/${world}/fields/world.element`)
+        .patch(`/worlds/${world}/fields/world.field.element`)
         .send({ label: 'X', dataType: { kind: 'string' } })
         .expect(403);
-      await bob.delete(`/worlds/${world}/fields/world.element`).expect(403);
+      await bob.delete(`/worlds/${world}/fields/world.field.element`).expect(403);
     });
 
     it('404s every Field route for a World the caller cannot reach (no existence leak)', async () => {
@@ -196,10 +196,10 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
       await carol.get(`/worlds/${world}/fields`).expect(404);
       await carol.post(`/worlds/${world}/fields`).send(elementField).expect(404);
       await carol
-        .patch(`/worlds/${world}/fields/world.element`)
+        .patch(`/worlds/${world}/fields/world.field.element`)
         .send({ label: 'X', dataType: { kind: 'string' } })
         .expect(404);
-      await carol.delete(`/worlds/${world}/fields/world.element`).expect(404);
+      await carol.delete(`/worlds/${world}/fields/world.field.element`).expect(404);
     });
   });
 
@@ -211,7 +211,7 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
       await ada.post(`/worlds/${worldA}/fields`).send(elementField).expect(201);
 
       const inB = await ada.get(`/worlds/${worldB}/fields`).expect(200);
-      expect(inB.body.some((f: { id: string }) => f.id === 'world.element')).toBe(false);
+      expect(inB.body.some((f: { id: string }) => f.id === 'world.field.element')).toBe(false);
     });
   });
 
@@ -223,7 +223,7 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
 
       const pelor = await ada
         .post('/entities')
-        .send({ name: 'Pelor', types: ['core.note'] })
+        .send({ name: 'Pelor', types: ['core.type.note'] })
         .expect(201);
 
       // A value outside the enum's options is ill-typed — caught by the World-scoped resolver. The
@@ -231,28 +231,31 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
       const bad = await ada
         .put(`/entities/${pelor.body.id}`)
         .send({
-          document: { 'world.element': 'plasma' },
+          document: { 'world.field.element': 'plasma' },
           version: 1,
           tags: [],
-          types: ['core.note'],
-          fields: ['world.element'],
+          types: ['core.type.note'],
+          fields: ['world.field.element'],
         })
         .expect(400);
-      expect(bad.body.data.fields).toContainEqual({ key: 'world.element', code: 'type' });
+      expect(bad.body.data.fields).toContainEqual({ key: 'world.field.element', code: 'type' });
 
       // A well-formed value saves and is indexed over the effective set — a filter by the attached
       // Field's value finds the Entity, though its type never named the Field.
       await ada
         .put(`/entities/${pelor.body.id}`)
         .send({
-          document: { 'world.element': 'fire' },
+          document: { 'world.field.element': 'fire' },
           version: 1,
           tags: [],
-          types: ['core.note'],
-          fields: ['world.element'],
+          types: ['core.type.note'],
+          fields: ['world.field.element'],
         })
         .expect(200);
-      const filtered = await ada.get('/entities').query({ worldId: world, field: 'world.element:eq:fire' }).expect(200);
+      const filtered = await ada
+        .get('/entities')
+        .query({ worldId: world, field: 'world.field.element:eq:fire' })
+        .expect(200);
       expect(filtered.body.items.map((e: { id: string }) => e.id)).toContain(pelor.body.id);
     });
 
@@ -263,32 +266,32 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
 
       const pelor = await ada
         .post('/entities')
-        .send({ name: 'Pelor', types: ['core.note'] })
+        .send({ name: 'Pelor', types: ['core.type.note'] })
         .expect(201);
       await ada
         .put(`/entities/${pelor.body.id}`)
         .send({
-          document: { 'world.element': 'fire' },
+          document: { 'world.field.element': 'fire' },
           version: 1,
           tags: [],
-          types: ['core.note'],
-          fields: ['world.element'],
+          types: ['core.type.note'],
+          fields: ['world.field.element'],
         })
         .expect(200);
 
-      await ada.delete(`/worlds/${world}/fields/world.element`).expect(204);
+      await ada.delete(`/worlds/${world}/fields/world.field.element`).expect(204);
 
       // The value is untouched — a Field is a lens — and a re-save no longer runs the (now-missing) gate.
       const read = await ada.get(`/entities/${pelor.body.id}`).expect(200);
-      expect(read.body.document).toEqual({ 'world.element': 'fire' });
+      expect(read.body.document).toEqual({ 'world.field.element': 'fire' });
       await ada
         .put(`/entities/${pelor.body.id}`)
         .send({
-          document: { 'world.element': 'plasma' },
+          document: { 'world.field.element': 'plasma' },
           version: 2,
           tags: [],
-          types: ['core.note'],
-          fields: ['world.element'],
+          types: ['core.type.note'],
+          fields: ['world.field.element'],
         })
         .expect(200);
     });
@@ -300,33 +303,42 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
       await ada
         .post(`/worlds/${world}/types`)
         .send({
-          id: 'world.deity',
+          id: 'world.type.deity',
           label: 'Deity',
-          fieldRefs: ['world.element'],
+          fieldRefs: ['world.field.element'],
         })
         .expect(201);
 
-      // The same Field rides a plain note and a world.deity — reuse across unrelated types.
+      // The same Field rides a plain note and a world.type.deity — reuse across unrelated types.
       const note = await ada
         .post('/entities')
-        .send({ name: 'Ember', types: ['core.note'] })
+        .send({ name: 'Ember', types: ['core.type.note'] })
         .expect(201);
       const deity = await ada
         .post('/entities')
-        .send({ name: 'Pelor', types: ['world.deity'] })
+        .send({ name: 'Pelor', types: ['world.type.deity'] })
         .expect(201);
       for (const [id, types] of [
-        [note.body.id, ['core.note']],
-        [deity.body.id, ['world.deity']],
+        [note.body.id, ['core.type.note']],
+        [deity.body.id, ['world.type.deity']],
       ] as const) {
         await ada
           .put(`/entities/${id}`)
-          .send({ document: { 'world.element': 'ice' }, version: 1, tags: [], types, fields: ['world.element'] })
+          .send({
+            document: { 'world.field.element': 'ice' },
+            version: 1,
+            tags: [],
+            types,
+            fields: ['world.field.element'],
+          })
           .expect(200);
       }
 
       // One Field, indexed over both regardless of type — a value filter finds them both.
-      const filtered = await ada.get('/entities').query({ worldId: world, field: 'world.element:eq:ice' }).expect(200);
+      const filtered = await ada
+        .get('/entities')
+        .query({ worldId: world, field: 'world.field.element:eq:ice' })
+        .expect(200);
       expect(filtered.body.items.map((e: { id: string }) => e.id)).toEqual(
         expect.arrayContaining([note.body.id, deity.body.id]),
       );

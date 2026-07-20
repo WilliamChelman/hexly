@@ -129,7 +129,7 @@ describe('Superadmin repair surface', () => {
     return (
       await owner
         .post('/entities')
-        .send({ name, types: ['core.note'], worldId })
+        .send({ name, types: ['core.type.note'], worldId })
         .expect(201)
     ).body.id;
   }
@@ -138,7 +138,7 @@ describe('Superadmin repair surface', () => {
   async function link(owner: Agent, id: string, targetId: string): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityDocument = {
-      'core.content': tiptapContent({
+      'core.field.content': tiptapContent({
         type: 'doc',
         content: [
           {

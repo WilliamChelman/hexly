@@ -4,7 +4,7 @@ import { ClientConfigStore } from '@hexly/web-core';
 import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { CORE_RICH_CONTENT, PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
 import { PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
-import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
+import { CORE_VIEW_RICH_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { CORE_VIEW_FIELDS, CORE_VIEW_MAP } from '@hexly/web-entity';
@@ -54,7 +54,7 @@ describe('ViewRegistry filtering by the enabled-Plugin set', () => {
     expect(registry.get(CORE_VIEW_MAP)).toBeUndefined();
     expect(registry.forDataType(CORE_HEX_GRID)).toBeUndefined();
     // The content View is enabled, so its data-type still resolves.
-    expect(registry.forDataType(CORE_RICH_CONTENT)?.id).toBe(CORE_VIEW_CONTENT);
+    expect(registry.forDataType(CORE_RICH_CONTENT)?.id).toBe(CORE_VIEW_RICH_CONTENT);
   });
 
   it('offers only enabled data-types to the World Types editor', () => {

@@ -11,7 +11,7 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
   const noteId = entityIdFromUrl(page);
 
   await enterLibrary(page);
-  const mapId = await createEntity(page, 'core.hexmap');
+  const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 

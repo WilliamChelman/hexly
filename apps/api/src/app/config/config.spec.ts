@@ -58,7 +58,7 @@ describe('loadConfig', () => {
     search: { weights: { name: 10, tags: 5, content: 1 } },
     liveFollow: { heartbeatSeconds: 30 },
     features: { plugin: {} },
-    entities: { defaultType: 'core.note' },
+    entities: { defaultType: 'core.type.note' },
   };
 
   it('falls back to defaults when no file is present', () => {
@@ -164,15 +164,15 @@ describe('loadConfig: features.plugin (ADR-0052)', () => {
 });
 
 describe('loadConfig: entities.defaultType (ADR-0052)', () => {
-  it('defaults to core.note when absent', () => {
-    expect(loadConfig(dataDir(), PLUGINS).entities.defaultType).toBe('core.note');
-    expect(loadConfig(':memory:', PLUGINS).entities.defaultType).toBe('core.note');
+  it('defaults to core.type.note when absent', () => {
+    expect(loadConfig(dataDir(), PLUGINS).entities.defaultType).toBe('core.type.note');
+    expect(loadConfig(':memory:', PLUGINS).entities.defaultType).toBe('core.type.note');
   });
 
   it('resolves a present value verbatim, with no validation against the enabled set', () => {
-    // `nope.type` names no bundled Plugin's Type — this knob never fails boot (soft client-side fallback).
-    expect(loadConfig(dataDir('entities:\n  defaultType: nope.type\n'), PLUGINS).entities.defaultType).toBe(
-      'nope.type',
+    // `nope.type.unknown` names no bundled Plugin's Type — this knob never fails boot (soft client-side fallback).
+    expect(loadConfig(dataDir('entities:\n  defaultType: nope.type.unknown\n'), PLUGINS).entities.defaultType).toBe(
+      'nope.type.unknown',
     );
   });
 });

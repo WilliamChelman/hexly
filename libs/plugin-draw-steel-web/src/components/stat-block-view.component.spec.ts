@@ -13,7 +13,7 @@ import { DS_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { StatBlockViewComponent } from './stat-block-view.component';
 
 /**
- * The `draw-steel.stat-block` data-type's View (#243, ADR-0055) — the classic card, one View in two modes.
+ * The `draw-steel.datatype.stat-block` data-type's View (#243, ADR-0055) — the classic card, one View in two modes.
  * It binds to the {@link ENTITY_SESSION} contract plus {@link VIEW_FIELD_KEY} (the one document key its
  * whole block lives at), so a minimal fake session and a fixed key stand in for the app's.
  */

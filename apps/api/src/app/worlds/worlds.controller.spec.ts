@@ -170,7 +170,7 @@ describe('Worlds endpoints', () => {
       .post('/entities')
       .send({
         name: 'Lady Mara',
-        types: ['core.note'],
+        types: ['core.type.note'],
         worldId: created.body.id,
       })
       .expect(201);
@@ -221,7 +221,7 @@ describe('Worlds endpoints', () => {
       .post('/entities')
       .send({
         name: 'Lady Mara',
-        types: ['core.note'],
+        types: ['core.type.note'],
         worldId: created.body.id,
       })
       .expect(201);
@@ -254,11 +254,11 @@ describe('Worlds endpoints', () => {
 
     const a = await ada
       .post('/entities')
-      .send({ name: 'A', types: ['core.note'], worldId: world.body.id })
+      .send({ name: 'A', types: ['core.type.note'], worldId: world.body.id })
       .expect(201);
     const b = await ada
       .post('/entities')
-      .send({ name: 'B', types: ['core.note'], worldId: world.body.id })
+      .send({ name: 'B', types: ['core.type.note'], worldId: world.body.id })
       .expect(201);
 
     const res = await ada
@@ -278,7 +278,7 @@ describe('Worlds endpoints', () => {
     for (const name of ['A', 'B', 'C']) {
       const e = await ada
         .post('/entities')
-        .send({ name, types: ['core.note'], worldId: world.body.id })
+        .send({ name, types: ['core.type.note'], worldId: world.body.id })
         .expect(201);
       ids.push(e.body.id);
     }
@@ -305,11 +305,11 @@ describe('Worlds endpoints', () => {
     const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
     const a = await ada
       .post('/entities')
-      .send({ name: 'A', types: ['core.note'], worldId: world.body.id })
+      .send({ name: 'A', types: ['core.type.note'], worldId: world.body.id })
       .expect(201);
     const b = await ada
       .post('/entities')
-      .send({ name: 'B', types: ['core.note'], worldId: world.body.id })
+      .send({ name: 'B', types: ['core.type.note'], worldId: world.body.id })
       .expect(201);
 
     // A duplicate id (reachable directly via the API) collapses to one, first-wins order.
@@ -327,7 +327,7 @@ describe('Worlds endpoints', () => {
       .post('/entities')
       .send({
         name: 'Shared lore',
-        types: ['core.note'],
+        types: ['core.type.note'],
         worldId: world.body.id,
       })
       .expect(201);

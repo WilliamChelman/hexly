@@ -11,14 +11,14 @@ import {
   test,
 } from './fixtures';
 
-/** The Hex Map's own grid, at the `grid` key `core.hexmap` declares. */
+/** The Hex Map's own grid, at the `grid` key `core.type.hex-map` declares. */
 const MAP_VIEW = mapViewToggle();
 /** The attached grid — a World Field a worldbuilder authored and hung on this one Entity (ADR-0054). */
-const BATTLEMAP_VIEW = mapViewToggle('world.battlemap');
+const BATTLEMAP_VIEW = mapViewToggle('world.field.battle-map');
 
 /**
  * A Field of a Structured Data Type attached *directly* to an Entity auto-affords its View (#232,
- * ADR-0054): a `core.hexmap` carrying an instance-attached `battlemap` Field of the `core.hex-grid` Data Type affords
+ * ADR-0054): a `core.type.hex-map` carrying an instance-attached `battlemap` Field of the `core.datatype.hex-grid` Data Type affords
  * a second map View, appended after its type-placed Views in `fields[]` order. The sibling of
  * `two-grids.spec.ts`, which reaches the second grid through a *type* — here the grid rides no type at
  * all, only the attachment. What is asserted is the same: each View has its own store and undo stack,
@@ -28,26 +28,26 @@ test('an attached grid Field affords its own map View, with its own paint and un
   const worldId = await enterLibrary(page);
   // A reusable World Field of the grid Data Type — no type declares it; it exists to be attached.
   await authorWorldField(page, worldId, {
-    segment: 'battlemap',
+    segment: 'battle-map',
     label: 'Battlemap',
-    kind: 'core.hex-grid',
+    kind: 'core.datatype.hex-grid',
   });
 
   await enterLibrary(page);
-  const entityId = await createEntity(page, 'core.hexmap');
+  const entityId = await createEntity(page, 'core.type.hex-map');
   await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');
 
   // Paint the world map *before* the battlemap is attached, so its hexes cannot be a fresh mint.
   await paint(page, 'Ocean', [0, 1]);
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
 
-  await attachField(page, 'world.battlemap');
+  await attachField(page, 'world.field.battle-map');
 
   // Two map toggles: the type-placed grid View first, then the attachment's — appended in `fields[]`
   // order (CONTEXT.md → View), each named by its Field, which is what tells the world map from the battlemap.
   await expect(page.getByTestId(MAP_VIEW)).toHaveText('Map');
   await expect(page.getByTestId(BATTLEMAP_VIEW)).toHaveText('Battlemap');
-  // `core.hexmap`'s grid is still the default View, so the live map is the one we were painting, untorn.
+  // `core.type.hex-map`'s grid is still the default View, so the live map is the one we were painting, untorn.
   await expect(page.getByTestId(MAP_VIEW)).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
 
@@ -91,10 +91,10 @@ test('an attached grid Field affords its own map View, with its own paint and un
   await expect(page.getByTestId('hex-count')).toHaveText('3 hexes');
 
   // Two Fields of the one EntityDocument map, each holding the terrain painted on its own View
-  // (ADR-0050). The `world.battlemap` grid's presence as a document key *is* the attachment (ADR-0057) —
+  // (ADR-0050). The `world.field.battle-map` grid's presence as a document key *is* the attachment (ADR-0057) —
   // there is no separate `fields[]` to check.
   const worldMap = await savedGrid(request, entityId);
-  const battlemap = await savedGrid(request, entityId, 'world.battlemap');
+  const battlemap = await savedGrid(request, entityId, 'world.field.battle-map');
   expect(Object.values(worldMap.hexes)).toEqual([{ terrain: 'ocean' }, { terrain: 'ocean' }, { terrain: 'ocean' }]);
   expect(Object.values(battlemap.hexes)).toEqual([{ terrain: 'mountain' }, { terrain: 'mountain' }]);
 });

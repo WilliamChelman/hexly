@@ -46,7 +46,7 @@ export class ViewRegistry {
   }
 
   /**
-   * The View that renders a Field of the **Structured Data Type** `kind` (`core.hex-grid` → the map View),
+   * The View that renders a Field of the **Structured Data Type** `kind` (`core.datatype.hex-grid` → the map View),
    * or `undefined` when this build registers none — or ships it from a **disabled** Plugin. So even an
    * enabled Type's placed Field of a disabled kind degrades to a plain value (ADR-0050, ADR-0052).
    */

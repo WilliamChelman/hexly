@@ -21,13 +21,13 @@ export function providePluginDnd(): EnvironmentProviders {
     providePlugin({
       id: PLUGIN_ID,
       types: DND_TYPE_DEFINITIONS,
-      // The `dnd.stat-block` structured Field (ADR-0054); the prose `core.content` it also references is
+      // The `dnd.datatype.stat-block` structured Field (ADR-0054); the prose `core.field.content` it also references is
       // the content plugin's.
       fields: [DND_STAT_BLOCK_FIELD],
       views: [
         {
           id: DND_VIEW_STAT_BLOCK,
-          // The `dnd.stat-block` data-type's View, not the `dnd.monster` type's (ADR-0055): it renders
+          // The `dnd.datatype.stat-block` data-type's View, not the `dnd.type.monster` type's (ADR-0055): it renders
           // whichever stat-block Field placed it and takes its toggle label from that Field — so no toggle
           // copy of its own, mirroring the map View (ADR-0050).
           dataType: DND_STAT_BLOCK,

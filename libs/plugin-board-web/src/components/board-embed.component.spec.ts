@@ -49,7 +49,7 @@ function embedElement(over: Partial<EmbedElement> = {}): EmbedElement {
     size: { width: 360, height: 260 },
     z: 0,
     targetEntityId: 'note-2',
-    viewInstance: 'core.view.content',
+    viewInstance: 'core.view.rich-content',
     ...over,
   };
 }
@@ -63,7 +63,7 @@ function boardDetail(element: EmbedElement): EntityDetail {
     id: 'board-1',
     worldId: 'w1',
     name: 'A board',
-    types: ['core.board'],
+    types: ['core.type.board'],
     document: { [SURFACE_FIELD.id]: { elements: [element] } },
   } as unknown as EntityDetail;
 }
@@ -104,7 +104,7 @@ describe('BoardEmbed', () => {
     setup();
     render();
     expect(captured?.entityId).toBe('note-2');
-    expect(captured?.viewKey).toBe('core.view.content');
+    expect(captured?.viewKey).toBe('core.view.rich-content');
   });
 
   it('advances the render context at the page root: this Board is the sole ancestor, depth 1', () => {

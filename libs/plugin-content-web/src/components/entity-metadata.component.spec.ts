@@ -14,19 +14,19 @@ import { EntityMetadataComponent } from './entity-metadata.component';
  */
 
 /**
- * A stand-in structured Field: any `namespace.id` kind is structured (ADR-0050), so `test.grid` stands
+ * A stand-in structured Field: any `namespace.datatype.name` kind is structured (ADR-0050), so `test.datatype.grid` stands
  * for a registered structured Field the panel must skip — its value is a document with its own View —
  * without pulling in the map plugin.
  */
 const GRID_FIELD: Field = {
-  id: 'test.grid',
+  id: 'test.field.grid',
   label: 'Grid',
-  dataType: { kind: 'test.grid' },
+  dataType: { kind: 'test.datatype.grid' },
   required: false,
   facetable: false,
 };
 
-/** `core.note`, as the plugin registers it: its one canonical prose Field, referenced by id. */
+/** `core.type.note`, as the plugin registers it: its one canonical prose Field, referenced by id. */
 const NOTE_TYPE: TypeDefinition = {
   id: CORE_NOTE,
   icon: 'label',
@@ -44,7 +44,11 @@ const NOTE_TYPE: TypeDefinition = {
 };
 
 /** A grid-carrying type — prose beside a Field of a Structured Data Type, both of which the panel skips. */
-const MAP_TYPE: TypeDefinition = { ...NOTE_TYPE, id: 'core.hexmap', fieldRefs: [CONTENT_FIELD.id, GRID_FIELD.id] };
+const MAP_TYPE: TypeDefinition = {
+  ...NOTE_TYPE,
+  id: 'core.type.hex-map',
+  fieldRefs: [CONTENT_FIELD.id, GRID_FIELD.id],
+};
 
 const noteWith = (types: readonly string[], metadata?: Record<string, unknown>): EntityDetail => ({
   id: 'n1',
@@ -58,7 +62,7 @@ const noteWith = (types: readonly string[], metadata?: Record<string, unknown>):
   createdAt: 1,
   updatedAt: 1,
   document: {
-    'core.content': { format: 'tiptap-v1', snapshot: {} },
+    'core.field.content': { format: 'tiptap-v1', snapshot: {} },
     ...metadata,
   },
 });
@@ -117,7 +121,7 @@ describe('EntityMetadata', () => {
     // The grid lives at a EntityDocument key like every other Field value, but it is a document with
     // its own View: dumping it here as a line of JSON would tell the reader nothing. A type carrying
     // nothing but Fields of a Structured Data Type therefore shows no disclosure at all.
-    session.loadDetail(noteWith(['core.hexmap'], { 'test.grid': { hexes: {} } }));
+    session.loadDetail(noteWith(['core.type.hex-map'], { 'test.field.grid': { hexes: {} } }));
     const fixture = TestBed.createComponent(EntityMetadataComponent);
     fixture.detectChanges();
 
@@ -126,21 +130,21 @@ describe('EntityMetadata', () => {
 });
 
 /**
- * With no map plugin, `core.hexmap` is unregistered: it types no key, so the grid is not a Field at
+ * With no map plugin, `core.type.hex-map` is unregistered: it types no key, so the grid is not a Field at
  * all and falls through to plain EntityDocument — shown rather than skipped (ADR-0048).
  */
 describe('EntityMetadata without the Hex Map plugin', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [EntityMetadataComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
-      // Only `core.note` is registered; `core.hexmap` resolves no Fields.
+      // Only `core.type.note` is registered; `core.type.hex-map` resolves no Fields.
       providers: [provideFakeEntitySession(), provideEntityTypesTesting([NOTE_TYPE], [CONTENT_FIELD])],
     }).compileComponents();
   });
 
   it('shows a Hex Map’s grid as plain EntityDocument — an unrendered value, never a lost one', () => {
     TestBed.inject(FakeEntitySession).loadDetail(
-      noteWith(['core.hexmap'], { 'test.grid': { hexes: {} }, status: 'canon' }),
+      noteWith(['core.type.hex-map'], { 'test.field.grid': { hexes: {} }, status: 'canon' }),
     );
     const fixture = TestBed.createComponent(EntityMetadataComponent);
     fixture.detectChanges();

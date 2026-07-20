@@ -43,7 +43,7 @@ async function linksOf(agent: request.Agent, worldId: string, name: string) {
   const detail = await agent.get(`/entities/${summary.id}`).expect(200);
   return {
     id: summary.id,
-    links: entityLinks(detail.body.document['core.content'].snapshot),
+    links: entityLinks(detail.body.document['core.field.content'].snapshot),
   };
 }
 
@@ -86,7 +86,7 @@ async function imagesOf(agent: request.Agent, worldId: string, name: string): Pr
   const list = await agent.get(`/entities?worldId=${worldId}`).expect(200);
   const summary = list.body.items.find((e: { name: string }) => e.name === name);
   const detail = await agent.get(`/entities/${summary.id}`).expect(200);
-  return imageSrcs(detail.body.document['core.content'].snapshot);
+  return imageSrcs(detail.body.document['core.field.content'].snapshot);
 }
 
 describe('Vault import endpoint', () => {
@@ -159,10 +159,10 @@ describe('Vault import endpoint', () => {
     const list = await ada.get(`/entities?worldId=${res.body.worldId}`).expect(200);
     const mara = list.body.items.find((e: { name: string }) => e.name === 'Lady Mara');
     expect(mara).toBeDefined();
-    expect(mara.types).toEqual(['core.note']);
+    expect(mara.types).toEqual(['core.type.note']);
   });
 
-  it('makes an imported note findable by its Content prose with no re-save (ADR-0035)', async () => {
+  it('makes an imported note findable by its RichContent prose with no re-save (ADR-0035)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const zip = vaultZip({
       'Lady Mara.md': '# Lady Mara\n\nA ranger of the sunken citadel.',
@@ -201,8 +201,8 @@ describe('Vault import endpoint', () => {
 
     const mara = await ada.get(`/entities/${summary.id}`).expect(200);
     // Body converted to the opaque tiptap-v3 snapshot (ADR-0019).
-    expect(mara.body.document['core.content'].format).toBe('tiptap-v3');
-    expect(mara.body.document['core.content'].snapshot.type).toBe('doc');
+    expect(mara.body.document['core.field.content'].format).toBe('tiptap-v3');
+    expect(mara.body.document['core.field.content'].snapshot.type).toBe('doc');
 
     // Folder path preserved under the reserved namespace; frontmatter (incl. aliases)
     // passes through as EntityDocument; `tags` moved out to Hexly Tags (not left in EntityDocument). The body IS
@@ -218,7 +218,7 @@ describe('Vault import endpoint', () => {
   it("keeps a foreign note's bare frontmatter keys as plain untyped values, never coerced into a namespaced Field (ADR-0056)", async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     // A stranger's Obsidian note, unstamped: a bare `content` key whose leaf collides with the namespaced
-    // `core.content` Field, and a bare `element` matched by nothing (ADR-0056's own worry, its lines 5-8).
+    // `core.field.content` Field, and a bare `element` matched by nothing (ADR-0056's own worry, its lines 5-8).
     const zip = vaultZip({
       'Fireheart.md': [
         '---',
@@ -235,16 +235,16 @@ describe('Vault import endpoint', () => {
     const { detail } = await entityNamed(ada, res.body.worldId, 'Fireheart');
 
     // A plain Note — no type was stamped, so nothing typed it.
-    expect(detail.types).toEqual(['core.note']);
+    expect(detail.types).toEqual(['core.type.note']);
     // Both bare keys land verbatim under their own names — data preserved, lensed by no Field.
     expect(detail.document).toMatchObject({
       element: 'fire',
       content: 'A bare content string, not Hexly prose.',
     });
-    // The bare `content` and the namespaced `core.content` coexist as two distinct predicates sharing a
-    // leaf: the body's prose lives at `core.content` while the frontmatter string stays at bare `content`.
+    // The bare `content` and the namespaced `core.field.content` coexist as two distinct predicates sharing a
+    // leaf: the body's prose lives at `core.field.content` while the frontmatter string stays at bare `content`.
     expect(typeof detail.document['content']).toBe('string');
-    expect(JSON.stringify(detail.document['core.content'].snapshot)).toContain('The mountain burns.');
+    expect(JSON.stringify(detail.document['core.field.content'].snapshot)).toContain('The mountain burns.');
   });
 
   /** The read half of the export's generic `hexly.type` stamp (#203, ADR-0050). */
@@ -254,7 +254,7 @@ describe('Vault import endpoint', () => {
       const zip = vaultZip({
         'Bestiary/Owlbear.md': [
           '---',
-          'hexly.type: [core.note, dnd.monster]',
+          'hexly.type: [core.type.note, dnd.type.monster]',
           'challenge_rating: 3',
           'size: Large',
           '---',
@@ -266,7 +266,7 @@ describe('Vault import endpoint', () => {
       const { summary, detail } = await entityNamed(ada, res.body.worldId, 'Owlbear');
 
       // Primary type first, as stamped.
-      expect(summary.types).toEqual(['core.note', 'dnd.monster']);
+      expect(summary.types).toEqual(['core.type.note', 'dnd.type.monster']);
       expect(detail.document).toMatchObject({ challenge_rating: 3, size: 'Large' });
       // Reserved provenance: consumed, never stored back as author EntityDocument.
       expect(detail.document).not.toHaveProperty('hexly.type');
@@ -274,16 +274,16 @@ describe('Vault import endpoint', () => {
 
     it('applies a type this build has never heard of — nothing is resolved on the import path', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      // `world.deity`'s definition lives in the World it was authored in, not in the vault. The id
+      // `world.type.deity`'s definition lives in the World it was authored in, not in the vault. The id
       // still lands: an unresolvable type degrades to the generic Field view (ADR-0048).
       const zip = vaultZip({
-        'Deities/Vela.md': ['---', 'hexly.type: [world.deity]', 'domain: dusk', '---', '# Vela'].join('\n'),
+        'Deities/Vela.md': ['---', 'hexly.type: [world.type.deity]', 'domain: dusk', '---', '# Vela'].join('\n'),
       });
 
       const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
       const { summary, detail } = await entityNamed(ada, res.body.worldId, 'Vela');
 
-      expect(summary.types).toEqual(['world.deity']);
+      expect(summary.types).toEqual(['world.type.deity']);
       expect(detail.document).toMatchObject({ domain: 'dusk' });
     });
 
@@ -298,8 +298,8 @@ describe('Vault import endpoint', () => {
 
       // Neither file is skipped.
       expect(res.body.notesImported).toBe(2);
-      expect((await entityNamed(ada, res.body.worldId, 'Junk')).summary.types).toEqual(['core.note']);
-      expect((await entityNamed(ada, res.body.worldId, 'Bare')).summary.types).toEqual(['core.note']);
+      expect((await entityNamed(ada, res.body.worldId, 'Junk')).summary.types).toEqual(['core.type.note']);
+      expect((await entityNamed(ada, res.body.worldId, 'Bare')).summary.types).toEqual(['core.type.note']);
     });
 
     it('opens an imported note whose grid: frontmatter is not a valid grid', async () => {
@@ -307,13 +307,15 @@ describe('Vault import endpoint', () => {
       // A stranger's vault uses `grid:` for something else. Field validation is forward-only, so the
       // value is stored as it stands.
       const zip = vaultZip({
-        'Chart.md': ['---', 'hexly.type: [core.hexmap]', 'grid: hand-drawn, 12 squares', '---', '# Chart'].join('\n'),
+        'Chart.md': ['---', 'hexly.type: [core.type.hex-map]', 'grid: hand-drawn, 12 squares', '---', '# Chart'].join(
+          '\n',
+        ),
       });
 
       const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
       const { summary, detail } = await entityNamed(ada, res.body.worldId, 'Chart');
 
-      expect(summary.types).toEqual(['core.hexmap']);
+      expect(summary.types).toEqual(['core.type.hex-map']);
       expect(detail.document).toMatchObject({ grid: 'hand-drawn, 12 squares' });
     });
   });
@@ -325,12 +327,12 @@ describe('Vault import endpoint', () => {
     const zip = vaultZip({
       'Vela.md': [
         '---',
-        'hexly.type: [core.note, world.deity]',
+        'hexly.type: [core.type.note, world.type.deity]',
         '---',
-        '<!-- hexly:field core.content -->',
+        '<!-- hexly:field core.field.content -->',
         'Public lore.',
         '',
-        '<!-- hexly:field world.secrets -->',
+        '<!-- hexly:field world.field.secrets -->',
         'Hidden truth.',
       ].join('\n'),
     });
@@ -339,8 +341,8 @@ describe('Vault import endpoint', () => {
     const { detail } = await entityNamed(ada, res.body.worldId, 'Vela');
 
     // Each marked block lands at its own key, converted to prose; the marker comment itself is gone.
-    expect(JSON.stringify(detail.document['core.content'].snapshot)).toContain('Public lore.');
-    expect(JSON.stringify(detail.document['world.secrets'].snapshot)).toContain('Hidden truth.');
+    expect(JSON.stringify(detail.document['core.field.content'].snapshot)).toContain('Public lore.');
+    expect(JSON.stringify(detail.document['world.field.secrets'].snapshot)).toContain('Hidden truth.');
     expect(JSON.stringify(detail.document)).not.toContain('hexly:field');
   });
 
@@ -352,8 +354,10 @@ describe('Vault import endpoint', () => {
     const { detail } = await entityNamed(ada, res.body.worldId, 'Keep');
 
     // No markers → the whole body converts into the canonical `content` Field.
-    expect(detail.document['core.content'].format).toBe('tiptap-v3');
-    expect(JSON.stringify(detail.document['core.content'].snapshot)).toContain('The northern keep guards the pass.');
+    expect(detail.document['core.field.content'].format).toBe('tiptap-v3');
+    expect(JSON.stringify(detail.document['core.field.content'].snapshot)).toContain(
+      'The northern keep guards the pass.',
+    );
   });
 
   it('reports dangling links, degraded constructs, and zero assets in the summary', async () => {
@@ -395,7 +399,7 @@ describe('Vault import endpoint', () => {
     expect(referencedBy).toEqual([
       {
         descriptor: null,
-        source: { id: keep.id, name: 'Keep', types: ['core.note'] },
+        source: { id: keep.id, name: 'Keep', types: ['core.type.note'] },
       },
     ]);
   });
@@ -658,7 +662,7 @@ describe('Vault import endpoint', () => {
     const aldermoor = list.body.items.find((e: { name: string }) => e.name === 'Aldermoor');
     const note = await ada.get(`/entities/${aldermoor.id}`).expect(200);
     // It carries its lore, and the reserved `hexly.*` key isn't persisted as author EntityDocument.
-    expect(JSON.stringify(note.body.document['core.content'].snapshot)).toContain('The frontier realm.');
+    expect(JSON.stringify(note.body.document['core.field.content'].snapshot)).toContain('The frontier realm.');
     expect(note.body.document).not.toHaveProperty('hexly.isHome');
   });
 

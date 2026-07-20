@@ -1,5 +1,5 @@
 import { defineField, EntityDocument, ReindexFailure, emptyEntityDocument } from '@hexly/domain';
-import { emptyContent, tiptapContent } from '@hexly/plugin-content';
+import { emptyRichContent, tiptapContent } from '@hexly/plugin-content';
 import { and, eq } from 'drizzle-orm';
 import { createDb, Db } from '../db/db';
 import {
@@ -171,9 +171,9 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Ealdred',
-        types: ['core.note'],
+        types: ['core.type.note'],
         tags: [],
-        document: { 'core.content': CONTENT },
+        document: { 'core.field.content': CONTENT },
       });
 
       expect(descriptorsOf('Ealdred')).toEqual(['spouse']);
@@ -186,9 +186,9 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'The Reach',
-        types: ['core.hexmap'],
+        types: ['core.type.hex-map'],
         tags: [],
-        document: { 'core.content': CONTENT, 'core.grid': GRID },
+        document: { 'core.field.content': CONTENT, 'core.field.grid': GRID },
       });
 
       expect(contentTextOf('The Reach')).toBe('Married to Ashford The Kingdom of Avalon The Whisperwood');
@@ -204,9 +204,9 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Ealdred',
-        types: ['core.note'],
+        types: ['core.type.note'],
         tags: [],
-        document: { 'core.content': CONTENT },
+        document: { 'core.field.content': CONTENT },
       });
 
       expect(edgesOf('Ealdred')).toEqual([
@@ -228,10 +228,10 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Aldermoor',
-        types: ['core.note'],
+        types: ['core.type.note'],
         tags: [],
         document: {
-          'core.content': tiptapContent({
+          'core.field.content': tiptapContent({
             type: 'doc',
             content: [
               {
@@ -264,15 +264,15 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Ealdred',
-        types: ['core.note'],
+        types: ['core.type.note'],
         tags: [],
-        document: { 'core.content': CONTENT },
+        document: { 'core.field.content': CONTENT },
       });
 
       writes.mutate(ADA, row.id, {
         kind: 'edit',
         version: row.version,
-        document: { 'core.content': emptyContent() },
+        document: { 'core.field.content': emptyRichContent() },
       });
 
       expect(descriptorsOf('Ealdred')).toEqual([]);
@@ -284,15 +284,15 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Ealdred',
-        types: ['core.note'],
+        types: ['core.type.note'],
         tags: [],
-        document: { 'core.content': CONTENT },
+        document: { 'core.field.content': CONTENT },
       });
 
       writes.mutate(ADA, row.id, {
         kind: 'edit',
         version: row.version,
-        document: { 'core.content': emptyContent() },
+        document: { 'core.field.content': emptyRichContent() },
       });
 
       expect(edgesOf('Ealdred')).toEqual([]);
@@ -307,9 +307,9 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Ealdred',
-        types: ['core.note'],
+        types: ['core.type.note'],
         tags: [],
-        document: { 'core.content': CONTENT },
+        document: { 'core.field.content': CONTENT },
       });
       writes.mutate(ADA, row.id, {
         kind: 'edit',
@@ -320,7 +320,7 @@ describe('EntityWrites', () => {
       const result = writes.mutate(ADA, row.id, {
         kind: 'edit',
         version: row.version, // stale
-        document: { 'core.content': emptyContent() },
+        document: { 'core.field.content': emptyRichContent() },
       });
 
       expect(result.status).toBe('conflict');
@@ -360,7 +360,7 @@ describe('EntityWrites', () => {
       }
 
       it('rebuilds an unindexed Entity’s edges, descriptors, and search text from its document', () => {
-        seedUnindexed('ealdred', WORLD, { 'core.content': CONTENT });
+        seedUnindexed('ealdred', WORLD, { 'core.field.content': CONTENT });
 
         reindexAll();
 
@@ -385,9 +385,9 @@ describe('EntityWrites', () => {
         seedRaw(
           'the-reach',
           WORLD,
-          JSON.stringify({ 'core.content': CONTENT, 'core.grid': GRID }),
+          JSON.stringify({ 'core.field.content': CONTENT, 'core.field.grid': GRID }),
           'hexmap',
-          'Married to', // What the old, Content-only derivation left behind.
+          'Married to', // What the old, RichContent-only derivation left behind.
         );
 
         reindexAll();
@@ -405,19 +405,19 @@ describe('EntityWrites', () => {
         seedUser(BOB);
         seedWorld(OTHER, BOB);
         seedUnindexed('goblin', WORLD, {
-          'hexly.source': { importer: 'draw-steel.monsters', sourceId: 'goblin', rev: 'sha-abc' },
+          'hexly.source': { importer: 'draw-steel.importer.monsters', sourceId: 'goblin', rev: 'sha-abc' },
         });
         seedUnindexed('ajax', OTHER, {
-          'hexly.source': { importer: 'draw-steel.monsters', sourceId: 'ajax', rev: 'sha-abc' },
+          'hexly.source': { importer: 'draw-steel.importer.monsters', sourceId: 'ajax', rev: 'sha-abc' },
         });
 
         reindexAll();
 
         expect(importSourceOf('goblin')).toEqual([
-          { worldId: WORLD, importer: 'draw-steel.monsters', sourceId: 'goblin', rev: 'sha-abc' },
+          { worldId: WORLD, importer: 'draw-steel.importer.monsters', sourceId: 'goblin', rev: 'sha-abc' },
         ]);
         expect(importSourceOf('ajax')).toEqual([
-          { worldId: OTHER, importer: 'draw-steel.monsters', sourceId: 'ajax', rev: 'sha-abc' },
+          { worldId: OTHER, importer: 'draw-steel.importer.monsters', sourceId: 'ajax', rev: 'sha-abc' },
         ]);
       });
 
@@ -427,7 +427,7 @@ describe('EntityWrites', () => {
        * does it yield new state, and that stale window closes on the reader's next navigation.
        */
       it('rewrites the indexes silently: no seq bump, no nudge', () => {
-        seedUnindexed('ealdred', WORLD, { 'core.content': CONTENT });
+        seedUnindexed('ealdred', WORLD, { 'core.field.content': CONTENT });
 
         reindexAll();
 
@@ -438,7 +438,7 @@ describe('EntityWrites', () => {
 
       /** Safe to re-run: the document is authoritative and the write is a wholesale replace. */
       it('is idempotent: a second run leaves the same rows and reports the same count', () => {
-        seedUnindexed('ealdred', WORLD, { 'core.content': CONTENT });
+        seedUnindexed('ealdred', WORLD, { 'core.field.content': CONTENT });
 
         const first = reindexAll();
         const afterFirst = {
@@ -461,8 +461,8 @@ describe('EntityWrites', () => {
         const OTHER = 'world-2';
         seedUser(BOB);
         seedWorld(OTHER, BOB); // A World the reindex has no membership in, and reaches anyway.
-        seedUnindexed('ealdred', WORLD, { 'core.content': CONTENT });
-        seedUnindexed('elsewhere', OTHER, { 'core.content': CONTENT });
+        seedUnindexed('ealdred', WORLD, { 'core.field.content': CONTENT });
+        seedUnindexed('elsewhere', OTHER, { 'core.field.content': CONTENT });
 
         expect(reindexAll()).toMatchObject({
           walked: 3,
@@ -485,8 +485,8 @@ describe('EntityWrites', () => {
        * transaction would serve no other request while it ran.
        */
       it('pages through the instance, reaching every Entity exactly once', () => {
-        seedUnindexed('ealdred', WORLD, { 'core.content': CONTENT });
-        seedUnindexed('elsewhere', WORLD, { 'core.content': CONTENT });
+        seedUnindexed('ealdred', WORLD, { 'core.field.content': CONTENT });
+        seedUnindexed('elsewhere', WORLD, { 'core.field.content': CONTENT });
 
         // 3 Entities at a page apiece, plus the empty page that settles the exhausted cursor.
         expect(reindexAll(1)).toMatchObject({
@@ -522,7 +522,7 @@ describe('EntityWrites', () => {
        * Entities around it: one corrupt row must not deny every other Entity its derivation.
        */
       it('skips a document it cannot parse, reports it, and reindexes the rest', () => {
-        seedUnindexed('ealdred', WORLD, { 'core.content': CONTENT });
+        seedUnindexed('ealdred', WORLD, { 'core.field.content': CONTENT });
         seedCorrupt('broken', WORLD);
 
         const walk = reindexAll();
@@ -590,13 +590,13 @@ describe('EntityWrites', () => {
         // The type references its link Field by id (ADR-0054); the Field itself is registered instance-wide.
         typeFields.registerField(
           defineField({
-            id: 'test.lair',
+            id: 'test.field.lair',
             label: 'Lair',
             dataType: { kind: 'entityLink' },
             facetable: true,
           }),
         );
-        typeFields.register('test.monster', ['test.lair']);
+        typeFields.register('test.type.monster', ['test.field.lair']);
       });
 
       it('materialises an edge and a target-id facet from an Entity-Link Field value', () => {
@@ -604,18 +604,18 @@ describe('EntityWrites', () => {
           ownerId: ADA,
           worldId: WORLD,
           name: 'Aboleth',
-          types: ['test.monster'],
+          types: ['test.type.monster'],
           tags: [],
           document: {
-            'core.content': emptyContent(),
-            'test.lair': { entityId: 'whisperwood', label: 'The Whisperwood' },
+            'core.field.content': emptyRichContent(),
+            'test.field.lair': { entityId: 'whisperwood', label: 'The Whisperwood' },
           },
         });
 
         expect(edgesOf('Aboleth')).toEqual([
           { worldId: WORLD, targetKind: 'entity', targetId: 'whisperwood', descriptor: null },
         ]);
-        expect(facetsOf('Aboleth')).toEqual([{ key: 'test.lair', value: 'whisperwood', num: null }]);
+        expect(facetsOf('Aboleth')).toEqual([{ key: 'test.field.lair', value: 'whisperwood', num: null }]);
       });
 
       it('re-pointing the link replaces both the edge and the facet (self-pruning)', () => {
@@ -623,25 +623,28 @@ describe('EntityWrites', () => {
           ownerId: ADA,
           worldId: WORLD,
           name: 'Aboleth',
-          types: ['test.monster'],
+          types: ['test.type.monster'],
           tags: [],
           document: {
-            'core.content': emptyContent(),
-            'test.lair': { entityId: 'whisperwood', label: 'The Whisperwood' },
+            'core.field.content': emptyRichContent(),
+            'test.field.lair': { entityId: 'whisperwood', label: 'The Whisperwood' },
           },
         });
 
         writes.mutate(ADA, row.id, {
           kind: 'edit',
           version: row.version,
-          types: ['test.monster'],
-          document: { 'core.content': emptyContent(), 'test.lair': { entityId: 'sunken-keep', label: 'Sunken Keep' } },
+          types: ['test.type.monster'],
+          document: {
+            'core.field.content': emptyRichContent(),
+            'test.field.lair': { entityId: 'sunken-keep', label: 'Sunken Keep' },
+          },
         });
 
         expect(edgesOf('Aboleth')).toEqual([
           { worldId: WORLD, targetKind: 'entity', targetId: 'sunken-keep', descriptor: null },
         ]);
-        expect(facetsOf('Aboleth')).toEqual([{ key: 'test.lair', value: 'sunken-keep', num: null }]);
+        expect(facetsOf('Aboleth')).toEqual([{ key: 'test.field.lair', value: 'sunken-keep', num: null }]);
       });
     });
 
@@ -652,10 +655,10 @@ describe('EntityWrites', () => {
      * facet (story 18) — and Reindex rebuilds both from the stored `fields[]` column (story 21).
      */
     describe('directly-attached Plugin Fields (ADR-0054, #226)', () => {
-      // A facetable Entity-Link Plugin Field, registered instance-wide and attached by id — `core.note`
+      // A facetable Entity-Link Plugin Field, registered instance-wide and attached by id — `core.type.note`
       // (the only type below) declares nothing but its prose, so `ally` rides the Entity alone.
       const ALLY = defineField({
-        id: 'test.ally',
+        id: 'test.field.ally',
         label: 'Ally',
         dataType: { kind: 'entityLink' },
         facetable: true,
@@ -670,25 +673,28 @@ describe('EntityWrites', () => {
           ownerId: ADA,
           worldId: WORLD,
           name: 'Ealdred',
-          types: ['core.note'],
-          // No stored attachment set: `test.ally` is a registered key the document carries that `core.note`
+          types: ['core.type.note'],
+          // No stored attachment set: `test.field.ally` is a registered key the document carries that `core.type.note`
           // never defaults, so it resolves into the effective set as an attachment.
-          document: { 'core.content': emptyContent(), 'test.ally': { entityId: 'mira', label: 'Mira' } },
+          document: {
+            'core.field.content': emptyRichContent(),
+            'test.field.ally': { entityId: 'mira', label: 'Mira' },
+          },
           tags: [],
         });
 
         expect(edgesOf('Ealdred')).toEqual([
           { worldId: WORLD, targetKind: 'entity', targetId: 'mira', descriptor: null },
         ]);
-        expect(facetsOf('Ealdred')).toEqual([{ key: 'test.ally', value: 'mira', num: null }]);
+        expect(facetsOf('Ealdred')).toEqual([{ key: 'test.field.ally', value: 'mira', num: null }]);
       });
 
       it('rebuilds the attached Field’s edge and facet from the document on reindex (ADR-0057)', () => {
         // Seeded raw with no derived rows, so the rebuild is observed independently of `insert` — the
         // reindex must derive the effective set from `types` + the document's own attachment keys.
-        seedAttachedRaw('ealdred', WORLD, ['core.note'], {
-          'core.content': emptyContent(),
-          'test.ally': { entityId: 'mira', label: 'Mira' },
+        seedAttachedRaw('ealdred', WORLD, ['core.type.note'], {
+          'core.field.content': emptyRichContent(),
+          'test.field.ally': { entityId: 'mira', label: 'Mira' },
         });
 
         expect(writes.reindexChunk(null, 100)).toMatchObject({ walked: expect.any(Number), reindexed: 2 });
@@ -696,7 +702,7 @@ describe('EntityWrites', () => {
         expect(edgesFrom('ealdred')).toEqual([
           { worldId: WORLD, targetKind: 'entity', targetId: 'mira', descriptor: null },
         ]);
-        expect(facetsOf('ealdred')).toEqual([{ key: 'test.ally', value: 'mira', num: null }]);
+        expect(facetsOf('ealdred')).toEqual([{ key: 'test.field.ally', value: 'mira', num: null }]);
       });
 
       /** An Entity seeded raw with no derived rows, for a reindex to rebuild from its document (ADR-0057). */
@@ -728,14 +734,14 @@ describe('EntityWrites', () => {
      * loading a document. Materialised at this same choke point; Reindex rebuilds it (below).
      */
     describe('Import Source index (ADR-0060)', () => {
-      const SOURCE = { importer: 'draw-steel.monsters', sourceId: 'goblin', rev: 'sha-abc' };
+      const SOURCE = { importer: 'draw-steel.importer.monsters', sourceId: 'goblin', rev: 'sha-abc' };
 
       it('materialises a row from a document carrying hexly.source', () => {
         writes.insert({
           ownerId: ADA,
           worldId: WORLD,
           name: 'Goblin',
-          types: ['core.note'],
+          types: ['core.type.note'],
           tags: [],
           document: { 'hexly.source': SOURCE },
         });
@@ -748,9 +754,9 @@ describe('EntityWrites', () => {
           ownerId: ADA,
           worldId: WORLD,
           name: 'Plain',
-          types: ['core.note'],
+          types: ['core.type.note'],
           tags: [],
-          document: { 'core.content': emptyContent() },
+          document: { 'core.field.content': emptyRichContent() },
         });
 
         expect(importSourceOf('Plain')).toEqual([]);
@@ -762,9 +768,9 @@ describe('EntityWrites', () => {
           ownerId: ADA,
           worldId: WORLD,
           name: 'Broken',
-          types: ['core.note'],
+          types: ['core.type.note'],
           tags: [],
-          document: { 'hexly.source': { importer: 'draw-steel.monsters' } }, // no sourceId / rev
+          document: { 'hexly.source': { importer: 'draw-steel.importer.monsters' } }, // no sourceId / rev
         });
 
         expect(importSourceOf('Broken')).toEqual([]);
@@ -780,7 +786,7 @@ describe('EntityWrites', () => {
           ownerId: ADA,
           worldId: WORLD,
           name: 'Goblin',
-          types: ['core.note'],
+          types: ['core.type.note'],
           tags: [],
           document: { 'hexly.source': SOURCE },
         });
@@ -797,7 +803,7 @@ describe('EntityWrites', () => {
         writes.mutate(ADA, row.id, {
           kind: 'edit',
           version: rowOf(row.id).version,
-          document: { 'core.content': emptyContent() },
+          document: { 'core.field.content': emptyRichContent() },
         });
         expect(importSourceOf('Goblin')).toEqual([{ worldId: WORLD, ...SOURCE }]);
       });
@@ -807,7 +813,7 @@ describe('EntityWrites', () => {
           ownerId: ADA,
           worldId: WORLD,
           name: 'Goblin',
-          types: ['core.note'],
+          types: ['core.type.note'],
           tags: [],
           document: { 'hexly.source': SOURCE },
         });
@@ -828,7 +834,7 @@ describe('EntityWrites', () => {
           ownerId: ADA,
           worldId: WORLD,
           name: 'Goblin',
-          types: ['core.note'],
+          types: ['core.type.note'],
           tags: [],
           document: { 'hexly.source': SOURCE },
         });
@@ -836,7 +842,7 @@ describe('EntityWrites', () => {
           ownerId: ADA,
           worldId: WORLD,
           name: 'Ajax',
-          types: ['core.note'],
+          types: ['core.type.note'],
           tags: [],
           document: { 'hexly.source': { ...SOURCE, sourceId: 'ajax' } },
         });
@@ -845,9 +851,9 @@ describe('EntityWrites', () => {
           ownerId: ADA,
           worldId: WORLD,
           name: 'Foreign',
-          types: ['core.note'],
+          types: ['core.type.note'],
           tags: [],
-          document: { 'hexly.source': { importer: 'other.pack', sourceId: 'x', rev: 'r' } },
+          document: { 'hexly.source': { importer: 'other.importer.pack', sourceId: 'x', rev: 'r' } },
         });
 
         expect([...provenanceIdsOf(WORLD, SOURCE.importer)].sort()).toEqual([ajax.id, goblin.id].sort());
@@ -917,17 +923,17 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Ealdred',
-        types: ['core.note'],
+        types: ['core.type.note'],
         tags: [],
-        document: { 'core.content': CONTENT }, // Ealdred → e2
+        document: { 'core.field.content': CONTENT }, // Ealdred → e2
       });
       const mira = writes.insert({
         ownerId: ADA,
         worldId: WORLD,
         name: 'Mira',
-        types: ['core.note'],
+        types: ['core.type.note'],
         tags: [],
-        document: { 'core.content': linkTo(ealdred.id) }, // Mira → Ealdred
+        document: { 'core.field.content': linkTo(ealdred.id) }, // Mira → Ealdred
       });
 
       writes.mutate(ADA, ealdred.id, { kind: 'delete' });
@@ -957,16 +963,16 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'The Reach',
-        types: ['core.hexmap'],
+        types: ['core.type.hex-map'],
         tags: [],
-        document: { 'core.content': emptyContent(), 'core.grid': { hexes, regions: [], labels: [] } },
+        document: { 'core.field.content': emptyRichContent(), 'core.field.grid': { hexes, regions: [], labels: [] } },
       });
 
       expect(edgesFrom(row.id)).toHaveLength(7000);
     });
 
     /**
-     * A Board is a first-class Entity like a Hex Map (#263): its `core.board-surface` Field harvests every
+     * A Board is a first-class Entity like a Hex Map (#263): its `core.datatype.board-surface` Field harvests every
      * Embed target and every Text Block inline link as a descriptor-less edge, and its Text Block prose
      * feeds the search text — all through the generic derive pass, since `board` is a bundled Plugin.
      */
@@ -976,11 +982,11 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'The Session Board',
-        types: ['core.board'],
+        types: ['core.type.board'],
         tags: [],
         document: {
-          'core.content': emptyContent(),
-          'core.surface': {
+          'core.field.content': emptyRichContent(),
+          'core.field.surface': {
             elements: [
               { id: 'em1', kind: 'embed', targetEntityId: 'e2', viewInstance: '', ...geometry },
               {
@@ -1010,7 +1016,7 @@ describe('EntityWrites', () => {
       expect(contentTextOf('The Session Board')).toBe('The Whisperwood');
     });
 
-    /** Content holding one bare `entityLink` at `targetId`. */
+    /** RichContent holding one bare `entityLink` at `targetId`. */
     function linkTo(targetId: string) {
       return tiptapContent({
         type: 'doc',
@@ -1302,7 +1308,7 @@ describe('EntityWrites', () => {
         id,
         worldId,
         name: id,
-        types: ['core.note'],
+        types: ['core.type.note'],
         tags: [],
         visibility,
         version: 1,

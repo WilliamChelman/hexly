@@ -11,7 +11,7 @@ function entity(id: string, name: string, worldId = 'w1'): EntitySummary {
     id,
     name,
     worldId,
-    types: ['core.note'],
+    types: ['core.type.note'],
     tags: [],
     visibility: 'private',
     version: 1,

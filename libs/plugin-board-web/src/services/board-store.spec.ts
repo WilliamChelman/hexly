@@ -7,14 +7,14 @@ import {
   ImageElement,
   TextElement,
 } from '@hexly/plugin-board';
-import { emptyContent, tiptapContent } from '@hexly/plugin-content';
+import { emptyRichContent, tiptapContent } from '@hexly/plugin-content';
 import { BoardStore } from './board-store';
 import { FakeEntitySession, provideBoardStoreTesting } from '../testing/entity-session.fake';
 
 let session: FakeEntitySession;
 
 beforeEach(() => {
-  // Binds the store to `core.board`'s own `core.surface` Field, as the entity page's outlet does.
+  // Binds the store to `core.type.board`'s own `core.field.surface` Field, as the entity page's outlet does.
   TestBed.configureTestingModule({ providers: provideBoardStoreTesting() });
   session = TestBed.inject(FakeEntitySession);
 });
@@ -350,7 +350,7 @@ describe('BoardStore element operations', () => {
 });
 
 describe('BoardStore Text Block', () => {
-  it('adds a Text Block: an empty core.rich-content element on top, selected and armed to type into', () => {
+  it('adds a Text Block: an empty core.datatype.rich-content element on top, selected and armed to type into', () => {
     const store = makeStore();
     const box = store.addElement({ x: 0, y: 0 });
     const id = store.addText({ x: 20, y: 30 });
@@ -358,8 +358,8 @@ describe('BoardStore Text Block', () => {
     const element = store.document().elements.find((e) => e.id === id) as TextElement | undefined;
     expect(element?.kind).toBe('text');
     expect(element?.position).toEqual({ x: 20, y: 30 });
-    // The same empty `core.rich-content` value an Entity's Content opens on.
-    expect(element?.content).toEqual(emptyContent());
+    // The same empty `core.datatype.rich-content` value an Entity's RichContent opens on.
+    expect(element?.content).toEqual(emptyRichContent());
     // Lands above the pre-existing box.
     const boxZ = store.document().elements.find((e) => e.id === box)?.z ?? 0;
     expect(element?.z).toBeGreaterThan(boxZ);
@@ -380,7 +380,7 @@ describe('BoardStore Text Block', () => {
     expect((store.document().elements[0] as TextElement).content).toEqual(prose);
 
     store.undo();
-    expect((store.document().elements[0] as TextElement).content).toEqual(emptyContent());
+    expect((store.document().elements[0] as TextElement).content).toEqual(emptyRichContent());
   });
 
   it('ignores setContent for a missing element or a non-text kind — records no undo step', () => {
@@ -485,12 +485,12 @@ describe('BoardStore Embed elements', () => {
   it('adds an Embed targeting an Entity and the chosen View, on top and selected', () => {
     const store = makeStore();
     const box = store.addElement({ x: 0, y: 0 });
-    const id = store.addEmbed({ x: 40, y: 40 }, 'note-1', 'core.view.map:core.grid');
+    const id = store.addEmbed({ x: 40, y: 40 }, 'note-1', 'core.view.map:core.field.grid');
 
     const element = store.document().elements.find((e) => e.id === id) as EmbedElement | undefined;
     expect(element?.kind).toBe('embed');
     expect(element?.targetEntityId).toBe('note-1');
-    expect(element?.viewInstance).toBe('core.view.map:core.grid');
+    expect(element?.viewInstance).toBe('core.view.map:core.field.grid');
     // Lands above the pre-existing box, and is the current selection.
     const boxZ = store.document().elements.find((e) => e.id === box)?.z ?? 0;
     expect(element?.z).toBeGreaterThan(boxZ);
@@ -529,8 +529,8 @@ describe('BoardStore Embed elements', () => {
     const store = makeStore();
     const id = store.addEmbed({ x: 0, y: 0 }, 'note-1');
 
-    store.setEmbedView(id, 'core.view.content');
-    expect((store.document().elements[0] as EmbedElement).viewInstance).toBe('core.view.content');
+    store.setEmbedView(id, 'core.view.rich-content');
+    expect((store.document().elements[0] as EmbedElement).viewInstance).toBe('core.view.rich-content');
 
     store.undo();
     expect((store.document().elements[0] as EmbedElement).viewInstance).toBe('');
@@ -541,7 +541,7 @@ describe('BoardStore Embed elements', () => {
     const box = store.addElement({ x: 0, y: 0 });
     const before = store.document();
 
-    store.setEmbedView(box, 'core.view.content');
+    store.setEmbedView(box, 'core.view.rich-content');
     // The document is untouched, and no undo step was recorded beyond the box placement.
     expect(store.document()).toBe(before);
   });

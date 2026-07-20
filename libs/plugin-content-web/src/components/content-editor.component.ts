@@ -17,7 +17,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { Editor, JSONContent } from '@tiptap/core';
 import { catchError, firstValueFrom, of } from 'rxjs';
-import { Content, CONTENT_FIELD, tiptapContent } from '@hexly/plugin-content';
+import { RichContent, CONTENT_FIELD, tiptapContent } from '@hexly/plugin-content';
 import { EntitiesClient } from '@hexly/web-core';
 import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { TiptapDirective } from '../directives/tiptap.directive';
@@ -44,7 +44,7 @@ import { BubbleMenuDirective } from '../directives/bubble-menu.directive';
 const COMMIT_DEBOUNCE_MS = 250;
 
 /**
- * The Content editing surface every Entity shares (ADR-0019): mounts TipTap, which owns the live doc,
+ * The RichContent editing surface every Entity shares (ADR-0019): mounts TipTap, which owns the live doc,
  * cursor, and history. Seeds from {@link ENTITY_SESSION}'s body when {@link EntitySession.loadGeneration}
  * ticks — not on an edit echo, so the cursor holds — and commits `getJSON()` back through `session.mutate`
  * on a debounce, discarding the patches (ADR-0051). Carries the snapshot load-to-save, never parsing it.
@@ -347,7 +347,7 @@ export class ContentEditorComponent {
     effect(() => {
       const editor = this.editor();
       if (!editor || this.editable()) return;
-      const snapshot = (this.session.doc()[this.fieldKey] as Content | undefined)?.snapshot;
+      const snapshot = (this.session.doc()[this.fieldKey] as RichContent | undefined)?.snapshot;
       const doc = isDocSnapshot(snapshot) ? snapshot : { type: 'doc', content: [] };
       const serialized = JSON.stringify(doc);
       if (serialized === this.committed) return;
@@ -364,7 +364,7 @@ export class ContentEditorComponent {
       if (generation === seededGeneration) return;
       seededGeneration = generation;
       // untracked: sample the body once; tracking it would rebuild the editor on every commit.
-      const content = untracked(() => this.session.doc()[this.fieldKey]) as Content | undefined;
+      const content = untracked(() => this.session.doc()[this.fieldKey]) as RichContent | undefined;
       // A placeholder body ({}) or malformed snapshot yields an empty editor — a fresh note, a
       // prose-less reload, or a document at rest this build cannot parse.
       const rawSnapshot = content?.snapshot;

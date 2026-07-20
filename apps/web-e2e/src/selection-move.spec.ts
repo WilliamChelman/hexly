@@ -18,7 +18,7 @@ async function flushAndReadGrid(
 
 test('drags one label of a multi-label selection and the whole group moves', async ({ page, request }) => {
   await enterLibrary(page);
-  const mapId = await createEntity(page, 'core.hexmap');
+  const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();
@@ -74,7 +74,7 @@ test('drags one label of a multi-label selection and the whole group moves', asy
 
 test('drags a region on its own and its whole footprint moves', async ({ page, request }) => {
   await enterLibrary(page);
-  const mapId = await createEntity(page, 'core.hexmap');
+  const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();

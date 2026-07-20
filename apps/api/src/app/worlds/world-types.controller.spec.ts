@@ -61,7 +61,7 @@ describe('World user-defined types endpoints', () => {
   }
 
   // World-defined Fields a deity type references — the schema lives on the Field, not the type. The
-  // server slugs `world.<segment>` and pins the document key to it (ADR-0056).
+  // server slugs `world.field.<segment>` and pins the document key to it (ADR-0056).
   const domainField = {
     segment: 'domain',
     label: 'Domain',
@@ -71,9 +71,13 @@ describe('World user-defined types endpoints', () => {
   const alignmentField = { segment: 'alignment', label: 'Alignment', dataType: { kind: 'string' } };
 
   /** A user-defined type referencing its default Fields by id (ADR-0054). */
-  const deityType = { id: 'world.deity', label: 'Deity', fieldRefs: ['world.domain', 'world.alignment'] };
+  const deityType = {
+    id: 'world.type.deity',
+    label: 'Deity',
+    fieldRefs: ['world.field.domain', 'world.field.alignment'],
+  };
 
-  /** Author `world.domain` + `world.alignment`, then the deity type referencing them, in a fresh World. */
+  /** Author `world.field.domain` + `world.field.alignment`, then the deity type referencing them, in a fresh World. */
   async function seedDeity(agent: request.Agent): Promise<string> {
     const world = await makeWorld(agent);
     await makeField(agent, world, domainField);
@@ -89,40 +93,40 @@ describe('World user-defined types endpoints', () => {
 
       const created = await ada.post(`/worlds/${world}/types`).send(deityType).expect(201);
       expect(created.body).toEqual({
-        id: 'world.deity',
+        id: 'world.type.deity',
         label: 'Deity',
         // A type declares its default Fields by id only (ADR-0054) — no inline schema echoed back.
-        fieldRefs: ['world.domain', 'world.alignment'],
+        fieldRefs: ['world.field.domain', 'world.field.alignment'],
       });
 
       // The available-types read carries it back (source `user`).
       const listed = await ada.get(`/worlds/${world}/types`).expect(200);
       expect(listed.body).toContainEqual(
-        expect.objectContaining({ id: 'world.deity', label: 'Deity', source: 'user' }),
+        expect.objectContaining({ id: 'world.type.deity', label: 'Deity', source: 'user' }),
       );
 
       // Rename + replace the referenced Field set wholesale.
       const renamed = await ada
-        .patch(`/worlds/${world}/types/world.deity`)
-        .send({ label: 'God', fieldRefs: ['world.domain'] })
+        .patch(`/worlds/${world}/types/world.type.deity`)
+        .send({ label: 'God', fieldRefs: ['world.field.domain'] })
         .expect(200);
       expect(renamed.body.label).toBe('God');
-      expect(renamed.body.fieldRefs).toEqual(['world.domain']);
+      expect(renamed.body.fieldRefs).toEqual(['world.field.domain']);
 
-      await ada.delete(`/worlds/${world}/types/world.deity`).expect(204);
+      await ada.delete(`/worlds/${world}/types/world.type.deity`).expect(204);
       const empty = await ada.get(`/worlds/${world}/types`).expect(200);
-      expect(empty.body.some((t: { id: string }) => t.id === 'world.deity')).toBe(false);
+      expect(empty.body.some((t: { id: string }) => t.id === 'world.type.deity')).toBe(false);
     });
 
     it('rejects a non-`world.`-namespaced id and a malformed fieldRef (400)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await makeWorld(ada);
 
-      await ada.post(`/worlds/${world}/types`).send({ id: 'dnd.monster', label: 'Monster' }).expect(400);
-      // A `fieldRef` must be a `namespace.id` reuse handle, not a bare key.
+      await ada.post(`/worlds/${world}/types`).send({ id: 'dnd.type.monster', label: 'Monster' }).expect(400);
+      // A `fieldRef` must be a `namespace.field.name` reuse handle, not a bare key.
       await ada
         .post(`/worlds/${world}/types`)
-        .send({ id: 'world.thing', label: 'Thing', fieldRefs: ['x'] })
+        .send({ id: 'world.type.thing', label: 'Thing', fieldRefs: ['x'] })
         .expect(400);
     });
 
@@ -131,15 +135,15 @@ describe('World user-defined types endpoints', () => {
       const world = await makeWorld(ada);
 
       await ada.post(`/worlds/${world}/types`).send(deityType).expect(201);
-      await ada.post(`/worlds/${world}/types`).send({ id: 'world.deity', label: 'Other' }).expect(409);
+      await ada.post(`/worlds/${world}/types`).send({ id: 'world.type.deity', label: 'Other' }).expect(409);
     });
 
     it('404s a rename or delete of a type the World has not defined', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await makeWorld(ada);
 
-      await ada.patch(`/worlds/${world}/types/world.ghost`).send({ label: 'Ghost' }).expect(404);
-      await ada.delete(`/worlds/${world}/types/world.ghost`).expect(404);
+      await ada.patch(`/worlds/${world}/types/world.type.ghost`).send({ label: 'Ghost' }).expect(404);
+      await ada.delete(`/worlds/${world}/types/world.type.ghost`).expect(404);
     });
 
     it('refuses a non-Owner member the CRUD, while letting them read the type set', async () => {
@@ -153,11 +157,11 @@ describe('World user-defined types endpoints', () => {
 
       // A Contributor may read the available types (for the create dialog / facets)…
       const listed = await bob.get(`/worlds/${world}/types`).expect(200);
-      expect(listed.body).toContainEqual(expect.objectContaining({ id: 'world.deity' }));
+      expect(listed.body).toContainEqual(expect.objectContaining({ id: 'world.type.deity' }));
       // …but not author them.
-      await bob.post(`/worlds/${world}/types`).send({ id: 'world.faction', label: 'Faction' }).expect(403);
-      await bob.patch(`/worlds/${world}/types/world.deity`).send({ label: 'God' }).expect(403);
-      await bob.delete(`/worlds/${world}/types/world.deity`).expect(403);
+      await bob.post(`/worlds/${world}/types`).send({ id: 'world.type.faction', label: 'Faction' }).expect(403);
+      await bob.patch(`/worlds/${world}/types/world.type.deity`).send({ label: 'God' }).expect(403);
+      await bob.delete(`/worlds/${world}/types/world.type.deity`).expect(403);
     });
 
     it('404s every type route for a World the caller cannot reach (no existence leak)', async () => {
@@ -168,9 +172,9 @@ describe('World user-defined types endpoints', () => {
       const carol = await signIn('carol@hexly.test', 'correct horse');
 
       await carol.get(`/worlds/${world}/types`).expect(404);
-      await carol.post(`/worlds/${world}/types`).send({ id: 'world.x', label: 'X' }).expect(404);
-      await carol.patch(`/worlds/${world}/types/world.deity`).send({ label: 'X' }).expect(404);
-      await carol.delete(`/worlds/${world}/types/world.deity`).expect(404);
+      await carol.post(`/worlds/${world}/types`).send({ id: 'world.type.x', label: 'X' }).expect(404);
+      await carol.patch(`/worlds/${world}/types/world.type.deity`).send({ label: 'X' }).expect(404);
+      await carol.delete(`/worlds/${world}/types/world.type.deity`).expect(404);
     });
   });
 
@@ -182,13 +186,13 @@ describe('World user-defined types endpoints', () => {
       await ada.post(`/worlds/${worldA}/types`).send(deityType).expect(201);
 
       const inB = await ada.get(`/worlds/${worldB}/types`).expect(200);
-      expect(inB.body.some((t: { id: string }) => t.id === 'world.deity')).toBe(false);
+      expect(inB.body.some((t: { id: string }) => t.id === 'world.type.deity')).toBe(false);
     });
 
     it('lists the instance-wide plugin types alongside a World’s user-defined types', async () => {
       // A bundled plugin registers an instance-wide type at startup (stand-in for a real plugin) —
       // by id, with its default Field ids (ADR-0054); none needed for the merge assertion here.
-      app.get(TypeFieldRegistry).register('test.monster', [], 'Monster');
+      app.get(TypeFieldRegistry).register('test.type.monster', [], 'Monster');
 
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await makeWorld(ada);
@@ -196,9 +200,9 @@ describe('World user-defined types endpoints', () => {
 
       const listed = await ada.get(`/worlds/${world}/types`).expect(200);
       expect(listed.body).toContainEqual(
-        expect.objectContaining({ id: 'test.monster', label: 'Monster', source: 'plugin' }),
+        expect.objectContaining({ id: 'test.type.monster', label: 'Monster', source: 'plugin' }),
       );
-      expect(listed.body).toContainEqual(expect.objectContaining({ id: 'world.deity', source: 'user' }));
+      expect(listed.body).toContainEqual(expect.objectContaining({ id: 'world.type.deity', source: 'user' }));
     });
   });
 
@@ -208,22 +212,22 @@ describe('World user-defined types endpoints', () => {
       await seedDeity(ada);
       const created = await ada
         .post('/entities')
-        .send({ name: 'Nameless', types: ['core.note'] })
+        .send({ name: 'Nameless', types: ['core.type.note'] })
         .expect(201);
 
       // A typed edit ill-types the string `domain` Field — rejected by the world-scoped resolver, which
-      // resolves `world.deity`'s `fieldRefs` (→ the World Field `world.domain`) to a string data-type.
+      // resolves `world.type.deity`'s `fieldRefs` (→ the World Field `world.field.domain`) to a string data-type.
       const res = await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: { 'world.domain': 42 },
+          document: { 'world.field.domain': 42 },
           version: 1,
           tags: [],
-          types: ['world.deity'],
+          types: ['world.type.deity'],
         })
         .expect(400);
       expect(res.body.code).toBe('invalid-fields');
-      expect(res.body.data.fields).toContainEqual({ key: 'world.domain', code: 'type' });
+      expect(res.body.data.fields).toContainEqual({ key: 'world.field.domain', code: 'type' });
     });
 
     it('facets and filters by the user-defined type’s facetable referenced Field', async () => {
@@ -231,30 +235,30 @@ describe('World user-defined types endpoints', () => {
       const world = await seedDeity(ada);
       const created = await ada
         .post('/entities')
-        .send({ name: 'Pelor', types: ['core.note'] })
+        .send({ name: 'Pelor', types: ['core.type.note'] })
         .expect(201);
 
       // A typed save that carries the type + its EntityDocument — the facetable `domain` value materialises.
       await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: { 'world.domain': 'sun' },
+          document: { 'world.field.domain': 'sun' },
           version: 1,
           tags: [],
-          types: ['world.deity'],
+          types: ['world.type.deity'],
         })
         .expect(200);
 
-      // The Field facet surfaces contextually once `world.deity` is the active Type filter.
-      const facets = await ada.get('/entities/facets').query({ worldId: world, type: 'world.deity' }).expect(200);
+      // The Field facet surfaces contextually once `world.type.deity` is the active Type filter.
+      const facets = await ada.get('/entities/facets').query({ worldId: world, type: 'world.type.deity' }).expect(200);
       expect(facets.body.fields).toContainEqual(
-        expect.objectContaining({ key: 'world.domain', values: [{ value: 'sun', count: 1 }] }),
+        expect.objectContaining({ key: 'world.field.domain', values: [{ value: 'sun', count: 1 }] }),
       );
 
       // And filtering by that Field returns the Entity.
       const filtered = await ada
         .get('/entities')
-        .query({ worldId: world, type: 'world.deity', field: 'world.domain:eq:sun' })
+        .query({ worldId: world, type: 'world.type.deity', field: 'world.field.domain:eq:sun' })
         .expect(200);
       expect(filtered.body.items.map((e: { id: string }) => e.id)).toContain(created.body.id);
     });
@@ -264,23 +268,23 @@ describe('World user-defined types endpoints', () => {
       const world = await seedDeity(ada);
       const created = await ada
         .post('/entities')
-        .send({ name: 'Pelor', types: ['world.deity'] })
+        .send({ name: 'Pelor', types: ['world.type.deity'] })
         .expect(201);
       await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: { 'world.domain': 'sun' },
+          document: { 'world.field.domain': 'sun' },
           version: 1,
           tags: [],
-          types: ['world.deity'],
+          types: ['world.type.deity'],
         })
         .expect(200);
 
-      await ada.delete(`/worlds/${world}/types/world.deity`).expect(204);
+      await ada.delete(`/worlds/${world}/types/world.type.deity`).expect(204);
 
       // The Entity still reads back, its EntityDocument untouched — a Field is a lens, not a store.
       const read = await ada.get(`/entities/${created.body.id}`).expect(200);
-      expect(read.body.document).toEqual({ 'world.domain': 'sun' });
+      expect(read.body.document).toEqual({ 'world.field.domain': 'sun' });
     });
   });
 
@@ -288,15 +292,15 @@ describe('World user-defined types endpoints', () => {
     // The World-defined grid Field, plus a deity type placing it *after* its Fields — a deity opens on
     // its Fields, then its map. The grid schema lives on the Field; the type only references it by id.
     const battlemapField = {
-      segment: 'battlemap',
+      segment: 'battle-map',
       label: 'Battlemap',
-      dataType: { kind: 'core.hex-grid' },
+      dataType: { kind: 'core.datatype.hex-grid' },
     };
     const deityWithMap = {
-      id: 'world.deity',
+      id: 'world.type.deity',
       label: 'Deity',
-      fieldRefs: ['world.domain', 'world.battlemap'],
-      views: ['core.view.fields', 'core.view.content', { field: 'world.battlemap' }],
+      fieldRefs: ['world.field.domain', 'world.field.battle-map'],
+      views: ['core.view.fields', 'core.view.rich-content', { field: 'world.field.battle-map' }],
     };
 
     /** One painted hex — the smallest grid that proves the value survived the round trip. */
@@ -318,16 +322,20 @@ describe('World user-defined types endpoints', () => {
       await makeField(ada, world, battlemapField);
 
       const created = await ada.post(`/worlds/${world}/types`).send(deityWithMap).expect(201);
-      expect(created.body.fieldRefs).toEqual(['world.domain', 'world.battlemap']);
+      expect(created.body.fieldRefs).toEqual(['world.field.domain', 'world.field.battle-map']);
       // The View list round-trips verbatim: the API stores an order it does not resolve.
-      expect(created.body.views).toEqual(['core.view.fields', 'core.view.content', { field: 'world.battlemap' }]);
+      expect(created.body.views).toEqual([
+        'core.view.fields',
+        'core.view.rich-content',
+        { field: 'world.field.battle-map' },
+      ]);
 
       const listed = await ada.get(`/worlds/${world}/types`).expect(200);
       expect(listed.body).toContainEqual(
         expect.objectContaining({
-          id: 'world.deity',
+          id: 'world.type.deity',
           source: 'user',
-          views: ['core.view.fields', 'core.view.content', { field: 'world.battlemap' }],
+          views: ['core.view.fields', 'core.view.rich-content', { field: 'world.field.battle-map' }],
         }),
       );
     });
@@ -343,11 +351,15 @@ describe('World user-defined types endpoints', () => {
       // longer resolves (the type no longer references it), but it is left in the stored list — inert
       // at resolution rather than eagerly pruned.
       const patched = await ada
-        .patch(`/worlds/${world}/types/world.deity`)
-        .send({ fieldRefs: ['world.domain'] })
+        .patch(`/worlds/${world}/types/world.type.deity`)
+        .send({ fieldRefs: ['world.field.domain'] })
         .expect(200);
-      expect(patched.body.fieldRefs).toEqual(['world.domain']);
-      expect(patched.body.views).toEqual(['core.view.fields', 'core.view.content', { field: 'world.battlemap' }]);
+      expect(patched.body.fieldRefs).toEqual(['world.field.domain']);
+      expect(patched.body.views).toEqual([
+        'core.view.fields',
+        'core.view.rich-content',
+        { field: 'world.field.battle-map' },
+      ]);
     });
 
     it('validates and persists the grid the referenced Field types, and harvests its links', async () => {
@@ -356,42 +368,45 @@ describe('World user-defined types endpoints', () => {
 
       const lair = await ada
         .post('/entities')
-        .send({ name: 'The Sunken Keep', types: ['core.note'] })
+        .send({ name: 'The Sunken Keep', types: ['core.type.note'] })
         .expect(201);
       const pelor = await ada
         .post('/entities')
-        .send({ name: 'Pelor', types: ['world.deity'] })
+        .send({ name: 'Pelor', types: ['world.type.deity'] })
         .expect(201);
 
       // Refused by the same forward-only gate a `string` Field rides: the write path resolves
-      // `core.hex-grid`'s own schema from the bundled plugins, not from a map branch.
+      // `core.datatype.hex-grid`'s own schema from the bundled plugins, not from a map branch.
       const bad = await ada
         .put(`/entities/${pelor.body.id}`)
         .send({
-          document: { 'world.battlemap': 'not a grid' },
+          document: { 'world.field.battle-map': 'not a grid' },
           version: 1,
           tags: [],
-          types: ['world.deity'],
+          types: ['world.type.deity'],
         })
         .expect(400);
-      expect(bad.body.data.fields).toContainEqual({ key: 'world.battlemap', code: 'type' });
+      expect(bad.body.data.fields).toContainEqual({ key: 'world.field.battle-map', code: 'type' });
 
       // A well-formed grid saves, links and all.
       await ada
         .put(`/entities/${pelor.body.id}`)
         .send({
           document: {
-            'world.domain': 'sun',
-            'world.battlemap': { ...paintedGrid, hexes: { '0,0': { terrain: 'ocean', entityId: lair.body.id } } },
+            'world.field.domain': 'sun',
+            'world.field.battle-map': {
+              ...paintedGrid,
+              hexes: { '0,0': { terrain: 'ocean', entityId: lair.body.id } },
+            },
           },
           version: 1,
           tags: [],
-          types: ['world.deity'],
+          types: ['world.type.deity'],
         })
         .expect(200);
 
       const read = await ada.get(`/entities/${pelor.body.id}`).expect(200);
-      expect(read.body.document['world.battlemap'].hexes['0,0'].terrain).toBe('ocean');
+      expect(read.body.document['world.field.battle-map'].hexes['0,0'].terrain).toBe('ocean');
 
       // The data-type owns its edges, so a World Owner's map feeds References and the World Graph.
       const refs = await ada.get(`/entities/${lair.body.id}/references`).expect(200);
@@ -405,24 +420,24 @@ describe('World user-defined types endpoints', () => {
       await makeField(ada, world, { ...battlemapField, facetable: true });
       await ada
         .post(`/worlds/${world}/types`)
-        .send({ id: 'world.deity', label: 'Deity', fieldRefs: ['world.battlemap'] })
+        .send({ id: 'world.type.deity', label: 'Deity', fieldRefs: ['world.field.battle-map'] })
         .expect(201);
 
       const pelor = await ada
         .post('/entities')
-        .send({ name: 'Pelor', types: ['world.deity'] })
+        .send({ name: 'Pelor', types: ['world.type.deity'] })
         .expect(201);
       await ada
         .put(`/entities/${pelor.body.id}`)
         .send({
-          document: { 'world.battlemap': paintedGrid },
+          document: { 'world.field.battle-map': paintedGrid },
           version: 1,
           tags: [],
-          types: ['world.deity'],
+          types: ['world.type.deity'],
         })
         .expect(200);
 
-      const facets = await ada.get('/entities/facets').query({ worldId: world, type: 'world.deity' }).expect(200);
+      const facets = await ada.get('/entities/facets').query({ worldId: world, type: 'world.type.deity' }).expect(200);
       expect(facets.body.fields).toEqual([]);
     });
   });

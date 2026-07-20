@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { EntityDocument } from '@hexly/domain';
-import { emptyContent, tiptapContent } from '@hexly/plugin-content';
+import { emptyRichContent, tiptapContent } from '@hexly/plugin-content';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
 import { ConfigModule } from '../config/config.module';
@@ -58,7 +58,7 @@ describe('Entity references', () => {
         {
           targetId: mira,
           descriptor: 'spouse',
-          target: { id: mira, name: 'Mira', types: ['core.note'] },
+          target: { id: mira, name: 'Mira', types: ['core.type.note'] },
         },
       ]);
     });
@@ -93,7 +93,7 @@ describe('Entity references', () => {
         {
           targetId: secret,
           descriptor: null,
-          target: { id: secret, name: 'The Cabal', types: ['core.note'] },
+          target: { id: secret, name: 'The Cabal', types: ['core.type.note'] },
         },
       ]);
 
@@ -103,8 +103,8 @@ describe('Entity references', () => {
 
     /**
      * A Hex, a Feature, and a Region each carry an Entity Link, harvested through the Structured
-     * Data Type `core.hexmap` declares (ADR-0050). Covers the generic path end to end: the Entity's
-     * types must resolve to the `grid` Field and `core.hex-grid` must be registered, or a map's
+     * Data Type `core.type.hex-map` declares (ADR-0050). Covers the generic path end to end: the Entity's
+     * types must resolve to the `grid` Field and `core.datatype.hex-grid` must be registered, or a map's
      * placements harvest to nothing at all.
      */
     it('harvests a Hex, Feature, and Region link off the grid Field, descriptor-less (ADR-0050)', async () => {
@@ -116,7 +116,7 @@ describe('Entity references', () => {
       const map = (
         await ada
           .post('/entities')
-          .send({ name: 'The Reach', types: ['core.hexmap'], worldId: world })
+          .send({ name: 'The Reach', types: ['core.type.hex-map'], worldId: world })
           .expect(201)
       ).body;
 
@@ -126,8 +126,8 @@ describe('Entity references', () => {
           version: map.version,
           tags: [],
           document: {
-            'core.content': emptyContent(),
-            'core.grid': {
+            'core.field.content': emptyRichContent(),
+            'core.field.grid': {
               hexes: {
                 '0,0': { terrain: 'grass', entityId: harbour },
                 '1,0': { terrain: 'grass', feature: { ref: 'settlement', entityId: riverbend } },
@@ -151,7 +151,7 @@ describe('Entity references', () => {
       // And the other direction: the linked Note lists the map among its Referenced by.
       const { referencedBy } = await referencesOf(ada, harbour);
       expect(referencedBy).toEqual([
-        { descriptor: null, source: { id: map.id, name: 'The Reach', types: ['core.hexmap'] } },
+        { descriptor: null, source: { id: map.id, name: 'The Reach', types: ['core.type.hex-map'] } },
       ]);
     });
   });
@@ -169,7 +169,7 @@ describe('Entity references', () => {
       expect(referencedBy).toEqual([
         {
           descriptor: 'spouse',
-          source: { id: ealdred, name: 'Ealdred', types: ['core.note'] },
+          source: { id: ealdred, name: 'Ealdred', types: ['core.type.note'] },
         },
       ]);
     });
@@ -201,7 +201,7 @@ describe('Entity references', () => {
           source: {
             id: cabal,
             name: 'Secret Cabal Roster',
-            types: ['core.note'],
+            types: ['core.type.note'],
           },
         },
       ]);
@@ -228,7 +228,7 @@ describe('Entity references', () => {
           source: {
             id: cabal,
             name: 'Secret Cabal Roster',
-            types: ['core.note'],
+            types: ['core.type.note'],
           },
         },
       ]);
@@ -292,7 +292,7 @@ describe('Entity references', () => {
     return (
       await owner
         .post('/entities')
-        .send({ name, types: ['core.note'], worldId })
+        .send({ name, types: ['core.type.note'], worldId })
         .expect(201)
     ).body.id;
   }
@@ -305,11 +305,11 @@ describe('Entity references', () => {
     await owner.patch(`/entities/${id}`).send({ visibility: 'shared' }).expect(200);
   }
 
-  /** Save `id`'s Content as prose holding one `entityLink` per entry. */
+  /** Save `id`'s RichContent as prose holding one `entityLink` per entry. */
   async function link(owner: Agent, id: string, links: Record<string, unknown>[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityDocument = {
-      'core.content': tiptapContent({
+      'core.field.content': tiptapContent({
         type: 'doc',
         content: [
           {

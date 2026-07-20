@@ -115,26 +115,31 @@ describe('Vault export endpoint', () => {
     const entities = app.get(EntitiesService);
 
     // A World-defined SECOND prose Field beside the canonical `content`, referenced by a World type. The
-    // server slugs `world.secrets` and pins the document key to it (ADR-0056).
+    // server slugs `world.field.secrets` and pins the document key to it (ADR-0056).
     await ada
       .post(`/worlds/${worldId}/fields`)
-      .send({ segment: 'secrets', label: 'Secrets', dataType: { kind: 'core.rich-content' } })
+      .send({ segment: 'secrets', label: 'Secrets', dataType: { kind: 'core.datatype.rich-content' } })
       .expect(201);
     await ada
       .post(`/worlds/${worldId}/types`)
-      .send({ id: 'world.deity', label: 'Deity', fieldRefs: ['world.secrets'] })
+      .send({ id: 'world.type.deity', label: 'Deity', fieldRefs: ['world.field.secrets'] })
       .expect(201);
 
-    // An Entity carrying both prose Fields — `content` (core.note) and `secrets` (world.deity).
+    // An Entity carrying both prose Fields — `content` (core.type.note) and `secrets` (world.type.deity).
     const paragraph = (t: string) => ({ type: 'paragraph', content: [{ type: 'text', text: t }] });
-    const vela = entities.create(adaId, { types: ['core.note', 'world.deity'], name: 'Vela', worldId, tags: [] });
+    const vela = entities.create(adaId, {
+      types: ['core.type.note', 'world.type.deity'],
+      name: 'Vela',
+      worldId,
+      tags: [],
+    });
     entities.save(adaId, vela.id, {
       version: vela.version,
       tags: [],
       descriptors: [],
       document: {
-        'core.content': tiptapContent({ type: 'doc', content: [paragraph('Public lore.')] }),
-        'world.secrets': tiptapContent({ type: 'doc', content: [paragraph('Hidden truth.')] }),
+        'core.field.content': tiptapContent({ type: 'doc', content: [paragraph('Public lore.')] }),
+        'world.field.secrets': tiptapContent({ type: 'doc', content: [paragraph('Hidden truth.')] }),
       },
     });
 
@@ -142,22 +147,22 @@ describe('Vault export endpoint', () => {
     const md = text(files, 'Vela.md');
 
     // Both blocks are marked, content before secrets (resolved Field order), each rendering its prose.
-    expect(md).toContain('<!-- hexly:field core.content -->');
-    expect(md.indexOf('<!-- hexly:field core.content -->')).toBeLessThan(
-      md.indexOf('<!-- hexly:field world.secrets -->'),
+    expect(md).toContain('<!-- hexly:field core.field.content -->');
+    expect(md.indexOf('<!-- hexly:field core.field.content -->')).toBeLessThan(
+      md.indexOf('<!-- hexly:field world.field.secrets -->'),
     );
     expect(md).toContain('Public lore.');
     expect(md).toContain('Hidden truth.');
 
-    // Re-import lands each block back in the Field it came from, even though `world.deity` is unknown to
+    // Re-import lands each block back in the Field it came from, even though `world.type.deity` is unknown to
     // the fresh World — the marker key carries it, converted as prose (ADR-0051).
     const reimport = await ada
       .post('/worlds/import')
       .attach('file', Buffer.from(res.body), 'Aldermoor.zip')
       .expect(201);
     const reimported = entities.listByWorld(adaId, reimport.body.worldId).find((e) => e.name === 'Vela');
-    expect(JSON.stringify(reimported?.document['core.content'])).toContain('Public lore.');
-    expect(JSON.stringify(reimported?.document['world.secrets'])).toContain('Hidden truth.');
+    expect(JSON.stringify(reimported?.document['core.field.content'])).toContain('Public lore.');
+    expect(JSON.stringify(reimported?.document['world.field.secrets'])).toContain('Hidden truth.');
   });
 
   it('rebuilds the folder tree from hexly.sourcePath and never emits hexly.* as frontmatter', async () => {
@@ -207,14 +212,14 @@ describe('Vault export endpoint', () => {
     const worldId = await importVault(ada, { 'Bestiary/Owlbear.md': '# Owlbear' });
     const created = await ada
       .post('/entities')
-      .send({ name: 'Owlbear', types: ['core.note', 'dnd.monster'], worldId })
+      .send({ name: 'Owlbear', types: ['core.type.note', 'dnd.type.monster'], worldId })
       .expect(201);
-    expect(created.body.types).toEqual(['core.note', 'dnd.monster']);
+    expect(created.body.types).toEqual(['core.type.note', 'dnd.type.monster']);
 
     const { files } = await exportZip(ada, worldId);
     const fm = frontmatter(text(files, 'Owlbear.md'));
 
-    expect(fm['hexly.type']).toEqual(['core.note', 'dnd.monster']);
+    expect(fm['hexly.type']).toEqual(['core.type.note', 'dnd.type.monster']);
   });
 
   it('writes assets under assets/<originalFilename> and rewrites image src to match', async () => {
@@ -243,7 +248,7 @@ describe('Vault export endpoint', () => {
     // Arrange a hexmap with lore Content AND a painted, named hex.
     const entities = app.get(EntitiesService);
     const created = entities.create(adaId, {
-      types: ['core.hexmap'],
+      types: ['core.type.hex-map'],
       name: 'Aldermoor Map',
       worldId,
       tags: [],
@@ -253,7 +258,7 @@ describe('Vault export endpoint', () => {
       tags: [],
       descriptors: [],
       document: {
-        'core.content': tiptapContent({
+        'core.field.content': tiptapContent({
           type: 'doc',
           content: [
             {
@@ -267,7 +272,7 @@ describe('Vault export endpoint', () => {
             },
           ],
         }),
-        'core.grid': { hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } }, regions: [], labels: [] },
+        'core.field.grid': { hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } }, regions: [], labels: [] },
       },
     });
 
@@ -276,13 +281,13 @@ describe('Vault export endpoint', () => {
     const fm = frontmatter(md);
 
     // Lore round-trips as prose, and the map's type is flagged — no EntityDocument key records it.
-    expect(fm['hexly.type']).toEqual(['core.hexmap']);
+    expect(fm['hexly.type']).toEqual(['core.type.hex-map']);
     expect(md).toContain('The Aldermoor');
     expect(md).toContain('A wild frontier.');
     // The grid rides the frontmatter as a nested Field value, so the map survives the round-trip
     // (ADR-0050 amends ADR-0033's lossy export) — and it does so through the generic EntityDocument path,
     // which knows nothing of hexes.
-    expect(fm['core.grid']).toEqual({
+    expect(fm['core.field.grid']).toEqual({
       hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } },
       regions: [],
       labels: [],
@@ -294,14 +299,22 @@ describe('Vault export endpoint', () => {
     const worldId = await importVault(ada, { 'Note.md': '# Note' });
 
     const entities = app.get(EntitiesService);
-    const created = entities.create(adaId, { types: ['dnd.monster'], name: 'Ancient Red Dragon', worldId, tags: [] });
+    const created = entities.create(adaId, {
+      types: ['dnd.type.monster'],
+      name: 'Ancient Red Dragon',
+      worldId,
+      tags: [],
+    });
     const statBlock = { size: 'Huge', creature_type: 'dragon', challenge_rating: 24, strength: 30 };
     entities.save(adaId, created.id, {
       version: created.version,
       tags: [],
       descriptors: [],
       // The whole stat block is one grouped value at `stat_block` (ADR-0055), beside the prose.
-      document: { 'core.content': tiptapContent({ type: 'doc', content: [] }), 'dnd.stat_block': statBlock },
+      document: {
+        'core.field.content': tiptapContent({ type: 'doc', content: [] }),
+        'dnd.field.stat-block': statBlock,
+      },
     });
 
     const { files } = await exportZip(ada, worldId);
@@ -309,7 +322,7 @@ describe('Vault export endpoint', () => {
 
     // The stat block projects to frontmatter (`vault: { slot: 'frontmatter' }`) as one nested value the
     // generic EntityDocument path serializes and re-reads — no custom converter, mirroring the grid.
-    expect(fm['dnd.stat_block']).toEqual(statBlock);
+    expect(fm['dnd.field.stat-block']).toEqual(statBlock);
   });
 
   it("round-trips a Draw Steel Monster's FULL stat block — numeric, traits, and abilities (ADR-0055, #247)", async () => {
@@ -317,7 +330,12 @@ describe('Vault export endpoint', () => {
     const worldId = await importVault(ada, { 'Note.md': '# Note' });
 
     const entities = app.get(EntitiesService);
-    const created = entities.create(adaId, { types: ['draw-steel.monster'], name: 'Bone Colossus', worldId, tags: [] });
+    const created = entities.create(adaId, {
+      types: ['draw-steel.type.monster'],
+      name: 'Bone Colossus',
+      worldId,
+      tags: [],
+    });
     // Every branch in one value — scalars, damage maps, Traits (#245), Abilities (#246): if any needed a
     // bespoke `toMarkdown`, that branch would drop on the round-trip (ADR-0055).
     const statBlock = {
@@ -366,11 +384,11 @@ describe('Vault export endpoint', () => {
       version: created.version,
       tags: [],
       document: {
-        'core.content': tiptapContent({
+        'core.field.content': tiptapContent({
           type: 'doc',
           content: [{ type: 'paragraph', content: [{ type: 'text', text: 'A tower of fused bone.' }] }],
         }),
-        'draw-steel.stat_block': statBlock,
+        'draw-steel.field.stat-block': statBlock,
       },
     });
 
@@ -378,7 +396,7 @@ describe('Vault export endpoint', () => {
     const md = text(files, 'Bone Colossus.md');
 
     // The whole block rides the frontmatter as one nested value; the prose projects to the body.
-    expect(frontmatter(md)['draw-steel.stat_block']).toEqual(statBlock);
+    expect(frontmatter(md)['draw-steel.field.stat-block']).toEqual(statBlock);
     expect(md).toContain('A tower of fused bone.');
 
     // Re-importing the export reconstructs the block byte-for-byte — every branch survives the generic
@@ -388,9 +406,9 @@ describe('Vault export endpoint', () => {
       .attach('file', Buffer.from(res.body), 'Aldermoor.zip')
       .expect(201);
     const reimported = entities.listByWorld(adaId, reimport.body.worldId).find((e) => e.name === 'Bone Colossus');
-    expect(reimported?.types).toEqual(['draw-steel.monster']);
-    expect(reimported?.document['draw-steel.stat_block']).toEqual(statBlock);
-    expect(JSON.stringify(reimported?.document['core.content'])).toContain('A tower of fused bone.');
+    expect(reimported?.types).toEqual(['draw-steel.type.monster']);
+    expect(reimported?.document['draw-steel.field.stat-block']).toEqual(statBlock);
+    expect(JSON.stringify(reimported?.document['core.field.content'])).toContain('A tower of fused bone.');
   });
 
   it('round-trips a fixture vault: import → export reproduces the folder layout and content', async () => {
@@ -448,32 +466,37 @@ describe('Vault export endpoint', () => {
     await ada
       .post(`/worlds/${worldId}/types`)
       .send({
-        id: 'world.deity',
+        id: 'world.type.deity',
         label: 'Deity',
         fields: [{ key: 'domain', label: 'Domain', dataType: { kind: 'string' }, required: false, facetable: true }],
       })
       .expect(201);
 
     // A Monster (plugin type, plain Fields).
-    const owlbear = entities.create(adaId, { types: ['core.note', 'dnd.monster'], name: 'Owlbear', worldId, tags: [] });
+    const owlbear = entities.create(adaId, {
+      types: ['core.type.note', 'dnd.type.monster'],
+      name: 'Owlbear',
+      worldId,
+      tags: [],
+    });
     entities.save(adaId, owlbear.id, {
       version: owlbear.version,
       tags: [],
       descriptors: [],
       document: {
-        'core.content': tiptapContent({ type: 'doc', content: [] }),
+        'core.field.content': tiptapContent({ type: 'doc', content: [] }),
         challenge_rating: 3,
         size: 'Large',
       },
     });
 
     // A Deity (user-defined type, a plain Field).
-    const vela = entities.create(adaId, { types: ['world.deity'], name: 'Vela', worldId, tags: [] });
+    const vela = entities.create(adaId, { types: ['world.type.deity'], name: 'Vela', worldId, tags: [] });
     entities.save(adaId, vela.id, {
       version: vela.version,
       tags: [],
       descriptors: [],
-      document: { 'core.content': tiptapContent({ type: 'doc', content: [] }), domain: 'dusk' },
+      document: { 'core.field.content': tiptapContent({ type: 'doc', content: [] }), domain: 'dusk' },
     });
 
     // A Hex Map (plugin type, a Structured Data Type) — terrain, a feature, a region, and a label.
@@ -485,12 +508,12 @@ describe('Vault export endpoint', () => {
       regions: [{ id: 'r1', name: 'The Whisperwood', color: '#33aa55', hexes: { '0,0': true } }],
       labels: [{ id: 'l1', text: 'The Aldermoor', position: { x: 10, y: 20 }, size: 32 }],
     };
-    const map = entities.create(adaId, { types: ['core.hexmap'], name: 'Aldermoor Map', worldId, tags: [] });
+    const map = entities.create(adaId, { types: ['core.type.hex-map'], name: 'Aldermoor Map', worldId, tags: [] });
     entities.save(adaId, map.id, {
       version: map.version,
       tags: [],
       descriptors: [],
-      document: { 'core.content': tiptapContent({ type: 'doc', content: [] }), grid },
+      document: { 'core.field.content': tiptapContent({ type: 'doc', content: [] }), grid },
     });
 
     // Export the World, then import the export back as a fresh World.
@@ -503,15 +526,15 @@ describe('Vault export endpoint', () => {
     const byName = (name: string) => reimported.find((e) => e.name === name);
 
     // Primary type first, Fields intact.
-    expect(byName('Owlbear')?.types).toEqual(['core.note', 'dnd.monster']);
+    expect(byName('Owlbear')?.types).toEqual(['core.type.note', 'dnd.type.monster']);
     expect(byName('Owlbear')?.document).toMatchObject({ challenge_rating: 3, size: 'Large' });
 
     // The user-defined type on the same footing — neither was resolved.
-    expect(byName('Vela')?.types).toEqual(['world.deity']);
+    expect(byName('Vela')?.types).toEqual(['world.type.deity']);
     expect(byName('Vela')?.document).toMatchObject({ domain: 'dusk' });
 
     // Terrain, feature, region, and label all survive.
-    expect(byName('Aldermoor Map')?.types).toEqual(['core.hexmap']);
+    expect(byName('Aldermoor Map')?.types).toEqual(['core.type.hex-map']);
     expect(byName('Aldermoor Map')?.document['grid']).toEqual(grid);
   });
 
@@ -559,7 +582,7 @@ describe('Vault export endpoint', () => {
       worldId,
       id: bobNoteId,
       name: 'Bob Secret',
-      types: ['core.note'],
+      types: ['core.type.note'],
       tags: [],
       document: emptyEntityDocument(),
     });

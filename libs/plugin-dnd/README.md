@@ -1,6 +1,6 @@
 # plugin-dnd
 
-The bundled D&D plugin (CONTEXT.md → Type Definition, ADR-0048, #192): the `dnd.monster` Entity Type
+The bundled D&D plugin (CONTEXT.md → Type Definition, ADR-0048, #192): the `dnd.type.monster` Entity Type
 and the stat-block View that renders it.
 
 Two entry points, because a plugin's halves have different consumers:
@@ -22,5 +22,5 @@ chunk until a monster is first opened. `nx build web` lists it as a `stat-block-
 `@hexly/plugin-dnd/testing` exports the translation catalogs as synchronous JSON, for the app's shared
 transloco test setup — test-only, and never reachable from the app bundle.
 
-A second plugin (`pathfinder.monster`) would be a sibling lib exporting its own `providePluginX()`: one
+A second plugin (`pathfinder.type.monster`) would be a sibling lib exporting its own `providePluginX()`: one
 more line in the app's `app.config.ts`, and one more entry in the API's `bundled-plugins.ts`.

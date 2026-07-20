@@ -4,11 +4,11 @@ import { CORE_VIEW_FIELDS } from '../models/view-definition';
 /**
  * The **View** order a user-defined type affords (ADR-0050, ADR-0051): its generic Field view, then
  * each **Field of a Structured Data Type** its author chose to show, in declaration order — prose among them, since
- * the `core.rich-content` Content Field is a Field of a Structured Data Type like any other now. A type shipping no
+ * the `core.datatype.rich-content` Content Field is a Field of a Structured Data Type like any other now. A type shipping no
  * code resolves nothing else.
  *
- * Structured Views go last, so adding a battlemap to a `world.deity` does not change what a deity
- * opens on. A plugin type places its Fields' Views by hand and may choose otherwise: `core.hexmap`
+ * Structured Views go last, so adding a battlemap to a `world.type.deity` does not change what a deity
+ * opens on. A plugin type places its Fields' Views by hand and may choose otherwise: `core.type.hex-map`
  * places its grid first, and opens on its map.
  */
 export function userTypeViews(

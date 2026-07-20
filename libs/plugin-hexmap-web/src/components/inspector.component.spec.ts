@@ -6,7 +6,7 @@ import { EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { TypeDefinition } from '@hexly/web-entity';
-import { CORE_VIEW_CONTENT } from '@hexly/plugin-content/web';
+import { CORE_VIEW_RICH_CONTENT } from '@hexly/plugin-content/web';
 import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { HEXMAP_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { HexMapStore } from '../services/hexmap-store';
@@ -16,9 +16,9 @@ import { InspectorComponent } from './inspector.component';
 
 /** The Note, as the app registers it. */
 const NOTE_TYPE: TypeDefinition = {
-  id: 'core.note' as TypeDefinition['id'],
+  id: 'core.type.note' as TypeDefinition['id'],
   icon: 'label',
-  views: [CORE_VIEW_CONTENT],
+  views: [CORE_VIEW_RICH_CONTENT],
   graphColorToken: '--color-ink-muted',
   labels: {
     eyebrow: 'editor.note.eyebrow',
@@ -36,7 +36,7 @@ function summary(id: string, name: string): EntitySummary {
     id,
     worldId: 'w1',
     name,
-    types: ['core.note'],
+    types: ['core.type.note'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -663,10 +663,10 @@ describe('Inspector Entity Link control', () => {
 
     (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
     fixture.detectChanges();
-    (byId(el, 'entity-link-create-core.note') as HTMLButtonElement).click();
+    (byId(el, 'entity-link-create-core.type.note') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    expect(createdCalls.map((c) => c.type)).toEqual(['core.note']);
+    expect(createdCalls.map((c) => c.type)).toEqual(['core.type.note']);
     expect(store.document().hexes['0,0'].entityId).toBe('n-new');
   });
 
@@ -681,11 +681,11 @@ describe('Inspector Entity Link control', () => {
 
     (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
     fixture.detectChanges();
-    (byId(el, 'entity-link-create-core.hexmap') as HTMLButtonElement).click();
+    (byId(el, 'entity-link-create-core.type.hex-map') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     // The Feature's own link points at the new hexmap — independent of the Hex it sits on.
-    expect(createdCalls.map((c) => c.type)).toEqual(['core.hexmap']);
+    expect(createdCalls.map((c) => c.type)).toEqual(['core.type.hex-map']);
     expect(store.document().hexes['0,0'].feature).toEqual({
       ref: 'settlement',
       entityId: 'city-map',

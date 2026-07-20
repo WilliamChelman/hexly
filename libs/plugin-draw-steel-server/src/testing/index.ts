@@ -1,6 +1,6 @@
 /**
  * The Draw Steel server plugin's **testing** entry (`@hexly/plugin-draw-steel/server/testing`): the
- * fixture-backed fetch port that lets a test drive the real `draw-steel.monsters` Importer with no
+ * fixture-backed fetch port that lets a test drive the real `draw-steel.importer.monsters` Importer with no
  * network (ADR-0061). The API's importer controller spec wires this over the boot-time codeload port.
  */
 

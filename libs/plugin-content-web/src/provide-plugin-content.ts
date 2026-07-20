@@ -2,11 +2,11 @@ import { EnvironmentProviders } from '@angular/core';
 import { providePlugin } from '@hexly/web-entity';
 import { CONTENT_FIELD, CORE_RICH_CONTENT, PLUGIN_ID, RICH_CONTENT_DATA_TYPE } from '@hexly/plugin-content';
 import { CONTENT_EDITOR_TRANSLATIONS } from './i18n/content-editor-translations';
-import { CONTENT_TYPE_DEFINITIONS, CORE_VIEW_CONTENT } from './content-types';
+import { CONTENT_TYPE_DEFINITIONS, CORE_VIEW_RICH_CONTENT } from './content-types';
 
 /**
  * The Content plugin's one entry point into the app (ADR-0048, ADR-0051): `app.config.ts` names this
- * beside `providePluginHexmap()` and `providePluginDnd()`. Omit it, and `core.note` is unregistered —
+ * beside `providePluginHexmap()` and `providePluginDnd()`. Omit it, and `core.type.note` is unregistered —
  * the Entity affords the generic Field view alone (the absent-plugin degradation of ADR-0051).
  *
  * The View is deferred (`loadComponent`) because this runs in the root injector, where naming
@@ -21,8 +21,8 @@ export function providePluginContent(): EnvironmentProviders {
     fields: [CONTENT_FIELD],
     views: [
       {
-        id: CORE_VIEW_CONTENT,
-        // The `core.rich-content` data-type's View: it renders whichever prose Field placed it, reading
+        id: CORE_VIEW_RICH_CONTENT,
+        // The `core.datatype.rich-content` data-type's View: it renders whichever prose Field placed it, reading
         // that Field's key from `VIEW_FIELD_KEY` (ADR-0051).
         dataType: CORE_RICH_CONTENT,
         // Toggle label when a Type places this View by id; a `{ field }` placement uses the Field's label.

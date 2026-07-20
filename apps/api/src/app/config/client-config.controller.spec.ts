@@ -25,7 +25,7 @@ async function controllerFor(config: HexlyConfig): Promise<ClientConfigControlle
 describe('ClientConfigController', () => {
   it('projects each Plugin enabled state and the default type from HexlyConfig', async () => {
     const controller = await controllerFor(
-      configWith({ content: { enabled: true }, hexmap: { enabled: false }, dnd: { enabled: true } }, 'core.note'),
+      configWith({ content: { enabled: true }, hexmap: { enabled: false }, dnd: { enabled: true } }, 'core.type.note'),
     );
 
     const client: ClientConfig = controller.getConfig();
@@ -36,7 +36,7 @@ describe('ClientConfigController', () => {
         hexmap: { enabled: false },
         dnd: { enabled: true },
       },
-      entities: { defaultType: 'core.note' },
+      entities: { defaultType: 'core.type.note' },
     });
   });
 
@@ -44,7 +44,7 @@ describe('ClientConfigController', () => {
     const controller = await controllerFor(
       // A Plugin's server-side config may carry extra knobs beyond `enabled`; the client channel
       // exposes only enablement.
-      configWith({ dnd: { enabled: true, someServerKnob: 'x' } as never }, 'dnd.monster'),
+      configWith({ dnd: { enabled: true, someServerKnob: 'x' } as never }, 'dnd.type.monster'),
     );
 
     expect(controller.getConfig().plugins).toEqual({ dnd: { enabled: true } });
@@ -52,15 +52,15 @@ describe('ClientConfigController', () => {
 
   it('crosses a Plugin-declared client knob (the Board `maxEmbedDepth`) alongside `enabled`', async () => {
     const controller = await controllerFor(
-      configWith({ board: { enabled: true, maxEmbedDepth: 5 } as never }, 'core.board'),
+      configWith({ board: { enabled: true, maxEmbedDepth: 5 } as never }, 'core.type.board'),
     );
 
     expect(controller.getConfig().plugins).toEqual({ board: { enabled: true, maxEmbedDepth: 5 } });
   });
 
   it('carries whatever `entities.defaultType` the config resolved, verbatim', async () => {
-    const controller = await controllerFor(configWith({}, 'world.deity'));
+    const controller = await controllerFor(configWith({}, 'world.type.deity'));
 
-    expect(controller.getConfig().entities.defaultType).toBe('world.deity');
+    expect(controller.getConfig().entities.defaultType).toBe('world.type.deity');
   });
 });

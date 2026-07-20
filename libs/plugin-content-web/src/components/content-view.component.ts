@@ -12,7 +12,7 @@ import { ReferencesStore } from '../services/references-store';
 import { RightDock } from '../services/right-dock';
 
 /**
- * The `core.view.content` renderer (ADR-0048, *Views* amendment; ADR-0051): the Content body in a
+ * The `core.view.rich-content` renderer (ADR-0048, *Views* amendment; ADR-0051): the Content body in a
  * centred reading column with its Outline / References dock. It renders whichever prose Field placed
  * it, reading that Field's key from `VIEW_FIELD_KEY` (the {@link ContentEditorComponent} it hosts does the read).
  *

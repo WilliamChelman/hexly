@@ -21,7 +21,7 @@ const DEFAULT_TYPE_PORT = basePort + 2;
 // dnd off: its Types degrade to the generic Field View, values intact (ADR-0052).
 const DISABLE_DND_YAML = ['features:', '  plugin:', '    dnd:', '      enabled: false', ''].join('\n');
 // The "New" button mints a Hex Map by default — an enabled non-note Type (ADR-0052).
-const DEFAULT_HEXMAP_YAML = ['entities:', '  defaultType: core.hexmap', ''].join('\n');
+const DEFAULT_HEXMAP_YAML = ['entities:', '  defaultType: core.type.hex-map', ''].join('\n');
 
 /** One `e2e-server.mjs` invocation: its own port, throwaway Instance Directory, and optional hexly.yml. */
 function server(port: number, opts: { instanceSubdir?: string; configYaml?: string } = {}) {
@@ -92,7 +92,7 @@ export default defineConfig({
     authenticated('plugin-disabled', PLUGIN_DISABLED_PORT, {
       testMatch: /.*[/\\]config[/\\]plugin-disabled\.spec\.ts/,
     }),
-    // entities.defaultType set to core.hexmap (ADR-0052): the primary create button follows it.
+    // entities.defaultType set to core.type.hex-map (ADR-0052): the primary create button follows it.
     setup('default-type', DEFAULT_TYPE_PORT),
     authenticated('default-type', DEFAULT_TYPE_PORT, {
       testMatch: /.*[/\\]config[/\\]default-type\.spec\.ts/,

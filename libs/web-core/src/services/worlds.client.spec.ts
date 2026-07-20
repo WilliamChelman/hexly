@@ -28,8 +28,8 @@ describe('WorldsClient', () => {
   };
   const graph: WorldGraph = {
     nodes: [
-      { id: 'e1', name: 'Ealdred', types: ['core.note'] },
-      { id: 'e2', name: 'Mira', types: ['core.note'] },
+      { id: 'e1', name: 'Ealdred', types: ['core.type.note'] },
+      { id: 'e2', name: 'Mira', types: ['core.type.note'] },
     ],
     edges: [{ source: 'e1', target: 'e2', descriptor: 'spouse' }],
   };

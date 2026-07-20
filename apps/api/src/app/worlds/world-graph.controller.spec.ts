@@ -55,8 +55,8 @@ describe('World Graph', () => {
     const { nodes, edges } = await graphOf(ada, world);
 
     expect(nodes).toEqual([
-      { id: ealdred, name: 'Ealdred', types: ['core.note'] },
-      { id: mira, name: 'Mira', types: ['core.note'] },
+      { id: ealdred, name: 'Ealdred', types: ['core.type.note'] },
+      { id: mira, name: 'Mira', types: ['core.type.note'] },
     ]);
     expect(edges).toEqual([{ source: ealdred, target: mira, descriptor: 'spouse' }]);
   });
@@ -65,9 +65,9 @@ describe('World Graph', () => {
   it('renders an Entity-Link Field relation as a graph edge, hidden when an endpoint is private', async () => {
     const registry = app.get(TypeFieldRegistry);
     registry.registerField(
-      defineField({ id: 'test.lair', label: 'Lair', dataType: { kind: 'entityLink' }, facetable: false }),
+      defineField({ id: 'test.field.lair', label: 'Lair', dataType: { kind: 'entityLink' }, facetable: false }),
     );
-    registry.register('test.monster', ['test.lair']);
+    registry.register('test.type.monster', ['test.field.lair']);
     const ada = await signIn('ada@hexly.test');
     const bob = await signIn('bob@hexly.test');
     const world = await makeWorld(ada);
@@ -117,7 +117,7 @@ describe('World Graph', () => {
     await link(ada, town, [{ entityId: cabal }]); // shared → private
 
     const asBob = await graphOf(bob, world);
-    expect(asBob.nodes).toEqual([{ id: town, name: 'Riverbend', types: ['core.note'] }]);
+    expect(asBob.nodes).toEqual([{ id: town, name: 'Riverbend', types: ['core.type.note'] }]);
     expect(asBob.edges).toEqual([]);
 
     // The rows are the same; only the viewer differs. Ada, who owns both, sees the whole picture.
@@ -250,7 +250,7 @@ describe('World Graph', () => {
     return (
       await owner
         .post('/entities')
-        .send({ name, types: ['core.note'], worldId })
+        .send({ name, types: ['core.type.note'], worldId })
         .expect(201)
     ).body.id;
   }
@@ -277,16 +277,16 @@ describe('World Graph', () => {
     await save(owner, id, [{ type: 'image', attrs: { src } }]);
   }
 
-  /** Typed-save `id` as a `test.monster` whose `lair` Entity-Link Field points at `link` (#190). */
+  /** Typed-save `id` as a `test.type.monster` whose `lair` Entity-Link Field points at `link` (#190). */
   async function linkField(owner: Agent, id: string, link: { entityId: string; label: string }): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     await owner
       .put(`/entities/${id}`)
       .send({
-        document: { 'core.content': tiptapContent({ type: 'doc', content: [] }), 'test.lair': link },
+        document: { 'core.field.content': tiptapContent({ type: 'doc', content: [] }), 'test.field.lair': link },
         version: current.version,
         tags: [],
-        types: ['test.monster'],
+        types: ['test.type.monster'],
       })
       .expect(200);
   }
@@ -294,7 +294,7 @@ describe('World Graph', () => {
   async function save(owner: Agent, id: string, inline: unknown[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityDocument = {
-      'core.content': tiptapContent({
+      'core.field.content': tiptapContent({
         type: 'doc',
         content: [{ type: 'paragraph', content: inline }],
       }),

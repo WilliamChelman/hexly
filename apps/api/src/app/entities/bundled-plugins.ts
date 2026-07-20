@@ -42,7 +42,7 @@ function enabledPlugins(config: HexlyConfig): readonly ServerPlugin[] {
 
 /**
  * The enabled bundled Plugins' Type declarations — framework-free half only (id, label, Field schema),
- * never a view. `core.note` is a bundled type like any other, so a disabled content Plugin drops it
+ * never a view. `core.type.note` is a bundled type like any other, so a disabled content Plugin drops it
  * (ADR-0051, ADR-0052). Seeds {@link TypeFieldRegistry}.
  */
 export function enabledPluginTypes(config: HexlyConfig): readonly PluginTypeDefinition[] {
@@ -79,7 +79,7 @@ export function enabledStructuredDataTypes(config: HexlyConfig): StructuredDataT
 /**
  * Every bundled **Structured Data Type**, regardless of enablement (ADR-0052) — the register-time
  * guard that a bundled Type names only data-types the build ships. Unlike {@link enabledStructuredDataTypes},
- * it tolerates a Type naming a disabled Plugin's data-type (`core.hexmap`'s `content` Field when content
+ * it tolerates a Type naming a disabled Plugin's data-type (`core.type.hex-map`'s `content` Field when content
  * is off): that degrades at derive/vault time; a kind no Plugin bundles is still a build error.
  */
 export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDataTypesOf(BUNDLED_PLUGINS);
@@ -112,7 +112,7 @@ export const BUNDLED_STRUCTURED_DATA_TYPE_OWNERS: ReadonlyMap<string, string> = 
 /**
  * The Entity Type a vault import assigns a Markdown file with no `hexly.type` stamp, and the one whose
  * lone presence marks an Entity a "bare Note" the export leaves unstamped (ADR-0051, ADR-0052). Exactly
- * one bundled plugin declares it (content → `core.note`), so the vault services need not import
+ * one bundled plugin declares it (content → `core.type.note`), so the vault services need not import
  * `@hexly/plugin-content` to learn the default.
  *
  * Relaxed since content became disableable (ADR-0052): with no enabled Plugin declaring a default it

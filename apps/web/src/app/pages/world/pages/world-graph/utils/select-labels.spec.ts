@@ -5,7 +5,7 @@ import { selectLabels } from './select-labels';
 /** A World of `nodes`, linked by `edges` given as `'source>target'` or `'source-descriptor>target'`. */
 function world(nodes: string[], edges: string[] = []): WorldGraph {
   return {
-    nodes: nodes.map((name) => ({ id: name, name, types: ['core.note'] })),
+    nodes: nodes.map((name) => ({ id: name, name, types: ['core.type.note'] })),
     edges: edges.map((e) => {
       const [left, target] = e.split('>');
       const [source, descriptor] = left.split('-');

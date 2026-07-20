@@ -1,6 +1,6 @@
-/** The heading Outline of an Entity's Content — derived, never stored. */
+/** The heading Outline of an Entity's RichContent — derived, never stored. */
 
-import { Content } from './content';
+import { RichContent } from './rich-content';
 import { ContentNode, visit } from './content-node';
 import { entityLinkText } from './entity-link';
 
@@ -10,8 +10,8 @@ export interface OutlineHeading {
   readonly text: string;
 }
 
-/** Every `heading` in the Content, in document order; `[]` for a non-tiptap format. */
-export function extractOutline(content: Content): OutlineHeading[] {
+/** Every `heading` in the RichContent, in document order; `[]` for a non-tiptap format. */
+export function extractOutline(content: RichContent): OutlineHeading[] {
   if (!content.format.startsWith('tiptap-')) return [];
   const found: OutlineHeading[] = [];
   visit(content.snapshot, (node) => {

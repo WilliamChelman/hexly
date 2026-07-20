@@ -29,13 +29,13 @@ interface Slot {
 }
 
 /**
- * The `dnd.stat-block` data-type's View (`dnd.view.stat-block`, ADR-0055): a laid-out stat block over
+ * The `dnd.datatype.stat-block` data-type's View (`dnd.view.stat-block`, ADR-0055): a laid-out stat block over
  * one grouped **Structured Data Type** value. It renders whichever stat-block Field placed it, reading
- * that Field's EntityDocument key from {@link VIEW_FIELD_KEY} — so a monster's `stat_block`, or the key of
- * a `dnd.stat-block` Field attached to any other type or a single Entity, are all edited here (ADR-0054).
+ * that Field's EntityDocument key from {@link VIEW_FIELD_KEY} — so a monster's `dnd.field.stat-block`, or the key of
+ * a `dnd.datatype.stat-block` Field attached to any other type or a single Entity, are all edited here (ADR-0054).
  *
  * The block is its Entity's only stat-authoring surface (the create dialog collects scalar required
- * Fields only, and a `dnd.stat-block` Field is structured), so it must offer a slot for every stat: an
+ * Fields only, and a `dnd.datatype.stat-block` Field is structured), so it must offer a slot for every stat: an
  * unrendered one would be unsettable.
  */
 @Component({
@@ -120,7 +120,7 @@ export class StatBlockViewComponent {
 
   /**
    * The stat-block Field this View renders — {@link DND_STAT_BLOCK_FIELD} re-keyed to {@link VIEW_FIELD_KEY},
-   * so it lenses whichever document key the placing Field named (a monster's `stat_block`, or an
+   * so it lenses whichever document key the placing Field named (a monster's `dnd.field.stat-block`, or an
    * attachment's own key). The whole block is one value at that key (ADR-0055).
    */
   private readonly field: Field = { ...DND_STAT_BLOCK_FIELD, id: inject(VIEW_FIELD_KEY) };

@@ -21,7 +21,7 @@ import { ViewRegistry } from './view-registry';
  * afforded view surfaces. `register()` returns an unregister fn.
  *
  * The app seeds **no** type of its own (ADR-0051): every code type arrives through {@link PLUGIN_TYPES}
- * — `core.note` from the content plugin, `core.hexmap` from the map plugin — and a World's user-defined
+ * — `core.type.note` from the content plugin, `core.type.hex-map` from the map plugin — and a World's user-defined
  * types join at runtime, projected by {@link WorldTypesLoader}.
  *
  * Implements {@link EntityTypes}, the read contract a lib injects (bound to {@link ENTITY_TYPES} in
@@ -87,7 +87,7 @@ export class TypeRegistry implements EntityTypes {
   /**
    * The definition for an Entity's primary `type`, or {@link GENERIC_TYPE_DEFINITION} for an absent,
    * unregistered, or disabled id — so chrome always resolves, never `undefined`, never a throw. The
-   * `core.note` fallback is gone: content is a disableable Plugin now, no longer guaranteed (ADR-0052).
+   * `core.type.note` fallback is gone: content is a disableable Plugin now, no longer guaranteed (ADR-0052).
    */
   resolve(type: string | null | undefined): TypeDefinition {
     return this.get(type) ?? GENERIC_TYPE_DEFINITION;
@@ -135,7 +135,8 @@ export class TypeRegistry implements EntityTypes {
       }
       for (const placement of def.views) {
         if (typeof placement === 'string') {
-          afford({ viewId: placement });
+          // The domain keeps a string placement opaque; `viewPlacementSchema` already pinned it to `namespace.view.name`.
+          afford({ viewId: placement as ViewId });
           continue;
         }
         affordField(byKey.get(placement.field));

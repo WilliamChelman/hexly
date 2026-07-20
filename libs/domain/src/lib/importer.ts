@@ -11,6 +11,16 @@
 import { z } from 'zod';
 import { EntityType, HEXLY_METADATA_PREFIX, visibilitySchema } from './entity';
 import { EntityDocument } from './field';
+import { kindedIdRegex } from './kinded-id';
+
+/**
+ * An Importer's id: a `namespace.importer.name` key (`draw-steel.importer.monsters`), carrying the
+ * `importer` kind segment (see `kinded-id.ts`). Parsed where the host registry registers one, so a
+ * malformed id fails at startup, not at run time.
+ */
+export const importerIdSchema = z
+  .string()
+  .regex(kindedIdRegex('importer'), 'An Importer id must be a `namespace.importer.name` key');
 
 /**
  * The reserved Entity Document key an Entity's **Import Source** lives under (CONTEXT.md → Import
@@ -91,7 +101,7 @@ export interface ImportProduction {
  * near-pure function that is trivially fixture-tested.
  */
 export interface Importer {
-  /** This Importer's `namespace.id` — the `importer` an {@link ImportSource} names (`draw-steel.monsters`). */
+  /** This Importer's `namespace.id` — the `importer` an {@link ImportSource} names (`draw-steel.importer.monsters`). */
   readonly id: string;
   /**
    * The Importer's **transloco key** for the generic Imports panel (CONTEXT.md → Importer), resolved

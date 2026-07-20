@@ -148,11 +148,11 @@ describe('draw-steel monsters transform — structural mapping', () => {
     expect(JSON.stringify(traits)).not.toMatch(/\[\[|\]\]/);
   });
 
-  it('omits core.content for an empty biography, and folds a present one to prose', () => {
+  it('omits core.field.content for an empty biography, and folds a present one to prose', () => {
     // Ajax + Goblin both have empty biographies → no prose field at all.
     expect(toMonsterRecord(AJAX_MONSTER_FIXTURE)?.document).not.toHaveProperty(CONTENT_FIELD.id);
     expect(toMonsterRecord(GOBLIN_MONSTER_FIXTURE)?.document).not.toHaveProperty(CONTENT_FIELD.id);
-    // A monster with a real biography carries a core.content whose prose round-trips.
+    // A monster with a real biography carries a core.field.content whose prose round-trips.
     const record = toMonsterRecord({
       type: 'npc',
       _id: 'b1',

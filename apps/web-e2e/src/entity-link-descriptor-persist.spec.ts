@@ -37,7 +37,7 @@ test('characterises a Content Entity Link via :: , persists the descriptor, and 
   // The persisted snapshot carries the descriptor; the server indexed it for suggestions.
   await page.reload();
   const res = await request.get(`/api/entities/${sourceId}`);
-  expect(JSON.stringify((await res.json()).document['core.content'].snapshot)).toContain('spouse');
+  expect(JSON.stringify((await res.json()).document['core.field.content'].snapshot)).toContain('spouse');
   const vocab = await (await request.get('/api/entities/descriptors')).json();
   expect(vocab).toContain('spouse');
 

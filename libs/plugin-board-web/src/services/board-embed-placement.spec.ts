@@ -59,9 +59,9 @@ describe('BoardEmbedPlacement', () => {
     placement.place({ x: 12, y: 34 });
     expect(dialogs.opened[0].data).toEqual({ worldId: 'w1' });
 
-    dialogs.lastRef().close({ targetEntityId: 'note-1', viewInstance: 'core.view.map:core.grid' });
+    dialogs.lastRef().close({ targetEntityId: 'note-1', viewInstance: 'core.view.map:core.field.grid' });
     expect(store.added).toEqual([
-      { position: { x: 12, y: 34 }, targetEntityId: 'note-1', viewInstance: 'core.view.map:core.grid' },
+      { position: { x: 12, y: 34 }, targetEntityId: 'note-1', viewInstance: 'core.view.map:core.field.grid' },
     ]);
     // A successful placement keeps the armed Tool sticky — repeat placement stays one click away.
     expect(store.toolArms).toEqual([]);

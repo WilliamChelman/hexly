@@ -7,7 +7,7 @@ import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/tes
 import { EntitySearchPickerComponent } from './entity-search-picker.component';
 import { COLLAB_TEST_CATALOGS } from '../i18n/test-catalogs';
 
-function summary(id: string, name = id, type: EntityType = 'core.note'): EntitySummary {
+function summary(id: string, name = id, type: EntityType = 'core.type.note'): EntitySummary {
   return {
     id,
     worldId: 'w1',

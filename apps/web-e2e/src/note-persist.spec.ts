@@ -26,8 +26,8 @@ test('types into a note, saves, and the Content survives a reload', async ({ pag
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   // A note's Entity Type lives in the entity-level `types` set, not in the body — which is
-  // `{ content, metadata }` for every Entity (ADR-0050). `core.note` is the primary type.
-  expect(detail.types).toContain('core.note');
-  expect(detail.document['core.content'].format).toBe('tiptap-v3'); // mirrors CONTENT_FORMAT
-  expect(JSON.stringify(detail.document['core.content'].snapshot)).toContain(content);
+  // `{ content, metadata }` for every Entity (ADR-0050). `core.type.note` is the primary type.
+  expect(detail.types).toContain('core.type.note');
+  expect(detail.document['core.field.content'].format).toBe('tiptap-v3'); // mirrors CONTENT_FORMAT
+  expect(JSON.stringify(detail.document['core.field.content'].snapshot)).toContain(content);
 });

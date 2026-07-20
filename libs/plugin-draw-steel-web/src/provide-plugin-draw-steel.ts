@@ -58,13 +58,13 @@ export function providePluginDrawSteel(): EnvironmentProviders {
     providePlugin({
       id: PLUGIN_ID,
       types: DS_TYPE_DEFINITIONS,
-      // The `draw-steel.stat-block` structured Field (ADR-0054); the prose `core.content` it also
+      // The `draw-steel.datatype.stat-block` structured Field (ADR-0054); the prose `core.field.content` it also
       // references is the content plugin's.
       fields: [DS_STAT_BLOCK_FIELD],
       views: [
         {
           id: DS_VIEW_STAT_BLOCK,
-          // The `draw-steel.stat-block` data-type's View, not the `draw-steel.monster` type's (ADR-0055):
+          // The `draw-steel.datatype.stat-block` data-type's View, not the `draw-steel.type.monster` type's (ADR-0055):
           // it renders whichever stat-block Field placed it and takes its toggle label from that Field —
           // so no toggle copy of its own, mirroring the map View (ADR-0050).
           dataType: DS_STAT_BLOCK,

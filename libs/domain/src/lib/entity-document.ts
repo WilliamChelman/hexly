@@ -20,7 +20,7 @@ export function emptyEntityDocument(
 /**
  * Mint the default value of every declared Field that has none — the reconcile a *type change* runs.
  * Only a **Structured Data Type** declares a default ({@link StructuredDataType.empty}); for a `string`
- * or a `number`, absent *is* unset. Prose (`core.rich-content`) mints through this same path.
+ * or a `number`, absent *is* unset. Prose (`core.datatype.rich-content`) mints through this same path.
  *
  * Adds, never overwrites: a present value stays, however malformed (validation is forward-only), and
  * dropping a type never strips its values. Returns the same reference when there is nothing to mint,

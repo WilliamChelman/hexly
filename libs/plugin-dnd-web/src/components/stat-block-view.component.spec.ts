@@ -11,7 +11,7 @@ import { DND_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { StatBlockViewComponent } from './stat-block-view.component';
 
 /**
- * The `dnd.stat-block` data-type's View (#192, ADR-0055). It binds to the {@link ENTITY_SESSION} contract
+ * The `dnd.datatype.stat-block` data-type's View (#192, ADR-0055). It binds to the {@link ENTITY_SESSION} contract
  * plus {@link VIEW_FIELD_KEY} — the one document key its whole block lives at — so a minimal fake session
  * and a fixed key stand in for the app's.
  */

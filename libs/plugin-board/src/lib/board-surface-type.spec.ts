@@ -44,7 +44,7 @@ const text = (id: string, prose: string, links: string[] = []): TextElement => (
   ...geometry,
 });
 
-describe('the core.board-surface Structured Data Type (ADR-0050, #263)', () => {
+describe('the core.datatype.board-surface Structured Data Type (ADR-0050, #263)', () => {
   it('mints a blank plane — no elements', () => {
     expect(BOARD_SURFACE_DATA_TYPE.empty()).toEqual({ elements: [] });
   });
@@ -68,7 +68,7 @@ describe('the core.board-surface Structured Data Type (ADR-0050, #263)', () => {
     });
     expect(fields.map((field) => field.id)).toEqual([CONTENT_FIELD.id, SURFACE_FIELD.id]);
     expect(SURFACE_FIELD).toMatchObject({
-      id: 'core.surface',
+      id: 'core.field.surface',
       dataType: { kind: CORE_BOARD_SURFACE },
       facetable: false,
     });

@@ -13,7 +13,7 @@ import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing'
 import { EntitySession } from './services/entity-session';
 import { CORE_VIEW_MAP, ENTITY_SESSION, ENTITY_TYPES, viewInstanceKey } from '@hexly/web-entity';
 import { TypeRegistry } from '../../entity-types/type-registry';
-import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
+import { CORE_VIEW_RICH_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { ViewRegistry } from '../../entity-types/view-registry';
 import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { noteDetail } from './components/note-detail.fixtures';
@@ -40,14 +40,14 @@ const hexmapWithContent = (text: string): EntityDetail => ({
   // Owner opener (ADR-0039): the `edit` Right keeps the map/editor writable.
   rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
   document: {
-    'core.content': {
+    'core.field.content': {
       format: CONTENT_FORMAT,
       snapshot: {
         type: 'doc',
         content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
       },
     },
-    'core.grid': { hexes: {}, regions: [], labels: [] },
+    'core.field.grid': { hexes: {}, regions: [], labels: [] },
   },
 });
 
@@ -122,7 +122,7 @@ describe('EntityPage routing', () => {
     entities.load.mockReturnValue(of(detail('n1', 'note')));
     const fixture = mount();
     // The content View is the content plugin's now, fetched by the page rather than named (ADR-0051).
-    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -145,10 +145,10 @@ describe('EntityPage routing', () => {
 
   it('restores the active View from the ?view query param (#75, ADR-0048)', async () => {
     // A shared link with the full View id lands the hexmap on its Content view.
-    await configure('m1', { view: CORE_VIEW_CONTENT });
+    await configure('m1', { view: CORE_VIEW_RICH_CONTENT });
     entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
     const fixture = mount();
-    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -261,7 +261,7 @@ describe('EntityPage layout', () => {
     TestBed.inject(EntitySession).adopt(noteDetail('Lady Mara'));
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
-    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
     fixture.detectChanges();
     return fixture;
   }
@@ -349,8 +349,8 @@ describe('EntityPage layout', () => {
   it('swaps the canvas for the Content editor in the Note view, seeded with the map’s Content', async () => {
     const fixture = await mountMap(); // mounts on the grid (the empty route leaves the default map view)
     // Flip to the Content view after mount, as the header's toggle would.
-    fixture.debugElement.injector.get(EntityViewStore).setView(CORE_VIEW_CONTENT);
-    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
+    fixture.debugElement.injector.get(EntityViewStore).setView(CORE_VIEW_RICH_CONTENT);
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -390,7 +390,7 @@ describe('EntityPage layout', () => {
     TestBed.inject(EntitySession).adopt({
       ...noteDetail('Lady Mara'),
       document: {
-        'core.content': {
+        'core.field.content': {
           format: 'tiptap-v1',
           snapshot: {
             type: 'doc',
@@ -406,7 +406,7 @@ describe('EntityPage layout', () => {
     });
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
-    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;

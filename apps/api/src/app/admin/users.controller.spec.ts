@@ -134,7 +134,7 @@ describe('Account management (/users)', () => {
     const entityId = (
       await bob
         .post('/entities')
-        .send({ name: 'Secret', types: ['core.note'], worldId })
+        .send({ name: 'Secret', types: ['core.type.note'], worldId })
         .expect(201)
     ).body.id;
 
@@ -263,7 +263,7 @@ describe('Account management (/users)', () => {
     const noteId = (
       await carol
         .post('/entities')
-        .send({ name: 'Ledger', types: ['core.note'], worldId })
+        .send({ name: 'Ledger', types: ['core.type.note'], worldId })
         .expect(201)
     ).body.id;
     // Reassign sole ownership of the note to Bob (ownership is an `owner`-role grant row).
@@ -308,7 +308,7 @@ describe('Account management (/users)', () => {
     const entityId = (
       await bob
         .post('/entities')
-        .send({ name: 'Secret', types: ['core.note'], worldId })
+        .send({ name: 'Secret', types: ['core.type.note'], worldId })
         .expect(201)
     ).body.id; // private by default
 
@@ -329,7 +329,7 @@ describe('Account management (/users)', () => {
     const entityId = (
       await bob
         .post('/entities')
-        .send({ name: 'Stuck', types: ['core.note'], worldId })
+        .send({ name: 'Stuck', types: ['core.type.note'], worldId })
         .expect(201)
     ).body.id;
 

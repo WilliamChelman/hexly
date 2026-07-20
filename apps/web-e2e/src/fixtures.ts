@@ -53,13 +53,13 @@ interface SavedGrid {
 /**
  * The grid a Hex Map has actually persisted, fetched from the API. The one place a test knows *where*
  * the grid is stored: a **Field of a Structured Data Type**'s value in the Entity's body, which **is** the EntityDocument
- * map (ADR-0050, ADR-0051). `core.hexmap` declares its grid at `core.grid` (ADR-0056); a user-defined
+ * map (ADR-0050, ADR-0051). `core.type.hex-map` declares its grid at `core.field.grid` (ADR-0056); a user-defined
  * type declares its at whatever key its author chose — that is `fieldKey`.
  */
 export async function savedGrid(
   request: APIRequestContext,
   entityId: string,
-  fieldKey = 'core.grid',
+  fieldKey = 'core.field.grid',
 ): Promise<SavedGrid> {
   const res = await request.get(`/api/entities/${entityId}`);
   expect(res.ok()).toBeTruthy();
@@ -71,7 +71,7 @@ export async function savedGrid(
  * A map View toggle's testid — the View id plus the **Field of a Structured Data Type** it renders (ADR-0050),
  * composed through the app's own {@link viewInstanceKey}.
  */
-export function mapViewToggle(fieldKey = 'core.grid'): string {
+export function mapViewToggle(fieldKey = 'core.field.grid'): string {
   return viewInstanceKey({ viewId: 'core.view.map', fieldKey });
 }
 
@@ -82,15 +82,15 @@ export function mapViewToggle(fieldKey = 'core.grid'): string {
  * keys plain, so `fieldKey` is optional.
  */
 export function contentViewToggle(fieldKey?: string): string {
-  return viewInstanceKey({ viewId: 'core.view.content', fieldKey });
+  return viewInstanceKey({ viewId: 'core.view.rich-content', fieldKey });
 }
 
 /**
  * The stat-block View toggle's testid (ADR-0055). The stat block is a **Structured Data Type**'s View
- * now, bound to the `dnd.stat-block` Field that placed it, so it keys `viewId:fieldKey` like the map —
- * `dnd.monster` places it at `dnd.stat_block`, an attachment at whatever key the Field carries.
+ * now, bound to the `dnd.datatype.stat-block` Field that placed it, so it keys `viewId:fieldKey` like the map —
+ * `dnd.type.monster` places it at `dnd.field.stat-block`, an attachment at whatever key the Field carries.
  */
-export function statBlockViewToggle(fieldKey = 'dnd.stat_block'): string {
+export function statBlockViewToggle(fieldKey = 'dnd.field.stat-block'): string {
   return viewInstanceKey({ viewId: 'dnd.view.stat-block', fieldKey });
 }
 
@@ -160,16 +160,16 @@ export async function createEntity(page: Page, typeId: string): Promise<string> 
 
 /** A Field on a user-defined type, as the World Types editor's form takes one. */
 export interface AuthoredField {
-  /** The `world.`-less key segment the form slugs into a `world.<segment>` id/key (ADR-0056). */
+  /** The `world.`-less key segment the form slugs into a `world.field.<segment>` id/key (ADR-0056). */
   readonly segment: string;
   readonly label: string;
-  /** A **Structured Data Type** (`core.hex-grid`, #201); absent leaves the form's `string`. */
+  /** A **Structured Data Type** (`core.datatype.hex-grid`, #201); absent leaves the form's `string`. */
   readonly kind?: string;
 }
 
 /**
  * Author a user-defined type in a World's settings, and land back on the types list with it saved.
- * `id` is the bare id the form takes; the World's namespace makes it `world.<id>`.
+ * `id` is the bare id the form takes; the World's namespace makes it `world.type.<id>`.
  */
 export async function authorWorldType(
   page: Page,
@@ -184,7 +184,7 @@ export async function authorWorldType(
   await page.getByTestId('type-name-input').fill(type.name);
 
   // A type *references* Fields by id (ADR-0054): mint each inline from the new-Field modal, which
-  // slugs a `world.<segment>` Field from the label/segment and references it (ADR-0056). The reference
+  // slugs a `world.field.<segment>` Field from the label/segment and references it (ADR-0056). The reference
   // checkbox confirms it landed.
   for (const field of type.fields) {
     await page.getByTestId('new-field').click();
@@ -192,16 +192,16 @@ export async function authorWorldType(
     await page.getByTestId('newfield-key').fill(field.segment);
     if (field.kind) await page.getByTestId(`newfield-kind-option-${field.kind}`).click();
     await page.getByTestId('newfield-save').click();
-    await expect(page.getByTestId(`field-ref-checkbox-world.${field.segment}`)).toBeChecked();
+    await expect(page.getByTestId(`field-ref-checkbox-world.field.${field.segment}`)).toBeChecked();
   }
 
   await page.getByTestId('type-save').click();
-  await expect(page.getByTestId(`type-world.${type.id}`)).toBeVisible();
+  await expect(page.getByTestId(`type-world.type.${type.id}`)).toBeVisible();
 }
 
 /**
  * Author a reusable World-defined Field in a World's settings (ADR-0054, #230, ADR-0056), and land back
- * on the Fields list with it saved. `segment` is the `world.`-less key the form slugs into `world.<segment>`
+ * on the Fields list with it saved. `segment` is the `world.`-less key the form slugs into `world.field.<segment>`
  * (its id *and* document key); the label drives it but the fixture sets it explicitly. `kind` defaults to
  * the form's `string`; `options` fills an enum's comma-separated list.
  */
@@ -219,7 +219,7 @@ export async function authorWorldField(
   if (field.kind) await page.getByTestId(`field-kind-option-${field.kind}`).click();
   if (field.options !== undefined) await page.getByTestId('field-options').fill(field.options);
   await page.getByTestId('field-save').click();
-  await expect(page.getByTestId(`field-world.${field.segment}`)).toBeVisible();
+  await expect(page.getByTestId(`field-world.field.${field.segment}`)).toBeVisible();
 }
 
 /**

@@ -1,6 +1,6 @@
 /**
  * The Board plugin's one entry point into the API (ADR-0053), the server mirror of `providePluginBoard`.
- * Framework-free — it names the `core.board` type, the `core.surface` Field, and the `core.board-surface`
+ * Framework-free — it names the `core.type.board` type, the `core.field.surface` Field, and the `core.datatype.board-surface`
  * **Structured Data Type** the API resolves a surface Field against, never the Angular board view. A thin
  * mirror of `serverPluginHexmap`, with one added knob.
  */
@@ -25,7 +25,7 @@ export const boardConfigSchema: PluginConfigSchema = basePluginConfigSchema.exte
 });
 
 export function serverPluginBoard(): ServerPlugin {
-  // Declares the surface Field (ADR-0054); the prose `core.content` it references is the content plugin's,
+  // Declares the surface Field (ADR-0054); the prose `core.field.content` it references is the content plugin's,
   // folded from there.
   return serverPlugin({
     id: PLUGIN_ID,

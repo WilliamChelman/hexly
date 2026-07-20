@@ -1,4 +1,4 @@
-import { tiptapContent } from './content';
+import { tiptapContent } from './rich-content';
 import { extractOutline } from './extract-outline';
 
 describe('extractOutline', () => {

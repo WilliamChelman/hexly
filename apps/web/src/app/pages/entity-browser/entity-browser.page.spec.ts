@@ -20,7 +20,7 @@ describe('EntityBrowser', () => {
     id: 'x',
     worldId: 'w1',
     name: 'A map',
-    types: ['core.hexmap'],
+    types: ['core.type.hex-map'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -312,8 +312,8 @@ describe('EntityBrowser', () => {
 
   it('shows each entity’s type', () => {
     const fixture = renderWith([
-      summary({ id: 'm1', name: 'Aldermoor', types: ['core.hexmap'] }),
-      summary({ id: 'n1', name: 'Lady Mara', types: ['core.note'] }),
+      summary({ id: 'm1', name: 'Aldermoor', types: ['core.type.hex-map'] }),
+      summary({ id: 'n1', name: 'Lady Mara', types: ['core.type.note'] }),
     ]);
     const typeOf = (id: string) =>
       (fixture.nativeElement.querySelector(`[data-testid=type-${id}]`) as HTMLElement)?.textContent?.trim();
@@ -344,8 +344,8 @@ describe('EntityBrowser', () => {
 
   it('renders the primary create action and type labels in French when French is active', () => {
     const fixture = renderWith([
-      summary({ id: 'm1', name: 'Aldermoor', types: ['core.hexmap'] }),
-      summary({ id: 'n1', name: 'Lady Mara', types: ['core.note'] }),
+      summary({ id: 'm1', name: 'Aldermoor', types: ['core.type.hex-map'] }),
+      summary({ id: 'n1', name: 'Lady Mara', types: ['core.type.note'] }),
     ]);
     const el = fixture.nativeElement as HTMLElement;
 
@@ -610,7 +610,7 @@ describe('EntityBrowser', () => {
         ...summary({
           id: 'created',
           name: 'Untitled note',
-          types: ['core.note'],
+          types: ['core.type.note'],
         }),
         seq: 1,
         document: { content: { format: 'tiptap-v1', snapshot: {} } },
@@ -618,7 +618,7 @@ describe('EntityBrowser', () => {
     );
     (fixture.nativeElement.querySelector('[data-testid=new-default-entity]') as HTMLButtonElement).click();
 
-    expect(client.create).toHaveBeenCalledWith('Untitled note', ['core.note'], 'w1');
+    expect(client.create).toHaveBeenCalledWith('Untitled note', ['core.type.note'], 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);
   });
 
@@ -747,7 +747,7 @@ describe('EntityBrowser', () => {
 
   describe('Facet rail (#155)', () => {
     const facet = (el: HTMLElement, tid: string) =>
-      // Quote the value: a `namespace.id` type testid (e.g. `facet-type-core.note`) carries a dot,
+      // Quote the value: a `namespace.id` type testid (e.g. `facet-type-core.type.note`) carries a dot,
       // which an unquoted attribute selector rejects.
       el.querySelector(`[data-testid="${tid}"]`) as HTMLButtonElement | null;
 
@@ -755,8 +755,8 @@ describe('EntityBrowser', () => {
       client.facets.mockReturnValue(
         of({
           type: [
-            { value: 'core.note', count: 3 },
-            { value: 'core.hexmap', count: 1 },
+            { value: 'core.type.note', count: 3 },
+            { value: 'core.type.hex-map', count: 1 },
           ],
           tag: [{ value: 'deity', count: 2 }],
           visibility: [{ value: 'private', count: 4 }],
@@ -765,8 +765,8 @@ describe('EntityBrowser', () => {
       );
       const el = renderWith([summary({ id: 'm1' })]).nativeElement as HTMLElement;
 
-      expect(facet(el, 'facet-type-core.note')?.textContent).toContain('Note');
-      expect(facet(el, 'facet-type-core.note')?.textContent).toContain('3');
+      expect(facet(el, 'facet-type-core.type.note')?.textContent).toContain('Note');
+      expect(facet(el, 'facet-type-core.type.note')?.textContent).toContain('3');
       expect(facet(el, 'facet-tag-deity')?.textContent).toContain('deity');
       expect(facet(el, 'facet-tag-deity')?.textContent).toContain('2');
       expect(facet(el, 'facet-visibility-private')).not.toBeNull();
@@ -775,7 +775,7 @@ describe('EntityBrowser', () => {
     it('toggles a Type Facet: filters the list and mirrors it to the URL', () => {
       client.facets.mockReturnValue(
         of({
-          type: [{ value: 'core.note', count: 1 }],
+          type: [{ value: 'core.type.note', count: 1 }],
           tag: [],
           visibility: [],
           fields: [],
@@ -786,23 +786,23 @@ describe('EntityBrowser', () => {
 
       client.list.mockReturnValueOnce(
         of({
-          items: [summary({ id: 'n1', types: ['core.note'] })],
+          items: [summary({ id: 'n1', types: ['core.type.note'] })],
           nextCursor: null,
         }),
       );
-      facet(el, 'facet-type-core.note')?.click();
+      facet(el, 'facet-type-core.type.note')?.click();
       fixture.detectChanges();
 
       expect(client.list).toHaveBeenLastCalledWith({
         limit: 50,
         worldId: 'w1',
         rights: true,
-        type: ['core.note'],
+        type: ['core.type.note'],
       });
       expect(navigate).toHaveBeenCalledWith(
         [],
         expect.objectContaining({
-          queryParams: expect.objectContaining({ type: ['core.note'] }),
+          queryParams: expect.objectContaining({ type: ['core.type.note'] }),
           queryParamsHandling: 'merge',
           replaceUrl: true,
         }),
@@ -812,7 +812,7 @@ describe('EntityBrowser', () => {
     it('removes an individual active Facet by toggling it off', () => {
       client.facets.mockReturnValue(
         of({
-          type: [{ value: 'core.note', count: 1 }],
+          type: [{ value: 'core.type.note', count: 1 }],
           tag: [],
           visibility: [],
           fields: [],
@@ -822,13 +822,13 @@ describe('EntityBrowser', () => {
       const el = fixture.nativeElement as HTMLElement;
 
       client.list.mockReturnValue(of({ items: [], nextCursor: null }));
-      facet(el, 'facet-type-core.note')?.click();
+      facet(el, 'facet-type-core.type.note')?.click();
       fixture.detectChanges();
       // The value now reads as active.
-      expect(facet(el, 'facet-type-core.note')?.getAttribute('aria-pressed')).toBe('true');
+      expect(facet(el, 'facet-type-core.type.note')?.getAttribute('aria-pressed')).toBe('true');
 
       // Toggling the same value off drops the whole category from the request/URL.
-      facet(el, 'facet-type-core.note')?.click();
+      facet(el, 'facet-type-core.type.note')?.click();
       fixture.detectChanges();
       expect(client.list).toHaveBeenLastCalledWith({
         limit: 50,
@@ -846,7 +846,7 @@ describe('EntityBrowser', () => {
     it('Clear all resets the query and every Facet, dropping their URL params', () => {
       client.facets.mockReturnValue(
         of({
-          type: [{ value: 'core.note', count: 1 }],
+          type: [{ value: 'core.type.note', count: 1 }],
           tag: [],
           visibility: [],
           fields: [],
@@ -856,7 +856,7 @@ describe('EntityBrowser', () => {
       const el = fixture.nativeElement as HTMLElement;
 
       client.list.mockReturnValue(of({ items: [], nextCursor: null }));
-      facet(el, 'facet-type-core.note')?.click();
+      facet(el, 'facet-type-core.type.note')?.click();
       fixture.detectChanges();
       // Clear all only appears once something is active.
       expect(facet(el, 'facet-clear')).not.toBeNull();
@@ -884,7 +884,7 @@ describe('EntityBrowser', () => {
     });
 
     it('seeds active Facets from the URL and carries them into the first fetch', () => {
-      queryParams$.next(convertToParamMap({ type: 'core.note', tag: ['deity', 'ruined'] }));
+      queryParams$.next(convertToParamMap({ type: 'core.type.note', tag: ['deity', 'ruined'] }));
       client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
       const fixture = TestBed.createComponent(EntityBrowserPage);
       fixture.detectChanges();
@@ -895,7 +895,7 @@ describe('EntityBrowser', () => {
         limit: 50,
         worldId: 'w1',
         rights: true,
-        type: ['core.note'],
+        type: ['core.type.note'],
         tag: ['deity', 'ruined'],
       });
       expect(client.list).toHaveBeenCalledTimes(1);
@@ -921,7 +921,7 @@ describe('EntityBrowser', () => {
       const withEnumField = () =>
         client.facets.mockReturnValue(
           of({
-            type: [{ value: 'test.beast', count: 2 }],
+            type: [{ value: 'test.type.beast', count: 2 }],
             tag: [],
             visibility: [],
             fields: [
@@ -979,7 +979,7 @@ describe('EntityBrowser', () => {
       it('a number Field facet renders a range whose bound becomes a `gte` token', () => {
         client.facets.mockReturnValue(
           of({
-            type: [{ value: 'test.beast', count: 2 }],
+            type: [{ value: 'test.type.beast', count: 2 }],
             tag: [],
             visibility: [],
             fields: [
@@ -1016,7 +1016,7 @@ describe('EntityBrowser', () => {
       it('seeds Field filters from a `field` URL param into the first fetch', () => {
         queryParams$.next(
           convertToParamMap({
-            type: 'test.beast',
+            type: 'test.type.beast',
             field: 'alignment:eq:lawful-good',
           }),
         );
@@ -1029,7 +1029,7 @@ describe('EntityBrowser', () => {
           limit: 50,
           worldId: 'w1',
           rights: true,
-          type: ['test.beast'],
+          type: ['test.type.beast'],
           field: ['alignment:eq:lawful-good'],
         });
       });
