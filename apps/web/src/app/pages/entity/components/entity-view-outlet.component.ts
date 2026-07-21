@@ -181,18 +181,25 @@ export class EntityViewOutletComponent {
 
   /**
    * The injector the active View's component is created in — this outlet's own, plus {@link VIEW_FIELD_KEY}
-   * when the View renders a Field of a Structured Data Type. Keyed on {@link EntityViewStore.activeFieldKey},
-   * which settles, so `NgComponentOutlet` doesn't tear a live map down on every re-derived view list.
+   * carrying the Field the View renders. Keyed on {@link EntityViewStore.activeFieldKey}, which settles, so
+   * `NgComponentOutlet` doesn't tear a live map down on every re-derived view list.
+   *
+   * {@link VIEW_FIELD_KEY} is provided **unconditionally** — `null` for a Type's own View (a Note's prose,
+   * placed by id, names no Field). It must *shadow* the token, not defer to it: an Embed's Outlet nests
+   * inside the enclosing View's injector (a Board's surface View provides `core.field.surface`), so a
+   * Field-less View that skipped the provider would let the transcluded editor inherit the *outer* View's
+   * key and read the wrong document slot — the empty-body Embed bug. A `null` here lets the editor fall to
+   * its canonical Field key (ADR-0051, ADR-0062).
    */
   protected readonly viewInjector = computed(() => {
-    const fieldKey = this.viewStore.activeFieldKey();
+    const fieldKey = this.viewStore.activeFieldKey() ?? null;
     return Injector.create({
       parent: this.injector,
       providers: [
         // The context this outlet renders at, so a transcluded surface's own Embeds read where they sit
         // and advance it by one level (ADR-0062, #270).
         { provide: ENTITY_RENDER_CONTEXT, useValue: this.renderContext() },
-        ...(fieldKey ? [{ provide: VIEW_FIELD_KEY, useValue: fieldKey }] : []),
+        { provide: VIEW_FIELD_KEY, useValue: fieldKey },
       ],
     });
   });
