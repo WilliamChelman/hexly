@@ -279,14 +279,19 @@ describe('EntityPage layout', () => {
     expect(select?.getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('boots to a clear map: a full-bleed canvas, a bare rail, and the panel closed', async () => {
+  it('boots to a clear map: a full-bleed canvas, the Dock strip’s Map toggles, and the Dock closed', async () => {
     const fixture = await mountMap();
 
     const el = fixture.nativeElement as HTMLElement;
-    // Canvas, strip, and rail present; right panel closed by default (ADR-0013, story 20).
+    const dock = fixture.debugElement.injector.get(EntityDock);
+    // Canvas and palette present; the map's Inspector/Regions toggles are on the page Dock strip now
+    // (ADR-0067), and the Dock is closed by default (ADR-0013, story 20).
     expect(el.querySelector('app-map-canvas')).not.toBeNull();
     expect(el.querySelector('app-tool-palette')).not.toBeNull();
-    expect(el.querySelector('app-editor-rail')).not.toBeNull();
+    expect(el.querySelector('[data-testid=map-inspector-toggle]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=map-regions-toggle]')).not.toBeNull();
+    expect(dock.openPanel()).toBeNull();
+    // No Panel body mounted while the Dock is closed (its lazy body never fetched).
     expect(el.querySelector('app-inspector')).toBeNull();
     expect(el.querySelector('app-regions-panel')).toBeNull();
   });
@@ -372,18 +377,29 @@ describe('EntityPage layout', () => {
     expect(surface.textContent).toContain('The reach lies north.');
   });
 
-  it('opens the Regions panel from the closed default via the rail', async () => {
+  /**
+   * The Map View contributes its Regions Panel to the page Dock (ADR-0067, #298): its toggle sits on the
+   * Dock strip, and clicking it claims the Dock's one open slot. The Panel's lazy body renders in the app
+   * with the running View's injector — proven end-to-end (region-inspector-persist.spec) — but is left
+   * unmounted here so no unflushed fetch fires, mirroring the Content View Outline spec above.
+   */
+  it('opens the Regions Panel from the closed default via the Dock strip', async () => {
     const fixture = await mountMap();
-
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('app-regions-panel')).toBeNull();
-    expect(el.querySelector('app-inspector')).toBeNull();
+    const dock = fixture.debugElement.injector.get(EntityDock);
 
-    (el.querySelector('[data-testid=rail-regions]') as HTMLButtonElement).click();
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid=map-regions-toggle]');
+    expect(toggle).not.toBeNull();
+    expect(dock.openPanel()).toBeNull();
+
+    toggle!.click();
     fixture.detectChanges();
+    expect(dock.openPanel()?.id).toBe('core.panel.map-regions');
 
-    expect(el.querySelector('app-regions-panel')).not.toBeNull();
-    expect(el.querySelector('app-inspector')).toBeNull();
+    // A second click on the active toggle closes the Dock.
+    toggle!.click();
+    fixture.detectChanges();
+    expect(dock.openPanel()).toBeNull();
   });
 
   it('shows the open note’s name, with no map canvas', () => {

@@ -1,7 +1,9 @@
 import { Provider } from '@angular/core';
 import { EntityDocument } from '@hexly/domain';
-import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { ENTITY_SESSION, EntityDock, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { FakeEntitySession as BaseFakeEntitySession } from '@hexly/web-entity/testing';
+import { AuthClient } from '@hexly/web-core';
+import { MockAuthClient } from '@hexly/web-core/testing';
 import { emptyHexMap, HEX_GRID_FIELD, HexMap } from '@hexly/plugin-hexmap';
 import { HexMapStore } from '../services/hexmap-store';
 
@@ -49,7 +51,17 @@ export function provideFakeEntitySession(): Provider[] {
  * `core.type.hex-map`'s own `grid` Field. The Field key is explicit because the store requires one; in
  * the app it comes from the entity page's outlet. A spec exercising a second grid overrides
  * {@link VIEW_FIELD_KEY} with its own key.
+ *
+ * The page-owned {@link EntityDock} is provided too, since the store now claims/releases the Dock's slot
+ * on selection (ADR-0067); its {@link AuthClient} dependency (via `AuthScopedStorage`) is a mock so the
+ * remembered-choice storage resolves.
  */
 export function provideHexMapStoreTesting(): Provider[] {
-  return [HexMapStore, { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.id }, ...provideFakeEntitySession()];
+  return [
+    HexMapStore,
+    EntityDock,
+    { provide: AuthClient, useValue: new MockAuthClient() },
+    { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.id },
+    ...provideFakeEntitySession(),
+  ];
 }

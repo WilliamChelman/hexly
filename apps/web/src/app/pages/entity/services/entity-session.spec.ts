@@ -6,10 +6,10 @@ import { of, Subject, throwError } from 'rxjs';
 import { EntityDetail, EntitySaveOutcome, EntityDocument } from '@hexly/domain';
 import { CONTENT_FORMAT, CORE_NOTE, emptyRichContent, tiptapContent } from '@hexly/plugin-content';
 import { coordKey, CORE_HEXMAP, emptyHexMap, HEX_GRID_FIELD, HexMap } from '@hexly/plugin-hexmap';
-import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
-import { EntitiesClient, NudgeBusClient, EVICTED, Watched } from '@hexly/web-core';
+import { MockAuthClient, MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
+import { AuthClient, EntitiesClient, NudgeBusClient, EVICTED, Watched } from '@hexly/web-core';
 import { EntitySession } from './entity-session';
-import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { ENTITY_SESSION, EntityDock, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { HexMapStore } from '@hexly/plugin-hexmap/testing';
 
@@ -64,6 +64,10 @@ describe('EntitySession', () => {
         // token, as the app's composition root wires it (ADR-0048).
         { provide: ENTITY_SESSION, useExisting: EntitySession },
         HexMapStore,
+        // The store claims the page Dock's slot on selection (ADR-0067); provide the page-scoped Dock and
+        // a mock AuthClient (its remembered-choice storage's dep) so the store constructs here.
+        EntityDock,
+        { provide: AuthClient, useValue: new MockAuthClient() },
         // Which grid the store edits is the page's to say; here, `core.type.hex-map`'s own.
         { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.id },
         { provide: EntitiesClient, useValue: entities },

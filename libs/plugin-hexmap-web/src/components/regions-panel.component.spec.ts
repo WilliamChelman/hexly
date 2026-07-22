@@ -81,13 +81,11 @@ describe('RegionsPanel', () => {
   it('routes a list selection through the shared store selection, even for an empty Region', () => {
     const store = TestBed.inject(HexMapStore);
     const id = store.createRegion('The Whisperwood', '#6f7fae');
-    store.showRegionsPanel();
     const fixture = render();
 
     items(fixture.nativeElement)[0].click();
 
     expect(store.selection()).toEqual({ kind: 'region', id });
     expect(store.selectedRegion()?.name).toBe('The Whisperwood');
-    expect(store.rightPanel()).toBe('inspector');
   });
 });

@@ -2,7 +2,7 @@ import { EnvironmentProviders } from '@angular/core';
 import { CORE_VIEW_MAP, providePlugin } from '@hexly/web-entity';
 import { CORE_HEX_GRID, HEX_GRID_DATA_TYPE, HEX_GRID_FIELD, PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { HEXMAP_TRANSLATIONS } from './i18n/hexmap-translations';
-import { HEXMAP_TYPE_DEFINITIONS } from './hexmap-types';
+import { HEXMAP_TYPE_DEFINITIONS, MAP_INSPECTOR_PANEL, MAP_REGIONS_PANEL } from './hexmap-types';
 
 /**
  * The Hex Map plugin's one entry point into the app (ADR-0048, ADR-0050): `app.config.ts` names this
@@ -31,6 +31,10 @@ export function providePluginHexmap(): EnvironmentProviders {
         dataType: CORE_HEX_GRID,
         // The copy naming the *kind* where a World Owner picks it, in the World Types editor (#201).
         dataTypeLabelKey: 'map.dataType.hexGrid',
+        // The View contributes its Inspector and Regions Panels to the page Dock (ADR-0067): declared,
+        // so the Dock draws the toggles synchronously before this View's body is fetched, and hosts each
+        // Panel with the View's injector so it reaches the View-scoped HexMapStore.
+        panels: [MAP_INSPECTOR_PANEL, MAP_REGIONS_PANEL],
         loadComponent: () => import('./components/map-view.component').then((m) => m.MapViewComponent),
       },
     ],

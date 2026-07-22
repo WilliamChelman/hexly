@@ -84,7 +84,7 @@ test('drags a region on its own and its whole footprint moves', async ({ page, r
   const dx = 100; // one column right (offset q+1)
 
   // Create a region and paint the centre (0,0) into its membership.
-  await page.getByTestId('rail-regions').click();
+  await page.getByTestId('map-regions-toggle').click();
   await page.getByTestId('new-region').click();
   await expect(page.getByTestId('region-name')).toHaveValue('Region 1');
   await canvas.click();

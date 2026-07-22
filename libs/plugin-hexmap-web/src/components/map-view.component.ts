@@ -4,40 +4,37 @@ import { ENTITY_SESSION } from '@hexly/web-entity';
 import { HexMapStore } from '../services/hexmap-store';
 import { MapCanvasComponent } from './map-canvas.component';
 import { ToolPaletteComponent } from './tool-palette.component';
-import { InspectorComponent } from './inspector.component';
-import { RegionsPanelComponent } from './regions-panel.component';
-import { EditorRailComponent } from './editor-rail.component';
 
 /**
- * The `core.view.map` renderer (ADR-0048, *Views* amendment): the full-bleed hex
- * canvas with its floating tool palette and Inspector / Regions dock.
+ * The `core.view.map` renderer (ADR-0048, *Views* amendment): the full-bleed hex canvas with its
+ * floating tool palette.
  *
- * The canvas itself is a read affordance (pan/zoom); every editing dock is gated on
- * {@link ENTITY_SESSION.writable}, so a read-only opener sees the map but no tools (ADR-0037).
- * `display:contents` so the canvas and floating chrome position against the entity page's `<main>`.
+ * The Inspector and Regions are page-Dock Panels now (ADR-0067) — declared on the map
+ * {@link ViewDefinition.panels} and hosted by the page's Dock with this View's injector — so the
+ * right-edge editor-rail the View once owned, and its floating panel dock, are gone. What remains here
+ * is the canvas and the tool palette.
+ *
+ * The canvas itself is a read affordance (pan/zoom); the tool palette is gated on
+ * {@link ENTITY_SESSION.writable}, so a read-only opener sees the map but no tools (ADR-0037) — as are
+ * the two Dock Panels, write-gated by their definitions. `display:contents` so the canvas and floating
+ * chrome position against the entity page's `<main>`.
  */
 @Component({
   selector: 'app-map-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  // The store lives and dies with the Map View; its children (canvas, palette, docks) resolve this
-  // one instance, and it injects the route-scoped ENTITY_SESSION from an ancestor (ADR-0048).
+  // The store lives and dies with the Map View; its children (canvas, palette) and the page Dock's
+  // View-contributed Panels (Inspector, Regions) resolve this one instance, and it injects the
+  // route-scoped ENTITY_SESSION from an ancestor (ADR-0048).
   //
   // The `map` catalog is *not* provided here: it is an eager scope registered app-wide by
   // `providePluginHexmap()` (ADR-0049), because the type's chrome labels are `map.*` keys the app's
   // header, browser, and command palette render, where no pipe of this lib exists to trigger a lazy
   // load.
   providers: [HexMapStore],
-  imports: [
-    MapCanvasComponent,
-    ToolPaletteComponent,
-    InspectorComponent,
-    RegionsPanelComponent,
-    EditorRailComponent,
-    TranslocoPipe,
-  ],
+  imports: [MapCanvasComponent, ToolPaletteComponent, TranslocoPipe],
   template: `
-    <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->
+    <!-- Full-bleed canvas; the tool palette floats over it (ADR-0013). -->
     <app-map-canvas class="absolute inset-0" />
     <!--
       The model-derived hex count, kept as a screen-reader-only live region rather
@@ -52,23 +49,6 @@ import { EditorRailComponent } from './editor-rail.component';
     }}</span>
     @if (session.writable()) {
       <app-tool-palette class="absolute top-3 left-3 z-[1]" />
-      <!--
-        Right dock: panel (Inspector / Regions) + edge rail as a flex row, no
-        hand-computed offsets (ADR-0013). pointer-events-none so the canvas stays
-        interactive below a short panel; each child re-enables it.
-      -->
-      <div class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none">
-        @if (store.rightPanel() === 'regions') {
-          <app-regions-panel
-            class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
-          />
-        } @else if (store.rightPanel() === 'inspector') {
-          <app-inspector
-            class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
-          />
-        }
-        <app-editor-rail class="pointer-events-auto" />
-      </div>
     }
   `,
   styles: `
@@ -83,7 +63,7 @@ import { EditorRailComponent } from './editor-rail.component';
   `,
 })
 export class MapViewComponent {
-  /** Drives the Inspector / Regions dock and holds the grid document. */
+  /** The central store; holds the grid document the hex read-out counts. */
   protected readonly store = inject(HexMapStore);
   /** The central store; `writable()` gates the editing chrome (ADR-0037/0048). */
   protected readonly session = inject(ENTITY_SESSION);

@@ -20,7 +20,8 @@ import {
   terrainPalette,
 } from '@hexly/plugin-hexmap';
 import { Patch } from '@hexly/immer';
-import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { ENTITY_SESSION, EntityDock, VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { CORE_PANEL_MAP_INSPECTOR } from '../hexmap-types';
 import { MapSelection } from './map-selection';
 import type { Selection, SelectMode, SelectionRef } from './map-selection';
 
@@ -124,6 +125,14 @@ export class HexMapStore {
   private readonly session = inject(ENTITY_SESSION);
 
   /**
+   * The page-owned {@link EntityDock} this Map View shares (ADR-0067), reached from the page injector
+   * above the View outlet. A selection {@link EntityDock.claim claims} the Inspector Panel transiently —
+   * never touching the user's remembered Dock choice — and emptying the selection
+   * {@link EntityDock.releaseClaim releases} it, restoring whatever the user last chose.
+   */
+  private readonly dock = inject(EntityDock);
+
+  /**
    * The Field this store's grid lives at — the grid data-type's Field, re-keyed to whichever Field the
    * active map View renders. Only the `id` (== the document key it lenses, ADR-0056) varies.
    *
@@ -182,15 +191,6 @@ export class HexMapStore {
   private readonly _feature = signal<FeatureSubtool>(DEFAULT_FEATURE);
   private readonly _region = signal<RegionSubtool | null>(null);
   private readonly _selectSubtool = signal<SelectSubtool>('pick');
-
-  /**
-   * What floats in the dismissible right panel: the {@link Inspector}, the Regions
-   * list, or `null` when closed (the default). Selecting an entity or Region opens
-   * the Inspector; the right-edge rail toggles `regions` ⇄ closed. Session-only;
-   * a fresh load ({@link resetForLoad}) resets it closed.
-   */
-  private readonly _rightPanel = signal<'inspector' | 'regions' | null>(null);
-  readonly rightPanel = this._rightPanel.asReadonly();
 
   /** The remembered Select Subtool; the canvas reads this to choose its Select gesture. */
   readonly selectSubtool = this._selectSubtool.asReadonly();
@@ -279,16 +279,6 @@ export class HexMapStore {
     this._tool.set(id);
   }
 
-  /** Flip the right column to the Regions list; selecting a Region yields it back to the Inspector. */
-  showRegionsPanel(): void {
-    this._rightPanel.set('regions');
-  }
-
-  /** Toggle the right panel between the Regions list and closed — never the Inspector. */
-  toggleRegionsPanel(): void {
-    this._rightPanel.set(this._rightPanel() === 'regions' ? null : 'regions');
-  }
-
   /** Arm the Select tool with `subtool`, remembering it as the Select Subtool. */
   armSelectSubtool(subtool: SelectSubtool): void {
     this._selectSubtool.set(subtool);
@@ -351,8 +341,10 @@ export class HexMapStore {
 
   /**
    * Reset the transient editor state a fresh load invalidates: undo/redo history (its patches target
-   * the old body), the selection and its brush, the armed Tool, and the dock. The document itself is
-   * derived from the session's body, so there is no map to set here.
+   * the old body), the selection and its brush, and the armed Tool. The document itself is derived from
+   * the session's body, so there is no map to set here. The Dock's open Panel is *not* reset: the user's
+   * remembered choice is cross-View and cross-session (ADR-0067); the {@link deselect} below only drops
+   * the transient Inspector claim this load's selection held.
    */
   private resetForLoad(): void {
     this.undoStack.length = 0;
@@ -362,7 +354,6 @@ export class HexMapStore {
     this._tool.set('select');
     this.resetSubtoolMemory();
     this.deselect();
-    this._rightPanel.set(null);
   }
 
   /** Restore the cold-start Subtool memory shared by a fresh store and a reload. */
@@ -719,16 +710,19 @@ export class HexMapStore {
   }
 
   /**
-   * Project the Selection onto the right panel: a non-empty Selection opens the
-   * Inspector; emptying it closes the Inspector but never a rail-opened Regions list.
+   * Project the Selection onto the page Dock (ADR-0067): a non-empty Selection {@link EntityDock.claim
+   * claims} the Inspector Panel, a transient claim that shows it without overwriting the user's remembered
+   * Dock choice; emptying the Selection {@link EntityDock.releaseClaim releases} that claim, restoring
+   * whatever the user last chose (a Regions list they toggled open, or nothing). The Dock's
+   * close-don't-substitute rule means a claim the Map View no longer offers simply closes.
    *
    * ponytail: a synchronous projection off the select commands, not a reactive `effect` on
    * {@link selections} — an effect needs an injection context and wouldn't run synchronously
    * under the plain-`new` store spec. Route a new panel rule through here.
    */
   private projectPanelFromSelection(): void {
-    if (this.sel.selections().length > 0) this._rightPanel.set('inspector');
-    else if (this._rightPanel() === 'inspector') this._rightPanel.set(null);
+    if (this.sel.selections().length > 0) this.dock.claim(CORE_PANEL_MAP_INSPECTOR);
+    else this.dock.releaseClaim();
   }
 
   /**
