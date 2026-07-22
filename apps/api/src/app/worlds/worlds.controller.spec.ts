@@ -664,6 +664,18 @@ describe('Worlds endpoints', () => {
         expect(selectedIds).toEqual([asset.id]);
       });
 
+      it('resolves a hidden-type Asset by an explicit id lookup — an id lookup is not a default listing (#278)', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const asset = (await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201))
+          .body;
+
+        // The `/entities/:id` redirect guard (Quick Open, pins, recents) looks up by id with no type
+        // selected. The hidden-type exclusion must not swallow that lookup, or the redirect never fires.
+        const byId = (await ada.get('/entities').query({ ids: asset.id }).expect(200)).body.items;
+        expect(byId.map((e: { id: string }) => e.id)).toEqual([asset.id]);
+      });
+
       it('lists the asset type in the type facet with a count even when unselected, so it can be opted into', async () => {
         const ada = await signIn('ada@hexly.test', 'correct horse');
         const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;

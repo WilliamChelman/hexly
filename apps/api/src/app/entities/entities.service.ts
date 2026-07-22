@@ -136,8 +136,11 @@ export class EntitiesService {
     // all-punctuation) keeps the last-edited order.
     const match = opts.q ? toFtsMatch(opts.q) : null;
     // Hidden types are absent from the default listing but surface once selected (ADR-0065): resolve the
-    // exclusion against whatever the caller selected, so it self-lifts for a selected hidden type.
-    opts = { ...opts, excludedTypes: this.excludedHiddenTypes(opts.type) };
+    // exclusion against whatever the caller selected, so it self-lifts for a selected hidden type. An
+    // explicit id lookup is not a default listing, though — Quick Open, pins, recents and the
+    // `/entities/:id` redirect guard resolve an Asset by id like any Entity (ADR-0065), so skip the
+    // exclusion entirely when `ids` is present.
+    opts = { ...opts, excludedTypes: opts.ids ? [] : this.excludedHiddenTypes(opts.type) };
     const w = this.config.search.weights;
     const access = entityAccess(this.db, readerId);
     const query = this.db
