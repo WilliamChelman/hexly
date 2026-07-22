@@ -4,6 +4,7 @@ import {
   EntityFacets,
   EntityGrant,
   EntityPage,
+  EntityReferences,
   EntitySaveOutcome,
   EntityType,
   GrantRole,
@@ -29,6 +30,11 @@ export class MockEntitiesClient {
       (id: string, changes: { name?: string; visibility?: EntityDetail['visibility'] }) => Observable<EntityDetail>
     >();
   delete = vi.fn<(id: string) => Observable<void>>();
+  // Defaults to no links so the usage-aware delete confirmation (ADR-0065) renders its plain prompt
+  // without stubbing; override per test to exercise the referencing-Entities list.
+  references = vi.fn<(id: string) => Observable<EntityReferences>>(() =>
+    of<EntityReferences>({ references: [], referencedBy: [] }),
+  );
   create =
     vi.fn<
       (name: string, types: readonly EntityType[], worldId?: string, doc?: EntityDocument) => Observable<EntityDetail>

@@ -6,12 +6,17 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import { EntityPage, EntitySummary } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld, ToasterService, LocaleService } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
+import { DialogRef, DialogService } from '@hexly/web-ui';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { EntityBrowserPage } from './entity-browser.page';
 
 describe('EntityBrowser', () => {
   let client: MockEntitiesClient;
   let navigate: ReturnType<typeof vi.spyOn>;
+  // The delete confirmation is opened through DialogService (ADR-0065); stub it so a test drives the
+  // confirm/cancel decision directly (the dialog's own behaviour is covered in its component spec).
+  let lastDialog: DialogRef<unknown, boolean>;
+  const dialogService = { open: vi.fn(() => (lastDialog = new DialogRef<unknown, boolean>({}))) };
   // The URL `q` mirror, controllable per test: push a new value to simulate a
   // shared/refreshed link or a back/forward step (#154).
   let queryParams$: BehaviorSubject<ParamMap>;
@@ -38,12 +43,14 @@ describe('EntityBrowser', () => {
 
   beforeEach(async () => {
     client = new MockEntitiesClient();
+    dialogService.open.mockClear();
     queryParams$ = new BehaviorSubject<ParamMap>(convertToParamMap({}));
     await TestBed.configureTestingModule({
       imports: [EntityBrowserPage, provideTranslocoTesting()],
       providers: [
         providePluginContent(),
         { provide: EntitiesClient, useValue: client },
+        { provide: DialogService, useValue: dialogService },
         provideRouter([]),
         // Stub the route's query-param stream so tests can seed `?q=` and step
         // back/forward; absolute routerLinks don't consult it, so tiles still resolve.
@@ -715,7 +722,7 @@ describe('EntityBrowser', () => {
     expect((el.querySelector('[data-testid=entity-title]') as HTMLElement).textContent?.trim()).toBe('Aldermoor');
   });
 
-  it('deletes a map, then refreshes from page one (ADR-0025)', () => {
+  it('confirms, then deletes a map and refreshes from page one (ADR-0025, ADR-0065)', () => {
     const fixture = renderWith([
       summary({ id: 'm1', name: 'Aldermoor' }),
       summary({ id: 'm2', name: 'The Whisperwood' }),
@@ -729,7 +736,11 @@ describe('EntityBrowser', () => {
         nextCursor: null,
       }),
     );
+    // Delete opens the confirmation, not the network call; nothing deletes until it resolves confirm.
     (fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLButtonElement).click();
+    expect(dialogService.open).toHaveBeenCalled();
+    expect(client.delete).not.toHaveBeenCalled();
+    lastDialog.close(true);
 
     expect(client.delete).toHaveBeenCalledWith('m1');
     expect(client.list).toHaveBeenCalledWith({
@@ -1036,16 +1047,28 @@ describe('EntityBrowser', () => {
     });
   });
 
-  it('keeps the card and surfaces an error toast when a delete fails', () => {
+  it('keeps the card and surfaces an error toast when a confirmed delete fails', () => {
     const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
 
     client.delete.mockReturnValueOnce(throwError(() => new Error('boom')));
     (fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLButtonElement).click();
+    lastDialog.close(true);
     fixture.detectChanges();
 
     // The card stays (the delete didn't take) and the failure is surfaced.
     expect(fixture.nativeElement.querySelector('[data-testid=open-m1]')).not.toBeNull();
     const toasts = TestBed.inject(ToasterService).toasts();
     expect(toasts.map((t) => t.tone)).toEqual(['error']);
+  });
+
+  it('cancelling the confirmation deletes nothing (ADR-0065)', () => {
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
+
+    (fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLButtonElement).click();
+    lastDialog.close(false);
+    fixture.detectChanges();
+
+    expect(client.delete).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('[data-testid=open-m1]')).not.toBeNull();
   });
 });

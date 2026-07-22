@@ -13,7 +13,8 @@ import {
   ActiveWorld,
   ToasterService,
 } from '@hexly/web-core';
-import { ButtonComponent, EyebrowComponent, IconComponent, PageHeaderComponent } from '@hexly/web-ui';
+import { ButtonComponent, DialogService, EyebrowComponent, IconComponent, PageHeaderComponent } from '@hexly/web-ui';
+import { DeleteEntityDialogComponent, DeleteEntityDialogData } from '../../entity-types/delete-entity-dialog.component';
 import { EntitySearchComponent } from '../entity-browser/components/entity-search.component';
 import { EmptyStateComponent } from '../entity-browser/components/empty-state.component';
 import {
@@ -242,6 +243,7 @@ export class AssetBrowserPage {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
+  private readonly dialogs = inject(DialogService);
 
   protected readonly worldId = this.activeWorld.worldId;
 
@@ -493,10 +495,21 @@ export class AssetBrowserPage {
       });
   }
 
+  /**
+   * Confirm before deleting (ADR-0065): the generic, usage-aware dialog names the Entities that
+   * reference this Asset (per-viewer) so the caller sees what a delete would dangle; confirm runs the
+   * ordinary Entity delete (bytes + thumbnail follow), cancel does nothing.
+   */
   protected remove(id: string): void {
-    this.entitiesClient.delete(id).subscribe({
-      next: () => this.fetchFirstPage(),
-      error: () => this.toaster.show(this.transloco.translate('assetBrowser.deleteError'), 'error'),
-    });
+    const name = this._assets().find((asset) => asset.id === id)?.name ?? '';
+    this.dialogs
+      .open<DeleteEntityDialogData, boolean>(DeleteEntityDialogComponent, { id, name })
+      .closed.subscribe((confirmed) => {
+        if (!confirmed) return;
+        this.entitiesClient.delete(id).subscribe({
+          next: () => this.fetchFirstPage(),
+          error: () => this.toaster.show(this.transloco.translate('assetBrowser.deleteError'), 'error'),
+        });
+      });
   }
 }
