@@ -141,6 +141,51 @@ describe('CommandPalette', () => {
     expect(option?.textContent).toContain('Aldermoor');
   });
 
+  it('renders a small thumbnail beside a command that carries one', () => {
+    const command: Command = {
+      id: 'e1',
+      label: 'Aldermoor',
+      thumbnailUrl: '/api/assets/a1/thumb',
+      run: vi.fn(),
+    };
+    const provider: CommandProvider = {
+      prefix: '',
+      label: 'commandPalette.entities',
+      search: () => of([command]),
+    };
+    TestBed.inject(CommandRegistry).register(provider);
+
+    const fixture = render();
+    dispatchCmdK();
+    fixture.detectChanges();
+    typeQuery(fixture, 'ald');
+
+    const thumb: HTMLImageElement = fixture.nativeElement.querySelector('[data-testid="command-palette-thumbnail-e1"]');
+    expect(thumb).not.toBeNull();
+    expect(thumb.getAttribute('src')).toBe('/api/assets/a1/thumb');
+    // Decorative — the label names the row.
+    expect(thumb.getAttribute('alt')).toBe('');
+  });
+
+  it('renders no thumbnail slot for a command without one', () => {
+    const command: Command = { id: 'e1', label: 'Aldermoor', run: vi.fn() };
+    const provider: CommandProvider = {
+      prefix: '',
+      label: 'commandPalette.entities',
+      search: () => of([command]),
+    };
+    TestBed.inject(CommandRegistry).register(provider);
+
+    const fixture = render();
+    dispatchCmdK();
+    fixture.detectChanges();
+    typeQuery(fixture, 'ald');
+
+    expect(fixture.nativeElement.querySelector('[data-testid="command-palette-thumbnail-e1"]')).toBeNull();
+    // The row still renders, unchanged.
+    expect(fixture.nativeElement.querySelector('[data-testid="command-palette-option-e1"]')).not.toBeNull();
+  });
+
   it('runs the picked command and closes the palette', () => {
     const run = vi.fn();
     const command: Command = { id: 'c1', label: 'Aldermoor', run };
