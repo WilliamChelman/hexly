@@ -305,15 +305,10 @@ export class EntitiesService {
    */
   private presentFieldKeys(opts: FacetOptions, filter: SQL): string[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
-    const query = this.db
+    return this.db
       .select({ key: entityFieldFacets.key })
       .from(entities)
       .innerJoin(entityFieldFacets, eq(entityFieldFacets.entityId, entities.id))
-      .$dynamic();
-    if (match) {
-      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
-    }
-    return query
       .where(facetWhere(opts, match, filter))
       .groupBy(entityFieldFacets.key)
       .all()
@@ -354,18 +349,13 @@ export class EntitiesService {
    */
   private countFieldValues(opts: FacetOptions, key: string, filter: SQL): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
-    const query = this.db
+    return this.db
       .select({
         value: entityFieldFacets.value,
         count: sql<number>`count(*)`.as('count'),
       })
       .from(entities)
       .innerJoin(entityFieldFacets, and(eq(entityFieldFacets.entityId, entities.id), eq(entityFieldFacets.key, key)))
-      .$dynamic();
-    if (match) {
-      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
-    }
-    return query
       .where(facetWhere(opts, match, filter))
       .groupBy(entityFieldFacets.value)
       .orderBy(asc(entityFieldFacets.value))
@@ -376,14 +366,9 @@ export class EntitiesService {
   /** Count a denormalized scalar column's values (visibility) under `opts`. */
   private countColumn(opts: FacetOptions, column: typeof entities.visibility, filter: SQL): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
-    const query = this.db
+    return this.db
       .select({ value: column, count: sql<number>`count(*)`.as('count') })
       .from(entities)
-      .$dynamic();
-    if (match) {
-      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
-    }
-    return query
       .where(facetWhere(opts, match, filter))
       .groupBy(column)
       .all()
@@ -401,18 +386,13 @@ export class EntitiesService {
     filter: SQL,
   ): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
-    const query = this.db
+    return this.db
       .select({
         value: sql<string>`each.value`.as('value'),
         count: sql<number>`count(*)`.as('count'),
       })
       .from(entities)
       .innerJoin(sql`json_each(${column}) as each`, sql`1 = 1`)
-      .$dynamic();
-    if (match) {
-      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
-    }
-    return query
       .where(facetWhere(opts, match, filter))
       .groupBy(sql`each.value`)
       .all()
@@ -1064,9 +1044,19 @@ function rangeBound(value: string, op: '>=' | '<='): SQL {
   return sql`(CASE WHEN f.num IS NOT NULL THEN ${numeric} ELSE ${lexical} END)`;
 }
 
-/** The same predicates {@link EntitiesService.list} applies, minus paging. */
+/**
+ * The same predicates {@link EntitiesService.list} applies, minus paging. The text query is a
+ * rowid-IN subquery rather than a MATCH join: next to a positive `json_each` EXISTS predicate (a
+ * Type selection) SQLite flips the join order and degrades the join's MATCH into a probe per World
+ * row — seconds on a real World. The subquery pins one FTS evaluation. `list` keeps the join; its
+ * bm25 ordering needs the FTS table in scope and already forces the match-first plan.
+ */
 function facetWhere(opts: FacetOptions, match: string | null, filter: SQL) {
-  return and(filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined);
+  return and(
+    filter,
+    ...filters(opts),
+    match ? sql`${entities}.rowid IN (SELECT rowid FROM entities_fts WHERE entities_fts MATCH ${match})` : undefined,
+  );
 }
 
 /**

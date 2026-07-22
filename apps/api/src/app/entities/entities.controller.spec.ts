@@ -1286,6 +1286,60 @@ describe('Entities endpoints', () => {
       ]);
     });
 
+    it('drills facet counts down by the text query combined with a Type selection', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const keep = await note(ada, 'Aldermoor Keep');
+      await tag(ada, keep, 'deity');
+      const grove = await note(ada, 'Grove');
+      await tag(ada, grove, 'nature');
+      const worldId = (await ada.get(`/entities/${grove}`)).body.worldId;
+      // A hexmap also matching the query — counted by the Type facet, drilled out of Tag counts.
+      await ada.post('/entities').send({ name: 'Aldermoor Map', types: ['core.type.hex-map'] });
+
+      const res = await ada
+        .get('/entities/facets')
+        .query({ worldId, q: 'aldermoor', type: 'core.type.note' })
+        .expect(200);
+
+      // Tag counts narrow to query-matching notes: 'nature' (Grove misses the query) drops out.
+      expect(byValue(res.body.tag)).toEqual([{ value: 'deity', count: 1 }]);
+      // The Type facet drops its own selection but keeps the query: both Aldermoor entities.
+      expect(byValue(res.body.type)).toEqual([
+        { value: 'core.type.hex-map', count: 1 },
+        { value: 'core.type.note', count: 1 },
+      ]);
+    });
+
+    // SQLite (no ANALYZE stats) flips the join order when a positive `json_each` EXISTS predicate
+    // (a Type selection) rides next to a MATCH-joined `entities_fts`, degrading the match into a
+    // probe per World row — seconds on a real World. The rowid-IN subquery pins one evaluation;
+    // this locks that plan shape at the engine seam, since a timing assertion would be flaky.
+    it('evaluates the text query once per facet count, never as a per-row probe', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const keep = await note(ada, 'Aldermoor Keep');
+      const worldId = (await ada.get(`/entities/${keep}`)).body.worldId;
+
+      const captured: string[] = [];
+      const client = db.$client;
+      const original = client.prepare.bind(client);
+      vi.spyOn(client, 'prepare').mockImplementation(((source: string) => {
+        captured.push(source);
+        return original(source);
+      }) as typeof client.prepare);
+
+      await ada.get('/entities/facets').query({ worldId, q: 'alder', type: 'core.type.note' }).expect(200);
+      vi.restoreAllMocks();
+
+      const ftsQueries = captured.filter((source) => source.includes('entities_fts'));
+      expect(ftsQueries.length).toBeGreaterThan(0);
+      for (const source of ftsQueries) {
+        const params = Array((source.match(/\?/g) ?? []).length).fill('x');
+        const plan = original(`EXPLAIN QUERY PLAN ${source}`).all(...params) as { detail: string }[];
+        // An `:=M` FTS index detail is a rowid-constrained MATCH probe inside an outer loop.
+        expect(plan.filter((row) => row.detail.includes('entities_fts') && row.detail.includes(':=M'))).toEqual([]);
+      }
+    });
+
     it('keeps facet counts owner- and World-scoped', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const adaNote = await note(ada, 'Ada Temple');
