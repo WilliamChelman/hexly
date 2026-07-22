@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { EntityDocument } from '@hexly/domain';
+import { EntityDocument, EntityType } from '@hexly/domain';
 import { RichContent, emptyRichContent } from '@hexly/plugin-content';
 import { ENTITY_SESSION, EntitySession, LiveEditor, Patch } from '@hexly/web-entity';
 import { BoardStore } from './board-store';
@@ -56,6 +56,26 @@ export class TextBlockSession implements EntitySession {
 
   /** Unused by the RichContent editor; delegated so the interface is honoured. */
   readonly current = this.base.current;
+
+  /**
+   * The board Entity's own Types/Fields and their management — unused by the RichContent editor (a Text
+   * Block edits prose, not the board's substance), delegated to the real session so the port is honoured
+   * and any surface that did read them would see the board's, not a stub's.
+   */
+  readonly types = this.base.types;
+  readonly fields = this.base.fields;
+
+  setTypes(types: readonly EntityType[]): void {
+    this.base.setTypes(types);
+  }
+
+  attachField(id: string): void {
+    this.base.attachField(id);
+  }
+
+  detachField(id: string): void {
+    this.base.detachField(id);
+  }
 
   /**
    * Route the editor's full-doc commit into the target Text Block. The editor assigns a fresh RichContent at

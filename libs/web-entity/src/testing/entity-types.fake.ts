@@ -67,8 +67,20 @@ export class FakeEntityTypes implements EntityTypes {
     return [...byId.values()];
   }
 
-  private get(type: string | null | undefined): TypeDefinition | undefined {
+  get(type: string | null | undefined): TypeDefinition | undefined {
     return this.definitions().find((d) => d.id === type);
+  }
+
+  field(id: string): Field | undefined {
+    return this.fieldsById.get(id);
+  }
+
+  attachableFields(
+    types: readonly string[] | null | undefined,
+    fieldIds: readonly string[] | null | undefined,
+  ): Field[] {
+    const present = new Set(this.effectiveFields(types, fieldIds).map((field) => field.id));
+    return [...this.fieldsById.values()].filter((field) => !present.has(field.id));
   }
 }
 
