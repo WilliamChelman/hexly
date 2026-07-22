@@ -9,6 +9,15 @@
     "empty": "No entities",
     "unavailable": "Unavailable"
   },
+  "assetLink": {
+    "set": "Set image…",
+    "change": "Change image…",
+    "upload": "Upload a new image",
+    "uploading": "Uploading…",
+    "uploadError": "Upload failed. Please try again.",
+    "search": "Search images…",
+    "empty": "No images"
+  },
   "generic": {
     "eyebrow": "Entity",
     "titleLabel": "Entity name",

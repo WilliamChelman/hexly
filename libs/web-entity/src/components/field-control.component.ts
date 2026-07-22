@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityLinkValue, entityLinkValueSchema, EntitySummary, Field } from '@hexly/domain';
+import { CORE_ASSET_TYPE_ID } from '@hexly/plugin-asset';
 import { EntitySearchPickerComponent } from './entity-search-picker.component';
+import { AssetLinkPickerComponent } from './asset-link-picker.component';
 
 /**
  * One data-type-appropriate control for a typed Field (ADR-0048). Reads a raw EntityDocument `value`, emits
@@ -11,52 +13,65 @@ import { EntitySearchPickerComponent } from './entity-search-picker.component';
   selector: 'app-field-control',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [TranslocoPipe, EntitySearchPickerComponent],
+  imports: [TranslocoPipe, EntitySearchPickerComponent, AssetLinkPickerComponent],
   template: `
     @switch (field().dataType.kind) {
       @case ('entityLink') {
-        <div class="flex flex-col gap-1.5" [attr.data-testid]="'entity-link-field-' + field().id">
-          <!-- Render the last-known name, so a deleted/hidden target stays legible, never erroring. -->
-          @if (link(); as current) {
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-ink" data-testid="entity-link-value">{{
-                current.label || current.entityId
-              }}</span>
-              @if (!disabled()) {
+        <!-- An asset-targeting entityLink grows the pick-or-upload affordance (ADR-0066, #288): the same
+             control, one interaction — pick an image Asset by sight or upload one on the spot. Any other
+             entityLink stays the plain search picker below. -->
+        @if (isAssetLink()) {
+          <app-asset-link-picker
+            [value]="link()"
+            [worldId]="worldId()"
+            [disabled]="disabled()"
+            [invalid]="invalid()"
+            (valueChange)="valueChange.emit($event)"
+          />
+        } @else {
+          <div class="flex flex-col gap-1.5" [attr.data-testid]="'entity-link-field-' + field().id">
+            <!-- Render the last-known name, so a deleted/hidden target stays legible, never erroring. -->
+            @if (link(); as current) {
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-ink" data-testid="entity-link-value">{{
+                  current.label || current.entityId
+                }}</span>
+                @if (!disabled()) {
+                  <button
+                    type="button"
+                    class="text-xs text-ink-muted hover:text-danger"
+                    data-testid="entity-link-clear"
+                    (click)="valueChange.emit(undefined)"
+                  >
+                    ✕
+                  </button>
+                }
+              </div>
+            }
+            @if (!disabled()) {
+              @if (picking()) {
+                <app-entity-search-picker
+                  testid="entity-link-picker"
+                  [query]="query()"
+                  [worldId]="worldId()"
+                  [types]="targetTypes()"
+                  (queryChange)="query.set($event)"
+                  (pick)="pickLink($event)"
+                />
+              } @else {
                 <button
                   type="button"
-                  class="text-xs text-ink-muted hover:text-danger"
-                  data-testid="entity-link-clear"
-                  (click)="valueChange.emit(undefined)"
+                  class="self-start rounded border border-line bg-surface px-2 py-1 text-sm text-ink-muted hover:text-ink"
+                  data-testid="entity-link-open"
+                  [attr.aria-invalid]="invalid() || null"
+                  (click)="picking.set(true)"
                 >
-                  ✕
+                  {{ (link() ? 'fields.entityLink.change' : 'fields.entityLink.set') | transloco }}
                 </button>
               }
-            </div>
-          }
-          @if (!disabled()) {
-            @if (picking()) {
-              <app-entity-search-picker
-                testid="entity-link-picker"
-                [query]="query()"
-                [worldId]="worldId()"
-                [types]="targetTypes()"
-                (queryChange)="query.set($event)"
-                (pick)="pickLink($event)"
-              />
-            } @else {
-              <button
-                type="button"
-                class="self-start rounded border border-line bg-surface px-2 py-1 text-sm text-ink-muted hover:text-ink"
-                data-testid="entity-link-open"
-                [attr.aria-invalid]="invalid() || null"
-                (click)="picking.set(true)"
-              >
-                {{ (link() ? 'fields.entityLink.change' : 'fields.entityLink.set') | transloco }}
-              </button>
             }
-          }
-        </div>
+          </div>
+        }
       }
       @case ('boolean') {
         <input
@@ -140,6 +155,14 @@ export class FieldControlComponent {
   protected targetTypes(): readonly string[] | undefined {
     const dataType = this.field().dataType;
     return dataType.kind === 'entityLink' ? dataType.targetTypes : undefined;
+  }
+
+  /**
+   * Whether this entityLink targets `core.type.asset` — the trigger for the pick-or-upload affordance
+   * (ADR-0066). Generic: it fires for any asset-targeting Field, plugin or user-defined, never by field id.
+   */
+  protected isAssetLink(): boolean {
+    return this.targetTypes()?.includes(CORE_ASSET_TYPE_ID) ?? false;
   }
 
   /** Commit a picked Entity as the link value — its id plus a name snapshot (the dangling fallback). */
