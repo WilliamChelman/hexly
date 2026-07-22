@@ -9,6 +9,15 @@
     "empty": "Aucune entité",
     "unavailable": "Indisponible"
   },
+  "assetLink": {
+    "set": "Définir une image…",
+    "change": "Changer d’image…",
+    "upload": "Téléverser une nouvelle image",
+    "uploading": "Téléversement…",
+    "uploadError": "Échec du téléversement. Veuillez réessayer.",
+    "search": "Rechercher des images…",
+    "empty": "Aucune image"
+  },
   "generic": {
     "eyebrow": "Entité",
     "titleLabel": "Nom de l’entité",
