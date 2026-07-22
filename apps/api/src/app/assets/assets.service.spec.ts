@@ -39,7 +39,7 @@ describe('AssetsService', () => {
   /**
    * Seed an Asset Entity for a stored file: an `entities` row carrying the asset-ref at the
    * `core.field.asset` key, plus the derived `asset_index` row the write choke point would materialise
-   * (ADR-0065). The `assets` table is gone — list/export enumerate Asset Entities via this index.
+   * (ADR-0065) — the index list/export enumerate Asset Entities through.
    */
   function seedAsset(worldId: string, entityId: string, name: string, hash: string, ext: string, size: number): void {
     const doc = JSON.stringify({ 'core.field.asset': { hash, ext, mime: 'image/png', size, stats: null } });

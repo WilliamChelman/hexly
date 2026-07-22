@@ -20,7 +20,7 @@ describe('Asset serving endpoint', () => {
     db = createDb(':memory:');
     dir = mkdtempSync(join(tmpdir(), 'hexly-assets-ctl-'));
     const moduleRef = await Test.createTestingModule({
-      // AssetsModule now pulls in the Entity write graph for mint-and-dedup (ADR-0065), whose NudgeBus
+      // AssetsModule pulls in the Entity write graph for mint-and-dedup (ADR-0065), whose NudgeBus
       // needs the Instance Configuration — so the serving test composes ConfigModule too.
       imports: [ConfigModule, AssetsModule],
     })

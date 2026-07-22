@@ -434,8 +434,8 @@ describe('Worlds endpoints', () => {
       const bob = await signIn('bob@hexly.test', 'battery staple');
 
       const first = await ada.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201);
-      // Ada's Asset keeps the upload default `shared`, so Bob may read it: the dedup returns it whole, the
-      // first name intact — the readable-hit contract is untouched by the private-leak fix.
+      // Ada's Asset keeps the upload default `shared`, so Bob may read it: the dedup returns it whole,
+      // the first name intact — ADR-0046 redaction applies only to an unreadable twin.
       const again = await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'copy.png').expect(201);
       expect(again.body.id).toBe(first.body.id);
       expect(again.body.name).toBe('Portrait');
