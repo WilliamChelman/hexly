@@ -22,12 +22,20 @@ export interface PluginTypeDefinition {
   readonly label: string;
   /** The default Fields this type references by id (ADR-0054) — the sole way a Type declares its Fields. */
   readonly fieldRefs: readonly string[];
+  /**
+   * A generic Type Definition capability (ADR-0065): the Entity Browser omits a type that sets this from its
+   * default result set, surfacing its Entities only once the type is explicitly selected in the type facet.
+   * The asset type sets it so bulk-imported media never drowns authored work — but the capability names no
+   * type, so the Browser honours the declaration alone. Absent → the ordinary always-listed type.
+   */
+  readonly hiddenFromDefaultListing?: boolean;
 }
 
 const pluginTypeSchema = z.object({
   id: entityTypeSchema,
   label: nameSchema,
   fieldRefs: fieldRefsSchema,
+  hiddenFromDefaultListing: z.boolean().optional(),
 });
 
 /**
@@ -38,6 +46,7 @@ export function defineType(definition: {
   readonly id: string;
   readonly label: string;
   readonly fieldRefs?: readonly string[];
+  readonly hiddenFromDefaultListing?: boolean;
 }): PluginTypeDefinition {
   return Object.freeze(pluginTypeSchema.parse(definition));
 }

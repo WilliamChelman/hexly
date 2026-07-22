@@ -63,6 +63,10 @@ describe('core.type.asset', () => {
     expect(CORE_ASSET_TYPE.fieldRefs).toEqual([ASSET_FIELD.id, 'core.field.content']);
     expect(ASSET_FIELD.id).toBe('core.field.asset');
   });
+
+  it('sets the generic hidden-from-default-listing capability so the Browser omits it by default (ADR-0065, #278)', () => {
+    expect(CORE_ASSET_TYPE.hiddenFromDefaultListing).toBe(true);
+  });
 });
 
 describe('reading an Asset Entity’s ref', () => {

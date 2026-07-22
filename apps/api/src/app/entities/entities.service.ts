@@ -83,10 +83,19 @@ export interface ListOptions {
   readonly worldId?: string;
   /** Attach the caller's Rights to each summary — opt-in, the Entity Browser sets it. */
   readonly withRights?: boolean;
+  /**
+   * Hidden-from-default-listing exclusion (ADR-0065, internal — never from the query): drop any Entity
+   * carrying one of these types. The service resolves it from the registry's hidden types minus whatever
+   * the caller explicitly selected, so a hidden type surfaces the moment it is selected in the type facet.
+   */
+  readonly excludedTypes?: readonly string[];
 }
 
 /** The filter state a facet-count read narrows against — the list filters minus paging/ids. */
-export type FacetOptions = Pick<ListOptions, 'worldId' | 'q' | 'type' | 'tags' | 'visibility' | 'fields'>;
+export type FacetOptions = Pick<
+  ListOptions,
+  'worldId' | 'q' | 'type' | 'tags' | 'visibility' | 'fields' | 'excludedTypes'
+>;
 
 /** Everything {@link filters} reads — shared by the paged list and the facet-count reads. */
 type FilterOptions = FacetOptions & Pick<ListOptions, 'ids'>;
@@ -126,6 +135,9 @@ export class EntitiesService {
     // A text query becomes an FTS5 MATCH ranked by bm25; absent (or
     // all-punctuation) keeps the last-edited order.
     const match = opts.q ? toFtsMatch(opts.q) : null;
+    // Hidden types are absent from the default listing but surface once selected (ADR-0065): resolve the
+    // exclusion against whatever the caller selected, so it self-lifts for a selected hidden type.
+    opts = { ...opts, excludedTypes: this.excludedHiddenTypes(opts.type) };
     const w = this.config.search.weights;
     const access = entityAccess(this.db, readerId);
     const query = this.db
@@ -188,14 +200,29 @@ export class EntitiesService {
   facets(readerId: string, opts: FacetOptions): EntityFacets {
     // Resolve the read filter (Superadmin bypass folded in) once, reuse it in every count.
     const { filter } = entityAccess(this.db, readerId);
+    // The hidden-type exclusion (ADR-0065) rides every count *but* the type facet's: the type facet is the
+    // opt-in surface, so a hidden type must still be counted over the full universe there — otherwise it
+    // would never appear to be selected into view. Every sibling category counts assets only once the asset
+    // type is selected (which self-lifts the exclusion), matching the default listing.
+    const scoped: FacetOptions = { ...opts, excludedTypes: this.excludedHiddenTypes(opts.type) };
     return {
-      // Drop a category's own selection before counting it (drill-down).
-      type: this.countJsonArray({ ...opts, type: undefined }, entities.types, filter),
-      visibility: this.countColumn({ ...opts, visibility: undefined }, entities.visibility, filter),
-      tag: this.countJsonArray({ ...opts, tags: undefined }, entities.tags, filter),
+      // Drop a category's own selection before counting it (drill-down). No hidden-type exclusion here.
+      type: this.countJsonArray({ ...opts, type: undefined, excludedTypes: [] }, entities.types, filter),
+      visibility: this.countColumn({ ...scoped, visibility: undefined }, entities.visibility, filter),
+      tag: this.countJsonArray({ ...scoped, tags: undefined }, entities.tags, filter),
       // Field facets by presence in the result set — no longer gated on the active Type (ADR-0054, #231).
-      fields: this.countFieldFacets(opts, filter),
+      fields: this.countFieldFacets(scoped, filter),
     };
+  }
+
+  /**
+   * The hidden-from-default-listing types (ADR-0065) to exclude under `selected`: every registry-declared
+   * hidden type the caller did *not* explicitly select. Selecting a hidden type in the type facet drops it
+   * from this set, so its Entities enter the result set — the generic opt-in, naming no type.
+   */
+  private excludedHiddenTypes(selected: readonly EntityType[] | undefined): string[] {
+    const selectedSet = new Set(selected ?? []);
+    return this.typeFields.hiddenDefaultTypes.filter((id) => !selectedSet.has(id as EntityType));
   }
 
   /**
@@ -956,6 +983,9 @@ function filters(opts: FilterOptions) {
   if (opts.ids) predicates.push(inArray(entities.id, [...opts.ids]));
   // Facets: OR within a category, AND across them; empty arrays are skipped.
   if (opts.type?.length) predicates.push(hasAny(entities.types, opts.type));
+  // Hidden-from-default-listing exclusion (ADR-0065): drop any Entity carrying an excluded type. The
+  // service resolves the set (hidden types minus selected), so this predicate names no type.
+  if (opts.excludedTypes?.length) predicates.push(sql`NOT ${hasAny(entities.types, opts.excludedTypes)}`);
   if (opts.visibility?.length) predicates.push(inArray(entities.visibility, [...opts.visibility]));
   if (opts.tags?.length) predicates.push(hasAny(entities.tags, opts.tags));
   if (opts.fields?.length) predicates.push(...fieldFilters(opts.fields));

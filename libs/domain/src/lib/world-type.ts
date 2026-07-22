@@ -97,4 +97,10 @@ export interface AvailableType {
    * its own in code, and on a user-defined type that never named an order (the host defaults it).
    */
   readonly views?: readonly ViewPlacement[];
+  /**
+   * The generic hidden-from-default-listing capability (ADR-0065), carried from the type's declaration so
+   * surfaces can honour it without naming a type. Set today only by code-registered types (the asset type);
+   * absent → the ordinary always-listed type.
+   */
+  readonly hiddenFromDefaultListing?: boolean;
 }
