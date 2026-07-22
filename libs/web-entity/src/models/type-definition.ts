@@ -1,6 +1,6 @@
 import { EntityType } from '@hexly/domain';
 import { IconName } from '@hexly/web-ui';
-import { CORE_VIEW_FIELDS, ViewPlacement } from './view-definition';
+import { CORE_VIEW_DETAILS, ViewPlacement } from './view-definition';
 
 /**
  * The transloco *keys* a type contributes to its page chrome (resolved live by
@@ -77,7 +77,7 @@ export interface TypeDefinition {
 export const GENERIC_TYPE_DEFINITION: TypeDefinition = {
   id: '' as EntityType,
   icon: 'label',
-  views: [CORE_VIEW_FIELDS],
+  views: [CORE_VIEW_DETAILS],
   graphColorToken: '--color-ink-muted',
   labels: {
     eyebrow: 'fields.generic.eyebrow',

@@ -5,6 +5,7 @@ import {
   expect,
   flushSave,
   mapViewToggle,
+  openDetails,
   savedGrid,
   test,
 } from './fixtures';
@@ -14,8 +15,9 @@ const BATTLEMAP_VIEW = mapViewToggle('world.field.battle-map');
 
 /**
  * A World Owner gives a type they authored in the World's settings a map, code-lessly: the map
- * plugin contributes only a data-type on a dropdown. Adding a grid to a deity does not turn it into
- * a map — the Entity still opens on its Fields, with the grid one toggle away.
+ * plugin contributes only a data-type on a dropdown. The battlemap is the deity's only View, so it
+ * opens straight on the map (ADR-0067 — the Details View is fallback-only and leaves the toggle when
+ * another View exists); its scalar Fields live in the Details Panel.
  */
 test('a World Owner gives a user-defined type a map, and painting it persists', async ({ page, request }) => {
   const worldId = await enterLibrary(page);
@@ -42,21 +44,11 @@ test('a World Owner gives a user-defined type a map, and painting it persists', 
   const deityId = await createEntity(page, 'world.type.deity');
   await expect(page.getByTestId('title')).toBeVisible();
 
-  // It opens on its Fields, not its map — what the type's view order buys, and why a Field's View is
-  // placed rather than implicitly first.
-  await expect(page.getByTestId('generic-field-view')).toBeVisible();
-  await expect(page.getByTestId('core.view.fields')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId(BATTLEMAP_VIEW)).toHaveAttribute('aria-pressed', 'false');
-  // A grid is a document, not a form row: it is edited on its View, never in the Fields form.
-  await expect(page.getByTestId('field-world.field.domain')).toBeVisible();
-  await expect(page.getByTestId('field-world.field.battle-map')).toHaveCount(0);
-
-  // Its toggle is labelled by the Field, which is what tells one grid from another.
-  await expect(page.getByTestId(BATTLEMAP_VIEW)).toHaveText('Battlemap');
-  await page.getByTestId(BATTLEMAP_VIEW).click();
-
-  // The canvas opens on the empty plane the `battlemap` Field minted at create.
+  // The battlemap is the only View the deity affords, so the canvas opens straight away — no toggle,
+  // since a single View shows none (ADR-0067). It opens on the empty plane the Field minted at create.
   await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');
+  await expect(page.getByTestId(BATTLEMAP_VIEW)).toHaveCount(0);
+
   await page.getByTestId('tool-terrain').click();
   await page.getByRole('group', { name: 'Terrain' }).getByRole('button', { name: 'Ocean' }).click();
   await page.getByRole('img', { name: 'Hex map' }).click();
@@ -65,9 +57,14 @@ test('a World Owner gives a user-defined type a map, and painting it persists', 
   await flushSave(page);
   await page.reload();
 
-  // The paint survives, and so does the active View — the URL carries the Field key with the View id.
+  // The paint survives, and the map is still what the Entity opens on.
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
-  await expect(page.getByTestId(BATTLEMAP_VIEW)).toHaveAttribute('aria-pressed', 'true');
+
+  // The scalar `domain` Field lives in the Details Panel now; a grid is a document, not a form row, so
+  // it never shows there as a control (ADR-0067).
+  await openDetails(page);
+  await expect(page.getByTestId('detail-field-world.field.domain')).toBeVisible();
+  await expect(page.getByTestId('detail-field-world.field.battle-map')).toHaveCount(0);
 
   // And it persisted where a Field's value lives: the Entity's EntityDocument, at the key its author chose.
   const grid = await savedGrid(request, deityId, 'world.field.battle-map');

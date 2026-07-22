@@ -1,6 +1,6 @@
 import { Injectable, Type, computed, inject, signal } from '@angular/core';
 import { StructuredDataTypeId } from '@hexly/domain';
-import { CORE_VIEW_FIELDS, PLUGIN_VIEWS, ViewDefinition, ViewId } from '@hexly/web-entity';
+import { CORE_VIEW_DETAILS, PLUGIN_VIEWS, ViewDefinition, ViewId } from '@hexly/web-entity';
 import { PluginRegistry } from './plugin-registry';
 
 /**
@@ -65,12 +65,12 @@ export class ViewRegistry {
   }
 
   /**
-   * The definition for `id`, falling back to the always-present generic `core.view.fields` for an
-   * absent/unregistered View (ADR-0051; mirrors {@link TypeRegistry.resolve}). The content View is a
-   * plugin's now, so the app-owned fallback is the one View genuinely always present.
+   * The definition for `id`, falling back to the always-present `core.view.details` for an
+   * absent/unregistered View (ADR-0051, ADR-0067; mirrors {@link TypeRegistry.resolve}). The content View is a
+   * plugin's now, so the app-owned Details fallback is the one View genuinely always present.
    */
   resolve(id: ViewId | null | undefined): ViewDefinition {
-    return this.get(id) ?? this.get(CORE_VIEW_FIELDS)!;
+    return this.get(id) ?? this.get(CORE_VIEW_DETAILS)!;
   }
 
   /**

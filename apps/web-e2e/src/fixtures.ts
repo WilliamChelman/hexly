@@ -223,15 +223,25 @@ export async function authorWorldField(
 }
 
 /**
- * Attach the registered Field `fieldId` to the open Entity through the header's Edit-fields dialog,
- * and close it. The Field must be attachable — not already on the Entity's effective set.
+ * Ensure the shared Details rendering is on screen, so its inline management (`detail-*` testids) is
+ * reachable (ADR-0067). A field-only Entity already shows the fallback Details View full-width; anything
+ * affording another View needs the Dock's Details Panel opened. Both mount the same `details-panel`.
+ */
+export async function openDetails(page: Page): Promise<void> {
+  if (await page.getByTestId('details-panel').count()) return; // the fallback Details View is already shown
+  await page.getByTestId('details-toggle').click();
+  await expect(page.getByTestId('details-panel')).toBeVisible();
+}
+
+/**
+ * Attach the registered Field `fieldId` to the open Entity through the Details View/Panel's inline
+ * management (ADR-0067 — the Edit-fields dialog is retired). The Field must be attachable — not already
+ * on the Entity's effective set.
  */
 export async function attachField(page: Page, fieldId: string): Promise<void> {
-  await openEntityActions(page);
-  await page.getByTestId('edit-fields').click();
-  await page.getByTestId('field-add').selectOption(fieldId);
-  await expect(page.getByTestId(`field-chip-${fieldId}`)).toBeVisible();
-  await page.getByTestId('fields-close').click();
+  await openDetails(page);
+  await page.getByTestId('detail-field-add').selectOption(fieldId);
+  await expect(page.getByTestId(`detail-field-${fieldId}`)).toBeVisible();
 }
 
 /**

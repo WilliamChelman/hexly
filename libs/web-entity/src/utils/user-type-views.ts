@@ -1,26 +1,23 @@
 import { Field, isFieldViewPlacement, isStructuredDataType, ViewPlacement } from '@hexly/domain';
-import { CORE_VIEW_FIELDS } from '../models/view-definition';
 
 /**
- * The **View** order a user-defined type affords (ADR-0050, ADR-0051): its generic Field view, then
- * each **Field of a Structured Data Type** its author chose to show, in declaration order — prose among them, since
- * the `core.datatype.rich-content` Content Field is a Field of a Structured Data Type like any other now. A type shipping no
- * code resolves nothing else.
+ * The **View** order a user-defined type affords (ADR-0050, ADR-0051, ADR-0067): each **Field of a
+ * Structured Data Type** its author chose to show, in declaration order — prose among them, since the
+ * `core.datatype.rich-content` Content Field is a Field of a Structured Data Type like any other now.
  *
- * Structured Views go last, so adding a battlemap to a `world.type.deity` does not change what a deity
- * opens on. A plugin type places its Fields' Views by hand and may choose otherwise: `core.type.hex-map`
- * places its grid first, and opens on its map.
+ * The Details View is **no longer** placed here (ADR-0067): it is the fallback alone, appended by
+ * {@link TypeRegistry.viewsFor} only when a type affords no other View — so a deity that grows a
+ * battlemap opens on that battlemap, never on a "Details" toggle sitting beside it. A type with only
+ * scalar Fields therefore places nothing and falls to the full-width Details View. A plugin type places
+ * its Fields' Views by hand: `core.type.hex-map` places its grid, and opens on its map.
  */
 export function userTypeViews(
   fields: readonly Field[],
   isShownAsView: (field: Field) => boolean = () => true,
 ): ViewPlacement[] {
-  return [
-    CORE_VIEW_FIELDS,
-    ...fields
-      .filter((field) => isStructuredDataType(field.dataType) && isShownAsView(field))
-      .map((field) => ({ field: field.id })),
-  ];
+  return fields
+    .filter((field) => isStructuredDataType(field.dataType) && isShownAsView(field))
+    .map((field) => ({ field: field.id }));
 }
 
 /**

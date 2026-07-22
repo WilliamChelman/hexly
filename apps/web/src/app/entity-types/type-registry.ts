@@ -2,7 +2,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { EntityType, Field, isStructuredDataType } from '@hexly/domain';
 import {
-  CORE_VIEW_FIELDS,
+  CORE_VIEW_DETAILS,
   EntityTypes,
   GENERIC_TYPE_DEFINITION,
   PLUGIN_TYPES,
@@ -14,6 +14,13 @@ import {
 } from '@hexly/web-entity';
 import { PluginRegistry } from './plugin-registry';
 import { ViewRegistry } from './view-registry';
+
+/**
+ * The pre-rename id of the Details View (ADR-0067), which user types persisted in their `views` list
+ * before it became fallback-only. No data is migrated, so a stale placement may still name it; it is
+ * treated as inert here, exactly as the current {@link CORE_VIEW_DETAILS} placement would be.
+ */
+const LEGACY_CORE_VIEW_FIELDS = 'core.view.fields';
 
 /**
  * Root registry where Entity Types make themselves known to the type-specific UI: the one place the
@@ -107,9 +114,10 @@ export class TypeRegistry implements EntityTypes {
    * A placement that cannot resolve — a Field the effective set lacks, a built-in data-type (a form
    * row, not a View), or a structured one whose plugin this build omits — contributes nothing.
    *
-   * A registered type affords exactly the Views it declares. An **unregistered** type — a plugin this
-   * build does not bundle — affords the generic Field view **alone** (ADR-0051): #199's content floor
-   * is withdrawn, and its values (prose included) stay readable there as plain EntityDocument.
+   * The **Details View is fallback-only** (ADR-0067): it is never a placed toggle sitting beside
+   * another View, so it is appended once, at the end, *only* when nothing else was afforded. An
+   * **unregistered** type (a plugin this build does not bundle) affords no View of its own and a plain
+   * attached Field affords none either — both fall to that fallback, where their values stay readable.
    */
   viewsFor(
     types: readonly string[] | null | undefined,
@@ -129,12 +137,13 @@ export class TypeRegistry implements EntityTypes {
 
     for (const type of types ?? []) {
       const def = this.get(type);
-      if (!def) {
-        afford({ viewId: CORE_VIEW_FIELDS });
-        continue;
-      }
+      // An unregistered type affords no View of its own; the Details fallback below covers its values.
+      if (!def) continue;
       for (const placement of def.views) {
         if (typeof placement === 'string') {
+          // The Details View is the fallback alone, never a placed toggle beside another View (ADR-0067);
+          // a stale pre-rename `core.view.fields` string from a persisted type reads through here the same.
+          if (placement === CORE_VIEW_DETAILS || placement === LEGACY_CORE_VIEW_FIELDS) continue;
           // The domain keeps a string placement opaque; `viewPlacementSchema` already pinned it to `namespace.view.name`.
           afford({ viewId: placement as ViewId });
           continue;
@@ -145,12 +154,12 @@ export class TypeRegistry implements EntityTypes {
     // Attached Fields append their View after the types' (CONTEXT.md → View); dedup drops a re-placed one.
     for (const id of fieldIds ?? []) {
       const field = this.resolveField(id);
-      if (!field) continue;
-      // A Field of a Structured Data Type appends its own bound View; a built-in Field has no View of
-      // its own, so it rides the generic Field view — its control's home (CONTEXT.md → View, ADR-0054).
-      if (isStructuredDataType(field.dataType)) affordField(field);
-      else afford({ viewId: CORE_VIEW_FIELDS });
+      // A Field of a Structured Data Type appends its own bound View; a plain attached Field affords no
+      // View at all now (ADR-0067) — it is managed in the Details View/Panel, not a toggle of its own.
+      if (field && isStructuredDataType(field.dataType)) affordField(field);
     }
+    // The fallback main content: an Entity affording no other View opens full-width on the Details View (ADR-0067).
+    if (seen.size === 0) afford({ viewId: CORE_VIEW_DETAILS });
     return [...seen.values()];
   }
 

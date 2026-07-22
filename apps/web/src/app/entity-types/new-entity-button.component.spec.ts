@@ -12,7 +12,7 @@ import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
 import { PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
-import { CORE_VIEW_FIELDS, TypeDefinition } from '@hexly/web-entity';
+import { TypeDefinition } from '@hexly/web-entity';
 import { DialogService } from '@hexly/web-ui';
 import { NewEntityButtonComponent } from './new-entity-button.component';
 import { TypeRegistry } from './type-registry';
@@ -54,7 +54,7 @@ function worldType(id: string, fieldRefs: string[]): TypeDefinition {
   return {
     id: id as TypeDefinition['id'],
     icon: 'label',
-    views: [CORE_VIEW_FIELDS],
+    views: [],
     fieldRefs,
     graphColorToken: '--color-ink-muted',
     labels: {
@@ -192,7 +192,7 @@ describe('NewEntityButton', () => {
       id: 'world.type.deity',
       icon: 'label',
       labelText: 'Deity',
-      views: [CORE_VIEW_FIELDS],
+      views: [],
       graphColorToken: '--color-ink-muted',
     });
     const fixture = render();

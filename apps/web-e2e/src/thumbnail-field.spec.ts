@@ -3,8 +3,6 @@ import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 /** The canonical Thumbnail Field — an entityLink to an image Asset, attach-on-demand (ADR-0066). */
 const THUMBNAIL_FIELD = 'core.field.thumbnail';
-/** The generic Field view the attached Thumbnail Field's control renders in (ADR-0054). */
-const FIELDS_VIEW = 'core.view.fields';
 
 // A real 20×8 solid-color PNG: minting it runs sharp, so the Asset gets image Stats and a real
 // thumbnail (a WebP beside the bytes) the card can resolve and render.
@@ -29,12 +27,11 @@ test('attaches the Thumbnail Field, uploads an image in place, and sees it on th
   await expect(page.getByTestId('title')).toBeVisible();
 
   // Attach the canonical Thumbnail Field — a Field the note's type never declared — the attach-on-demand
-  // layer (ADR-0054/0057). The attachment appends the generic Field view where its control now lives.
+  // layer (ADR-0054/0057), through the Details Panel's inline management where its control now lives (ADR-0067).
   await attachField(page, THUMBNAIL_FIELD);
-  await page.getByTestId(FIELDS_VIEW).click();
 
   // The asset-targeting entityLink renders the pick-or-upload affordance, not the plain search picker (#288).
-  const control = page.getByTestId(`field-${THUMBNAIL_FIELD}`);
+  const control = page.getByTestId(`detail-field-${THUMBNAIL_FIELD}`);
   await control.getByTestId('asset-link-open').click();
 
   // Upload an image in place: mints an Asset via the ordinary path and stores its wrapper's id as the link.
