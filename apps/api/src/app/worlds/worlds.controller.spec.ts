@@ -626,6 +626,90 @@ describe('Worlds endpoints', () => {
         ]);
       });
     });
+
+    describe('Entity Browser: hidden-by-default type + asset facets (ADR-0065, #278)', () => {
+      /** A real landscape image sharp can parse, so the mint writes orientation + a dominant color → hue facet. */
+      async function banner(): Promise<Buffer> {
+        return sharp({ create: { width: 12, height: 4, channels: 3, background: { r: 200, g: 24, b: 24 } } })
+          .png()
+          .toBuffer();
+      }
+
+      /** The field-facet keys a facets read offers (kind/orientation/hue etc.), for presence assertions. */
+      const fieldKeys = (facets: { fields: { key: string }[] }) => facets.fields.map((f) => f.key).sort();
+
+      it('omits Assets from the default listing but includes them once the asset type is selected', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const note = (
+          await ada
+            .post('/entities')
+            .send({ name: 'Lore', types: ['core.type.note'], worldId: world.id })
+            .expect(201)
+        ).body;
+        const asset = (await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201))
+          .body;
+
+        // Default listing: the authored Note is present, the Asset is absent (hidden by its type, not by name).
+        const defaultIds = (await ada.get('/entities').query({ worldId: world.id }).expect(200)).body.items.map(
+          (e: { id: string }) => e.id,
+        );
+        expect(defaultIds).toContain(note.id);
+        expect(defaultIds).not.toContain(asset.id);
+
+        // Selecting the asset type in the type facet includes the Asset in results.
+        const selectedIds = (
+          await ada.get('/entities').query({ worldId: world.id, type: 'core.type.asset' }).expect(200)
+        ).body.items.map((e: { id: string }) => e.id);
+        expect(selectedIds).toEqual([asset.id]);
+      });
+
+      it('lists the asset type in the type facet with a count even when unselected, so it can be opted into', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        await ada
+          .post('/entities')
+          .send({ name: 'Lore', types: ['core.type.note'], worldId: world.id })
+          .expect(201);
+        await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201);
+
+        // The type facet is the opt-in surface: it counts over the full universe, so the hidden asset type
+        // still appears with its true count. The sibling facets, though, exclude the Asset by default —
+        // no asset field facets (kind/orientation/hue) surface until the type is selected.
+        const base = (await ada.get('/entities/facets').query({ worldId: world.id }).expect(200)).body;
+        expect(base.type).toContainEqual({ value: 'core.type.asset', count: 1 });
+        expect(base.type).toContainEqual({ value: 'core.type.note', count: 1 });
+        expect(fieldKeys(base)).toEqual([]);
+      });
+
+      it('surfaces kind / orientation / hue / Tag facets with counts once the asset type is selected', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const asset = (
+          await ada
+            .post(`/worlds/${world.id}/assets`)
+            .attach('file', await banner(), 'Banner.png')
+            .expect(201)
+        ).body;
+        // Tag the Asset so the Tag facet has a value to offer under the asset type.
+        await ada
+          .put(`/entities/${asset.id}`)
+          .send({ version: asset.version, tags: ['portrait'], document: asset.document })
+          .expect(200);
+
+        const facets = (
+          await ada.get('/entities/facets').query({ worldId: world.id, type: 'core.type.asset' }).expect(200)
+        ).body;
+        // The harvested asset dimensions surface by presence, each with a live count.
+        expect(fieldKeys(facets)).toEqual(['hue', 'kind', 'orientation']);
+        const kind = facets.fields.find((f: { key: string }) => f.key === 'kind');
+        expect(kind.values).toContainEqual({ value: 'image', count: 1 });
+        const orientation = facets.fields.find((f: { key: string }) => f.key === 'orientation');
+        expect(orientation.values).toContainEqual({ value: 'landscape', count: 1 });
+        // The Tag facet counts the Asset's tag under the selected type.
+        expect(facets.tag).toContainEqual({ value: 'portrait', count: 1 });
+      });
+    });
   });
 
   it('refuses every World route without a session cookie', async () => {

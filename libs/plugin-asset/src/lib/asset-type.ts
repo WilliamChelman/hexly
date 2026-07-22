@@ -24,4 +24,8 @@ export const CORE_ASSET_TYPE: PluginTypeDefinition = defineType({
   id: CORE_ASSET_TYPE_ID,
   label: 'Asset',
   fieldRefs: [ASSET_FIELD.id, CONTENT_FIELD.id],
+  // Hidden from the Entity Browser's default listing (ADR-0065): bulk-imported media stays out of the way
+  // until the asset type is explicitly selected. A generic Type Definition capability, not an asset special
+  // case — the Browser omits any type that sets it and names none.
+  hiddenFromDefaultListing: true,
 });

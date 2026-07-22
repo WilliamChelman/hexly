@@ -20,6 +20,13 @@ import {
 interface RegisteredType {
   readonly fieldRefs: readonly string[];
   readonly label?: string;
+  /** The generic hidden-from-default-listing capability (ADR-0065); absent → always listed. */
+  readonly hiddenFromDefaultListing?: boolean;
+}
+
+/** Optional per-type capability flags a code-registered type may declare (ADR-0065). */
+export interface TypeCapabilities {
+  readonly hiddenFromDefaultListing?: boolean;
 }
 
 /**
@@ -53,7 +60,10 @@ export class TypeFieldRegistry {
     for (const [id, dataType] of enabledStructuredDataTypes(config)) this.structuredDataTypesById.set(id, dataType);
     this.defaultType = defaultEntityType(config);
     for (const field of enabledPluginFields(config)) this.fieldsById.set(field.id, field);
-    for (const type of enabledPluginTypes(config)) this.register(type.id, type.fieldRefs, type.label);
+    for (const type of enabledPluginTypes(config))
+      this.register(type.id, type.fieldRefs, type.label, {
+        hiddenFromDefaultListing: type.hiddenFromDefaultListing,
+      });
   }
 
   /**
@@ -79,8 +89,8 @@ export class TypeFieldRegistry {
    * schema — so the guard that a Field's **Structured Data Type** is bundled moves to Field
    * registration. Returns an unregister fn.
    */
-  register(typeId: string, fieldRefs: readonly string[], label?: string): () => void {
-    this.byType.set(typeId, { fieldRefs, label });
+  register(typeId: string, fieldRefs: readonly string[], label?: string, capabilities?: TypeCapabilities): () => void {
+    this.byType.set(typeId, { fieldRefs, label, hiddenFromDefaultListing: capabilities?.hiddenFromDefaultListing });
     return () => this.byType.delete(typeId);
   }
 
@@ -114,11 +124,22 @@ export class TypeFieldRegistry {
 
   /** Every registered plugin type as an {@link AvailableType} — label defaults to the id. */
   plugins(): AvailableType[] {
-    return [...this.byType.entries()].map(([id, { fieldRefs, label }]) => ({
+    return [...this.byType.entries()].map(([id, { fieldRefs, label, hiddenFromDefaultListing }]) => ({
       id,
       label: label ?? id,
       source: 'plugin',
       fieldRefs,
+      // Carry the capability through so surfaces honour it generically (ADR-0065); omit when unset.
+      ...(hiddenFromDefaultListing ? { hiddenFromDefaultListing: true } : {}),
     }));
+  }
+
+  /**
+   * The ids of every registered type that sets the hidden-from-default-listing capability (ADR-0065) —
+   * the generic set the Entity Browser excludes from its default result set (and every facet count but
+   * the type facet), surfacing each only once its type is explicitly selected. Names no type.
+   */
+  get hiddenDefaultTypes(): readonly string[] {
+    return [...this.byType.entries()].filter(([, t]) => t.hiddenFromDefaultListing).map(([id]) => id);
   }
 }
