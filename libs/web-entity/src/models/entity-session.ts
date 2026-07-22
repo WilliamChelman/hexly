@@ -1,5 +1,5 @@
 import { InjectionToken, Signal } from '@angular/core';
-import { EntityDetail, EntityDocument } from '@hexly/domain';
+import { EntityDetail, EntityDocument, EntityType } from '@hexly/domain';
 import { Patch } from '@hexly/immer';
 
 /** Re-exported so a View lib (e.g. the Hex Map plugin) reads the undo/redo currency from one place. */
@@ -43,6 +43,24 @@ export interface EntitySession {
   applyPatches(patches: Patch[]): void;
   /** Whether the caller may edit (ADR-0037); a View gates its editing affordances on it. */
   readonly writable: Signal<boolean>;
+  /**
+   * The live, ordered type set (`types[0]` primary, ADR-0048) — the substance the universal Details
+   * panel reads and manages ({@link setTypes}), declared here so that panel need not reach for
+   * `apps/web`'s concrete session (ADR-0067).
+   */
+  readonly types: Signal<readonly EntityType[]>;
+  /**
+   * The Entity's directly-attached Field ids — its **attached extras** (ADR-0057): a registered Field
+   * key the document carries that no current type defaults. Derived off the document; the Details panel
+   * manages it through {@link attachField}/{@link detachField}.
+   */
+  readonly fields: Signal<readonly string[]>;
+  /** Replace the live type set, `types[0]` primary; the next save persists it version-checked (ADR-0048). */
+  setTypes(types: readonly EntityType[]): void;
+  /** Attach a registered Field directly to the Entity — an additive document key (ADR-0054/ADR-0057). */
+  attachField(id: string): void;
+  /** Discard a directly-attached Field — delete its key, dropping the attachment and its value (ADR-0057). */
+  detachField(id: string): void;
   /**
    * Bumps on a *fresh* load (a new Entity adopted, or the canvas cleared for a route
    * swap) — never on an edit. A View watches it to reset the transient state whose

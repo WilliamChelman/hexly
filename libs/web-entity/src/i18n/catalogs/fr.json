@@ -10,6 +10,16 @@
     "unavailable": "Indisponible",
     "dangling": "Cette entité est indisponible"
   },
+  "details": {
+    "toggle": "Détails",
+    "types": "Types",
+    "fields": "Champs",
+    "addType": "Ajouter un type…",
+    "removeType": "Retirer le type {{ type }}",
+    "attachField": "Attacher un champ…",
+    "detachField": "Détacher le champ {{ field }}",
+    "fieldsEmpty": "Aucun champ"
+  },
   "links": {
     "toggle": "Afficher/masquer les liens",
     "references": "Références",

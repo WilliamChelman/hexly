@@ -28,6 +28,21 @@ export interface EntityTypes {
    * (`fieldIds`) unioned with its types' defaults, deduped by `id`.
    */
   effectiveFields(types: readonly string[] | null | undefined, fieldIds: readonly string[] | null | undefined): Field[];
+  /**
+   * The definition for a registered, **active** type, or `undefined` for an unknown or disabled one —
+   * how a surface tells a type it can label from one it must render as its raw id (a missing Plugin).
+   */
+  get(type: string | null | undefined): TypeDefinition | undefined;
+  /** A registered Field by id, or `undefined` for an unknown or disabled one — what labels an attached Field. */
+  field(id: string): Field | undefined;
+  /**
+   * The registered Fields an Entity carrying `types`/`fieldIds` may still **attach directly** (ADR-0054):
+   * every available Field whose `id` its effective set does not already cover — the attach picker's offer.
+   */
+  attachableFields(
+    types: readonly string[] | null | undefined,
+    fieldIds: readonly string[] | null | undefined,
+  ): Field[];
 }
 
 /** DI token for the {@link EntityTypes}; the composition root binds the concrete registry to it. */

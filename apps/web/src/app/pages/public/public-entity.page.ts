@@ -5,7 +5,7 @@ import { EMPTY, catchError, combineLatest, of, switchMap, tap } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityNudge, StaleNudge } from '@hexly/domain';
 import { PublicClient, PublicEntityMode, AppShellStore, EVICTED } from '@hexly/web-core';
-import { ENTITY_SESSION, UNIVERSAL_PANELS } from '@hexly/web-entity';
+import { DETAILS_PANEL, ENTITY_SESSION, UNIVERSAL_PANELS } from '@hexly/web-entity';
 import { EntitySession } from '../entity/services/entity-session';
 import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { PublicEntityNameResolver } from './services/public-entity-name-resolver';
@@ -33,9 +33,11 @@ interface Followed {
     EntitySession,
     { provide: ENTITY_SESSION, useExisting: EntitySession },
     { provide: EntityNameResolver, useClass: PublicEntityNameResolver },
-    // The page Dock offers no universal Panel here: References needs `/entities/:id/references`, which
-    // answers an authenticated user, and this Entity's Public Link grants no scope beyond itself.
-    { provide: UNIVERSAL_PANELS, useValue: [] },
+    // The page Dock narrows to the read-only Details panel here (ADR-0067): References needs
+    // `/entities/:id/references`, which answers an authenticated user, and this Entity's Public Link
+    // grants no scope beyond itself — but Details is not hidden, since it shows the same substance the
+    // fallback Details View already gives any reader.
+    { provide: UNIVERSAL_PANELS, useValue: [DETAILS_PANEL] },
   ],
   imports: [TranslocoPipe, RouterLink, EntityPage],
   template: `

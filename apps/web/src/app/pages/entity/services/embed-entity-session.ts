@@ -111,4 +111,21 @@ export class EmbedEntitySession implements EntitySessionPort {
   registerEditor(_editor: LiveEditor): () => void {
     return () => undefined;
   }
+
+  /**
+   * Type/Field management is edit-only (ADR-0067): the Details panel gates it on {@link writable}, which
+   * an Embed pins false, so these never route here. Present to satisfy the port, inert like the session
+   * itself — an Embed edits the target's substance only by opening the target.
+   */
+  setTypes(_types: readonly EntityType[]): void {
+    /* read-only transclusion: no-op */
+  }
+
+  attachField(_id: string): void {
+    /* read-only transclusion: no-op */
+  }
+
+  detachField(_id: string): void {
+    /* read-only transclusion: no-op */
+  }
 }

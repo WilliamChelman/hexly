@@ -29,6 +29,8 @@ describe('StatBlockView (draw-steel)', () => {
       doc: doc.asReadonly(),
       writable: signal(writable).asReadonly(),
       loadGeneration: signal(0).asReadonly(),
+      types: signal<readonly string[]>([]).asReadonly(),
+      fields: signal<readonly string[]>([]).asReadonly(),
       mutate: (recipe) => {
         const [next, redo, undo] = produceWithPatches(doc(), recipe);
         doc.set(next);
@@ -36,6 +38,9 @@ describe('StatBlockView (draw-steel)', () => {
       },
       applyPatches: () => undefined,
       registerEditor: () => () => undefined,
+      setTypes: () => undefined,
+      attachField: () => undefined,
+      detachField: () => undefined,
     };
   }
 

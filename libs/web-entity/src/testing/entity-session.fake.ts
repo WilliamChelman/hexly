@@ -1,5 +1,5 @@
 import { Provider, signal } from '@angular/core';
-import { EntityDetail, EntityDocument } from '@hexly/domain';
+import { EntityDetail, EntityDocument, EntityType } from '@hexly/domain';
 import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
 import { ENTITY_SESSION, EntitySession, LiveEditor } from '../models/entity-session';
 
@@ -17,6 +17,12 @@ export class FakeEntitySession implements EntitySession {
 
   private readonly _writable = signal(true);
   readonly writable = this._writable.asReadonly();
+
+  private readonly _types = signal<readonly EntityType[]>([]);
+  readonly types = this._types.asReadonly();
+
+  private readonly _fields = signal<readonly string[]>([]);
+  readonly fields = this._fields.asReadonly();
 
   private readonly _loadGeneration = signal(0);
   readonly loadGeneration = this._loadGeneration.asReadonly();
@@ -47,6 +53,32 @@ export class FakeEntitySession implements EntitySession {
     return () => this.editors.delete(editor);
   }
 
+  setTypes(types: readonly EntityType[]): void {
+    this._types.set([...types]);
+  }
+
+  /** Attach a Field: a `null` document key plus the id in the attached set. A no-op if already present. */
+  attachField(id: string): void {
+    if (id in this._doc()) return;
+    this._doc.set({ ...this._doc(), [id]: null });
+    this._fields.update((fields) => (fields.includes(id) ? fields : [...fields, id]));
+  }
+
+  /** Detach a Field: drop its document key and its place in the attached set. */
+  detachField(id: string): void {
+    if (id in this._doc()) {
+      const next = { ...this._doc() };
+      delete next[id];
+      this._doc.set(next);
+    }
+    this._fields.update((fields) => fields.filter((f) => f !== id));
+  }
+
+  /** Test helper: seed the attached Field ids ({@link fields}) directly. */
+  setFields(fields: readonly string[]): void {
+    this._fields.set([...fields]);
+  }
+
   /** Test helper: adopt `doc` as a fresh load and bump the load generation (a new Entity). */
   loadDoc(doc: EntityDocument): void {
     this._doc.set(doc);
@@ -60,6 +92,10 @@ export class FakeEntitySession implements EntitySession {
    */
   loadDetail(detail: EntityDetail): void {
     this._current.set(detail);
+    this._types.set(detail.types);
+    // Attached extras derive from the document in the real session; a fresh load starts with none, and a
+    // spec seeds them explicitly via {@link setFields}/{@link attachField} after loading.
+    this._fields.set([]);
     this.loadDoc(detail.document);
   }
 

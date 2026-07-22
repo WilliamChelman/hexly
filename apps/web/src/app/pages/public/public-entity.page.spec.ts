@@ -94,12 +94,15 @@ describe('PublicEntityPage', () => {
 
   /**
    * References is not a panel this context can serve: the endpoint answers a `CurrentUser`, and a
-   * Public Link grants no scope beyond its own Entity — the fetch could only ever 403.
+   * Public Link grants no scope beyond its own Entity — the fetch could only ever 403. The read-only
+   * Details panel stays, though (ADR-0067): it shows the same substance the fallback Details View gives
+   * any reader.
    */
-  it('offers the Outline but not References', async () => {
+  it('offers the Outline and a read-only Details panel, but not References', async () => {
     const el = await render();
 
     expect(el.querySelector('[data-testid=outline-toggle]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=details-toggle]')).not.toBeNull();
     expect(el.querySelector('[data-testid=references-toggle]')).toBeNull();
   });
 
