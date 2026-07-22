@@ -35,13 +35,18 @@ describe('WorldLayout', () => {
     return TestBed.inject(NavRailStore).entries();
   }
 
-  it('fills the rail with the Dashboard, Library and Graph links from the active World (ADR-0041)', () => {
-    expect(railFor(world(['read'])).map((e) => e.testid)).toEqual(['nav-dashboard', 'nav-entities', 'nav-world-graph']);
+  it('fills the rail with the Dashboard, Library, Assets and Graph links from the active World (ADR-0041)', () => {
+    expect(railFor(world(['read'])).map((e) => e.testid)).toEqual([
+      'nav-dashboard',
+      'nav-entities',
+      'nav-assets',
+      'nav-world-graph',
+    ]);
   });
 
   /** The World Graph is a read of the World, so it shows to anyone who can reach it (#181). */
   it('links the World Graph with the canonical slug-base62 route (ADR-0042)', () => {
-    const graph = railFor(world(['read']))[2];
+    const graph = railFor(world(['read']))[3];
     expect(graph.link).toEqual(worldGraphRoute('w1', 'Aldermoor'));
   });
 
@@ -55,6 +60,7 @@ describe('WorldLayout', () => {
     expect(railFor(world(['read', 'manage'])).map((e) => e.testid)).toEqual([
       'nav-dashboard',
       'nav-entities',
+      'nav-assets',
       'nav-world-graph',
       'nav-world-settings',
     ]);

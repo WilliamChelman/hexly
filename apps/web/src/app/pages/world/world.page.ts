@@ -1,6 +1,13 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { ActiveWorld, worldDashboardRoute, worldGraphRoute, worldRoute, worldSettingsRoute } from '@hexly/web-core';
+import {
+  ActiveWorld,
+  worldAssetsRoute,
+  worldDashboardRoute,
+  worldGraphRoute,
+  worldRoute,
+  worldSettingsRoute,
+} from '@hexly/web-core';
 import { NavRailStore } from '../../shell/nav-rail.store';
 import { WorldTypesLoader } from '../../entity-types/world-types-loader';
 import { WorldFieldsLoader } from '../../entity-types/world-fields-loader';
@@ -46,6 +53,14 @@ export class WorldPage {
           testid: 'nav-entities',
           icon: 'library',
           labelKey: 'nav.library',
+        },
+        // The Asset Browser (ADR-0065): a read of the World's media, so every reader gets it — the
+        // reader-scoped list shows an owner their private uploads and a Viewer only what is shared.
+        {
+          link: worldAssetsRoute(worldId, name),
+          testid: 'nav-assets',
+          icon: 'asset',
+          labelKey: 'nav.assets',
         },
         // The World Graph is a read of the World, so every reader gets it — no rights gate.
         {

@@ -84,6 +84,14 @@ export const appRoutes: Route[] = [
         title: 'entityBrowser.tabTitle',
       },
       {
+        // The Asset Browser (ADR-0065, #282): the Entity Browser preset to the asset type — a World's
+        // uploaded media as thumbnail tiles, with upload at hand.
+        path: 'assets',
+        pathMatch: 'full',
+        loadComponent: () => import('./pages/asset-browser/asset-browser.page').then((m) => m.AssetBrowserPage),
+        title: 'assetBrowser.tabTitle',
+      },
+      {
         // The World Graph (#181). Lazy on its own chunk: cosmos.gl is ~168 kB gzip
         // of WebGL that nothing outside this page needs.
         path: 'graph',
