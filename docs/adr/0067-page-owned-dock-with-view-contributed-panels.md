@@ -1,0 +1,16 @@
+# The Entity page owns one right-side Dock; Views contribute Panels declaratively
+
+Side panels used to be baked into individual View components — the Content View owned an Outline/References dock, the Map View owned a Regions/Inspector dock, the Board View an Inspector dock — with the dock DOM idiom copy-pasted across the three and References reachable only from the Content View. We decided the Entity page owns a single **Dock**: a real layout column (not a floating overlay; below a viewport breakpoint the open panel overlays instead of pushing) with an always-visible toggle strip, holding at most one open **Panel**. Universal Panels (References, the **Details panel**) exist on every View; a View contributes its own (Outline, Regions, Inspector) via a declarative `panels` list on its `ViewDefinition` — the same contract shape as View registration itself — instantiated with the running View's injector so panels reach View-scoped services, and able to claim the open slot programmatically (selection opens the Inspector) without overwriting the user's remembered, cross-View, per-user choice.
+
+## Considered Options
+
+- **View-owned docks (status quo)** — each View composes its own side panels. Rejected: the idiom was already triplicated and drifting, References was accidentally content-plugin-owned, and — decisive — a Board Embed transcludes the View component, so embedded Views dragged their docks along (ADR-0062 embeds of prose pages carried a floating Outline/References dock).
+- **Page-owned Dock, runtime panel registration** — the running View registers panels on init. Rejected: the toggle strip would pop in only after the View's lazy chunk loads, and the panel contract would live nowhere inspectable.
+- **Page-owned Dock, declarative `ViewDefinition.panels` (chosen)** — the strip is known synchronously from the definition; the Inspector folds in as an ordinary write-gated Panel rather than a competing second dock.
+
+## Consequences
+
+- **A View is only its main content.** An Embed transcludes the bare View; the Dock, being page chrome, never appears on Boards — embedded prose pages visibly lose their floating outline toggle (the fix, not a regression).
+- **The Fields View becomes the Details View** (`core.view.details`, id renamed — no data to migrate) and survives only as the _fallback_ main content when an Entity affords no other View; it leaves the View toggle otherwise. A plain attached Field no longer affords a View at all. Its rail sibling, the universal **Details panel**, edits Fields in place and absorbs type/field management: the Edit-fields dialog and its actions-menu entry are retired, as is the Content View's inline metadata block.
+- **References moves out of the content plugin** into the core web-entity layer; the Asset View's inline usage list dies in its favour. The Public Link page filters panel availability instead of overriding a content-plugin token: anonymous readers get Outline and a read-only Details panel, not References (no endpoint access) — Details is not hidden, since the fallback Details View already shows the same substance to any reader.
+- The entity view outlet must create View components manually (capturing the component injector) rather than via `*ngComponentOutlet`, and a page-scoped Dock service carries programmatic slot claims.
