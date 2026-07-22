@@ -22,7 +22,9 @@ export class EntityQuickOpen implements CommandProvider {
   // survives the palette re-subscribing per keystroke.
   // ponytail: no unsubscribe — app-lifetime root singleton, nothing to leak.
   private readonly query$ = new Subject<string>();
-  private readonly commands$ = searchEntities(this.entitiesClient, this.query$).pipe(
+  // thumbnails=1 so a result row can show the Entity's resolved Thumbnail (ADR-0066) — recognizable
+  // by sight before Enter. The emit contract (#286) carries thumbnailUrl on the summary.
+  private readonly commands$ = searchEntities(this.entitiesClient, this.query$, { thumbnails: true }).pipe(
     map((items) => items.map((entity) => this.toCommand(entity))),
     // Replay the last results so a re-subscribing keystroke shows them until the
     // next search lands (stale-while-revalidate); refCount:false keeps the
@@ -48,6 +50,8 @@ export class EntityQuickOpen implements CommandProvider {
       label: entity.name,
       // The primary type (CONTEXT.md → Entity Type) as the quick-open hint.
       hint: entity.types[0],
+      // The resolved Thumbnail (ADR-0066), present only when one resolved; absent → an unchanged row.
+      thumbnailUrl: entity.thumbnailUrl,
       route,
       run: () => void this.router.navigate(route),
     };

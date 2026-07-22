@@ -106,6 +106,18 @@ export const COMMAND_PROVIDERS = new InjectionToken<readonly CommandProvider[]>(
 
     <ng-template #rowBody let-row>
       <span class="flex min-w-0 items-center gap-2">
+        <!-- A resolved Thumbnail (ADR-0066) lets a worldbuilder confirm the target by sight before
+             Enter; rows without one render exactly as before. Decorative — the label names the row. -->
+        @if (row.command.thumbnailUrl) {
+          <img
+            class="shrink-0 size-6 rounded-sm object-cover bg-surface-sunken"
+            loading="lazy"
+            draggable="false"
+            [src]="row.command.thumbnailUrl"
+            [attr.data-testid]="'command-palette-thumbnail-' + row.command.id"
+            alt=""
+          />
+        }
         <span class="truncate">{{ row.command.label }}</span>
         @if (row.command.hint) {
           <span class="text-2xs text-ink-muted">{{ row.command.hint }}</span>

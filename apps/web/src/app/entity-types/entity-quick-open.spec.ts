@@ -38,7 +38,7 @@ describe('EntityQuickOpen', () => {
     expect(provider.prefix).toBe('');
   });
 
-  it('searches globally — not scoped to any World', async () => {
+  it('searches globally — not scoped to any World — opting into thumbnails', async () => {
     entitiesClient.list.mockReturnValue(of({ items: [entity('e1', 'Aldermoor')], nextCursor: null }));
 
     const commands = await firstValueFrom(provider.search('alder'));
@@ -46,8 +46,27 @@ describe('EntityQuickOpen', () => {
     expect(entitiesClient.list).toHaveBeenCalledWith({
       q: 'alder',
       limit: 20,
+      thumbnails: true,
     });
     expect(commands).toEqual([expect.objectContaining({ id: 'e1', label: 'Aldermoor' })]);
+  });
+
+  it("threads the summary's resolved thumbnailUrl onto the command", async () => {
+    entitiesClient.list.mockReturnValue(
+      of({ items: [{ ...entity('e1', 'Aldermoor'), thumbnailUrl: '/api/assets/a1/thumb' }], nextCursor: null }),
+    );
+
+    const [command] = await firstValueFrom(provider.search('alder'));
+
+    expect(command.thumbnailUrl).toBe('/api/assets/a1/thumb');
+  });
+
+  it('leaves thumbnailUrl undefined when the summary carries none', async () => {
+    entitiesClient.list.mockReturnValue(of({ items: [entity('e1', 'Aldermoor')], nextCursor: null }));
+
+    const [command] = await firstValueFrom(provider.search('alder'));
+
+    expect(command.thumbnailUrl).toBeUndefined();
   });
 
   it('skips the request for a blank query', async () => {

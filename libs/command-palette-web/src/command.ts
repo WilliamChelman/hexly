@@ -9,6 +9,9 @@ export interface Command {
   readonly label: string;
   /** Optional secondary text, e.g. an Entity's type. */
   readonly hint?: string;
+  /** Optional preview tile shown beside the label (ADR-0066) — e.g. an Entity's resolved Thumbnail.
+   * Always safe as an `<img src>`; a row without one renders unchanged. */
+  readonly thumbnailUrl?: string;
   /** If the Command navigates, its routerLink commands array — the Palette
    * renders the row as an anchor so it can open in a new tab; `run()` stays
    * the plain in-place activation. */
