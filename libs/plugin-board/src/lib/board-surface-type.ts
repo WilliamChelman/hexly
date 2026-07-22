@@ -5,6 +5,7 @@
  */
 
 import {
+  assetHashFromUrl,
   defineField,
   defineStructuredDataType,
   joinSearchText,
@@ -19,10 +20,13 @@ import { BoardSurface, boardSurfaceSchema, emptyBoardSurface } from './board-sur
 export const CORE_BOARD_SURFACE: StructuredDataTypeId = 'core.datatype.board-surface';
 
 /**
- * The surface data-type. Its edges are every **Embed**'s target and every inline **Entity Link** inside a
- * **Text Block** — an Embed and a surface link both express a placement, not a characterised relationship,
- * so (like a Hex Map placement) they carry no **Link Descriptor**. Its searchable text is the Text Block
- * prose the user typed. No facet dimensions — a Board harvests no facets (user story 52).
+ * The surface data-type. Its edges are every **Embed**'s target, every inline **Entity Link** inside a
+ * **Text Block**, and the **Asset** an **Image** element displays (its capability `assetUrl` resolved
+ * URL → hash into an asset edge, ADR-0065, so an Asset placed on a Board counts as usage/inbound-link like
+ * one embedded in prose) — an Embed, a surface link, and an Image placement each express a placement, not a
+ * characterised relationship, so (like a Hex Map placement) they carry no **Link Descriptor**. Its
+ * searchable text is the Text Block prose the user typed. No facet dimensions — a Board harvests no facets
+ * (user story 52).
  */
 export const BOARD_SURFACE_DATA_TYPE = defineStructuredDataType({
   id: CORE_BOARD_SURFACE,
@@ -34,6 +38,12 @@ export const BOARD_SURFACE_DATA_TYPE = defineStructuredDataType({
     for (const element of surface.elements) {
       if (element.kind === 'embed') {
         link(element.targetEntityId);
+      } else if (element.kind === 'image') {
+        // An Image element references its Asset by capability URL (content-addressed, ADR-0065); the hash
+        // is the same asset edge Content prose harvests, so usage/orphanhood is one inbound-link read. A
+        // non-Asset `src` (external URL, not-yet-rewritten vault path) resolves to no hash and no edge.
+        const hash = assetHashFromUrl(element.assetUrl);
+        if (hash) edges.push({ targetKind: 'asset', targetId: hash, descriptor: null });
       } else if (element.kind === 'text' && element.content.format.startsWith('tiptap-')) {
         visit(element.content.snapshot, (node) => {
           if (node.type !== 'entityLink') return;

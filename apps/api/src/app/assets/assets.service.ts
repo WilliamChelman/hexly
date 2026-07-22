@@ -1,12 +1,13 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { AssetSummary, assetUrl, EntityDocument, entityDocumentSchema, THUMBNAIL_SUFFIX } from '@hexly/domain';
 import { assetSummaryOf, readAssetValue } from '@hexly/plugin-asset';
 import { asc, eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { assetIndex, entities } from '../db/schema';
+import { DeletedEntity, EntityDeletionRegistry } from '../entities/entity-deletion-registry';
 
 /** DI token for the on-disk Assets root (`<instanceDir>/assets`, or a temp dir for `:memory:`). */
 export const ASSETS_DIR = Symbol('ASSETS_DIR');
@@ -50,11 +51,43 @@ export interface StoredAsset {
  * into the derived `(worldId, hash) → entity` index, and byte serving reads disk with no table consulted.
  */
 @Injectable()
-export class AssetsService {
+export class AssetsService implements OnModuleInit {
   constructor(
     @Inject(DB) private readonly db: Db,
     @Inject(ASSETS_DIR) private readonly dir: string,
+    private readonly deletions: EntityDeletionRegistry,
   ) {}
+
+  /**
+   * Register the Asset byte reaper on the Entity deletion hooks (ADR-0065): deleting an Asset Entity is the
+   * ordinary Entity delete, and this is what makes it take the bytes/thumbnail with it. `EntityWrites` fires
+   * it post-commit; dedup guarantees one Entity per hash, so the bytes are safely orphaned once it is gone.
+   */
+  onModuleInit(): void {
+    this.deletions.register((deleted) => this.reap(deleted));
+  }
+
+  /**
+   * Reap a deleted Entity's Asset bytes (ADR-0065). A non-Asset (no readable asset-ref) reaps nothing; a
+   * placeholder ref this build cannot parse reads as absent and is left alone (forward-only). The bytes go
+   * content-addressed by hash — the pinned `ext` locates the original beside its thumbnail.
+   */
+  private reap(deleted: DeletedEntity): void {
+    const value = readAssetValue(deleted.document);
+    if (value) this.deleteBytes(deleted.worldId, value.hash, value.ext);
+  }
+
+  /**
+   * Remove an Asset's stored bytes and its thumbnail cache (ADR-0065). Best-effort and idempotent (`force`),
+   * so a missing file — a re-run reap, a thumbnail that was never minted — is a no-op. Path-traversal-safe:
+   * a `worldId`/`hash` that is not a single path segment is refused, never allowed to escape the Asset root.
+   */
+  deleteBytes(worldId: string, hash: string, ext: string): void {
+    if (basename(worldId) !== worldId || basename(hash) !== hash) return;
+    const worldDir = join(this.dir, worldId);
+    rmSync(join(worldDir, hash + ext), { force: true });
+    rmSync(join(worldDir, hash + THUMBNAIL_SUFFIX), { force: true });
+  }
 
   /**
    * Write `bytes` for `worldId`, content-addressed by their sha256 (ADR-0034). Idempotent: identical

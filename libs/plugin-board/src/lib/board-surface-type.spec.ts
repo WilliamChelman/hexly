@@ -93,7 +93,22 @@ describe('the core.datatype.board-surface Structured Data Type (ADR-0050, #263)'
       ]);
     });
 
-    it('harvests nothing from an image-only or unlinked plane, or from a malformed value at rest', () => {
+    it('harvests an Image element’s Asset as a content-addressed asset edge (ADR-0065, #277)', () => {
+      const hash = 'a'.repeat(64);
+      const edges = BOARD_SURFACE_DATA_TYPE.harvestEdges?.(
+        surface([image('i1', `/assets/world-1/${hash}.png`), embed('e1', 'riverbend')]),
+      );
+
+      // The capability URL resolves URL → hash into the same asset edge Content prose harvests, so an Asset
+      // placed on a Board is usage/inbound-link too. The Embed's entity edge rides alongside, order-preserved.
+      expect(edges).toEqual([
+        { targetKind: 'asset', targetId: hash, descriptor: null },
+        { targetKind: 'entity', targetId: 'riverbend', descriptor: null },
+      ]);
+    });
+
+    it('harvests nothing from a non-Asset image src, an unlinked plane, or a malformed value at rest', () => {
+      // A non-Asset src (external URL, not a content address) resolves to no hash and so no edge.
       expect(BOARD_SURFACE_DATA_TYPE.harvestEdges?.(surface([image('i1', 'https://assets/a.png')]))).toEqual([]);
       expect(BOARD_SURFACE_DATA_TYPE.harvestEdges?.(surface([text('t1', 'plain prose')]))).toEqual([]);
       // Forward-only (ADR-0048): a document this build cannot parse yields no edges rather than throwing.

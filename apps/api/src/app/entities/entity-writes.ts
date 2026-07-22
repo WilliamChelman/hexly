@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import {
   DocumentDerivedState,
   EntityEdge,
@@ -27,6 +27,7 @@ import {
   entityImportSource,
 } from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
+import { EntityDeletionRegistry } from './entity-deletion-registry';
 import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
 
@@ -177,6 +178,10 @@ export class EntityWrites {
     // The instance-wide Structured Data Types (ADR-0050), from which a structured value
     // harvests its own edges in the same derive pass.
     private readonly typeFields: TypeFieldRegistry,
+    // Post-commit deletion hooks (ADR-0065): the byte-owning Asset subsystem registers a reaper so
+    // deleting an Asset Entity takes its bytes/thumbnail with it. Optional — a unit that constructs
+    // EntityWrites without the assets wiring simply runs no reapers.
+    @Optional() private readonly deletions?: EntityDeletionRegistry,
   ) {}
 
   /**
@@ -540,11 +545,29 @@ export class EntityWrites {
           : decision.canWrite;
     if (!permitted) return { status: 'forbidden' };
 
-    return this.transact(() => {
-      const result = this.apply(access, decision.row, change);
+    const result = this.transact(() => {
+      const applied = this.apply(access, decision.row, change);
       // The choke point: every committed change nudges, whatever its kind.
-      if (result.status === 'ok') this.enqueue(id);
-      return result;
+      if (applied.status === 'ok') this.enqueue(id);
+      return applied;
+    });
+
+    // Post-commit deletion side effects (ADR-0065): once the row is gone for good, reap any bytes it
+    // owned. Outside the transaction so a rolled-back delete never takes the bytes with it; the deleted
+    // row's last document carries the asset-ref a reaper reads.
+    if (change.kind === 'delete' && result.status === 'ok') this.reapDeletion(result.row);
+
+    return result;
+  }
+
+  /** Fire the registered deletion reapers for a just-committed single-Entity delete (ADR-0065). */
+  private reapDeletion(row: EntityRow): void {
+    if (!this.deletions) return;
+    this.deletions.reap({
+      id: row.id,
+      worldId: row.worldId,
+      types: row.types,
+      document: JSON.parse(row.document) as EntityDocument,
     });
   }
 

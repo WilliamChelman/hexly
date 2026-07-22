@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { INestApplication } from '@nestjs/common';
@@ -6,6 +6,7 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import sharp from 'sharp';
 import request from 'supertest';
+import { tiptapContent } from '@hexly/plugin-content';
 import { DB, Db, createDb } from '../db/db';
 import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthService } from '../auth/auth.service';
@@ -528,6 +529,101 @@ describe('Worlds endpoints', () => {
         // No thumbnail was minted, so the thumb URL falls back to the original bytes (a PNG, not a WebP).
         const thumb = await ada.get(`/assets/${world.body.id}/${ref.hash}.thumb.webp`).expect(200);
         expect(thumb.headers['content-type']).toContain('image/png');
+      });
+    });
+
+    describe('usage, delete & heal (ADR-0065, #277)', () => {
+      /** Create a Note whose prose embeds the Asset at `src`, so the content-addressed asset edge is harvested. */
+      async function noteEmbedding(agent: request.Agent, worldId: string, name: string, src: string): Promise<string> {
+        const note = (
+          await agent
+            .post('/entities')
+            .send({ name, types: ['core.type.note'], worldId })
+            .expect(201)
+        ).body;
+        await agent
+          .put(`/entities/${note.id}`)
+          .send({
+            version: note.version,
+            tags: [],
+            document: {
+              'core.field.content': tiptapContent({ type: 'doc', content: [{ type: 'image', attrs: { src } }] }),
+            },
+          })
+          .expect(200);
+        return note.id;
+      }
+
+      it('resolves a Content prose reference into the Asset’s inbound-link usage', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const asset = (await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201))
+          .body;
+        const src = `/assets/${world.id}/${asset.document['core.field.asset'].hash}.png`;
+
+        // A freshly-minted Asset is unused.
+        expect((await ada.get(`/entities/${asset.id}/references`).expect(200)).body.referencedBy).toEqual([]);
+
+        const note = await noteEmbedding(ada, world.id, 'Character Sheet', src);
+
+        // The hash edge the Note harvested resolves to the Asset Entity at read time — usage is an inbound link.
+        expect((await ada.get(`/entities/${asset.id}/references`).expect(200)).body.referencedBy).toEqual([
+          { descriptor: null, source: { id: note, name: 'Character Sheet', types: ['core.type.note'] } },
+        ]);
+      });
+
+      it('takes the bytes and thumbnail with the Asset Entity on delete', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        // A real image so a WebP thumbnail is minted beside the bytes.
+        const banner = await sharp({
+          create: { width: 12, height: 4, channels: 3, background: { r: 200, g: 24, b: 24 } },
+        })
+          .png()
+          .toBuffer();
+        const asset = (await ada.post(`/worlds/${world.id}/assets`).attach('file', banner, 'Banner.png').expect(201))
+          .body;
+        const hash = asset.document['core.field.asset'].hash;
+
+        // Both serve before deletion.
+        await ada.get(`/assets/${world.id}/${hash}.png`).expect(200);
+        await ada.get(`/assets/${world.id}/${hash}.thumb.webp`).expect(200);
+
+        await ada.delete(`/entities/${asset.id}`).expect(204);
+
+        // Bytes and thumbnail are gone from disk — the served route (thumb→original fallback included) 404s both.
+        expect(existsSync(join(assetsDir, world.id, `${hash}.png`))).toBe(false);
+        expect(existsSync(join(assetsDir, world.id, `${hash}.thumb.webp`))).toBe(false);
+        await ada.get(`/assets/${world.id}/${hash}.png`).expect(404);
+        await ada.get(`/assets/${world.id}/${hash}.thumb.webp`).expect(404);
+      });
+
+      it('heals every dangling reference when identical bytes are re-uploaded (same hash, same URL)', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const asset = (await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201))
+          .body;
+        const hash = asset.document['core.field.asset'].hash;
+        const src = `/assets/${world.id}/${hash}.png`;
+        const note = await noteEmbedding(ada, world.id, 'Character Sheet', src);
+
+        await ada.delete(`/entities/${asset.id}`).expect(204);
+        // The Asset Entity is gone: its byte URL 404s and the Note's reference now dangles.
+        await ada.get(`/entities/${asset.id}/references`).expect(404);
+        await ada.get(src).expect(404);
+
+        // Re-upload the identical bytes: content-addressed, so the same hash → same URL, a fresh wrapper Entity.
+        const healed = (
+          await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Portrait-again.png').expect(201)
+        ).body;
+        expect(healed.document['core.field.asset'].hash).toBe(hash);
+        expect(healed.id).not.toBe(asset.id);
+
+        // The bytes serve again, and the Note's untouched reference resolves to the new Asset — healed for free.
+        await ada.get(src).expect(200);
+        expect((await ada.get(`/entities/${healed.id}/references`).expect(200)).body.referencedBy).toEqual([
+          { descriptor: null, source: { id: note, name: 'Character Sheet', types: ['core.type.note'] } },
+        ]);
       });
     });
   });
