@@ -791,6 +791,27 @@ describe('Worlds endpoints', () => {
         expect(fieldKeys(base)).toEqual([]);
       });
 
+      it('counts a name-matched hidden-type Asset in the sibling facets, matching the list a name search returns (#284)', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const asset = (await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Dragon.png').expect(201)).body;
+        // Tag the Asset so the name search also has a Tag facet value to count.
+        await ada
+          .put(`/entities/${asset.id}`)
+          .send({ version: asset.version, tags: ['bestiary'], document: asset.document })
+          .expect(200);
+
+        // A name search (`q`) with no type selected lifts the hidden-type exclusion on both seams (ADR-0065).
+        const listed = (await ada.get('/entities').query({ worldId: world.id, q: 'Dragon' }).expect(200)).body.items;
+        expect(listed.map((e: { id: string }) => e.id)).toContain(asset.id);
+
+        // The Facet rail must not contradict those results: the Asset is counted in visibility and tag.
+        const facets = (await ada.get('/entities/facets').query({ worldId: world.id, q: 'Dragon' }).expect(200)).body;
+        // The upload default is `shared` (ADR-0065), so it's counted there.
+        expect(facets.visibility).toContainEqual({ value: 'shared', count: 1 });
+        expect(facets.tag).toContainEqual({ value: 'bestiary', count: 1 });
+      });
+
       it('surfaces kind / orientation / hue / Tag facets with counts once the asset type is selected', async () => {
         const ada = await signIn('ada@hexly.test', 'correct horse');
         const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
