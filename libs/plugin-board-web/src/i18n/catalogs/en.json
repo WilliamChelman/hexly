@@ -57,8 +57,10 @@
     "uploading": "Uploading…",
     "uploadError": "Upload failed. Try again.",
     "existing": "Choose existing",
+    "search": "Search images",
     "loading": "Loading images…",
     "empty": "No images uploaded yet.",
+    "noMatches": "No images match your search.",
     "cancel": "Cancel"
   },
   "embedPicker": {

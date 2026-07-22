@@ -57,8 +57,10 @@
     "uploading": "Téléversement…",
     "uploadError": "Échec du téléversement. Réessayez.",
     "existing": "Choisir une image existante",
+    "search": "Rechercher des images",
     "loading": "Chargement des images…",
     "empty": "Aucune image téléversée pour l’instant.",
+    "noMatches": "Aucune image ne correspond à votre recherche.",
     "cancel": "Annuler"
   },
   "embedPicker": {

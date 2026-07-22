@@ -78,22 +78,23 @@ describe('AssetsService', () => {
     expect(readdirSync(join(dir, 'world-1'))).toHaveLength(2);
   });
 
-  describe('list (the picker source, #269, ADR-0065)', () => {
-    it('returns an empty list for a World with no Assets', () => {
-      expect(assets.list('world-1')).toEqual([]);
+  describe('summariesFor (the picker source, #269, #281, ADR-0065)', () => {
+    it('returns an empty list when the entity-search matched nothing', () => {
+      expect(assets.summariesFor('world-1', [])).toEqual([]);
     });
 
-    it('summarizes every Asset Entity with its capability url, mime and size', () => {
+    it('dresses each matched Asset Entity as an AssetSummary with its url, thumbnail, mime and size', () => {
       const portrait = assets.store('world-1', 'Portrait.png', PNG_A);
       seedAsset('world-1', 'asset-1', 'Portrait', portrait.hash, '.png', PNG_A.length);
 
-      const summaries = assets.list('world-1');
+      const summaries = assets.summariesFor('world-1', [{ id: 'asset-1', name: 'Portrait' }]);
       expect(summaries).toEqual([
         {
           url: portrait.url,
           // The hash-derived thumbnail URL (ADR-0065); the serving route falls back to the original.
           thumbnailUrl: `/assets/world-1/${portrait.hash}.thumb.webp`,
-          // The Entity's name + its ref's pinned extension — a rename relabels this, never the URL.
+          // The Entity's name (as the search returned it) + its ref's pinned extension — a rename relabels
+          // this, never the URL.
           originalFilename: 'Portrait.png',
           mime: 'image/png',
           size: PNG_A.length,
@@ -103,14 +104,36 @@ describe('AssetsService', () => {
       expect(summaries[0]).not.toHaveProperty('hash');
     });
 
-    it('lists a World in isolation — a sibling World’s Assets never bleed in', () => {
-      db.$client.prepare('INSERT INTO worlds (id, name, created_at, updated_at) VALUES (?,?,0,0)').run('world-2', 'W2');
+    it('preserves the search order the caller passed (relevance is authoritative, ADR-0065)', () => {
       const a = assets.store('world-1', 'Portrait.png', PNG_A);
-      const b = assets.store('world-2', 'Map.png', PNG_B);
-      seedAsset('world-1', 'asset-1', 'Portrait', a.hash, '.png', PNG_A.length);
-      seedAsset('world-2', 'asset-2', 'Map', b.hash, '.png', PNG_B.length);
+      const b = assets.store('world-1', 'Map.png', PNG_B);
+      seedAsset('world-1', 'asset-a', 'Portrait', a.hash, '.png', PNG_A.length);
+      seedAsset('world-1', 'asset-b', 'Map', b.hash, '.png', PNG_B.length);
 
-      expect(assets.list('world-1').map((s) => s.originalFilename)).toEqual(['Portrait.png']);
+      // Pass them B-then-A: the summaries come back in exactly that order, never re-sorted here.
+      expect(
+        assets
+          .summariesFor('world-1', [
+            { id: 'asset-b', name: 'Map' },
+            { id: 'asset-a', name: 'Portrait' },
+          ])
+          .map((s) => s.originalFilename),
+      ).toEqual(['Map.png', 'Portrait.png']);
+    });
+
+    it('drops a match whose Entity is gone (no readable asset-ref) rather than emitting a broken tile', () => {
+      const portrait = assets.store('world-1', 'Portrait.png', PNG_A);
+      seedAsset('world-1', 'asset-1', 'Portrait', portrait.hash, '.png', PNG_A.length);
+
+      // 'ghost' has no entities row, so no readable ref — it is skipped forward-only.
+      expect(
+        assets
+          .summariesFor('world-1', [
+            { id: 'ghost', name: 'Ghost' },
+            { id: 'asset-1', name: 'Portrait' },
+          ])
+          .map((s) => s.originalFilename),
+      ).toEqual(['Portrait.png']);
     });
   });
 

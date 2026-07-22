@@ -4,6 +4,8 @@
  * (CONTEXT.md → Asset).
  */
 
+import * as z from 'zod';
+
 /** Where an Asset's bytes are served from. `ext` carries its own leading dot (`'.png'`). */
 export function assetUrl(worldId: string, hash: string, ext: string): string {
   return `/assets/${worldId}/${hash}${ext}`;
@@ -47,6 +49,23 @@ export interface AssetSummary {
   /** The Asset's size in bytes. */
   readonly size: number;
 }
+
+/**
+ * The Board image picker's search query (#281, ADR-0065): the subset of the Entity list contract the
+ * picker speaks against `GET /worlds/:id/assets(/facets)` — an FTS `q` and repeated `field` facet tokens
+ * (`orientation:eq:landscape`). The server pins the asset type + image kind on top, so these are only the
+ * caller-controlled axes. `field` normalises the query-string's one-or-many shape to an array, matching
+ * the Entity list schema so the two search surfaces stay one contract.
+ */
+export const assetSearchQuerySchema = z.object({
+  q: z.string().optional(),
+  field: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
+});
+
+export type AssetSearchQuery = z.infer<typeof assetSearchQuerySchema>;
 
 /** A sha256 digest, lowercase base-16 — the content address an Asset is stored and served under. */
 const ASSET_URL = /^\/assets\/[^/]+\/([0-9a-f]{64})(\.[^/.]+)?$/;

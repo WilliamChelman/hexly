@@ -4,7 +4,7 @@ import { basename, extname, join } from 'node:path';
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { AssetSummary, assetUrl, EntityDocument, entityDocumentSchema, THUMBNAIL_SUFFIX } from '@hexly/domain';
 import { assetSummaryOf, readAssetValue } from '@hexly/plugin-asset';
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { assetIndex, entities } from '../db/schema';
 import { DeletedEntity, EntityDeletionRegistry } from '../entities/entity-deletion-registry';
@@ -169,19 +169,37 @@ export class AssetsService implements OnModuleInit {
   }
 
   /**
-   * Every Asset in a World as an {@link AssetSummary} — the picker source a Board Image or Content
-   * references (#269, ADR-0034, ADR-0065). Metadata only (no disk read): the capability URL plus the
-   * `mime`/`size`/`name + ext` the Asset Entity's asset-ref carries. Ordered by the Entity's `createdAt`
-   * then `hash` for a stable list.
+   * Turn already-matched Asset Entities into {@link AssetSummary}s — the picker source (#269, ADR-0065,
+   * #281). The Board image picker searches through the one entity-search machinery (pinned to the asset
+   * type + image kind), which yields ordered `{ id, name }` rows; this reads each one's asset-ref off its
+   * document to attach the capability URL, thumbnail, `mime` and `size` the picker draws. Metadata only,
+   * no disk read; the caller's order is preserved (relevance under a query), and a row whose document
+   * carries no readable asset-ref (a placeholder this build cannot parse) is dropped forward-only.
    */
-  list(worldId: string): AssetSummary[] {
-    return this.assetEntities(worldId).map(({ name, value }) => assetSummaryOf(worldId, name, value));
+  summariesFor(worldId: string, matches: readonly { id: string; name: string }[]): AssetSummary[] {
+    if (matches.length === 0) return [];
+    const docs = new Map<string, string>();
+    for (const row of this.db
+      .select({ id: entities.id, document: entities.document })
+      .from(entities)
+      .where(inArray(entities.id, [...new Set(matches.map((m) => m.id))]))
+      .all())
+      docs.set(row.id, row.document);
+    const out: AssetSummary[] = [];
+    for (const match of matches) {
+      const raw = docs.get(match.id);
+      if (!raw) continue;
+      const parsed = entityDocumentSchema.safeParse(JSON.parse(raw) as EntityDocument);
+      const value = parsed.success ? readAssetValue(parsed.data) : null;
+      if (value) out.push(assetSummaryOf(worldId, match.name, value));
+    }
+    return out;
   }
 
   /**
    * The World's Asset Entities' names and asset-ref values, joined off the derived dedup index (ADR-0065)
-   * — the shared source for {@link list} and {@link exportAssets}. An Entity whose document carries no
-   * readable asset-ref (a placeholder ref this build cannot parse) is skipped forward-only.
+   * — the source {@link exportAssets} enumerates. An Entity whose document carries no readable asset-ref
+   * (a placeholder ref this build cannot parse) is skipped forward-only.
    */
   private assetEntities(worldId: string): { name: string; value: NonNullable<ReturnType<typeof readAssetValue>> }[] {
     const rows = this.db

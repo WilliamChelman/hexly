@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
-import { AssetSummary, EntityDetail } from '@hexly/domain';
-import { AssetsClient } from '@hexly/web-core';
+import { AssetSummary, EntityDetail, EntityFacets } from '@hexly/domain';
+import { AssetsClient, AssetSearchParams } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { DialogRef } from '@hexly/web-ui';
 import { BOARD_TEST_CATALOGS } from '../i18n/test-catalogs';
@@ -22,15 +22,33 @@ const EXISTING: AssetSummary[] = [
     mime: 'image/jpeg',
     size: 20,
   },
-  // A non-image Asset the World holds — the grid renders `<img>`, so it must be filtered out.
-  {
-    url: '/assets/w1/notes.pdf',
-    thumbnailUrl: '/assets/w1/notes.thumb.webp',
-    originalFilename: 'notes.pdf',
-    mime: 'application/pdf',
-    size: 30,
-  },
 ];
+
+/** Facet counts the server returns pinned to the asset type + image kind — the picker drops the pinned `kind`. */
+const FACETS: EntityFacets = {
+  type: [],
+  tag: [],
+  visibility: [],
+  fields: [
+    {
+      key: 'kind',
+      label: 'asset.facet.kind',
+      labelKey: 'asset.facet.kind',
+      dataType: { kind: 'enum', options: ['image', 'pdf', 'audio', 'other'] },
+      values: [{ value: 'image', count: 2 }],
+    },
+    {
+      key: 'orientation',
+      label: 'asset.facet.orientation',
+      labelKey: 'asset.facet.orientation',
+      dataType: { kind: 'enum', options: ['landscape', 'portrait', 'square'] },
+      values: [
+        { value: 'landscape', count: 1 },
+        { value: 'portrait', count: 1 },
+      ],
+    },
+  ],
+};
 
 /** The wrapper Asset Entity the upload endpoint returns (ADR-0065) — the picker reads its URL off the ref. */
 const NEW_ASSET = {
@@ -39,11 +57,21 @@ const NEW_ASSET = {
   document: { 'core.field.asset': { hash: 'a'.repeat(64), ext: '.png', mime: 'image/png', size: 5, stats: null } },
 } as unknown as EntityDetail;
 
-/** A fake AssetsClient the picker drives — records the upload call and returns canned streams. */
+/** A fake AssetsClient the picker drives — records the search params + upload, and returns canned streams. */
 class FakeAssetsClient {
   uploaded: File | null = null;
+  lastSearch: AssetSearchParams | null = null;
+  lastFacets: AssetSearchParams | null = null;
+  searchResult = EXISTING;
   uploadResult = of<EntityDetail>(NEW_ASSET);
-  list = () => of(EXISTING);
+  search = (_worldId: string, params: AssetSearchParams = {}) => {
+    this.lastSearch = params;
+    return of(this.searchResult);
+  };
+  facets = (_worldId: string, params: AssetSearchParams = {}) => {
+    this.lastFacets = params;
+    return of(FACETS);
+  };
   upload = (_worldId: string, file: File) => {
     this.uploaded = file;
     return this.uploadResult;
@@ -104,12 +132,43 @@ describe('BoardImagePicker', () => {
     expect(fixture.nativeElement.querySelector('[data-testid=image-upload-error]')).not.toBeNull();
   });
 
-  it('excludes non-image Assets from the grid (a PDF would render as a broken tile, board review)', () => {
-    const tiles = fixture.nativeElement.querySelectorAll('[data-testid=image-asset-choice]');
-    // Only the two image Assets — the PDF is filtered out.
-    expect(tiles.length).toBe(2);
-    const labels = Array.from(tiles).map((t) => (t as HTMLElement).getAttribute('aria-label'));
-    expect(labels).toEqual(['one.png', 'two.jpg']);
+  it('searches Assets by name through the pinned entity-search (#281)', () => {
+    const search = fixture.nativeElement.querySelector('[data-testid=image-search]') as HTMLInputElement;
+    search.value = 'castle';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    // The query rides to the server as `q` — no client-side name filter (same contract as the Asset Browser).
+    expect(assets.lastSearch).toEqual({ q: 'castle', field: [] });
+    expect(assets.lastFacets).toEqual({ q: 'castle', field: [] });
+  });
+
+  it('offers image Facets and filters by them, hiding the pinned kind dimension (#281)', () => {
+    // The pinned `kind` dimension is never a picker choice; the orientation Facet is.
+    expect(fixture.nativeElement.querySelector('[data-testid=image-facet-kind]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=image-facet-orientation]')).not.toBeNull();
+
+    const chip = fixture.nativeElement.querySelector(
+      '[data-testid=image-facet-orientation-landscape]',
+    ) as HTMLButtonElement;
+    chip.click();
+    fixture.detectChanges();
+
+    // Toggling a Facet AND-s its `key:eq:value` token into the search (the server pins image kind on top).
+    expect(chip.getAttribute('aria-pressed')).toBe('true');
+    expect(assets.lastSearch).toEqual({ q: undefined, field: ['orientation:eq:landscape'] });
+  });
+
+  it('reads "no matches" (not "no images") when a search narrows to nothing', () => {
+    assets.searchResult = [];
+    const search = fixture.nativeElement.querySelector('[data-testid=image-search]') as HTMLInputElement;
+    search.value = 'nope';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement.querySelector('[data-testid=image-empty]') as HTMLElement).textContent).toContain(
+      'No images match your search.',
+    );
   });
 
   it('cancels without choosing — closes with no result, so nothing is placed', () => {
