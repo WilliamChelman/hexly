@@ -938,18 +938,76 @@ describe('Worlds endpoints', () => {
       it('surfaces the referrer by name in the Asset’s usage, and drops the thumbnail from later lists on delete (cascade)', async () => {
         const ada = await signIn('ada@hexly.test', 'correct horse');
         const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
-        const { asset: portrait } = await uploadAsset(ada, world.id, PNG, 'Portrait.png');
+        const { asset: portrait, hash } = await uploadAsset(ada, world.id, PNG, 'Portrait.png');
         const deity = await noteWithThumbnail(ada, world.id, 'Vashenka', portrait.id);
 
-        // The thumbnail link surfaces as an ordinary *named* inbound reference on the Asset (usage).
+        // The thumbnail link surfaces as an ordinary *named* inbound reference on the Asset (usage), the
+        // referrer row now carrying its own resolved thumbnail (its designation, the same image; #290).
         expect((await ada.get(`/entities/${portrait.id}/references`).expect(200)).body.referencedBy).toEqual([
-          { descriptor: null, source: { id: deity.id, name: 'Vashenka', types: ['core.type.note'] } },
+          {
+            descriptor: null,
+            source: {
+              id: deity.id,
+              name: 'Vashenka',
+              types: ['core.type.note'],
+              thumbnailUrl: thumbUrl(world.id, hash),
+            },
+          },
         ]);
 
         // Deleting the Asset drops its dedup-index row, so the designation degrades to nothing — no cleanup.
         await ada.delete(`/entities/${portrait.id}`).expect(204);
         const listed = await listWithThumbs(ada, { worldId: world.id });
         expect(listed.find((e) => e.id === deity.id)?.thumbnailUrl).toBeUndefined();
+      });
+
+      it('populates thumbnailUrl on inbound and outbound linked reference rows (#290)', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const { asset: portrait, hash } = await uploadAsset(ada, world.id, PNG, 'Portrait.png');
+        // The designation both resolves deity's own thumbnail (field precedence) and mints the edge
+        // deity → portrait, so one scenario exercises both reference directions.
+        const deity = await noteWithThumbnail(ada, world.id, 'Vashenka', portrait.id);
+
+        // Outbound: deity's References list portrait, carrying its own-bytes thumbnail (ADR-0065).
+        const outbound = (await ada.get(`/entities/${deity.id}/references`).expect(200)).body.references;
+        expect(outbound).toHaveLength(1);
+        expect(outbound[0]).toMatchObject({
+          targetId: portrait.id,
+          target: { id: portrait.id, thumbnailUrl: thumbUrl(world.id, hash) },
+        });
+
+        // Inbound: portrait's usage names deity, carrying deity's field-resolved thumbnail (the same image).
+        const inbound = (await ada.get(`/entities/${portrait.id}/references`).expect(200)).body.referencedBy;
+        expect(inbound).toEqual([
+          {
+            descriptor: null,
+            source: {
+              id: deity.id,
+              name: 'Vashenka',
+              types: ['core.type.note'],
+              thumbnailUrl: thumbUrl(world.id, hash),
+            },
+          },
+        ]);
+
+        // A linked row whose target resolves no thumbnail is unchanged — no `thumbnailUrl` key at all:
+        // designate a plain Note (an edge is minted, but it is not an image Asset, so nothing resolves).
+        const ledger = (
+          await ada
+            .post('/entities')
+            .send({ name: 'Ledger', types: ['core.type.note'], worldId: world.id })
+            .expect(201)
+        ).body;
+        const scribe = await noteWithThumbnail(ada, world.id, 'Ink', ledger.id);
+        const plain = (await ada.get(`/entities/${scribe.id}/references`).expect(200)).body.references;
+        expect(plain).toEqual([
+          {
+            targetId: ledger.id,
+            descriptor: null,
+            target: { id: ledger.id, name: 'Ledger', types: ['core.type.note'] },
+          },
+        ]);
       });
 
       it('rebuilds the designation on Reindex for a row written before the column existed', async () => {

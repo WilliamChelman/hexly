@@ -28,6 +28,12 @@ export interface LinkedEntity {
   readonly name: string;
   /** The ordered Entity Type set; `types[0]` is primary and drives the icon/colour a surface draws. */
   readonly types: readonly EntityType[];
+  /**
+   * The served Thumbnail URL (ADR-0066), present only when one resolves — the linked Entity's Thumbnail
+   * Field designation beating its own image bytes, exactly as a list resolves it. Absent → the surface
+   * falls back to the primary type's glyph. Always safe as an `<img src>`.
+   */
+  readonly thumbnailUrl?: string;
 }
 
 /**

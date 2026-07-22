@@ -15,9 +15,21 @@ import { LinkedEntity } from '@hexly/domain';
   selector: 'app-reference-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, TranslocoPipe],
-  host: { class: 'flex items-baseline gap-1.5 py-1 pr-2' },
+  host: { class: 'flex items-center gap-1.5 py-1 pr-2' },
   template: `
     @if (entity(); as target) {
+      <!-- A resolved Thumbnail (ADR-0066) lets the link list read visually; a row without one is
+           unchanged (no glyph placeholder). Decorative — the name is the accessible label. -->
+      @if (target.thumbnailUrl) {
+        <img
+          class="shrink-0 size-6 rounded-sm object-cover bg-surface-sunken"
+          loading="lazy"
+          draggable="false"
+          [src]="target.thumbnailUrl"
+          [attr.data-testid]="'reference-thumbnail-' + target.id"
+          alt=""
+        />
+      }
       <a
         [routerLink]="['/entities', target.id]"
         class="min-w-0 flex-1 truncate text-sm text-ink-muted no-underline hover:text-ink"
