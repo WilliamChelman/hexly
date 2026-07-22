@@ -26,6 +26,9 @@ export interface EntityCardVm {
   updatedAt: number;
   /** The caller's Rights on this Entity (ADR-0039) — gates the rename/delete actions. */
   rights?: readonly EntityVerb[];
+  /** The resolved Thumbnail URL (ADR-0066), present only when the list opted into thumbnails and one
+   * resolved; absent → the sigil falls back to the primary type's icon. Always safe as an `<img src>`. */
+  thumbnailUrl?: string;
 }
 
 /**
@@ -54,9 +57,26 @@ export interface EntityCardVm {
       raised
     >
       <span class="absolute left-0 top-0 bottom-0 w-1.5 {{ bar() }}"></span>
-      <span class="shrink-0 size-12 rounded-full flex items-center justify-center {{ sigil() }}">
-        <app-icon [name]="typeIcon()" [size]="20" />
-      </span>
+      <!-- The Thumbnail stands in for the type icon so a card is recognizable by sight (ADR-0066);
+           absent — no designation, no own bytes, or a dangling link the server already dropped — the
+           primary type's sigil renders instead, never a broken image. -->
+      @if (card().thumbnailUrl) {
+        <img
+          class="shrink-0 size-12 rounded-full object-cover bg-surface-sunken"
+          loading="lazy"
+          draggable="false"
+          [src]="card().thumbnailUrl"
+          [attr.data-testid]="'thumbnail-' + card().id"
+          alt=""
+        />
+      } @else {
+        <span
+          class="shrink-0 size-12 rounded-full flex items-center justify-center {{ sigil() }}"
+          data-testid="type-sigil"
+        >
+          <app-icon [name]="typeIcon()" [size]="20" />
+        </span>
+      }
       <div class="min-w-0 flex-1">
         @if (renaming()) {
           <input
