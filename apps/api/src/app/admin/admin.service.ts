@@ -90,10 +90,10 @@ export class AdminService {
         cursor = chunk.cursor;
         await yieldToEventLoop();
       }
-      // Refresh the planner's cost data with the derived state: without `sqlite_stat1` SQLite
-      // guesses join orders — it degraded the facet counts' FTS match to a per-row probe (see
-      // `facetWhere`) — and nothing else ever runs ANALYZE.
-      this.db.$client.exec('ANALYZE');
+      // Every chunk is durably committed by here, so the walk has already succeeded. Refreshing the
+      // planner's stats is a best-effort epilogue: `failed` means the database refused a *write*
+      // (JSDoc), never a stats refresh, so `analyze` swallows its own faults.
+      await this.analyze();
       this.job = { ...this.job, status: 'succeeded', finishedAt: Date.now() };
     } catch (err) {
       this.job = {
@@ -102,6 +102,22 @@ export class AdminService {
         finishedAt: Date.now(),
         error: err instanceof Error ? err.message : String(err),
       };
+    }
+  }
+
+  /**
+   * Refresh the query-planner's cost data with the derived state (best-effort). Without `sqlite_stat1`
+   * SQLite guesses join orders — it degraded the facet counts' FTS match to a per-row probe (see
+   * `facetWhere`) — and nothing else ever runs ANALYZE. Yields first, then runs: `exec` is synchronous
+   * on the one shared connection, so an unyielded ANALYZE would stall every other request. A refused
+   * ANALYZE leaves stale-but-valid stats and must not flip a fully-committed walk to `failed`.
+   */
+  private async analyze(): Promise<void> {
+    await yieldToEventLoop();
+    try {
+      this.db.$client.exec('ANALYZE');
+    } catch {
+      // Stats are a cache; a refused refresh is harmless next to the committed reindex.
     }
   }
 

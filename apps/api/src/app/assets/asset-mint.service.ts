@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { basename, extname } from 'node:path';
 import { Inject, Injectable } from '@nestjs/common';
-import { emptyEntityDocument, EntityDetail, EntityDocument, nameSchema } from '@hexly/domain';
+import { emptyEntityDocument, EntityDetail, EntityDocument, EntityType, nameSchema } from '@hexly/domain';
 import {
   ASSET_FIELD_ID,
   assetValueUrl,
@@ -11,6 +11,7 @@ import {
 } from '@hexly/plugin-asset';
 import { and, eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
+import { entityAccess } from '../acl/entity-access';
 import { assetIndex } from '../db/schema';
 import { EntitiesService } from '../entities/entities.service';
 import { EntityWrites } from '../entities/entity-writes';
@@ -82,7 +83,16 @@ export class AssetMintService {
       // Index and Entity are written in one transaction, so a row here means the Entity exists.
       if (entity) {
         const value = readAssetValue(entity.document);
-        if (value) return { entity, url: assetValueUrl(worldId, value), deduped: true };
+        if (value) {
+          // Whether the uploader may *read* the twin decides what the dedup echoes. A readable hit (own
+          // or `shared`) comes back whole — the first name sticks (ADR-0065). A hit the uploader cannot
+          // read is someone else's `private` Asset, so ADR-0046 (private is indistinguishable from
+          // missing) forbids echoing its curated name/prose/Tags/visibility: hand back a redacted,
+          // fresh-mint-shaped wrapper carrying only the served URL.
+          const canRead = entityAccess(this.db, ownerId).decideMeta(existing.entityId)?.canRead;
+          const dedup = canRead ? entity : this.redactedDedup(entity.id, worldId, filename, value);
+          return { entity: dedup, url: assetValueUrl(worldId, value), deduped: true };
+        }
       }
     }
 
@@ -122,5 +132,39 @@ export class AssetMintService {
     const entity = this.entities.detailById(row.id);
     if (!entity) throw new Error(`Minted Asset ${row.id} could not be reloaded`);
     return { entity, url: assetValueUrl(worldId, assetValue), deduped: false };
+  }
+
+  /**
+   * The wrapper a dedup hands back when the uploader cannot read the twin — a `private` Asset owned by
+   * someone else (ADR-0046: private is indistinguishable from missing; ADR-0065: `private` = "only in the
+   * uploader's picker"). It echoes none of that Entity's curated metadata: it is shaped like a fresh mint
+   * of the uploader's own bytes — the filename-stem `name`, empty Tags, default `shared`, the type's empty
+   * document — carrying only the content-addressed asset-ref, whose `hash`/`ext`/`stats` are derived from
+   * the identical bytes the uploader just supplied (so not a leak) and whose served URL (capability-served,
+   * ADR-0034) still resolves for the Board picker. The real id rides along as a handle (access-checked on
+   * every other route); the timing/version fields are synthesised, never read from the private row.
+   */
+  private redactedDedup(id: string, worldId: string, filename: string, value: AssetValue): EntityDetail {
+    const now = Date.now();
+    const name = nameSchema.catch('Asset').parse(basename(filename, extname(filename)));
+    const seed: EntityDocument = { [ASSET_FIELD_ID]: value };
+    const fields = this.worldTypeFields.effectiveFields(worldId, [CORE_ASSET_TYPE_ID], seed);
+    const document: EntityDocument = {
+      ...emptyEntityDocument(fields, this.typeFields.structuredDataTypes),
+      [ASSET_FIELD_ID]: value,
+    };
+    return {
+      id,
+      worldId,
+      name,
+      types: [CORE_ASSET_TYPE_ID as EntityType],
+      tags: [],
+      visibility: 'shared',
+      version: 1,
+      seq: 0,
+      document,
+      createdAt: now,
+      updatedAt: now,
+    };
   }
 }

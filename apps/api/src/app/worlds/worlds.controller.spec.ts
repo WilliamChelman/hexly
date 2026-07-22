@@ -6,7 +6,7 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import sharp from 'sharp';
 import request from 'supertest';
-import { tiptapContent } from '@hexly/plugin-content';
+import { CONTENT_FIELD_ID, tiptapContent } from '@hexly/plugin-content';
 import { DB, Db, createDb } from '../db/db';
 import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthService } from '../auth/auth.service';
@@ -424,6 +424,64 @@ describe('Worlds endpoints', () => {
 
       // The picker still lists exactly one Asset.
       expect((await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toHaveLength(1);
+    });
+
+    it('dedups a `shared` Asset for another Contributor, echoing the whole wrapper unchanged (ADR-0065)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      addMember(world.body.id, bobId, 'contributor');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      const first = await ada.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201);
+      // Ada's Asset keeps the upload default `shared`, so Bob may read it: the dedup returns it whole, the
+      // first name intact — the readable-hit contract is untouched by the private-leak fix.
+      const again = await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'copy.png').expect(201);
+      expect(again.body.id).toBe(first.body.id);
+      expect(again.body.name).toBe('Portrait');
+      expect(again.body.visibility).toBe('shared');
+    });
+
+    it("redacts a dedup to another user's `private` Asset — no name/prose/Tags/visibility leak (ADR-0046)", async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      addMember(world.body.id, bobId, 'contributor');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      // Ada uploads, curates the wrapper (Tags + prose), then makes it `private` = "only in my picker".
+      const first = await ada.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201);
+      await ada
+        .put(`/entities/${first.body.id}`)
+        .send({
+          document: {
+            ...first.body.document,
+            [CONTENT_FIELD_ID]: tiptapContent({
+              type: 'doc',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'ADA-SECRET-PROSE' }] }],
+            }),
+          },
+          tags: ['ada-secret-tag'],
+          version: first.body.version,
+        })
+        .expect(200);
+      await ada.patch(`/entities/${first.body.id}`).send({ visibility: 'private' }).expect(200);
+
+      // Bob uploads identical bytes: mint dedups to Ada's row (no twin), but Bob cannot read it, so the
+      // response is redacted — shaped like a fresh mint of his own bytes, echoing none of Ada's curation.
+      const again = await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Copy.png').expect(201);
+      expect(again.body.id).toBe(first.body.id); // the real handle, but access-checked everywhere else
+      expect(again.body.name).toBe('Copy'); // Bob's own filename stem, never Ada's 'Portrait'
+      expect(again.body.visibility).toBe('shared'); // the fresh-mint default, never the real 'private'
+      expect(again.body.tags).toEqual([]); // Ada's Tags redacted
+      const doc = JSON.stringify(again.body.document);
+      expect(doc).not.toContain('ADA-SECRET-PROSE'); // no prose leak
+      expect(doc).not.toContain('ada-secret'); // no Tag leak
+      // The served URL still resolves (same content address) — the Board picker upload flow keeps working.
+      expect(again.body.document['core.field.asset'].hash).toBe(first.body.document['core.field.asset'].hash);
+
+      // Bob still cannot enumerate Ada's `private` Asset in his picker — indistinguishable from missing.
+      expect((await bob.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([]);
     });
 
     it('renaming the Asset never moves the served capability URL (extension pinned at mint, ADR-0065)', async () => {

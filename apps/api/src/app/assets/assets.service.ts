@@ -158,12 +158,11 @@ export class AssetsService implements OnModuleInit {
     const out: { servedUrl: string; originalFilename: string; bytes: Buffer }[] = [];
     for (const { name, value } of this.assetEntities(worldId)) {
       const found = this.read(worldId, value.hash + value.ext);
-      if (found)
-        out.push({
-          servedUrl: assetUrl(worldId, value.hash, value.ext),
-          originalFilename: `${name}${value.ext}`,
-          bytes: found.bytes,
-        });
+      if (found) {
+        // One home for the served-URL + `name + ext` derivation: the picker's {@link assetSummaryOf}.
+        const summary = assetSummaryOf(worldId, name, value);
+        out.push({ servedUrl: summary.url, originalFilename: summary.originalFilename, bytes: found.bytes });
+      }
     }
     return out;
   }

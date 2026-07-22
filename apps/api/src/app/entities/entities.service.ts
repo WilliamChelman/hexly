@@ -560,7 +560,8 @@ export class EntitiesService {
    * Load an Entity as an {@link EntityDetail} by id with **no access check** — a system read for callers
    * that have already gated. The Asset mint-and-dedup returns the wrapper it just minted or deduped to
    * (ADR-0065): the dedup target may be another user's `shared` Asset, so the return is a system fact,
-   * not an access-filtered read. Null when the row is gone.
+   * not an access-filtered read. That caller re-checks readability itself and redacts a `private` twin
+   * (ADR-0046), so this stays access-free. Null when the row is gone.
    */
   detailById(id: string): EntityDetail | null {
     const row = this.db.select().from(entities).where(eq(entities.id, id)).get();
