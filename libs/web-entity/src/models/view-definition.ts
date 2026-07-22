@@ -13,12 +13,13 @@ export type { ViewId };
 /** The hex-grid View a `hex-grid`-carrying Entity additionally affords. */
 export const CORE_VIEW_MAP = 'core.view.map';
 /**
- * The **generic Field View**: renders a type's declared Fields off the Entity's EntityDocument and edits
- * them back into it. Contributed by any type that declares Fields, and the fallback for an Entity
- * whose type has no registered view (a missing plugin, a World-defined type) — where it shows the
- * type as an inert chip and the values as plain EntityDocument.
+ * The **Details View** (ADR-0067, `core.view.details` — renamed from `core.view.fields`, no data to
+ * migrate): the Entity's Types, declared Fields (edited in place), and untyped keys, sharing one
+ * rendering with the universal Details Panel. It is the **fallback main content alone**: an Entity
+ * affording no other View opens full-width on it, and it leaves the View toggle the moment any other
+ * View exists — so "Details" never sits beside "Map" as a fake alternative rendering.
  */
-export const CORE_VIEW_FIELDS = 'core.view.fields';
+export const CORE_VIEW_DETAILS = 'core.view.details';
 
 /**
  * One entry in a Type's ordered {@link TypeDefinition.views} list: either a View id the Type

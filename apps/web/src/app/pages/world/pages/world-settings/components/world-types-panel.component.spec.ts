@@ -6,7 +6,6 @@ import { of } from 'rxjs';
 import { AvailableType, defineField } from '@hexly/domain';
 import { ActiveWorld, WorldsClient } from '@hexly/web-core';
 import { MockWorldsClient } from '@hexly/web-core/testing';
-import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
 import { CORE_HEX_GRID } from '@hexly/plugin-hexmap';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { TypeRegistry } from '../../../../../entity-types/type-registry';
@@ -102,12 +101,13 @@ describe('WorldTypesPanel', () => {
       id: 'world.type.deity',
       label: 'Deity',
       fieldRefs: ['world.field.domain'],
-      // A string Field places no View; a type with no Structured Data Type Field opens on its Fields (ADR-0051).
-      views: [CORE_VIEW_FIELDS],
+      // A string Field places no View; a type with no Structured Data Type Field places nothing and
+      // falls to the fallback Details View (ADR-0051, ADR-0067).
+      views: [],
     });
   });
 
-  it('places a referenced Field of a Structured Data Type’s View last, so the type opens on its Fields', () => {
+  it('places a referenced Field of a Structured Data Type’s View, so the type opens on it (ADR-0067)', () => {
     click('type-new');
     type('type-id-input', 'deity');
     type('type-name-input', 'Deity');
@@ -118,8 +118,8 @@ describe('WorldTypesPanel', () => {
       id: 'world.type.deity',
       label: 'Deity',
       fieldRefs: ['world.field.battle-map'],
-      // "Show as a view" defaults on, and the grid's View sits *after* the generic Field view.
-      views: [CORE_VIEW_FIELDS, { field: 'world.field.battle-map' }],
+      // "Show as a view" defaults on, so the grid's View is placed — the only View the deity affords.
+      views: [{ field: 'world.field.battle-map' }],
     });
   });
 
@@ -134,7 +134,7 @@ describe('WorldTypesPanel', () => {
 
     const [, req] = worlds.createType.mock.calls[0];
     expect(req.fieldRefs).toEqual(['world.field.battle-map']);
-    expect(req.views).toEqual([CORE_VIEW_FIELDS]);
+    expect(req.views).toEqual([]);
   });
 
   it('mints a new World Field from the inline modal, then references it', () => {
@@ -182,7 +182,7 @@ describe('WorldTypesPanel', () => {
           label: 'Deity',
           source: 'user',
           fieldRefs: ['world.field.battle-map'],
-          views: [CORE_VIEW_FIELDS],
+          views: [],
         },
       ]),
     );

@@ -14,7 +14,6 @@ import { ButtonComponent, ButtonGroupComponent, EyebrowComponent, PageHeaderComp
 import { EntityActionsMenuComponent } from './entity-actions-menu.component';
 import { EntityShareDialogComponent } from './entity-share-dialog.component';
 import { EntityTypesDialogComponent } from './entity-types-dialog.component';
-import { EntityFieldsDialogComponent } from './entity-fields-dialog.component';
 import { EntityTagsComponent } from './entity-tags.component';
 import { SaveStatusComponent } from './save-status.component';
 import { EntitySession } from '../services/entity-session';
@@ -41,7 +40,6 @@ import { EntityViewStore } from '../services/entity-view-store';
     EntityActionsMenuComponent,
     EntityShareDialogComponent,
     EntityTypesDialogComponent,
-    EntityFieldsDialogComponent,
     TranslocoPipe,
     EntityTagsComponent,
     SaveStatusComponent,
@@ -103,18 +101,12 @@ import { EntityViewStore } from '../services/entity-view-store';
 
       <!-- The Entity's actions — Edit types, Visibility, Pin, and Share — gathered behind one
            overflow menu. Share and Edit types are this header's dialog surfaces, so the menu emits
-           and we open them. -->
-      <app-entity-actions-menu
-        pageHeaderActions
-        (share)="ownersOpen.set(true)"
-        (editTypes)="typesOpen.set(true)"
-        (editFields)="fieldsOpen.set(true)"
-      />
+           and we open them. Field management moved inline to the Details View/Panel (ADR-0067). -->
+      <app-entity-actions-menu pageHeaderActions (share)="ownersOpen.set(true)" (editTypes)="typesOpen.set(true)" />
     </app-page-header>
 
     <app-entity-share-dialog [open]="ownersOpen()" (closed)="ownersOpen.set(false)" (resigned)="onResigned()" />
     <app-entity-types-dialog [open]="typesOpen()" (closed)="typesOpen.set(false)" />
-    <app-entity-fields-dialog [open]="fieldsOpen()" (closed)="fieldsOpen.set(false)" />
   `,
 })
 export class EntityHeaderComponent {
@@ -144,9 +136,6 @@ export class EntityHeaderComponent {
 
   /** Whether the Edit-types dialog (#189) is open — toggled by the actions menu's Edit types item. */
   protected readonly typesOpen = signal(false);
-
-  /** Whether the Edit-fields dialog (ADR-0054, #229) is open — toggled by the actions menu's Edit fields item. */
-  protected readonly fieldsOpen = signal(false);
 
   /** Resigning can cost reach to this Entity, so drop back to the World Index. */
   protected onResigned(): void {

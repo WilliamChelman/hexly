@@ -7,10 +7,10 @@ import { PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
 import { CORE_VIEW_RICH_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
-import { CORE_VIEW_FIELDS, CORE_VIEW_MAP } from '@hexly/web-entity';
+import { CORE_VIEW_DETAILS, CORE_VIEW_MAP } from '@hexly/web-entity';
 import { ViewRegistry } from './view-registry';
 
-/** A stand-in for the generic Field View the entity chunk registers at runtime, with no owning Plugin. */
+/** A stand-in for the Details View the entity chunk registers at runtime, with no owning Plugin. */
 class FieldsViewStub {}
 
 /** A loaded {@link ClientConfigStore} reporting exactly `enabled` — mutate the signal to drive reactivity. */
@@ -44,8 +44,8 @@ describe('ViewRegistry filtering by the enabled-Plugin set', () => {
       ],
     });
     registry = TestBed.inject(ViewRegistry);
-    // The app-owned generic Field View registers from the entity chunk, not a Plugin — do it by hand.
-    registry.register({ id: CORE_VIEW_FIELDS, labelKey: 'x', component: FieldsViewStub });
+    // The app-owned Details View registers from the entity chunk, not a Plugin — do it by hand.
+    registry.register({ id: CORE_VIEW_DETAILS, labelKey: 'x', component: FieldsViewStub });
   });
 
   it('drops a disabled Plugin’s View from `all`, `get`, and `forDataType`', () => {
@@ -64,9 +64,9 @@ describe('ViewRegistry filtering by the enabled-Plugin set', () => {
     expect(kinds).not.toContain(CORE_HEX_GRID);
   });
 
-  it('falls back to the generic Field View when a disabled View id is resolved', () => {
+  it('falls back to the Details View when a disabled View id is resolved', () => {
     // `resolve` never returns undefined — a disabled Plugin's View id lands on the app-owned floor.
-    expect(registry.resolve(CORE_VIEW_MAP).id).toBe(CORE_VIEW_FIELDS);
+    expect(registry.resolve(CORE_VIEW_MAP).id).toBe(CORE_VIEW_DETAILS);
     expect(registry.component(CORE_VIEW_MAP)).toBe(FieldsViewStub);
   });
 

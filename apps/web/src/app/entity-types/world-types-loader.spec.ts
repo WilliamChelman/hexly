@@ -6,7 +6,6 @@ import { ActiveWorld, WorldsClient } from '@hexly/web-core';
 import { AvailableType, defineField } from '@hexly/domain';
 import { WorldTypesLoader } from './world-types-loader';
 import { TypeRegistry } from './type-registry';
-import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
 import { CORE_VIEW_RICH_CONTENT } from '@hexly/plugin-content/web';
 
 describe('WorldTypesLoader', () => {
@@ -56,37 +55,40 @@ describe('WorldTypesLoader', () => {
     TestBed.flushEffects(); // flush the initial `null` world emission
   });
 
-  it('registers a user-defined type as a generic-Field-View definition when the World loads', () => {
+  it('registers a user-defined type placing no View when the World loads — it falls to the Details View', () => {
     availableTypes.mockReturnValue(of([monster, deity]));
     worldId.set('w1');
     TestBed.flushEffects();
 
     const def = registry.get('world.type.deity');
     expect(def?.labelText).toBe('Deity');
-    // No authored order, and no prose Field: the type affords its generic Field view alone (ADR-0051).
-    // Prose is a Field of a Structured Data Type now, so a deity gets a content View only when it declares one.
-    expect(def?.views).toEqual([CORE_VIEW_FIELDS]);
-    // Its Fields resolve, so the generic view and facets pick them up.
+    // No authored order, and no structured Field: the type places no View at all (ADR-0067), so it falls
+    // to the fallback Details View in `viewsFor`. Prose is a Field of a Structured Data Type now, so a
+    // deity gets a content View only when it declares one.
+    expect(def?.views).toEqual([]);
+    // Its Fields resolve, so the Details View and facets pick them up.
     expect(registry.resolveFields(['world.type.deity']).map((f) => f.id)).toEqual(['world.field.domain']);
   });
 
-  it('defaults the View of a Field of a Structured Data Type to *last*, so a deity with a battlemap still opens on its Fields', () => {
+  it('places a Field of a Structured Data Type’s View, so a deity with a battlemap opens on it (ADR-0067)', () => {
     availableTypes.mockReturnValue(of([{ ...deity, fieldRefs: ['world.field.domain', 'world.field.battle-map'] }]));
     worldId.set('w1');
     TestBed.flushEffects();
 
-    expect(registry.get('world.type.deity')?.views).toEqual([CORE_VIEW_FIELDS, { field: 'world.field.battle-map' }]);
+    // Only the structured Field places a View now — the Details View is never placed, it is the fallback.
+    expect(registry.get('world.type.deity')?.views).toEqual([{ field: 'world.field.battle-map' }]);
   });
 
   it('projects the author’s own View order verbatim, so "Show as a view" can drop one', () => {
-    // The toggle, off: the `battlemap` Field is still referenced, but places no View.
+    // The toggle, off: the `battlemap` Field is still referenced, but places no View — the author's list
+    // carries a content View alone, and the loader passes it through untouched.
     availableTypes.mockReturnValue(
-      of([{ ...deity, fieldRefs: ['world.field.battle-map'], views: [CORE_VIEW_FIELDS, CORE_VIEW_RICH_CONTENT] }]),
+      of([{ ...deity, fieldRefs: ['world.field.battle-map'], views: [CORE_VIEW_RICH_CONTENT] }]),
     );
     worldId.set('w1');
     TestBed.flushEffects();
 
-    expect(registry.get('world.type.deity')?.views).toEqual([CORE_VIEW_FIELDS, CORE_VIEW_RICH_CONTENT]);
+    expect(registry.get('world.type.deity')?.views).toEqual([CORE_VIEW_RICH_CONTENT]);
   });
 
   it('never registers a plugin-source type — those register in code', () => {

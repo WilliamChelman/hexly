@@ -54,15 +54,15 @@ test('a pre-seeded dnd.type.monster opens on the generic Field View with its val
 
   await expect(page.getByTestId('title')).toHaveText('Ancient Red Dragon');
 
-  // No bespoke stat block — the Plugin that ships it is absent. The Entity affords the generic Field
-  // View alone, and the unregistered Type reads as an inert chip.
+  // No bespoke stat block — the Plugin that ships it is absent. The Entity falls to the Details View
+  // (ADR-0067), and the unregistered Type reads as a plain row there by its raw id.
   await expect(page.getByTestId('dnd.view.stat-block')).toHaveCount(0);
   await expect(page.getByTestId('stat-block-view')).toHaveCount(0);
-  await expect(page.getByTestId('generic-field-view')).toBeVisible();
-  await expect(page.getByTestId('type-chip')).toHaveText('dnd.type.monster');
+  await expect(page.getByTestId('details-view')).toBeVisible();
+  await expect(page.getByTestId('detail-type-dnd.type.monster')).toHaveText('dnd.type.monster');
 
   // The values fall through to the plain-Entity-Document display, unhidden and readable.
-  const plain = page.getByTestId('field-plain-metadata');
+  const plain = page.getByTestId('detail-plain');
   await expect(plain).toContainText('challenge_rating');
   await expect(plain).toContainText('24');
   await expect(plain).toContainText('strength');

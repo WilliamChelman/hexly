@@ -8,7 +8,7 @@ import { EntitiesClient } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { WEB_ENTITY_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { provideEntityTypesTesting } from '../testing/entity-types.fake';
-import { CORE_VIEW_FIELDS } from '../models/view-definition';
+import { CORE_VIEW_DETAILS } from '../models/view-definition';
 import { TypeDefinition } from '../models/type-definition';
 import { EntityLinkPickerComponent } from './entity-link-picker.component';
 
@@ -17,7 +17,7 @@ function codeType(id: string, fieldRefs: readonly string[] = []): TypeDefinition
   return {
     id: id as TypeDefinition['id'],
     icon: 'label',
-    views: [CORE_VIEW_FIELDS],
+    views: [CORE_VIEW_DETAILS],
     fieldRefs,
     graphColorToken: '--color-ink-muted',
     labels: {
@@ -36,7 +36,7 @@ const deity: TypeDefinition = {
   id: 'world.type.deity' as TypeDefinition['id'],
   icon: 'label',
   labelText: 'Deity',
-  views: [CORE_VIEW_FIELDS],
+  views: [CORE_VIEW_DETAILS],
   graphColorToken: '--color-ink-muted',
 };
 

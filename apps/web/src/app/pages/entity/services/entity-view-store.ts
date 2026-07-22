@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { CORE_VIEW_FIELDS, ViewInstance, parseViewInstanceKey, viewInstanceKey } from '@hexly/web-entity';
+import { CORE_VIEW_DETAILS, ViewInstance, parseViewInstanceKey, viewInstanceKey } from '@hexly/web-entity';
 import { EntitySession } from './entity-session';
 
 /**
@@ -32,13 +32,13 @@ export class EntityViewStore {
 
   /**
    * The effective active View: the selection when the Entity affords it, else the
-   * default (the primary type's first View), else the always-present generic Field view (ADR-0051).
+   * default (the primary type's first View), else the always-present Details View (ADR-0051, ADR-0067).
    */
   readonly activeView = computed<ViewInstance>(() => {
     const afforded = this.views();
     const selected = this._selected();
     const found = afforded.find((view) => viewInstanceKey(view) === selected);
-    return found ?? afforded[0] ?? { viewId: CORE_VIEW_FIELDS };
+    return found ?? afforded[0] ?? { viewId: CORE_VIEW_DETAILS };
   });
 
   /**

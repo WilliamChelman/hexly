@@ -1,15 +1,16 @@
-import { authorWorldField, createEntity, enterLibrary, expect, flushSave, openEntityActions, test } from './fixtures';
-
-/** The generic Field view's toggle — the home an attached built-in Field's control renders in (ADR-0054). */
-const FIELDS_VIEW = 'core.view.fields';
+import { authorWorldField, createEntity, enterLibrary, expect, flushSave, openDetails, test } from './fixtures';
 
 /**
- * Attach / detach a registered **Field** on a single Entity (ADR-0054, #229): a worldbuilder reuses a
- * World-authored scalar Field on a plain `core.type.note` its type never named, fills it, and detaches it
- * again — the additive instance layer. (The dnd scalar Fields retired, ADR-0055, so a World Field is the
- * scalar-attach fixture now; the structured attach-and-afford path is `stat-block-attach.spec.ts`.)
+ * Attach / detach a registered **Field** on a single Entity (ADR-0054, #229), now entirely through the
+ * Details Panel's inline management (ADR-0067 — the Edit-fields dialog is retired): a worldbuilder reuses
+ * a World-authored scalar Field on a plain `core.type.note` its type never named, fills it in place, and
+ * detaches it again. The attachment adds **no** view toggle — a plain Field affords no View of its own;
+ * it lives in the Details Panel beside the note's Content View.
  */
-test('attaches a reused World Field to a note, persists its value, and detaches it', async ({ page, request }) => {
+test('attaches a reused World Field to a note inline, persists its value, and detaches it', async ({
+  page,
+  request,
+}) => {
   const worldId = await enterLibrary(page);
   // A reusable World enum Field — no type declares it; it exists to be attached.
   await authorWorldField(page, worldId, {
@@ -22,22 +23,16 @@ test('attaches a reused World Field to a note, persists its value, and detaches 
   await enterLibrary(page);
   const id = await createEntity(page, 'core.type.note');
   await expect(page.getByTestId('title')).toBeVisible();
-  // A plain note affords its Content View alone — no view toggle, no attached Fields yet.
-  await expect(page.getByTestId(FIELDS_VIEW)).toHaveCount(0);
+  // A plain note affords its Content View alone — no view toggle for the attached Field (ADR-0067).
+  await expect(page.getByTestId('core.view.details')).toHaveCount(0);
 
-  // Attach `world.field.size` — a Field the note's type never declared — through the Edit-fields dialog.
-  await openEntityActions(page);
-  await page.getByTestId('edit-fields').click();
-  await page.getByTestId('field-add').selectOption('world.field.size');
-  await expect(page.getByTestId('field-chip-world.field.size')).toBeVisible();
-  await page.getByTestId('fields-close').click();
+  // Attach `world.field.size` — a Field the note's type never declared — through the Details Panel's
+  // inline attach. The note has a Content View, so `openDetails` opens the Dock's Details Panel.
+  await openDetails(page);
+  await page.getByTestId('detail-field-add').selectOption('world.field.size');
 
-  // The attachment appends the generic Field view, where the built-in Field's control now lives.
-  await expect(page.getByTestId(FIELDS_VIEW)).toBeVisible();
-  await page.getByTestId(FIELDS_VIEW).click();
-
-  // Attached-but-empty, it renders as an empty control before it is filled.
-  const size = page.getByTestId('field-world.field.size').locator('select');
+  // Attached-but-empty, it renders as an empty control in place, right in the panel.
+  const size = page.getByTestId('detail-field-world.field.size').locator('select');
   await expect(size).toBeVisible();
   await expect(size).toHaveValue('');
   await size.selectOption('Huge');
@@ -49,18 +44,12 @@ test('attaches a reused World Field to a note, persists its value, and detaches 
   expect(body.document).toMatchObject({ 'world.field.size': 'Huge' });
 
   await page.reload();
-  await page.getByTestId(FIELDS_VIEW).click();
-  await expect(page.getByTestId('field-world.field.size').locator('select')).toHaveValue('Huge');
+  await openDetails(page);
+  await expect(page.getByTestId('detail-field-world.field.size').locator('select')).toHaveValue('Huge');
 
-  // Detach it: discarding the Field deletes its key from the document entirely (ADR-0057).
-  await openEntityActions(page);
-  await page.getByTestId('edit-fields').click();
-  await page.getByTestId('field-detach-world.field.size').click();
-  await expect(page.getByTestId('field-chip-world.field.size')).toHaveCount(0);
-  await page.getByTestId('fields-close').click();
-
-  // With no attached Field left, the note affords its Content View alone — the toggle disappears.
-  await expect(page.getByTestId(FIELDS_VIEW)).toHaveCount(0);
+  // Detach it inline: discarding the Field deletes its key from the document entirely (ADR-0057).
+  await page.getByTestId('detail-field-detach-world.field.size').click();
+  await expect(page.getByTestId('detail-field-world.field.size')).toHaveCount(0);
 
   await flushSave(page);
   const res = await request.get(`/api/entities/${id}`);

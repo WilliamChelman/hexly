@@ -7,7 +7,7 @@ import { DND_MONSTER, DND_STAT_BLOCK, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/
 import { CORE_VIEW_RICH_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { DND_VIEW_STAT_BLOCK, providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
-import { CORE_VIEW_FIELDS, CORE_VIEW_MAP } from '@hexly/web-entity';
+import { CORE_VIEW_DETAILS, CORE_VIEW_MAP } from '@hexly/web-entity';
 import { PluginRegistry } from './plugin-registry';
 
 /** A loaded {@link ClientConfigStore} reporting exactly `enabled` — mutate the signal to drive reactivity. */
@@ -89,8 +89,8 @@ describe('PluginRegistry', () => {
 
       expect(plugins.isViewActive(CORE_VIEW_RICH_CONTENT)).toBe(true);
       expect(plugins.isViewActive(DND_VIEW_STAT_BLOCK)).toBe(false);
-      // The app-owned generic Field View has no owner either.
-      expect(plugins.isViewActive(CORE_VIEW_FIELDS)).toBe(true);
+      // The app-owned Details View has no owner either.
+      expect(plugins.isViewActive(CORE_VIEW_DETAILS)).toBe(true);
     });
 
     it('recomputes when the enabled set changes', () => {

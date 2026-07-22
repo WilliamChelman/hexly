@@ -8,7 +8,7 @@ import { CONTENT_FIELD, CORE_RICH_CONTENT, PLUGIN_ID as CONTENT_PLUGIN_ID } from
 import { DND_MONSTER, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
 import { TypeRegistry } from './type-registry';
 import {
-  CORE_VIEW_FIELDS,
+  CORE_VIEW_DETAILS,
   CORE_VIEW_MAP,
   PLUGIN_IDS,
   TypeDefinition,
@@ -104,11 +104,11 @@ describe('TypeRegistry', () => {
   it('resolves an unregistered or absent type to synthetic generic chrome — never the note, never a throw', () => {
     // The `?? core.type.note` crutch is gone (ADR-0052): content is disableable now, so no Type is
     // guaranteed present. A registered type resolves to itself; anything else to the generic default —
-    // its own View list the generic Field View, and its labels generic keys, not `core.type.note`'s.
+    // its own View list the Details View, and its labels generic keys, not `core.type.note`'s.
     expect(registry.resolve('core.type.hex-map').id).toBe('core.type.hex-map');
     expect(registry.resolve('pathfinder.type.monster').id).not.toBe('core.type.note');
-    expect(registry.resolve('pathfinder.type.monster').views).toEqual([CORE_VIEW_FIELDS]);
-    expect(registry.resolve(undefined).views).toEqual([CORE_VIEW_FIELDS]);
+    expect(registry.resolve('pathfinder.type.monster').views).toEqual([CORE_VIEW_DETAILS]);
+    expect(registry.resolve(undefined).views).toEqual([CORE_VIEW_DETAILS]);
     // The generic keys resolve through the app catalog, so chrome reads as a sensible noun, not broken.
     expect(registry.chromeLabel('pathfinder.type.monster', 'create')).toBe('New entity');
   });
@@ -124,8 +124,9 @@ describe('TypeRegistry', () => {
       `${CORE_VIEW_MAP}:core.field.grid`,
       CORE_VIEW_RICH_CONTENT,
     ]);
-    expect(registry.viewsFor([])).toEqual([]);
-    expect(registry.viewsFor(undefined)).toEqual([]);
+    // A typeless, fieldless Entity still affords the Details View — the universal fallback (ADR-0067).
+    expect(registry.viewsFor([])).toEqual([{ viewId: CORE_VIEW_DETAILS }]);
+    expect(registry.viewsFor(undefined)).toEqual([{ viewId: CORE_VIEW_DETAILS }]);
   });
 
   it('binds the View of a Field of a Structured Data Type to the Field it renders, and a Type’s View to nothing', () => {
@@ -165,16 +166,17 @@ describe('TypeRegistry', () => {
       ]);
     });
 
-    it('does not drag in the generic Field View — a bespoke view is what the code bought', () => {
-      expect(viewKeys(registry.viewsFor([DND_MONSTER]))).not.toContain(CORE_VIEW_FIELDS);
+    it('does not drag in the Details View — a bespoke view is what the code bought (ADR-0067)', () => {
+      expect(viewKeys(registry.viewsFor([DND_MONSTER]))).not.toContain(CORE_VIEW_DETAILS);
     });
   });
 
-  it('affords exactly the Views a registered type declares', () => {
-    // A fields-only type (every user-defined one) declares the generic Field View outright…
-    registry.register({ ...definition('dnd.type.beast', ['world.field.cr']), views: [CORE_VIEW_FIELDS] });
-    expect(viewKeys(registry.viewsFor(['dnd.type.beast']))).toEqual([CORE_VIEW_FIELDS]);
-    // …and a core type declaring no Fields never surfaces it.
+  it('falls to the Details View only when a type affords no other (ADR-0067)', () => {
+    // A fields-only type (a user-defined one placing no structured Field) affords nothing of its own,
+    // so it falls to the Details View — never as a toggle beside another View.
+    registry.register({ ...definition('dnd.type.beast', ['world.field.cr']), views: [] });
+    expect(viewKeys(registry.viewsFor(['dnd.type.beast']))).toEqual([CORE_VIEW_DETAILS]);
+    // A core type declaring a Content View never surfaces the Details View beside it.
     expect(viewKeys(registry.viewsFor(['core.type.note']))).toEqual([CORE_VIEW_RICH_CONTENT]);
   });
 
@@ -190,43 +192,40 @@ describe('TypeRegistry', () => {
   });
 
   describe('a user-defined type carrying a Field of a Structured Data Type', () => {
-    it('affords the grid’s map View, bound to the Field — and still opens on its Fields', () => {
+    it('affords the grid’s map View alone, bound to the Field — Details leaves the toggle (ADR-0067)', () => {
       registry.register({
         ...definition('world.type.deity', ['world.field.battle-map']),
-        views: [CORE_VIEW_FIELDS, CORE_VIEW_RICH_CONTENT, { field: 'world.field.battle-map' }],
+        views: [{ field: 'world.field.battle-map' }],
       });
 
-      // The map is last, so the default View — the primary type's first — is the deity's own Fields.
-      expect(viewKeys(registry.viewsFor(['world.type.deity']))).toEqual([
-        CORE_VIEW_FIELDS,
-        CORE_VIEW_RICH_CONTENT,
-        `${CORE_VIEW_MAP}:world.field.battle-map`,
-      ]);
+      // The deity affords its battlemap, so it opens on it — the Details View is not placed beside it.
+      expect(viewKeys(registry.viewsFor(['world.type.deity']))).toEqual([`${CORE_VIEW_MAP}:world.field.battle-map`]);
     });
 
     it('affords *two* map Views when it also carries core.type.hex-map — one per grid', () => {
       registry.register({
         ...definition('world.type.deity', ['world.field.battle-map']),
-        views: [CORE_VIEW_FIELDS, { field: 'world.field.battle-map' }],
+        views: [{ field: 'world.field.battle-map' }],
       });
 
-      // Two Views of one Entity, each bound to its own Field — why a View is an instance (#200).
+      // Two Views of one Entity, each bound to its own Field — why a View is an instance (#200). The
+      // Content View comes from `core.type.hex-map`; no Details toggle, since real Views exist.
       expect(viewKeys(registry.viewsFor(['core.type.hex-map', 'world.type.deity']))).toEqual([
         `${CORE_VIEW_MAP}:core.field.grid`,
         CORE_VIEW_RICH_CONTENT,
-        CORE_VIEW_FIELDS,
         `${CORE_VIEW_MAP}:world.field.battle-map`,
       ]);
     });
 
-    it('drops the Field’s View when "Show as a view" is off, leaving the Field itself alone', () => {
-      // The toggle authors the *views* list, never the Field: the value stays, and stays declared.
+    it('drops the Field’s View when "Show as a view" is off — falling to Details, leaving the Field alone', () => {
+      // The toggle authors the *views* list, never the Field: the value stays, and stays declared. With
+      // the grid unplaced the deity affords nothing else, so it falls to the fallback Details View.
       registry.register({
         ...definition('world.type.deity', ['world.field.battle-map']),
-        views: [CORE_VIEW_FIELDS, CORE_VIEW_RICH_CONTENT],
+        views: [],
       });
 
-      expect(viewKeys(registry.viewsFor(['world.type.deity']))).toEqual([CORE_VIEW_FIELDS, CORE_VIEW_RICH_CONTENT]);
+      expect(viewKeys(registry.viewsFor(['world.type.deity']))).toEqual([CORE_VIEW_DETAILS]);
       expect(registry.resolveFields(['world.type.deity']).map((f) => f.id)).toEqual(['world.field.battle-map']);
     });
   });
@@ -237,11 +236,10 @@ describe('TypeRegistry', () => {
       // Views, each bound to the Field it renders — the twin of two grids affording two map Views (#202).
       registry.register({
         ...definition('world.type.saint', ['world.field.content', 'world.field.secrets']),
-        views: [CORE_VIEW_FIELDS, { field: 'world.field.content' }, { field: 'world.field.secrets' }],
+        views: [{ field: 'world.field.content' }, { field: 'world.field.secrets' }],
       });
 
       expect(viewKeys(registry.viewsFor(['world.type.saint']))).toEqual([
-        CORE_VIEW_FIELDS,
         `${CORE_VIEW_RICH_CONTENT}:world.field.content`,
         `${CORE_VIEW_RICH_CONTENT}:world.field.secrets`,
       ]);
@@ -253,12 +251,12 @@ describe('TypeRegistry', () => {
     });
   });
 
-  it('affords the generic Field View *alone* for an unregistered type — the missing-plugin case', () => {
+  it('affords the Details View *alone* for an unregistered type — the missing-plugin case', () => {
     // No definition registered for `pathfinder.type.monster`: #199's content floor is withdrawn (ADR-0051),
-    // so the Entity opens on the generic View alone — its type an inert chip, its values (prose
-    // included) shown there as plain EntityDocument. No data-type is privileged: no content View is
-    // afforded for a Field the absent plugin never declared.
-    expect(viewKeys(registry.viewsFor(['pathfinder.type.monster']))).toEqual([CORE_VIEW_FIELDS]);
+    // and an unregistered type affords no View of its own (ADR-0067) — so the Entity falls to the Details
+    // View, its type a row there, its values (prose included) shown as plain document. No data-type is
+    // privileged: no content View is afforded for a Field the absent plugin never declared.
+    expect(viewKeys(registry.viewsFor(['pathfinder.type.monster']))).toEqual([CORE_VIEW_DETAILS]);
   });
 
   it('resolves the union of Field schemas a types[] set declares, primary type first', () => {
@@ -363,7 +361,7 @@ describe('TypeRegistry', () => {
 
     it('reuses one World Field across two unrelated types via instance attachment', () => {
       registry.setWorldFields([element]);
-      registry.register({ ...definition('world.type.deity', []), views: [CORE_VIEW_FIELDS] });
+      registry.register({ ...definition('world.type.deity', []), views: [] });
       // Attached to a plain note and to a world.type.deity — one Field, two unrelated types.
       expect(registry.effectiveFields(['core.type.note'], ['world.field.element']).map((f) => f.id)).toContain(
         'world.field.element',
@@ -383,27 +381,22 @@ describe('TypeRegistry', () => {
       ]);
     });
 
-    it('affords the generic Field view for an attached built-in Field — its control needs a home (ADR-0054)', () => {
-      // `world.field.cr` is a number with no View of its own; attaching it to a note appends the generic Field
-      // view so its control has a surface to render on (CONTEXT.md → View, #229).
-      expect(viewKeys(registry.viewsFor(['core.type.note'], ['world.field.cr']))).toEqual([
-        CORE_VIEW_RICH_CONTENT,
-        CORE_VIEW_FIELDS,
-      ]);
+    it('affords no extra View for an attached built-in Field — a plain Field affords none now (ADR-0067)', () => {
+      // `world.field.cr` is a number with no View of its own; attaching it to a note adds no toggle. Its
+      // control lives in the Details View/Panel, not a View of its own (CONTEXT.md → View, ADR-0067).
+      expect(viewKeys(registry.viewsFor(['core.type.note'], ['world.field.cr']))).toEqual([CORE_VIEW_RICH_CONTENT]);
     });
 
-    it('affords the generic Field view once for several attached built-in Fields', () => {
-      // Two built-in attachments share the one generic Field view — dedup keeps a single toggle.
+    it('adds no toggle for several attached built-in Fields either', () => {
       expect(viewKeys(registry.viewsFor(['core.type.note'], ['world.field.cr', 'world.field.alignment']))).toEqual([
         CORE_VIEW_RICH_CONTENT,
-        CORE_VIEW_FIELDS,
       ]);
     });
 
-    it('surfaces an attached grid’s View even on an unregistered type — the missing-plugin floor plus the attachment', () => {
-      // The type affords the generic Field view alone; the attached grid still surfaces its Map View.
+    it('surfaces an attached grid’s View on an unregistered type — no Details toggle beside it', () => {
+      // The unregistered type affords no View of its own; the attached grid surfaces its Map View, and
+      // because a real View now exists the Details fallback is not appended (ADR-0067).
       expect(viewKeys(registry.viewsFor(['pathfinder.type.monster'], [HEX_GRID_FIELD.id]))).toEqual([
-        CORE_VIEW_FIELDS,
         `${CORE_VIEW_MAP}:core.field.grid`,
       ]);
     });
@@ -438,7 +431,7 @@ describe('TypeRegistry', () => {
       id: 'world.type.deity' as TypeDefinition['id'],
       icon: 'label',
       labelText: 'Deity',
-      views: [CORE_VIEW_FIELDS],
+      views: [],
       graphColorToken: '--color-ink-muted',
     };
 
@@ -480,11 +473,11 @@ describe('TypeRegistry without the Hex Map plugin', () => {
     expect(registry.get('core.type.hex-map')).toBeUndefined();
   });
 
-  it('opens an existing Hex Map on the generic Field view alone — the withdrawn content floor', () => {
-    // The Entity opens, and nothing is hidden: `core.type.hex-map` is unregistered, so it affords the generic
-    // View alone (ADR-0051), and the grid — a EntityDocument value like any other — is still there,
-    // under an unrendered Field rather than a canvas. Its prose is shown there too, unrendered.
-    expect(viewKeys(registry.viewsFor(['core.type.hex-map']))).toEqual([CORE_VIEW_FIELDS]);
+  it('opens an existing Hex Map on the Details View alone — the withdrawn content floor', () => {
+    // The Entity opens, and nothing is hidden: `core.type.hex-map` is unregistered, so it affords no View
+    // of its own and falls to the Details View (ADR-0051, ADR-0067), where the grid — a EntityDocument
+    // value like any other — is still there, under an unrendered Field rather than a canvas. Its prose too.
+    expect(viewKeys(registry.viewsFor(['core.type.hex-map']))).toEqual([CORE_VIEW_DETAILS]);
     // No map View is afforded by anything, so the header offers no toggle to a canvas that isn't here.
     expect(registry.typeIdsForView(CORE_VIEW_MAP)).toEqual([]);
   });
@@ -498,12 +491,12 @@ describe('TypeRegistry without the Hex Map plugin', () => {
       id: 'world.type.deity' as TypeDefinition['id'],
       icon: 'label',
       labelText: 'Deity',
-      views: [CORE_VIEW_FIELDS, { field: 'world.field.battle-map' }],
+      views: [{ field: 'world.field.battle-map' }],
       fieldRefs: ['world.field.battle-map'],
       graphColorToken: '--color-ink-muted',
     });
 
-    expect(viewKeys(registry.viewsFor(['world.type.deity']))).toEqual([CORE_VIEW_FIELDS]);
+    expect(viewKeys(registry.viewsFor(['world.type.deity']))).toEqual([CORE_VIEW_DETAILS]);
   });
 
   it('still renders a Hex Map’s chrome — the synthetic generic default, no longer the note’s', () => {
@@ -513,7 +506,7 @@ describe('TypeRegistry without the Hex Map plugin', () => {
     const chrome = registry.resolve('core.type.hex-map');
     expect(chrome.id).not.toBe('core.type.note');
     expect(chrome.icon).toBe('label');
-    expect(chrome.views).toEqual([CORE_VIEW_FIELDS]);
+    expect(chrome.views).toEqual([CORE_VIEW_DETAILS]);
   });
 });
 
@@ -556,8 +549,8 @@ describe('TypeRegistry filtering by the enabled-Plugin set', () => {
     expect(registry.all().map((d) => d.id)).toEqual(['core.type.note', 'core.type.hex-map']);
     // A disabled Type reads as absent — never registered — so every caller degrades with no branch.
     expect(registry.get(DND_MONSTER)).toBeUndefined();
-    // Its Entity affords the generic Field View alone (its values readable there), not the stat block.
-    expect(viewKeys(registry.viewsFor([DND_MONSTER]))).toEqual([CORE_VIEW_FIELDS]);
+    // Its Entity falls to the Details View alone (its values readable there), not the stat block.
+    expect(viewKeys(registry.viewsFor([DND_MONSTER]))).toEqual([CORE_VIEW_DETAILS]);
     // The maps filter and the content-view type list omit it too.
     expect(registry.typeIdsForView(CORE_VIEW_RICH_CONTENT)).toEqual(['core.type.note', 'core.type.hex-map']);
   });
@@ -565,7 +558,7 @@ describe('TypeRegistry filtering by the enabled-Plugin set', () => {
   it('resolves a disabled Type to synthetic generic chrome — never a throw, never the note', () => {
     const chrome = registry.resolve(DND_MONSTER);
     expect(chrome.id).not.toBe('core.type.note');
-    expect(chrome.views).toEqual([CORE_VIEW_FIELDS]);
+    expect(chrome.views).toEqual([CORE_VIEW_DETAILS]);
     expect(registry.chromeLabel(DND_MONSTER, 'eyebrow')).toBe('Entity');
   });
 
@@ -591,7 +584,7 @@ describe('TypeRegistry filtering by the enabled-Plugin set', () => {
       id: 'world.type.deity' as TypeDefinition['id'],
       icon: 'label',
       labelText: 'Deity',
-      views: [CORE_VIEW_FIELDS],
+      views: [],
       graphColorToken: '--color-ink-muted',
     });
     enabled.set(new Set()); // every Plugin off — the coherent generic-everywhere state
@@ -608,10 +601,10 @@ describe('TypeRegistry filtering by the enabled-Plugin set', () => {
       id: 'world.type.realm' as TypeDefinition['id'],
       icon: 'label',
       labelText: 'Realm',
-      views: [CORE_VIEW_FIELDS, { field: 'world.field.battle-map' }],
+      views: [{ field: 'world.field.battle-map' }],
       fieldRefs: ['world.field.battle-map'],
       graphColorToken: '--color-ink-muted',
     });
-    expect(viewKeys(registry.viewsFor(['world.type.realm']))).toEqual([CORE_VIEW_FIELDS]);
+    expect(viewKeys(registry.viewsFor(['world.type.realm']))).toEqual([CORE_VIEW_DETAILS]);
   });
 });
