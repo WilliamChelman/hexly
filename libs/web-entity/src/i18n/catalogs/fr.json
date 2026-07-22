@@ -7,7 +7,15 @@
     "remove": "Retirer le lien",
     "search": "Rechercher des entités…",
     "empty": "Aucune entité",
-    "unavailable": "Indisponible"
+    "unavailable": "Indisponible",
+    "dangling": "Cette entité est indisponible"
+  },
+  "links": {
+    "toggle": "Afficher/masquer les liens",
+    "references": "Références",
+    "referencedBy": "Référencé par",
+    "referencesEmpty": "Cette entité ne renvoie à rien",
+    "referencedByEmpty": "Rien ne renvoie ici"
   },
   "assetLink": {
     "set": "Définir une image…",

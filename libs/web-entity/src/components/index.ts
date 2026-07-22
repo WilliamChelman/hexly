@@ -6,3 +6,5 @@ export * from './grant-set.component';
 export * from './member-set.component';
 export * from './owner-set.component';
 export * from './public-link.component';
+export * from './reference-row.component';
+export * from './references-panel.component';

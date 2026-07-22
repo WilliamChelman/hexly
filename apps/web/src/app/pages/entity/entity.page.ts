@@ -3,10 +3,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Observable, concat, distinctUntilChanged, ignoreElements, map, of } from 'rxjs';
+import { EntityDock } from '@hexly/web-entity';
 import { EntitySession } from './services/entity-session';
 import { EntityViewStore } from './services/entity-view-store';
 import { EntityHeaderComponent } from './components/entity-header.component';
 import { EntityViewOutletComponent } from './components/entity-view-outlet.component';
+import { EntityDockComponent } from './components/entity-dock.component';
 import { ViewRegistry } from '../../entity-types/view-registry';
 import { CORE_VIEW_DEFINITIONS } from './views/core-views';
 
@@ -24,21 +26,27 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-hidden' },
   // EntityViewStore is page-scoped: it reads the open Entity's types off the session, provided above
-  // the page in both the routed and Public Link mounts. The content View's dock stores are the
-  // View's own now (ADR-0051) — provided in `ContentView`, as the map's store is in `MapView`.
-  providers: [EntityViewStore],
-  imports: [EntityHeaderComponent, EntityViewOutletComponent, TranslocoPipe],
+  // the page in both the routed and Public Link mounts. EntityDock is page-scoped too (ADR-0067):
+  // provided above the View outlet so the running View can claim the open slot. The content View's
+  // own dock stores stay the View's (ADR-0051) — provided in `ContentView`, as the map's are in `MapView`.
+  providers: [EntityViewStore, EntityDock],
+  imports: [EntityHeaderComponent, EntityViewOutletComponent, EntityDockComponent, TranslocoPipe],
   template: `
     @if (session.current()) {
       <div class="grid h-full" style="grid-template-rows: auto 1fr">
         <!-- Page-owned header docked above the body (ADR-0022). -->
         <app-entity-header />
-        <main class="relative min-h-0">
-          <!-- The View body — resolution, outletting, and the card/dangling fallbacks — is the
-               reusable Entity View Outlet's now (Seam C, #264), shared with the Board Embed. The page
-               drives its own route-loaded session, so it passes no target id and the default context. -->
-          <app-entity-view-outlet />
-        </main>
+        <!-- Body: the View's main content beside the page-owned Dock column (ADR-0067). The Dock's
+             open Panel is an in-flow column at wide viewports (main shrinks) and an overlay below. -->
+        <div class="grid min-h-0" style="grid-template-columns: minmax(0, 1fr) auto">
+          <main class="relative min-h-0 overflow-hidden">
+            <!-- The View body — resolution, outletting, and the card/dangling fallbacks — is the
+                 reusable Entity View Outlet's now (Seam C, #264), shared with the Board Embed. The page
+                 drives its own route-loaded session, so it passes no target id and the default context. -->
+            <app-entity-view-outlet />
+          </main>
+          <app-entity-dock />
+        </div>
       </div>
     } @else if (session.evicted()) {
       <!-- Live eviction (ADR-0044, #174): the followed Entity became unreachable (deleted,

@@ -3,8 +3,7 @@ import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { EMPTY, catchError, distinctUntilChanged, map, switchMap } from 'rxjs';
 import { EntityReferences } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
-import { ENTITY_SESSION } from '@hexly/web-entity';
-import { RightDock } from './right-dock';
+import { ENTITY_SESSION } from '../models/entity-session';
 
 /** A fetched list, tagged with the Entity it describes. */
 interface Loaded {
@@ -13,29 +12,29 @@ interface Loaded {
 }
 
 /**
- * Route-scoped UI state for the References panel — the open Entity's own links and the Entities
- * that link to it (CONTEXT.md → Entity Link; ADR-0046).
+ * UI state for the References Panel — the open Entity's own links and the Entities that link to it
+ * (CONTEXT.md → Entity Link; ADR-0046). A universal Panel of the page's Dock now (ADR-0067), moved
+ * out of the content plugin: References read the core materialized link index, not prose.
  *
- * The fetch is keyed on the open Entity's `(id, seq)` (ADR-0045), not on `content()`: References
- * read the derived edge index, which the server rebuilds only on a committed save. Nothing is
- * fetched while the panel is closed, and opening it always fetches.
+ * Panel-scoped: it lives only while the References Panel is open, so "nothing fetched while closed" and
+ * "opening always fetches" fall out of the lifecycle rather than a dock gate. The fetch is keyed on the
+ * open Entity's `(id, seq)` (ADR-0045), not on content: References read the derived edge index, which
+ * the server rebuilds only on a committed save.
  *
- * Freshness ceiling: `seq` tracks changes to *this* Entity only. A *Referenced by* row added by
- * another Entity's save, or an outbound target's rename, bumps that other Entity's `seq` and never
- * this one's — so an open panel does not see either. It refreshes on reopen, on navigation, and on
- * this Entity's own saves.
+ * Freshness ceiling: `seq` tracks changes to *this* Entity only. A *Referenced by* row added by another
+ * Entity's save, or an outbound target's rename, bumps that other Entity's `seq` and never this one's —
+ * so an open panel does not see either. It refreshes on reopen, on navigation, and on this Entity's own
+ * saves.
  *
- * The page keeps this store alive across `:id` changes, so a held list is tagged with the Entity it
- * was fetched for and shown only for that Entity: swapping Entities blanks the panel rather than
- * briefly attributing one Entity's links to another.
- *
- * The inbound half is access-filtered server-side per viewer.
+ * The Panel stays open across `:id` changes (it is page chrome), so a held list is tagged with the
+ * Entity it was fetched for and shown only for that Entity: swapping Entities blanks the panel rather
+ * than briefly attributing one Entity's links to another. The inbound half is access-filtered
+ * server-side per viewer.
  */
 @Injectable()
 export class ReferencesStore {
   private readonly session = inject(ENTITY_SESSION);
   private readonly entities = inject(EntitiesClient);
-  private readonly dock = inject(RightDock);
 
   private readonly _loaded = signal<Loaded | null>(null);
 
@@ -53,11 +52,10 @@ export class ReferencesStore {
   readonly loaded = computed(() => this.current() !== undefined);
 
   constructor() {
-    /** What the panel wants loaded right now, or `null` while it is closed. */
+    /** What the panel wants loaded — the open Entity's `(id, seq)`, or `null` while none is open. */
     const target = computed(() => {
       const entity = this.session.current();
-      const showing = this.dock.panel() === 'references';
-      return showing && entity ? { id: entity.id, seq: entity.seq } : null;
+      return entity ? { id: entity.id, seq: entity.seq } : null;
     });
 
     toObservable(target)

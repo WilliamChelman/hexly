@@ -1,6 +1,7 @@
 import { InjectionToken, Type } from '@angular/core';
 import { StructuredDataTypeId, ViewPlacement } from '@hexly/domain';
 import { ViewId } from '../utils/view-instance';
+import { PanelDefinition } from './panel-definition';
 
 /**
  * A **View** id — an open, `core.view.*`-style namespaced key identifying a togglable renderer+editor
@@ -58,6 +59,12 @@ export const VIEW_FIELD_KEY = new InjectionToken<string>('hexly.view.fieldKey');
  */
 export type ViewDefinition = {
   readonly id: ViewId;
+  /**
+   * The **Panels** this View contributes to the page's Dock (ADR-0067) — declared, not registered at
+   * runtime, so the Dock's toggle strip is known synchronously before the View's lazy body loads. The
+   * strip merges these with the universal Panels; absent means the View contributes none.
+   */
+  readonly panels?: readonly PanelDefinition[];
 } & (
   | {
       /** transloco key for the view-toggle button label (ADR-0014). */
