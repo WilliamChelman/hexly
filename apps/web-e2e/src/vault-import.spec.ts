@@ -1,5 +1,5 @@
 import { strToU8, zipSync } from 'fflate';
-import { expect, segRe, test } from './fixtures';
+import { expect, openDetails, segRe, test } from './fixtures';
 
 /**
  * Vault-import smoke (ADR-0033). The vault is built in memory (fflate) so there's no
@@ -51,11 +51,13 @@ test('imports a vault from the World Index, landing in the new World with a reso
   await expect(page.getByRole('link', { name: 'Keep' })).toBeVisible();
 
   // Open the note carrying the wikilink; its frontmatter came across as read-only
-  // EntityDocument, including the provenance key hexly.sourcePath.
+  // EntityDocument, including the provenance key hexly.sourcePath. The inline metadata
+  // block is retired (ADR-0067) — those untyped keys now read from the Details panel.
   await page.getByRole('link', { name: 'Mara' }).click();
   await expect(page.getByTestId('title')).toHaveText('Mara');
-  await expect(page.getByTestId('entity-metadata')).toContainText('hexly.sourcePath');
-  await expect(page.getByTestId('entity-metadata')).toContainText('Mara.md');
+  await openDetails(page);
+  await expect(page.getByTestId('detail-plain')).toContainText('hexly.sourcePath');
+  await expect(page.getByTestId('detail-plain')).toContainText('Mara.md');
 
   // [[Keep]] resolved to a real, navigable Entity Link (not a dangling label).
   const link = page.getByTestId('entity-link');

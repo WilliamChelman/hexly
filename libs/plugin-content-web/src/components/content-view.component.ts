@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { ENTITY_SESSION, ENTITY_TYPES } from '@hexly/web-entity';
 import { TranslocoService } from '@jsverse/transloco';
 import { ContentEditorComponent } from './content-editor.component';
-import { EntityMetadataComponent } from './entity-metadata.component';
 import { OutlineSourceDirective } from '../directives/outline-source.directive';
 import { OutlineStore } from '../services/outline-store';
 
@@ -18,18 +17,20 @@ import { OutlineStore } from '../services/outline-store';
  * Dock-hosted Outline Panel reaches it through the View injector.
  *
  * `display:contents` (host `class: contents`) so the scroll column positions against the page's `<main>`.
+ *
+ * The inline metadata block the View once rendered above prose is retired (ADR-0067): document keys now
+ * render in exactly one place — the universal Details panel — so the redundant inline block is gone.
  */
 @Component({
   selector: 'app-content-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
   providers: [OutlineStore],
-  imports: [ContentEditorComponent, EntityMetadataComponent, OutlineSourceDirective],
+  imports: [ContentEditorComponent, OutlineSourceDirective],
   template: `
     <!-- Content body in a centred reading column; the page's grid reserves the Dock's column beside it. -->
     <div data-content-scroll class="absolute inset-0 overflow-y-auto bg-surface-sunken">
       <div class="max-w-[60rem] mx-auto py-6 px-6">
-        <app-entity-metadata />
         <app-content-editor appOutlineSource [ariaLabel]="editorLabel()" />
       </div>
     </div>
