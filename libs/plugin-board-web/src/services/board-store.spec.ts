@@ -8,16 +8,23 @@ import {
   TextElement,
 } from '@hexly/plugin-board';
 import { emptyRichContent, tiptapContent } from '@hexly/plugin-content';
+import { EntityDock, REFERENCES_PANEL } from '@hexly/web-entity';
 import { BoardStore } from './board-store';
+import { BOARD_INSPECTOR_PANEL, CORE_PANEL_BOARD_INSPECTOR } from '../board-types';
 import { FakeEntitySession, provideBoardStoreTesting } from '../testing/entity-session.fake';
 
 let session: FakeEntitySession;
 
 beforeEach(() => {
+  // The Dock persists the user's remembered Panel per-user (AuthScopedStorage → localStorage under jsdom);
+  // clear it so one test's toggle never leaks its remembered choice into the next (ADR-0067).
+  localStorage.clear();
   // Binds the store to `core.type.board`'s own `core.field.surface` Field, as the entity page's outlet does.
   TestBed.configureTestingModule({ providers: provideBoardStoreTesting() });
   session = TestBed.inject(FakeEntitySession);
 });
+
+afterEach(() => localStorage.clear());
 
 function makeStore(): BoardStore {
   return TestBed.inject(BoardStore);
@@ -656,5 +663,79 @@ describe('BoardStore element arming', () => {
     expect(store.tool()).toBe('select');
     expect(store.selectedIds()).toEqual([]);
     expect(store.armed()).toBeNull();
+  });
+});
+
+/**
+ * The Board View contributes its Inspector as a page-Dock Panel (ADR-0067). A selection {@link
+ * EntityDock.claim claims} the Inspector transiently, never touching the user's remembered cross-View
+ * choice; emptying the selection releases the claim and restores it. Mirrors the Map View's store.
+ */
+describe('BoardStore Inspector claim on the page Dock', () => {
+  /** Provision the Dock's available set as the page chrome does — the Inspector plus a universal panel. */
+  function openDock(): EntityDock {
+    const dock = TestBed.inject(EntityDock);
+    dock.setAvailable([BOARD_INSPECTOR_PANEL, REFERENCES_PANEL]);
+    return dock;
+  }
+
+  it('claims the Inspector Panel when an element is selected', () => {
+    const store = makeStore();
+    const dock = openDock();
+    const a = store.addElement({ x: 0, y: 0 }); // placement selects, so the Inspector claim opens on it
+
+    store.select(a);
+
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_BOARD_INSPECTOR);
+  });
+
+  it('claims the Inspector on a marquee/programmatic multi-selection too', () => {
+    const store = makeStore();
+    const dock = openDock();
+    const [a, b] = addThreeBoxes(store);
+
+    store.selectMany([a, b]);
+
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_BOARD_INSPECTOR);
+  });
+
+  it('claims the Inspector transiently over the user’s remembered Panel, restoring it on deselect', () => {
+    const store = makeStore();
+    const dock = openDock();
+    dock.toggle(REFERENCES_PANEL.id); // the user's remembered cross-View choice
+    expect(dock.openPanel()?.id).toBe(REFERENCES_PANEL.id);
+
+    const a = store.addElement({ x: 0, y: 0 });
+    store.select(a); // a selection claims the Inspector, superseding the remembered References
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_BOARD_INSPECTOR);
+
+    store.deselect(); // emptying the selection releases the claim, restoring the remembered choice
+    expect(dock.openPanel()?.id).toBe(REFERENCES_PANEL.id);
+  });
+
+  it('releases the Inspector claim when the selection is deleted', () => {
+    const store = makeStore();
+    const dock = openDock();
+    const a = store.addElement({ x: 0, y: 0 });
+    store.select(a);
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_BOARD_INSPECTOR);
+
+    store.delete();
+
+    expect(dock.openPanel()).toBeNull();
+  });
+
+  it('releases the Inspector claim on a fresh load, leaving the user’s remembered choice intact', () => {
+    const store = makeStore();
+    const dock = openDock();
+    dock.toggle(REFERENCES_PANEL.id); // the user's remembered choice
+    const a = store.addElement({ x: 0, y: 0 });
+    store.select(a); // claims the Inspector, superseding the remembered list
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_BOARD_INSPECTOR);
+
+    reload({ elements: [] }); // a fresh load resets the selection…
+
+    // …so the transient Inspector claim drops and the remembered References surfaces again.
+    expect(dock.openPanel()?.id).toBe(REFERENCES_PANEL.id);
   });
 });

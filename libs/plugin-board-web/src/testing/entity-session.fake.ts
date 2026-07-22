@@ -1,8 +1,10 @@
 import { Provider } from '@angular/core';
 import { EntityDocument } from '@hexly/domain';
 import { BoardSurface, emptyBoardSurface, SURFACE_FIELD } from '@hexly/plugin-board';
-import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { ENTITY_SESSION, EntityDock, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { FakeEntitySession as BaseFakeEntitySession } from '@hexly/web-entity/testing';
+import { AuthClient } from '@hexly/web-core';
+import { MockAuthClient } from '@hexly/web-core/testing';
 import { BoardStore } from '../services/board-store';
 
 /**
@@ -51,7 +53,17 @@ export function provideFakeEntitySession(): Provider[] {
  * `core.field.surface` Field. The Field key is explicit because the store requires one; in the app it comes
  * from the entity page's outlet. A spec exercising a second surface overrides {@link VIEW_FIELD_KEY}
  * with its own key.
+ *
+ * The page-owned {@link EntityDock} is provided too, since the store now claims/releases the Dock's slot
+ * on selection (ADR-0067); its {@link AuthClient} dependency (via `AuthScopedStorage`) is a mock so the
+ * remembered-choice storage resolves.
  */
 export function provideBoardStoreTesting(): Provider[] {
-  return [BoardStore, { provide: VIEW_FIELD_KEY, useValue: SURFACE_FIELD.id }, ...provideFakeEntitySession()];
+  return [
+    BoardStore,
+    EntityDock,
+    { provide: AuthClient, useValue: new MockAuthClient() },
+    { provide: VIEW_FIELD_KEY, useValue: SURFACE_FIELD.id },
+    ...provideFakeEntitySession(),
+  ];
 }

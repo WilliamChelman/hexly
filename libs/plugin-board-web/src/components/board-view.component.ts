@@ -7,16 +7,20 @@ import { BoardStore } from '../services/board-store';
 import { BoardCanvasComponent } from './board-canvas.component';
 import { BoardElementsComponent } from './board-elements.component';
 import { ToolPaletteComponent } from './tool-palette.component';
-import { InspectorComponent } from './inspector.component';
 
 /**
  * The `core.view.board` renderer (ADR-0048, *Views* amendment): the full-bleed board surface with its
- * floating tool palette and Inspector dock (#267, Seam B).
+ * floating tool palette.
+ *
+ * The Inspector is a page-Dock Panel now (ADR-0067) — declared on the board {@link ViewDefinition.panels}
+ * and hosted by the page's Dock with this View's injector, driven by the {@link BoardStore}'s selection
+ * claim — so the floating Inspector dock the View once owned is gone. What remains here is the canvas,
+ * the element overlay, and the tool palette.
  *
  * The canvas grid is a read affordance (pan/zoom) and the element overlay renders for every session —
  * a read-only opener and an Embed's transclusion (ADR-0062) must see the Board's *content*, not a bare
- * grid, or nested Embeds never mount. Only the editing docks (tool palette, Inspector) and the overlay's
- * editing gestures are gated on {@link ENTITY_SESSION.writable} (ADR-0037), mirroring the Hex Map View
+ * grid, or nested Embeds never mount. Only the tool palette and the overlay's editing gestures are gated
+ * on {@link ENTITY_SESSION.writable} (ADR-0037), mirroring the Hex Map View
  * whose content canvas renders outside the writable gate. A real full-bleed box (`absolute inset-0`),
  * not `display:contents`: this host carries the wheel listener, and a boxless host receives the bubbled
  * wheel as non-cancelable, so `preventDefault()` is silently dropped and a pinch zooms the whole page
@@ -33,7 +37,7 @@ import { InspectorComponent } from './inspector.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'absolute inset-0', '(wheel)': 'onWheel($event)' },
   providers: [BoardStore, BoardCamera, BoardImagePlacement, BoardEmbedPlacement],
-  imports: [BoardCanvasComponent, BoardElementsComponent, ToolPaletteComponent, InspectorComponent],
+  imports: [BoardCanvasComponent, BoardElementsComponent, ToolPaletteComponent],
   template: `
     <!-- Full-bleed canvas grid; the element overlay and all side chrome float over it (ADR-0013). -->
     <app-board-canvas class="absolute inset-0" />
@@ -43,15 +47,6 @@ import { InspectorComponent } from './inspector.component';
     <app-board-elements [readOnly]="!session.writable()" />
     @if (session.writable()) {
       <app-board-tool-palette class="absolute top-3 left-3 z-[1]" />
-      <!--
-        Right dock: the Inspector as a flex row, no hand-computed offsets (ADR-0013). pointer-events-none
-        so the canvas stays interactive below a short panel; the panel re-enables it.
-      -->
-      <div class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none">
-        <app-board-inspector
-          class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
-        />
-      </div>
     }
   `,
   styles: `
@@ -88,8 +83,9 @@ export class BoardViewComponent {
    * mid-drag pinch would zoom the whole page.
    *
    * Two regions keep the *plain* wheel to themselves, so it neither pans nor zooms the board: the
-   * floating chrome (tool palette, Inspector, zoom control, and the selected element's control strip —
-   * the Inspector must scroll, and the strip must not pan the board out from under its buttons), and an
+   * floating chrome (tool palette, zoom control, and the selected element's control strip — the strip
+   * must not pan the board out from under its buttons; the Inspector is page-Dock chrome now, ADR-0067,
+   * mounted outside this host so its wheels never reach here), and an
    * *armed* element's interactive content (a Text Block's live editor, an Embed's transclusion —
    * scrolling inside it must not move the board, CONTEXT.md → Text Block/Embed). Both are a `closest()`
    * containment test; not calling through leaves the native scroll and `preventDefault` to that inner
@@ -112,9 +108,7 @@ export class BoardViewComponent {
     const zoomIntent = event.ctrlKey || event.metaKey;
     if (
       !zoomIntent &&
-      target?.closest(
-        'app-board-tool-palette, app-board-inspector, app-board-zoom-control, app-board-element-controls, .element.is-armed',
-      )
+      target?.closest('app-board-tool-palette, app-board-zoom-control, app-board-element-controls, .element.is-armed')
     ) {
       return;
     }
