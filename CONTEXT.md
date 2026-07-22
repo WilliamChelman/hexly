@@ -5,191 +5,195 @@ A web application for TTRPG worldbuilding: authoring interlinked **Entities** �
 ## Entities
 
 **Entity**:
-The top-level thing a user creates, owns, and shares. Carries a `name`, an ordered set of **Entity Types**, a set of directly-attached **Fields**, `tags`, and an **Entity Document** — the one key→value map that is its whole substance, prose included. Its _effective_ Field set is its types' default Fields (resolved live) unioned with the Fields it attaches directly, so one deity may carry a `world.field.element` Field and another not, without the deity type naming it. A **Hex Map** is one kind of Entity. The unit of ownership, sharing, and saving.
+The top-level thing a user creates, owns, and shares: a `name`, an ordered set of **Entity Types**, directly-attached **Fields**, `tags`, and an **Entity Document**. The unit of ownership, sharing, and saving.
 _Avoid_: page, record, object; Document (an Entity _has_ an **Entity Document**, it is not one)
 
 **Entity Type**:
-A user-facing identity an Entity carries — `core.type.note`, `core.type.hex-map`, `dnd.type.monster`, `world.type.deity`. An **open**, `namespace.type.name`-keyed set (every registered id carries its kind segment — ADR-0064). A _semantic bag_: it **references** (by id) a set of **default Fields**, declares an ordered set of **Views**, and names its facets — it does not _own_ its Fields, it points at them, and the same Field may be a default of many types or attached to an Entity with no such type at all. An Entity holds an **ordered set** of types; the first is _primary_ — driving its icon, default view, and headline — and may also carry **Fields** its types never named. Two flavours: a **Plugin type** (code, instance-wide, bespoke view) and a **User-defined type** (data, World-scoped, generic view).
-_Avoid_: Kind, category, class; payload kind (retired — a type adds Fields, not a body shape); container (a type references Fields, it does not contain them)
+A user-facing identity an Entity carries — an **open**, `namespace.type.name`-keyed set (ADR-0064) that references default **Fields** by id and declares **Views** and facets. An Entity holds an ordered set of types; the first is _primary_, driving its icon, default view, and headline.
+_Avoid_: Kind, category, class; payload kind (retired); container (a type references Fields, it does not contain them)
 
 **View**:
-A distinct togglable renderer + editor an Entity affords — today's Note/Map toggle, generalized. An **open**, `namespace.view.name`-keyed set — the same kind-segment pattern as every registered id (ADR-0064), so a View id can never collide with an **Entity Type** or **Field** id. A View is contributed either by a **Type** (a plugin's stat-block; the generic Field view that renders user-defined and absent-plugin types) or by a **structured Data Type** (the map view, the content view) — and such a View is bound to _that Field_, so an Entity with two grids affords two map Views, and one with a `core.field.content` and a `world.field.secrets` Field affords two content Views, each labelled by its Field. The afforded Views resolve over the Entity's **effective Field set**, not just its types': a Type _places_ its default Fields' Views in its own ordered list (so a Hex Map still opens on its map), and a Field attached directly to an Entity appends its View after those. The primary type's first View is the default; a single-View Entity shows no toggle. No View is guaranteed: an Entity whose Type this build does not register affords only the generic Field view, its prose among the values it shows unrendered.
-_Avoid_: Surface (kept only for informal prose like "landing surface"), tab, mode, panel
+A distinct togglable renderer + editor an Entity affords — an open, `namespace.view.name`-keyed set, contributed either by a **Type** or by a structured **Data Type** and bound to the **Field** carrying it. The primary type's first View is the default (ADR-0050).
+_Avoid_: Surface (informal prose only), tab, mode, panel
 
 **Field**:
-A named, typed, **reusable** slot — `core.field.content`, `dnd.field.strength`, `world.field.element` — referenced by id from an **Entity Type**'s defaults, attached directly to an **Entity**, or both. Identified by a single `namespace.field.name` **id** — its reuse handle and single source of truth — which _is_ the **Entity Document** key it lenses: one namespaced key, so a rename changes only the `label`, never the key, and no two Fields share a key. Carries that id, a `label`, a **Data Type**, and whether it is `required`/`facetable`. A typing _lens_ over the Entity Document, not a separate store: values live in the one map, so an absent Field definition (a disabled plugin, a deleted World-defined Field) leaves them as plain document values — as does a bare, un-namespaced document key, which no Field lenses. A Field of a structured **Data Type** is never _directly_ facetable — the blob has no discrete values to count — though its Data Type may **harvest** facet dimensions from the value (see **Structured Data Type**). Two flavours mirroring an Entity Type: a **Plugin field** (code, instance-wide) and a **User-defined field** (data, World-scoped, `world.field.*`-keyed). Validated _forward-only_ — enforced on active typed edits, tolerated on imported or at-rest data.
+A named, typed, **reusable** slot referenced by a **Type**'s defaults or attached directly to an **Entity** — its `namespace.field.name` id _is_ the **Entity Document** key it lenses (ADR-0056). A typing _lens_ over the document, never a separate store. Two flavours: a **Plugin field** (code, instance-wide) and a **User-defined field** (data, World-scoped).
 _Avoid_: Property, attribute, column, custom field
 
 **Data Type**:
-The _kind_ of a **Field**: what its value is shaped like, and how it is edited, validated, edge-harvested, and vault-projected. The _type of a Field_, as an **Entity Type** is the type of an Entity. An **open** set — the **built-ins** (`string`, `number`, `boolean`, `date`, `enum`, `list`, or a typed **Entity Link**) and the **structured** ones a plugin contributes (see **Structured Data Type**), marked by a `namespace.datatype.name` id, where a built-in stays a bare word — the kind segment is itself the built-in/structured line (ADR-0064). Reusable: many Fields share one Data Type. A Field's parameters — an `enum`'s options, a `list`'s item type, a link's target types — live on the **Field**, not the Data Type, so the Data Type stays a bare kind.
-_Avoid_: Field Type (rejected rename — the kind layer keeps the data-type name), kind (informal prose only), payload kind
+The _kind_ of a **Field**: what its value is shaped like and how it is edited and validated. An open set — the built-ins (`string`, `number`, `boolean`, `date`, `enum`, `list`, **Entity Link**) plus the **structured** ones plugins contribute; a Field's parameters (an `enum`'s options, a link's target types) live on the Field, not the Data Type.
+_Avoid_: Field Type (rejected rename), kind (informal prose only), payload kind
 
 **Structured Data Type**:
-A **Data Type** a plugin contributes rather than a built-in: a value with its own schema, its own link-edge harvesting, its own searchable text, its own **Vault Projection**, and its own **View** — edited on that View, not in a form row. A Hex Map's grid is one (`core.datatype.hex-grid`); so is an Entity's prose (`core.datatype.rich-content`). Its `namespace.datatype.name` id is what marks it structured — no built-in carries the `datatype` segment; a **Field** of a structured Data Type is never _directly_ facetable (the blob has no discrete values to count) — but a structured Data Type may **harvest** facet dimensions from its value, the way it harvests link-edges and searchable text: it declares its dimensions (each a facet key, label, and **Data Type**) and emits their values per Entity, so a stat block still surfaces its challenge-rating and size facets. Faceting a structured value keys off the Data Type's harvest, never the Field's `facetable` flag. A Field carrying one — the grid at the `core.field.grid` key, prose at `core.field.content` — is what earlier drafts called a _Structured Field_; the structured-ness is the **Data Type's**, not the Field's. The concept that _replaced_ the retired Payload Kind and swallowed prose into **Rich Content**, so an Entity's substance is one shape — the **Entity Document** — for every Entity.
-_Avoid_: Payload, payload kind, blob, opaque field, complex field; Structured Field (the _type_ is structured, not the field)
+A **Data Type** a plugin contributes rather than a built-in — a value with its own schema, its own harvesting (link edges, searchable text, facet dimensions), its own **Vault Projection**, and usually its own **View** (`core.datatype.hex-grid`, `core.datatype.rich-content`). The `datatype` kind segment is what marks it structured; the structured-ness is the Data Type's, never the Field's (ADR-0050, ADR-0055).
+_Avoid_: Payload, payload kind, blob, opaque field, complex field; Structured Field
 
 **Vault Projection**:
-How a **Field**'s value takes its place in an exported Markdown file, declared by the Field (a structured **Data Type** supplying the default): the `body` — the Markdown prose below the frontmatter — or `frontmatter` (YAML, nested if need be), or `omit`. Prose projects to the body, a grid to frontmatter. An Entity may hold **several** body Fields — a deity with `core.field.content` and `world.field.secrets` — and they are written in Field order, each preceded by an HTML comment naming its key (`<!-- hexly:field world.field.secrets -->`) so the file round-trips; the comment is emitted only when there is more than one, so an ordinary Note is plain Markdown. An unmarked body — a hand-written note, a foreign vault — imports into the Entity's first body Field.
+Where a **Field**'s value takes its place in an exported Markdown file: the `body`, the `frontmatter`, or `omit`. Declared by the Field, defaulted by its structured **Data Type** (ADR-0051).
 _Avoid_: Export strategy, serialization, slot
 
 **Type Definition**:
-The registration that gives an **Entity Type** its default **Fields** (referenced by id), Views, and facets. Either a **Plugin type** — declared in code by a bundled plugin at startup, instance-wide, shipping a bespoke view (even `core.type.note` and `core.type.hex-map` register this way — both the Note and the Hex Map ship as bundled plugins, framework-free half and all, so the app itself names no type and the plugin API cannot rot un-exercised) — or a **User-defined type** — authored as data by a **World Owner**, scoped to one World, rendered by the generic Field view. Code buys only the bespoke view; everything else — default Fields, facets, link-fields, a Field of a **Structured Data Type** and its View, primary, multi-type — works code-lessly. Its Field _definitions_ live in their own registration (a **Plugin field** or **User-defined field**); a Type Definition only lists the ids it defaults.
+The registration that gives an **Entity Type** its default **Fields** (referenced by id), Views, and facets — either a **Plugin type** (code, instance-wide, bespoke view) or a **User-defined type** (data, World-scoped, generic view).
 _Avoid_: Schema, template, model, class
 
 **Rich Content**:
-Rich text as a _kind_ — the `core.datatype.rich-content` **Structured Data Type**: block-based prose with its own editor, its own link-edge and searchable-text harvest, and a `body` **Vault Projection**. Not a place on the Entity: an Entity has prose only where a **Field** of this Data Type is present — defaulted by a **Type** or attached directly — and may have more than one (a deity's public **Content** and its `world.field.secrets`); a **Text Block** holds one loose on a **Board Surface**. Shipped by a bundled plugin, like the **Hex Map**: an Instance without it has no editor to open one on.
-_Avoid_: Content (the canonical **Field**, not the kind — an Entity's `world.field.secrets` is Rich Content but not Content), rich text (informal prose only), document, prose
+Rich text as a _kind_ — the `core.datatype.rich-content` **Structured Data Type**: block-based prose with its own editor and harvest. An Entity has prose only where a Field of this Data Type is present, and may have more than one.
+_Avoid_: Content (the canonical **Field**, not the kind), rich text (informal prose only), document, prose
 
 **Content**:
-The canonical prose **Field** — `core.field.content`, of the **Rich Content** Data Type — the one Field every Type that means to carry prose references, so a multi-type Entity resolves exactly one. "The Entity's Content" names the value at that key: its lore, its page body. Other prose Fields sit beside it as peers (`world.field.secrets`), each affording its own content View.
-_Avoid_: Rich Content (the Data Type, not this Field); Body (an Entity has no body, only its **Entity Document** — `body` is the Markdown file's prose region, see **Vault Projection**); rich text; document; prose
+The canonical prose **Field** — `core.field.content`, of the **Rich Content** Data Type — the one Field every Type that means to carry prose references. "The Entity's Content" names the value at that key.
+_Avoid_: Rich Content (the Data Type, not this Field); Body; rich text; document; prose
 
 **Entity Document**:
-The one open key→value map on an Entity — its whole authored substance, there is no second store. A key a **Field** lenses is still an ordinary document key: the Field only types and surfaces it, and that holds for a Field of a **Structured Data Type** too — a Hex Map's grid and an Entity's prose are document values like any other, which is why a missing plugin leaves them intact and readable. Frontmatter is not what the document _is_ but one **Vault Projection** of it: an imported note's frontmatter populates it, and on export a Field goes to frontmatter or to the Markdown body as its projection says. Keys under the reserved `hexly.` namespace carry Hexly's own provenance and are consumed on export rather than written back. Stored serialized in the `document` column; its type is `EntityDocument`, and a local holding one is named `doc` (never `document`, which shadows the browser global).
-_Avoid_: Metadata (retired as the map's name — kept only as the read-only **properties** panel's UI label and the ADR-0037 name/visibility "metadata patch"); frontmatter (a projection, not a synonym); properties; attributes; custom field
+The one open key→value map on an Entity — its whole authored substance; there is no second store. A key a **Field** lenses is still an ordinary document key, which is why a missing plugin leaves values intact and readable.
+_Avoid_: Metadata (retired); frontmatter (a projection, not a synonym); properties; attributes; custom field
 
 **Asset**:
-An **Entity** carrying the `core.type.asset` type — a binary file (an image today; PDFs, audio later) wrapped as the unit users browse, rename, tag, annotate, share, and delete. The type defaults two Fields: the asset-ref (a Field of the `core.datatype.asset` **Structured Data Type** — the bytes' content hash, pinned extension, mime, size, and **Asset Stats**) and the canonical **Content** (prose about it: credits, license, lore). Minted by upload or vault import and deduped per World by content hash — same bytes, same Asset — with the uploader as initial sole Owner and visibility defaulting to `shared`. Two access layers, deliberately distinct (ADR-0065): the Entity — its document, its discoverability, its prose — sits under the ordinary sharing model, while its **bytes** are served by an unguessable, unauthenticated capability link (ADR-0034), so possession of the link reads the bytes whatever the Entity's visibility. Renaming never moves that link (the extension is pinned at mint); deleting the Asset deletes the bytes, and re-uploading the same bytes heals dangling references. Referenced by capability link from Content prose and a Board's **Image** element — resolved by harvest to ordinary link edges, so usage is just inbound links.
-_Avoid_: Attachment, file, blob, media, upload; Asset Entity (an Asset _is_ an Entity — one name)
+An **Entity** carrying the `core.type.asset` type — a binary file (an image today; PDFs, audio later) wrapped as the unit users browse, rename, tag, share, and delete. Two access layers, deliberately distinct: the Entity sits under the ordinary sharing model, while its **bytes** are served by an unguessable capability link (ADR-0034, ADR-0065).
+_Avoid_: Attachment, file, blob, media, upload; Asset Entity (an Asset _is_ an Entity)
 
 **Asset Stats**:
-Mechanical facts derived from an **Asset**'s bytes, carried in its asset-ref value — an image's dimensions, orientation, and dominant color; later a PDF's page count, an audio file's duration. Computed at mint and never stale (the bytes are immutable), backfillable by repair, never authored, and absent when no extractor knows the kind. The asset **Structured Data Type** harvests facet dimensions from them (kind, orientation, color) for the **Asset Browser** and pickers.
+Mechanical facts derived from an **Asset**'s bytes — an image's dimensions, orientation, and dominant color; later a PDF's page count, an audio file's duration. Computed, never authored.
 _Avoid_: Metadata (overloaded), EXIF, properties, stats (bare, in prose about anything else)
 
 **Augmentation**:
-An interpretive, machine-produced description or tags on an **Asset** — a future AI plugin's output, enriching search. Distinct from **Asset Stats** (mechanical facts) and from **Tags** (authored labels). Derived and backfillable like Stats; a disabled augmenter **Plugin** leaves prior Augmentations inert as data, the ordinary absent-plugin degradation.
+An interpretive, machine-produced description or tags on an **Asset** — a future AI plugin's output. Distinct from **Asset Stats** (mechanical facts) and **Tags** (authored labels).
 _Avoid_: AI tags, annotation, auto-tags, labels
 
+**Thumbnail**:
+The small image standing in for an **Entity** wherever it renders as a tile or row, sourced from its own bytes (an **Asset**) or its Thumbnail Field — the canonical `core.field.thumbnail`, an **Entity Link** to an image Asset. Absent both, surfaces fall back to the primary type's icon (ADR-0066).
+_Avoid_: Cover, portrait, avatar, preview
+
 **Tag**:
-A free-text label on an Entity, for flavour and informal grouping (e.g. "ruined", "northern reach") — user-invented on the spot, carrying no behaviour. Both Tags and **Entity Types** are multi-valued labels; the line between them is _registration_: a Type is a registered category (Plugin or World-defined) carrying Fields, a view, and facets, whereas a Tag is not. "Deity" is a Tag until someone defines it as a Type.
+A free-text label on an Entity, for flavour and informal grouping — user-invented, carrying no behaviour. The line against an **Entity Type** is _registration_: "Deity" is a Tag until someone defines it as a Type.
 _Avoid_: Keyword, category, label
 
 **Entity Link**:
-An optional reference to an Entity by id, from a Map element (a Hex, Feature, or Region — not a Label), inline within another Entity's Content (prose), a typed **Field** on an Entity, or a Board's **Embed** element: e.g. a settlement Feature pointing at the town's `note`, a sentence in one note linking to another `hexmap`, a monster's `lair` Field pointing at a place, or a Board embedding a `note` rendered in place. Most forms are merely navigable; an **Embed** additionally _renders_ its target inline by transclusion. A link to a missing or inaccessible Entity renders non-navigable — a Content link shows its last-known name as a dangling label, an Embed a dangling placeholder — rather than erroring. A Content link may carry an optional Link Descriptor.
+An optional reference to an Entity by id — from a Map element, inline within Content prose, a typed **Field**, or a Board's **Embed**. A link to a missing or inaccessible Entity renders non-navigable (a dangling label or placeholder) rather than erroring.
 _Avoid_: Reference, relation, backlink
 
 **Link Descriptor**:
-An optional free-text label on a Content Entity Link, characterising the relationship it expresses (e.g. "spouse", "rival", "capital of"). Like a Tag, but on a link rather than an Entity: carries no behaviour, one per link. A one-way annotation — it does not imply a reciprocal link on the target.
+An optional free-text label on a Content Entity Link, characterising the relationship it expresses ("spouse", "capital of"). Like a Tag, but on a link; one per link, one-way.
 _Avoid_: Relationship, relation, role, type
 
 **Map element**:
-A placed thing _within_ a Hex Map — a Hex, Feature, Region, or Label — that can be selected and moved, and (except a Label) can carry an Entity Link. The in-map counterpart to a top-level Entity. (Formerly called "entity" informally; renamed to free that word for the top-level type.)
+A placed thing _within_ a Hex Map — a Hex, Feature, Region, or Label — selectable, movable, and (except a Label) able to carry an Entity Link.
 _Avoid_: Entity, item, object
 
 ## Import
 
 **Importer**:
-A code-registered producer that turns an external source into **Entities** — the Draw Steel monster pack, a future bestiary or ruleset. A **Plugin** contributes one by `namespace.importer.name` (`draw-steel.importer.monsters`) as its single server entry point's `importers`; it only **fetches and transforms**, yielding **Import Records**, and never touches the database, provenance, or the write choke point — the framework's reconcile does. Owner-triggered, per **World**, from the generic Imports panel; the same generic panel and reconcile serve every Importer, so a Plugin adds one by shipping a `produce()` and its copy. Distinct from the **Vault** import, which mints a World of Notes from a Markdown zip.
+A code-registered producer that turns an external source into **Entities** — contributed by a **Plugin** as `namespace.importer.name`, it only fetches and transforms, yielding **Import Records** (ADR-0060). Distinct from the **Vault** import.
 _Avoid_: Loader, seeder, sync, connector
 
 **Import Record**:
-An **Importer**'s unit of output: a `sourceId`, a `name`, an ordered **Entity Type** set, and an **Entity Document** — everything the framework needs to mint or update one **Entity**, and nothing about _how_ it lands. The reconcile matches Records to existing Entities by **Import Source** and upserts; a Record whose transform failed is skipped and tallied, never aborting the run.
+An **Importer**'s unit of output: a `sourceId`, a `name`, an ordered **Entity Type** set, and an **Entity Document** — everything needed to mint or update one Entity, nothing about _how_ it lands.
 _Avoid_: Row, DTO, payload, seed
 
 **Import Source**:
-The provenance an **Entity** carries from the **Importer** that produced it: the reserved `hexly.source` **Entity Document** key `{ importer, sourceId, rev }` — _which_ importer owns it, its **stable** upstream id, and the pinned source revision it reflects. The source of truth for wipe-and-reimport; a Plugin absent, it is an inert `hexly.*` value like any other. Reimport is an **identity-preserving overwrite** keyed on `(importer, sourceId)` — the Entity id is reused so inbound **Entity Links** survive, and the Entity's authored edits are _not_ preserved: an imported set is a **managed reference library**, not a customization surface. Mirrored by the derived `entityImportSource` index (an **index, never a source of truth**, like the facet and link indexes) so a World can be filtered by provenance without loading a single document.
+The provenance an **Entity** carries from the **Importer** that produced it — the reserved `hexly.source` document key `{ importer, sourceId, rev }`. Reimport is an identity-preserving overwrite keyed on `(importer, sourceId)` (ADR-0060).
 _Avoid_: Origin, provenance record, external id, sync key
 
 ## Language
 
 **Hex Map**:
-An **Entity** carrying the `core.type.hex-map` type — the type that defaults two Fields, the canonical **Content** Field (its lore) and the grid of hexes, overlays, regions, and labels (a Field of the `core.datatype.hex-grid` **Structured Data Type**). The grid is an infinite sparse plane — a Hex exists only where painted. Ownership, sharing, and saving are properties of the Entity, not the grid. Shipped by a bundled plugin, not by the core: an Instance without it opens a Hex Map on the generic Field view, grid and lore alike unrendered **Entity Document** values — the ordinary absent-plugin degradation. The hex-locked sibling of the free-positioned **Board**.
-_Avoid_: Map document, board (now the free-positioned sibling Entity — see **Board**), canvas
+An **Entity** carrying the `core.type.hex-map` type, whose grid Field (`core.datatype.hex-grid`) is an infinite sparse plane of hexes, overlays, regions, and labels. Shipped by a bundled plugin; the hex-locked sibling of the free-positioned **Board**.
+_Avoid_: Map document, board (the free-positioned sibling Entity), canvas
 
 **Hex**:
-A cell the user has given content to, stored at its coordinate. The map is an infinite plane, so a Hex exists _only_ where painted — there is no bounded grid of pre-existing cells. Carries exactly one terrain, plus optional content: at most one feature and an optional name.
+A cell the user has given content to, stored at its coordinate — the plane is infinite, so a Hex exists _only_ where painted. Carries exactly one terrain, at most one feature, and an optional name.
 _Avoid_: Cell, tile, square
 
 **Void**:
-A coordinate with no Hex record — untouched space on the infinite plane. Rendered as a neutral background; carries no data.
+A coordinate with no Hex record — untouched space on the infinite plane.
 _Avoid_: Empty hex, blank, null tile
 
 **Terrain**:
-The base type/fill of a single hex (e.g. grassland, ocean, mountains). Exactly one per hex.
+The base type/fill of a single hex (grassland, ocean, mountains). Exactly one per hex.
 _Avoid_: Biome, ground, background
 
 **Feature**:
-A discrete piece of content placed on a hex, typically rendered as an icon (e.g. a settlement, a ruin, a point of interest).
+A discrete piece of content placed on a hex, typically rendered as an icon (a settlement, a ruin).
 _Avoid_: Icon, marker, token, object
 
 **Overlay**:
-A linear element that rides on hex edges or vertices rather than filling a hex — rivers, roads, borders.
+A linear element riding hex edges or vertices rather than filling a hex — rivers, roads, borders.
 _Avoid_: Line, path, connector
 
 **Region**:
-A named, colored grouping of hex coordinates with optional notes (e.g. "The Kingdom of Avalon", "The Whisperwood"). Regions overlap freely: a single hex may belong to many regions at once (political, geographic, situational). Distinct from Terrain (per-hex fill) and Feature (single icon).
+A named, colored grouping of hex coordinates with optional notes. Regions overlap freely: one hex may belong to many.
 _Avoid_: Area, zone, territory, group
 
 **Note**:
-An Entity carrying the `core.type.note` type — the type that declares nothing but the canonical **Content** Field, so an Entity is its prose and nothing else: a worldbuilding page (a character, a faction, a place, a bit of history). The lore, description, and secrets — a first-class Entity that Map elements link to, not text attached to a single Map element. Shipped by the same bundled plugin as the Content Field and the editor that fills it.
+An Entity carrying the `core.type.note` type — a worldbuilding page that is its prose and nothing else, a first-class Entity that Map elements link to.
 _Avoid_: Description, comment, annotation, lore
 
 **Name**:
-A short identifying title carried by a Map element — a Hex (e.g. a village's name) or a Region. On a Hex it is optional, and only a painted Hex can hold one; it travels with the Hex's content when moved or swapped. The renderer draws it minimally, anchored to the hex. Distinct from a Label (free, hand-placed typography) and from a linked Entity's own `name`.
+A short identifying title carried by a Map element — a Hex or a Region. Distinct from a Label (free typography) and from a linked Entity's own `name`.
 _Avoid_: Title, caption, label
 
 **Label**:
-A free-positioned text element drawn on the map (a point + text + size + optional rotation), not snapped to the hex grid — used for cartographic typography like region or ocean names. Distinct from an entity's `name` field, which the renderer may draw but which is not a Label.
+A free-positioned text element drawn on the map, not snapped to the hex grid — cartographic typography like region or ocean names.
 _Avoid_: Text, caption, title, annotation
 
 ## Board
 
 **Board**:
-An **Entity** carrying the `core.type.board` type — a free-positioned 2D worldbuilding surface, the sibling of the **Hex Map**. The type defaults two Fields: the canonical **Content** (its lore) and the surface at the `core.field.surface` key (a Field of the `core.datatype.board-surface` **Structured Data Type**), an infinite plane of **Board Elements**. Ownership, sharing, and saving are properties of the Entity, not the surface. Shipped by a bundled **Plugin** (`board`), not the core: an Instance without it opens a Board on the generic **View**, surface and lore alike unrendered **Entity Document** values — the ordinary absent-plugin degradation.
-_Avoid_: Canvas (kept only for the informal gesture-surface sense — the thing you drag on), board as a Hex Map synonym (retired — the Board is its own Entity now), scene, collage, whiteboard
+An **Entity** carrying the `core.type.board` type — a free-positioned 2D worldbuilding surface, the sibling of the **Hex Map**, whose surface Field (`core.datatype.board-surface`) holds **Board Elements**. Shipped by a bundled plugin.
+_Avoid_: Canvas (informal gesture-surface sense only), board as a Hex Map synonym (retired), scene, collage, whiteboard
 
 **Board Surface**:
-The `core.datatype.board-surface` **Structured Data Type** — a Board's substance: an infinite 2D plane, panned and zoomed by a camera, holding a z-ordered set of **Board Elements**. It **harvests** link edges (every **Embed**'s target and every inline **Entity Link** inside a **Text Block**) and searchable text (Text Block prose), and harvests no facets. Its **Vault Projection** is `frontmatter` — the whole element model serialized losslessly — while the Board's lore **Content** projects to the body.
-_Avoid_: Canvas, board (bare — the Entity is the Board; this is its surface Data Type), grid (the Hex Map's), plane
+The `core.datatype.board-surface` **Structured Data Type** — an infinite 2D plane, panned and zoomed by a camera, holding a z-ordered set of **Board Elements**.
+_Avoid_: Canvas, board (bare), grid (the Hex Map's), plane
 
 **Board Element**:
-A placed thing on a **Board Surface** — the free-positioned counterpart to a **Map element**. Carries geometry (a position and a size) and an explicit **z-order** for stacking. Three kinds today: an **Image**, an **Embed**, and a **Text Block**. Selected, moved, and resized with the Board's Select **Tool**; the interactive kinds (Embed, Text Block) additionally **arm** on a click into them, as a Tool arms — one armed at a time, click-out disarms.
-_Avoid_: Item, node, card (that is the Embed's fallback rendering), widget, shape
+A placed thing on a **Board Surface** — geometry plus an explicit z-order. Three kinds today: an **Image**, an **Embed**, and a **Text Block**; the interactive kinds **arm** on a click into them, one at a time.
+_Avoid_: Item, node, card (the Embed's fallback rendering), widget, shape
 
 **Image**:
-A **Board Element** that displays an **Asset**'s bytes — a capability-link reference plus geometry. _Decor_, always static (never armed), cheap in quantity: a collage of thirty tokens is thirty Images. Distinct from an **Embed** of an Asset, which is a reference with presence (card fallback, the Asset's View, arms on click). Sourced by uploading a new file (which mints an **Asset**) or by picking an existing one; the reference resolves by harvest to an ordinary link edge, so the Board Surface counts in the Asset's usage like **Content** does.
+A **Board Element** that displays an **Asset**'s bytes by capability link — _decor_, always static, cheap in quantity. Distinct from an **Embed** of an Asset (a reference with presence).
 _Avoid_: Picture, photo, media, sprite
 
 **Embed**:
-A **Board Element** that renders another **Entity** inline by full live transclusion of a chosen **View** — `{ target Entity, View }`, the View selectable per Embed. An **Entity Link**: it emits a link edge, appears in the **World Graph**, and resolves per viewer through the access filter — an unreadable or deleted target renders as a dangling, non-navigable placeholder. Bounded by cycle detection and a configurable maximum render depth (**Instance Configuration**, default 3), past which — or when the chosen View cannot render (its Field gone, its **Plugin** disabled) — it degrades to a **card preview** (name, type icon, snippet). Static until clicked, when it **arms** for read-interaction only (pan, scroll, click-through); editing the target means opening it, never editing through the Embed.
-_Avoid_: Transclusion (the mechanism, not the element), card (the fallback rendering, not the Embed), portal, inset, iframe
+A **Board Element** that renders another **Entity** inline by full live transclusion of a chosen **View** — an **Entity Link** that degrades to a card preview past the depth limit or when its View cannot render (ADR-0062).
+_Avoid_: Transclusion (the mechanism, not the element), card (the fallback rendering), portal, inset, iframe
 
 **Text Block**:
-A **Board Element** holding a `core.datatype.rich-content` value — rich text authored on the surface, with formatting and inline **Entity Links**, edited with the same editor as an Entity's **Content**. Static until clicked, when it **arms** its editor; click-out disarms. Its prose feeds the **Board Surface**'s searchable text and its inline links the link harvest. Distinct from a **Label** (a Hex Map's minimal cartographic typography, not rich text).
-_Avoid_: Label (the map's minimal text), note, sticky, caption, text box
+A **Board Element** holding rich text authored on the surface, edited with the same editor as an Entity's **Content**. Distinct from a **Label** (the map's minimal typography).
+_Avoid_: Label, note, sticky, caption, text box
 
 ## Worlds
 
 **World**:
-A lightweight container record that groups Entities for a single campaign or setting. Not an Entity type — it lives outside the entity model. Every Entity belongs to exactly one World. Carries a name and an owner. Its landing surface is the derived World Dashboard; it holds an ordered set of Pinned Entities surfaced there.
+A lightweight container record grouping Entities for a single campaign or setting — not an Entity type. Every Entity belongs to exactly one World; carries a name and an owner.
 _Avoid_: Space, container, campaign
 
 **World Dashboard**:
-The per-World landing surface at `/w/:worldId` — the front door on entering a World. A read-only _derived_ view (recent Entities, Hex Maps, at-a-glance counts) plus the Owners' curated Pinned Entities. It authors nothing of its own — so authored landing prose, if wanted, is just a Note the Owner pins. Distinct from the World Index (lists Worlds, at `/`) and the Entity Browser (lists this World's Entities, at `/entities`).
+The per-World landing surface — a read-only _derived_ view (recents, counts) plus the Owners' curated **Pinned Entities**. It authors nothing of its own.
 _Avoid_: Home Entity, world home, landing page, overview
 
 **Pinned Entity**:
-An Entity an Owner has featured on the World Dashboard. The pin set is a World property — one shared, ordered list, the same for everyone, curated only by World Owners. A pin is a reference by id, resolved per viewer through the ordinary access filter: a pinned Entity the caller can't reach (`private` without a grant, or deleted) simply drops off their Dashboard.
+An Entity an Owner has featured on the World Dashboard. The pin set is a World property — one shared, ordered list, resolved per viewer through the ordinary access filter.
 _Avoid_: Bookmark, favourite, featured note
 
 **World Index**:
-The page at `/` listing every World the caller can reach — owned, member, or holding any Entity the caller owns or is granted — and the surface that owns World create, rename, and delete. The durable directory of Worlds — distinct from the World Switcher (a transient quick-hop control) and from a World's own World Dashboard (its in-world landing surface).
+The page at `/` listing every World the caller can reach — the durable directory of Worlds, owning World create, rename, and delete.
 _Avoid_: World home, world library, world picker
 
 **World Switcher**:
-The compact in-app control at the nav-rail masthead for hopping to another reachable World without returning to the World Index. Pure navigation — it shows the current World and switches the URL scope; it does not manage Worlds. Shown only inside a World; on the World Index the Index itself is the chooser, so the Switcher is absent.
+The compact in-app control for hopping to another reachable World — pure navigation, shown only inside a World.
 _Avoid_: World selector, world dropdown
 
 **World Graph**:
-A per-World view of its Entities as nodes and their Entity Links as edges — the node-link picture of how a World's Entities connect. Every Entity is a node, an **Asset** included (its usage is its inbound edges); access-filtered per viewer: an Entity appears only if the viewer can read it, and an edge only when the viewer can read _both_ endpoints — so it never reveals a `private` Entity. Orphan Entities (no links) are hidden by default behind a show-orphans toggle — a generic control, not a per-type rule — since bulk-minted Assets would otherwise flood the picture with isolated nodes. A derived, read-only view — sibling to the World Dashboard and Entity Browser.
+A per-World view of its Entities as nodes and their Entity Links as edges, access-filtered per viewer (an edge shows only when both endpoints are readable). A derived, read-only view.
 _Avoid_: web, network, mind map, relationship map, world map (collides with Hex Map)
 
 **World Owner**:
-A user holding full control of a World: membership, roles, the public link, World rename/delete, and full control (edit, delete, change visibility) over every `shared` Entity in the World. No special access to others' `private` Entities. Ownership is a symmetric set — one or more Owners, all equal, any Owner may add or remove other Owners; the creator holds no special status after creation. Invariant: at least one Owner (the last cannot be removed or resign).
-_Avoid_: Admin, GM (user vocabulary, not system vocabulary), co-owner (an Owner is an Owner)
+A user holding full control of a World — membership, roles, the public link, rename/delete, and full control over every `shared` Entity in it; no special access to others' `private` Entities. A symmetric set of one or more, all equal; the last cannot be removed.
+_Avoid_: Admin, GM (user vocabulary), co-owner
 
 **Contributor**:
-A named user granted the ability to create Entities inside a World (becoming each created Entity's initial sole Owner) and to read all `shared` Entities. Cannot edit Entities they do not own unless granted entity-level Editor access separately.
+A named user granted the ability to create Entities inside a World (becoming each created Entity's initial sole Owner) and to read all `shared` Entities.
 _Avoid_: Editor, member, player
 
 **World Viewer**:
@@ -197,37 +201,37 @@ A named user (or public link holder) granted read-only access to all `shared` En
 _Avoid_: Reader, guest, spectator
 
 **World Public Link**:
-An unguessable, unlisted URL that grants World Viewer access to all `shared` Entities in a World without an account.
+An unguessable, unlisted URL that grants World Viewer access without an account.
 _Avoid_: Share link, invite link
 
 ## Sharing
 
 **Rights**:
-The closed set of actions a given caller may perform on a specific Entity or World — e.g. reading it, editing its substance, deleting it, changing its visibility, managing its sharing. Derived from the sharing rules (a caller's standing as Owner, grantee, or member) rather than granted directly. The vocabulary is per resource kind: a World is not something one "edits the substance" of. Distinct from a role (Owner, Editor, Contributor… — a collaboration role, not an Instance Role), which is _why_ a caller holds a Right; the Rights are the resolved _what_.
-_Avoid_: Permissions, ACL, capabilities, grants (a grant is one input to Rights, not the Rights)
+The closed set of actions a given caller may perform on a specific Entity or World, derived from the sharing rules. The resolved _what_; a role (Owner, Editor, Contributor…) is the _why_.
+_Avoid_: Permissions, ACL, capabilities, grants (a grant is one input to Rights)
 
 **Entity Visibility**:
-A two-value field on every Entity: `private` (default) or `shared`. A `private` Entity is accessible only to its Owners and any entity-level grants (named Editor/Viewer, or anonymous via its Public Link) — World Owners and Instance Role holders have no special access to it; private is absolute within the collaboration model (only a Superadmin, outside the model, can reach it). A `shared` Entity is accessible to all World members (Contributor, World Viewer, World Public Link holders). Per-user visibility is not a separate feature — it is what an entity-level grant on a `private` Entity delivers.
+A two-value field on every Entity: `private` (default — Owners and entity-level grants only) or `shared` (all World members). Private is absolute within the collaboration model; only a Superadmin, outside it, can reach a `private` Entity.
 _Avoid_: Published, public, visible
 
 **Owner**:
-A user holding full control of an Entity — substance, lifecycle (delete), exposure (visibility), and grant/link management. Ownership is a symmetric set — one or more Owners, all equal, any Owner may add or remove other Owners; the creator (initially the sole Owner) holds no special status after creation. Invariant: at least one Owner. A `private` Entity is private to its Owner set.
+A user holding full control of an Entity — substance, lifecycle, exposure, and grant management. A symmetric set of one or more, all equal; at least one always.
 _Avoid_: Admin, creator, co-owner
 
 **Editor**:
-A named user — any user on the Instance, World membership not required — granted permission to edit a specific Entity's substance: its **Entity Document** (prose, grid, properties), name, and Tags. Never its lifecycle or exposure: no delete, no visibility change, no grant management.
+A named user — World membership not required — granted permission to edit a specific Entity's substance, never its lifecycle or exposure.
 _Avoid_: Collaborator, contributor
 
 **Viewer**:
-A named user — any user on the Instance, World membership not required — granted read-only access to a specific Entity.
+A named user — World membership not required — granted read-only access to a specific Entity.
 _Avoid_: Reader, guest
 
 **Public Link**:
-An unguessable, unlisted URL that grants read-only access to a specific Entity without an account — an anonymous Viewer grant, so it pierces `private` like any entity-level grant; revoking the link is how access is withdrawn. Distinct from the World Public Link, which covers all `shared` Entities in a World.
+An unguessable, unlisted URL granting read-only access to a specific Entity without an account — an anonymous Viewer grant, so it pierces `private`.
 _Avoid_: Share link, public URL, share token
 
 **Live-follow**:
-A viewer in read mode seeing another user's _committed_ changes to the Entity or World they are looking at appear on their own screen without a manual refresh — e.g. a player watching a `shared` Hex Map the GM is editing, or a World Dashboard whose pins the Owner is reordering. Applies to committed versions, not keystrokes. Extends to anonymous World/Entity Public Link viewers. If the followed resource becomes unreachable (made `private`, un-shared, link revoked, or deleted), the follower's view is evicted rather than left stale. Never overwrites the follower's own unsaved edits: an editor with local changes keeps them and resolves the concurrent edit at save time.
+A viewer in read mode seeing another user's _committed_ changes appear without a manual refresh — committed versions, not keystrokes (ADR-0044/0045). An unreachable followed resource evicts the view rather than leaving it stale.
 _Avoid_: Real-time sync, live editing, collaboration, streaming
 
 ## Placement modes
@@ -240,114 +244,114 @@ Every piece of map content sits in exactly one of three placement modes:
 
 ## Editing tools
 
-These concepts are surface-agnostic — shared by every surface editor (the **Hex Map**, the **Board**) — but the _toolset_ is per-plugin: each surface Plugin supplies its own Tools. Code-sharing a surface-editor lib is a separate, later call. The terms below are illustrated with the Hex Map's toolset unless noted.
+Surface-agnostic concepts shared by every surface editor (the **Hex Map**, the **Board**); the _toolset_ itself is per-plugin.
 
 **Tool**:
-A top-level editing mode armed in a surface editor's palette. Exactly one is armed at a time, and a canvas gesture applies it. The set is per-surface: a Hex Map arms Select, Terrain, Feature, Label, Erase; a Board arms Select, Image, Embed, Text. A surface opens armed with Select. (On the Hex Map, Region is _not_ a palette Tool: Regions are created in the Regions panel and their membership is painted via the Inspector's Add/Remove brush.)
+A top-level editing mode armed in a surface editor's palette — exactly one armed at a time, applied by a canvas gesture. The set is per-surface; a surface opens armed with Select.
 _Avoid_: Mode, brush, instrument
 
 **Subtool**:
-A mutually-exclusive variant _within_ a Tool — the Terrain tool's individual terrains, the Feature tool's individual features (and its Clear variant), and the Select tool's **Pick** and **Marquee**. Tools that have Subtools remember the last one used for the session. Label and Erase have no Subtools.
+A mutually-exclusive variant _within_ a Tool — a terrain, a feature, Select's **Pick** and **Marquee**. Tools with Subtools remember the last one used for the session.
 _Avoid_: Sub-mode, option, variant
 
 **Select**:
-The one non-destructive Tool, holding a **Selection** and split into two Subtools, **Pick** and **Marquee**. Painting Tools never select; Select itself never paints.
+The one non-destructive Tool, holding a **Selection**, split into **Pick** and **Marquee**. Painting Tools never select; Select never paints.
 _Avoid_: Pointer, move tool, arrow
 
 **Selection**:
-The set of placed elements currently picked out — Map elements on a Hex Map (Hexes, Features, Labels, Regions), Board Elements on a Board — zero, one, or many. Shown in the Inspector and moved together by a drag. Built by Select's clicks and modifiers; not part of the document, so never undone or persisted.
+The set of placed elements currently picked out — zero, one, or many — shown in the Inspector and moved together. Not part of the document, so never undone or persisted.
 _Avoid_: Highlight, focus, active item
 
 **Pick**:
-The default Select Subtool: click selects the topmost entity under the cursor and drag moves the whole Selection. Repeated plain clicks at one coordinate cycle _deeper_ through the stack — `Label → Feature → Hex → each Region containing that coordinate (document order) → wrap` — so an overlapped or interior Region becomes reachable. A plain click replaces the Selection; Cmd/Ctrl-click toggles the topmost entity in it; Shift-click toggles the whole stack at that coordinate; a click on empty space clears it.
+The default Select Subtool: click selects the topmost element under the cursor, drag moves the Selection, and repeated clicks cycle _deeper_ through the stack (ADR-0017).
 _Avoid_: Move tool, arrow
 
 **Marquee**:
-The Select Subtool that drags a rectangle to select every Hex and Label within it. Regions are not marquee-selectable — they have no single position.
+The Select Subtool that drags a rectangle to select every Hex and Label within it. Regions are not marquee-selectable.
 _Avoid_: Rubber band, lasso, box select
 
 **Erase**:
-The Tool that deletes a whole Hex record (its terrain _and_ feature), turning the coordinate back into Void. Distinct from the Feature tool's Clear Subtool, which removes only the feature and leaves the terrain.
+The Tool that deletes a whole Hex record, returning the coordinate to Void. Distinct from the Feature tool's Clear Subtool, which removes only the feature.
 _Avoid_: Delete, clear, remove
 
 **Inspector**:
-The surface that shows and edits the currently selected element. On a Hex Map that is a Map element, including its Entity Link: for a Label it edits text/size/rotation/position; for a Region it edits name, color, deletion, and the Add/Remove membership direction — the _only_ place Region details are edited, and engaging Add/Remove here arms the Region membership brush on that Region (the only way to arm it). On a Board it is a Board Element: geometry and z-order for all, plus an Image's Asset, an Embed's target Entity and View.
+The surface that shows and edits the currently selected element — and the _only_ place Region details are edited (ADR-0011/0012).
 _Avoid_: Side panel, details pane, properties
 
 **Regions panel**:
-A list of every Region (named, colored, including ones currently empty and so invisible on the map), plus a New Region action. Selecting a Region here is equivalent to selecting it on the canvas. Shares its on-screen home with the Inspector.
+A list of every Region (empty ones included) plus a New Region action; selecting a Region here is equivalent to selecting it on the canvas.
 _Avoid_: Region legend, layers, list
 
 ## Command Palette
 
 **Command Palette**:
-A Cmd/Ctrl+K overlay, reachable from anywhere in the app regardless of route or active World, for finding Entities and Worlds and invoking Commands. Distinct from the World Switcher (Worlds only) and the Inspector's Entity Link picker (one Content Link's target only) — the Command Palette is the one cross-cutting search-and-act surface.
+A Cmd/Ctrl+K overlay, reachable from anywhere, for finding Entities and Worlds and invoking Commands — the one cross-cutting search-and-act surface.
 _Avoid_: Quick open, search bar, spotlight
 
 **Command**:
-A single invocable entry in the Command Palette — e.g. creating a Note, or navigating to a matched Entity or World. Distinct from a Tool: invoking a Command may arm a Tool, but a Command is not itself one.
+A single invocable entry in the Command Palette. Distinct from a Tool: invoking a Command may arm a Tool, but a Command is not one.
 _Avoid_: Action, shortcut
 
 **Command Prefix**:
-The leading marker that routes a Command Palette query to the **Command Providers** bound to it — empty is Quick Open (Entity/World search), `>` is Show Commands, `/r ` is a **Roll**. Many-to-one: several Providers may answer one prefix. A query routes to the **longest** registered prefix it starts with, so multi-character prefixes coexist with single-character ones and no provider hard-codes the set.
+The leading marker that routes a Command Palette query to the **Command Providers** bound to it — empty is Quick Open, `>` is Show Commands, `/r ` is a **Roll**. The longest registered prefix wins (ADR-0059).
 _Avoid_: Sigil, trigger, mode key
 
 ## Dice
 
 **Roll**:
-An ephemeral evaluation of a **Dice Expression** into a **Roll Result** — a live, in-session action, **never persisted**: it writes nothing to an **Entity Document**, adds no server surface, and vanishes on reload. Raised two ways: from the **Command Palette** under the `/r ` **Command Prefix**, or from a context button (today, a Draw Steel **Power Roll**, which resolves ephemerally while its stored tiers stay render-faithful prose — Hexly rolls, but never stores the roll).
+An ephemeral evaluation of a **Dice Expression** into a **Roll Result** — a live, in-session action, **never persisted**.
 _Avoid_: Throw, dice throw (informal only), roll record, roll log (nothing is logged)
 
 **Dice Expression**:
-The notation a **Roll** evaluates: dice terms (`NdM`) combined with arithmetic (`+ - * /` and parentheses, division flooring) and per-term modifiers (keep/drop highest-lowest, exploding, reroll). Parsed forward-only — invalid text yields a typed error surfaced to the user, never a throw.
+The notation a **Roll** evaluates: dice terms (`NdM`) with arithmetic and per-term modifiers. Parsed forward-only — invalid text yields a typed error, never a throw.
 _Avoid_: Formula, dice string, notation (bare)
 
 **Roll Result**:
-The structured outcome of a **Roll** — the per-die faces, per-term subtotals, and the numeric total. Presented ephemerally: flashed through the toaster for a palette Roll, or in an anchored bubble for a button Roll. Any reading beyond the total (a Draw Steel tier band) belongs to the caller, not the Roll.
+The structured outcome of a **Roll** — per-die faces, per-term subtotals, and the total. Presented ephemerally; any reading beyond the total belongs to the caller.
 _Avoid_: Outcome, score, value
 
 ## Entity Browser
 
 **Entity Browser**:
-The durable, in-World surface that lists a single World's Entities as a card grid and lets the user find them by Facets and by a full-text query matched against an Entity's name, Tags, and the prose of its Content. A **Type Definition** may declare its Entities hidden from the default listing (the asset type does — bulk-minted media must not drown authored work), surfacing them only when that Type is explicitly selected; the Browser honors the declaration and names no type. Scoped to one World — distinct from the Command Palette (global, transient, cross-World) and the World Index (lists Worlds, not Entities).
-_Avoid_: Entity list, library, catalog, explorer; fuzzy search (the query is full-text, ranked by relevance)
+The durable, in-World surface listing a single World's Entities as a card grid, found by **Facets** and a full-text query. Scoped to one World — distinct from the Command Palette (global, transient) and the World Index (lists Worlds).
+_Avoid_: Entity list, library, catalog, explorer; fuzzy search (the query is full-text, ranked)
 
 **Asset Browser**:
-The World-scoped nav destination for finding and managing **Assets**: the **Entity Browser** preset to the asset type — the same query, Facets (kind, orientation, color, Tags), and paging — presented as thumbnail tiles with upload at hand. Rename, share, and delete are ordinary Entity operations; deleting shows the Asset's usage (its inbound links, named per viewer) before it takes the bytes with it.
+The **Entity Browser** preset to the asset type, presented as thumbnail tiles with upload at hand. Rename, share, and delete are ordinary Entity operations.
 _Avoid_: Media library, gallery, asset manager, file manager
 
 **Facet**:
-A filterable dimension of a World's Entities offered in the Entity Browser with its distinct values and their counts — Type, Tag, and Visibility always, plus facetable **Fields** (and the dimensions a **Structured Data Type** harvests) surfaced _by presence_: a Field Facet appears whenever the current result set carries values for its key, whatever types those Entities hold. Selecting values within one Facet is OR; across Facets is AND; the combined filter is AND-ed with the text query.
+A filterable dimension of a World's Entities with its distinct values and counts — Type, Tag, and Visibility always, plus facetable **Fields** and harvested dimensions, surfaced _by presence_. Values within one Facet OR; across Facets AND.
 _Avoid_: Filter, dimension, aspect
 
 ## Outline
 
 **Outline**:
-A navigation view of a Content's headings — a nested, click-to-jump list that also marks the heading currently in view. Derived from the Content, never stored. Available wherever an Entity shows its Content body — a Note, or a Hex Map on its Note view. Sibling to the Inspector and Regions panel.
+A navigation view of a Content's headings — a nested, click-to-jump list marking the heading in view. Derived from the Content, never stored.
 _Avoid_: Table of contents, TOC, minimap, nav panel
 
 ## User preferences
 
 **User Settings**:
-The account-owned page where a signed-in user edits their own **Preferences** and profile — display name and password (email is shown read-only). Distinct from a World's membership settings (World Owner surface) and from Instance Configuration (operator settings).
+The account-owned page where a signed-in user edits their own **Preferences** and profile. Distinct from World membership settings and Instance Configuration.
 _Avoid_: Account settings, profile page, options
 
 **Preferences**:
-A user's roaming presentation choices — UI **Locale**, **Format Locale**, and theme — bound to the account so they follow the user across devices. Anonymous public-link viewers, who have no account, still get these choices locally. Distinct from Instance Configuration (operator, per-Instance) and World membership settings.
+A user's roaming presentation choices — UI **Locale**, **Format Locale**, and theme — bound to the account so they follow the user across devices.
 _Avoid_: Settings, options, config
 
 **Locale**:
-A user's chosen **interface language** (English or French today) — which strings the UI renders. Distinct from Format Locale: Locale picks the words, Format Locale picks how dates and numbers read.
+A user's chosen **interface language** — which strings the UI renders.
 _Avoid_: Language (as a field name), i18n, region
 
 **Format Locale**:
-A user's chosen **regional formatting** (a BCP-47 tag) governing how dates, numbers, and times are rendered, independent of the UI **Locale** — so an English reader can see day-month dates. Defaults to the UI Locale when unset.
+A user's chosen **regional formatting** (a BCP-47 tag) for dates, numbers, and times, independent of the UI **Locale**; defaults to it when unset.
 _Avoid_: Date format, regional settings, locale (bare — that means the UI language)
 
 ## Self-hosting
 
 **Plugin**:
-A bundled, compiled-in unit that contributes **Entity Types**, **Fields**, their **Views**, and **Structured Data Types** (and its own copy) to an Instance — the delivery mechanism behind every code Type, `core.type.note` and `core.type.hex-map` included. Identified by a canonical `id` (`content`, `hexmap`, `dnd`) its own framework-free half declares, kept distinct from any type namespace because the `core` namespace is shared by two Plugins (content and hexmap). "Bundled" means shipped in the build, not installed at runtime — there are no third-party Plugins. Enabled by default; an operator disables one in **Instance Configuration** (`features.plugin.<id>.enabled: false`), and a disabled Plugin is indistinguishable from one this build never bundled — on both server and client its Types degrade to the generic **View**, values intact.
+A bundled, compiled-in unit contributing **Entity Types**, **Fields**, **Views**, **Structured Data Types**, and **Importers** to an Instance — shipped in the build, never installed at runtime. A disabled Plugin is indistinguishable from one never bundled: its Types degrade to the generic View, values intact (ADR-0052).
 _Avoid_: Extension, addon, module, package
 
 **Instance**:
@@ -355,21 +359,21 @@ A single self-hosted deployment of Hexly, over one Instance Directory. The unit 
 _Avoid_: Server, deployment, tenant
 
 **Instance Directory**:
-The folder an operator points Hexly at, holding its database and Instance Configuration — named for holding both data and config.
+The folder an operator points Hexly at, holding its database and Instance Configuration.
 _Avoid_: Data directory, data folder, db path, storage dir
 
 **Instance Role**:
-A member of the closed, code-known set of instance-wide powers a user may hold, stored as a set (`roles`) on the user account. Two members today: `manage-users` — account management (create, disable, and delete users, reset passwords, and grant/revoke Instance Roles), refusing a user's deletion while they solely own any World or Entity and using disable (login locked, data and memberships intact) as the immediate lever — and `create-worlds` — may create Worlds. The members are orthogonal: holding one implies nothing about the other, and `manage-users` carries zero content powers, reaching no World or Entity (granting oneself `create-worlds` is an explicit, visible act). "Role" here is account-wide, scoped by the word Instance; distinct from a collaboration role (Owner, Editor, Viewer, Contributor), which is a standing on a specific World or Entity. Superadmin is not an Instance Role.
+A member of the closed set of instance-wide powers a user account may hold — `manage-users` and `create-worlds` today, orthogonal (ADR-0047). Distinct from a collaboration role (Owner, Editor…), which is a standing on a specific World or Entity.
 _Avoid_: Instance Admin (retired), Admin (ambiguous with Superadmin), capability, permission, flag
 
 **Superadmin**:
-The in-app embodiment of the operator: unrestricted access, sitting outside the collaboration model entirely and superseding every Instance Role. Exists for repair — orphaned data, accidental deletions — not for day-to-day account management (that is the `manage-users` role's job). A separate account flag, not a member of the `roles` set; at least one per Instance, seeded at setup, and the last one is irremovable. The operator's repair tools are reachable only by a Superadmin today, though an Instance Role could be granted that access later.
+The in-app embodiment of the operator — unrestricted, outside the collaboration model entirely, existing for repair rather than day-to-day administration. A separate account flag, not an Instance Role; the last one is irremovable.
 _Avoid_: Root, god mode, owner
 
 **Instance Configuration**:
-Operator-facing settings for one Instance, stored beside the database. Distinct from per-User or per-World settings, which live in the database.
+Operator-facing settings for one Instance, stored beside the database. Distinct from per-User or per-World settings.
 _Avoid_: Config, settings, preferences, environment
 
 **Reindex**:
-A Superadmin repair action that recomputes every Entity's document-derived state — its searchable text, Link Descriptor vocabulary, link edges, and facets — from the authoritative **Entity Document**, across all Worlds, asking each **Field** for the text and edges its value carries. Idempotent and safe to run anytime: the Entity's document is the source of truth, and the derived tables are a cache it rebuilds. A repair tool, not part of daily administration — which is why it is the Superadmin's, not the `manage-users` role's (which reaches no Entity). It runs as one instance-wide background job the operator polls, and a document this build cannot parse is skipped and reported rather than allowed to abort the walk.
+A Superadmin repair action that recomputes every Entity's document-derived state from the authoritative **Entity Document**, across all Worlds. Idempotent — the derived tables are a cache it rebuilds.
 _Avoid_: Rebuild, refresh, recompute, sync
