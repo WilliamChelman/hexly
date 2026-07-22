@@ -18,6 +18,7 @@ import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-acce
 import { DB, Db } from '../db/db';
 import {
   INITIAL_SEQ,
+  assetIndex,
   entities,
   entityDescriptors,
   entityEdges,
@@ -445,6 +446,18 @@ export class EntityWrites {
     this.replaceEdges(id, worldId, derived.edges);
     this.replaceFieldFacets(id, worldId, derived.fieldFacets);
     this.replaceImportSource(id, worldId, derived.importSource);
+    this.replaceAssetIndex(id, worldId, derived.assetHash);
+  }
+
+  /**
+   * Replace the Entity's **Asset dedup index** row with the freshly derived content hash (self-pruning,
+   * ADR-0065): an asset-ref-carrying document materialises one row keyed on the bytes' hash, clearing the
+   * ref removes it, and the FK cascade drops it with the Entity. Derived, never authoritative — an index
+   * over the document like the edge and provenance sets, so `worldId` is denormalised off the source.
+   */
+  private replaceAssetIndex(id: string, worldId: string, hash: string | null): void {
+    this.db.delete(assetIndex).where(eq(assetIndex.entityId, id)).run();
+    if (hash) this.db.insert(assetIndex).values({ entityId: id, worldId, hash }).run();
   }
 
   /**

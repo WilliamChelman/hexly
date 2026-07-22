@@ -1,0 +1,11 @@
+{
+  "eyebrow": "Ressource",
+  "titleLabel": "Nom de la ressource",
+  "rename": "Renommer la ressource",
+  "editorLabel": "Notes de la ressource",
+  "create": "Créer une ressource",
+  "untitled": "Ressource sans titre",
+  "view": {
+    "asset": "Ressource"
+  }
+}

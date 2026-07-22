@@ -44,6 +44,12 @@ export interface DocumentDerivedState {
    * reads a plain document key, not a Field, so it needs neither the Field set nor the data-types.
    */
   readonly importSource: ImportSource | null;
+  /**
+   * The content `hash` of the bytes an Asset's asset-ref wraps, or `null` (ADR-0065) — mirrored to the
+   * derived `(worldId, hash) → entity` index at the write choke point, the dedup key an upload resolves
+   * against. Harvested from the one **Structured Data Type** that owns bytes, like edges and facets.
+   */
+  readonly assetHash: string | null;
 }
 
 export function deriveDocumentState(
@@ -87,11 +93,14 @@ export function deriveDocumentState(
   // own edges, text, and facet dimensions (ADR-0050/0051/0055). The domain never learns what is inside —
   // and reads each value once, where three separate walks read it three times.
   const textParts: (string | undefined)[] = [];
+  // At most one Field wraps stored bytes (an Asset's asset-ref); the first non-null address wins.
+  let assetHash: string | null = null;
   for (const { field, dataType } of resolvedStructuredDataTypeFields(fields, dataTypes)) {
     const value = readField(doc, field);
     for (const edge of dataType.harvestEdges?.(value) ?? []) addEdge(edge);
     textParts.push(dataType.extractText?.(value));
     for (const row of dataType.harvestFacets?.(value) ?? []) addFacet(row);
+    assetHash ??= dataType.harvestAssetHash?.(value) ?? null;
   }
 
   const edgeList = [...edges.values()];
@@ -104,5 +113,6 @@ export function deriveDocumentState(
     fieldFacets,
     // Provenance is a plain reserved key, read forward-only: an absent or ill-shaped stamp is `null`.
     importSource: readImportSource(doc) ?? null,
+    assetHash,
   };
 }

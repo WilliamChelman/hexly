@@ -1,6 +1,7 @@
 import { posix } from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { EntityDetail, EntityType, HEXLY_TYPE_KEY, VaultExportContext } from '@hexly/domain';
+import { CORE_ASSET_TYPE_ID } from '@hexly/plugin-asset';
 import { entityToMarkdown } from '@hexly/obsidian';
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { AssetsService } from '../assets/assets.service';
@@ -53,6 +54,9 @@ export class VaultExportService {
     const entities = this.entities.listByWorld(ownerId, worldId);
     const nameById = new Map(entities.map((e) => [e.id, e.name]));
     for (const entity of entities) {
+      // An Asset Entity is lossy binary passthrough (ADR-0065): its bytes were already written above,
+      // under `name + ext`; it has no Markdown projection, so it never lands as a `.md` file.
+      if (entity.types.includes(CORE_ASSET_TYPE_ID)) continue;
       files[uniquePath(files, filePath(entity))] = strToU8(this.toMarkdown(entity, srcMap, nameById, worldId));
     }
 

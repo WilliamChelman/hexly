@@ -2,10 +2,11 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { Inject, Injectable } from '@nestjs/common';
-import { AssetSummary, assetUrl } from '@hexly/domain';
-import { and, asc, eq } from 'drizzle-orm';
+import { AssetSummary, assetUrl, EntityDocument, entityDocumentSchema } from '@hexly/domain';
+import { assetSummaryOf, readAssetValue } from '@hexly/plugin-asset';
+import { asc, eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
-import { assets } from '../db/schema';
+import { assetIndex, entities } from '../db/schema';
 
 /** DI token for the on-disk Assets root (`<instanceDir>/assets`, or a temp dir for `:memory:`). */
 export const ASSETS_DIR = Symbol('ASSETS_DIR');
@@ -29,17 +30,24 @@ const MIME_BY_EXT: Record<string, string> = {
 /** The set of extensions Hexly treats as importable Assets (ADR-0034) — shared with the vault importer. */
 export const ASSET_EXTENSIONS = new Set(Object.keys(MIME_BY_EXT));
 
-/** What {@link AssetsService.store} tells the importer: the capability URL, the hash, and whether it deduped. */
+/** The content type a filename's extension serves as (ADR-0034); unlisted extensions are a generic download. */
+export function mimeForExt(ext: string): string {
+  return MIME_BY_EXT[ext.toLowerCase()] ?? 'application/octet-stream';
+}
+
+/** What {@link AssetsService.store} tells the mint path: the capability URL and the bytes' content hash. */
 export interface StoredAsset {
   readonly url: string;
   readonly hash: string;
-  readonly deduped: boolean;
+  readonly ext: string;
+  readonly mime: string;
 }
 
 /**
- * Per-World content-addressed Asset storage (ADR-0034). Bytes are written to disk under
- * `<ASSETS_DIR>/<worldId>/<sha256>.<ext>`; metadata rows the `assets` table. The hash IS the
- * capability token the unauthenticated serving route relies on.
+ * Per-World content-addressed Asset byte storage (ADR-0034, ADR-0065). Bytes are written to disk under
+ * `<ASSETS_DIR>/<worldId>/<sha256>.<ext>`; the hash IS the capability token the unauthenticated serving
+ * route relies on. Dedup and enumeration are the **Asset Entity's** job now — the `assets` table dissolved
+ * into the derived `(worldId, hash) → entity` index, and byte serving reads disk with no table consulted.
  */
 @Injectable()
 export class AssetsService {
@@ -49,43 +57,18 @@ export class AssetsService {
   ) {}
 
   /**
-   * Store `bytes` for `worldId`, deduped by their sha256. A repeat (same bytes already stored
-   * in this World) writes nothing and reports `deduped: true`, returning the existing capability
-   * URL. `filename` supplies the extension (on disk and in the URL) and is kept for export.
+   * Write `bytes` for `worldId`, content-addressed by their sha256 (ADR-0034). Idempotent: identical
+   * bytes hash to the same on-disk name, so a repeat overwrites a byte-identical file — the mint path's
+   * `(worldId, hash)` dedup decides whether a new Entity is minted. `filename` supplies the extension
+   * (on disk and in the URL), pinned at first store so the served URL is stable across renames (ADR-0065).
    */
   store(worldId: string, filename: string, bytes: Uint8Array): StoredAsset {
     const hash = createHash('sha256').update(bytes).digest('hex');
-    const existing = this.db
-      .select({ originalFilename: assets.originalFilename })
-      .from(assets)
-      .where(and(eq(assets.worldId, worldId), eq(assets.hash, hash)))
-      .get();
-    if (existing) {
-      // Match the on-disk name, which was minted from the FIRST store's extension (lower-cased,
-      // like the write path below — else the served URL 404s on a case-sensitive filesystem).
-      return {
-        url: assetUrl(worldId, hash, extname(existing.originalFilename).toLowerCase()),
-        hash,
-        deduped: true,
-      };
-    }
-
     const ext = extname(filename).toLowerCase();
     const worldDir = join(this.dir, worldId);
     mkdirSync(worldDir, { recursive: true });
     writeFileSync(join(worldDir, hash + ext), bytes);
-    this.db
-      .insert(assets)
-      .values({
-        hash,
-        worldId,
-        originalFilename: filename,
-        mime: MIME_BY_EXT[ext] ?? 'application/octet-stream',
-        size: bytes.length,
-        createdAt: Date.now(),
-      })
-      .run();
-    return { url: assetUrl(worldId, hash, ext), hash, deduped: false };
+    return { url: assetUrl(worldId, hash, ext), hash, ext, mime: mimeForExt(ext) };
   }
 
   /**
@@ -98,35 +81,23 @@ export class AssetsService {
     if (basename(worldId) !== worldId || basename(file) !== file) return null;
     const path = join(this.dir, worldId, file);
     if (!existsSync(path)) return null;
-    return {
-      bytes: readFileSync(path),
-      mime: MIME_BY_EXT[extname(file).toLowerCase()] ?? 'application/octet-stream',
-    };
+    return { bytes: readFileSync(path), mime: mimeForExt(extname(file)) };
   }
 
   /**
-   * Every stored Asset for a World, for the vault export (ADR-0033): the capability URL its docs
-   * reference, the human-readable `originalFilename` to write into the zip, and its bytes. A row
-   * whose file is missing on disk is skipped rather than aborting the export.
+   * Every Asset for a World, for the vault export (ADR-0033, ADR-0065): the capability URL its docs
+   * reference, the human-readable `name + ext` to write into the zip, and its bytes. Derived from the
+   * Asset Entities (their asset-ref) via the dedup index — no `assets` table. An Entity whose bytes are
+   * missing on disk is skipped rather than aborting the export.
    */
   exportAssets(worldId: string): { servedUrl: string; originalFilename: string; bytes: Buffer }[] {
-    const rows = this.db
-      .select({ hash: assets.hash, originalFilename: assets.originalFilename })
-      .from(assets)
-      .where(eq(assets.worldId, worldId))
-      .all();
-    const out: {
-      servedUrl: string;
-      originalFilename: string;
-      bytes: Buffer;
-    }[] = [];
-    for (const row of rows) {
-      const ext = extname(row.originalFilename).toLowerCase();
-      const found = this.read(worldId, row.hash + ext);
+    const out: { servedUrl: string; originalFilename: string; bytes: Buffer }[] = [];
+    for (const { name, value } of this.assetEntities(worldId)) {
+      const found = this.read(worldId, value.hash + value.ext);
       if (found)
         out.push({
-          servedUrl: assetUrl(worldId, row.hash, ext),
-          originalFilename: row.originalFilename,
+          servedUrl: assetUrl(worldId, value.hash, value.ext),
+          originalFilename: `${name}${value.ext}`,
           bytes: found.bytes,
         });
     }
@@ -134,32 +105,38 @@ export class AssetsService {
   }
 
   /**
-   * Every stored Asset for a World as an {@link AssetSummary} — the picker source a Board Image or
-   * Content references (#269, ADR-0034). Metadata only (no disk read): the capability URL plus the
-   * `mime`/`size`/`originalFilename` the row already carries. Ordered by `createdAt` then `hash`
-   * for a stable list.
+   * Every Asset in a World as an {@link AssetSummary} — the picker source a Board Image or Content
+   * references (#269, ADR-0034, ADR-0065). Metadata only (no disk read): the capability URL plus the
+   * `mime`/`size`/`name + ext` the Asset Entity's asset-ref carries. Ordered by the Entity's `createdAt`
+   * then `hash` for a stable list.
    */
   list(worldId: string): AssetSummary[] {
-    return this.db
-      .select({
-        hash: assets.hash,
-        originalFilename: assets.originalFilename,
-        mime: assets.mime,
-        size: assets.size,
-      })
-      .from(assets)
-      .where(eq(assets.worldId, worldId))
-      .orderBy(asc(assets.createdAt), asc(assets.hash))
-      .all()
-      .map((row) => ({
-        url: assetUrl(worldId, row.hash, extname(row.originalFilename).toLowerCase()),
-        originalFilename: row.originalFilename,
-        mime: row.mime,
-        size: row.size,
-      }));
+    return this.assetEntities(worldId).map(({ name, value }) => assetSummaryOf(worldId, name, value));
   }
 
-  /** Remove a World's entire Asset folder (its rows cascade away with the World). Best-effort: a missing folder is fine. */
+  /**
+   * The World's Asset Entities' names and asset-ref values, joined off the derived dedup index (ADR-0065)
+   * — the shared source for {@link list} and {@link exportAssets}. An Entity whose document carries no
+   * readable asset-ref (a placeholder ref this build cannot parse) is skipped forward-only.
+   */
+  private assetEntities(worldId: string): { name: string; value: NonNullable<ReturnType<typeof readAssetValue>> }[] {
+    const rows = this.db
+      .select({ name: entities.name, document: entities.document, hash: assetIndex.hash })
+      .from(assetIndex)
+      .innerJoin(entities, eq(entities.id, assetIndex.entityId))
+      .where(eq(assetIndex.worldId, worldId))
+      .orderBy(asc(entities.createdAt), asc(assetIndex.hash))
+      .all();
+    const out: { name: string; value: NonNullable<ReturnType<typeof readAssetValue>> }[] = [];
+    for (const row of rows) {
+      const parsed = entityDocumentSchema.safeParse(JSON.parse(row.document) as EntityDocument);
+      const value = parsed.success ? readAssetValue(parsed.data) : null;
+      if (value) out.push({ name: row.name, value });
+    }
+    return out;
+  }
+
+  /** Remove a World's entire Asset folder (its index rows cascade away with the World). Best-effort: a missing folder is fine. */
   deleteWorld(worldId: string): void {
     rmSync(join(this.dir, worldId), { recursive: true, force: true });
   }

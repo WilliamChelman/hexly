@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
 import { createDb, DB, Db } from '../db/db';
+import { ConfigModule } from '../config/config.module';
 import { AssetsModule } from './assets.module';
 import { ASSETS_DIR, AssetsService } from './assets.service';
 
@@ -19,7 +20,9 @@ describe('Asset serving endpoint', () => {
     db = createDb(':memory:');
     dir = mkdtempSync(join(tmpdir(), 'hexly-assets-ctl-'));
     const moduleRef = await Test.createTestingModule({
-      imports: [AssetsModule],
+      // AssetsModule now pulls in the Entity write graph for mint-and-dedup (ADR-0065), whose NudgeBus
+      // needs the Instance Configuration — so the serving test composes ConfigModule too.
+      imports: [ConfigModule, AssetsModule],
     })
       .overrideProvider(DB)
       .useValue(db)

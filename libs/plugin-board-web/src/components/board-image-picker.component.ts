@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { AssetSummary } from '@hexly/domain';
+import { assetValueUrl, readAssetValue } from '@hexly/plugin-asset';
 import { AssetsClient } from '@hexly/web-core';
 import { ButtonComponent, DialogComponent, DialogRef } from '@hexly/web-ui';
 
@@ -124,18 +125,27 @@ export class BoardImagePickerComponent {
     this.error.set(false);
     this.uploading.set(true);
     this.assetsClient.upload(this.ref.data.worldId, file).subscribe({
-      next: (asset) => this.choose(asset.url),
-      error: () => {
-        this.uploading.set(false);
-        this.error.set(true);
-        input.value = '';
+      // The endpoint returns the wrapper Asset Entity (ADR-0065); the Image element stores its served URL,
+      // read off the asset-ref. A wrapper with no readable ref is treated as a failed upload.
+      next: (entity) => {
+        const value = readAssetValue(entity.document);
+        if (value) this.choose(assetValueUrl(this.ref.data.worldId, value));
+        else this.failUpload(input);
       },
+      error: () => this.failUpload(input),
     });
   }
 
   /** Close with the chosen Asset URL — the value the Image Tool places an element at. */
   protected choose(url: string): void {
     this.ref.close(url);
+  }
+
+  /** An upload that failed (or minted an unreadable wrapper): keep the dialog open with a retry hint. */
+  private failUpload(input: HTMLInputElement): void {
+    this.uploading.set(false);
+    this.error.set(true);
+    input.value = '';
   }
 
   /** Dismiss without choosing; the Image Tool places nothing. */

@@ -49,8 +49,16 @@ The one open key→value map on an Entity — its whole authored substance, ther
 _Avoid_: Metadata (retired as the map's name — kept only as the read-only **properties** panel's UI label and the ADR-0037 name/visibility "metadata patch"); frontmatter (a projection, not a synonym); properties; attributes; custom field
 
 **Asset**:
-A binary file — typically an image, but also a PDF or other media — belonging to a World and referenced from an Entity's Content or from a **Board Surface** (an **Image** element). Served by an unguessable, unauthenticated link, so possession of the link is the only access control (even for an Asset referenced from a `private` Entity).
-_Avoid_: Attachment, file, blob, media, upload
+An **Entity** carrying the `core.type.asset` type — a binary file (an image today; PDFs, audio later) wrapped as the unit users browse, rename, tag, annotate, share, and delete. The type defaults two Fields: the asset-ref (a Field of the `core.datatype.asset` **Structured Data Type** — the bytes' content hash, pinned extension, mime, size, and **Asset Stats**) and the canonical **Content** (prose about it: credits, license, lore). Minted by upload or vault import and deduped per World by content hash — same bytes, same Asset — with the uploader as initial sole Owner and visibility defaulting to `shared`. Two access layers, deliberately distinct (ADR-0065): the Entity — its document, its discoverability, its prose — sits under the ordinary sharing model, while its **bytes** are served by an unguessable, unauthenticated capability link (ADR-0034), so possession of the link reads the bytes whatever the Entity's visibility. Renaming never moves that link (the extension is pinned at mint); deleting the Asset deletes the bytes, and re-uploading the same bytes heals dangling references. Referenced by capability link from Content prose and a Board's **Image** element — resolved by harvest to ordinary link edges, so usage is just inbound links.
+_Avoid_: Attachment, file, blob, media, upload; Asset Entity (an Asset _is_ an Entity — one name)
+
+**Asset Stats**:
+Mechanical facts derived from an **Asset**'s bytes, carried in its asset-ref value — an image's dimensions, orientation, and dominant color; later a PDF's page count, an audio file's duration. Computed at mint and never stale (the bytes are immutable), backfillable by repair, never authored, and absent when no extractor knows the kind. The asset **Structured Data Type** harvests facet dimensions from them (kind, orientation, color) for the **Asset Browser** and pickers.
+_Avoid_: Metadata (overloaded), EXIF, properties, stats (bare, in prose about anything else)
+
+**Augmentation**:
+An interpretive, machine-produced description or tags on an **Asset** — a future AI plugin's output, enriching search. Distinct from **Asset Stats** (mechanical facts) and from **Tags** (authored labels). Derived and backfillable like Stats; a disabled augmenter **Plugin** leaves prior Augmentations inert as data, the ordinary absent-plugin degradation.
+_Avoid_: AI tags, annotation, auto-tags, labels
 
 **Tag**:
 A free-text label on an Entity, for flavour and informal grouping (e.g. "ruined", "northern reach") — user-invented on the spot, carrying no behaviour. Both Tags and **Entity Types** are multi-valued labels; the line between them is _registration_: a Type is a registered category (Plugin or World-defined) carrying Fields, a view, and facets, whereas a Tag is not. "Deity" is a Tag until someone defines it as a Type.
@@ -139,7 +147,7 @@ A placed thing on a **Board Surface** — the free-positioned counterpart to a *
 _Avoid_: Item, node, card (that is the Embed's fallback rendering), widget, shape
 
 **Image**:
-A **Board Element** that displays an **Asset** — an Asset reference plus geometry. Always static (never armed). Sourced by uploading a new file (which mints a World **Asset**) or by picking an existing one. The Board Surface is a second Asset reference site beside **Content**, so Asset-usage accounting must count it.
+A **Board Element** that displays an **Asset**'s bytes — a capability-link reference plus geometry. _Decor_, always static (never armed), cheap in quantity: a collage of thirty tokens is thirty Images. Distinct from an **Embed** of an Asset, which is a reference with presence (card fallback, the Asset's View, arms on click). Sourced by uploading a new file (which mints an **Asset**) or by picking an existing one; the reference resolves by harvest to an ordinary link edge, so the Board Surface counts in the Asset's usage like **Content** does.
 _Avoid_: Picture, photo, media, sprite
 
 **Embed**:
@@ -173,7 +181,7 @@ The compact in-app control at the nav-rail masthead for hopping to another reach
 _Avoid_: World selector, world dropdown
 
 **World Graph**:
-A per-World view of its Entities as nodes and their Entity Links as edges — the node-link picture of how a World's Entities connect. Entity-only (Assets are never nodes) and access-filtered per viewer: an Entity appears only if the viewer can read it, and an edge only when the viewer can read _both_ endpoints — so it never reveals a `private` Entity. Orphan Entities (no links) still appear, as isolated nodes. A derived, read-only view — sibling to the World Dashboard and Entity Browser.
+A per-World view of its Entities as nodes and their Entity Links as edges — the node-link picture of how a World's Entities connect. Every Entity is a node, an **Asset** included (its usage is its inbound edges); access-filtered per viewer: an Entity appears only if the viewer can read it, and an edge only when the viewer can read _both_ endpoints — so it never reveals a `private` Entity. Orphan Entities (no links) are hidden by default behind a show-orphans toggle — a generic control, not a per-type rule — since bulk-minted Assets would otherwise flood the picture with isolated nodes. A derived, read-only view — sibling to the World Dashboard and Entity Browser.
 _Avoid_: web, network, mind map, relationship map, world map (collides with Hex Map)
 
 **World Owner**:
@@ -301,8 +309,12 @@ _Avoid_: Outcome, score, value
 ## Entity Browser
 
 **Entity Browser**:
-The durable, in-World surface that lists a single World's Entities as a card grid and lets the user find them by Facets and by a full-text query matched against an Entity's name, Tags, and the prose of its Content. Scoped to one World — distinct from the Command Palette (global, transient, cross-World) and the World Index (lists Worlds, not Entities).
+The durable, in-World surface that lists a single World's Entities as a card grid and lets the user find them by Facets and by a full-text query matched against an Entity's name, Tags, and the prose of its Content. A **Type Definition** may declare its Entities hidden from the default listing (the asset type does — bulk-minted media must not drown authored work), surfacing them only when that Type is explicitly selected; the Browser honors the declaration and names no type. Scoped to one World — distinct from the Command Palette (global, transient, cross-World) and the World Index (lists Worlds, not Entities).
 _Avoid_: Entity list, library, catalog, explorer; fuzzy search (the query is full-text, ranked by relevance)
+
+**Asset Browser**:
+The World-scoped nav destination for finding and managing **Assets**: the **Entity Browser** preset to the asset type — the same query, Facets (kind, orientation, color, Tags), and paging — presented as thumbnail tiles with upload at hand. Rename, share, and delete are ordinary Entity operations; deleting shows the Asset's usage (its inbound links, named per viewer) before it takes the bytes with it.
+_Avoid_: Media library, gallery, asset manager, file manager
 
 **Facet**:
 A filterable dimension of a World's Entities offered in the Entity Browser with its distinct values and their counts — Type, Tag, and Visibility always, plus facetable **Fields** (and the dimensions a **Structured Data Type** harvests) surfaced _by presence_: a Field Facet appears whenever the current result set carries values for its key, whatever types those Entities hold. Selecting values within one Facet is OR; across Facets is AND; the combined filter is AND-ed with the text query.

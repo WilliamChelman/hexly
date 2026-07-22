@@ -1,0 +1,8 @@
+{
+  "name": "plugin-asset-server",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/plugin-asset-server/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {}
+}

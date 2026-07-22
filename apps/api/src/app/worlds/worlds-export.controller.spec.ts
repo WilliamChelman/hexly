@@ -454,7 +454,8 @@ describe('Vault export endpoint', () => {
       .expect(201);
     expect(reimport.body.linksResolved).toBe(1);
     const world = await ada.get(`/worlds/${reimport.body.worldId}`).expect(200);
-    expect(world.body.entityCount).toBe(2); // Just the two notes — no seeded Home Entity.
+    // The two notes plus the portrait, now minted as its own Asset Entity (ADR-0065) — no seeded Home Entity.
+    expect(world.body.entityCount).toBe(3);
   });
 
   it("round-trips an Entity's types and its structured values: a Monster, a Hex Map, a user-defined type", async () => {

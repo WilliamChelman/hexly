@@ -22,6 +22,7 @@ import {
   addOwnerRequestSchema,
   AssetSummary,
   AuthUser,
+  EntityDetail,
   AvailableType,
   createUserDefinedTypeRequestSchema,
   createWorldFieldRequestSchema,
@@ -166,10 +167,10 @@ export class WorldsController {
   }
 
   /**
-   * Upload a file, minting a new World Asset in one step (#269, ADR-0034), returning its
-   * {@link AssetSummary} for the author to reference. Contributor-gated in the service: unreachable
-   * → 404, reachable-but-not-contributor → 403, no file → 400. Multer buffers the upload in memory
-   * (size cap set instance-wide via MulterModule, ADR-0036).
+   * Upload a file, minting (or deduping to) a World Asset in one step (#269, ADR-0034, ADR-0065),
+   * returning the wrapper **Asset Entity** for the author to reference. Contributor-gated in the service:
+   * unreachable → 404, reachable-but-not-contributor → 403, no file → 400. Multer buffers the upload in
+   * memory (size cap set instance-wide via MulterModule, ADR-0036).
    */
   @Post(':id/assets')
   @UseInterceptors(FileInterceptor('file'))
@@ -177,7 +178,7 @@ export class WorldsController {
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @UploadedFile() file: UploadedAsset | undefined,
-  ): AssetSummary {
+  ): EntityDetail {
     if (!file) throw new BadRequestException();
     const result = this.worlds.uploadAsset(user.id, id, file.originalname, file.buffer);
     if (result === 'not-found') throw new NotFoundException();
