@@ -1,15 +1,19 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ComponentRef,
   Injector,
+  Type,
+  ViewContainerRef,
   computed,
   effect,
   inject,
   input,
+  output,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
-import { NgComponentOutlet } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { isStructuredDataType } from '@hexly/domain';
 import {
@@ -56,7 +60,7 @@ type OutletMode = 'view' | 'card' | 'dangling';
   selector: 'app-entity-view-outlet',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [NgComponentOutlet, IconComponent, TranslocoPipe],
+  imports: [IconComponent, TranslocoPipe],
   template: `
     @switch (mode()) {
       @case ('dangling') {
@@ -90,15 +94,14 @@ type OutletMode = 'view' | 'card' | 'dangling';
           </div>
         </div>
       }
-      @default {
-        <!-- The chosen View's component (a plugin view / the generic Field view), resolved from the
-             ViewRegistry with no type sniffing (ADR-0048). The injector carries the Field key when the
-             View renders a Field of a Structured Data Type, so two grids get one store each (ADR-0050). -->
-        @if (activeComponent(); as component) {
-          <ng-container *ngComponentOutlet="component; injector: viewInjector()" />
-        }
-      }
     }
+    <!-- The chosen View's component (a plugin view / the generic Field view), resolved from the
+         ViewRegistry with no type sniffing (ADR-0048) and created *manually* (not *ngComponentOutlet):
+         only manual creation exposes the running View's own injector, which the outlet emits so the
+         page's Dock can host View-contributed Panels with it (ADR-0067, #294). Empty in the card/dangling
+         modes and while a deferred body loads. The anchor stays mounted across modes so a mode flip never
+         races the created View's teardown — {@link mountView} owns create/destroy off the resolved mode. -->
+    <ng-container #viewHost />
   `,
 })
 export class EntityViewOutletComponent {
@@ -121,6 +124,20 @@ export class EntityViewOutletComponent {
   /** The transclusion bounds — cycle chain, depth, and the cap (ADR-0062). Defaults to the top-of-page context. */
   readonly renderContext = input<EntityRenderContext>(DEFAULT_ENTITY_RENDER_CONTEXT);
 
+  /**
+   * The manually-created active View's own injector — emitted so a host can hand it to the page's Dock,
+   * which instantiates View-contributed Panels with it (ADR-0067, #294). `null` while no View body is
+   * mounted (the card/dangling fallbacks, or a deferred body in flight). The page binds this to the Dock;
+   * the Board Embed leaves it unbound, so a transcluded View never feeds a Dock (the Dock is page chrome).
+   */
+  readonly viewInjectorChange = output<Injector | null>();
+
+  /** The anchor the active View is created into — always mounted, so a mode flip never races its teardown. */
+  private readonly viewHost = viewChild('viewHost', { read: ViewContainerRef });
+
+  /** The live created View, torn down (never re-pointed) whenever the component or its injector changes. */
+  private viewRef: ComponentRef<unknown> | null = null;
+
   /** Set when this outlet's own fetch found the target unreadable or deleted (403/404) — the dangling case. */
   private readonly _dangling = signal(false);
 
@@ -142,6 +159,38 @@ export class EntityViewOutletComponent {
 
     // Fetch a deferred View's body once it is the active one (moved off the page with the view-hosting).
     effect(() => this.views.fetch(this.viewStore.activeView().viewId));
+
+    // Manually create the active View so its injector escapes to the Dock (ADR-0067, #294). Reacts to the
+    // resolved mode, the component, and the per-instance injector — remounting on any change, matching what
+    // `*ngComponentOutlet` did. The card/dangling fallbacks pass no component, so the View body never mounts
+    // there (recursion stops, ADR-0062).
+    effect(() => {
+      const host = this.viewHost();
+      const component = this.mode() === 'view' ? this.activeComponent() : undefined;
+      const injector = this.viewInjector();
+      untracked(() => this.mountView(host, component, injector));
+    });
+  }
+
+  /**
+   * Create (or tear down) the active View in {@link viewHost}, and emit its injector. The previous instance
+   * is always destroyed first — never re-pointed — so switching grids rebuilds the component and its
+   * VIEW_FIELD_KEY-scoped store rather than re-aiming a live one at another Field (ADR-0050), exactly as
+   * `*ngComponentOutlet` recreated on a component/injector change.
+   */
+  private mountView(
+    host: ViewContainerRef | undefined,
+    component: Type<unknown> | undefined,
+    injector: Injector,
+  ): void {
+    this.viewRef?.destroy();
+    this.viewRef = null;
+    if (!host || !component) {
+      this.viewInjectorChange.emit(null);
+      return;
+    }
+    this.viewRef = host.createComponent(component, { injector });
+    this.viewInjectorChange.emit(this.viewRef.injector);
   }
 
   private load(id: string): void {
@@ -182,7 +231,7 @@ export class EntityViewOutletComponent {
   /**
    * The injector the active View's component is created in — this outlet's own, plus {@link VIEW_FIELD_KEY}
    * carrying the Field the View renders. Keyed on {@link EntityViewStore.activeFieldKey}, which settles, so
-   * `NgComponentOutlet` doesn't tear a live map down on every re-derived view list.
+   * {@link mountView} doesn't tear a live map down on every re-derived view list.
    *
    * {@link VIEW_FIELD_KEY} is provided **unconditionally** — `null` for a Type's own View (a Note's prose,
    * placed by id, names no Field). It must *shadow* the token, not defer to it: an Embed's Outlet nests

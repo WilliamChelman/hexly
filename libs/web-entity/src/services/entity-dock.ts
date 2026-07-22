@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import { AuthScopedStorage } from '@hexly/web-core';
 import { PanelDefinition, PanelId } from '../models/panel-definition';
 
@@ -35,6 +35,15 @@ export class EntityDock {
   /** A View's transient programmatic claim on the slot; never persisted. */
   private readonly _claim = signal<PanelId | null>(null);
 
+  /**
+   * The running View's own injector, handed over by the Entity view outlet as it manually creates the
+   * active View (ADR-0067, #294). The Dock instantiates a **View-contributed** Panel with it, so that
+   * Panel reaches the View-scoped services its host View provides; `null` while the View degrades to the
+   * card/dangling fallback (no body mounted). A universal Panel is unaffected — it never wants it.
+   */
+  private readonly _viewInjector = signal<Injector | null>(null);
+  readonly viewInjector = this._viewInjector.asReadonly();
+
   /** What the Dock is asked to show — a live claim wins, else the remembered choice. */
   private readonly requested = computed(() => this._claim() ?? this._remembered());
 
@@ -54,6 +63,11 @@ export class EntityDock {
   /** Set the Panels the current View offers (universal ∪ the View's, already write-gated by the chrome). */
   setAvailable(panels: readonly PanelDefinition[]): void {
     this._available.set(panels);
+  }
+
+  /** Hand the Dock the running View's injector (or `null` when no View body is mounted) — ADR-0067, #294. */
+  setViewInjector(injector: Injector | null): void {
+    this._viewInjector.set(injector);
   }
 
   /** Show `id`, closing whatever was showing; toggling the open one closes the Dock. A user action clears any claim. */
