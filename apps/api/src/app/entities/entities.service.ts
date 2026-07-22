@@ -142,12 +142,7 @@ export class EntitiesService {
     // A text query becomes an FTS5 MATCH ranked by bm25; absent (or
     // all-punctuation) keeps the last-edited order.
     const match = opts.q ? toFtsMatch(opts.q) : null;
-    // Hidden types are absent from the default listing but surface once selected (ADR-0065): resolve the
-    // exclusion against whatever the caller selected, so it self-lifts for a selected hidden type. Neither
-    // an explicit id lookup nor a name search is a "default listing", though — pins and the `/entities/:id`
-    // redirect guard resolve an Asset by id, and Quick Open matches it by name, treating an Asset like any
-    // Entity (ADR-0065) — so skip the exclusion entirely when `ids` or `q` is present.
-    opts = { ...opts, excludedTypes: opts.ids || opts.q ? [] : this.excludedHiddenTypes(opts.type) };
+    opts = { ...opts, excludedTypes: this.resolveExcludedTypes(opts) };
     const w = this.config.search.weights;
     const access = entityAccess(this.db, readerId);
     const query = this.db
@@ -223,9 +218,10 @@ export class EntitiesService {
     const { filter } = entityAccess(this.db, readerId);
     // The hidden-type exclusion (ADR-0065) rides every count *but* the type facet's: the type facet is the
     // opt-in surface, so a hidden type must still be counted over the full universe there — otherwise it
-    // would never appear to be selected into view. Every sibling category counts assets only once the asset
-    // type is selected (which self-lifts the exclusion), matching the default listing.
-    const scoped: FacetOptions = { ...opts, excludedTypes: this.excludedHiddenTypes(opts.type) };
+    // would never appear to be selected into view. Every sibling category resolves the exclusion exactly as
+    // `list` does — via the shared helper — so the rail can never contradict the results it annotates: a
+    // name search (`q`) lifts the exclusion on both sides, so an Asset matched by name is counted here too.
+    const scoped: FacetOptions = { ...opts, excludedTypes: this.resolveExcludedTypes(opts) };
     return {
       // Drop a category's own selection before counting it (drill-down). No hidden-type exclusion here.
       type: this.countJsonArray({ ...opts, type: undefined, excludedTypes: [] }, entities.types, filter),
@@ -234,6 +230,18 @@ export class EntitiesService {
       // Field facets by presence in the result set — no longer gated on the active Type (ADR-0054, #231).
       fields: this.countFieldFacets(scoped, filter),
     };
+  }
+
+  /**
+   * Resolve the hidden-from-default-listing exclusion (ADR-0065) for a read — the single source both
+   * {@link list} and {@link facets} route through, so the paged results and the Facet rail annotating them
+   * can never drift. The exclusion self-lifts for a hidden type the caller selects (see
+   * {@link excludedHiddenTypes}), and lifts *entirely* when `ids` or `q` is present: neither an id lookup
+   * nor a name search is a "default listing" — pins and the `/entities/:id` redirect guard resolve an Asset
+   * by id, and Quick Open matches it by name, treating an Asset like any Entity. `facets` carries no `ids`.
+   */
+  private resolveExcludedTypes(opts: Pick<FilterOptions, 'ids' | 'q' | 'type'>): string[] {
+    return opts.ids || opts.q ? [] : this.excludedHiddenTypes(opts.type);
   }
 
   /**
