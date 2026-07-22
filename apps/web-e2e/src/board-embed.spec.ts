@@ -57,8 +57,18 @@ test('a Board Embed of a Note renders the target’s prose, not an empty body', 
   await openEntity(page, boardId);
 
   // The Embed mounts the Content View and seeds the target's prose — the assertion the empty-body bug fails.
-  const embeddedBody = page.locator('app-board-embed [data-testid="note-content"]');
+  const embed = page.locator('app-board-embed');
+  const embeddedBody = embed.locator('[data-testid="note-content"]');
   await expect(embeddedBody).toContainText(prose);
+
+  // Bare View only (ADR-0067, #303): the Dock is page chrome, so an Embed transcludes no Dock strip, no
+  // open Panel, and none of the floating Outline/References toggles this prose page carries on its own page.
+  // The Board page itself owns a Dock — so the absence inside the Embed is a real contrast, not a blank render.
+  await expect(page.locator('[data-testid="dock-strip"]')).toHaveCount(1);
+  await expect(embed.locator('[data-testid="dock-strip"]')).toHaveCount(0);
+  await expect(embed.locator('[data-testid="dock-panel"]')).toHaveCount(0);
+  await expect(embed.locator('[data-testid="outline-toggle"]')).toHaveCount(0);
+  await expect(embed.locator('[data-testid="references-toggle"]')).toHaveCount(0);
 });
 
 /**
