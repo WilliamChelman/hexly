@@ -3,6 +3,7 @@ import { emptyRichContent, tiptapContent } from '@hexly/plugin-content';
 import { and, eq } from 'drizzle-orm';
 import { createDb, Db } from '../db/db';
 import {
+  assetIndex,
   entities,
   entityDescriptors,
   entityEdges,
@@ -418,6 +419,39 @@ describe('EntityWrites', () => {
         ]);
         expect(importSourceOf('ajax')).toEqual([
           { worldId: OTHER, importer: 'draw-steel.importer.monsters', sourceId: 'ajax', rev: 'sha-abc' },
+        ]);
+      });
+
+      /**
+       * The Asset dedup index and its harvested facets are derived state like the edges and Import
+       * Source (ADR-0065): an asset Entity seeded with neither an `(worldId, hash)` row nor its
+       * `kind`/`orientation`/`hue` facets gets both back on reindex, harvested from the stored
+       * asset-ref alone — the `assets` table dissolving into a Reindex-rebuilt index, no backfill.
+       */
+      it('rebuilds the Asset hash index and harvested facets from a raw asset document', () => {
+        const HASH = 'a'.repeat(64);
+        seedRaw(
+          'portrait',
+          WORLD,
+          JSON.stringify({
+            'core.field.asset': {
+              hash: HASH,
+              ext: '.png',
+              mime: 'image/png',
+              size: 11,
+              stats: { width: 1200, height: 400, orientation: 'landscape', dominantColor: '#c81818' },
+            },
+          }),
+          'type.asset',
+        );
+
+        reindexAll();
+
+        expect(assetIndexOf('portrait')).toEqual([{ worldId: WORLD, hash: HASH }]);
+        expect(facetsOf('portrait').sort((a, b) => a.key.localeCompare(b.key))).toEqual([
+          { key: 'hue', value: 'red', num: null },
+          { key: 'kind', value: 'image', num: null },
+          { key: 'orientation', value: 'landscape', num: null },
         ]);
       });
 
@@ -888,6 +922,15 @@ describe('EntityWrites', () => {
         .where(and(eq(entityImportSource.worldId, worldId), eq(entityImportSource.importer, importer)))
         .all()
         .map((r) => r.entityId);
+    }
+
+    /** The denormalised Asset dedup-index rows an Entity carries, by name (ADR-0065). */
+    function assetIndexOf(name: string) {
+      return db
+        .select({ worldId: assetIndex.worldId, hash: assetIndex.hash })
+        .from(assetIndex)
+        .where(eq(assetIndex.entityId, idOf(name)))
+        .all();
     }
 
     /** The denormalised Field-facet rows an Entity carries, by name. */

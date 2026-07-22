@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
@@ -7,7 +10,8 @@ import { eq } from 'drizzle-orm';
 import { InstanceRole, EntityDocument } from '@hexly/domain';
 import { tiptapContent } from '@hexly/plugin-content';
 import { DB, Db, createDb } from '../db/db';
-import { entityEdges } from '../db/schema';
+import { assetIndex, entityEdges, entityFieldFacets } from '../db/schema';
+import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { AdminModule } from './admin.module';
@@ -18,14 +22,19 @@ import { ConfigModule } from '../config/config.module';
 describe('Superadmin repair surface', () => {
   let app: INestApplication;
   let db: Db;
+  let assetsDir: string;
 
   beforeEach(async () => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
+    // A throwaway Assets root, so the upload endpoint's bytes never litter the repo.
+    assetsDir = mkdtempSync(join(tmpdir(), 'hexly-admin-assets-'));
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule, AuthModule, AdminModule, WorldsModule, EntitiesModule],
     })
       .overrideProvider(DB)
       .useValue(db)
+      .overrideProvider(ASSETS_DIR)
+      .useValue(assetsDir)
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -35,6 +44,7 @@ describe('Superadmin repair surface', () => {
 
   afterEach(async () => {
     await app.close();
+    rmSync(assetsDir, { recursive: true, force: true });
   });
 
   const PASSWORD = 'correct horse battery';
@@ -65,6 +75,35 @@ describe('Superadmin repair surface', () => {
       failures: [],
     });
     expect(edgeTargets(ealdred)).toEqual([mira]);
+  });
+
+  /**
+   * The `assets` table dissolved into a Reindex-rebuilt `(worldId, hash) → entity` index and its
+   * harvested facets (ADR-0065): derived asset state repairs through the same walk as the edges. An
+   * asset uploaded, then its index and facet rows dropped as if lost, comes back on Reindex — the
+   * dedup key an upload resolves against and the `kind` the Browser rail filters on.
+   */
+  it('rebuilds the asset hash index and harvested facets from asset Entity Documents', async () => {
+    await seedSuperadmin('ada@hexly.test', 'Ada');
+    const ada = await signIn('ada@hexly.test');
+    const worldId = await makeWorld(ada, 'Aerthos');
+
+    // A tiny valid-enough PNG; only its bytes' content-address identity matters here.
+    const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+    const asset = (await ada.post(`/worlds/${worldId}/assets`).attach('file', PNG, 'Portrait.png').expect(201)).body;
+    const hash = asset.document['core.field.asset'].hash;
+
+    // The instance as it stood before the derived asset state shipped — the table dropped.
+    db.delete(assetIndex).run();
+    db.delete(entityFieldFacets).run();
+
+    await ada.post('/admin/reindex').expect(202);
+    const done = await pollUntilDone(ada);
+
+    expect(done).toMatchObject({ status: 'succeeded', failures: [] });
+    expect(assetHashRows()).toEqual([{ entityId: asset.id, worldId, hash }]);
+    // A statless PNG still faces the Browser rail by kind (ADR-0065).
+    expect(facetsOf(asset.id)).toContainEqual({ key: 'kind', value: 'image' });
   });
 
   /** Readable before any Reindex has ever run — the button needs to know it is free. */
@@ -158,5 +197,22 @@ describe('Superadmin repair surface', () => {
       .where(eq(entityEdges.sourceEntityId, sourceEntityId))
       .all()
       .map((r) => r.targetId);
+  }
+
+  /** The rebuilt `(worldId, hash) → entity` dedup rows (ADR-0065). */
+  function assetHashRows() {
+    return db
+      .select({ entityId: assetIndex.entityId, worldId: assetIndex.worldId, hash: assetIndex.hash })
+      .from(assetIndex)
+      .all();
+  }
+
+  /** The harvested facet rows an Entity carries (ADR-0055/0065). */
+  function facetsOf(entityId: string) {
+    return db
+      .select({ key: entityFieldFacets.key, value: entityFieldFacets.value })
+      .from(entityFieldFacets)
+      .where(eq(entityFieldFacets.entityId, entityId))
+      .all();
   }
 });
