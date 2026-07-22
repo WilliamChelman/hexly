@@ -6,7 +6,28 @@
   "create": "Créer une ressource",
   "untitled": "Ressource sans titre",
   "view": {
-    "asset": "Ressource"
+    "asset": "Ressource",
+    "label": "Ressource"
+  },
+  "stats": {
+    "heading": "Statistiques",
+    "dimensions": "Dimensions",
+    "orientation": "Orientation",
+    "dominantColor": "Couleur dominante",
+    "mime": "Type",
+    "size": "Taille"
+  },
+  "orientation": {
+    "landscape": "Paysage",
+    "portrait": "Portrait",
+    "square": "Carré"
+  },
+  "prose": {
+    "heading": "Notes"
+  },
+  "usage": {
+    "heading": "Utilisée par",
+    "empty": "Pas encore utilisée."
   },
   "facet": {
     "kind": "Type",

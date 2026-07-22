@@ -1,4 +1,11 @@
 import { contentViewToggle, enterLibrary, entityIdFromUrl, expect, flushSave, openEntity, test } from './fixtures';
+import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
+
+// A real 20×8 solid-color PNG for minting an image Asset to embed (ADR-0065).
+const PNG_20x8 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAABQAAAAICAIAAAB2/0i6AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAFUlEQVQYlWOwyTtBNmIY1XxiiAQYACBM50E1XKcYAAAAAElFTkSuQmCC',
+  'base64',
+);
 
 /**
  * Board Embed transclusion (ADR-0062, #270): an Embed element renders its target Entity's chosen View
@@ -52,4 +59,51 @@ test('a Board Embed of a Note renders the target’s prose, not an empty body', 
   // The Embed mounts the Content View and seeds the target's prose — the assertion the empty-body bug fails.
   const embeddedBody = page.locator('app-board-embed [data-testid="note-content"]');
   await expect(embeddedBody).toContainText(prose);
+});
+
+/**
+ * A Board Embed of an **Asset** renders the Asset's View by transclusion (ADR-0065, #276): a future PDF/audio
+ * kind lands on a Board with zero new machinery, and an image draws inline through the same Entity View Outlet
+ * the Note embed uses. Confirms the Asset's default View (`''` selects it) resolves and renders inside an Embed.
+ */
+test('a Board Embed of an image Asset renders its image View by transclusion', async ({ page }) => {
+  const worldId = idFromSegment(await enterLibrary(page)); // the raw id the API keys on, decoded from the pretty segment
+
+  // Mint the Asset through the ordinary upload path (ADR-0065); it returns the wrapper Entity to embed.
+  const uploaded = await page.request.post(`/api/worlds/${worldId}/assets`, {
+    multipart: { file: { name: 'sigil.png', mimeType: 'image/png', buffer: PNG_20x8 } },
+  });
+  expect(uploaded.ok(), `${uploaded.status()} ${await uploaded.text()}`).toBeTruthy();
+  const assetId = (await uploaded.json()).id as string;
+
+  // A Board embedding the Asset through its default View (`viewInstance: ''`), seeded over the API.
+  const created = await page.request.post('/api/entities', {
+    data: {
+      name: 'Untitled board',
+      types: ['core.type.board'],
+      document: {
+        'core.field.surface': {
+          elements: [
+            {
+              id: 'embed-1',
+              kind: 'embed',
+              position: { x: 0, y: 0 },
+              size: { width: 480, height: 360 },
+              z: 0,
+              targetEntityId: assetId,
+              viewInstance: '', // the Asset's default View — the mime-dispatching Asset renderer
+            },
+          ],
+        },
+      },
+    },
+  });
+  expect(created.ok(), `${created.status()} ${await created.text()}`).toBeTruthy();
+  const boardId = (await created.json()).id as string;
+
+  await openEntity(page, boardId);
+
+  // The Embed mounts the Asset View, which draws the image inline (the transclusion the ticket asks for).
+  const embeddedImage = page.locator('app-board-embed [data-testid="asset-image"]');
+  await expect(embeddedImage).toBeVisible();
 });
