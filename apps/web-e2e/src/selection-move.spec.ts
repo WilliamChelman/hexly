@@ -83,11 +83,14 @@ test('drags a region on its own and its whole footprint moves', async ({ page, r
   const cy = box.y + box.height / 2;
   const dx = 100; // one column right (offset q+1)
 
-  // Create a region and paint the centre (0,0) into its membership.
+  // Create a region and paint the centre (0,0) into its membership. Target the origin by
+  // `box.width/2` (measured before the Regions Panel pushed the map narrower), not a no-position
+  // centre click: with the Dock open the world origin no longer sits at the canvas's geometric
+  // centre, and cx below likewise grabs that origin (ADR-0067).
   await page.getByTestId('map-regions-toggle').click();
   await page.getByTestId('new-region').click();
   await expect(page.getByTestId('region-name')).toHaveValue('Region 1');
-  await canvas.click();
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
 
   // The region is still selected. Drag by grabbing its member cell.
   await page.getByTestId('tool-select').click();
