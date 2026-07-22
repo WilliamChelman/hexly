@@ -47,8 +47,8 @@ export interface StoredAsset {
 /**
  * Per-World content-addressed Asset byte storage (ADR-0034, ADR-0065). Bytes are written to disk under
  * `<ASSETS_DIR>/<worldId>/<sha256>.<ext>`; the hash IS the capability token the unauthenticated serving
- * route relies on. Dedup and enumeration are the **Asset Entity's** job now — the `assets` table dissolved
- * into the derived `(worldId, hash) → entity` index, and byte serving reads disk with no table consulted.
+ * route relies on. Dedup and enumeration are the **Asset Entity's** job, resolved through the derived
+ * `(worldId, hash) → entity` index (ADR-0065); byte serving reads disk with no table consulted.
  */
 @Injectable()
 export class AssetsService implements OnModuleInit {
@@ -151,7 +151,7 @@ export class AssetsService implements OnModuleInit {
   /**
    * Every Asset for a World, for the vault export (ADR-0033, ADR-0065): the capability URL its docs
    * reference, the human-readable `name + ext` to write into the zip, and its bytes. Derived from the
-   * Asset Entities (their asset-ref) via the dedup index — no `assets` table. An Entity whose bytes are
+   * Asset Entities (their asset-ref) via the dedup index. An Entity whose bytes are
    * missing on disk is skipped rather than aborting the export.
    */
   exportAssets(worldId: string): { servedUrl: string; originalFilename: string; bytes: Buffer }[] {

@@ -468,7 +468,7 @@ describe('Vault export endpoint', () => {
       .expect(201);
     expect(reimport.body.linksResolved).toBe(1);
     const world = await ada.get(`/worlds/${reimport.body.worldId}`).expect(200);
-    // The two notes plus the portrait, now minted as its own Asset Entity (ADR-0065) — no seeded Home Entity.
+    // The two notes plus the portrait, minted as its own Asset Entity (ADR-0065); an import seeds no Home Entity.
     expect(world.body.entityCount).toBe(3);
   });
 

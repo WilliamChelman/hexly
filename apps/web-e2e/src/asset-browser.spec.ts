@@ -10,8 +10,8 @@ const PNG_20x8 = Buffer.from(
 
 /**
  * The Board image picker's entity-search flow (ADR-0065, #281): the picker offers the same search + Facets
- * as the Asset Browser, pinned to the asset type + image kind, replacing the old list-everything client
- * filter. This drives the on-canvas Image Tool to open the picker, searches by name, filters by an image
+ * as the Asset Browser, pinned to the asset type + image kind — server-side search, never a client-side
+ * mime filter. This drives the on-canvas Image Tool to open the picker, searches by name, filters by an image
  * Facet, and picks an existing Asset — landing a **capability-URL Image element** (static decor, never armed;
  * distinct from an Embed of an Asset).
  */
@@ -116,7 +116,7 @@ test('the Asset Browser lists uploaded media as thumbnail tiles, with upload, se
 
 /**
  * Assets are ordinary Entities (ADR-0065, #282), so Quick Open matches them by name and the Dashboard can
- * pin one — both free from the Entity model, once a hidden-by-default type no longer hides an Asset from a
+ * pin one — both free from the Entity model: a hidden-by-default type never hides an Asset from a
  * deliberate name search or an id-resolved pin. This seeds an Asset over the API, finds it in Quick Open,
  * then pins it to the Dashboard and confirms the pinned tile resolves.
  */
@@ -138,8 +138,8 @@ test('Quick Open matches an Asset by name and it can be pinned to the World Dash
   });
   expect(note.ok(), `${note.status()} ${await note.text()}`).toBeTruthy();
 
-  // Quick Open matches the Asset by name — a name search is not a "default listing", so a hidden-by-default
-  // type no longer hides it (ADR-0065). The palette opens on the Command Palette chord.
+  // Quick Open matches the Asset by name — a name search is not a "default listing", so the hidden-type
+  // exclusion lifts (ADR-0065). The palette opens on the Command Palette chord.
   await page.keyboard.press('ControlOrMeta+KeyK');
   await page.getByTestId('command-palette-input').fill('moonlit-keep');
   await expect(page.getByTestId(`command-palette-option-${assetId}`)).toBeVisible();
@@ -151,8 +151,8 @@ test('Quick Open matches an Asset by name and it can be pinned to the World Dash
   expect(pinned.ok(), `${pinned.status()} ${await pinned.text()}`).toBeTruthy();
   expect((await pinned.json()).pinnedEntityIds).toContain(assetId);
 
-  // The Dashboard resolves the pinned tile by id — the id-lookup no longer excludes a hidden-by-default
-  // type (#278), so the pinned Asset actually appears rather than silently dropping out. A full load of the
+  // The Dashboard resolves the pinned tile by id — an id lookup lifts the hidden-type exclusion (#278),
+  // so the pinned Asset appears rather than silently dropping out. A full load of the
   // Dashboard root re-reads the World (with its fresh pins) through the active-World guard.
   await page.goto(`/w/${prettyWorld}`);
   await page.waitForURL(/\/w\/[\w-]+$/);

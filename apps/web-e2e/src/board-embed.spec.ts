@@ -103,7 +103,7 @@ test('a Board Embed of an image Asset renders its image View by transclusion', a
 
   await openEntity(page, boardId);
 
-  // The Embed mounts the Asset View, which draws the image inline (the transclusion the ticket asks for).
+  // The Embed mounts the Asset View, which draws the image inline — transclusion, not a copy (ADR-0062).
   const embeddedImage = page.locator('app-board-embed [data-testid="asset-image"]');
   await expect(embeddedImage).toBeVisible();
 });

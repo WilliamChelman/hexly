@@ -25,7 +25,7 @@ test('a note round-trips: create → appears → open → rename → delete', as
   await expect(page.getByTestId('title')).toHaveText('Lady Mara');
 
   await page.getByRole('link', { name: 'Library' }).click();
-  // Delete now goes through the usage-aware confirmation (ADR-0065): an unreferenced note shows the
+  // Delete goes through the usage-aware confirmation (ADR-0065): an unreferenced note shows the
   // plain prompt, and only the Delete button in the dialog commits it.
   await page.getByTestId(`delete-${id}`).click();
   await expect(page.getByTestId('delete-prompt')).toBeVisible();
