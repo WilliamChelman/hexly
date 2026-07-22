@@ -11,8 +11,8 @@ import { FacetRailComponent } from './facet-rail.component';
  */
 describe('FacetRail — harvested dimension labels (#235)', () => {
   const CATALOGS = {
-    'fixture/en': { threat: 'Threat Level' },
-    'fixture/fr': { threat: 'Niveau de menace' },
+    'fixture/en': { threat: 'Threat Level', kind: { image: 'Image file' } },
+    'fixture/fr': { threat: 'Niveau de menace', kind: { image: 'Fichier image' } },
   };
 
   /** A facets payload carrying one harvested-dimension facet (`labelKey`) and one scalar Field facet. */
@@ -31,6 +31,19 @@ describe('FacetRail — harvested dimension labels (#235)', () => {
           values: [
             { value: '1', count: 1 },
             { value: '10', count: 1 },
+          ],
+        },
+        {
+          // A harvested enum dimension carrying a per-value key prefix (ADR-0055/0065): each value resolves
+          // as `<valuesKeyPrefix>.<value>`. `mystery` has no copy — it must fall back to the raw token.
+          key: 'fx_kind',
+          label: 'fixture.kind',
+          labelKey: 'fixture.threat',
+          valuesKeyPrefix: 'fixture.kind',
+          dataType: { kind: 'enum', options: ['image', 'mystery'] },
+          values: [
+            { value: 'image', count: 3 },
+            { value: 'mystery', count: 1 },
           ],
         },
         {
@@ -54,6 +67,11 @@ describe('FacetRail — harvested dimension labels (#235)', () => {
   const heading = (fixture: ComponentFixture<FacetRailComponent>, key: string) =>
     (fixture.nativeElement as HTMLElement).querySelector(`[data-testid="facet-field-${key}"] h3`)?.textContent?.trim();
 
+  const valueLabel = (fixture: ComponentFixture<FacetRailComponent>, key: string, value: string) =>
+    (fixture.nativeElement as HTMLElement)
+      .querySelector(`[data-testid="facet-field-${key}-${value}"] span.truncate`)
+      ?.textContent?.trim();
+
   it('renders a harvested dimension label translated in the active Locale, not the raw key', () => {
     const fixture = render();
     expect(heading(fixture, 'fx_threat')).toBe('Threat Level');
@@ -66,6 +84,23 @@ describe('FacetRail — harvested dimension labels (#235)', () => {
   it('renders a scalar Field facet with its authored label, untranslated', () => {
     const fixture = render();
     expect(heading(fixture, 'alignment')).toBe('Alignment');
+  });
+
+  it('translates a harvested dimension VALUE via its key prefix in the active Locale (ADR-0055/0065)', () => {
+    const fixture = render();
+    expect(valueLabel(fixture, 'fx_kind', 'image')).toBe('Image file');
+
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+    expect(valueLabel(fixture, 'fx_kind', 'image')).toBe('Fichier image');
+  });
+
+  it('falls back to the raw token for a dimension value with no copy, and for a scalar Field value', () => {
+    const fixture = render();
+    // Unknown value under a translated dimension → raw token, never the bare `<prefix>.<value>` key.
+    expect(valueLabel(fixture, 'fx_kind', 'mystery')).toBe('mystery');
+    // A scalar Field carries no `valuesKeyPrefix`, so its value renders verbatim.
+    expect(valueLabel(fixture, 'alignment', 'lawful-good')).toBe('lawful-good');
   });
 
   it('picks the control from the dimension’s dataType: a numeric dimension renders a range', () => {

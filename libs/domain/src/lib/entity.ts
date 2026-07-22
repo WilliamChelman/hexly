@@ -286,11 +286,16 @@ export interface FacetCount {
  * `labelKey` is set only when the facet comes from a harvested dimension (ADR-0055): its i18n key, so
  * the rail renders the label translated in the active Locale. A scalar Field leaves it unset — its
  * `label` is an authored string, not a translation key.
+ *
+ * `valuesKeyPrefix` is the matching i18n key prefix for the dimension's enum VALUES (ADR-0055/0065): a
+ * client resolves each `FacetCount.value` as `<valuesKeyPrefix>.<value>`, falling back to the raw token.
+ * Unset for a scalar Field, whose values are authored data and render verbatim.
  */
 export interface FieldFacet {
   readonly key: string;
   readonly label: string;
   readonly labelKey?: string;
+  readonly valuesKeyPrefix?: string;
   readonly dataType: FieldDataType;
   readonly values: readonly FacetCount[];
 }

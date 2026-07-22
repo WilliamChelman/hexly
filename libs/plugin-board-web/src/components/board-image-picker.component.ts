@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { AssetSummary, EntityFacets, FieldFacet } from '@hexly/domain';
+import { AssetSummary, EntityFacets, FacetCount, FieldFacet } from '@hexly/domain';
 import { assetValueUrl, ASSET_KIND_FACET_KEY, readAssetValue } from '@hexly/plugin-asset';
 import { AssetsClient, AssetSearchParams } from '@hexly/web-core';
 import { ButtonComponent, DialogComponent, DialogRef, InputComponent } from '@hexly/web-ui';
@@ -83,7 +83,7 @@ const NO_FACETS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] 
                     [attr.aria-pressed]="isActive(facet.key, value.value)"
                     (click)="toggleFacet(facet.key, value.value)"
                   >
-                    <span>{{ value.label ?? value.value }}</span>
+                    <span>{{ valueLabel(facet, value) }}</span>
                     <span class="text-ink-faint tabular-nums">{{ value.count }}</span>
                   </button>
                 }
@@ -190,6 +190,20 @@ export class BoardImagePickerComponent {
   /** A harvested dimension carries an i18n key the active Locale translates (ADR-0055); fall back to its key. */
   protected label(facet: FieldFacet): string {
     return facet.labelKey ? this.i18n.translate(facet.labelKey) : facet.label;
+  }
+
+  /**
+   * One Facet value's chip label (ADR-0055/0065). A harvested dimension carries a `valuesKeyPrefix`, so its
+   * enum value translates as `<prefix>.<value>`; an untranslated value (or a scalar Field with no prefix)
+   * falls back to the raw token — the server-sent `label`, else the value.
+   */
+  protected valueLabel(facet: FieldFacet, value: FacetCount): string {
+    if (facet.valuesKeyPrefix) {
+      const key = `${facet.valuesKeyPrefix}.${value.value}`;
+      const translated = this.i18n.translate(key);
+      if (translated !== key) return translated;
+    }
+    return value.label ?? value.value;
   }
 
   /** Whether one Facet value is currently selected. */

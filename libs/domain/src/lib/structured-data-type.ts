@@ -87,10 +87,15 @@ export const structuredDataTypeIdSchema = z.custom<StructuredDataTypeId>(
  * One **Facet** dimension a structured data-type harvests (ADR-0055): the facet `key` it surfaces under
  * (shared with scalar Fields' document keys), its i18n `labelKey`, and the `dataType` the rail picks a
  * control from. The static mirror of {@link StructuredDataType.valueSchema}.
+ *
+ * `valuesKeyPrefix` is the i18n key *prefix* for the dimension's enum VALUES (ADR-0055/0065): the rail
+ * resolves each value as `<valuesKeyPrefix>.<value>`, falling back to the raw token when a value has no
+ * copy. A scalar Field leaves it unset — its values are authored data, never translation keys.
  */
 export interface FacetDimension {
   readonly key: string;
   readonly labelKey: string;
+  readonly valuesKeyPrefix?: string;
   readonly dataType: FieldDataType;
 }
 

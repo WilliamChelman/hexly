@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityFacets } from '@hexly/domain';
+import { EntityFacets, FacetCount } from '@hexly/domain';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /** One type's Field selection (ADR-0048, #188): eq membership for enum/list/string, or a
@@ -190,6 +190,20 @@ export class FacetRailComponent {
     });
   }
 
+  /**
+   * One facet value's display label (ADR-0055/0065). A harvested dimension carries a `valuesKeyPrefix`, so
+   * its enum value translates as `<prefix>.<value>`; an untranslated value (or a scalar Field, which has no
+   * prefix) falls back to the raw token — an Entity-Link facet's server-sent `label`, else the value (#190).
+   */
+  private valueLabel(prefix: string | undefined, value: FacetCount): string {
+    if (prefix) {
+      const key = `${prefix}.${value.value}`;
+      const translated = this.transloco.translate(key);
+      if (translated !== key) return translated;
+    }
+    return value.label ?? value.value;
+  }
+
   /** Categories as render rows. Type/Visibility labels are translated; a Tag
    * shows its raw text. Empty categories are dropped — no bare headings. */
   protected readonly groups = computed(() => {
@@ -243,8 +257,7 @@ export class FacetRailComponent {
         const rows = field.values.map((v) => ({
           value: v.value,
           count: v.count,
-          // An Entity-Link facet's value is a target id; the server sends its name as `label` (#190).
-          label: v.label ?? v.value,
+          label: this.valueLabel(field.valuesKeyPrefix, v),
           active: (selection.values ?? []).includes(v.value),
         }));
         return {
