@@ -11,6 +11,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Res,
   UploadedFile,
   UseGuards,
@@ -21,14 +22,17 @@ import {
   addMemberRequestSchema,
   addOwnerRequestSchema,
   AssetSummary,
+  assetSearchQuerySchema,
   AuthUser,
   EntityDetail,
+  EntityFacets,
   AvailableType,
   createUserDefinedTypeRequestSchema,
   createWorldFieldRequestSchema,
   createWorldRequestSchema,
   Field,
   ImportSummary,
+  parseFieldFilters,
   PublicLink,
   setMemberRoleRequestSchema,
   updateUserDefinedTypeRequestSchema,
@@ -152,15 +156,37 @@ export class WorldsController {
   }
 
   /**
-   * The World's stored Assets, for the Board image picker (#269, ADR-0034): a Board Image element
-   * (and Content) references a World Asset by its capability URL. Contributor-gated in the service —
-   * the picker is an editing surface and a listed URL is fetchable via the guard-less serving route,
-   * so a Viewer must not enumerate (board review): unreachable → 404, reachable-but-not-contributor
+   * The Facet counts for the Board image picker's rail (#281, ADR-0065): the same drill-down counts the
+   * Asset Browser shows, pinned to the asset type + image kind. Before `:id/assets` matching so the literal
+   * `facets` segment isn't captured. Same query contract as `GET /entities/facets` (`q` + `field` tokens);
+   * a malformed `field` token is dropped, never a 400, so a stale picker URL degrades to no-filter.
+   */
+  @Get(':id/assets/facets')
+  assetFacets(@CurrentUser() user: AuthUser, @Param('id') id: string, @Query() query: unknown): EntityFacets {
+    const parsed = assetSearchQuerySchema.safeParse(query);
+    if (!parsed.success) throw new BadRequestException();
+    const { q, field } = parsed.data;
+    const result = this.worlds.assetFacets(user.id, id, { q, fields: parseFieldFilters(field) });
+    if (result === 'not-found') throw new NotFoundException();
+    if (result === 'forbidden') throw new ForbiddenException();
+    return result;
+  }
+
+  /**
+   * Search the World's image Assets, for the Board image picker (#269, #281, ADR-0034, ADR-0065): a Board
+   * Image element (and Content) references a World Asset by its capability URL. The picker offers the same
+   * search + Facets as the Asset Browser, pinned to the asset type + image kind — the FTS `q` and image
+   * Field facets (`field` tokens) go through the one entity-search machinery. Contributor-gated in the
+   * service — the picker is an editing surface and a listed URL is fetchable via the guard-less serving
+   * route, so a Viewer must not enumerate (board review): unreachable → 404, reachable-but-not-contributor
    * → 403.
    */
   @Get(':id/assets')
-  assets(@CurrentUser() user: AuthUser, @Param('id') id: string): AssetSummary[] {
-    const result = this.worlds.listAssets(user.id, id);
+  assets(@CurrentUser() user: AuthUser, @Param('id') id: string, @Query() query: unknown): AssetSummary[] {
+    const parsed = assetSearchQuerySchema.safeParse(query);
+    if (!parsed.success) throw new BadRequestException();
+    const { q, field } = parsed.data;
+    const result = this.worlds.searchAssets(user.id, id, { q, fields: parseFieldFilters(field) });
     if (result === 'not-found') throw new NotFoundException();
     if (result === 'forbidden') throw new ForbiddenException();
     return result;

@@ -18,6 +18,7 @@ import {
   defineField,
   defineStructuredDataType,
   type Field,
+  type FieldFilter,
   type HarvestedFacet,
   type StructuredDataTypeId,
 } from '@hexly/domain';
@@ -26,6 +27,22 @@ import { ASSET_KINDS, assetKind, bucketHue, HUE_BUCKETS, ORIENTATIONS } from './
 
 /** The `namespace.id` kind naming the asset-ref data-type — what marks the `core.field.asset` Field structured. */
 export const CORE_ASSET: StructuredDataTypeId = 'core.datatype.asset';
+
+/**
+ * The harvested facet-dimension keys the asset-ref surfaces (ADR-0055/0065). One name each, so the harvest
+ * and every filter that pins to a dimension (the Board image picker's `kind:eq:image`, ADR-0065 #281) speak
+ * the same key and can never drift.
+ */
+export const ASSET_KIND_FACET_KEY = 'kind';
+export const ASSET_ORIENTATION_FACET_KEY = 'orientation';
+export const ASSET_HUE_FACET_KEY = 'hue';
+
+/**
+ * The Field filter that pins a search to **image** Assets (ADR-0065, #281): the `kind` dimension equal to
+ * `image`. The Board image picker AND-s it into its entity-search so the picker offers only pickable art,
+ * reusing the one facet mechanism rather than filtering mimes client-side.
+ */
+export const IMAGE_KIND_FIELD_FILTER: FieldFilter = { key: ASSET_KIND_FACET_KEY, op: 'eq', value: 'image' };
 
 /** A fresh, empty asset-ref — a placeholder the mint path always overwrites with the stored bytes' ref. */
 export function emptyAssetValue(): AssetValue {
@@ -39,24 +56,24 @@ export const ASSET_DATA_TYPE = defineStructuredDataType({
   // The mechanical facets (ADR-0055/0065): `kind` off the mime (always present), and — when an extractor
   // wrote Asset Stats — `orientation` and the bucketed `hue`. Enum dimensions, so the rail toggles values.
   facetDimensions: [
-    { key: 'kind', labelKey: 'asset.facet.kind', dataType: { kind: 'enum', options: [...ASSET_KINDS] } },
+    { key: ASSET_KIND_FACET_KEY, labelKey: 'asset.facet.kind', dataType: { kind: 'enum', options: [...ASSET_KINDS] } },
     {
-      key: 'orientation',
+      key: ASSET_ORIENTATION_FACET_KEY,
       labelKey: 'asset.facet.orientation',
       dataType: { kind: 'enum', options: [...ORIENTATIONS] },
     },
-    { key: 'hue', labelKey: 'asset.facet.hue', dataType: { kind: 'enum', options: [...HUE_BUCKETS] } },
+    { key: ASSET_HUE_FACET_KEY, labelKey: 'asset.facet.hue', dataType: { kind: 'enum', options: [...HUE_BUCKETS] } },
   ],
   harvestFacets: (value: AssetValue): HarvestedFacet[] => {
     // A bare, pre-mint placeholder ref (no bytes yet) has no real mime to bucket — it harvests nothing,
     // like its hash. Mint fills the ref in the same write, so an Asset at rest always carries real facets.
     if (!value.hash) return [];
-    const rows: HarvestedFacet[] = [{ key: 'kind', value: assetKind(value.mime), num: null }];
+    const rows: HarvestedFacet[] = [{ key: ASSET_KIND_FACET_KEY, value: assetKind(value.mime), num: null }];
     const stats = value.stats;
-    if (stats?.orientation) rows.push({ key: 'orientation', value: stats.orientation, num: null });
+    if (stats?.orientation) rows.push({ key: ASSET_ORIENTATION_FACET_KEY, value: stats.orientation, num: null });
     if (typeof stats?.dominantColor === 'string') {
       const hue = bucketHue(stats.dominantColor);
-      if (hue) rows.push({ key: 'hue', value: hue, num: null });
+      if (hue) rows.push({ key: ASSET_HUE_FACET_KEY, value: hue, num: null });
     }
     return rows;
   },

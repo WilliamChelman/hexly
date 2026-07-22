@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { AssetSummary, EntityDetail } from '@hexly/domain';
+import { AssetSummary, EntityDetail, EntityFacets } from '@hexly/domain';
 import { AssetsClient } from './assets.client';
 
 describe('AssetsClient', () => {
@@ -26,15 +26,39 @@ describe('AssetsClient', () => {
 
   afterEach(() => http.verify());
 
-  it('lists a World’s Assets', () => {
+  it('searches a World’s image Assets, passing the query + Facet tokens (#281)', () => {
     let listed: AssetSummary[] | undefined;
-    client.list('w1').subscribe((a) => (listed = a));
+    client.search('w1', { q: 'castle', field: ['orientation:eq:landscape'] }).subscribe((a) => (listed = a));
 
-    const req = http.expectOne('/api/worlds/w1/assets');
+    const req = http.expectOne((r) => r.url === '/api/worlds/w1/assets');
     expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('q')).toBe('castle');
+    expect(req.request.params.getAll('field')).toEqual(['orientation:eq:landscape']);
     req.flush([asset]);
 
     expect(listed).toEqual([asset]);
+  });
+
+  it('omits an empty query and sends no field params for a bare search', () => {
+    client.search('w1').subscribe();
+
+    const req = http.expectOne((r) => r.url === '/api/worlds/w1/assets');
+    expect(req.request.params.has('q')).toBe(false);
+    expect(req.request.params.has('field')).toBe(false);
+    req.flush([]);
+  });
+
+  it('reads the picker’s Facet-rail counts (#281)', () => {
+    const facets: EntityFacets = { type: [], tag: [], visibility: [], fields: [] };
+    let read: EntityFacets | undefined;
+    client.facets('w1', { q: 'castle' }).subscribe((f) => (read = f));
+
+    const req = http.expectOne((r) => r.url === '/api/worlds/w1/assets/facets');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('q')).toBe('castle');
+    req.flush(facets);
+
+    expect(read).toEqual(facets);
   });
 
   it('uploads a file as multipart form data, returning the wrapper Asset Entity (ADR-0065)', () => {
