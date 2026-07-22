@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -25,6 +25,17 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
   selector: 'app-entity-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-hidden' },
+  styles: `
+    /* Seat the Dock Panel in a reading-column View's side whitespace instead of pushing the column,
+       once the body is wide enough for it (content 60rem + a 20rem Panel each side + the 3.5rem strip;
+       ADR-0067). Narrower — or a full-bleed View (no \`.reading\`) — leaves the property unset, so the
+       Panel stays in flow and pushes. The flip does not change this container's width, so no loop. */
+    @container entity-body (min-width: 103.5rem) {
+      .reading app-entity-dock {
+        --dock-panel-pos: absolute;
+      }
+    }
+  `,
   // EntityViewStore is page-scoped: it reads the open Entity's types off the session, provided above
   // the page in both the routed and Public Link mounts. EntityDock is page-scoped too (ADR-0067):
   // provided above the View outlet so the running View can claim the open slot. The content View's
@@ -36,9 +47,15 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
       <div class="grid h-full" style="grid-template-rows: auto 1fr">
         <!-- Page-owned header docked above the body (ADR-0022). -->
         <app-entity-header />
-        <!-- Body: the View's main content beside the page-owned Dock column (ADR-0067). The Dock's
-             open Panel is an in-flow column at wide viewports (main shrinks) and an overlay below. -->
-        <div class="grid min-h-0" style="grid-template-columns: minmax(0, 1fr) auto">
+        <!-- Body: the View's main content beside the page-owned Dock column (ADR-0067). The Dock's open
+             Panel pushes the main content (in-flow column) by default; for a reading-column View on a
+             viewport wide enough to seat the Panel in the side whitespace, it overlays instead so the
+             column never shifts. This row is the query container: its width is stable under the flip. -->
+        <div
+          class="grid min-h-0"
+          [class.reading]="reading()"
+          style="grid-template-columns: minmax(0, 1fr) auto; container: entity-body / inline-size"
+        >
           <main class="relative min-h-0 overflow-hidden">
             <!-- The View body — resolution, outletting, and the card/dangling fallbacks — is the
                  reusable Entity View Outlet's now (Seam C, #264), shared with the Board Embed. The page
@@ -75,6 +92,12 @@ export class EntityPage {
   protected readonly dock = inject(EntityDock);
   private readonly viewStore = inject(EntityViewStore);
   private readonly views = inject(ViewRegistry);
+
+  /** A reading-column View (Content, Details) lets a wide viewport overlay the Dock Panel rather than
+   * shift the column; a full-bleed View always pushes (ADR-0067). Drives the body's `.reading` gate. */
+  protected readonly reading = computed(
+    () => this.views.resolve(this.viewStore.activeView().viewId).layout === 'reading',
+  );
 
   constructor() {
     // Register the core Views from the lazy entity chunk, dropping them when the page is torn down.

@@ -13,6 +13,9 @@ export const CORE_VIEW_DEFINITIONS: readonly ViewDefinition[] = [
     // Core-registered here so it is always resolvable, without a plugin present.
     id: CORE_VIEW_DETAILS,
     labelKey: 'editorShell.view.details',
+    // A centred reading column (ADR-0067): a wide viewport overlays the Dock Panel into the side
+    // whitespace rather than shifting the column.
+    layout: 'reading',
     component: DetailsViewComponent,
   },
 ];

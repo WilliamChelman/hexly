@@ -32,6 +32,9 @@ export function providePluginContent(): EnvironmentProviders {
         // The View contributes its Outline to the page Dock (ADR-0067): declared, so the Dock draws the
         // toggle synchronously before this View's body is fetched, and hosts the Panel with the View's injector.
         panels: [OUTLINE_PANEL],
+        // A centred reading column (ADR-0067): a wide viewport overlays the Dock Panel into the side
+        // whitespace rather than shifting the prose column.
+        layout: 'reading',
         loadComponent: () => import('./components/content-view.component').then((m) => m.ContentViewComponent),
       },
     ],

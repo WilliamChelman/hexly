@@ -66,6 +66,14 @@ export type ViewDefinition = {
    * strip merges these with the universal Panels; absent means the View contributes none.
    */
   readonly panels?: readonly PanelDefinition[];
+  /**
+   * How the View uses horizontal space, deciding whether an open Dock Panel pushes or overlays it
+   * (ADR-0067): `'reading'` is a centred, capped reading column (Content, Details) — with room to spare
+   * the Panel overlays the side whitespace so the column never shifts, and only pushes when the column
+   * would otherwise be covered; `'full'` (the default) fills the width (Map, Board), so the Panel always
+   * pushes, there being no whitespace to overlay into.
+   */
+  readonly layout?: 'reading' | 'full';
 } & (
   | {
       /** transloco key for the view-toggle button label (ADR-0014). */
