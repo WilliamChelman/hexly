@@ -7,7 +7,9 @@ import { LinkedEntity, typesSchema } from '@hexly/domain';
  * Such a row resolves to `null` and the caller drops it: one unrenderable row must never fail a
  * whole World's read.
  */
-export function linkedEntity(id: string, name: string, types: unknown): LinkedEntity | null {
+export function linkedEntity(id: string, name: string, types: unknown, thumbnailUrl?: string): LinkedEntity | null {
   const parsed = typesSchema.safeParse(types);
-  return parsed.success ? { id, name, types: parsed.data } : null;
+  if (!parsed.success) return null;
+  // Omit the key entirely when unresolved, so a row without a thumbnail serialises identically to before.
+  return thumbnailUrl ? { id, name, types: parsed.data, thumbnailUrl } : { id, name, types: parsed.data };
 }

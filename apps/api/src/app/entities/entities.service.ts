@@ -149,9 +149,7 @@ export class EntitiesService {
     const access = entityAccess(this.db, readerId);
     // The dedup index (ADR-0065), aliased for the two thumbnail sources it answers (ADR-0066): the Entity's
     // own bytes and the Thumbnail Field's designated target; `fieldKind` gates the latter to image Assets.
-    const ownAsset = alias(assetIndex, 'own_asset');
-    const fieldAsset = alias(assetIndex, 'field_asset');
-    const fieldKind = alias(entityFieldFacets, 'field_kind');
+    const { ownAsset, fieldAsset, fieldKind, columns: thumbnailColumns } = thumbnailJoin();
     const query = this.db
       .select({
         id: entities.id,
@@ -168,9 +166,7 @@ export class EntitiesService {
         // Opt-in thumbnail resolution (ADR-0065/0066): the Entity's own bytes' hash, and — beating it by
         // precedence — the hash the **Thumbnail** Field designates. Both off the same dedup index, aliased
         // twice, so a list resolves the served URL as indexed joins and other lists never pay for them.
-        ...(opts.withThumbnails
-          ? { ownAssetHash: ownAsset.hash, fieldAssetHash: fieldAsset.hash, fieldAssetWorldId: fieldAsset.worldId }
-          : {}),
+        ...(opts.withThumbnails ? thumbnailColumns : {}),
       })
       .from(entities)
       .$dynamic();
@@ -216,17 +212,8 @@ export class EntitiesService {
       // non-Asset with no designation carries none. The field target's URL keys off *its* World (an
       // entity-link stays in-World, so it equals the row's, but the resolved index is authoritative).
       if (opts.withThumbnails) {
-        const r = row as typeof row & {
-          ownAssetHash?: string | null;
-          fieldAssetHash?: string | null;
-          fieldAssetWorldId?: string | null;
-        };
-        if (r.fieldAssetHash)
-          summary = {
-            ...summary,
-            thumbnailUrl: assetThumbnailUrl(r.fieldAssetWorldId ?? row.worldId, r.fieldAssetHash),
-          };
-        else if (r.ownAssetHash) summary = { ...summary, thumbnailUrl: assetThumbnailUrl(row.worldId, r.ownAssetHash) };
+        const thumbnailUrl = resolveThumbnailUrl(row as typeof row & ThumbnailRow, row.worldId);
+        if (thumbnailUrl) summary = { ...summary, thumbnailUrl };
       }
       if (!opts.withRights) return summary;
       // The predicate columns arrive as SQLite 0/1; rightsOf reads them truthily.
@@ -484,6 +471,8 @@ export class EntitiesService {
    * target. Asset edges are stored but surface-less, so `entity` targets alone are selected.
    */
   private outbound(access: EntityAccess, id: string): OutboundReference[] {
+    // Resolve each target's Thumbnail exactly as a list does (ADR-0066), so a link list reads visually.
+    const { ownAsset, fieldAsset, fieldKind, columns: thumbnailColumns } = thumbnailJoin();
     return (
       this.db
         .select({
@@ -491,9 +480,21 @@ export class EntitiesService {
           descriptor: entityEdges.descriptor,
           name: entities.name,
           types: entities.types,
+          worldId: entities.worldId,
+          ...thumbnailColumns,
         })
         .from(entityEdges)
         .leftJoin(entities, and(eq(entities.id, entityEdges.targetId), access.filter))
+        .leftJoin(ownAsset, eq(ownAsset.entityId, entities.id))
+        .leftJoin(
+          fieldKind,
+          and(
+            eq(fieldKind.entityId, entities.thumbnailEntityId),
+            eq(fieldKind.key, IMAGE_KIND_FIELD_FILTER.key),
+            eq(fieldKind.value, IMAGE_KIND_FIELD_FILTER.value),
+          ),
+        )
+        .leftJoin(fieldAsset, eq(fieldAsset.entityId, fieldKind.entityId))
         .where(and(eq(entityEdges.sourceEntityId, id), eq(entityEdges.targetKind, 'entity')))
         // Resolved targets by name; the dangling ones last, where they read as a footnote. `targetId`
         // is the final tiebreak, so two Entities sharing a name — or two descriptors to one target —
@@ -510,7 +511,11 @@ export class EntitiesService {
           descriptor: row.descriptor,
           // An Entity whose stored types can't be read reads as a dangling target, same as an
           // unreadable or deleted one: the reference is there, the thing at the end of it is not.
-          target: row.name === null ? null : linkedEntity(row.targetId, row.name, row.types),
+          // A resolved target carries a worldId, so the Thumbnail URL keys off *its* World.
+          target:
+            row.name === null
+              ? null
+              : linkedEntity(row.targetId, row.name, row.types, resolveThumbnailUrl(row, row.worldId ?? '')),
         }))
     );
   }
@@ -543,6 +548,8 @@ export class EntitiesService {
           )
         : undefined,
     );
+    // Resolve each source's Thumbnail exactly as a list does (ADR-0066), so usage rows read visually.
+    const { ownAsset, fieldAsset, fieldKind, columns: thumbnailColumns } = thumbnailJoin();
     return (
       this.db
         .select({
@@ -550,9 +557,21 @@ export class EntitiesService {
           descriptor: entityEdges.descriptor,
           name: entities.name,
           types: entities.types,
+          worldId: entities.worldId,
+          ...thumbnailColumns,
         })
         .from(entityEdges)
         .innerJoin(entities, and(eq(entities.id, entityEdges.sourceEntityId), access.filter))
+        .leftJoin(ownAsset, eq(ownAsset.entityId, entities.id))
+        .leftJoin(
+          fieldKind,
+          and(
+            eq(fieldKind.entityId, entities.thumbnailEntityId),
+            eq(fieldKind.key, IMAGE_KIND_FIELD_FILTER.key),
+            eq(fieldKind.value, IMAGE_KIND_FIELD_FILTER.value),
+          ),
+        )
+        .leftJoin(fieldAsset, eq(fieldAsset.entityId, fieldKind.entityId))
         .where(targets)
         // `id` is the final tiebreak, for the same reason as {@link outbound}'s `targetId`.
         .orderBy(asc(entities.name), asc(entities.id), asc(entityEdges.descriptor))
@@ -560,7 +579,7 @@ export class EntitiesService {
         // A source is the thing doing the linking, so unlike {@link outbound}'s target it cannot
         // dangle: a row whose source has no drawable type drops out entirely.
         .flatMap((row) => {
-          const source = linkedEntity(row.sourceId, row.name, row.types);
+          const source = linkedEntity(row.sourceId, row.name, row.types, resolveThumbnailUrl(row, row.worldId));
           return source ? [{ descriptor: row.descriptor, source }] : [];
         })
     );
@@ -1128,6 +1147,46 @@ function hasAny(column: typeof entities.types | typeof entities.tags, values: re
 function toFtsMatch(q: string): string {
   const tokens = q.match(/[\p{L}\p{N}]+/gu) ?? [];
   return tokens.map((t) => `"${t}"*`).join(' ');
+}
+
+/**
+ * Fresh aliases + projected columns for one Entity's Thumbnail resolution (ADR-0066) — the single
+ * shape every read that shows a thumbnail joins through (`list`, and both directions of `references`),
+ * so they can never drift. The dedup index (ADR-0065) is aliased twice — the Entity's own bytes and the
+ * Thumbnail Field's designated image — and `fieldKind` gates the designation to an image-kind Asset. The
+ * caller chains three LEFT JOINs — `ownAsset` on the subject id, `fieldKind` on the subject's
+ * `thumbnailEntityId`, `fieldAsset` on the gated target — and hands each row to {@link resolveThumbnailUrl}.
+ * Aliases are unique within one statement, so each method that runs its own query gets its own set.
+ */
+function thumbnailJoin() {
+  const ownAsset = alias(assetIndex, 'own_asset');
+  const fieldAsset = alias(assetIndex, 'field_asset');
+  const fieldKind = alias(entityFieldFacets, 'field_kind');
+  return {
+    ownAsset,
+    fieldAsset,
+    fieldKind,
+    columns: { ownAssetHash: ownAsset.hash, fieldAssetHash: fieldAsset.hash, fieldAssetWorldId: fieldAsset.worldId },
+  };
+}
+
+/** The columns {@link resolveThumbnailUrl} reads off a {@link thumbnailJoin} row. */
+interface ThumbnailRow {
+  readonly ownAssetHash?: string | null;
+  readonly fieldAssetHash?: string | null;
+  readonly fieldAssetWorldId?: string | null;
+}
+
+/**
+ * The served Thumbnail URL for one {@link thumbnailJoin} row, with precedence (ADR-0066): the Thumbnail
+ * Field's designated image beats the Entity's own bytes; neither resolves → `undefined`. The field
+ * target's URL keys off *its* World (an entity-link stays in-World, so it equals the subject's, but the
+ * resolved index is authoritative); own bytes key off the subject's World.
+ */
+function resolveThumbnailUrl(row: ThumbnailRow, worldId: string): string | undefined {
+  if (row.fieldAssetHash) return assetThumbnailUrl(row.fieldAssetWorldId ?? worldId, row.fieldAssetHash);
+  if (row.ownAssetHash) return assetThumbnailUrl(worldId, row.ownAssetHash);
+  return undefined;
 }
 
 type SummaryRow = Omit<typeof entities.$inferSelect, 'document'>;

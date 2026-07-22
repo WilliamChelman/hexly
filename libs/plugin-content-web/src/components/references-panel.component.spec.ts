@@ -85,6 +85,29 @@ describe('ReferencesPanel', () => {
     expect(item?.querySelector('a')?.getAttribute('href')).toBe('/entities/mira');
   });
 
+  /** A resolved Thumbnail (ADR-0066, #290) renders before the name; a target without one shows no image. */
+  it('renders a linked target’s thumbnail when present, and none when absent', () => {
+    const el = render({
+      references: [
+        {
+          targetId: 'mira',
+          descriptor: null,
+          target: { id: 'mira', name: 'Mira', types: [CORE_NOTE], thumbnailUrl: '/assets/w1/abc.thumb.webp' },
+        },
+        {
+          targetId: 'gwen',
+          descriptor: null,
+          target: { id: 'gwen', name: 'Gwen', types: [CORE_NOTE] },
+        },
+      ],
+    });
+
+    expect(el.querySelector<HTMLImageElement>('[data-testid=reference-thumbnail-mira]')?.src).toContain(
+      '/assets/w1/abc.thumb.webp',
+    );
+    expect(el.querySelector('[data-testid=reference-thumbnail-gwen]')).toBeNull();
+  });
+
   /** A deleted or unreadable target is indistinguishable, and neither is navigable (#78). */
   it('renders an unresolved outbound target as a non-navigable dangling label', () => {
     const el = render({
