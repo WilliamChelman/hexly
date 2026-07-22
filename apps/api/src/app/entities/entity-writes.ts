@@ -13,6 +13,7 @@ import {
   reservedKeys,
   stripReservedKeys,
 } from '@hexly/domain';
+import { CORE_THUMBNAIL_FIELD_ID } from '@hexly/plugin-asset';
 import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-access';
 import { DB, Db } from '../db/db';
@@ -210,6 +211,9 @@ export class EntityWrites {
       seq: INITIAL_SEQ,
       document: JSON.stringify(input.document),
       contentText: derived.searchText,
+      // The **Thumbnail** designation materialised at the choke point (ADR-0066), a derived column like
+      // `contentText` — so a list resolves it through one indexed join, never a read-time `json_extract`.
+      thumbnailEntityId: derived.thumbnailEntityId,
       createdAt: now,
       updatedAt: now,
     };
@@ -252,6 +256,7 @@ export class EntityWrites {
           visibility: input.visibility,
           document: JSON.stringify(input.document),
           contentText: derived.searchText,
+          thumbnailEntityId: derived.thumbnailEntityId,
           version: existing.version + 1,
           updatedAt: now,
           seq: existing.seq + 1,
@@ -409,7 +414,11 @@ export class EntityWrites {
     if (derived.length > 0)
       this.transact(() => {
         for (const { row, derived: d } of derived) {
-          this.db.update(entities).set({ contentText: d.searchText }).where(eq(entities.id, row.id)).run();
+          this.db
+            .update(entities)
+            .set({ contentText: d.searchText, thumbnailEntityId: d.thumbnailEntityId })
+            .where(eq(entities.id, row.id))
+            .run();
           this.replaceDerived(row.id, row.worldId, d);
         }
       });
@@ -438,7 +447,12 @@ export class EntityWrites {
     // document itself: an attached link Field harvests its edge and an attached facetable Field its facet,
     // like a type default.
     const fields = this.worldTypeFields.effectiveFields(worldId, types, doc);
-    return deriveDocumentState(doc, fields, this.typeFields.structuredDataTypes);
+    // Name the **Thumbnail** Field so the pure walk materialises its designation (ADR-0066) without the
+    // domain learning any plugin's Field id. A disabled asset plugin leaves the key unresolved in the
+    // effective set, so the designation derives to `null` and the value sits inert — no guard needed here.
+    return deriveDocumentState(doc, fields, this.typeFields.structuredDataTypes, {
+      thumbnailFieldId: CORE_THUMBNAIL_FIELD_ID,
+    });
   }
 
   /**
@@ -631,6 +645,9 @@ export class EntityWrites {
       ...(change.document !== undefined && {
         document: JSON.stringify(document),
         contentText: derived?.searchText,
+        // Re-materialise the **Thumbnail** designation on every substance edit (ADR-0066): setting,
+        // changing, or clearing the `core.field.thumbnail` value moves the derived column with the document.
+        thumbnailEntityId: derived?.thumbnailEntityId ?? null,
       }),
       ...(change.version !== undefined && { version: change.version + 1 }),
       updatedAt: Date.now(),

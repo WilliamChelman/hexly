@@ -92,6 +92,13 @@ export const entities = sqliteTable(
     // (ADR-0045). Nullable: pre-FTS rows predate the column. The FTS table and its sync triggers are
     // raw SQL, outside Drizzle's typed API.
     contentText: text('content_text'),
+    // The **Thumbnail** Field's designated target `entityId` (CONTEXT.md → Thumbnail, ADR-0066): a derived,
+    // nullable column EntityWrites materialises from the `core.field.thumbnail` entityLink value at the write
+    // choke point (ADR-0045) and Reindex rebuilds — so a `thumbnails=1` list resolves the designation through
+    // the asset dedup index (entityId → hash → served URL) as one indexed join, never a read-time
+    // `json_extract`. **No FK**: a dangling link is a valid document (like `entityEdges.targetId`), and a
+    // deleted target's dedup-index row cascades away, so the join degrades to no URL rather than erroring.
+    thumbnailEntityId: text('thumbnail_entity_id'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },

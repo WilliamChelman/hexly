@@ -50,12 +50,36 @@ export interface DocumentDerivedState {
    * against. Harvested from the one **Structured Data Type** that owns bytes, like edges and facets.
    */
   readonly assetHash: string | null;
+  /**
+   * The `entityId` the **Thumbnail** Field designates, or `null` (CONTEXT.md → Thumbnail, ADR-0066) —
+   * mirrored to the nullable `thumbnail_entity_id` column at the write choke point so a list resolves the
+   * designation through the asset dedup index (entityId → hash → served URL) as one indexed join, never a
+   * read-time `json_extract`. Read from the entityLink value at {@link DeriveOptions.thumbnailFieldId};
+   * an absent, ill-typed, or blank value is `null` (forward-only). No FK — a dangling link is a valid
+   * document, and the read simply emits no URL.
+   */
+  readonly thumbnailEntityId: string | null;
+}
+
+/**
+ * Host-supplied identifiers the derivation needs but cannot name itself, so the domain stays free of any
+ * plugin's Field ids (the {@link StructuredDataTypeSet} precedent). The asset plugin owns
+ * `core.field.thumbnail`, so the write choke point passes it in.
+ */
+export interface DeriveOptions {
+  /**
+   * The **Thumbnail** Field's id (`core.field.thumbnail`, ADR-0066) — the entityLink key whose target
+   * `entityId` materialises into {@link DocumentDerivedState.thumbnailEntityId}. Omitted (the asset plugin
+   * disabled, or a caller with no type context) yields no thumbnail designation.
+   */
+  readonly thumbnailFieldId?: string;
 }
 
 export function deriveDocumentState(
   doc: EntityDocument | undefined,
   fields: readonly Field[],
   dataTypes: StructuredDataTypeSet,
+  options: DeriveOptions = {},
 ): DocumentDerivedState {
   // Edges dedup on (target, descriptor). `\0` cannot occur in an id or a descriptor, so the key is
   // unambiguous. The descriptor folds into the key but not the row: `"Spouse"` and `"spouse"` name one
@@ -80,8 +104,13 @@ export function deriveDocumentState(
 
   // A typed Entity-Link Field value is a descriptor-less edge to its target (#190); a facetable scalar
   // Field materialises its value. Both are lenses over the built-in Field data-types, no structure needed.
-  for (const { value } of entityLinkFieldValues(fields, doc))
+  // The **Thumbnail** Field is one such link (ADR-0066): the same shape-valid values feed its designation,
+  // so its target is picked out here by key rather than parsed a second time.
+  let thumbnailEntityId: string | null = null;
+  for (const { key, value } of entityLinkFieldValues(fields, doc)) {
     if (value.entityId) addEdge({ targetKind: 'entity', targetId: value.entityId, descriptor: null });
+    if (key === options.thumbnailFieldId) thumbnailEntityId = value.entityId || null;
+  }
   for (const field of fields) {
     if (!isFacetableField(field)) continue;
     const raw = readField(doc, field);
@@ -114,5 +143,6 @@ export function deriveDocumentState(
     // Provenance is a plain reserved key, read forward-only: an absent or ill-shaped stamp is `null`.
     importSource: readImportSource(doc) ?? null,
     assetHash,
+    thumbnailEntityId,
   };
 }

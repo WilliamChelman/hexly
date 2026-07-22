@@ -34,6 +34,8 @@ import {
   visibilitySchema,
 } from '@hexly/domain';
 import { and, asc, desc, eq, inArray, or, sql, SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
+import { IMAGE_KIND_FIELD_FILTER } from '@hexly/plugin-asset';
 import { AclSetResult, gate, isSuperadmin, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
 import { EntityAccess, entityAccess, ownsEntity, READ_ONLY_RIGHTS, sharedVisibility } from '../acl/entity-access';
 import { canCreateEntityFilter, worldOwnerFilter } from '../acl/world-access';
@@ -145,6 +147,11 @@ export class EntitiesService {
     opts = { ...opts, excludedTypes: this.resolveExcludedTypes(opts) };
     const w = this.config.search.weights;
     const access = entityAccess(this.db, readerId);
+    // The dedup index (ADR-0065), aliased for the two thumbnail sources it answers (ADR-0066): the Entity's
+    // own bytes and the Thumbnail Field's designated target; `fieldKind` gates the latter to image Assets.
+    const ownAsset = alias(assetIndex, 'own_asset');
+    const fieldAsset = alias(assetIndex, 'field_asset');
+    const fieldKind = alias(entityFieldFacets, 'field_kind');
     const query = this.db
       .select({
         id: entities.id,
@@ -158,18 +165,35 @@ export class EntitiesService {
         updatedAt: entities.updatedAt,
         // Opt-in: project the predicate columns so each summary carries the caller's Rights.
         ...(opts.withRights ? access.rightsColumns : {}),
-        // Opt-in: the content-addressed hash off the dedup index (ADR-0065), for the summary's thumbnail URL.
-        ...(opts.withThumbnails ? { assetHash: assetIndex.hash } : {}),
+        // Opt-in thumbnail resolution (ADR-0065/0066): the Entity's own bytes' hash, and — beating it by
+        // precedence — the hash the **Thumbnail** Field designates. Both off the same dedup index, aliased
+        // twice, so a list resolves the served URL as indexed joins and other lists never pay for them.
+        ...(opts.withThumbnails
+          ? { ownAssetHash: ownAsset.hash, fieldAssetHash: fieldAsset.hash, fieldAssetWorldId: fieldAsset.worldId }
+          : {}),
       })
       .from(entities)
       .$dynamic();
     if (match) {
       query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
-    // The dedup index is 1:1 with an Entity (its PK is the entity id), so this LEFT JOIN never multiplies
-    // rows — an Entity with content-addressed bytes gets its hash, everything else a null.
     if (opts.withThumbnails) {
-      query.leftJoin(assetIndex, eq(assetIndex.entityId, entities.id));
+      // Own bytes (ADR-0065, unchanged): the dedup index is 1:1 with an Entity (its PK is the entity id),
+      // so this LEFT JOIN never multiplies rows — a bare Asset gets its hash, everything else a null.
+      query.leftJoin(ownAsset, eq(ownAsset.entityId, entities.id));
+      // The Thumbnail Field's designation (ADR-0066): resolve the target only when it is an **image**-kind
+      // Asset (the harvested `kind` facet, ADR-0055/0065), so a non-image or dangling designation joins to
+      // null and emits nothing — degrading to own bytes or the type icon, never a broken tile. The facet
+      // gate rides the target-hash join, so `fieldAsset.hash` is set only for an image target with bytes.
+      query.leftJoin(
+        fieldKind,
+        and(
+          eq(fieldKind.entityId, entities.thumbnailEntityId),
+          eq(fieldKind.key, IMAGE_KIND_FIELD_FILTER.key),
+          eq(fieldKind.value, IMAGE_KIND_FIELD_FILTER.value),
+        ),
+      );
+      query.leftJoin(fieldAsset, eq(fieldAsset.entityId, fieldKind.entityId));
     }
     const rows = query
       .where(and(access.filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined))
@@ -187,10 +211,23 @@ export class EntitiesService {
     const hasMore = rows.length > opts.limit;
     const items = rows.slice(0, opts.limit).map((row) => {
       let summary = toSummary(row);
-      // Opt-in thumbnail: an Entity in the dedup index carries a hash, so its served thumbnail URL is
-      // derivable (ADR-0065); a non-Asset's join yields null and carries none.
-      const hash = (row as typeof row & { assetHash?: string | null }).assetHash;
-      if (opts.withThumbnails && hash) summary = { ...summary, thumbnailUrl: assetThumbnailUrl(row.worldId, hash) };
+      // Opt-in thumbnail with precedence (ADR-0066): the **Thumbnail** Field's designated image beats the
+      // Entity's own bytes, so an Asset carrying the field emits the field's URL and a bare Asset its own; a
+      // non-Asset with no designation carries none. The field target's URL keys off *its* World (an
+      // entity-link stays in-World, so it equals the row's, but the resolved index is authoritative).
+      if (opts.withThumbnails) {
+        const r = row as typeof row & {
+          ownAssetHash?: string | null;
+          fieldAssetHash?: string | null;
+          fieldAssetWorldId?: string | null;
+        };
+        if (r.fieldAssetHash)
+          summary = {
+            ...summary,
+            thumbnailUrl: assetThumbnailUrl(r.fieldAssetWorldId ?? row.worldId, r.fieldAssetHash),
+          };
+        else if (r.ownAssetHash) summary = { ...summary, thumbnailUrl: assetThumbnailUrl(row.worldId, r.ownAssetHash) };
+      }
       if (!opts.withRights) return summary;
       // The predicate columns arrive as SQLite 0/1; rightsOf reads them truthily.
       const r = row as typeof row & Record<'canRead' | 'canEditSubstance' | 'canWrite' | 'isOwner', unknown>;
@@ -1096,7 +1133,7 @@ function toFtsMatch(q: string): string {
 type SummaryRow = Omit<typeof entities.$inferSelect, 'document'>;
 
 /** Exactly the columns {@link toSummary} reads, so the narrower `list` projection satisfies it. */
-type SummaryColumns = Omit<SummaryRow, 'contentText' | 'seq'>;
+type SummaryColumns = Omit<SummaryRow, 'contentText' | 'seq' | 'thumbnailEntityId'>;
 
 function toSummary(row: SummaryColumns): EntitySummary {
   return {

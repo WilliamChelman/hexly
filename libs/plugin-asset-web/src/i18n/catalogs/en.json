@@ -9,6 +9,9 @@
     "asset": "Asset",
     "label": "Asset"
   },
+  "field": {
+    "thumbnail": "Thumbnail"
+  },
   "stats": {
     "heading": "Asset stats",
     "dimensions": "Dimensions",

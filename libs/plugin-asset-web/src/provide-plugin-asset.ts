@@ -2,7 +2,7 @@ import { EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
 import { LucideFile, LucideFileText, LucideImage, LucideMusic } from '@lucide/angular';
 import { providePlugin } from '@hexly/web-entity';
 import { lucideGlyph, provideIcons } from '@hexly/web-ui';
-import { ASSET_DATA_TYPE, ASSET_FIELD, PLUGIN_ID } from '@hexly/plugin-asset';
+import { ASSET_DATA_TYPE, ASSET_FIELD, PLUGIN_ID, THUMBNAIL_FIELD } from '@hexly/plugin-asset';
 import { ASSET_TRANSLATIONS } from './i18n/asset-translations';
 import { ASSET_TYPE_DEFINITIONS, CORE_VIEW_ASSET } from './asset-types';
 
@@ -31,8 +31,10 @@ export function providePluginAsset(): EnvironmentProviders {
     providePlugin({
       id: PLUGIN_ID,
       types: ASSET_TYPE_DEFINITIONS,
-      // Declares the asset-ref Field (ADR-0054); the prose `core.field.content` it references is the content plugin's.
-      fields: [ASSET_FIELD],
+      // Declares the asset-ref Field (ADR-0054); the prose `core.field.content` it references is the content
+      // plugin's. Plus the canonical Thumbnail Field (ADR-0066), attach-on-demand and edited through the
+      // existing entityLink picker — no Type defaults it.
+      fields: [ASSET_FIELD, THUMBNAIL_FIELD],
       views: [
         {
           id: CORE_VIEW_ASSET,

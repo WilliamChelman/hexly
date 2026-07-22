@@ -9,6 +9,9 @@
     "asset": "Ressource",
     "label": "Ressource"
   },
+  "field": {
+    "thumbnail": "Vignette"
+  },
   "stats": {
     "heading": "Statistiques",
     "dimensions": "Dimensions",
