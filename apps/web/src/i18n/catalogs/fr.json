@@ -234,6 +234,14 @@
     "footerTokens": "Jetons de design"
   },
   "domain": {},
+  "deleteEntity": {
+    "heading": "Supprimer ?",
+    "checking": "Recherche des références…",
+    "prompt": "Supprimer {{name}} ? Cette action est irréversible.",
+    "usageIntro": "{{name}} est référencé par :",
+    "usageMore": "et {count, plural, one {# autre} other {# autres}}",
+    "usageNote": "Sa suppression laissera ces références orphelines. Cette action est irréversible."
+  },
   "common": {
     "language": "Langue",
     "userMenu": "Ouvrir le menu utilisateur",

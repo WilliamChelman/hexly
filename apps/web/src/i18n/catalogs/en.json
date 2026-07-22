@@ -234,6 +234,14 @@
     "footerTokens": "Design tokens"
   },
   "domain": {},
+  "deleteEntity": {
+    "heading": "Delete?",
+    "checking": "Checking where this is used…",
+    "prompt": "Delete {{name}}? This can't be undone.",
+    "usageIntro": "{{name}} is referenced by:",
+    "usageMore": "and {count, plural, one {# other} other {# others}}",
+    "usageNote": "Deleting it will leave these references dangling. This can't be undone."
+  },
   "common": {
     "language": "Language",
     "userMenu": "Open user menu",

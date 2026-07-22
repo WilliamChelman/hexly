@@ -5,8 +5,9 @@ import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, ma
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityFacets, EntityPage, EntitySummary, EntityType, parseFieldFilters, Visibility } from '@hexly/domain';
 import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, AppShellStore } from '@hexly/web-core';
-import { ButtonComponent, EyebrowComponent, PageHeaderComponent } from '@hexly/web-ui';
+import { ButtonComponent, DialogService, EyebrowComponent, PageHeaderComponent } from '@hexly/web-ui';
 import { NewEntityButtonComponent } from '../../entity-types/new-entity-button.component';
+import { DeleteEntityDialogComponent, DeleteEntityDialogData } from '../../entity-types/delete-entity-dialog.component';
 import { EntityCardComponent } from './components/entity-card.component';
 import { EntitySearchComponent } from './components/entity-search.component';
 import { EmptyStateComponent } from './components/empty-state.component';
@@ -179,6 +180,7 @@ export class EntityBrowserPage {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
+  private readonly dialogs = inject(DialogService);
 
   protected readonly worldId = this.activeWorld.worldId;
 
@@ -508,13 +510,24 @@ export class EntityBrowserPage {
     this.firstPageCache.clear();
   }
 
+  /**
+   * Confirm before deleting (ADR-0065): the generic, usage-aware dialog names the Entities that link
+   * here (per-viewer) so the caller sees what a delete would dangle; confirm runs the ordinary delete,
+   * cancel does nothing.
+   */
   protected remove(id: string): void {
-    this.entitiesClient.delete(id).subscribe({
-      next: () => {
-        this.invalidateCache();
-        this.fetchFirstPage();
-      },
-      error: () => this.toaster.show(this.transloco.translate('entityBrowser.deleteError'), 'error'),
-    });
+    const name = this._entities().find((entity) => entity.id === id)?.name ?? '';
+    this.dialogs
+      .open<DeleteEntityDialogData, boolean>(DeleteEntityDialogComponent, { id, name })
+      .closed.subscribe((confirmed) => {
+        if (!confirmed) return;
+        this.entitiesClient.delete(id).subscribe({
+          next: () => {
+            this.invalidateCache();
+            this.fetchFirstPage();
+          },
+          error: () => this.toaster.show(this.transloco.translate('entityBrowser.deleteError'), 'error'),
+        });
+      });
   }
 }
