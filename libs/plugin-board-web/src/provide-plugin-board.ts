@@ -18,7 +18,7 @@ import { providePlugin } from '@hexly/web-entity';
 import { lucideGlyph, provideIcons } from '@hexly/web-ui';
 import { BOARD_SURFACE_DATA_TYPE, CORE_BOARD_SURFACE, PLUGIN_ID, SURFACE_FIELD } from '@hexly/plugin-board';
 import { BOARD_TRANSLATIONS } from './i18n/board-translations';
-import { BOARD_TYPE_DEFINITIONS, CORE_VIEW_BOARD } from './board-types';
+import { BOARD_INSPECTOR_PANEL, BOARD_TYPE_DEFINITIONS, CORE_VIEW_BOARD } from './board-types';
 
 /**
  * The Board plugin's one entry point into the app (ADR-0048, ADR-0050): `app.config.ts` names this
@@ -68,6 +68,10 @@ export function providePluginBoard(): EnvironmentProviders {
           dataType: CORE_BOARD_SURFACE,
           // The copy naming the *kind* where a World Owner picks it, in the World Types editor (#201).
           dataTypeLabelKey: 'board.dataType.surface',
+          // The View contributes its Inspector Panel to the page Dock (ADR-0067): declared, so the Dock
+          // draws the toggle synchronously before this View's body is fetched, and hosts the Panel with
+          // the View's injector so it reaches the View-scoped BoardStore.
+          panels: [BOARD_INSPECTOR_PANEL],
           loadComponent: () => import('./components/board-view.component').then((m) => m.BoardViewComponent),
         },
       ],

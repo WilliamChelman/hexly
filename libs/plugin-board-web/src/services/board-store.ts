@@ -17,7 +17,8 @@ import {
 } from '@hexly/plugin-board';
 import { RichContent, emptyRichContent } from '@hexly/plugin-content';
 import { Patch } from '@hexly/immer';
-import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { ENTITY_SESSION, EntityDock, VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { CORE_PANEL_BOARD_INSPECTOR } from '../board-types';
 import { BoardSelection } from './board-selection';
 import type { SelectMode } from './board-selection';
 
@@ -65,6 +66,14 @@ export const DEFAULT_EMBED_SIZE: Size = { width: 360, height: 260 };
 @Injectable()
 export class BoardStore {
   private readonly session = inject(ENTITY_SESSION);
+
+  /**
+   * The page-owned {@link EntityDock} this Board View shares (ADR-0067), reached from the page injector
+   * above the View outlet. A selection {@link EntityDock.claim claims} the Inspector Panel transiently —
+   * never touching the user's remembered Dock choice — and emptying the selection
+   * {@link EntityDock.releaseClaim releases} it, restoring whatever the user last chose.
+   */
+  private readonly dock = inject(EntityDock);
 
   /**
    * The Field this store's surface lives at — the surface data-type's Field, re-keyed to whichever
@@ -198,18 +207,37 @@ export class BoardStore {
   select(id: string, mode: SelectMode = 'replace'): void {
     this.sel.select(id, mode);
     this.disarmIfUnselected();
+    this.projectPanelFromSelection();
   }
 
   /** Replace or (when `additive`) extend the selection with `ids` — the marquee/programmatic path. */
   selectMany(ids: readonly string[], additive = false): void {
     this.sel.selectMany(ids, additive);
     this.disarmIfUnselected();
+    this.projectPanelFromSelection();
   }
 
   /** Clear the selection (Escape, a click on empty surface); disarms too. */
   deselect(): void {
     this.sel.deselect();
     this.disarm();
+    this.projectPanelFromSelection();
+  }
+
+  /**
+   * Project the Selection onto the page Dock (ADR-0067): a non-empty Selection {@link EntityDock.claim
+   * claims} the Inspector Panel, a transient claim that shows it without overwriting the user's remembered
+   * Dock choice; emptying the Selection {@link EntityDock.releaseClaim releases} that claim, restoring
+   * whatever the user last chose (or nothing). The Dock's close-don't-substitute rule means a claim the
+   * Board View no longer offers simply closes.
+   *
+   * A synchronous projection off the selection commands, not a reactive `effect` on {@link selectedIds},
+   * mirroring the Map View's store (ADR-0067): every selection-mutating path routes through here. Route a
+   * new panel rule through this method.
+   */
+  private projectPanelFromSelection(): void {
+    if (this.selectedIds().length > 0) this.dock.claim(CORE_PANEL_BOARD_INSPECTOR);
+    else this.dock.releaseClaim();
   }
 
   // ---- Element operations --------------------------------------------------
@@ -334,6 +362,7 @@ export class BoardStore {
     const committed = this.commit((surface) => replaceSurface(surface, next));
     // Stamp the selection so undo drops the element and its selection together.
     this.sel.select(element.id, 'replace');
+    this.projectPanelFromSelection();
     if (committed) this.trackSelectionOnLastEdit();
   }
 
@@ -417,6 +446,7 @@ export class BoardStore {
     // Disarm an armed element caught in the deletion; session-only, deliberately out of the undoable edit.
     if (this._armed() && idSet.has(this._armed() as string)) this.disarm();
     this.sel.deselect();
+    this.projectPanelFromSelection();
     if (committed) this.trackSelectionOnLastEdit();
   }
 
@@ -426,6 +456,7 @@ export class BoardStore {
     const committed = this.commit((surface) => replaceSurface(surface, next));
     this.sel.dropWhere((selected) => selected === id);
     if (this._armed() === id) this.disarm();
+    this.projectPanelFromSelection();
     if (committed) this.trackSelectionOnLastEdit();
   }
 
@@ -523,7 +554,9 @@ export class BoardStore {
   /**
    * Reset the transient editor state a fresh load invalidates: the undo/redo history (its patches target
    * the old body), the selection, the armed element, and the armed Tool. The document itself is derived
-   * from the session's body, so there is no surface to set here.
+   * from the session's body, so there is no surface to set here. The Dock's open Panel is *not* reset —
+   * the user's remembered choice is cross-View and cross-session (ADR-0067); the projection below only
+   * drops the transient Inspector claim this load's selection held.
    */
   private resetForLoad(): void {
     this.undoStack.length = 0;
@@ -532,6 +565,7 @@ export class BoardStore {
     this._tool.set('select');
     this.sel.deselect();
     this.disarm();
+    this.projectPanelFromSelection();
   }
 
   /**

@@ -16,8 +16,9 @@ import { BoardViewComponent } from './board-view.component';
 /**
  * Smoke coverage for the View shell: the element overlay renders for every session (ADR-0062) — a
  * read-only opener or an Embed's transclusion must see the Board's content, not a bare grid — while the
- * editing chrome (tool palette, Inspector) and the overlay's editing gestures are gated on
- * {@link ENTITY_SESSION.writable} (ADR-0037), mirroring the Hex Map View.
+ * editing chrome (the tool palette) and the overlay's editing gestures are gated on
+ * {@link ENTITY_SESSION.writable} (ADR-0037), mirroring the Hex Map View. The Inspector is a page-Dock
+ * Panel now (ADR-0067), mounted by the page's Dock rather than this View, so it never renders in this host.
  */
 describe('BoardView', () => {
   beforeEach(async () => {
@@ -57,11 +58,12 @@ describe('BoardView', () => {
     return fixture;
   }
 
-  it('renders the palette, Inspector, and element overlay for a writable opener', () => {
+  it('renders the palette and element overlay for a writable opener', () => {
     const el = render().nativeElement as HTMLElement;
     expect(el.querySelector('app-board-canvas')).not.toBeNull();
     expect(el.querySelector('app-board-tool-palette')).not.toBeNull();
-    expect(el.querySelector('app-board-inspector')).not.toBeNull();
+    // The Inspector is page-Dock chrome now (ADR-0067), never a child of this View.
+    expect(el.querySelector('app-board-inspector')).toBeNull();
     const overlay = el.querySelector('app-board-elements');
     expect(overlay).not.toBeNull();
     // Writable → the overlay is interactive, not read-only.
@@ -78,10 +80,10 @@ describe('BoardView', () => {
     const box = el.querySelector('[data-testid=element-e1]');
     expect(box).not.toBeNull();
     expect(box?.classList.contains('is-readonly')).toBe(true);
-    // No editing affordances: no handles, no palette, no Inspector.
+    // No editing affordances: no handles, no palette. (The Inspector, a write-gated page-Dock Panel now,
+    // is never a child of this View regardless of writability — ADR-0067.)
     expect(el.querySelector('[data-testid=handle-nw]')).toBeNull();
     expect(el.querySelector('app-board-tool-palette')).toBeNull();
-    expect(el.querySelector('app-board-inspector')).toBeNull();
   });
 
   /**
@@ -177,24 +179,26 @@ describe('BoardView', () => {
       expect(event.defaultPrevented).toBe(true);
     });
 
-    it('leaves the camera untouched for a *plain* wheel over the Inspector — it must scroll natively', () => {
+    it('leaves the camera untouched for a *plain* wheel over the chrome — it must scroll natively', () => {
       const fixture = render();
       const cam = fixture.debugElement.injector.get(BoardCamera);
       const before = cam.camera();
 
-      wheel(query(fixture, 'app-board-inspector'), { deltaY: 100 });
+      // The tool palette stands in for the floating chrome exemption; the Inspector is a page-Dock Panel
+      // now (ADR-0067), mounted outside this host, so its wheels never reach this listener at all.
+      wheel(query(fixture, 'app-board-tool-palette'), { deltaY: 100 });
 
       expect(cam.camera()).toBe(before);
     });
 
-    it('zooms the board on Ctrl/⌘+wheel over the chrome — a pinch over the Inspector must not zoom the page', () => {
+    it('zooms the board on Ctrl/⌘+wheel over the chrome — a pinch over the palette must not zoom the page', () => {
       const fixture = render();
       const cam = fixture.debugElement.injector.get(BoardCamera);
 
       // The chrome exemption used to return without preventDefault for every wheel; the zoom intent is
       // now forwarded (and cancelled) exactly like over an armed element.
       const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100, ctrlKey: true });
-      query(fixture, 'app-board-inspector').dispatchEvent(event);
+      query(fixture, 'app-board-tool-palette').dispatchEvent(event);
 
       expect(cam.camera().zoom).toBeGreaterThan(1);
       expect(event.defaultPrevented).toBe(true);
@@ -219,7 +223,7 @@ describe('BoardView', () => {
       const reachedWindow = vi.fn();
       window.addEventListener('wheel', reachedWindow);
 
-      wheel(query(fixture, 'app-board-inspector'), { deltaY: 100 });
+      wheel(query(fixture, 'app-board-tool-palette'), { deltaY: 100 });
       window.removeEventListener('wheel', reachedWindow);
 
       expect(reachedWindow).toHaveBeenCalledOnce();
