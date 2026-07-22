@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { Inject, Injectable } from '@nestjs/common';
-import { AssetSummary, assetUrl, EntityDocument, entityDocumentSchema } from '@hexly/domain';
+import { AssetSummary, assetUrl, EntityDocument, entityDocumentSchema, THUMBNAIL_SUFFIX } from '@hexly/domain';
 import { assetSummaryOf, readAssetValue } from '@hexly/plugin-asset';
 import { asc, eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
@@ -72,16 +72,47 @@ export class AssetsService {
   }
 
   /**
+   * Store a minted thumbnail beside its source bytes at the hash-derived {@link THUMBNAIL_SUFFIX} path
+   * (ADR-0065). A thumbnail is a regenerable cache — no row, no identity — so nothing but the file records
+   * it; it is served on the same route as the bytes and deleted with its World's folder.
+   */
+  storeThumbnail(worldId: string, hash: string, bytes: Uint8Array): void {
+    const worldDir = join(this.dir, worldId);
+    mkdirSync(worldDir, { recursive: true });
+    writeFileSync(join(worldDir, hash + THUMBNAIL_SUFFIX), bytes);
+  }
+
+  /**
    * Read a stored Asset's bytes and content type for serving (ADR-0034), or null if it is
    * absent. Path-traversal-safe: `worldId`/`file` that aren't a single path segment (a `/`,
    * `\`, or `..` slipped through URL decoding) are rejected as not-found rather than allowed
    * to escape the Asset root.
+   *
+   * A thumbnail request (`<hash>${THUMBNAIL_SUFFIX}`) whose thumbnail was never minted — a non-image, or
+   * an upload sharp could not parse — falls back to the original bytes (ADR-0065), so a grid pointed at
+   * the thumbnail URL always renders something rather than 404ing.
    */
   read(worldId: string, file: string): { bytes: Buffer; mime: string } | null {
     if (basename(worldId) !== worldId || basename(file) !== file) return null;
     const path = join(this.dir, worldId, file);
-    if (!existsSync(path)) return null;
-    return { bytes: readFileSync(path), mime: mimeForExt(extname(file)) };
+    if (existsSync(path)) return { bytes: readFileSync(path), mime: mimeForExt(extname(file)) };
+    return this.originalForThumbnail(worldId, file);
+  }
+
+  /**
+   * The original bytes a missing thumbnail request falls back to (ADR-0065): for a `<hash>${THUMBNAIL_SUFFIX}`
+   * path, the one stored `<hash>.<ext>` sibling. Null for any other missing file, so a genuine miss stays a
+   * 404.
+   */
+  private originalForThumbnail(worldId: string, file: string): { bytes: Buffer; mime: string } | null {
+    if (!file.endsWith(THUMBNAIL_SUFFIX)) return null;
+    const hash = file.slice(0, -THUMBNAIL_SUFFIX.length);
+    if (!/^[0-9a-f]{64}$/.test(hash)) return null;
+    const worldDir = join(this.dir, worldId);
+    if (!existsSync(worldDir)) return null;
+    const original = readdirSync(worldDir).find((f) => f.startsWith(`${hash}.`) && !f.endsWith(THUMBNAIL_SUFFIX));
+    if (!original) return null;
+    return { bytes: readFileSync(join(worldDir, original)), mime: mimeForExt(extname(original)) };
   }
 
   /**

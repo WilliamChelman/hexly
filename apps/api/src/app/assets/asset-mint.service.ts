@@ -16,7 +16,8 @@ import { EntitiesService } from '../entities/entities.service';
 import { EntityWrites } from '../entities/entity-writes';
 import { TypeFieldRegistry } from '../entities/type-field-registry';
 import { WorldTypeFields } from '../entities/world-type-fields';
-import { AssetsService } from './assets.service';
+import { AssetExtraction, AssetExtractionService } from './asset-extraction.service';
+import { AssetsService, mimeForExt } from './assets.service';
 
 /** What a mint-and-dedup produced: the wrapper Asset Entity, its served capability URL, and whether it deduped. */
 export interface MintedAsset {
@@ -42,15 +43,34 @@ export class AssetMintService {
     private readonly entities: EntitiesService,
     private readonly worldTypeFields: WorldTypeFields,
     private readonly typeFields: TypeFieldRegistry,
+    private readonly extraction: AssetExtractionService,
   ) {}
 
   /**
-   * Mint (or dedup to) an Asset for `bytes` uploaded under `filename` into `worldId`, owned by `ownerId`.
-   * Keyed on `(worldId, hash)`: identical bytes already wrapped in this World return that Entity untouched
-   * — the on-disk bytes and served URL are content-addressed, so nothing is written and the first name
-   * sticks. A fresh mint pins the extension in the asset-ref, so a later rename never moves the URL.
+   * Derive the **Asset Stats** and thumbnail for `bytes` uploaded under `filename` (ADR-0065), keyed by the
+   * mime the extension names. Async because the image extractor (sharp) has no sync API, so a caller inside
+   * a synchronous mint transaction (the vault import) runs this first and passes the result into {@link mint}.
+   * Best-effort: unparseable or unrecognised bytes resolve to a statless, thumbnail-less extraction.
    */
-  mint(ownerId: string, worldId: string, filename: string, bytes: Uint8Array): MintedAsset {
+  extract(filename: string, bytes: Uint8Array): Promise<AssetExtraction> {
+    return this.extraction.extract(mimeForExt(extname(filename)), bytes);
+  }
+
+  /**
+   * Mint (or dedup to) an Asset for `bytes` uploaded under `filename` into `worldId`, owned by `ownerId`,
+   * with the pre-computed {@link AssetExtraction} written in. Keyed on `(worldId, hash)`: identical bytes
+   * already wrapped in this World return that Entity untouched — the on-disk bytes and served URL are
+   * content-addressed, so nothing is written (not even a re-extraction) and the first name sticks. A fresh
+   * mint pins the extension in the asset-ref, folds the stats into it, and stores the thumbnail beside the
+   * bytes, so a later rename never moves the URL.
+   */
+  mint(
+    ownerId: string,
+    worldId: string,
+    filename: string,
+    bytes: Uint8Array,
+    extraction: AssetExtraction,
+  ): MintedAsset {
     const hash = createHash('sha256').update(bytes).digest('hex');
     const existing = this.db
       .select({ entityId: assetIndex.entityId })
@@ -69,13 +89,16 @@ export class AssetMintService {
     // No twin: write the bytes and mint the wrapper. `store` re-derives the same hash and pins the
     // lower-cased extension on disk and in the URL.
     const stored = this.assets.store(worldId, filename, bytes);
+    // A minted thumbnail is a regenerable cache beside the bytes (ADR-0065): absent when extraction found
+    // none (a non-image, or bytes sharp could not parse), when the original serves as the fallback.
+    if (extraction.thumbnail) this.assets.storeThumbnail(worldId, stored.hash, extraction.thumbnail);
     const assetValue: AssetValue = {
       hash: stored.hash,
       ext: stored.ext,
       mime: stored.mime,
       size: bytes.length,
-      // Stats extraction (sharp) lands in its own ticket (ADR-0065); the ref mints statless for now.
-      stats: null,
+      // The mechanical Asset Stats extraction wrote (ADR-0065), or null when it could not parse the bytes.
+      stats: extraction.stats,
     };
     // Seed the asset-ref over the type's minted defaults (its Content opens empty), like a plain create.
     const seed: EntityDocument = { [ASSET_FIELD_ID]: assetValue };

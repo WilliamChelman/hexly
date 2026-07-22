@@ -86,8 +86,8 @@ export class WorldsController {
 
   /**
    * Import an Obsidian vault `.zip` into a fresh World (ADR-0033). Multer buffers the upload in
-   * memory, the import runs synchronously, and the {@link ImportSummary} reports what landed and
-   * what was lost.
+   * memory; the import pre-extracts Asset Stats/thumbnails (sharp, async, ADR-0065) then persists in
+   * one synchronous transaction, and the {@link ImportSummary} reports what landed and what was lost.
    */
   @Post('import')
   // Import mints a World, so it needs the World Creation capability too (ADR-0040).
@@ -96,7 +96,7 @@ export class WorldsController {
   // is set instance-wide via MulterModule (ADR-0036) and inherited here. The decompressed
   // ceiling (the real zip-bomb guard) lives in the importer, also config-driven.
   @UseInterceptors(FileInterceptor('file'))
-  import(@CurrentUser() user: AuthUser, @UploadedFile() file: UploadedZip | undefined): ImportSummary {
+  import(@CurrentUser() user: AuthUser, @UploadedFile() file: UploadedZip | undefined): Promise<ImportSummary> {
     if (!file) throw new BadRequestException();
     return this.importer.import(user.id, file.originalname, file.buffer);
   }
@@ -174,13 +174,13 @@ export class WorldsController {
    */
   @Post(':id/assets')
   @UseInterceptors(FileInterceptor('file'))
-  uploadAsset(
+  async uploadAsset(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @UploadedFile() file: UploadedAsset | undefined,
-  ): EntityDetail {
+  ): Promise<EntityDetail> {
     if (!file) throw new BadRequestException();
-    const result = this.worlds.uploadAsset(user.id, id, file.originalname, file.buffer);
+    const result = await this.worlds.uploadAsset(user.id, id, file.originalname, file.buffer);
     if (result === 'not-found') throw new NotFoundException();
     if (result === 'forbidden') throw new ForbiddenException();
     return result;

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { resolveAssetsDir } from '../db/db';
 import { DbModule } from '../db/db.module';
 import { EntitiesModule } from '../entities/entities.module';
+import { AssetExtractionService } from './asset-extraction.service';
 import { AssetMintService } from './asset-mint.service';
 import { AssetsController } from './assets.controller';
 import { ASSETS_DIR, AssetsService } from './assets.service';
@@ -15,7 +16,12 @@ import { ASSETS_DIR, AssetsService } from './assets.service';
 @Module({
   imports: [DbModule, EntitiesModule],
   controllers: [AssetsController],
-  providers: [AssetsService, AssetMintService, { provide: ASSETS_DIR, useFactory: () => resolveAssetsDir() }],
+  providers: [
+    AssetsService,
+    AssetMintService,
+    AssetExtractionService,
+    { provide: ASSETS_DIR, useFactory: () => resolveAssetsDir() },
+  ],
   exports: [AssetsService, AssetMintService],
 })
 export class AssetsModule {}

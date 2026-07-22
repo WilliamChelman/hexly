@@ -69,7 +69,9 @@ export interface ImagePickerData {
                     data-testid="image-asset-choice"
                     (click)="choose(asset.url)"
                   >
-                    <img class="w-full h-full object-cover" draggable="false" [src]="asset.url" alt="" />
+                    <!-- The thumbnail (ADR-0065), so the grid never downloads raw bytes; it falls back to
+                         the original on the serving route when no thumb was minted. -->
+                    <img class="w-full h-full object-cover" draggable="false" [src]="asset.thumbnailUrl" alt="" />
                   </button>
                 }
               </div>

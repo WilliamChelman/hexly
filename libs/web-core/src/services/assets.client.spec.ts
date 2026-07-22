@@ -10,6 +10,7 @@ describe('AssetsClient', () => {
 
   const asset: AssetSummary = {
     url: '/assets/w1/abc.png',
+    thumbnailUrl: '/assets/w1/abc.thumb.webp',
     originalFilename: 'map.png',
     mime: 'image/png',
     size: 42,
