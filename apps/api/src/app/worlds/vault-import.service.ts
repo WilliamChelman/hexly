@@ -90,8 +90,8 @@ export class VaultImportService {
     const assetIndex = new AssetIndex(assetFiles);
     const dataTypes = this.typeFields.structuredDataTypes;
     // Pre-extract Asset Stats + thumbnails (sharp, async) before the synchronous persist transaction
-    // (ADR-0065): storeAsset mints inside the transaction and cannot await, so the mechanical extraction
-    // is done up front, keyed by the vault path each embedded file will resolve to.
+    // (ADR-0065): the mint loop runs inside that transaction and cannot await, so the mechanical
+    // extraction is done up front for every binary, keyed by the vault path each file is stored under.
     const extractions = new Map<string, AssetExtraction>();
     for (const [path, bytes] of Object.entries(assetFiles))
       extractions.set(path, await this.assetMint.extract(path, bytes));
@@ -106,6 +106,24 @@ export class VaultImportService {
     // not the import: the World was already committed by mintWorld, and the asset store's writeFileSync
     // isn't transactional — a throw here leaves an empty World and written asset files behind.
     this.db.transaction(() => {
+      // Mint an Asset for EVERY binary in the zip, not only the ones a note embeds (ADR-0065): an imported
+      // vault is immediately browsable, and a re-imported export re-mints its `assets/` folder by hash so
+      // references heal even where prose lost the reference. Deduped per `(worldId, hash)` — twin files
+      // collapse to one Entity, first (path-sorted, for determinism) name winning — and the resulting
+      // `path → URL` map lets each note's storeAsset resolve its src to the already-minted capability URL.
+      const assetUrls = new Map<string, string>();
+      for (const assetPath of Object.keys(assetFiles).sort()) {
+        const minted = this.assetMint.mint(
+          ownerId,
+          worldId,
+          assetPath,
+          assetFiles[assetPath],
+          extractions.get(assetPath) ?? { stats: null, thumbnail: null },
+        );
+        if (!minted.deduped) assetsStored++;
+        assetUrls.set(assetPath, minted.url);
+      }
+
       for (const note of notes) {
         const noteDir = posix.dirname(note.path);
         const context: VaultImportContext = {
@@ -118,18 +136,8 @@ export class VaultImportService {
           storeAsset: (src) => {
             if (!src || isExternalUrl(src)) return null;
             const assetPath = assetIndex.resolve(src, noteDir);
-            if (!assetPath) return null;
-            // Mint through the ordinary path (ADR-0065): each embedded file becomes an **Asset Entity**,
-            // deduped per World by content hash, and the note's src is rewritten to its capability URL.
-            const minted = this.assetMint.mint(
-              ownerId,
-              worldId,
-              assetPath,
-              assetFiles[assetPath],
-              extractions.get(assetPath) ?? { stats: null, thumbnail: null },
-            );
-            if (!minted.deduped) assetsStored++;
-            return minted.url;
+            // The Asset was already minted above; rewrite the note's src to its capability URL (ADR-0065).
+            return assetPath ? (assetUrls.get(assetPath) ?? null) : null;
           },
           degrade,
         };

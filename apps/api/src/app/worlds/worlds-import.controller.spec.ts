@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
+import sharp from 'sharp';
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -512,24 +513,29 @@ describe('Vault import endpoint', () => {
     expect(res.body.linksDangling).toBe(0);
   });
 
-  it('ignores .obsidian config and non-note files, importing only markdown', async () => {
+  it('ignores .obsidian config, but mints every binary as an Asset (ADR-0065)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const zip = vaultZip({
       'Lady Mara.md': '# Lady Mara',
       '.obsidian/app.json': '{ "theme": "dark" }',
+      // An attachment no note embeds is still minted, so an imported vault is immediately browsable.
       'attachments/portrait.png': new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
     });
 
     const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     expect(res.body.notesImported).toBe(1);
-    // The World holds just the one imported note (no seeded Home Entity, ADR-0043).
+    // Every binary in the zip mints an Asset even when no note references it (ADR-0065): the note plus
+    // the portrait Asset. `.obsidian` config is never inflated, so it becomes neither note nor Asset.
+    expect(res.body.assetsStored).toBe(1);
     const world = await ada.get(`/worlds/${res.body.worldId}`).expect(200);
-    expect(world.body.entityCount).toBe(1);
+    expect(world.body.entityCount).toBe(2);
+    // The unreferenced Asset is browsable in the picker; `.obsidian` config produced nothing.
+    const assets = await ada.get(`/worlds/${res.body.worldId}/assets`).expect(200);
+    expect(assets.body).toHaveLength(1);
     const list = await ada.get(`/entities?worldId=${res.body.worldId}`).expect(200);
     const names = list.body.items.map((e: { name: string }) => e.name);
     expect(names).not.toContain('app');
-    expect(names).not.toContain('portrait');
   });
 
   it('skips an unreadable file and reports it, still importing the rest', async () => {
@@ -610,6 +616,61 @@ describe('Vault import endpoint', () => {
     // no Asset, so it is no edge: Villain has one asset edge, not two.
     const hash = heroImages[0].split('/').pop()!.replace('.png', '');
     expect(assetEdgesIn(worldId)).toEqual([hash, hash]);
+  });
+
+  it('mints an Asset (stats + thumbnail) for every binary in the zip, even ones no note embeds (ADR-0065)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    // A real image sharp can parse, so extraction runs and produces stats + a thumbnail.
+    const png = await sharp({ create: { width: 12, height: 4, channels: 3, background: { r: 200, g: 24, b: 24 } } })
+      .png()
+      .toBuffer();
+    const zip = vaultZip({
+      // No note references either binary — the imported vault must still be immediately browsable.
+      'Note.md': '# Just prose, no embeds',
+      'attachments/orphan.png': new Uint8Array(png),
+      'gallery/other.png': new Uint8Array([0x89, 0x50, 0x4e, 0x47, 9, 9, 9, 9]),
+    });
+
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+    const worldId = res.body.worldId;
+
+    // Both unreferenced binaries minted; the picker lists them as Assets.
+    expect(res.body.assetsStored).toBe(2);
+    const assets = (await ada.get(`/worlds/${worldId}/assets`).expect(200)).body as {
+      thumbnailUrl: string;
+      originalFilename: string;
+    }[];
+    expect(assets.map((a) => a.originalFilename).sort()).toEqual(['orphan.png', 'other.png']);
+
+    // The parseable PNG carries populated stats and serves a thumbnail — extraction ran inline at mint.
+    // Assets are hidden from the default listing (ADR-0065/#278), so select the asset type explicitly.
+    const assetList = await ada.get('/entities').query({ worldId, type: 'core.type.asset' }).expect(200);
+    const orphanId = assetList.body.items.find((e: { name: string }) => e.name === 'orphan').id;
+    const orphan = await ada.get(`/entities/${orphanId}`).expect(200);
+    expect(orphan.body.document['core.field.asset'].stats).not.toBeNull();
+    const orphanThumb = assets.find((a) => a.originalFilename === 'orphan.png')!.thumbnailUrl;
+    await request(app.getHttpServer()).get(orphanThumb).expect(200);
+  });
+
+  it('dedups identical binaries in the zip to one Asset — the path-sorted first name wins (ADR-0065)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
+    const zip = vaultZip({
+      'Note.md': '# Note',
+      // Byte-identical copies under two paths collapse to a single Asset (one hash, one Entity).
+      'b-folder/twin.png': png,
+      'a-folder/original.png': png,
+    });
+
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+
+    expect(res.body.assetsStored).toBe(1);
+    const assets = (await ada.get(`/worlds/${res.body.worldId}/assets`).expect(200)).body as {
+      originalFilename: string;
+    }[];
+    // Path-sorted iteration means `a-folder/original.png` mints first, so its stem is the name that sticks.
+    expect(assets).toHaveLength(1);
+    expect(assets[0].originalFilename).toBe('original.png');
   });
 
   /** The Asset `hash`es every Entity in `worldId` references, via the derived edge index. */
