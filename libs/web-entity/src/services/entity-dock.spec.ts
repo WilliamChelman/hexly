@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Type } from '@angular/core';
+import { Injector, Type } from '@angular/core';
 import { AuthClient } from '@hexly/web-core';
 import { MockAuthClient } from '@hexly/web-core/testing';
 import { EntityDock, DOCK_STORAGE_KEY } from './entity-dock';
@@ -137,5 +137,19 @@ describe('EntityDock', () => {
 
     dock.toggle(REFERENCES.id);
     expect(dock.openPanel()?.id).toBe(REFERENCES.id);
+  });
+
+  it('carries the running View’s injector for hosting View-contributed Panels (ADR-0067, #294)', () => {
+    const dock = make();
+    // None until the outlet mounts a View and hands its injector over.
+    expect(dock.viewInjector()).toBeNull();
+
+    const injector = Injector.create({ providers: [] });
+    dock.setViewInjector(injector);
+    expect(dock.viewInjector()).toBe(injector);
+
+    // Cleared when the View degrades to the card/dangling fallback (no body mounted).
+    dock.setViewInjector(null);
+    expect(dock.viewInjector()).toBeNull();
   });
 });

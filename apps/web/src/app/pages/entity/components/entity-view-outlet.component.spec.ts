@@ -1,6 +1,7 @@
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { Injector } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
@@ -9,7 +10,7 @@ import { CORE_HEXMAP, HEX_GRID_FIELD } from '@hexly/plugin-hexmap';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntitiesClient, ActiveWorld } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
-import { CORE_VIEW_MAP, ENTITY_SESSION, ENTITY_TYPES, viewInstanceKey } from '@hexly/web-entity';
+import { CORE_VIEW_MAP, ENTITY_RENDER_CONTEXT, ENTITY_SESSION, ENTITY_TYPES, viewInstanceKey } from '@hexly/web-entity';
 import { CORE_VIEW_RICH_CONTENT, providePluginContent, EntityNameResolver } from '@hexly/plugin-content/web';
 import { EntitySession } from '../services/entity-session';
 import { EntityViewStore } from '../services/entity-view-store';
@@ -165,6 +166,37 @@ describe('EntityViewOutlet', () => {
     fixture.detectChanges();
 
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="entity-view-dangling"]')).not.toBeNull();
+  });
+
+  it('hands the running View’s own injector out for the Dock to host View-contributed Panels (ADR-0067, #294)', async () => {
+    // The active View is created manually so its injector escapes to the Dock; capture what the outlet emits.
+    let captured: Injector | null | undefined;
+    entities.load.mockReturnValue(of(noteDetail('Lady Mara')));
+    const fixture = TestBed.createComponent(EntityViewOutletComponent);
+    fixture.componentInstance.viewInjectorChange.subscribe((i) => (captured = i));
+    fixture.componentRef.setInput('entityId', 'n1');
+    fixture.detectChanges();
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
+    fixture.detectChanges();
+
+    // A real injector, and the running View's own — a child of the outlet's, so it resolves the render
+    // context the outlet mints (and, in later tickets, the View's own View-scoped providers).
+    expect(captured).toBeTruthy();
+    expect(captured?.get(ENTITY_RENDER_CONTEXT)).toBe(DEFAULT_ENTITY_RENDER_CONTEXT);
+  });
+
+  it('hands out no injector when it degrades to the card — the View body never mounts (ADR-0062)', () => {
+    let captured: Injector | null | undefined;
+    entities.load.mockReturnValue(of(noteDetail('Lady Mara')));
+    const fixture = TestBed.createComponent(EntityViewOutletComponent);
+    fixture.componentInstance.viewInjectorChange.subscribe((i) => (captured = i));
+    fixture.componentRef.setInput('entityId', 'n1');
+    // A cycle degrades to the card, so no View is instantiated and no injector is offered.
+    fixture.componentRef.setInput('renderContext', { ancestorIds: ['n1'], depth: 0, maxDepth: 3 });
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="entity-view-card"]')).not.toBeNull();
+    expect(captured).toBeNull();
   });
 
   it('the pinned View key keeps the codec round-trip the header/URL rely on', () => {

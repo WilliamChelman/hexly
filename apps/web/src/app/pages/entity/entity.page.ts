@@ -42,8 +42,10 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
           <main class="relative min-h-0 overflow-hidden">
             <!-- The View body — resolution, outletting, and the card/dangling fallbacks — is the
                  reusable Entity View Outlet's now (Seam C, #264), shared with the Board Embed. The page
-                 drives its own route-loaded session, so it passes no target id and the default context. -->
-            <app-entity-view-outlet />
+                 drives its own route-loaded session, so it passes no target id and the default context.
+                 It routes the running View's injector to the page's Dock, so View-contributed Panels are
+                 hosted with it (ADR-0067, #294); the Board Embed leaves this unbound (no Dock on Boards). -->
+            <app-entity-view-outlet (viewInjectorChange)="dock.setViewInjector($event)" />
           </main>
           <app-entity-dock />
         </div>
@@ -68,6 +70,9 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
 })
 export class EntityPage {
   protected readonly session = inject(EntitySession);
+  // The page-scoped Dock the running View's injector is routed to (ADR-0067, #294); the same instance the
+  // Dock chrome renders, since both sit under this page's providers.
+  protected readonly dock = inject(EntityDock);
   private readonly viewStore = inject(EntityViewStore);
   private readonly views = inject(ViewRegistry);
 
