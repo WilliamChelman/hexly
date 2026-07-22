@@ -3,9 +3,8 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { Observable, of } from 'rxjs';
-import { EntityDetail, EntityReferences } from '@hexly/domain';
-import { EntitiesClient } from '@hexly/web-core';
+import { of } from 'rxjs';
+import { EntityDetail } from '@hexly/domain';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { FakeEntitySession, provideFakeEntitySession } from '@hexly/web-entity/testing';
 import { EntityNameResolver } from '@hexly/plugin-content/web';
@@ -47,17 +46,14 @@ function assetDetail(value: AssetValue): EntityDetail {
 }
 
 describe('AssetViewComponent', () => {
-  let references: (id: string) => Observable<EntityReferences>;
-
   beforeEach(async () => {
-    references = vi.fn(() => of<EntityReferences>({ references: [], referencedBy: [] }));
     await TestBed.configureTestingModule({
       imports: [provideTranslocoTesting({ ...ASSET_TEST_CATALOGS, ...CONTENT_EDITOR_TEST_CATALOGS })],
       providers: [
         ...provideFakeEntitySession(),
-        // The reused RichContent editor's ambient dependencies (mirrors the ContentEditor spec harness).
+        // The reused RichContent editor's ambient dependencies (mirrors the ContentEditor spec harness):
+        // EntityNameResolver over the real root EntitiesClient, backed by the testing HTTP backend.
         EntityNameResolver,
-        { provide: EntitiesClient, useValue: { references: (id: string) => references(id) } },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -116,24 +112,11 @@ describe('AssetViewComponent', () => {
     expect(fixture.debugElement.query(By.directive(ContentEditorComponent))).not.toBeNull();
   });
 
-  it('lists the Entities that link here as usage (inbound links)', () => {
-    references = vi.fn(() =>
-      of<EntityReferences>({
-        references: [],
-        referencedBy: [{ descriptor: null, source: { id: 'note-1', name: 'Lair of the Dragon', types: [] } }],
-      }),
-    );
+  // Usage ("where is this Asset used") is no longer a bespoke inline list: the universal References
+  // panel answers it on every View (ADR-0067, #296), so the Asset View renders no usage section.
+  it('renders no inline usage list — usage lives in the universal References panel now (ADR-0067)', () => {
     const { fixture } = render(assetValue());
 
-    const rows = fixture.nativeElement.querySelectorAll('[data-testid=asset-usage-row]');
-    expect(rows.length).toBe(1);
-    expect(rows[0].textContent).toContain('Lair of the Dragon');
-    expect(references).toHaveBeenCalledWith('asset-1');
-  });
-
-  it('shows the empty usage state once the (empty) list has landed', () => {
-    const { fixture } = render(assetValue());
-
-    expect(fixture.nativeElement.querySelector('[data-testid=asset-usage-empty]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=asset-usage]')).toBeNull();
   });
 });

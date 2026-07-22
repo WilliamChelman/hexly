@@ -47,10 +47,6 @@
   "prose": {
     "heading": "Notes"
   },
-  "usage": {
-    "heading": "Utilisée par",
-    "empty": "Pas encore utilisée."
-  },
   "facet": {
     "kind": "Type",
     "orientation": "Orientation",
