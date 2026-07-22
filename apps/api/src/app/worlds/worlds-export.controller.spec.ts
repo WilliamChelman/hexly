@@ -39,6 +39,20 @@ function frontmatter(md: string): Record<string, unknown> {
   return match ? (parseYaml(match[1]) ?? {}) : {};
 }
 
+/** Fetch a note by name via the API and return its converted-doc image `src`s, in document order. */
+async function imagesOf(agent: request.Agent, worldId: string, name: string): Promise<string[]> {
+  const list = await agent.get(`/entities?worldId=${worldId}`).expect(200);
+  const summary = list.body.items.find((e: { name: string }) => e.name === name);
+  const detail = await agent.get(`/entities/${summary.id}`).expect(200);
+  const found: string[] = [];
+  const walk = (node: { type?: string; content?: unknown[]; attrs?: Record<string, unknown> }) => {
+    if (node.type === 'image') found.push(String(node.attrs?.['src'] ?? ''));
+    for (const child of node.content ?? []) walk(child as typeof node);
+  };
+  walk(detail.body.document['core.field.content'].snapshot);
+  return found;
+}
+
 describe('Vault export endpoint', () => {
   let app: INestApplication;
   let db: Db;
@@ -456,6 +470,40 @@ describe('Vault export endpoint', () => {
     const world = await ada.get(`/worlds/${reimport.body.worldId}`).expect(200);
     // The two notes plus the portrait, now minted as its own Asset Entity (ADR-0065) — no seeded Home Entity.
     expect(world.body.entityCount).toBe(3);
+  });
+
+  it('heals a prose image reference across import → export → re-import by content hash (ADR-0065)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 4, 3, 2, 1]);
+    const worldId = await importVault(ada, {
+      'attachments/portrait.png': png,
+      'Hero.md': 'Hero\n\n![[portrait.png]]',
+    });
+
+    // Export writes the bytes back under the human-readable name and repoints the src at that copy.
+    const { res, files } = await exportZip(ada, worldId);
+    expect(files['assets/portrait.png']).toEqual(png);
+    expect(text(files, 'Hero.md')).toContain('assets/portrait.png');
+    expect(text(files, 'Hero.md')).not.toContain(`/assets/${worldId}`); // no capability URL leaks into the export
+
+    // Re-import the export: the Asset re-mints by content hash into the NEW World, so the note's
+    // `assets/portrait.png` src heals back to a served capability URL scoped to that World.
+    const reimport = await ada
+      .post('/worlds/import')
+      .attach('file', Buffer.from(res.body), 'Aldermoor.zip')
+      .expect(201);
+    const reworldId = reimport.body.worldId;
+    expect(reworldId).not.toBe(worldId);
+    expect(reimport.body.assetsStored).toBe(1);
+
+    const heroImages = await imagesOf(ada, reworldId, 'Hero');
+    expect(heroImages).toHaveLength(1);
+    // The healed src is a capability URL in the re-imported World — the reference is live again, not dangling.
+    expect(heroImages[0]).toMatch(new RegExp(`^/assets/${reworldId}/[0-9a-f]{64}\\.png$`));
+
+    // The bytes serve at the healed URL: same content, same hash across the round trip.
+    const served = await request(app.getHttpServer()).get(heroImages[0]).expect(200);
+    expect(new Uint8Array(served.body)).toEqual(png);
   });
 
   it("round-trips an Entity's types and its structured values: a Monster, a Hex Map, a user-defined type", async () => {
