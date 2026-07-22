@@ -197,6 +197,8 @@ export class EntityBrowserPage {
       updatedAt: entity.updatedAt,
       // The card gates rename/delete on rights.
       rights: entity.rights,
+      // The resolved Thumbnail (ADR-0066), when the list opted in; absent → the card shows the type icon.
+      thumbnailUrl: entity.thumbnailUrl,
     })),
   );
   protected readonly nextCursor = signal<string | null>(null);
@@ -401,7 +403,8 @@ export class EntityBrowserPage {
       this.loadError.set(false);
     }
     this.fetchSub = this.entitiesClient
-      .list({ limit: PAGE_SIZE, worldId, rights: true, ...params })
+      // thumbnails opted in so each card shows its Thumbnail, recognizable by sight (ADR-0066).
+      .list({ limit: PAGE_SIZE, worldId, rights: true, thumbnails: true, ...params })
       .pipe(this.shell.withLoading('subtle'))
       .subscribe({
         next: (page) => {
@@ -464,6 +467,7 @@ export class EntityBrowserPage {
         cursor,
         worldId: this.activeWorld.worldId() ?? undefined,
         rights: true,
+        thumbnails: true,
         ...this.activeFilterParams(),
       })
       .pipe(finalize(() => this.loadingMore.set(false)))

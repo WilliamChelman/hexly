@@ -123,6 +123,7 @@ describe('EntityBrowser', () => {
       limit: 50,
       worldId: 'w1',
       rights: true,
+      thumbnails: true,
     });
   });
 
@@ -137,6 +138,7 @@ describe('EntityBrowser', () => {
       limit: 50,
       worldId: 'w2',
       rights: true,
+      thumbnails: true,
     });
   });
 
@@ -185,6 +187,7 @@ describe('EntityBrowser', () => {
       limit: 50,
       worldId: 'w1',
       rights: true,
+      thumbnails: true,
     });
     const titles = Array.from(fixture.nativeElement.querySelectorAll('[data-testid=entity-title]')).map((t) =>
       (t as HTMLElement).textContent?.trim(),
@@ -232,6 +235,7 @@ describe('EntityBrowser', () => {
       limit: 50,
       worldId: 'w1',
       rights: true,
+      thumbnails: true,
     });
     expect(client.list).toHaveBeenCalledTimes(1);
     // The box shows the query it was opened with.
@@ -256,6 +260,7 @@ describe('EntityBrowser', () => {
       limit: 50,
       worldId: 'w1',
       rights: true,
+      thumbnails: true,
     });
     expect(searchBox(fixture.nativeElement).value).toBe('dragon');
   });
@@ -286,6 +291,7 @@ describe('EntityBrowser', () => {
       limit: 50,
       worldId: 'w1',
       rights: true,
+      thumbnails: true,
     });
   });
 
@@ -469,6 +475,7 @@ describe('EntityBrowser', () => {
       cursor: 'cursor-2',
       worldId: 'w1',
       rights: true,
+      thumbnails: true,
     });
     fixture.detectChanges();
 
@@ -507,6 +514,7 @@ describe('EntityBrowser', () => {
       cursor: 'cursor-2',
       worldId: 'w1',
       rights: true,
+      thumbnails: true,
       q: 'keep',
     });
     fixture.detectChanges();
@@ -676,6 +684,7 @@ describe('EntityBrowser', () => {
       limit: 50,
       worldId: 'w1',
       rights: true,
+      thumbnails: true,
     });
     fixture.detectChanges();
 
@@ -747,6 +756,7 @@ describe('EntityBrowser', () => {
       limit: 50,
       worldId: 'w1',
       rights: true,
+      thumbnails: true,
     });
     fixture.detectChanges();
 
@@ -808,6 +818,7 @@ describe('EntityBrowser', () => {
         limit: 50,
         worldId: 'w1',
         rights: true,
+        thumbnails: true,
         type: ['core.type.note'],
       });
       expect(navigate).toHaveBeenCalledWith(
@@ -845,6 +856,7 @@ describe('EntityBrowser', () => {
         limit: 50,
         worldId: 'w1',
         rights: true,
+        thumbnails: true,
       });
       expect(navigate).toHaveBeenLastCalledWith(
         [],
@@ -891,6 +903,7 @@ describe('EntityBrowser', () => {
         limit: 50,
         worldId: 'w1',
         rights: true,
+        thumbnails: true,
       });
     });
 
@@ -906,6 +919,7 @@ describe('EntityBrowser', () => {
         limit: 50,
         worldId: 'w1',
         rights: true,
+        thumbnails: true,
         type: ['core.type.note'],
         tag: ['deity', 'ruined'],
       });
@@ -975,6 +989,7 @@ describe('EntityBrowser', () => {
           limit: 50,
           worldId: 'w1',
           rights: true,
+          thumbnails: true,
           field: ['alignment:eq:lawful-good'],
         });
         expect(navigate).toHaveBeenLastCalledWith(
@@ -1020,6 +1035,7 @@ describe('EntityBrowser', () => {
           limit: 50,
           worldId: 'w1',
           rights: true,
+          thumbnails: true,
           field: ['cr:gte:5'],
         });
       });
@@ -1040,6 +1056,7 @@ describe('EntityBrowser', () => {
           limit: 50,
           worldId: 'w1',
           rights: true,
+          thumbnails: true,
           type: ['test.type.beast'],
           field: ['alignment:eq:lawful-good'],
         });
