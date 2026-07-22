@@ -228,9 +228,15 @@ export async function authorWorldField(
  * affording another View needs the Dock's Details Panel opened. Both mount the same `details-panel`.
  */
 export async function openDetails(page: Page): Promise<void> {
-  if (await page.getByTestId('details-panel').count()) return; // the fallback Details View is already shown
-  await page.getByTestId('details-toggle').click();
-  await expect(page.getByTestId('details-panel')).toBeVisible();
+  // The fallback Details View renders the panel full-width as main content and offers no Dock toggle —
+  // the Dock drops the redundant Details Panel there (ADR-0067); every other View puts Details behind a
+  // Dock toggle. Wait for whichever this page affords (surviving the post-reload bootstrap race), then
+  // open the Dock Panel only when it isn't already the shown one.
+  const panel = page.getByTestId('details-panel');
+  const toggle = page.getByTestId('details-toggle');
+  await panel.or(toggle).first().waitFor();
+  if (!(await panel.count())) await toggle.click();
+  await expect(panel).toBeVisible();
 }
 
 /**

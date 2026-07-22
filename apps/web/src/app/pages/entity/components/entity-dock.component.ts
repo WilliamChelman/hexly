@@ -11,7 +11,15 @@ import {
 } from '@angular/core';
 import { NgComponentOutlet } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { EntityDock, PANEL_FILTER, PanelDefinition, PanelId, UNIVERSAL_PANELS } from '@hexly/web-entity';
+import {
+  CORE_PANEL_DETAILS,
+  CORE_VIEW_DETAILS,
+  EntityDock,
+  PANEL_FILTER,
+  PanelDefinition,
+  PanelId,
+  UNIVERSAL_PANELS,
+} from '@hexly/web-entity';
 import { IconComponent, IconButtonComponent } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
 import { EntityViewStore } from '../services/entity-view-store';
@@ -83,9 +91,16 @@ export class EntityDockComponent {
    * minus any write-gated Panel a read-only viewer may not have (ADR-0037).
    */
   private readonly availablePanels = computed<readonly PanelDefinition[]>(() => {
-    const view = this.views.resolve(this.viewStore.activeView().viewId).panels ?? [];
+    const activeView = this.viewStore.activeView().viewId;
+    const view = this.views.resolve(activeView).panels ?? [];
     const writable = this.session.writable();
-    return [...UNIVERSAL_PANELS, ...view].filter((panel) => this.panelFilter(panel) && (!panel.writeGate || writable));
+    // The fallback Details View already renders the Details Panel's substance full-width as the main
+    // content (ADR-0067), so the Dock dropping the redundant Details toggle there — the same substance
+    // would otherwise show twice.
+    const redundant = activeView === CORE_VIEW_DETAILS ? CORE_PANEL_DETAILS : null;
+    return [...UNIVERSAL_PANELS, ...view].filter(
+      (panel) => panel.id !== redundant && this.panelFilter(panel) && (!panel.writeGate || writable),
+    );
   });
 
   constructor() {
