@@ -1,0 +1,1 @@
+ALTER TABLE `entities` ADD `thumbnail_entity_id` text;

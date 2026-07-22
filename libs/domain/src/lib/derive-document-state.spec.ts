@@ -212,6 +212,46 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
     });
   });
 
+  describe('thumbnailEntityId: the Thumbnail Field designation (ADR-0066)', () => {
+    // The asset plugin owns the id; the domain is told which key to pick, never hardcoding it.
+    const THUMB = 'core.field.thumbnail';
+    const thumbField = field(THUMB, 'entityLink');
+    const deriveThumb = (doc: EntityDocument, fields: readonly Field[] = [thumbField]) =>
+      deriveDocumentState(doc, fields, DATA_TYPES, { thumbnailFieldId: THUMB }).thumbnailEntityId;
+
+    it('materialises the designated target entityId from the entityLink value', () => {
+      expect(deriveThumb({ [THUMB]: { entityId: 'portrait-1', label: 'Portrait' } })).toBe('portrait-1');
+    });
+
+    it('is null when no thumbnail id is named (the asset plugin disabled)', () => {
+      expect(
+        deriveDocumentState({ [THUMB]: { entityId: 'portrait-1' } }, [thumbField], DATA_TYPES).thumbnailEntityId,
+      ).toBeNull();
+    });
+
+    it('is null when the field is absent, blank, or ill-typed (forward-only, never throws)', () => {
+      expect(deriveThumb({})).toBeNull();
+      expect(deriveThumb({ [THUMB]: { entityId: '', label: '' } })).toBeNull();
+      expect(deriveThumb({ [THUMB]: 'not-a-link' })).toBeNull();
+      expect(deriveThumb({ [THUMB]: { label: 'orphan' } })).toBeNull();
+    });
+
+    it('is null when the key resolves to no registered Field (unresolved key is dropped)', () => {
+      // No Field named for the key → not in the effective set → no designation, value sits inert.
+      expect(deriveThumb({ [THUMB]: { entityId: 'portrait-1' } }, [])).toBeNull();
+    });
+
+    it('still harvests the designation as an ordinary link edge (usage surfaces by name)', () => {
+      const edges = deriveDocumentState(
+        { [THUMB]: { entityId: 'portrait-1', label: 'Portrait' } },
+        [thumbField],
+        DATA_TYPES,
+        { thumbnailFieldId: THUMB },
+      ).edges;
+      expect(edges).toEqual([{ targetKind: 'entity', targetId: 'portrait-1', descriptor: null }]);
+    });
+  });
+
   describe('composition: one call yields every derived index for one document', () => {
     it('returns edges, descriptors, searchText and fieldFacets together', () => {
       const doc: EntityDocument = {

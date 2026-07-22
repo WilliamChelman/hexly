@@ -7,13 +7,15 @@
  * The prose `core.field.content` the type also references is the content plugin's, folded from there.
  */
 import { serverPlugin, ServerPlugin } from '@hexly/domain';
-import { ASSET_DATA_TYPE, ASSET_FIELD, CORE_ASSET_TYPE, PLUGIN_ID } from '@hexly/plugin-asset';
+import { ASSET_DATA_TYPE, ASSET_FIELD, CORE_ASSET_TYPE, PLUGIN_ID, THUMBNAIL_FIELD } from '@hexly/plugin-asset';
 
 export function serverPluginAsset(): ServerPlugin {
   return serverPlugin({
     id: PLUGIN_ID,
     types: [CORE_ASSET_TYPE],
-    fields: [ASSET_FIELD],
+    // The asset-ref Field `core.type.asset` defaults, plus the canonical Thumbnail Field (ADR-0066) — a
+    // reusable Field no Type defaults, registered so it resolves as an attach-on-demand extra (ADR-0054/0057).
+    fields: [ASSET_FIELD, THUMBNAIL_FIELD],
     dataTypes: [ASSET_DATA_TYPE],
   });
 }

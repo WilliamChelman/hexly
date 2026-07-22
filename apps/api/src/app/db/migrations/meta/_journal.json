@@ -183,6 +183,13 @@
       "when": 1784681437777,
       "tag": "0025_low_exiles",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1784729287646,
+      "tag": "0026_mean_junta",
+      "breakpoints": true
     }
   ]
 }

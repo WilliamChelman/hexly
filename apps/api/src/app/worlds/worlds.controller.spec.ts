@@ -12,6 +12,7 @@ import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from '../entities/entities.module';
+import { EntityWrites } from '../entities/entity-writes';
 import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from './worlds.module';
 
@@ -838,6 +839,159 @@ describe('Worlds endpoints', () => {
         expect(orientation.values).toContainEqual({ value: 'landscape', count: 1 });
         // The Tag facet counts the Asset's tag under the selected type.
         expect(facets.tag).toContainEqual({ value: 'portrait', count: 1 });
+      });
+    });
+
+    describe('Thumbnail Field (core.field.thumbnail, ADR-0066)', () => {
+      /** A second PNG whose bytes differ from {@link PNG}, so it content-addresses to a distinct hash. */
+      const PNG2 = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 8, 7]);
+
+      /** The served thumbnail URL an Asset's own bytes resolve to (ADR-0065) — the derivation's target. */
+      const thumbUrl = (worldId: string, hash: string) => `/assets/${worldId}/${hash}.thumb.webp`;
+
+      /** Upload an Asset and return its wrapper Entity plus its content-addressed hash. */
+      async function uploadAsset(ada: request.Agent, worldId: string, file: Buffer, filename: string) {
+        const asset = (await ada.post(`/worlds/${worldId}/assets`).attach('file', file, filename).expect(201)).body;
+        return { asset, hash: asset.document['core.field.asset'].hash as string };
+      }
+
+      /** Create a Note designating `targetId` as its thumbnail (attach-on-demand, ADR-0057). */
+      async function noteWithThumbnail(ada: request.Agent, worldId: string, name: string, targetId: string) {
+        return (
+          await ada
+            .post('/entities')
+            .send({
+              name,
+              types: ['core.type.note'],
+              worldId,
+              document: { 'core.field.thumbnail': { entityId: targetId, label: name } },
+            })
+            .expect(201)
+        ).body;
+      }
+
+      const listWithThumbs = async (ada: request.Agent, query: Record<string, string>) =>
+        (
+          await ada
+            .get('/entities')
+            .query({ thumbnails: '1', ...query })
+            .expect(200)
+        ).body.items as { id: string; thumbnailUrl?: string }[];
+
+      it('resolves a designation to the target Asset’s served URL under thumbnails=1, and emits none without the flag', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const { asset: portrait, hash } = await uploadAsset(ada, world.id, PNG, 'Portrait.png');
+        const deity = await noteWithThumbnail(ada, world.id, 'Vashenka', portrait.id);
+
+        const listed = await listWithThumbs(ada, { worldId: world.id });
+        expect(listed.find((e) => e.id === deity.id)?.thumbnailUrl).toBe(thumbUrl(world.id, hash));
+
+        // A list that never asked for thumbnails pays no cost and emits no field (ADR-0066).
+        const plain = (await ada.get('/entities').query({ worldId: world.id }).expect(200)).body.items;
+        expect(plain.find((e: { id: string }) => e.id === deity.id).thumbnailUrl).toBeUndefined();
+      });
+
+      it('lets the Thumbnail Field beat the Entity’s own bytes; a bare Asset still emits its own (precedence)', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const { asset: cover, hash: coverHash } = await uploadAsset(ada, world.id, PNG, 'Cover.png');
+        const { asset: chosen, hash: chosenHash } = await uploadAsset(ada, world.id, PNG2, 'Chosen.png');
+        expect(chosenHash).not.toBe(coverHash);
+
+        // Attach the Thumbnail Field to the `cover` Asset, designating the `chosen` image.
+        await ada
+          .put(`/entities/${cover.id}`)
+          .send({
+            document: { ...cover.document, 'core.field.thumbnail': { entityId: chosen.id, label: 'Chosen' } },
+            version: cover.version,
+            tags: [],
+          })
+          .expect(200);
+
+        const assets = await listWithThumbs(ada, { worldId: world.id, type: 'core.type.asset' });
+        // The Asset carrying the field emits the field's URL (the designation beats its own bytes)...
+        expect(assets.find((e) => e.id === cover.id)?.thumbnailUrl).toBe(thumbUrl(world.id, chosenHash));
+        // ...while the bare Asset still emits its own bytes' URL, so the Asset Browser is unchanged.
+        expect(assets.find((e) => e.id === chosen.id)?.thumbnailUrl).toBe(thumbUrl(world.id, chosenHash));
+      });
+
+      it('pierces the target Asset’s visibility — a private target emits on a shared referrer for a viewer without Asset access', async () => {
+        const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', { roles: [] });
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const { asset: portrait, hash } = await uploadAsset(ada, world.id, PNG, 'Portrait.png');
+        // Hide the Asset Entity: Visibility governs *finding* it, not the capability-served bytes.
+        await ada.patch(`/entities/${portrait.id}`).send({ visibility: 'private' }).expect(200);
+        const deity = await noteWithThumbnail(ada, world.id, 'Vashenka', portrait.id);
+        await ada.patch(`/entities/${deity.id}`).send({ visibility: 'shared' }).expect(200);
+        addMember(world.id, bobId, 'viewer');
+
+        const bob = await signIn('bob@hexly.test', 'hunter2 stationery');
+        // The viewer cannot even find the private Asset...
+        await bob.get(`/entities/${portrait.id}`).expect(404);
+        // ...yet the shared referrer's card still carries the thumbnail (the emitted URL is capability-served).
+        const listed = await listWithThumbs(bob, { worldId: world.id });
+        expect(listed.find((e) => e.id === deity.id)?.thumbnailUrl).toBe(thumbUrl(world.id, hash));
+      });
+
+      it('surfaces the referrer by name in the Asset’s usage, and drops the thumbnail from later lists on delete (cascade)', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const { asset: portrait } = await uploadAsset(ada, world.id, PNG, 'Portrait.png');
+        const deity = await noteWithThumbnail(ada, world.id, 'Vashenka', portrait.id);
+
+        // The thumbnail link surfaces as an ordinary *named* inbound reference on the Asset (usage).
+        expect((await ada.get(`/entities/${portrait.id}/references`).expect(200)).body.referencedBy).toEqual([
+          { descriptor: null, source: { id: deity.id, name: 'Vashenka', types: ['core.type.note'] } },
+        ]);
+
+        // Deleting the Asset drops its dedup-index row, so the designation degrades to nothing — no cleanup.
+        await ada.delete(`/entities/${portrait.id}`).expect(204);
+        const listed = await listWithThumbs(ada, { worldId: world.id });
+        expect(listed.find((e) => e.id === deity.id)?.thumbnailUrl).toBeUndefined();
+      });
+
+      it('rebuilds the designation on Reindex for a row written before the column existed', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const { asset: portrait, hash } = await uploadAsset(ada, world.id, PNG, 'Portrait.png');
+        const deity = await noteWithThumbnail(ada, world.id, 'Vashenka', portrait.id);
+
+        // Simulate a pre-column row: blank the derived column the way an old document would have left it.
+        db.$client.prepare('UPDATE entities SET thumbnail_entity_id = NULL WHERE id = ?').run(deity.id);
+        expect(
+          (await listWithThumbs(ada, { worldId: world.id })).find((e) => e.id === deity.id)?.thumbnailUrl,
+        ).toBeUndefined();
+
+        // Reindex rebuilds the derivation from the stored document (ADR-0046).
+        app.get(EntityWrites).reindexChunk(null, 100);
+        expect((await listWithThumbs(ada, { worldId: world.id })).find((e) => e.id === deity.id)?.thumbnailUrl).toBe(
+          thumbUrl(world.id, hash),
+        );
+      });
+
+      it('emits nothing for a non-image, dangling, or ill-typed designation, and never errors', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+
+        // A dangling designation: the target Entity does not exist (a valid document, ADR-0066).
+        const dangling = await noteWithThumbnail(ada, world.id, 'Orphan', 'no-such-entity');
+        // A non-image designation: the target is a real Asset, but a PDF, not an image.
+        const { asset: manual } = await uploadAsset(ada, world.id, PNG, 'Manual.pdf');
+        const nonImage = await noteWithThumbnail(ada, world.id, 'Rulebook', manual.id);
+
+        const listed = await listWithThumbs(ada, { worldId: world.id });
+        expect(listed.find((e) => e.id === dangling.id)?.thumbnailUrl).toBeUndefined();
+        expect(listed.find((e) => e.id === nonImage.id)?.thumbnailUrl).toBeUndefined();
+
+        // An ill-typed value at rest (a bare string) is tolerated: Reindex never throws and the list still 200s.
+        db.$client
+          .prepare('UPDATE entities SET document = ? WHERE id = ?')
+          .run(JSON.stringify({ 'core.field.thumbnail': 'garbage' }), dangling.id);
+        expect(() => app.get(EntityWrites).reindexChunk(null, 100)).not.toThrow();
+        const again = await listWithThumbs(ada, { worldId: world.id });
+        expect(again.find((e) => e.id === dangling.id)?.thumbnailUrl).toBeUndefined();
       });
     });
   });
