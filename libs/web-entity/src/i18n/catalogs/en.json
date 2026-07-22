@@ -7,7 +7,15 @@
     "remove": "Remove link",
     "search": "Search entities…",
     "empty": "No entities",
-    "unavailable": "Unavailable"
+    "unavailable": "Unavailable",
+    "dangling": "This entity is unavailable"
+  },
+  "links": {
+    "toggle": "Toggle links",
+    "references": "References",
+    "referencedBy": "Referenced by",
+    "referencesEmpty": "This entity links to nothing",
+    "referencedByEmpty": "Nothing links here"
   },
   "assetLink": {
     "set": "Set image…",

@@ -72,13 +72,6 @@
     "toggle": "Toggle outline",
     "empty": "No headings yet"
   },
-  "links": {
-    "toggle": "Toggle links",
-    "references": "References",
-    "referencedBy": "Referenced by",
-    "referencesEmpty": "This entity links to nothing",
-    "referencedByEmpty": "Nothing links here"
-  },
   "metadata": {
     "heading": "Metadata"
   }

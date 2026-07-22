@@ -4,7 +4,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { LinkedEntity } from '@hexly/domain';
 
 /**
- * One row of the References panel: an Entity at the far end of a link, plus the Link Descriptor
+ * One row of the References Panel: an Entity at the far end of a link, plus the Link Descriptor
  * characterising it. Both directions render through here.
  *
  * `entity` of `null` is the outbound dangling case — a target that is deleted, or that this viewer
@@ -38,9 +38,9 @@ import { LinkedEntity } from '@hexly/domain';
     } @else {
       <span
         data-dangling=""
-        [attr.title]="'editor.entityLink.dangling' | transloco"
+        [attr.title]="'fields.entityLink.dangling' | transloco"
         class="min-w-0 flex-1 truncate text-sm italic text-ink-muted"
-        >{{ 'editor.entityLink.dangling' | transloco }}</span
+        >{{ 'fields.entityLink.dangling' | transloco }}</span
       >
     }
     @if (descriptor()) {

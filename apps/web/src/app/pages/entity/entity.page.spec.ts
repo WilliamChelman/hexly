@@ -11,7 +11,7 @@ import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
 import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
-import { CORE_VIEW_MAP, ENTITY_SESSION, ENTITY_TYPES, viewInstanceKey } from '@hexly/web-entity';
+import { CORE_VIEW_MAP, ENTITY_SESSION, ENTITY_TYPES, EntityDock, viewInstanceKey } from '@hexly/web-entity';
 import { TypeRegistry } from '../../entity-types/type-registry';
 import { CORE_VIEW_RICH_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { ViewRegistry } from '../../entity-types/view-registry';
@@ -217,6 +217,9 @@ describe('EntityPage layout', () => {
   let http: HttpTestingController;
 
   beforeEach(async () => {
+    // The page Dock persists its open-Panel choice to auth-scoped localStorage; clear it so one test's
+    // toggle never restores an open (fetching) Panel into the next test's mount (ADR-0067).
+    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [EntityPage, provideTranslocoTesting()],
       providers: [
@@ -233,6 +236,8 @@ describe('EntityPage layout', () => {
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
   });
+
+  afterEach(() => localStorage.clear());
 
   afterEach(() => {
     // AuthClient's session resource fires on boot; not under test here.
@@ -286,8 +291,8 @@ describe('EntityPage layout', () => {
     expect(el.querySelector('app-regions-panel')).toBeNull();
   });
 
-  /** The Outline and References share the dock's single panel slot (ADR-0013): opening either closes the other. */
-  it('swaps the dock between the Outline and References, never showing both', async () => {
+  /** The Content View's own dock holds the Outline alone now; References moved to the page Dock (ADR-0067). */
+  it('toggles the Content View Outline from its dock', async () => {
     const fixture = await mountNote();
     const el = fixture.nativeElement as HTMLElement;
     const click = (testid: string) => {
@@ -295,26 +300,51 @@ describe('EntityPage layout', () => {
       fixture.detectChanges();
     };
 
-    // Both closed on boot.
     expect(el.querySelector('app-outline-panel')).toBeNull();
-    expect(el.querySelector('app-references-panel')).toBeNull();
 
     click('outline-toggle');
     expect(el.querySelector('app-outline-panel')).not.toBeNull();
 
-    click('references-toggle');
-    expect(el.querySelector('app-outline-panel')).toBeNull();
-    expect(el.querySelector('app-references-panel')).not.toBeNull();
-    // Opening it reads the edge index; the Outline, derived from live Content, reads nothing.
-    http.expectOne('/api/entities/n1/references').flush({ references: [], referencedBy: [] });
-
     // A second click on the active toggle closes the dock, as it always did.
-    click('references-toggle');
-    expect(el.querySelector('app-references-panel')).toBeNull();
+    click('outline-toggle');
+    expect(el.querySelector('app-outline-panel')).toBeNull();
   });
 
-  /** Both panels are the same width and float over the same corner: the column reserves room for either. */
-  it('reflows the reading column for whichever panel is open', async () => {
+  /**
+   * References is a universal page-owned Dock Panel (ADR-0067): its toggle sits on the strip, and
+   * clicking it claims the Dock's one open slot (its lazy body renders in the app — proven end-to-end,
+   * and by the Panel's own spec — but is left unmounted here so no unflushed fetch fires).
+   */
+  it('opens and closes the References Panel from the page Dock', async () => {
+    const fixture = await mountNote();
+    const el = fixture.nativeElement as HTMLElement;
+    const dock = fixture.debugElement.injector.get(EntityDock);
+
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid=references-toggle]');
+    expect(toggle).not.toBeNull();
+    expect(dock.openPanel()).toBeNull();
+
+    toggle!.click();
+    fixture.detectChanges();
+    expect(dock.openPanel()?.id).toBe('core.panel.references');
+
+    // A second click on the active toggle closes the Dock.
+    toggle!.click();
+    fixture.detectChanges();
+    expect(dock.openPanel()).toBeNull();
+  });
+
+  /** The Dock's toggle strip is page chrome, present on every View — the Map included (ADR-0067). */
+  it('shows the References toggle on the Map View too', async () => {
+    const fixture = await mountMap();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('[data-testid=dock-strip]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=references-toggle]')).not.toBeNull();
+  });
+
+  /** Opening the Content View Outline reflows the reading column so the panel never overlaps prose. */
+  it('reflows the reading column when the Outline is open', async () => {
     const fixture = await mountNote();
     const el = fixture.nativeElement as HTMLElement;
     const column = () => el.querySelector<HTMLElement>('[data-content-scroll]')!;
@@ -323,18 +353,13 @@ describe('EntityPage layout', () => {
       fixture.detectChanges();
     };
 
-    // Closed: room for the floating toggles only.
+    // Closed: room for the floating toggle only.
     expect(column().style.paddingRight).toBe('3.5rem');
 
     click('outline-toggle');
     expect(column().style.paddingRight).toBe('20rem');
 
-    click('references-toggle');
-    http.expectOne('/api/entities/n1/references').flush({ references: [], referencedBy: [] });
-    fixture.detectChanges();
-    expect(column().style.paddingRight).toBe('20rem');
-
-    click('references-toggle');
+    click('outline-toggle');
     expect(column().style.paddingRight).toBe('3.5rem');
   });
 

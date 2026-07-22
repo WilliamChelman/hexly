@@ -72,13 +72,6 @@
     "toggle": "Afficher/masquer le plan",
     "empty": "Aucun titre pour l’instant"
   },
-  "links": {
-    "toggle": "Afficher/masquer les liens",
-    "references": "Références",
-    "referencedBy": "Référencé par",
-    "referencesEmpty": "Cette entité ne renvoie à rien",
-    "referencedByEmpty": "Rien ne renvoie ici"
-  },
   "metadata": {
     "heading": "Métadonnées"
   }

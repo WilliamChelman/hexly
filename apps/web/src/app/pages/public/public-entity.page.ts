@@ -5,9 +5,9 @@ import { EMPTY, catchError, combineLatest, of, switchMap, tap } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityNudge, StaleNudge } from '@hexly/domain';
 import { PublicClient, PublicEntityMode, AppShellStore, EVICTED } from '@hexly/web-core';
-import { ENTITY_SESSION } from '@hexly/web-entity';
+import { ENTITY_SESSION, UNIVERSAL_PANELS } from '@hexly/web-entity';
 import { EntitySession } from '../entity/services/entity-session';
-import { EntityNameResolver, RIGHT_DOCK_PANELS } from '@hexly/plugin-content/web';
+import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { PublicEntityNameResolver } from './services/public-entity-name-resolver';
 import { EntityPage } from '../entity/entity.page';
 
@@ -33,9 +33,9 @@ interface Followed {
     EntitySession,
     { provide: ENTITY_SESSION, useExisting: EntitySession },
     { provide: EntityNameResolver, useClass: PublicEntityNameResolver },
-    // The dock offers the Outline alone: References would need `/entities/:id/references`, which
+    // The page Dock offers no universal Panel here: References needs `/entities/:id/references`, which
     // answers an authenticated user, and this Entity's Public Link grants no scope beyond itself.
-    { provide: RIGHT_DOCK_PANELS, useValue: ['outline'] },
+    { provide: UNIVERSAL_PANELS, useValue: [] },
   ],
   imports: [TranslocoPipe, RouterLink, EntityPage],
   template: `
