@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, Type, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  Injector,
+  Type,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { NgComponentOutlet } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityDock, PanelDefinition, PanelId, UNIVERSAL_PANELS } from '@hexly/web-entity';
@@ -14,8 +24,9 @@ import { ViewRegistry } from '../../../entity-types/view-registry';
  *
  * It derives the strip synchronously from the **universal** Panels merged with the active View's
  * declared {@link ViewDefinition.panels} — so the toggles are known before any Panel's lazy body loads
- * — and write-gates each against {@link EntitySession.writable} (ADR-0037). The open Panel's body is
- * fetched on first open and outletted.
+ * — and write-gates each against {@link EntitySession.writable} (ADR-0037). The open Panel's body is fetched
+ * on first open and outletted; a View-contributed Panel is outletted with the running View's injector
+ * ({@link EntityDock.viewInjector}, #294), so it reaches the View-scoped services its host View provides.
  *
  * The layout is a flex row `[panel][strip]`. At the `lg` breakpoint the open Panel is an in-flow
  * column, so the page's grid shrinks the main content to make room (it *pushes*); below it the Panel is
@@ -27,15 +38,13 @@ import { ViewRegistry } from '../../../entity-types/view-registry';
   host: { class: 'relative flex min-h-0' },
   imports: [NgComponentOutlet, IconComponent, IconButtonComponent, TranslocoPipe],
   template: `
-    @if (dock.openPanel()) {
-      @if (openComponent(); as component) {
-        <div
-          data-testid="dock-panel"
-          class="absolute right-full top-0 bottom-0 z-10 flex w-80 flex-col border-l border-line bg-surface shadow-2 lg:static lg:z-auto lg:shadow-none"
-        >
-          <ng-container *ngComponentOutlet="component" />
-        </div>
-      }
+    @if (openPanelBody(); as body) {
+      <div
+        data-testid="dock-panel"
+        class="absolute right-full top-0 bottom-0 z-10 flex w-80 flex-col border-l border-line bg-surface shadow-2 lg:static lg:z-auto lg:shadow-none"
+      >
+        <ng-container *ngComponentOutlet="body.component; injector: body.injector" />
+      </div>
     }
     <!-- Always-visible strip: one toggle per available Panel, known before any lazy body loads. -->
     <div
@@ -90,11 +99,24 @@ export class EntityDockComponent {
     });
   }
 
-  /** The component to outlet for the open Panel — `undefined` only while a deferred body is in flight. */
-  protected readonly openComponent = computed<Type<unknown> | undefined>(() => {
+  /**
+   * The open Panel's body and the injector to create it in — `undefined` while a deferred body is still
+   * in flight, or while a View-contributed Panel awaits its View's injector.
+   *
+   * A **universal** Panel (References, Details) resolves against the Dock's own page injector, so it takes
+   * no injector here. A **View-contributed** Panel (the Content View's Outline) is instantiated with the
+   * running View's injector (ADR-0067, #294) so it reaches the View-scoped services its host View provides
+   * (the Outline's `OutlineStore`); it is withheld until that injector arrives, so it never constructs
+   * against the wrong scope.
+   */
+  protected readonly openPanelBody = computed<{ component: Type<unknown>; injector?: Injector } | undefined>(() => {
     const panel = this.dock.openPanel();
     if (!panel) return undefined;
-    return panel.component ?? this.loaded().get(panel.id);
+    const component = panel.component ?? this.loaded().get(panel.id);
+    if (!component) return undefined;
+    if (this.universal.some((p) => p.id === panel.id)) return { component };
+    const injector = this.dock.viewInjector();
+    return injector ? { component, injector } : undefined;
   });
 
   private fetch(panel: PanelDefinition): void {

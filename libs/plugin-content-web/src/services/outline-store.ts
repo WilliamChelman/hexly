@@ -3,10 +3,11 @@ import { ENTITY_SESSION } from '@hexly/web-entity';
 import { CONTENT_FIELD, RichContent, extractOutline, OutlineHeading } from '@hexly/plugin-content';
 
 /**
- * Route-scoped UI state for the Outline — the heading-navigation panel beside the RichContent
- * editor (CONTEXT.md). Headings derive from the session's live RichContent via
- * {@link extractOutline}; the panel owns the scroll and scrollspy DOM work. Whether the panel
- * *shows* is {@link RightDock}'s state, not this store's.
+ * View-scoped UI state for the Outline — the heading-navigation panel the Content View contributes to
+ * the page Dock (ADR-0067). Provided by the Content View, so the Dock-hosted Outline Panel reaches it
+ * through the View injector. Headings derive from the session's live RichContent via
+ * {@link extractOutline}; the panel owns the scroll and scrollspy DOM work. Whether the panel *shows*
+ * is the page Dock's slot state, not this store's.
  */
 @Injectable()
 export class OutlineStore {

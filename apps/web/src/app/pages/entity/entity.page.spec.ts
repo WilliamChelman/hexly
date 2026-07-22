@@ -291,23 +291,29 @@ describe('EntityPage layout', () => {
     expect(el.querySelector('app-regions-panel')).toBeNull();
   });
 
-  /** The Content View's own dock holds the Outline alone now; References moved to the page Dock (ADR-0067). */
-  it('toggles the Content View Outline from its dock', async () => {
+  /**
+   * The Content View contributes its Outline to the page Dock now (ADR-0067, #297): its toggle sits on
+   * the Dock strip beside References/Details, and clicking it claims the Dock's one open slot. The Panel's
+   * lazy body renders in the app with the running View's injector — proven end-to-end (outline.spec) — but
+   * is left unmounted here so no unflushed fetch fires, mirroring the References Panel spec below.
+   */
+  it('toggles the Content View Outline from the page Dock', async () => {
     const fixture = await mountNote();
     const el = fixture.nativeElement as HTMLElement;
-    const click = (testid: string) => {
-      el.querySelector<HTMLButtonElement>(`[data-testid=${testid}]`)?.click();
-      fixture.detectChanges();
-    };
+    const dock = fixture.debugElement.injector.get(EntityDock);
 
-    expect(el.querySelector('app-outline-panel')).toBeNull();
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid=outline-toggle]');
+    expect(toggle).not.toBeNull();
+    expect(dock.openPanel()).toBeNull();
 
-    click('outline-toggle');
-    expect(el.querySelector('app-outline-panel')).not.toBeNull();
+    toggle!.click();
+    fixture.detectChanges();
+    expect(dock.openPanel()?.id).toBe('core.panel.outline');
 
-    // A second click on the active toggle closes the dock, as it always did.
-    click('outline-toggle');
-    expect(el.querySelector('app-outline-panel')).toBeNull();
+    // A second click on the active toggle closes the Dock, as it always did.
+    toggle!.click();
+    fixture.detectChanges();
+    expect(dock.openPanel()).toBeNull();
   });
 
   /**
@@ -341,26 +347,6 @@ describe('EntityPage layout', () => {
 
     expect(el.querySelector('[data-testid=dock-strip]')).not.toBeNull();
     expect(el.querySelector('[data-testid=references-toggle]')).not.toBeNull();
-  });
-
-  /** Opening the Content View Outline reflows the reading column so the panel never overlaps prose. */
-  it('reflows the reading column when the Outline is open', async () => {
-    const fixture = await mountNote();
-    const el = fixture.nativeElement as HTMLElement;
-    const column = () => el.querySelector<HTMLElement>('[data-content-scroll]')!;
-    const click = (testid: string) => {
-      el.querySelector<HTMLButtonElement>(`[data-testid=${testid}]`)?.click();
-      fixture.detectChanges();
-    };
-
-    // Closed: room for the floating toggle only.
-    expect(column().style.paddingRight).toBe('3.5rem');
-
-    click('outline-toggle');
-    expect(column().style.paddingRight).toBe('20rem');
-
-    click('outline-toggle');
-    expect(column().style.paddingRight).toBe('3.5rem');
   });
 
   it('shows the hex canvas in the Map view, not the Content editor', async () => {

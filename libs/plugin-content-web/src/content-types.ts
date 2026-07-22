@@ -1,8 +1,26 @@
-import { TypeDefinition, ViewId } from '@hexly/web-entity';
+import { PanelDefinition, TypeDefinition, ViewId } from '@hexly/web-entity';
 import { CORE_NOTE_TYPE } from '@hexly/plugin-content';
 
 /** The Content View's id — the prose renderer the `core.datatype.rich-content` data-type contributes (ADR-0051). */
 export const CORE_VIEW_RICH_CONTENT: ViewId = 'core.view.rich-content';
+
+/** The Outline Panel's id — the Content View's heading-navigation list, moved off its private dock into the page Dock (ADR-0067). */
+export const CORE_PANEL_OUTLINE = 'core.panel.outline';
+
+/**
+ * **Outline**, the first *View-contributed* Dock Panel (ADR-0067) — listed on the content View's
+ * {@link ViewDefinition.panels}, so the Dock draws its toggle whenever the Content View is active and
+ * instantiates it with that running View's injector, reaching the View-scoped {@link OutlineStore} the
+ * View provides. Its body is deferred (`loadComponent`) behind the same content chunk the View loads
+ * from — this definition registers eagerly in the root injector, so naming the component would drag it
+ * onto the initial bundle.
+ */
+export const OUTLINE_PANEL: PanelDefinition = {
+  id: CORE_PANEL_OUTLINE,
+  icon: 'outline',
+  labelKey: 'editor.outline.toggle',
+  loadComponent: () => import('./components/outline-panel.component').then((m) => m.OutlinePanelComponent),
+};
 
 /**
  * `core.type.note` as the web registers it (ADR-0051): the shared {@link CORE_NOTE_TYPE} declaration plus the
