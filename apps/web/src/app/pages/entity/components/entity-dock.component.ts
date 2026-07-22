@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { NgComponentOutlet } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { EntityDock, PanelDefinition, PanelId, UNIVERSAL_PANELS } from '@hexly/web-entity';
+import { EntityDock, PANEL_FILTER, PanelDefinition, PanelId, UNIVERSAL_PANELS } from '@hexly/web-entity';
 import { IconComponent, IconButtonComponent } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
 import { EntityViewStore } from '../services/entity-view-store';
@@ -72,19 +72,20 @@ export class EntityDockComponent {
   private readonly views = inject(ViewRegistry);
   private readonly viewStore = inject(EntityViewStore);
   private readonly session = inject(EntitySession);
-  private readonly universal = inject(UNIVERSAL_PANELS);
+  private readonly panelFilter = inject(PANEL_FILTER);
 
   /** Lazily-fetched Panel bodies, keyed by Panel id; never evicted (a component class is stable). */
   private readonly loaded = signal<ReadonlyMap<PanelId, Type<unknown>>>(new Map());
 
   /**
-   * The Panels the current View offers: the universal set (narrowed per mount) merged with the active
-   * View's declared Panels, minus any write-gated Panel a read-only viewer may not have (ADR-0037).
+   * The Panels the current View offers: the universal set merged with the active View's declared
+   * Panels, kept through the page's {@link PANEL_FILTER} (a Public Link page drops References), then
+   * minus any write-gated Panel a read-only viewer may not have (ADR-0037).
    */
   private readonly availablePanels = computed<readonly PanelDefinition[]>(() => {
     const view = this.views.resolve(this.viewStore.activeView().viewId).panels ?? [];
     const writable = this.session.writable();
-    return [...this.universal, ...view].filter((panel) => !panel.writeGate || writable);
+    return [...UNIVERSAL_PANELS, ...view].filter((panel) => this.panelFilter(panel) && (!panel.writeGate || writable));
   });
 
   constructor() {
@@ -114,7 +115,7 @@ export class EntityDockComponent {
     if (!panel) return undefined;
     const component = panel.component ?? this.loaded().get(panel.id);
     if (!component) return undefined;
-    if (this.universal.some((p) => p.id === panel.id)) return { component };
+    if (UNIVERSAL_PANELS.some((p) => p.id === panel.id)) return { component };
     const injector = this.dock.viewInjector();
     return injector ? { component, injector } : undefined;
   });

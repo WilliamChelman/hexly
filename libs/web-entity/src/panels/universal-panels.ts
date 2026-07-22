@@ -34,10 +34,23 @@ export const DETAILS_PANEL: PanelDefinition = {
 
 /**
  * The **universal Panels** the page's Dock offers on every View (ADR-0067), merged with the active
- * View's own {@link ViewDefinition.panels}. A token, not a constant, so a mount can *narrow* the set:
- * a Public Link page drops References, since it needs `GET /entities/:id/references`, which answers an
- * authenticated user an anonymous reader is not — but keeps the read-only Details panel.
+ * View's own {@link ViewDefinition.panels}. A plain constant, not a token: a mount no longer *narrows*
+ * this set by substituting its own — it filters the merged availability through {@link PANEL_FILTER}
+ * instead, a general mechanism that drops a Panel by identity wherever it came from.
  */
-export const UNIVERSAL_PANELS = new InjectionToken<readonly PanelDefinition[]>('hexly.dock.universalPanels', {
-  factory: (): readonly PanelDefinition[] => [DETAILS_PANEL, REFERENCES_PANEL],
+export const UNIVERSAL_PANELS: readonly PanelDefinition[] = [DETAILS_PANEL, REFERENCES_PANEL];
+
+/** A page-level predicate deciding whether a Panel is offered at all — see {@link PANEL_FILTER}. */
+export type PanelFilter = (panel: PanelDefinition) => boolean;
+
+/**
+ * The page's **Panel-availability filter** (ADR-0067): a predicate the Dock runs over the whole merged
+ * set (universal ∪ the active View's) before write-gating, so a mount can suppress a Panel by identity
+ * regardless of who contributed it. Defaults to offering everything; a Public Link page provides one
+ * that drops References, since it needs `GET /entities/:id/references` — a call that answers an
+ * authenticated user an anonymous reader is not — while the read-only Details panel stays, showing the
+ * same substance the fallback Details View already gives any reader.
+ */
+export const PANEL_FILTER = new InjectionToken<PanelFilter>('hexly.dock.panelFilter', {
+  factory: (): PanelFilter => () => true,
 });
