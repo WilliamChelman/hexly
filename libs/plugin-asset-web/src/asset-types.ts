@@ -1,21 +1,24 @@
-import { CORE_VIEW_FIELDS, TypeDefinition } from '@hexly/web-entity';
+import { TypeDefinition, ViewId } from '@hexly/web-entity';
 import { CORE_ASSET_TYPE } from '@hexly/plugin-asset';
+
+/** The Asset View's id — the one mime-dispatching renderer the asset type contributes (ADR-0065). */
+export const CORE_VIEW_ASSET: ViewId = 'core.view.asset';
 
 /**
  * The Asset's Type as the web registers it (ADR-0065, ADR-0050): the shared {@link CORE_ASSET_TYPE}
  * declaration — the id and its two Fields (the asset-ref and Content), which the API reads too — plus the
  * chrome only the web has: the icon, the transloco copy, and the graph colour.
  *
- * Views are the generic Field view for now: the mime-dispatching Asset renderer (image today; PDF/audio
- * later) is its own ticket (ADR-0065). Until then an Asset opens on the generic view — its ref and prose
- * among the values it shows — the ordinary skeleton state.
+ * It places the mime-dispatching Asset View by id (image renderer today, icon card otherwise), which is the
+ * whole detail page in one View — rendered bytes, Asset Stats, prose, and usage (ADR-0065). A Board Embed of
+ * an Asset transcludes this same View through the Entity View Outlet (ADR-0062).
  */
 export const ASSET_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
   {
     id: CORE_ASSET_TYPE.id,
     fieldRefs: CORE_ASSET_TYPE.fieldRefs,
     icon: 'asset',
-    views: [CORE_VIEW_FIELDS],
+    views: [CORE_VIEW_ASSET],
     graphColorToken: '--color-ink-muted',
     labels: {
       eyebrow: 'asset.eyebrow',

@@ -6,7 +6,28 @@
   "create": "Create Asset",
   "untitled": "Untitled asset",
   "view": {
-    "asset": "Asset"
+    "asset": "Asset",
+    "label": "Asset"
+  },
+  "stats": {
+    "heading": "Asset stats",
+    "dimensions": "Dimensions",
+    "orientation": "Orientation",
+    "dominantColor": "Dominant color",
+    "mime": "Type",
+    "size": "Size"
+  },
+  "orientation": {
+    "landscape": "Landscape",
+    "portrait": "Portrait",
+    "square": "Square"
+  },
+  "prose": {
+    "heading": "Notes"
+  },
+  "usage": {
+    "heading": "Used by",
+    "empty": "Not used anywhere yet."
   },
   "facet": {
     "kind": "Kind",
