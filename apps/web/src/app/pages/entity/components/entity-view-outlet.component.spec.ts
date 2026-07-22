@@ -10,7 +10,14 @@ import { CORE_HEXMAP, HEX_GRID_FIELD } from '@hexly/plugin-hexmap';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntitiesClient, ActiveWorld } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
-import { CORE_VIEW_MAP, ENTITY_RENDER_CONTEXT, ENTITY_SESSION, ENTITY_TYPES, viewInstanceKey } from '@hexly/web-entity';
+import {
+  CORE_VIEW_MAP,
+  ENTITY_RENDER_CONTEXT,
+  ENTITY_SESSION,
+  ENTITY_TYPES,
+  EntityDock,
+  viewInstanceKey,
+} from '@hexly/web-entity';
 import { CORE_VIEW_RICH_CONTENT, providePluginContent, EntityNameResolver } from '@hexly/plugin-content/web';
 import { EntitySession } from '../services/entity-session';
 import { EntityViewStore } from '../services/entity-view-store';
@@ -50,6 +57,9 @@ describe('EntityViewOutlet', () => {
         // Page-scoped in the app (provided on EntityPage); provided here since the spec mounts the
         // outlet alone, and it reads the active View off this store.
         EntityViewStore,
+        // Page-scoped too (ADR-0067): the Map View's HexMapStore claims its slot on selection, so a
+        // mounted Map View needs the Dock in its injector chain.
+        EntityDock,
         EntityNameResolver,
         { provide: EntitiesClient, useValue: entities },
         provideHttpClient(),

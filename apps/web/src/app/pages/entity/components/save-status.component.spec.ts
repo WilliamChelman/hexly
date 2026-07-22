@@ -5,11 +5,11 @@ import { of, Subject, throwError } from 'rxjs';
 import { EntityDetail, EntitySaveOutcome } from '@hexly/domain';
 import { emptyRichContent } from '@hexly/plugin-content';
 import { coordKey, CORE_HEXMAP, HEX_GRID_FIELD, HexMap } from '@hexly/plugin-hexmap';
-import { MockEntitiesClient } from '@hexly/web-core/testing';
-import { EntitiesClient } from '@hexly/web-core';
+import { MockAuthClient, MockEntitiesClient } from '@hexly/web-core/testing';
+import { AuthClient, EntitiesClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '@hexly/plugin-hexmap/testing';
-import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { ENTITY_SESSION, EntityDock, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { SaveStatusComponent } from './save-status.component';
 
 // Autosave feedback chip that replaced the Save button (ADR-0026):
@@ -50,6 +50,10 @@ describe('SaveStatus', () => {
       providers: [
         EntitySession,
         HexMapStore,
+        // The store claims the page Dock's slot on selection (ADR-0067); provide the Dock and a mock
+        // AuthClient (its storage's dep) so the store constructs.
+        EntityDock,
+        { provide: AuthClient, useValue: new MockAuthClient() },
         // The store edits *a* grid, so it is told which — as the entity page's outlet tells it.
         { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.id },
         { provide: ENTITY_SESSION, useExisting: EntitySession },

@@ -1,19 +1,40 @@
 import { TestBed } from '@angular/core/testing';
-import { VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { EntityDock, VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { AuthClient } from '@hexly/web-core';
+import { MockAuthClient } from '@hexly/web-core/testing';
 import { emptyHexMap, HEX_GRID_FIELD, HexMap } from '@hexly/plugin-hexmap';
 import { HexMapStore } from './hexmap-store';
+import {
+  CORE_PANEL_MAP_INSPECTOR,
+  CORE_PANEL_MAP_REGIONS,
+  MAP_INSPECTOR_PANEL,
+  MAP_REGIONS_PANEL,
+} from '../hexmap-types';
 import { FakeEntitySession, provideFakeEntitySession, provideHexMapStoreTesting } from '../testing/entity-session.fake';
 
 let session: FakeEntitySession;
 
 beforeEach(() => {
+  localStorage.clear();
   // Binds the store to `core.type.hex-map`'s own `grid` Field, as the entity page's outlet does in the app.
   TestBed.configureTestingModule({ providers: provideHexMapStoreTesting() });
   session = TestBed.inject(FakeEntitySession);
 });
 
+afterEach(() => localStorage.clear());
+
 function makeStore(): HexMapStore {
   return TestBed.inject(HexMapStore);
+}
+
+/**
+ * The page-owned Dock the store shares, primed with the Map View's two Panels available so its slot
+ * resolves the store's Inspector claims (ADR-0067) — the chrome does this in the app.
+ */
+function openDock(): EntityDock {
+  const dock = TestBed.inject(EntityDock);
+  dock.setAvailable([MAP_INSPECTOR_PANEL, MAP_REGIONS_PANEL]);
+  return dock;
 }
 
 function reload(grid: HexMap): void {
@@ -1198,13 +1219,14 @@ describe('HexMapStore marqueeSelect', () => {
     expect(store.selections()).toEqual([]);
   });
 
-  it('opens the Inspector on a marquee that selects something', () => {
+  it('claims the Inspector Panel on a marquee that selects something', () => {
     const store = makeStore();
+    const dock = openDock();
     store.paintAt({ q: 0, r: 0 }, 'forest');
 
     store.marqueeSelect([{ q: 0, r: 0 }], [], false);
 
-    expect(store.rightPanel()).toBe('inspector');
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_INSPECTOR);
   });
 });
 
@@ -2137,16 +2159,17 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
     expect(regions[0].hexes).toEqual({});
   });
 
-  it('selects the new Region and opens it in the Inspector, even from the list', () => {
+  it('selects the new Region and claims the Inspector Panel on it, even from the Regions list', () => {
     const store = makeStore();
-    store.showRegionsPanel(); // the user is on the Regions list when they click New
+    const dock = openDock();
+    dock.toggle(CORE_PANEL_MAP_REGIONS); // the user is on the Regions list when they click New
 
     const id = store.newRegion();
 
-    // The fresh Region is selected so the Inspector opens on it to be named, flipping
-    // the shared column from the list back to the Inspector.
+    // The fresh Region is selected so the Inspector claim opens on it to be named, transiently
+    // superseding the remembered Regions list.
     expect(store.selection()).toEqual({ kind: 'region', id });
-    expect(store.rightPanel()).toBe('inspector');
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_INSPECTOR);
   });
 
   it('arms the Region tool on the new Region in Add, so the next stroke paints into it', () => {
@@ -2201,84 +2224,79 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
   });
 });
 
-describe('HexMapStore shared right column', () => {
-  it('is closed by default and opens the Regions list on demand', () => {
+describe('HexMapStore Inspector claim on the page Dock', () => {
+  it('selects a Region by id — even an empty one — and claims the Inspector Panel', () => {
     const store = makeStore();
-
-    // The right panel is closed by default (ADR-0013): nothing covers the map until
-    // there is something to show — a selection (Inspector) or Regions toggled on.
-    expect(store.rightPanel()).toBeNull();
-
-    store.showRegionsPanel();
-
-    expect(store.rightPanel()).toBe('regions');
-  });
-
-  it('selects a Region by id — even an empty one — and flips back to the Inspector', () => {
-    const store = makeStore();
+    const dock = openDock();
     // An empty Region has no member hex, so select(coord) can't reach it — the list
     // selects by id. "Emptied Regions stay reachable" (ADR-0011).
     const id = store.createRegion('The Whisperwood', '#6f7fae');
-    store.showRegionsPanel();
 
     store.selectRegion(id);
 
     expect(store.selection()).toEqual({ kind: 'region', id });
     expect(store.selectedRegion()?.name).toBe('The Whisperwood');
-    expect(store.rightPanel()).toBe('inspector');
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_INSPECTOR);
   });
 
-  it('resets the right panel closed when a map is opened', () => {
+  it('releases the Inspector claim on a fresh load, leaving the user’s remembered choice intact', () => {
     const store = makeStore();
-    store.showRegionsPanel();
+    const dock = openDock();
+    dock.toggle(CORE_PANEL_MAP_REGIONS); // the user's remembered choice
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null); // claims the Inspector, superseding the remembered list
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_INSPECTOR);
 
-    // Opening a map is a fresh start (like the tool/selection reset in load): the
-    // right side reopens closed, not the prior list view or an empty Inspector
-    // (ADR-0013, story 20).
+    // Opening a map is a fresh start for the selection (like the tool/selection reset in load): the
+    // transient Inspector claim drops, so the remembered Regions list surfaces again — the choice is
+    // cross-session now (ADR-0067), not reset closed as the old private panel was.
     reload(emptyHexMap());
 
-    expect(store.rightPanel()).toBeNull();
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_REGIONS);
   });
 
-  it('flips the shared column back to the Inspector when a canvas selection is made', () => {
+  it('claims the Inspector when a canvas selection is made, superseding a remembered Regions list', () => {
     const store = makeStore();
+    const dock = openDock();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 }); // a member coordinate to click
-    store.showRegionsPanel(); // the user is on the Regions list
-    expect(store.rightPanel()).toBe('regions');
+    dock.toggle(CORE_PANEL_MAP_REGIONS); // the user is on the Regions list
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_REGIONS);
 
-    // A canvas selection opens the picked entity for editing, so the shared column
-    // flips back to the Inspector (the _rightPanel contract, issue #39).
+    // A canvas selection opens the picked entity for editing, so the Dock's transient claim shows the
+    // Inspector over the remembered list (the claim channel, issue #39, ADR-0067).
     store.select({ q: 0, r: 0 }, null);
 
-    expect(store.rightPanel()).toBe('inspector');
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_INSPECTOR);
     expect(store.selection()).toEqual({ kind: 'region', id });
   });
 
-  it('leaves a rail-opened Regions list alone on a modifier-click that hits empty Void', () => {
+  it('leaves a remembered Regions list alone on a modifier-click that hits empty Void', () => {
     const store = makeStore();
+    const dock = openDock();
     store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.marqueeSelect([{ q: 0, r: 0 }], [], false); // a selection exists
-    store.showRegionsPanel(); // the user flips to the Regions list
-    expect(store.rightPanel()).toBe('regions');
+    store.marqueeSelect([{ q: 0, r: 0 }], [], false); // a selection exists → claims the Inspector
+    dock.toggle(CORE_PANEL_MAP_REGIONS); // the user flips to the Regions list (clearing the claim)
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_REGIONS);
 
     // A modifier-click on empty Void resolves to no candidate — a no-op that must not
-    // steal the panel back to the Inspector (the selection is unchanged).
+    // re-claim the Inspector (the selection is unchanged).
     store.select({ q: 9, r: 9 }, null, 'toggle-top');
 
-    expect(store.rightPanel()).toBe('regions');
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_REGIONS);
     expect(store.selections()).toHaveLength(1);
   });
 
-  it('flips the shared column back to the Inspector when a Label is selected', () => {
+  it('claims the Inspector when a Label is selected, superseding a remembered Regions list', () => {
     const store = makeStore();
+    const dock = openDock();
     const id = store.addLabel('Pick me', { x: 0, y: 0 });
-    store.showRegionsPanel();
-    expect(store.rightPanel()).toBe('regions');
+    dock.toggle(CORE_PANEL_MAP_REGIONS);
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_REGIONS);
 
     store.selectLabel(id);
 
-    expect(store.rightPanel()).toBe('inspector');
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_INSPECTOR);
     expect(store.selectedLabel()?.id).toBe(id);
   });
 
@@ -2313,81 +2331,58 @@ describe('HexMapStore shared right column', () => {
     expect(store.region()).toEqual({ id: a, mode: 'remove' });
   });
 
-  it('toggles the right panel between the Regions list and closed', () => {
+  it('claims the Inspector from the closed default when an entity is selected', () => {
     const store = makeStore();
-
-    // The panel is closed by default; the rail entry's click opens the Regions list.
-    expect(store.rightPanel()).toBeNull();
-
-    store.toggleRegionsPanel();
-    expect(store.rightPanel()).toBe('regions');
-
-    // Clicking the active entry again closes the panel — its off-state is closed,
-    // not the Inspector (ADR-0013, story 18).
-    store.toggleRegionsPanel();
-    expect(store.rightPanel()).toBeNull();
-  });
-
-  it('opens the Inspector from the closed default when an entity is selected', () => {
-    const store = makeStore();
+    const dock = openDock();
     store.paintAt({ q: 0, r: 0 }, 'forest');
-    expect(store.rightPanel()).toBeNull(); // closed boot state
+    expect(dock.openPanel()).toBeNull(); // closed boot state, no remembered choice
 
-    // Selecting an entity opens the Inspector to edit it (story 16) — the contract
-    // holds even when the panel was closed.
+    // Selecting an entity claims the Inspector to edit it (story 16) — the claim
+    // holds even when the Dock was closed.
     store.select({ q: 0, r: 0 }, null);
 
-    expect(store.rightPanel()).toBe('inspector');
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_INSPECTOR);
   });
 
-  it('opens the Regions list from the Inspector when the rail entry is toggled', () => {
+  it('releases the Inspector claim when the selection that opened it is cleared', () => {
     const store = makeStore();
+    const dock = openDock();
     const id = store.addLabel('Pick me', { x: 0, y: 0 });
-    store.selectLabel(id); // a selection opens the Inspector
-    expect(store.rightPanel()).toBe('inspector');
+    store.selectLabel(id); // a selection claims the Inspector
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_INSPECTOR);
 
-    // Toggling Regions while the Inspector is open switches to the list (the
-    // toggle's on-state is `regions` regardless of what the panel currently shows).
-    store.toggleRegionsPanel();
-    expect(store.rightPanel()).toBe('regions');
-  });
-
-  it('closes the Inspector when the selection that opened it is cleared', () => {
-    const store = makeStore();
-    const id = store.addLabel('Pick me', { x: 0, y: 0 });
-    store.selectLabel(id); // a selection opens the Inspector
-    expect(store.rightPanel()).toBe('inspector');
-
-    // The Inspector only floats while it has a selection, so a deselect closes it —
-    // the mirror of the selection that opened it (ADR-0013, story 20).
+    // The Inspector claim only holds while there is a selection, so a deselect releases it — with no
+    // remembered choice to fall back to, the Dock closes (ADR-0067).
     store.deselect();
 
-    expect(store.rightPanel()).toBeNull();
+    expect(dock.openPanel()).toBeNull();
   });
 
-  it('closes the Inspector when the inspected entity is deleted', () => {
+  it('releases the Inspector claim when the inspected entity is deleted', () => {
     const store = makeStore();
+    const dock = openDock();
     const id = store.addLabel('Doomed', { x: 0, y: 0 });
     store.selectLabel(id);
-    expect(store.rightPanel()).toBe('inspector');
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_INSPECTOR);
 
     // Deleting the inspected entity clears the selection (deletion routes through
-    // deselect), so the panel closes rather than stranding an empty Inspector.
+    // deselect), so the claim releases rather than stranding an empty Inspector.
     store.deleteSelected();
 
-    expect(store.rightPanel()).toBeNull();
+    expect(dock.openPanel()).toBeNull();
   });
 
-  it('leaves the Regions list open when a canvas click deselects', () => {
+  it('restores the remembered Regions list when a canvas click deselects', () => {
     const store = makeStore();
-    store.showRegionsPanel();
-    expect(store.rightPanel()).toBe('regions');
+    const dock = openDock();
+    dock.toggle(CORE_PANEL_MAP_REGIONS); // remembered: the Regions list
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_REGIONS);
 
-    // A Void click deselects, but the rail-opened Regions list isn't selection-driven,
-    // so it stays open — only the Inspector closes on deselect.
+    // A Void click deselects; releasing the transient Inspector claim restores the remembered choice,
+    // so the Regions list — never selection-driven — surfaces again.
     store.select({ q: 9, r: 9 }, null);
 
-    expect(store.rightPanel()).toBe('regions');
+    expect(dock.openPanel()?.id).toBe(CORE_PANEL_MAP_REGIONS);
   });
 
   // The active-View state (the former Map/Note toggle) left HexMapStore for the
@@ -2602,7 +2597,14 @@ describe('HexMapStore bound to a Field', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
-      providers: [HexMapStore, provideFakeEntitySession(), { provide: VIEW_FIELD_KEY, useValue: 'battlemap' }],
+      // A second Field's grid, over the same fake session and the page Dock the store now claims into.
+      providers: [
+        HexMapStore,
+        EntityDock,
+        { provide: AuthClient, useValue: new MockAuthClient() },
+        provideFakeEntitySession(),
+        { provide: VIEW_FIELD_KEY, useValue: 'battlemap' },
+      ],
     });
     session = TestBed.inject(FakeEntitySession);
   });

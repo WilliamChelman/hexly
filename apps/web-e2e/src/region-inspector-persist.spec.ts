@@ -12,8 +12,8 @@ test('selects a Region on the canvas, renames it in the Inspector, and the renam
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
-  // Create Region from the Regions panel (ADR-0012). New Region arms the Add brush.
-  await page.getByTestId('rail-regions').click();
+  // Create Region from the Regions Panel on the page Dock (ADR-0012, ADR-0067). New Region arms the Add brush.
+  await page.getByTestId('map-regions-toggle').click();
   await page.getByTestId('new-region').click();
   await canvas.click();
 
