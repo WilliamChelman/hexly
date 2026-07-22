@@ -275,11 +275,11 @@ The Tool that deletes a whole Hex record, returning the coordinate to Void. Dist
 _Avoid_: Delete, clear, remove
 
 **Inspector**:
-The surface that shows and edits the currently selected element — and the _only_ place Region details are edited (ADR-0011/0012).
-_Avoid_: Side panel, details pane, properties
+The surface that shows and edits the currently selected element — and the _only_ place Region details are edited (ADR-0011/0012). A write-gated **Panel** in the **Dock**, contributed by the surface editor's View.
+_Avoid_: Side panel, properties; details pane (the Entity's **Details panel** is a different surface — the Inspector is about the selected element)
 
 **Regions panel**:
-A list of every Region (empty ones included) plus a New Region action; selecting a Region here is equivalent to selecting it on the canvas.
+A list of every Region (empty ones included) plus a New Region action; selecting a Region here is equivalent to selecting it on the canvas. A write-gated **Panel** contributed by the Map View.
 _Avoid_: Region legend, layers, list
 
 ## Command Palette
@@ -324,10 +324,24 @@ _Avoid_: Media library, gallery, asset manager, file manager
 A filterable dimension of a World's Entities with its distinct values and counts — Type, Tag, and Visibility always, plus facetable **Fields** and harvested dimensions, surfaced _by presence_. Values within one Facet OR; across Facets AND.
 _Avoid_: Filter, dimension, aspect
 
+## Dock
+
+**Dock**:
+The Entity page's right-side surface, present on every **View** — page chrome, not View content, so absent wherever a View renders alone (a Board **Embed**). Holds at most one open **Panel**; the choice is per-user and follows the user across Views.
+_Avoid_: Right rail, sidebar, drawer; rail (the nav rail and the map's editor rail)
+
+**Panel**:
+One togglable unit within the **Dock** — contributed universally (References, the **Details panel**) or by the active **View** (Outline, Regions, **Inspector**). A Panel may claim the open slot programmatically (selecting a Map element opens the Inspector) without overwriting the user's remembered choice.
+_Avoid_: Tab, pane, widget, side panel
+
+**Details panel**:
+The universal **Panel** holding an Entity's shape and substance in one place: its **Entity Types** (add/remove), its **Fields** (edited in place, attached/detached inline), and its untyped **Entity Document** keys (read-only). Management controls appear only for writers. The **Details View** — the fallback main content when an Entity affords no other View — renders the same at full width.
+_Avoid_: Fields panel (superseded), properties, metadata, sidebar
+
 ## Outline
 
 **Outline**:
-A navigation view of a Content's headings — a nested, click-to-jump list marking the heading in view. Derived from the Content, never stored.
+A navigation view of a Content's headings — a nested, click-to-jump list marking the heading in view. Derived from the Content, never stored. A **Panel** in the **Dock**, contributed by the Rich Content View.
 _Avoid_: Table of contents, TOC, minimap, nav panel
 
 ## User preferences
