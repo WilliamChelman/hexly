@@ -81,13 +81,14 @@ describe('EntityEmbedHost', () => {
       },
     }) as unknown as EntityDetail;
 
-  it('seeds a Note target’s prose despite an enclosing view’s VIEW_FIELD_KEY (async load)', async () => {
+  /** Mount the host on a loaded Note target and settle its transcluded prose View. */
+  async function mountLoadedNote(viewKey: string): Promise<ComponentFixture<EntityEmbedHostComponent>> {
     const load = new Subject<EntityDetail>();
     entities.load.mockReturnValue(load);
 
     const fixture: ComponentFixture<EntityEmbedHostComponent> = TestBed.createComponent(EntityEmbedHostComponent);
     fixture.componentRef.setInput('entityId', 'note-1');
-    fixture.componentRef.setInput('viewKey', CORE_VIEW_RICH_CONTENT); // bare, as a Note's by-id placement affords
+    fixture.componentRef.setInput('viewKey', viewKey);
     fixture.detectChanges(); // mount before the load resolves — the real HTTP-timed order
 
     load.next(note());
@@ -95,10 +96,30 @@ describe('EntityEmbedHost', () => {
     TestBed.tick(); // settle the embed session's reconciler + signals
     await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
     fixture.detectChanges();
+    return fixture;
+  }
+
+  it('seeds a Note target’s prose despite an enclosing view’s VIEW_FIELD_KEY (async load)', async () => {
+    const fixture = await mountLoadedNote(CORE_VIEW_RICH_CONTENT); // bare, as a Note's by-id placement affords
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('app-content-editor')).not.toBeNull();
     // The body seeds the Note's prose — the editor read `core.field.content`, not the inherited surface key.
     expect(el.querySelector('app-content-editor')?.textContent).toContain('Bigby lives here');
+  });
+
+  it('transcludes the bare View — no Dock, no Panels, no floating toggles (ADR-0067, #303)', async () => {
+    const fixture = await mountLoadedNote(CORE_VIEW_RICH_CONTENT);
+
+    const el = fixture.nativeElement as HTMLElement;
+    // The View body still renders — the Embed is not blank, only chrome-free.
+    expect(el.querySelector('app-content-editor')).not.toBeNull();
+    // The Dock is page chrome, not part of a View: an Embed transcludes only the bare View (ADR-0067).
+    // A prose page's Outline/References toggles lived in the old View-owned dock and must not tag along.
+    expect(el.querySelector('app-entity-dock')).toBeNull();
+    expect(el.querySelector('[data-testid="dock-strip"]')).toBeNull();
+    expect(el.querySelector('[data-testid="dock-panel"]')).toBeNull();
+    expect(el.querySelector('[data-testid="outline-toggle"]')).toBeNull();
+    expect(el.querySelector('[data-testid="references-toggle"]')).toBeNull();
   });
 });
