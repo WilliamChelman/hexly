@@ -1,10 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
 import { TranslocoPipe, translateSignal } from '@jsverse/transloco';
-import { EMPTY, catchError, distinctUntilChanged, map, switchMap } from 'rxjs';
-import { EntityReferences } from '@hexly/domain';
-import { EntitiesClient } from '@hexly/web-core';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { ContentEditorComponent } from '@hexly/plugin-content/editor';
 import { EyebrowComponent, IconComponent, IconName, SwatchComponent } from '@hexly/web-ui';
@@ -24,10 +19,11 @@ const KIND_ICONS: Record<string, IconName> = {
  * gracefully with zero new machinery. It backs both the **Asset detail page** and, through the Entity View
  * Outlet's transclusion (ADR-0062), a Board **Embed** of an Asset.
  *
- * It is the whole detail page in one View: the rendered image/icon, the mechanical **Asset Stats**, the
- * canonical **Content** prose (the very {@link ContentEditorComponent} an Entity's Content uses — so
- * authoring works identically, gated by {@link EntitySession.writable}), and the Asset's **usage** as the
- * Entities that link to it (per-viewer filtered inbound links, ADR-0046).
+ * It is the detail page's main content in one View: the rendered image/icon, the mechanical **Asset
+ * Stats**, and the canonical **Content** prose (the very {@link ContentEditorComponent} an Entity's
+ * Content uses — so authoring works identically, gated by {@link EntitySession.writable}). The Asset's
+ * **usage** ("where is this used") is no longer a bespoke inline list here: the page's universal
+ * References panel answers it on every View, Assets included (ADR-0067).
  *
  * The prose editor reads its Field key from the ambient `VIEW_FIELD_KEY` the Outlet provides — `null` for a
  * Type's own View placed by id — and so falls back to its canonical `core.field.content`, which is exactly
@@ -37,7 +33,7 @@ const KIND_ICONS: Record<string, IconName> = {
   selector: 'app-asset-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [ContentEditorComponent, RouterLink, EyebrowComponent, IconComponent, SwatchComponent, TranslocoPipe],
+  imports: [ContentEditorComponent, EyebrowComponent, IconComponent, SwatchComponent, TranslocoPipe],
   template: `
     <div class="absolute inset-0 overflow-y-auto bg-surface-sunken">
       <div class="mx-auto flex max-w-[60rem] flex-col gap-6 px-6 py-6">
@@ -102,33 +98,12 @@ const KIND_ICONS: Record<string, IconName> = {
           <span appEyebrow mark class="mb-2 block">{{ 'asset.prose.heading' | transloco }}</span>
           <app-content-editor [ariaLabel]="editorLabel()" />
         </section>
-
-        <!-- Usage (ADR-0065/ADR-0046): the Entities that link here, resolved per viewer. Always shown — the
-             detail page's answer to "where is this Asset used" before you touch it. -->
-        <section data-testid="asset-usage">
-          <span appEyebrow mark class="mb-2 block">{{ 'asset.usage.heading' | transloco }}</span>
-          @for (ref of referencedBy(); track $index) {
-            <a
-              [routerLink]="['/entities', ref.source.id]"
-              class="block truncate py-1 text-sm text-ink-muted no-underline hover:text-ink"
-              data-testid="asset-usage-row"
-              >{{ ref.source.name }}</a
-            >
-          } @empty {
-            @if (usageLoaded()) {
-              <p class="text-sm text-ink-muted" data-testid="asset-usage-empty">
-                {{ 'asset.usage.empty' | transloco }}
-              </p>
-            }
-          }
-        </section>
       </div>
     </div>
   `,
 })
 export class AssetViewComponent {
   private readonly session = inject(ENTITY_SESSION);
-  private readonly entities = inject(EntitiesClient);
 
   /** The Content editor's accessible name (ADR-0014), reusing the type's editor label copy. */
   protected readonly editorLabel = translateSignal('asset.editorLabel');
@@ -178,44 +153,6 @@ export class AssetViewComponent {
     const value = this.value();
     return value && value.size > 0 ? formatBytes(value.size) : null;
   });
-
-  private readonly _references = signal<{ id: string; value: EntityReferences } | null>(null);
-
-  /** The held references, but only while they still describe the open Asset (mirrors the References panel). */
-  private readonly references = computed(() => {
-    const held = this._references();
-    return held && held.id === this.session.current()?.id ? held.value : undefined;
-  });
-
-  /** The Entities that link here (usage), access-filtered server-side per viewer (ADR-0046). */
-  protected readonly referencedBy = computed(() => this.references()?.referencedBy ?? []);
-
-  /** False until the open Asset's usage has landed, so the empty state never flashes over an in-flight fetch. */
-  protected readonly usageLoaded = computed(() => this.references() !== undefined);
-
-  constructor() {
-    // Usage is keyed on the open Asset's (id, seq) — the derived edge index the server rebuilds on a
-    // committed save (ADR-0045) — so a rename or a new inbound link refetches; switchMap cancels an outrun
-    // fetch so responses never land out of order, and a failed fetch keeps the last-known list.
-    const target = computed(() => {
-      const entity = this.session.current();
-      return entity ? { id: entity.id, seq: entity.seq } : null;
-    });
-    toObservable(target)
-      .pipe(
-        distinctUntilChanged((a, b) => a?.id === b?.id && a?.seq === b?.seq),
-        switchMap((t) =>
-          t
-            ? this.entities.references(t.id).pipe(
-                map((value) => ({ id: t.id, value })),
-                catchError(() => EMPTY),
-              )
-            : EMPTY,
-        ),
-        takeUntilDestroyed(),
-      )
-      .subscribe((held) => this._references.set(held));
-  }
 
   /** Mark the current URL broken so the render falls back to the icon card (the original-is-fallback rule). */
   protected onImageError(): void {

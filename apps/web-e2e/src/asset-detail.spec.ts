@@ -10,9 +10,10 @@ const PNG_20x8 = Buffer.from(
 
 /**
  * The Asset detail page (ADR-0065, #276): an Asset's one View renders its bytes (the image renderer for an
- * image), its mechanical Asset Stats, its canonical Content prose, and its usage — all off the ordinary
- * Entity page, since an Asset is an Entity. Proves the View backs the detail page and that prose authored on
- * an Asset persists like any Entity's Content.
+ * image), its mechanical Asset Stats, and its canonical Content prose — all off the ordinary Entity page,
+ * since an Asset is an Entity. Usage ("where is this used") is answered by the page's universal References
+ * panel now, not a bespoke inline list (ADR-0067, #296). Proves the View backs the detail page and that
+ * prose authored on an Asset persists like any Entity's Content.
  */
 test('an image Asset detail page shows the rendered image, its stats, and editable prose', async ({ page }) => {
   const worldId = idFromSegment(await enterLibrary(page)); // the raw id the API keys on, decoded from the pretty segment
@@ -34,8 +35,10 @@ test('an image Asset detail page shows the rendered image, its stats, and editab
   // The mechanical Asset Stats sharp derived at mint — the 20×8 dimensions confirm extraction ran.
   await expect(page.getByTestId('asset-stat-dimensions')).toContainText('20 × 8');
 
-  // Usage: a fresh Asset is linked from nowhere, so the empty state shows (populated usage is #277's edges).
-  await expect(page.getByTestId('asset-usage-empty')).toBeVisible();
+  // Usage now lives in the page's universal References panel (ADR-0067): open it from the Dock strip and,
+  // since a fresh Asset is linked from nowhere, its "referenced by" empty state shows.
+  await page.getByTestId('references-toggle').click();
+  await expect(page.getByTestId('references-in-empty')).toBeVisible();
 
   // Prose authored on the Asset's canonical Content persists like any Entity's (ADR-0065).
   const prose = 'Painted by the Guild of Cartographers.';
