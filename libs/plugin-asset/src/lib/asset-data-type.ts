@@ -56,13 +56,26 @@ export const ASSET_DATA_TYPE = defineStructuredDataType({
   // The mechanical facets (ADR-0055/0065): `kind` off the mime (always present), and — when an extractor
   // wrote Asset Stats — `orientation` and the bucketed `hue`. Enum dimensions, so the rail toggles values.
   facetDimensions: [
-    { key: ASSET_KIND_FACET_KEY, labelKey: 'asset.facet.kind', dataType: { kind: 'enum', options: [...ASSET_KINDS] } },
+    {
+      key: ASSET_KIND_FACET_KEY,
+      labelKey: 'asset.facet.kind',
+      // Per-value i18n (ADR-0055/0065): the rail resolves `asset.kind.<value>` for each enum option.
+      valuesKeyPrefix: 'asset.kind',
+      dataType: { kind: 'enum', options: [...ASSET_KINDS] },
+    },
     {
       key: ASSET_ORIENTATION_FACET_KEY,
       labelKey: 'asset.facet.orientation',
+      // Reuses the existing `asset.orientation.*` value copy shown by the Asset view (ADR-0065).
+      valuesKeyPrefix: 'asset.orientation',
       dataType: { kind: 'enum', options: [...ORIENTATIONS] },
     },
-    { key: ASSET_HUE_FACET_KEY, labelKey: 'asset.facet.hue', dataType: { kind: 'enum', options: [...HUE_BUCKETS] } },
+    {
+      key: ASSET_HUE_FACET_KEY,
+      labelKey: 'asset.facet.hue',
+      valuesKeyPrefix: 'asset.hue',
+      dataType: { kind: 'enum', options: [...HUE_BUCKETS] },
+    },
   ],
   harvestFacets: (value: AssetValue): HarvestedFacet[] => {
     // A bare, pre-mint placeholder ref (no bytes yet) has no real mime to bucket — it harvests nothing,

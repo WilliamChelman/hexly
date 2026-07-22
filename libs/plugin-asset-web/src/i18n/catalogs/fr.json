@@ -17,10 +17,29 @@
     "mime": "Type",
     "size": "Taille"
   },
+  "kind": {
+    "image": "Image",
+    "pdf": "PDF",
+    "audio": "Audio",
+    "other": "Autre"
+  },
   "orientation": {
     "landscape": "Paysage",
     "portrait": "Portrait",
     "square": "Carré"
+  },
+  "hue": {
+    "red": "Rouge",
+    "orange": "Orange",
+    "yellow": "Jaune",
+    "green": "Vert",
+    "cyan": "Cyan",
+    "blue": "Bleu",
+    "purple": "Violet",
+    "pink": "Rose",
+    "black": "Noir",
+    "gray": "Gris",
+    "white": "Blanc"
   },
   "prose": {
     "heading": "Notes"

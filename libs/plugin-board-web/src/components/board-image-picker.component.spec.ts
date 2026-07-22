@@ -7,6 +7,12 @@ import { DialogRef } from '@hexly/web-ui';
 import { BOARD_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { BoardImagePickerComponent, ImagePickerData } from './board-image-picker.component';
 
+/** Fixture value copy for the harvested `orientation` dimension — a hermetic stand-in for the asset catalog. */
+const FIXTURE_CATALOGS = {
+  'fixture/en': { orient: { landscape: 'Wide' } },
+  'fixture/fr': { orient: { landscape: 'Panoramique' } },
+};
+
 const EXISTING: AssetSummary[] = [
   {
     url: '/assets/w1/one.png',
@@ -41,6 +47,9 @@ const FACETS: EntityFacets = {
       key: 'orientation',
       label: 'asset.facet.orientation',
       labelKey: 'asset.facet.orientation',
+      // A per-value key prefix (ADR-0055/0065): each value resolves as `<valuesKeyPrefix>.<value>`. A fixture
+      // scope keeps the spec hermetic; `portrait` has no copy, so it must fall back to the raw token.
+      valuesKeyPrefix: 'fixture.orient',
       dataType: { kind: 'enum', options: ['landscape', 'portrait', 'square'] },
       values: [
         { value: 'landscape', count: 1 },
@@ -91,7 +100,7 @@ describe('BoardImagePicker', () => {
     ref.closed.subscribe((r) => closed.push(r));
 
     await TestBed.configureTestingModule({
-      imports: [BoardImagePickerComponent, provideTranslocoTesting(BOARD_TEST_CATALOGS)],
+      imports: [BoardImagePickerComponent, provideTranslocoTesting(BOARD_TEST_CATALOGS, FIXTURE_CATALOGS)],
       providers: [
         { provide: DialogRef, useValue: ref },
         { provide: AssetsClient, useValue: assets },
@@ -157,6 +166,19 @@ describe('BoardImagePicker', () => {
     // Toggling a Facet AND-s its `key:eq:value` token into the search (the server pins image kind on top).
     expect(chip.getAttribute('aria-pressed')).toBe('true');
     expect(assets.lastSearch).toEqual({ q: undefined, field: ['orientation:eq:landscape'] });
+  });
+
+  it('translates a Facet VALUE via its key prefix, falling back to the raw token when uncopied (ADR-0055/0065)', () => {
+    const chipLabel = (value: string) =>
+      (
+        fixture.nativeElement.querySelector(
+          `[data-testid=image-facet-orientation-${value}] span:first-child`,
+        ) as HTMLElement
+      ).textContent?.trim();
+
+    // `landscape` has fixture copy → translated; `portrait` has none → raw token, never the bare key.
+    expect(chipLabel('landscape')).toBe('Wide');
+    expect(chipLabel('portrait')).toBe('portrait');
   });
 
   it('reads "no matches" (not "no images") when a search narrows to nothing', () => {

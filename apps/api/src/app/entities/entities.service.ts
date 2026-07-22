@@ -295,6 +295,8 @@ export class EntitiesService {
             label: source.label,
             // A harvested dimension carries an i18n key the rail translates; a scalar Field none (ADR-0055).
             ...(source.labelKey ? { labelKey: source.labelKey } : {}),
+            // ...and a per-value key prefix, so the rail translates the dimension's values too (ADR-0055/0065).
+            ...(source.valuesKeyPrefix ? { valuesKeyPrefix: source.valuesKeyPrefix } : {}),
             dataType: source.dataType,
             // An Entity-Link facet's values are target ids; resolve each to its name for the rail (#190).
             values: isEntityLinkDataType(source.dataType) ? this.labelLinkValues(values, filter) : values,

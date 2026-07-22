@@ -115,6 +115,8 @@ export class WorldTypeFields {
             key: dimension.key,
             label: dimension.labelKey,
             labelKey: dimension.labelKey,
+            // Carry the per-value i18n prefix so the rail can translate the dimension's values (ADR-0055).
+            ...(dimension.valuesKeyPrefix ? { valuesKeyPrefix: dimension.valuesKeyPrefix } : {}),
             dataType: dimension.dataType,
           });
     return byKey;
@@ -130,6 +132,7 @@ export interface FacetSource {
   readonly key: string;
   readonly label: string;
   readonly labelKey?: string;
+  readonly valuesKeyPrefix?: string;
   readonly dataType: FieldDataType;
 }
 
