@@ -2,7 +2,7 @@ import { EnvironmentProviders } from '@angular/core';
 import { providePlugin } from '@hexly/web-entity';
 import { CONTENT_FIELD, CORE_RICH_CONTENT, PLUGIN_ID, RICH_CONTENT_DATA_TYPE } from '@hexly/plugin-content';
 import { CONTENT_EDITOR_TRANSLATIONS } from './i18n/content-editor-translations';
-import { CONTENT_TYPE_DEFINITIONS, CORE_VIEW_RICH_CONTENT } from './content-types';
+import { CONTENT_TYPE_DEFINITIONS, CORE_VIEW_RICH_CONTENT, OUTLINE_PANEL } from './content-types';
 
 /**
  * The Content plugin's one entry point into the app (ADR-0048, ADR-0051): `app.config.ts` names this
@@ -29,6 +29,9 @@ export function providePluginContent(): EnvironmentProviders {
         labelKey: 'editor.view.content',
         // Names the kind in the World Types picker (#201).
         dataTypeLabelKey: 'editor.dataType.richContent',
+        // The View contributes its Outline to the page Dock (ADR-0067): declared, so the Dock draws the
+        // toggle synchronously before this View's body is fetched, and hosts the Panel with the View's injector.
+        panels: [OUTLINE_PANEL],
         loadComponent: () => import('./components/content-view.component').then((m) => m.ContentViewComponent),
       },
     ],
