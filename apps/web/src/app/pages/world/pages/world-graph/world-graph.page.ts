@@ -5,6 +5,7 @@ import { WorldGraph as WorldGraphPayload } from '@hexly/domain';
 import { ActiveWorld, entityRoute, ToasterService, WorldsClient } from '@hexly/web-core';
 import { EyebrowComponent, PageHeaderComponent, PanelComponent } from '@hexly/web-ui';
 import { GraphCanvasComponent, GraphOpen } from './components/graph-canvas.component';
+import { orphanIds, withoutOrphans } from './utils/orphans';
 
 /**
  * The World Graph page at `/w/:worldId/graph`: the World's readable Entities as nodes, their Entity
@@ -27,10 +28,23 @@ import { GraphCanvasComponent, GraphOpen } from './components/graph-canvas.compo
           {{ worldName() }}
         </h1>
       </div>
-      @if (graph(); as g) {
-        <span pageHeaderActions class="text-sm text-ink-muted" data-testid="graph-counts">
-          {{ 'worldGraph.counts' | transloco: { nodes: g.nodes.length, edges: g.edges.length } }}
-        </span>
+      @if (visibleGraph(); as g) {
+        <div pageHeaderActions class="flex items-center gap-4">
+          <span class="text-sm text-ink-muted" data-testid="graph-counts">
+            {{ 'worldGraph.counts' | transloco: { nodes: g.nodes.length, edges: g.edges.length } }}
+          </span>
+          @if (orphanCount(); as orphans) {
+            <button
+              type="button"
+              [attr.aria-pressed]="showOrphans()"
+              class="font-sans text-sm text-ink-strong px-2 py-1 rounded-sm hover:bg-surface-sunken aria-pressed:bg-gold/15 aria-pressed:text-gold"
+              data-testid="graph-orphans-toggle"
+              (click)="showOrphans.set(!showOrphans())"
+            >
+              {{ 'worldGraph.showOrphans' | transloco: { count: orphans } }}
+            </button>
+          }
+        </div>
       }
     </app-page-header>
 
@@ -46,7 +60,18 @@ import { GraphCanvasComponent, GraphOpen } from './components/graph-canvas.compo
           </p>
           <p class="text-sm m-0">{{ 'worldGraph.emptyHint' | transloco }}</p>
         </section>
-      } @else if (graph(); as g) {
+      } @else if (allHidden()) {
+        <section
+          class="h-full flex flex-col items-center justify-center gap-3 text-center text-ink-muted"
+          data-testid="graph-all-orphans"
+          appPanel
+        >
+          <p class="m-0 font-display text-lg text-ink-strong">
+            {{ 'worldGraph.allOrphansTitle' | transloco }}
+          </p>
+          <p class="text-sm m-0">{{ 'worldGraph.allOrphansHint' | transloco: { count: orphanCount() } }}</p>
+        </section>
+      } @else if (visibleGraph(); as g) {
         <div class="h-full overflow-hidden" appPanel>
           <app-graph-canvas [graph]="g" (open)="openEntity($event)" />
         </div>
@@ -63,8 +88,28 @@ export class WorldGraphPage {
 
   protected readonly worldName = this.activeWorld.name;
   protected readonly graph = signal<WorldGraphPayload | null>(null);
+  /**
+   * The show-orphans toggle, default off (ADR-0065): unlinked Entities of any type — chiefly
+   * bulk-minted Assets — stay out of the picture until the reader asks for them. Generic, no
+   * per-type rule. Filtering rides the client: the whole World is already in memory, so a flip is
+   * instant and never re-fetches.
+   */
+  protected readonly showOrphans = signal(false);
+  /** How many nodes the toggle would reveal; `0` hides the toggle — nothing to show. */
+  protected readonly orphanCount = computed(() => {
+    const g = this.graph();
+    return g ? orphanIds(g).size : 0;
+  });
+  /** The graph as drawn: orphans dropped unless the toggle is on. */
+  protected readonly visibleGraph = computed(() => {
+    const g = this.graph();
+    if (!g) return null;
+    return this.showOrphans() ? g : withoutOrphans(g);
+  });
   /** Gates the empty state on a resolved read, so it never flashes before the payload lands. */
   protected readonly isEmpty = computed(() => this.graph()?.nodes.length === 0);
+  /** Every node is an orphan and the toggle is off — a whole World hidden, not an empty one. */
+  protected readonly allHidden = computed(() => !this.isEmpty() && this.visibleGraph()?.nodes.length === 0);
 
   constructor() {
     const worldId = this.activeWorld.worldId();

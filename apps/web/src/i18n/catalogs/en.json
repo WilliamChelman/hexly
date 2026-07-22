@@ -336,6 +336,9 @@
     "tabTitle": "Hexly — Graph",
     "eyebrow": "World graph",
     "counts": "{{nodes}} entities · {{edges}} links",
+    "showOrphans": "Show orphans ({{count}})",
+    "allOrphansTitle": "Every entity is unlinked.",
+    "allOrphansHint": "{{count}} orphan entities are hidden. Show orphans to see them, or link them into your world.",
     "emptyTitle": "Nothing to draw yet.",
     "emptyHint": "Create a few entities and link them together to see the shape of your world.",
     "loadError": "Couldn't load the graph. Try again."
