@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
@@ -9,7 +10,7 @@ import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
 import { ConfigModule } from '../config/config.module';
 import { DB, Db, createDb } from '../db/db';
-import { entities, entityEdges } from '../db/schema';
+import { assetIndex, entities, entityEdges } from '../db/schema';
 import { EntitiesModule } from '../entities/entities.module';
 import { TypeFieldRegistry } from '../entities/type-field-registry';
 import { WorldsModule } from './worlds.module';
@@ -182,8 +183,12 @@ describe('World Graph', () => {
       expect(edges).toEqual([]);
     });
 
-    /** Assets are harvested as edges (ADR-0046) but are never nodes, so they never draw a line. */
-    it('when the target is an Asset', async () => {
+    /**
+     * An asset edge names a content-addressed hash (ADR-0065); when no Asset Entity holds that hash
+     * — never minted, or deleted — the hash resolves to no node, so the reference dangles exactly
+     * like a dead `entity` edge rather than drawing a line to nothing.
+     */
+    it('when the target is an unminted Asset hash', async () => {
       const ada = await signIn('ada@hexly.test');
       const world = await makeWorld(ada);
       const ealdred = await makeEntity(ada, world, 'Ealdred');
@@ -195,6 +200,42 @@ describe('World Graph', () => {
       expect(names(nodes)).toEqual(['Ealdred']);
       expect(edges).toEqual([]);
     });
+  });
+
+  /**
+   * An Asset is an ordinary node (ADR-0065): its usage is its inbound links, so the content-addressed
+   * asset edge — keyed by hash, not id — resolves through the `(worldId, hash)` dedup index to the
+   * Asset's Entity at read time, drawing the line a referencing Entity → Asset should.
+   */
+  it('renders an Asset as a node with its inbound reference resolved to an edge', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    const ealdred = await makeEntity(ada, world, 'Ealdred');
+    const hash = 'a'.repeat(64);
+    const portrait = mintAsset(world, hash, 'Portrait');
+    await illustrate(ada, ealdred, assetUrl(world, hash, '.png'));
+
+    const { nodes, edges } = await graphOf(ada, world);
+
+    expect(names(nodes)).toEqual(['Ealdred', 'Portrait']);
+    expect(drawn({ nodes, edges })).toEqual(['Ealdred → Portrait']);
+    expect(edges).toEqual([{ source: ealdred, target: portrait, descriptor: null }]);
+  });
+
+  /** An identical hash in another World shares no Entity, so its asset edge never leaks across. */
+  it('resolves an asset edge only within its own World', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    const elsewhere = await makeWorld(ada, 'Thornwood');
+    const ealdred = await makeEntity(ada, world, 'Ealdred');
+    const hash = 'b'.repeat(64);
+    // The Asset Entity for this hash lives in the *other* World.
+    mintAsset(elsewhere, hash, 'Portrait');
+    await illustrate(ada, ealdred, assetUrl(world, hash, '.png'));
+
+    const { nodes, edges } = await graphOf(ada, world);
+    expect(names(nodes)).toEqual(['Ealdred']);
+    expect(edges).toEqual([]);
   });
 
   /**
@@ -275,6 +316,32 @@ describe('World Graph', () => {
   /** Save `id`'s Content as prose holding one `image` — which harvests as an Asset edge. */
   async function illustrate(owner: Agent, id: string, src: string): Promise<void> {
     await save(owner, id, [{ type: 'image', attrs: { src } }]);
+  }
+
+  /**
+   * Seed a `shared` Asset Entity for `hash` and its `(worldId, hash)` dedup-index row — the shape
+   * mint-and-dedup leaves behind (ADR-0065), written straight to the DB so this spec need not carry
+   * the whole upload path. Returns the Asset's Entity id.
+   */
+  function mintAsset(worldId: string, hash: string, name: string): string {
+    const id = randomUUID();
+    const now = Date.now();
+    db.insert(entities)
+      .values({
+        id,
+        worldId,
+        name,
+        types: ['core.type.asset'],
+        tags: [],
+        visibility: 'shared',
+        version: 1,
+        document: '{}',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    db.insert(assetIndex).values({ entityId: id, worldId, hash }).run();
+    return id;
   }
 
   /** Typed-save `id` as a `test.type.monster` whose `lair` Entity-Link Field points at `link` (#190). */

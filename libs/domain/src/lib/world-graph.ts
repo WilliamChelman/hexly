@@ -18,7 +18,10 @@ export interface WorldGraphEdge {
 
 /**
  * `GET /worlds/:id/graph`. Nodes are every Entity of the World the viewer can read — orphans
- * included. Assets are never nodes.
+ * included, Assets among them (ADR-0065). An Asset's usage is its inbound links, so its
+ * content-addressed edges resolve to it as an ordinary node; the client's generic show-orphans
+ * toggle keeps unlinked Entities of any type (bulk-minted Assets included) out of the picture by
+ * default.
  */
 export interface WorldGraph {
   readonly nodes: readonly LinkedEntity[];
