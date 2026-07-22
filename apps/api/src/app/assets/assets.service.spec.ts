@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ASSET_EMBED_EXTENSIONS } from '@hexly/plugin-content';
 import { createDb, Db } from '../db/db';
+import { EntityDeletionRegistry } from '../entities/entity-deletion-registry';
 import { ASSET_EXTENSIONS, AssetsService } from './assets.service';
 
 describe('asset extension parity', () => {
@@ -26,7 +27,7 @@ describe('AssetsService', () => {
   beforeEach(() => {
     db = createDb(':memory:');
     dir = mkdtempSync(join(tmpdir(), 'hexly-assets-test-'));
-    assets = new AssetsService(db, dir);
+    assets = new AssetsService(db, dir, new EntityDeletionRegistry());
     db.$client.prepare('INSERT INTO worlds (id, name, created_at, updated_at) VALUES (?,?,0,0)').run('world-1', 'W');
   });
 

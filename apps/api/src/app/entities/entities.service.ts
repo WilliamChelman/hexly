@@ -32,13 +32,14 @@ import {
   validateFields,
   visibilitySchema,
 } from '@hexly/domain';
-import { and, asc, desc, eq, inArray, sql, SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or, sql, SQL } from 'drizzle-orm';
 import { AclSetResult, gate, isSuperadmin, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
 import { EntityAccess, entityAccess, ownsEntity, READ_ONLY_RIGHTS, sharedVisibility } from '../acl/entity-access';
 import { canCreateEntityFilter, worldOwnerFilter } from '../acl/world-access';
 import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
 import {
+  assetIndex,
   entities,
   entityDescriptors,
   entityEdges,
@@ -440,10 +441,33 @@ export class EntitiesService {
   }
 
   /**
-   * Who links here. The INNER JOIN's ON clause carries the ordinary per-viewer read filter over
-   * the *source*, so an unreadable source drops the row entirely — never cached across viewers.
+   * Who links here — the Entity's *usage*. The INNER JOIN's ON clause carries the ordinary per-viewer read
+   * filter over the *source*, so an unreadable source drops the row entirely — never cached across viewers.
+   *
+   * For an **Asset** (ADR-0065), usage also counts the content-addressed edges Content prose and Board Image
+   * elements harvest as `(targetKind: 'asset', targetId: hash)`: the harvest never resolved a hash to the
+   * Asset's Entity id, so the resolution happens here, at read time — the referencing document holds the
+   * capability URL, not the id, so re-uploading identical bytes (same hash) heals every reference for free
+   * and deleting the Asset leaves them dangling. The hash edges are World-scoped, since identical bytes in
+   * two Worlds share a hash but not an Entity.
    */
   private inbound(access: EntityAccess, id: string): InboundReference[] {
+    // The Asset's content hash + World, when `id` is an Asset — its asset edges key on the hash, not the id.
+    const asset = this.db
+      .select({ hash: assetIndex.hash, worldId: assetIndex.worldId })
+      .from(assetIndex)
+      .where(eq(assetIndex.entityId, id))
+      .get();
+    const targets = or(
+      and(eq(entityEdges.targetKind, 'entity'), eq(entityEdges.targetId, id)),
+      asset
+        ? and(
+            eq(entityEdges.targetKind, 'asset'),
+            eq(entityEdges.targetId, asset.hash),
+            eq(entityEdges.worldId, asset.worldId),
+          )
+        : undefined,
+    );
     return (
       this.db
         .select({
@@ -454,7 +478,7 @@ export class EntitiesService {
         })
         .from(entityEdges)
         .innerJoin(entities, and(eq(entities.id, entityEdges.sourceEntityId), access.filter))
-        .where(and(eq(entityEdges.targetKind, 'entity'), eq(entityEdges.targetId, id)))
+        .where(targets)
         // `id` is the final tiebreak, for the same reason as {@link outbound}'s `targetId`.
         .orderBy(asc(entities.name), asc(entities.id), asc(entityEdges.descriptor))
         .all()
