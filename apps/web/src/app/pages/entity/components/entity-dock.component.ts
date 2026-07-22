@@ -45,13 +45,32 @@ import { ViewRegistry } from '../../../entity-types/view-registry';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'relative flex min-h-0' },
   imports: [NgComponentOutlet, IconComponent, IconButtonComponent, TranslocoPipe],
+  styles: `
+    /* The open Panel overlays the main content by default — below the breakpoint, and (via a page-set
+       custom property) on wide viewports where a reading-column View leaves side whitespace to seat it
+       (ADR-0067). At \`lg\` the page flips \`--dock-panel-pos\` to \`static\` by omission for a full-bleed
+       View or a too-narrow reading one, so the Panel takes flow and pushes the main content instead. */
+    .dock-panel {
+      position: absolute;
+    }
+    @media (min-width: 64rem) {
+      .dock-panel {
+        position: var(--dock-panel-pos, static);
+      }
+    }
+  `,
   template: `
-    @if (openPanelBody(); as body) {
+    <!-- The open Panel's column stays mounted the whole time a Panel is open — keyed off the slot, not
+         the lazily-fetched body — so switching to a not-yet-loaded Panel never collapses the column and
+         flickers it closed/reopen (ADR-0067). The body outlets in once its deferred chunk resolves. -->
+    @if (dock.openPanel()) {
       <div
         data-testid="dock-panel"
-        class="absolute right-full top-0 bottom-0 z-10 flex w-80 flex-col border-l border-line bg-surface shadow-2 lg:static lg:z-auto lg:shadow-none"
+        class="dock-panel right-full top-0 bottom-0 z-10 flex w-80 flex-col border-l border-line bg-surface shadow-2"
       >
-        <ng-container *ngComponentOutlet="body.component; injector: body.injector" />
+        @if (openPanelBody(); as body) {
+          <ng-container *ngComponentOutlet="body.component; injector: body.injector" />
+        }
       </div>
     }
     <!-- Always-visible strip: one toggle per available Panel, known before any lazy body loads. -->
