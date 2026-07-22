@@ -90,6 +90,10 @@ export class AdminService {
         cursor = chunk.cursor;
         await yieldToEventLoop();
       }
+      // Refresh the planner's cost data with the derived state: without `sqlite_stat1` SQLite
+      // guesses join orders — it degraded the facet counts' FTS match to a per-row probe (see
+      // `facetWhere`) — and nothing else ever runs ANALYZE.
+      this.db.$client.exec('ANALYZE');
       this.job = { ...this.job, status: 'succeeded', finishedAt: Date.now() };
     } catch (err) {
       this.job = {

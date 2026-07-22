@@ -106,6 +106,25 @@ describe('Superadmin repair surface', () => {
     expect(facetsOf(asset.id)).toContainEqual({ key: 'kind', value: 'image' });
   });
 
+  /**
+   * ANALYZE rides the walk's tail: without `sqlite_stat1` cost data the planner degrades the
+   * facet counts' FTS match into a per-row probe (see `facetWhere`), and a fresh instance never
+   * has stats. Reindex is the refresh-everything tool, so the stats refresh with it.
+   */
+  it('refreshes the query-planner statistics when the walk succeeds', async () => {
+    await seedSuperadmin('ada@hexly.test', 'Ada');
+    const ada = await signIn('ada@hexly.test');
+    const worldId = await makeWorld(ada, 'Aerthos');
+    await makeEntity(ada, worldId, 'Ealdred');
+
+    await ada.post('/admin/reindex').expect(202);
+    const done = await pollUntilDone(ada);
+
+    expect(done).toMatchObject({ status: 'succeeded' });
+    const stats = db.$client.prepare('SELECT count(*) AS n FROM sqlite_stat1').get() as { n: number };
+    expect(stats.n).toBeGreaterThan(0);
+  });
+
   /** Readable before any Reindex has ever run — the button needs to know it is free. */
   it('reports an idle job before anything has been reindexed', async () => {
     await seedSuperadmin('ada@hexly.test', 'Ada');
