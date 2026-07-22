@@ -63,6 +63,8 @@ export class EntitiesClient {
     // Opt-in per-row Rights; callers that omit it keep the server a pure read-filter
     // (no per-row EXISTS).
     if (opts.rights) params = params.set('rights', '1');
+    // Opt-in per-row thumbnail URL (ADR-0065); only the Asset Browser sets it, so other lists skip the join.
+    if (opts.thumbnails) params = params.set('thumbnails', '1');
     return this.http.get<EntityPage>('/api/entities', { params });
   }
 

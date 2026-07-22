@@ -1,4 +1,23 @@
 {
+  "assetBrowser": {
+    "tabTitle": "Hexly — Ressources",
+    "eyebrow": "Ressources",
+    "heading": "Vos ressources",
+    "upload": "Téléverser",
+    "uploading": "Téléversement…",
+    "uploadError": "Échec du téléversement. Veuillez réessayer.",
+    "open": "Ouvrir la ressource",
+    "loadErrorTitle": "Impossible de charger vos ressources.",
+    "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",
+    "deleteError": "Impossible de supprimer. Veuillez réessayer.",
+    "loadMore": "Charger plus",
+    "loadingMore": "Chargement…",
+    "loadMoreError": "Impossible de charger plus. Veuillez réessayer.",
+    "emptyTitle": "Aucune ressource pour le moment.",
+    "emptyHint": "Téléversez une image pour commencer.",
+    "noMatchTitle": "Aucune ressource ne correspond à votre recherche.",
+    "noMatchHint": "Essayez un autre nom, type ou étiquette."
+  },
   "auth": {
     "tabTitle": "Hexly — Se connecter",
     "heading": "Se connecter",
@@ -241,6 +260,7 @@
     "worlds": "Mondes",
     "dashboard": "Tableau de bord",
     "library": "Bibliothèque",
+    "assets": "Ressources",
     "graph": "Graphe",
     "styleguide": "Guide de style",
     "expand": "Déployer la navigation",

@@ -664,6 +664,33 @@ describe('Worlds endpoints', () => {
         expect(selectedIds).toEqual([asset.id]);
       });
 
+      it('attaches a served thumbnail URL to an Asset row when the list opts in, and none to a non-Asset (#282)', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const note = (
+          await ada
+            .post('/entities')
+            .send({ name: 'Lore', types: ['core.type.note'], worldId: world.id })
+            .expect(201)
+        ).body;
+        const asset = (await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201))
+          .body;
+        const hash = asset.document['core.field.asset'].hash;
+
+        // The Asset Browser opts in (thumbnails=1) and pins the asset type; each Asset row carries its
+        // served thumbnail URL, derived generically off the dedup index (ADR-0065) — safe to use even when
+        // no thumbnail was minted, the serving route falls back to the original bytes.
+        const assets = (
+          await ada.get('/entities').query({ worldId: world.id, type: 'core.type.asset', thumbnails: '1' }).expect(200)
+        ).body.items;
+        expect(assets).toHaveLength(1);
+        expect(assets[0].thumbnailUrl).toBe(`/assets/${world.id}/${hash}.thumb.webp`);
+
+        // An ordinary (non-Asset) row carries no thumbnail URL even under the opt-in — it holds no bytes.
+        const notes = (await ada.get('/entities').query({ worldId: world.id, thumbnails: '1' }).expect(200)).body.items;
+        expect(notes.find((e: { id: string }) => e.id === note.id).thumbnailUrl).toBeUndefined();
+      });
+
       it('resolves a hidden-type Asset by an explicit id lookup — an id lookup is not a default listing (#278)', async () => {
         const ada = await signIn('ada@hexly.test', 'correct horse');
         const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
@@ -674,6 +701,18 @@ describe('Worlds endpoints', () => {
         // selected. The hidden-type exclusion must not swallow that lookup, or the redirect never fires.
         const byId = (await ada.get('/entities').query({ ids: asset.id }).expect(200)).body.items;
         expect(byId.map((e: { id: string }) => e.id)).toEqual([asset.id]);
+      });
+
+      it('matches a hidden-type Asset by name — Quick Open treats an Asset like any Entity (#282)', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const asset = (await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Sigil.png').expect(201)).body;
+
+        // Quick Open searches by name (FTS `q`) with no type selected. A name search is not a default
+        // listing, so the hidden-type exclusion lifts and the Asset matches — ADR-0065's "Quick Open ...
+        // treats Assets like any Entity".
+        const byName = (await ada.get('/entities').query({ worldId: world.id, q: 'Sigil' }).expect(200)).body.items;
+        expect(byName.map((e: { id: string }) => e.id)).toContain(asset.id);
       });
 
       it('lists the asset type in the type facet with a count even when unselected, so it can be opted into', async () => {

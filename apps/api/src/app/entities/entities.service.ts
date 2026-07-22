@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ApiError,
+  assetThumbnailUrl,
   CreateEntityRequest,
   emptyEntityDocument,
   entityDocumentSchema,
@@ -84,6 +85,12 @@ export interface ListOptions {
   /** Attach the caller's Rights to each summary — opt-in, the Entity Browser sets it. */
   readonly withRights?: boolean;
   /**
+   * Attach each summary's served thumbnail URL (ADR-0065) — opt-in, the Asset Browser sets it. Resolved
+   * generically off the `(worldId, hash)` dedup index (a LEFT JOIN), so it names no type and other lists
+   * never pay for the join.
+   */
+  readonly withThumbnails?: boolean;
+  /**
    * Hidden-from-default-listing exclusion (ADR-0065, internal — never from the query): drop any Entity
    * carrying one of these types. The service resolves it from the registry's hidden types minus whatever
    * the caller explicitly selected, so a hidden type surfaces the moment it is selected in the type facet.
@@ -136,11 +143,11 @@ export class EntitiesService {
     // all-punctuation) keeps the last-edited order.
     const match = opts.q ? toFtsMatch(opts.q) : null;
     // Hidden types are absent from the default listing but surface once selected (ADR-0065): resolve the
-    // exclusion against whatever the caller selected, so it self-lifts for a selected hidden type. An
-    // explicit id lookup is not a default listing, though — Quick Open, pins, recents and the
-    // `/entities/:id` redirect guard resolve an Asset by id like any Entity (ADR-0065), so skip the
-    // exclusion entirely when `ids` is present.
-    opts = { ...opts, excludedTypes: opts.ids ? [] : this.excludedHiddenTypes(opts.type) };
+    // exclusion against whatever the caller selected, so it self-lifts for a selected hidden type. Neither
+    // an explicit id lookup nor a name search is a "default listing", though — pins and the `/entities/:id`
+    // redirect guard resolve an Asset by id, and Quick Open matches it by name, treating an Asset like any
+    // Entity (ADR-0065) — so skip the exclusion entirely when `ids` or `q` is present.
+    opts = { ...opts, excludedTypes: opts.ids || opts.q ? [] : this.excludedHiddenTypes(opts.type) };
     const w = this.config.search.weights;
     const access = entityAccess(this.db, readerId);
     const query = this.db
@@ -156,11 +163,18 @@ export class EntitiesService {
         updatedAt: entities.updatedAt,
         // Opt-in: project the predicate columns so each summary carries the caller's Rights.
         ...(opts.withRights ? access.rightsColumns : {}),
+        // Opt-in: the content-addressed hash off the dedup index (ADR-0065), for the summary's thumbnail URL.
+        ...(opts.withThumbnails ? { assetHash: assetIndex.hash } : {}),
       })
       .from(entities)
       .$dynamic();
     if (match) {
       query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
+    }
+    // The dedup index is 1:1 with an Entity (its PK is the entity id), so this LEFT JOIN never multiplies
+    // rows — an Entity with content-addressed bytes gets its hash, everything else a null.
+    if (opts.withThumbnails) {
+      query.leftJoin(assetIndex, eq(assetIndex.entityId, entities.id));
     }
     const rows = query
       .where(and(access.filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined))
@@ -177,7 +191,11 @@ export class EntitiesService {
 
     const hasMore = rows.length > opts.limit;
     const items = rows.slice(0, opts.limit).map((row) => {
-      const summary = toSummary(row);
+      let summary = toSummary(row);
+      // Opt-in thumbnail: an Entity in the dedup index carries a hash, so its served thumbnail URL is
+      // derivable (ADR-0065); a non-Asset's join yields null and carries none.
+      const hash = (row as typeof row & { assetHash?: string | null }).assetHash;
+      if (opts.withThumbnails && hash) summary = { ...summary, thumbnailUrl: assetThumbnailUrl(row.worldId, hash) };
       if (!opts.withRights) return summary;
       // The predicate columns arrive as SQLite 0/1; rightsOf reads them truthily.
       const r = row as typeof row & Record<'canRead' | 'canEditSubstance' | 'canWrite' | 'isOwner', unknown>;

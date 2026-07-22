@@ -32,6 +32,14 @@ export function worldGraphRoute(worldId: string, worldName?: string): string[] {
   return ['/w', segment(worldId, worldName), 'graph'];
 }
 
+/**
+ * The Asset Browser `/w/:worldId/assets` (ADR-0065) — the Entity Browser preset to the asset type,
+ * where a World's uploaded media is managed as thumbnail tiles.
+ */
+export function worldAssetsRoute(worldId: string, worldName?: string): string[] {
+  return ['/w', segment(worldId, worldName), 'assets'];
+}
+
 export function entityRoute(worldId: string, entityId: string, worldName?: string, entityName?: string): string[] {
   return ['/w', segment(worldId, worldName), 'entities', segment(entityId, entityName)];
 }

@@ -1,4 +1,23 @@
 {
+  "assetBrowser": {
+    "tabTitle": "Hexly — Assets",
+    "eyebrow": "Assets",
+    "heading": "Your assets",
+    "upload": "Upload",
+    "uploading": "Uploading…",
+    "uploadError": "Couldn't upload that. Please try again.",
+    "open": "Open asset",
+    "loadErrorTitle": "Couldn't load your assets.",
+    "loadErrorHint": "Something went wrong. Please try again in a moment.",
+    "deleteError": "Couldn't delete that. Please try again.",
+    "loadMore": "Load more",
+    "loadingMore": "Loading…",
+    "loadMoreError": "Couldn't load more. Please try again.",
+    "emptyTitle": "No assets yet.",
+    "emptyHint": "Upload an image to begin.",
+    "noMatchTitle": "No assets match your search.",
+    "noMatchHint": "Try a different name, kind, or Tag."
+  },
   "auth": {
     "tabTitle": "Hexly — Sign in",
     "heading": "Sign in",
@@ -241,6 +260,7 @@
     "worlds": "Worlds",
     "dashboard": "Dashboard",
     "library": "Library",
+    "assets": "Assets",
     "graph": "Graph",
     "styleguide": "Styleguide",
     "expand": "Expand navigation",

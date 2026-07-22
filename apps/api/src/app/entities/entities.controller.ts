@@ -51,7 +51,7 @@ export class EntitiesController {
   list(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityPage {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { cursor, limit, ids, q, type, tag, visibility, field, worldId, rights } = parsed.data;
+    const { cursor, limit, ids, q, type, tag, visibility, field, worldId, rights, thumbnails } = parsed.data;
 
     // Absent cursor is page one; undecodable is a 400 (ADR-0001).
     const offset = cursor === undefined ? 0 : decodeCursor(cursor);
@@ -69,6 +69,7 @@ export class EntitiesController {
       fields: parseFieldFilters(field),
       worldId,
       withRights: rights,
+      withThumbnails: thumbnails,
     });
     return { items, nextCursor: hasMore ? encodeCursor(offset + limit) : null };
   }

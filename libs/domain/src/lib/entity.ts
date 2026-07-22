@@ -249,6 +249,11 @@ export const entityListQuerySchema = z.object({
     .string()
     .optional()
     .transform((v) => v === '1' || v === 'true'),
+  // Opt-in per-row thumbnail URL (ADR-0065): the Asset Browser sets it; other lists skip the join.
+  thumbnails: z
+    .string()
+    .optional()
+    .transform((v) => v === '1' || v === 'true'),
   limit: z.coerce
     .number()
     .int()
@@ -321,6 +326,13 @@ export interface EntitySummary {
   readonly updatedAt: number;
   /** The caller's Rights, present only when the list request opted in (`rights=1`). */
   readonly rights?: readonly EntityVerb[];
+  /**
+   * The served thumbnail URL (ADR-0065), present only when the list opted in (`thumbnails=1`) and the
+   * Entity carries content-addressed bytes in the dedup index — the Asset Browser's tile source. Derived
+   * generically from the `(worldId, hash)` index, so it names no type; it falls back to the original on
+   * the serving route when no thumbnail was minted, so it is always safe to use as a tile `src`.
+   */
+  readonly thumbnailUrl?: string;
 }
 
 /** What `GET /entities/:id` and saves return. */
