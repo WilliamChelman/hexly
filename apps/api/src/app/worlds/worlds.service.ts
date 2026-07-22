@@ -350,16 +350,19 @@ export class WorldsService {
    * Entity-creation-shaped, not a World management power: unreachable → 404, reachable-but-not-contributor
    * → 403. Re-uploading identical bytes returns the existing Asset, first name intact (ADR-0065).
    */
-  uploadAsset(
+  async uploadAsset(
     userId: string,
     id: string,
     filename: string,
     bytes: Uint8Array,
-  ): EntityDetail | 'not-found' | 'forbidden' {
+  ): Promise<EntityDetail | 'not-found' | 'forbidden'> {
     const meta = worldAccess(this.db, userId).decideMeta(id);
     if (!meta?.reachable) return 'not-found';
     if (!meta.canContribute) return 'forbidden';
-    return this.assetMint.mint(userId, id, filename, bytes).entity;
+    // Extract Asset Stats + thumbnail (sharp, async) before the synchronous mint (ADR-0065); the gate ran
+    // first, so we never do the work for an upload we would refuse.
+    const extraction = await this.assetMint.extract(filename, bytes);
+    return this.assetMint.mint(userId, id, filename, bytes, extraction).entity;
   }
 
   /**

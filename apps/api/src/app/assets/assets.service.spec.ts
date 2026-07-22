@@ -90,6 +90,8 @@ describe('AssetsService', () => {
       expect(summaries).toEqual([
         {
           url: portrait.url,
+          // The hash-derived thumbnail URL (ADR-0065); the serving route falls back to the original.
+          thumbnailUrl: `/assets/world-1/${portrait.hash}.thumb.webp`,
           // The Entity's name + its ref's pinned extension — a rename relabels this, never the URL.
           originalFilename: 'Portrait.png',
           mime: 'image/png',
@@ -108,6 +110,31 @@ describe('AssetsService', () => {
       seedAsset('world-2', 'asset-2', 'Map', b.hash, '.png', PNG_B.length);
 
       expect(assets.list('world-1').map((s) => s.originalFilename)).toEqual(['Portrait.png']);
+    });
+  });
+
+  describe('thumbnails (a regenerable cache beside the bytes, ADR-0065)', () => {
+    const THUMB = new Uint8Array([0x52, 0x49, 0x46, 0x46, 1, 2, 3]); // stand-in WebP bytes
+
+    it('stores a thumbnail at the hash-derived path and serves it on the same route', () => {
+      const stored = assets.store('world-1', 'Portrait.png', PNG_A);
+      assets.storeThumbnail('world-1', stored.hash, THUMB);
+
+      const served = assets.read('world-1', `${stored.hash}.thumb.webp`);
+      expect(served?.mime).toBe('image/webp');
+      expect(served && new Uint8Array(served.bytes)).toEqual(THUMB);
+    });
+
+    it('falls back to the original bytes when a thumbnail was never minted', () => {
+      const stored = assets.store('world-1', 'Portrait.png', PNG_A);
+      // No storeThumbnail (a non-image, or bytes sharp could not parse): the thumb URL serves the original.
+      const served = assets.read('world-1', `${stored.hash}.thumb.webp`);
+      expect(served?.mime).toBe('image/png');
+      expect(served && new Uint8Array(served.bytes)).toEqual(PNG_A);
+    });
+
+    it('still 404s a thumbnail request whose source Asset does not exist', () => {
+      expect(assets.read('world-1', `${'a'.repeat(64)}.thumb.webp`)).toBeNull();
     });
   });
 

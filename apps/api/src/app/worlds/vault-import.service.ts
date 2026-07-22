@@ -15,6 +15,7 @@ import {
 } from '@hexly/domain';
 import { bodyToFields, splitFrontmatter } from '@hexly/obsidian';
 import { AssetMintService } from '../assets/asset-mint.service';
+import { AssetExtraction } from '../assets/asset-extraction.service';
 import { DB, type Db } from '../db/db';
 import { EntitiesService } from '../entities/entities.service';
 import { TypeFieldRegistry } from '../entities/type-field-registry';
@@ -44,7 +45,7 @@ export class VaultImportService {
     private readonly typeFields: TypeFieldRegistry,
   ) {}
 
-  import(ownerId: string, filename: string, archive: Buffer): ImportSummary {
+  async import(ownerId: string, filename: string, archive: Buffer): Promise<ImportSummary> {
     // Decompress first: a malformed or oversized archive fails here (400/413) BEFORE any
     // World is minted, so a bad upload never leaves an orphan empty World behind. The
     // ceiling is baked into the injected VaultUnzipper (ADR-0036).
@@ -88,6 +89,12 @@ export class VaultImportService {
     const index = new NoteIndex(notes);
     const assetIndex = new AssetIndex(assetFiles);
     const dataTypes = this.typeFields.structuredDataTypes;
+    // Pre-extract Asset Stats + thumbnails (sharp, async) before the synchronous persist transaction
+    // (ADR-0065): storeAsset mints inside the transaction and cannot await, so the mechanical extraction
+    // is done up front, keyed by the vault path each embedded file will resolve to.
+    const extractions = new Map<string, AssetExtraction>();
+    for (const [path, bytes] of Object.entries(assetFiles))
+      extractions.set(path, await this.assetMint.extract(path, bytes));
     // The "bare Note" default (ADR-0051); `undefined` when content is disabled (ADR-0052), so an
     // unstamped file lands typeless.
     const defaultType = this.typeFields.defaultType;
@@ -114,7 +121,13 @@ export class VaultImportService {
             if (!assetPath) return null;
             // Mint through the ordinary path (ADR-0065): each embedded file becomes an **Asset Entity**,
             // deduped per World by content hash, and the note's src is rewritten to its capability URL.
-            const minted = this.assetMint.mint(ownerId, worldId, assetPath, assetFiles[assetPath]);
+            const minted = this.assetMint.mint(
+              ownerId,
+              worldId,
+              assetPath,
+              assetFiles[assetPath],
+              extractions.get(assetPath) ?? { stats: null, thumbnail: null },
+            );
             if (!minted.deduped) assetsStored++;
             return minted.url;
           },

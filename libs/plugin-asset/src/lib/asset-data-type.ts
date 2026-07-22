@@ -3,8 +3,10 @@
  * `core.type.asset` declares it at the `core.field.asset` key, so an Asset Entity's content-address handle
  * lives in the one EntityDocument map beside its prose.
  *
- * It harvests no text, no edges, and no facets yet (facet dimensions from **Asset Stats** land with the
- * extractor ticket). It alone owns bytes, so it is the one data-type that {@link StructuredDataType.harvestAssetHash}
+ * It harvests three **Facet** dimensions from the asset-ref (ADR-0055/0065): `kind` (from the mime), and —
+ * from the **Asset Stats** an extractor wrote — `orientation` and a bucketed named `hue` (the dominant color
+ * is stored as a value in stats; the facet is the bucket, see {@link bucketHue}). It carries no text and no
+ * edges. It alone owns bytes, so it is the one data-type that {@link StructuredDataType.harvestAssetHash}
  * — the content `hash` mirrored to the derived `(worldId, hash) → entity` dedup index at the write choke point.
  *
  * Its **Vault Projection** is `omit`: the asset-ref is not serialized into a Markdown file — the bytes ride
@@ -12,8 +14,15 @@
  * the ref by hash. The `core.` namespace names who owns the vocabulary, not which lib ships it (ADR-0050).
  */
 
-import { defineField, defineStructuredDataType, type Field, type StructuredDataTypeId } from '@hexly/domain';
+import {
+  defineField,
+  defineStructuredDataType,
+  type Field,
+  type HarvestedFacet,
+  type StructuredDataTypeId,
+} from '@hexly/domain';
 import { assetValueSchema, type AssetValue } from './asset-value';
+import { ASSET_KINDS, assetKind, bucketHue, HUE_BUCKETS, ORIENTATIONS } from './asset-stats';
 
 /** The `namespace.id` kind naming the asset-ref data-type — what marks the `core.field.asset` Field structured. */
 export const CORE_ASSET: StructuredDataTypeId = 'core.datatype.asset';
@@ -27,6 +36,30 @@ export const ASSET_DATA_TYPE = defineStructuredDataType({
   id: CORE_ASSET,
   valueSchema: assetValueSchema,
   empty: emptyAssetValue,
+  // The mechanical facets (ADR-0055/0065): `kind` off the mime (always present), and — when an extractor
+  // wrote Asset Stats — `orientation` and the bucketed `hue`. Enum dimensions, so the rail toggles values.
+  facetDimensions: [
+    { key: 'kind', labelKey: 'asset.facet.kind', dataType: { kind: 'enum', options: [...ASSET_KINDS] } },
+    {
+      key: 'orientation',
+      labelKey: 'asset.facet.orientation',
+      dataType: { kind: 'enum', options: [...ORIENTATIONS] },
+    },
+    { key: 'hue', labelKey: 'asset.facet.hue', dataType: { kind: 'enum', options: [...HUE_BUCKETS] } },
+  ],
+  harvestFacets: (value: AssetValue): HarvestedFacet[] => {
+    // A bare, pre-mint placeholder ref (no bytes yet) has no real mime to bucket — it harvests nothing,
+    // like its hash. Mint fills the ref in the same write, so an Asset at rest always carries real facets.
+    if (!value.hash) return [];
+    const rows: HarvestedFacet[] = [{ key: 'kind', value: assetKind(value.mime), num: null }];
+    const stats = value.stats;
+    if (stats?.orientation) rows.push({ key: 'orientation', value: stats.orientation, num: null });
+    if (typeof stats?.dominantColor === 'string') {
+      const hue = bucketHue(stats.dominantColor);
+      if (hue) rows.push({ key: 'hue', value: hue, num: null });
+    }
+    return rows;
+  },
   // The one data-type that owns bytes: its content hash keys the per-World dedup index (ADR-0065). An
   // empty placeholder ref (no hash yet) contributes nothing.
   harvestAssetHash: (value: AssetValue) => value.hash || null,

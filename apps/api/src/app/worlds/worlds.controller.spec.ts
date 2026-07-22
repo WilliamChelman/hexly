@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
+import sharp from 'sharp';
 import request from 'supertest';
 import { DB, Db, createDb } from '../db/db';
 import { ASSETS_DIR } from '../assets/assets.service';
@@ -402,6 +403,7 @@ describe('Worlds endpoints', () => {
       expect((await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([
         {
           url: `/assets/${world.body.id}/${ref.hash}.png`,
+          thumbnailUrl: `/assets/${world.body.id}/${ref.hash}.thumb.webp`,
           originalFilename: 'Portrait.png',
           mime: 'image/png',
           size: PNG.length,
@@ -450,6 +452,7 @@ describe('Worlds endpoints', () => {
       expect((await bob.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([
         {
           url: `/assets/${world.body.id}/${res.body.document['core.field.asset'].hash}.png`,
+          thumbnailUrl: `/assets/${world.body.id}/${res.body.document['core.field.asset'].hash}.thumb.webp`,
           originalFilename: 'Map.png',
           mime: 'image/png',
           size: PNG.length,
@@ -485,6 +488,47 @@ describe('Worlds endpoints', () => {
       const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
 
       await ada.post(`/worlds/${world.body.id}/assets`).expect(400);
+    });
+
+    describe('Asset Stats & thumbnails at mint (ADR-0065)', () => {
+      it('mints an image with populated Asset Stats and a served WebP thumbnail (sharp in-process)', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+        // A real tiny image sharp can parse: 12×4 (landscape) solid red.
+        const banner = await sharp({
+          create: { width: 12, height: 4, channels: 3, background: { r: 200, g: 24, b: 24 } },
+        })
+          .png()
+          .toBuffer();
+
+        const res = await ada.post(`/worlds/${world.body.id}/assets`).attach('file', banner, 'Banner.png').expect(201);
+        const ref = res.body.document['core.field.asset'];
+        // Dimensions, orientation, and a #rrggbb dominant color land in the asset-ref.
+        expect(ref.stats).toEqual({
+          width: 12,
+          height: 4,
+          orientation: 'landscape',
+          dominantColor: expect.stringMatching(/^#[0-9a-f]{6}$/),
+        });
+
+        // The thumbnail is served on the same unauthenticated static route, as a real WebP.
+        const thumb = await ada.get(`/assets/${world.body.id}/${ref.hash}.thumb.webp`).expect(200);
+        expect(thumb.headers['content-type']).toContain('image/webp');
+      });
+
+      it('succeeds with null stats and no thumbnail when sharp cannot parse the bytes', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+
+        // PNG is a fake header sharp rejects: the mint still succeeds, just statless (ADR-0065).
+        const res = await ada.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Broken.png').expect(201);
+        const ref = res.body.document['core.field.asset'];
+        expect(ref.stats).toBeNull();
+
+        // No thumbnail was minted, so the thumb URL falls back to the original bytes (a PNG, not a WebP).
+        const thumb = await ada.get(`/assets/${world.body.id}/${ref.hash}.thumb.webp`).expect(200);
+        expect(thumb.headers['content-type']).toContain('image/png');
+      });
     });
   });
 

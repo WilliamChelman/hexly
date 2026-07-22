@@ -7,5 +7,10 @@
   "untitled": "Ressource sans titre",
   "view": {
     "asset": "Ressource"
+  },
+  "facet": {
+    "kind": "Type",
+    "orientation": "Orientation",
+    "hue": "Couleur"
   }
 }

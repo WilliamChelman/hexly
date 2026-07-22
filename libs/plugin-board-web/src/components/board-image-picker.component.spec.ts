@@ -8,10 +8,28 @@ import { BOARD_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { BoardImagePickerComponent, ImagePickerData } from './board-image-picker.component';
 
 const EXISTING: AssetSummary[] = [
-  { url: '/assets/w1/one.png', originalFilename: 'one.png', mime: 'image/png', size: 10 },
-  { url: '/assets/w1/two.jpg', originalFilename: 'two.jpg', mime: 'image/jpeg', size: 20 },
+  {
+    url: '/assets/w1/one.png',
+    thumbnailUrl: '/assets/w1/one.thumb.webp',
+    originalFilename: 'one.png',
+    mime: 'image/png',
+    size: 10,
+  },
+  {
+    url: '/assets/w1/two.jpg',
+    thumbnailUrl: '/assets/w1/two.thumb.webp',
+    originalFilename: 'two.jpg',
+    mime: 'image/jpeg',
+    size: 20,
+  },
   // A non-image Asset the World holds — the grid renders `<img>`, so it must be filtered out.
-  { url: '/assets/w1/notes.pdf', originalFilename: 'notes.pdf', mime: 'application/pdf', size: 30 },
+  {
+    url: '/assets/w1/notes.pdf',
+    thumbnailUrl: '/assets/w1/notes.thumb.webp',
+    originalFilename: 'notes.pdf',
+    mime: 'application/pdf',
+    size: 30,
+  },
 ];
 
 /** The wrapper Asset Entity the upload endpoint returns (ADR-0065) — the picker reads its URL off the ref. */

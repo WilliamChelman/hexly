@@ -7,5 +7,10 @@
   "untitled": "Untitled asset",
   "view": {
     "asset": "Asset"
+  },
+  "facet": {
+    "kind": "Kind",
+    "orientation": "Orientation",
+    "hue": "Color"
   }
 }
