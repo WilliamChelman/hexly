@@ -243,25 +243,26 @@ export const entityLinks = sqliteTable(
 );
 
 /**
- * Per-World content-addressed Assets: metadata only — the bytes live on disk at
- * `assets/<worldId>/<hash>.<ext>` beside the SQLite DB. The `(worldId, hash)` PK
- * makes dedup per-World. `originalFilename` survives (the on-disk name is the
- * hash) so export can write human-readable names. Rows cascade with the World;
- * the on-disk folder is removed separately by {@link AssetsService.deleteWorld}.
+ * The derived **Asset dedup index** (ADR-0065): one row per Asset Entity, mapping the content `hash` of
+ * the bytes its asset-ref wraps to the Entity that owns them. The `entityImportSource` pattern — an
+ * **index, never a source of truth**: `EntityWrites` materialises it from the document at the write choke
+ * point and Reindex rebuilds it, so an upload resolves dedup, and byte serving reads disk with no table
+ * consulted at all. Deleting the Entity cascades the row away; the on-disk bytes are dropped separately.
+ *
+ * `entityId` is the PK — an Asset carries at most one asset-ref. `worldId` is denormalised off the source,
+ * mirroring the other derived indexes; the unique `(worldId, hash)` is the per-World dedup key the upload
+ * mint-and-dedup resolves against (re-uploading identical bytes returns the existing Asset).
  */
-export const assets = sqliteTable(
-  'assets',
+export const assetIndex = sqliteTable(
+  'asset_index',
   {
+    entityId: text('entity_id')
+      .primaryKey()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    worldId: text('world_id').notNull(),
     hash: text('hash').notNull(),
-    worldId: text('world_id')
-      .notNull()
-      .references(() => worlds.id, { onDelete: 'cascade' }),
-    originalFilename: text('original_filename').notNull(),
-    mime: text('mime').notNull(),
-    size: integer('size').notNull(),
-    createdAt: integer('created_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.worldId, table.hash] })],
+  (table) => [uniqueIndex('idx_asset_index_dedup').on(table.worldId, table.hash)],
 );
 
 /**

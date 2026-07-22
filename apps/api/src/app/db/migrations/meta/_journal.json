@@ -176,6 +176,13 @@
       "when": 1784475692561,
       "tag": "0024_silent_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1784681437777,
+      "tag": "0025_low_exiles",
+      "breakpoints": true
     }
   ]
 }

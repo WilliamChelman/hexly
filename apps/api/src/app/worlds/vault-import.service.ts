@@ -14,7 +14,7 @@ import {
   VaultImportContext,
 } from '@hexly/domain';
 import { bodyToFields, splitFrontmatter } from '@hexly/obsidian';
-import { AssetsService } from '../assets/assets.service';
+import { AssetMintService } from '../assets/asset-mint.service';
 import { DB, type Db } from '../db/db';
 import { EntitiesService } from '../entities/entities.service';
 import { TypeFieldRegistry } from '../entities/type-field-registry';
@@ -40,7 +40,7 @@ export class VaultImportService {
     private readonly worlds: WorldsService,
     private readonly entities: EntitiesService,
     private readonly unzipper: VaultUnzipper,
-    private readonly assets: AssetsService,
+    private readonly assetMint: AssetMintService,
     private readonly typeFields: TypeFieldRegistry,
   ) {}
 
@@ -112,9 +112,11 @@ export class VaultImportService {
             if (!src || isExternalUrl(src)) return null;
             const assetPath = assetIndex.resolve(src, noteDir);
             if (!assetPath) return null;
-            const result = this.assets.store(worldId, assetPath, assetFiles[assetPath]);
-            if (!result.deduped) assetsStored++;
-            return result.url;
+            // Mint through the ordinary path (ADR-0065): each embedded file becomes an **Asset Entity**,
+            // deduped per World by content hash, and the note's src is rewritten to its capability URL.
+            const minted = this.assetMint.mint(ownerId, worldId, assetPath, assetFiles[assetPath]);
+            if (!minted.deduped) assetsStored++;
+            return minted.url;
           },
           degrade,
         };

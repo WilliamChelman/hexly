@@ -24,10 +24,9 @@ describe('AssetsService', () => {
   let assets: AssetsService;
 
   beforeEach(() => {
-    db = createDb(':memory:'); // migrations run at boot, incl. the new assets table.
+    db = createDb(':memory:');
     dir = mkdtempSync(join(tmpdir(), 'hexly-assets-test-'));
     assets = new AssetsService(db, dir);
-    // assets.world_id FKs to a real World; seed one (ADR-0037: no owner_id column).
     db.$client.prepare('INSERT INTO worlds (id, name, created_at, updated_at) VALUES (?,?,0,0)').run('world-1', 'W');
   });
 
@@ -36,36 +35,41 @@ describe('AssetsService', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('stores bytes content-addressed on disk and rows them, deduping a repeat', () => {
+  /**
+   * Seed an Asset Entity for a stored file: an `entities` row carrying the asset-ref at the
+   * `core.field.asset` key, plus the derived `asset_index` row the write choke point would materialise
+   * (ADR-0065). The `assets` table is gone — list/export enumerate Asset Entities via this index.
+   */
+  function seedAsset(worldId: string, entityId: string, name: string, hash: string, ext: string, size: number): void {
+    const doc = JSON.stringify({ 'core.field.asset': { hash, ext, mime: 'image/png', size, stats: null } });
+    db.$client
+      .prepare(
+        `INSERT INTO entities (id, world_id, name, types, tags, visibility, version, seq, document, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,1,1,?,?,?)`,
+      )
+      .run(entityId, worldId, name, JSON.stringify(['core.type.asset']), '[]', 'shared', doc, 0, 0);
+    db.$client
+      .prepare('INSERT INTO asset_index (entity_id, world_id, hash) VALUES (?,?,?)')
+      .run(entityId, worldId, hash);
+  }
+
+  it('stores bytes content-addressed on disk, deduping a repeat by hash (no table, ADR-0065)', () => {
     const first = assets.store('world-1', 'Portrait.png', PNG_A);
 
     // URL is the capability path Content will reference (ADR-0034).
     expect(first.url).toBe(`/assets/world-1/${first.hash}.png`);
-    expect(first.deduped).toBe(false);
+    expect(first.mime).toBe('image/png');
+    expect(first.ext).toBe('.png');
 
     // Bytes land on disk under the World folder, named by hash + original extension.
     const onDisk = join(dir, 'world-1', `${first.hash}.png`);
     expect(existsSync(onDisk)).toBe(true);
     expect(new Uint8Array(readFileSync(onDisk))).toEqual(PNG_A);
 
-    // EntityDocument is rowed (original filename kept for export, ADR-0034).
-    const rows = db.$client.prepare('SELECT * FROM assets WHERE world_id = ?').all('world-1');
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      hash: first.hash,
-      original_filename: 'Portrait.png',
-      mime: 'image/png',
-      size: PNG_A.length,
-    });
-
-    // The same bytes, referenced again, store once: same hash, deduped, still one file/row.
+    // The same bytes hash the same, so a repeat writes one byte-identical file — no twin on disk.
     const again = assets.store('world-1', 'copy.png', PNG_A);
     expect(again.hash).toBe(first.hash);
-    expect(again.deduped).toBe(true);
     expect(readdirSync(join(dir, 'world-1'))).toHaveLength(1);
-    expect(db.$client.prepare('SELECT count(*) c FROM assets WHERE world_id = ?').get('world-1')).toMatchObject({
-      c: 1,
-    });
 
     // Different bytes hash differently and store separately.
     const other = assets.store('world-1', 'Map.png', PNG_B);
@@ -73,44 +77,58 @@ describe('AssetsService', () => {
     expect(readdirSync(join(dir, 'world-1'))).toHaveLength(2);
   });
 
-  describe('list (the picker source, #269)', () => {
+  describe('list (the picker source, #269, ADR-0065)', () => {
     it('returns an empty list for a World with no Assets', () => {
       expect(assets.list('world-1')).toEqual([]);
     });
 
-    it('summarizes every stored Asset with its capability url, mime and size', () => {
+    it('summarizes every Asset Entity with its capability url, mime and size', () => {
       const portrait = assets.store('world-1', 'Portrait.png', PNG_A);
-      assets.store('world-1', 'notes.pdf', PNG_B);
+      seedAsset('world-1', 'asset-1', 'Portrait', portrait.hash, '.png', PNG_A.length);
 
       const summaries = assets.list('world-1');
-      expect(summaries).toContainEqual({
-        url: portrait.url,
-        originalFilename: 'Portrait.png',
-        mime: 'image/png',
-        size: PNG_A.length,
-      });
-      // The pdf's mime comes from the row, not a URL re-derivation.
-      expect(summaries.find((a) => a.originalFilename === 'notes.pdf')?.mime).toBe('application/pdf');
-      // Metadata only — no hash/deduped leak to the summary.
+      expect(summaries).toEqual([
+        {
+          url: portrait.url,
+          // The Entity's name + its ref's pinned extension — a rename relabels this, never the URL.
+          originalFilename: 'Portrait.png',
+          mime: 'image/png',
+          size: PNG_A.length,
+        },
+      ]);
+      // Metadata only — no hash leak to the summary.
       expect(summaries[0]).not.toHaveProperty('hash');
     });
 
     it('lists a World in isolation — a sibling World’s Assets never bleed in', () => {
       db.$client.prepare('INSERT INTO worlds (id, name, created_at, updated_at) VALUES (?,?,0,0)').run('world-2', 'W2');
-      assets.store('world-1', 'Portrait.png', PNG_A);
-      assets.store('world-2', 'Map.png', PNG_B);
+      const a = assets.store('world-1', 'Portrait.png', PNG_A);
+      const b = assets.store('world-2', 'Map.png', PNG_B);
+      seedAsset('world-1', 'asset-1', 'Portrait', a.hash, '.png', PNG_A.length);
+      seedAsset('world-2', 'asset-2', 'Map', b.hash, '.png', PNG_B.length);
 
-      expect(assets.list('world-1').map((a) => a.originalFilename)).toEqual(['Portrait.png']);
+      expect(assets.list('world-1').map((s) => s.originalFilename)).toEqual(['Portrait.png']);
+    });
+  });
+
+  describe('exportAssets (the vault export source, ADR-0033/ADR-0065)', () => {
+    it('reads each Asset Entity’s bytes under its name + extension', () => {
+      const portrait = assets.store('world-1', 'Portrait.png', PNG_A);
+      seedAsset('world-1', 'asset-1', 'Portrait', portrait.hash, '.png', PNG_A.length);
+
+      expect(assets.exportAssets('world-1')).toEqual([
+        {
+          servedUrl: portrait.url,
+          originalFilename: 'Portrait.png',
+          bytes: expect.any(Buffer),
+        },
+      ]);
+      expect(new Uint8Array(assets.exportAssets('world-1')[0].bytes)).toEqual(PNG_A);
     });
 
-    it('orders by createdAt then hash for a stable list', () => {
-      // Two rows with the same createdAt fall back to the hash tiebreak; a stray older row sorts first.
-      assets.store('world-1', 'Second.png', PNG_A);
-      assets.store('world-1', 'First.png', PNG_B);
-      db.$client.prepare('UPDATE assets SET created_at = ? WHERE original_filename = ?').run(1, 'First.png');
-      db.$client.prepare('UPDATE assets SET created_at = ? WHERE original_filename = ?').run(2, 'Second.png');
-
-      expect(assets.list('world-1').map((a) => a.originalFilename)).toEqual(['First.png', 'Second.png']);
+    it('skips an Asset Entity whose bytes are missing on disk rather than aborting', () => {
+      seedAsset('world-1', 'asset-1', 'Ghost', 'a'.repeat(64), '.png', 3);
+      expect(assets.exportAssets('world-1')).toEqual([]);
     });
   });
 });

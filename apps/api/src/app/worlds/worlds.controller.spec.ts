@@ -374,22 +374,67 @@ describe('Worlds endpoints', () => {
         .run(worldId, userId, role);
     }
 
-    it('uploads a file, minting an Asset the author can reference, and lists it', async () => {
+    it('uploads a file, minting the wrapper Asset Entity, and lists it in the picker (ADR-0065)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
 
       // A fresh World carries no Assets.
       expect((await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([]);
 
+      // The endpoint returns the wrapper Entity: named after the filename stem, carrying core.type.asset,
+      // visibility `shared`, its asset-ref pinning the extension in the (stable) capability URL.
       const res = await ada.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201);
-      expect(res.body).toEqual({
-        url: expect.stringMatching(new RegExp(`^/assets/${world.body.id}/[0-9a-f]{64}\\.png$`)),
-        originalFilename: 'Portrait.png',
-        mime: 'image/png',
-        size: PNG.length,
+      expect(res.body).toMatchObject({
+        id: expect.any(String),
+        name: 'Portrait',
+        types: ['core.type.asset'],
+        visibility: 'shared',
       });
-      // The picker now surfaces the minted Asset.
-      expect((await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([res.body]);
+      const ref = res.body.document['core.field.asset'];
+      expect(ref).toMatchObject({ ext: '.png', mime: 'image/png', size: PNG.length, stats: null });
+      expect(ref.hash).toMatch(/^[0-9a-f]{64}$/);
+
+      // The uploader is the sole Owner — reading the Entity back carries full `manage` rights.
+      const detail = await ada.get(`/entities/${res.body.id}`).expect(200);
+      expect(detail.body.rights).toContain('manage');
+
+      // The picker surfaces the minted Asset as an AssetSummary (url + label metadata).
+      expect((await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([
+        {
+          url: `/assets/${world.body.id}/${ref.hash}.png`,
+          originalFilename: 'Portrait.png',
+          mime: 'image/png',
+          size: PNG.length,
+        },
+      ]);
+    });
+
+    it('dedups identical bytes to the existing Asset — no twin, the first name sticks (ADR-0065)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+
+      const first = await ada.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201);
+      // Same bytes, different filename: returns the SAME Entity, keeping the first name.
+      const again = await ada.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'copy.png').expect(201);
+      expect(again.body.id).toBe(first.body.id);
+      expect(again.body.name).toBe('Portrait');
+
+      // The picker still lists exactly one Asset.
+      expect((await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toHaveLength(1);
+    });
+
+    it('renaming the Asset never moves the served capability URL (extension pinned at mint, ADR-0065)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      const res = await ada.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201);
+      const url = `/assets/${world.body.id}/${res.body.document['core.field.asset'].hash}.png`;
+
+      await ada.patch(`/entities/${res.body.id}`).send({ name: 'A New Name' }).expect(200);
+
+      const summaries = (await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body;
+      // The URL is byte-identical; only the picker label follows the rename.
+      expect(summaries[0].url).toBe(url);
+      expect(summaries[0].originalFilename).toBe('A New Name.png');
     });
 
     it('lets a Contributor mint an Asset (Entity-creation-shaped, not a management power)', async () => {
@@ -400,9 +445,16 @@ describe('Worlds endpoints', () => {
       const bob = await signIn('bob@hexly.test', 'battery staple');
 
       const res = await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Map.png').expect(201);
-      expect(res.body.originalFilename).toBe('Map.png');
+      expect(res.body.name).toBe('Map');
       // A Contributor may also browse the picker list (same contribute standing gates both, board review).
-      expect((await bob.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([res.body]);
+      expect((await bob.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([
+        {
+          url: `/assets/${world.body.id}/${res.body.document['core.field.asset'].hash}.png`,
+          originalFilename: 'Map.png',
+          mime: 'image/png',
+          size: PNG.length,
+        },
+      ]);
     });
 
     it('refuses a Viewer listing or minting Assets with 403 (reachable, but no contribute standing)', async () => {

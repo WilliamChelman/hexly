@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   AssetSummary,
   CreateWorldRequest,
+  EntityDetail,
   MemberRole,
   PublicLink,
   WorldDetail,
@@ -10,6 +11,7 @@ import {
 } from '@hexly/domain';
 import { and, asc, count, eq, inArray, ne } from 'drizzle-orm';
 import { AssetsService } from '../assets/assets.service';
+import { AssetMintService } from '../assets/asset-mint.service';
 import { AclSetResult, gate, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
 import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
@@ -37,6 +39,7 @@ export class WorldsService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly assets: AssetsService,
+    private readonly assetMint: AssetMintService,
     private readonly bus: NudgeBus,
     private readonly writes: WorldWrites,
   ) {}
@@ -342,31 +345,21 @@ export class WorldsService {
   }
 
   /**
-   * Mint a new World Asset from an upload (#269, ADR-0034), returning it as an {@link AssetSummary}
-   * the author can reference. Contributor-gated (owner ∨ contributor ∨ Superadmin) — authoring an
-   * Asset is Entity-creation-shaped, not a World management power: unreachable → 404,
-   * reachable-but-not-contributor → 403. The stored `hash`/`deduped` never leave the service; the
-   * summary is refetched by URL so its `mime` is the row's canonical value, not a re-derivation.
+   * Mint (or dedup to) a World Asset from an upload (#269, ADR-0034, ADR-0065), returning the wrapper
+   * **Asset Entity**. Contributor-gated (owner ∨ contributor ∨ Superadmin) — authoring an Asset is
+   * Entity-creation-shaped, not a World management power: unreachable → 404, reachable-but-not-contributor
+   * → 403. Re-uploading identical bytes returns the existing Asset, first name intact (ADR-0065).
    */
   uploadAsset(
     userId: string,
     id: string,
     filename: string,
     bytes: Uint8Array,
-  ): AssetSummary | 'not-found' | 'forbidden' {
+  ): EntityDetail | 'not-found' | 'forbidden' {
     const meta = worldAccess(this.db, userId).decideMeta(id);
     if (!meta?.reachable) return 'not-found';
     if (!meta.canContribute) return 'forbidden';
-    const { url } = this.assets.store(id, filename, bytes);
-    // Refetch by URL so mime is the persisted row's value (a dedup returns the FIRST store's row).
-    return (
-      this.assets.list(id).find((a) => a.url === url) ?? {
-        url,
-        originalFilename: filename,
-        mime: 'application/octet-stream',
-        size: bytes.length,
-      }
-    );
+    return this.assetMint.mint(userId, id, filename, bytes).entity;
   }
 
   /**

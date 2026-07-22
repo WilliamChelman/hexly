@@ -137,6 +137,12 @@ export interface StructuredDataType {
    */
   harvestFacets?(value: unknown): readonly HarvestedFacet[];
   /**
+   * The content address of the stored bytes this value wraps (ADR-0065): an Asset's content `hash`,
+   * mirrored to the derived `(worldId, hash) → entity` index at the write choke point — the dedup key an
+   * upload resolves against. Absent for every data-type but the asset-ref, which alone owns bytes.
+   */
+  harvestAssetHash?(value: unknown): string | null;
+  /**
    * How this value takes its place in an exported Markdown file (CONTEXT.md → Vault Projection). The
    * data-type supplies the default slot; a Field may override it. `core.datatype.rich-content` projects to the
    * `body`, `core.datatype.hex-grid` to `frontmatter`. Absent when the data-type has no opinion (the vault layer
@@ -161,6 +167,7 @@ export function defineStructuredDataType<T>(definition: {
   readonly extractText?: (value: T) => string;
   readonly facetDimensions?: readonly FacetDimension[];
   readonly harvestFacets?: (value: T) => readonly HarvestedFacet[];
+  readonly harvestAssetHash?: (value: T) => string | null;
   /**
    * The data-type's default {@link VaultProjection}. Its converters see the value *unparsed* (cast to
    * `T`), unlike {@link harvestEdges}/{@link extractText}: an export must tolerate a value this build
@@ -173,7 +180,8 @@ export function defineStructuredDataType<T>(definition: {
   };
 }): StructuredDataType {
   const id = structuredDataTypeIdSchema.parse(definition.id);
-  const { valueSchema, empty, harvestEdges, extractText, facetDimensions, harvestFacets, vault } = definition;
+  const { valueSchema, empty, harvestEdges, extractText, facetDimensions, harvestFacets, harvestAssetHash, vault } =
+    definition;
   const declaredFacetKeys = new Set((facetDimensions ?? []).map((dimension) => dimension.key));
   return Object.freeze<StructuredDataType>({
     id,
@@ -197,6 +205,12 @@ export function defineStructuredDataType<T>(definition: {
         const parsed = valueSchema.safeParse(value);
         // Forward-only, and keys must be declared: a row under an undeclared key never reaches the index.
         return parsed.success ? harvestFacets(parsed.data).filter((row) => declaredFacetKeys.has(row.key)) : [];
+      },
+    }),
+    ...(harvestAssetHash && {
+      harvestAssetHash: (value: unknown) => {
+        const parsed = valueSchema.safeParse(value);
+        return parsed.success ? harvestAssetHash(parsed.data) : null;
       },
     }),
     ...(vault && {

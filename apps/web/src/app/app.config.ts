@@ -28,6 +28,7 @@ import { EntityEmbedHostComponent } from './pages/entity/components/entity-embed
 import { provideEntityViewChoices } from './entity-types/entity-view-choices.provider';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginBoard } from '@hexly/plugin-board/web';
+import { providePluginAsset } from '@hexly/plugin-asset/web';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginDrawSteel } from '@hexly/plugin-draw-steel/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
@@ -94,6 +95,7 @@ export const appConfig: ApplicationConfig = {
     providePluginContent(),
     providePluginHexmap(),
     providePluginBoard(),
+    providePluginAsset(),
     providePluginDnd(),
     providePluginDrawSteel(),
   ],

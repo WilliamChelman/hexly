@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
-import { AssetSummary } from '@hexly/domain';
+import { AssetSummary, EntityDetail } from '@hexly/domain';
 import { AssetsClient } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { DialogRef } from '@hexly/web-ui';
@@ -14,15 +14,17 @@ const EXISTING: AssetSummary[] = [
   { url: '/assets/w1/notes.pdf', originalFilename: 'notes.pdf', mime: 'application/pdf', size: 30 },
 ];
 
+/** The wrapper Asset Entity the upload endpoint returns (ADR-0065) — the picker reads its URL off the ref. */
+const NEW_ASSET = {
+  id: 'asset-new',
+  name: 'new',
+  document: { 'core.field.asset': { hash: 'a'.repeat(64), ext: '.png', mime: 'image/png', size: 5, stats: null } },
+} as unknown as EntityDetail;
+
 /** A fake AssetsClient the picker drives — records the upload call and returns canned streams. */
 class FakeAssetsClient {
   uploaded: File | null = null;
-  uploadResult = of<AssetSummary>({
-    url: '/assets/w1/new.png',
-    originalFilename: 'new.png',
-    mime: 'image/png',
-    size: 5,
-  });
+  uploadResult = of<EntityDetail>(NEW_ASSET);
   list = () => of(EXISTING);
   upload = (_worldId: string, file: File) => {
     this.uploaded = file;
@@ -61,7 +63,8 @@ describe('BoardImagePicker', () => {
     input.dispatchEvent(new Event('change'));
 
     expect(assets.uploaded).toBe(file);
-    expect(closed).toEqual(['/assets/w1/new.png']);
+    // The URL is derived from the wrapper's asset-ref (ADR-0065): /assets/<worldId>/<hash><ext>.
+    expect(closed).toEqual([`/assets/w1/${'a'.repeat(64)}.png`]);
   });
 
   it('closes with an existing Asset’s URL when one is picked (reuse, no upload)', () => {

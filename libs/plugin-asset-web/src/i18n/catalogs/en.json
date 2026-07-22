@@ -1,0 +1,11 @@
+{
+  "eyebrow": "Asset",
+  "titleLabel": "Asset name",
+  "rename": "Rename asset",
+  "editorLabel": "Asset notes",
+  "create": "Create Asset",
+  "untitled": "Untitled asset",
+  "view": {
+    "asset": "Asset"
+  }
+}
