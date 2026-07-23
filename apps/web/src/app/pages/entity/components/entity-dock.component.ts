@@ -36,47 +36,36 @@ import { ViewRegistry } from '../../../entity-types/view-registry';
  * on first open and outletted; a View-contributed Panel is outletted with the running View's injector
  * ({@link EntityDock.viewInjector}, #294), so it reaches the View-scoped services its host View provides.
  *
- * The layout is a flex row `[panel][strip]`. At the `lg` breakpoint the open Panel is an in-flow
- * column, so the page's grid shrinks the main content to make room (it *pushes*); below it the Panel is
- * absolutely positioned left of the strip, *overlaying* the main content instead.
+ * It *floats* over the main content (ADR-0067): the whole Dock is a flex row `[panel][strip]` pinned to
+ * the page body's top-right, inset from the edges, as a rounded card + rounded toggle strip with a
+ * shadow — never a solid flush column, and it never pushes the content. A full-bleed View (Map, Board)
+ * lets it float over the corner; a reading-column View insets its own content so nothing is covered
+ * (the page owns that, keyed off {@link ViewDefinition.layout}). The floating gaps are click-through
+ * (`pointer-events-none` on the row, `-auto` on the card and strip) so they never eat a map gesture.
  */
 @Component({
   selector: 'app-entity-dock',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'relative flex min-h-0' },
+  host: { class: 'absolute top-3 right-3 bottom-3 z-10 flex items-start gap-2 pointer-events-none' },
   imports: [NgComponentOutlet, IconComponent, IconButtonComponent, TranslocoPipe],
-  styles: `
-    /* The open Panel overlays the main content by default — below the breakpoint, and (via a page-set
-       custom property) on wide viewports where a reading-column View leaves side whitespace to seat it
-       (ADR-0067). At \`lg\` the page flips \`--dock-panel-pos\` to \`static\` by omission for a full-bleed
-       View or a too-narrow reading one, so the Panel takes flow and pushes the main content instead. */
-    .dock-panel {
-      position: absolute;
-    }
-    @media (min-width: 64rem) {
-      .dock-panel {
-        position: var(--dock-panel-pos, static);
-      }
-    }
-  `,
   template: `
-    <!-- The open Panel's column stays mounted the whole time a Panel is open — keyed off the slot, not
-         the lazily-fetched body — so switching to a not-yet-loaded Panel never collapses the column and
+    <!-- The open Panel's card stays mounted the whole time a Panel is open — keyed off the slot, not the
+         lazily-fetched body — so switching to a not-yet-loaded Panel never collapses the card and
          flickers it closed/reopen (ADR-0067). The body outlets in once its deferred chunk resolves. -->
     @if (dock.openPanel()) {
       <div
         data-testid="dock-panel"
-        class="dock-panel right-full top-0 bottom-0 z-10 flex w-80 flex-col border-l border-line bg-surface shadow-2"
+        class="pointer-events-auto flex max-h-full w-80 flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-2"
       >
         @if (openPanelBody(); as body) {
           <ng-container *ngComponentOutlet="body.component; injector: body.injector" />
         }
       </div>
     }
-    <!-- Always-visible strip: one toggle per available Panel, known before any lazy body loads. -->
+    <!-- Always-visible floating strip: one toggle per available Panel, known before any lazy body loads. -->
     <div
       data-testid="dock-strip"
-      class="flex w-14 shrink-0 flex-col items-center gap-2 border-l border-line bg-surface-sunken py-3"
+      class="pointer-events-auto flex shrink-0 flex-col items-center gap-2 rounded-lg border border-line bg-surface-sunken p-1.5 shadow-2"
     >
       @for (panel of dock.available(); track panel.id) {
         <button

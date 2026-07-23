@@ -10,7 +10,7 @@ import {
   readField,
   validateFields,
 } from '@hexly/domain';
-import { EyebrowComponent } from '@hexly/web-ui';
+import { EyebrowComponent, SelectComponent } from '@hexly/web-ui';
 import { ENTITY_SESSION } from '../models/entity-session';
 import { ENTITY_TYPES } from '../models/entity-types';
 import { FieldControlComponent } from './field-control.component';
@@ -32,7 +32,7 @@ import { FieldControlComponent } from './field-control.component';
 @Component({
   selector: 'app-details-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EyebrowComponent, FieldControlComponent, TranslocoPipe],
+  imports: [EyebrowComponent, FieldControlComponent, SelectComponent, TranslocoPipe],
   host: {
     class: 'flex flex-col gap-1 p-3 overflow-y-auto bg-surface min-h-0 flex-1',
     'data-testid': 'details-panel',
@@ -64,7 +64,7 @@ import { FieldControlComponent } from './field-control.component';
 
       @if (writable() && addableTypes().length > 0) {
         <select
-          class="py-1 px-2 text-sm text-ink bg-surface-sunken border border-line rounded-md"
+          appSelect
           data-testid="detail-type-add"
           [attr.aria-label]="'fields.details.addType' | transloco"
           (change)="onAddType($event)"
@@ -122,7 +122,8 @@ import { FieldControlComponent } from './field-control.component';
 
     @if (writable() && attachableFields().length > 0) {
       <select
-        class="mt-2 py-1 px-2 text-sm text-ink bg-surface-sunken border border-line rounded-md"
+        appSelect
+        class="mt-2"
         data-testid="detail-field-add"
         [attr.aria-label]="'fields.details.attachField' | transloco"
         (change)="onAttach($event)"
