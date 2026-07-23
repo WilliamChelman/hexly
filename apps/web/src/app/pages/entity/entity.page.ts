@@ -26,13 +26,23 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-hidden' },
   styles: `
-    /* Seat the Dock Panel in a reading-column View's side whitespace instead of pushing the column,
-       once the body is wide enough for it (content 60rem + a 20rem Panel each side + the 3.5rem strip;
-       ADR-0067). Narrower — or a full-bleed View (no \`.reading\`) — leaves the property unset, so the
-       Panel stays in flow and pushes. The flip does not change this container's width, so no loop. */
-    @container entity-body (min-width: 103.5rem) {
-      .reading app-entity-dock {
-        --dock-panel-pos: absolute;
+    /* The Dock floats over the content (ADR-0067); a reading-column View shrinks its own main from the
+       right so the floating Dock never covers the column — as a \`right\` offset, since \`main\` is
+       \`absolute inset-0\` and padding would not move an inset-0 child. No inset while there is side
+       whitespace to float into; a narrow viewport reserves the always-visible strip (closed) or the
+       whole Dock footprint (open). A full-bleed View (no \`.reading\`) never insets — the Dock floats
+       over its corner. */
+    .reading main {
+      transition: right 200ms;
+    }
+    @container entity-body (max-width: 68rem) {
+      .reading main {
+        right: 4rem;
+      }
+    }
+    @container entity-body (min-width: 48rem) and (max-width: 109rem) {
+      .reading.dock-open main {
+        right: 25rem;
       }
     }
   `,
@@ -47,16 +57,17 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
       <div class="grid h-full" style="grid-template-rows: auto 1fr">
         <!-- Page-owned header docked above the body (ADR-0022). -->
         <app-entity-header />
-        <!-- Body: the View's main content beside the page-owned Dock column (ADR-0067). The Dock's open
-             Panel pushes the main content (in-flow column) by default; for a reading-column View on a
-             viewport wide enough to seat the Panel in the side whitespace, it overlays instead so the
-             column never shifts. This row is the query container: its width is stable under the flip. -->
+        <!-- Body: the View's main content fills the row; the page-owned Dock floats over its top-right
+             (ADR-0067), never pushing. This row is the floating Dock's positioning context and the query
+             container (its width is stable, so the reading-column inset can't loop). The dock-open class
+             widens that inset only while a Panel is open. -->
         <div
-          class="grid min-h-0"
+          class="relative min-h-0 overflow-hidden"
           [class.reading]="reading()"
-          style="grid-template-columns: minmax(0, 1fr) auto; container: entity-body / inline-size"
+          [class.dock-open]="dock.isOpen()"
+          style="container: entity-body / inline-size"
         >
-          <main class="relative min-h-0 overflow-hidden">
+          <main class="absolute inset-0 overflow-hidden">
             <!-- The View body — resolution, outletting, and the card/dangling fallbacks — is the
                  reusable Entity View Outlet's now (Seam C, #264), shared with the Board Embed. The page
                  drives its own route-loaded session, so it passes no target id and the default context.
