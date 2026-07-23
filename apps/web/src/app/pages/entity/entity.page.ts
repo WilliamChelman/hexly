@@ -62,7 +62,7 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
              container (its width is stable, so the reading-column inset can't loop). The dock-open class
              widens that inset only while a Panel is open. -->
         <div
-          class="relative min-h-0 overflow-hidden"
+          class="relative min-h-0 overflow-hidden bg-surface-sunken"
           [class.reading]="reading()"
           [class.dock-open]="dock.isOpen()"
           style="container: entity-body / inline-size"
