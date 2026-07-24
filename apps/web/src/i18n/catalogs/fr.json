@@ -337,6 +337,7 @@
     "eyebrow": "Graphe du monde",
     "counts": "{{nodes}} entités · {{edges}} liens",
     "showOrphans": "Afficher les orphelins ({{count}})",
+    "showDecor": "Afficher les liens décoratifs ({{count}})",
     "allOrphansTitle": "Aucune entité n'est reliée.",
     "allOrphansHint": "{{count}} entités orphelines sont masquées. Affichez les orphelins pour les voir, ou reliez-les à votre monde.",
     "emptyTitle": "Rien à dessiner pour l'instant.",

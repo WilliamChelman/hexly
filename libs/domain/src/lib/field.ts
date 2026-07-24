@@ -175,6 +175,14 @@ export const fieldSchemaSchema = z.object({
    * seam by riding {@link Field}; the original leak was that a marker never did. Governs shape, not value.
    */
   systemManaged: z.boolean().optional(),
+  /**
+   * **Decor Link** (CONTEXT.md → Decor Link, ADR-0069): this Field's Entity-Link edges exist for
+   * presentation and carry no worldbuilding meaning. `core.field.thumbnail` sets it; the World-scoped
+   * field editor exposes it as a checkbox (default off) so a user-defined "Portrait" link doesn't
+   * re-flood the graph. Classifies the *edge* at harvest ({@link deriveDocumentState}); relation surfaces
+   * hide decor by default, usage surfaces count it. Only meaningful on an `entityLink` Field.
+   */
+  decor: z.boolean().optional(),
 });
 
 export type FieldSchema = z.infer<typeof fieldSchemaSchema>;
@@ -207,6 +215,8 @@ export function defineField(definition: {
   readonly vault?: { slot: VaultSlot };
   /** **System-managed** (ADR-0068): the system alone attaches/detaches it. Code-registered Fields only. */
   readonly systemManaged?: boolean;
+  /** **Decor Link** (ADR-0069): this Field's edges are presentation-only. `core.field.thumbnail` sets it. */
+  readonly decor?: boolean;
 }): Field {
   return Object.freeze(fieldSchema.parse(definition));
 }

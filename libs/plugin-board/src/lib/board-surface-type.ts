@@ -34,16 +34,19 @@ export const BOARD_SURFACE_DATA_TYPE = defineStructuredDataType({
   empty: emptyBoardSurface,
   harvestEdges: (surface: BoardSurface) => {
     const edges: EntityEdge[] = [];
-    const link = (targetId: string) => edges.push({ targetKind: 'entity', targetId, descriptor: null });
+    // A Board **Embed** and a Text Block's inline Entity Link are always semantic (ADR-0069): embedding is
+    // a curatorial act, a written link is authored meaning — both count as relations even against an Asset.
+    const link = (targetId: string) => edges.push({ targetKind: 'entity', targetId, descriptor: null, decor: false });
     for (const element of surface.elements) {
       if (element.kind === 'embed') {
         link(element.targetEntityId);
       } else if (element.kind === 'image') {
         // An Image element references its Asset by capability URL (content-addressed, ADR-0065); the hash
-        // is the same asset edge Content prose harvests, so usage/orphanhood is one inbound-link read. A
-        // non-Asset `src` (external URL, not-yet-rewritten vault path) resolves to no hash and no edge.
+        // is the same asset edge Content prose harvests. A capability-URL reference is decor by construction
+        // (ADR-0069) — presentation, not a relation — so a Board Image is a Decor Link. A non-Asset `src`
+        // (external URL, not-yet-rewritten vault path) resolves to no hash and no edge.
         const hash = assetHashFromUrl(element.assetUrl);
-        if (hash) edges.push({ targetKind: 'asset', targetId: hash, descriptor: null });
+        if (hash) edges.push({ targetKind: 'asset', targetId: hash, descriptor: null, decor: true });
       } else if (element.kind === 'text' && element.content.format.startsWith('tiptap-')) {
         visit(element.content.snapshot, (node) => {
           if (node.type !== 'entityLink') return;

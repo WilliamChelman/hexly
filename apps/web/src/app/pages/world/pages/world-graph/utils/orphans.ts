@@ -27,3 +27,20 @@ export function withoutOrphans(graph: WorldGraph): WorldGraph {
   if (orphans.size === 0) return graph;
   return { nodes: graph.nodes.filter((n) => !orphans.has(n.id)), edges: graph.edges };
 }
+
+/**
+ * The graph with its **Decor Link** edges dropped — what the show-decor toggle draws when off (the
+ * default, ADR-0069). Nodes are untouched here; orphan computation runs on the result, so an Asset
+ * whose only edges were decor becomes an ordinary orphan and falls out under the show-orphans toggle,
+ * with no asset-specific rule. An Asset deliberately Embedded on a Board keeps its semantic edge and
+ * stays. Applied *after* the server's access filter — hiding decor never widens what a Viewer sees.
+ */
+export function withoutDecorEdges(graph: WorldGraph): WorldGraph {
+  if (!graph.edges.some((e) => e.decor)) return graph;
+  return { nodes: graph.nodes, edges: graph.edges.filter((e) => !e.decor) };
+}
+
+/** How many edges are Decor Links — drives the show-decor toggle's visibility and count. */
+export function decorEdgeCount(graph: WorldGraph): number {
+  return graph.edges.filter((e) => e.decor).length;
+}

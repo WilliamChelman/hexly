@@ -59,7 +59,8 @@ describe('World Graph', () => {
       { id: ealdred, name: 'Ealdred', types: ['core.type.note'] },
       { id: mira, name: 'Mira', types: ['core.type.note'] },
     ]);
-    expect(edges).toEqual([{ source: ealdred, target: mira, descriptor: 'spouse' }]);
+    // A prose Entity Link is semantic (ADR-0069): the payload carries the flag; the client filters on it.
+    expect(edges).toEqual([{ source: ealdred, target: mira, descriptor: 'spouse', decor: false }]);
   });
 
   /** A typed Entity-Link Field relation feeds the same edge index as a Content or map link. */
@@ -81,7 +82,7 @@ describe('World Graph', () => {
 
     // Ada owns both, so the Field relation draws as an edge.
     const asAda = await graphOf(ada, world);
-    expect(asAda.edges).toEqual([{ source: aboleth, target: lair, descriptor: null }]);
+    expect(asAda.edges).toEqual([{ source: aboleth, target: lair, descriptor: null, decor: false }]);
 
     // Bob cannot read the private lair, so the edge (and its endpoint) drop — nothing dangles.
     const asBob = await graphOf(bob, world);
@@ -219,7 +220,9 @@ describe('World Graph', () => {
 
     expect(names(nodes)).toEqual(['Ealdred', 'Portrait']);
     expect(drawn({ nodes, edges })).toEqual(['Ealdred → Portrait']);
-    expect(edges).toEqual([{ source: ealdred, target: portrait, descriptor: null }]);
+    // A prose image is decor by construction (ADR-0069): the edge is in the payload, flagged, so the
+    // client hides it (and the Asset falls out as an orphan) by default but can reveal it.
+    expect(edges).toEqual([{ source: ealdred, target: portrait, descriptor: null, decor: true }]);
   });
 
   /** An identical hash in another World shares no Entity, so its asset edge never leaks across. */

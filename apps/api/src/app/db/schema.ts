@@ -292,13 +292,18 @@ export const entityEdges = sqliteTable(
       .notNull()
       .references(() => entities.id, { onDelete: 'cascade' }),
     worldId: text('world_id').notNull(),
-    // entity | asset. Asset edges are stored but surface-less — groundwork for Asset GC.
+    // entity | asset. Asset-hash edges are ordinary Decor Links now (ADR-0069) — hidden by
+    // default on relation surfaces, always counted in inbound usage.
     targetKind: text('target_kind').$type<EdgeTargetKind>().notNull(),
     // An `entityId`, or an Asset `hash`. Dangling-allowed, so no FK.
     targetId: text('target_id').notNull(),
     // The Link Descriptor, on `content → entity` edges alone. Two descriptors to the same
     // target are two edges ("spouse" *and* "rival" between one pair).
     descriptor: text('descriptor'),
+    // A **Decor Link** (ADR-0069): the edge exists for presentation, not worldbuilding meaning —
+    // written at harvest by the edge's producer (capability-URL images, `decor` Fields), rebuilt by
+    // Reindex. Relation reads (World Graph, outbound References) filter on it; usage reads count it.
+    decor: integer('decor', { mode: 'boolean' }).notNull().default(false),
   },
   (table) => [
     // Outbound: an Entity's References.

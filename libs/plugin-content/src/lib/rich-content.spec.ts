@@ -29,18 +29,19 @@ describe('core.datatype.rich-content data-type (ADR-0051)', () => {
   });
 
   describe('harvestEdges — the inline Entity Links and image Assets', () => {
-    it('reads a content entityLink as an edge to that Entity, carrying its Link Descriptor', () => {
+    it('reads a content entityLink as a semantic edge to that Entity, carrying its Link Descriptor', () => {
+      // A prose Entity Link is always semantic (ADR-0069): authored meaning, never decor.
       expect(harvest(prose({ entityId: 'mira', label: 'Mira', descriptor: 'spouse' }))).toEqual([
-        { targetKind: 'entity', targetId: 'mira', descriptor: 'spouse' },
+        { targetKind: 'entity', targetId: 'mira', descriptor: 'spouse', decor: false },
       ]);
     });
 
     it('trims the authored descriptor and treats a blank one as none', () => {
       expect(harvest(prose({ entityId: 'mira', descriptor: '  Capital Of  ' }))).toEqual([
-        { targetKind: 'entity', targetId: 'mira', descriptor: 'Capital Of' },
+        { targetKind: 'entity', targetId: 'mira', descriptor: 'Capital Of', decor: false },
       ]);
       expect(harvest(prose({ entityId: 'mira', descriptor: '  ' }))).toEqual([
-        { targetKind: 'entity', targetId: 'mira', descriptor: null },
+        { targetKind: 'entity', targetId: 'mira', descriptor: null, decor: false },
       ]);
     });
 
@@ -49,7 +50,8 @@ describe('core.datatype.rich-content data-type (ADR-0051)', () => {
       expect(harvest(prose({ label: 'Ghost' }))).toEqual([]);
     });
 
-    it('reads an image at an Asset URL as an asset edge, and an external image as none', () => {
+    it('reads an image at an Asset URL as a decor asset edge, and an external image as none', () => {
+      // A prose image is a capability-URL reference — decor by construction (ADR-0069).
       const hash = 'a'.repeat(64);
       const value = tiptapContent({
         type: 'doc',
@@ -58,7 +60,7 @@ describe('core.datatype.rich-content data-type (ADR-0051)', () => {
           { type: 'image', attrs: { src: 'https://example.test/cat.png' } },
         ],
       });
-      expect(harvest(value)).toEqual([{ targetKind: 'asset', targetId: hash, descriptor: null }]);
+      expect(harvest(value)).toEqual([{ targetKind: 'asset', targetId: hash, descriptor: null, decor: true }]);
     });
 
     it('finds links nested deep in the document tree', () => {
@@ -81,7 +83,7 @@ describe('core.datatype.rich-content data-type (ADR-0051)', () => {
           },
         ],
       });
-      expect(harvest(value)).toEqual([{ targetKind: 'entity', targetId: 'e1', descriptor: 'liege' }]);
+      expect(harvest(value)).toEqual([{ targetKind: 'entity', targetId: 'e1', descriptor: 'liege', decor: false }]);
     });
 
     it('reads no edges under a format tag this build cannot walk', () => {

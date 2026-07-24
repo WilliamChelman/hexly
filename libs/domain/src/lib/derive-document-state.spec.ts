@@ -19,7 +19,12 @@ const BOARD = defineStructuredDataType({
   valueSchema: z.object({ tiles: z.array(z.object({ entityId: z.string(), name: z.string().optional() })) }),
   empty: () => ({ tiles: [] }),
   harvestEdges: (board) =>
-    board.tiles.map((tile) => ({ targetKind: 'entity' as const, targetId: tile.entityId, descriptor: null })),
+    board.tiles.map((tile) => ({
+      targetKind: 'entity' as const,
+      targetId: tile.entityId,
+      descriptor: null,
+      decor: false,
+    })),
   extractText: (board) =>
     board.tiles
       .map((tile) => tile.name ?? '')
@@ -31,7 +36,12 @@ const LINKS = defineStructuredDataType({
   valueSchema: z.array(z.object({ entityId: z.string(), descriptor: z.string().nullish() })),
   empty: () => [],
   harvestEdges: (links) =>
-    links.map((l) => ({ targetKind: 'entity' as const, targetId: l.entityId, descriptor: l.descriptor ?? null })),
+    links.map((l) => ({
+      targetKind: 'entity' as const,
+      targetId: l.entityId,
+      descriptor: l.descriptor ?? null,
+      decor: false,
+    })),
 });
 const PROSE = defineStructuredDataType({
   id: 'test.datatype.prose',
@@ -67,8 +77,8 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
           linksField,
         ]).edges,
       ).toEqual([
-        { targetKind: 'entity', targetId: 'mira', descriptor: 'spouse' },
-        { targetKind: 'entity', targetId: 'mira', descriptor: 'rival' },
+        { targetKind: 'entity', targetId: 'mira', descriptor: 'spouse', decor: false },
+        { targetKind: 'entity', targetId: 'mira', descriptor: 'rival', decor: false },
       ]);
     });
 
@@ -83,8 +93,8 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
           [linksField],
         ).edges,
       ).toEqual([
-        { targetKind: 'entity', targetId: 'mira', descriptor: 'Spouse' },
-        { targetKind: 'entity', targetId: 'mira', descriptor: null },
+        { targetKind: 'entity', targetId: 'mira', descriptor: 'Spouse', decor: false },
+        { targetKind: 'entity', targetId: 'mira', descriptor: null, decor: false },
       ]);
     });
   });
@@ -94,7 +104,9 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
 
     it('emits an edge per Entity-Link Field value, resolved against the Entity fields', () => {
       const doc: EntityDocument = { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } };
-      expect(derive(doc, [lair]).edges).toEqual([{ targetKind: 'entity', targetId: 'whisperwood', descriptor: null }]);
+      expect(derive(doc, [lair]).edges).toEqual([
+        { targetKind: 'entity', targetId: 'whisperwood', descriptor: null, decor: false },
+      ]);
     });
 
     it('reads no Field edge without the resolved fields', () => {
@@ -108,8 +120,8 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
         board: { tiles: [{ entityId: 'riverbend' }, { entityId: 'harbour' }] },
       };
       expect(derive(doc, [lair, boardField]).edges).toEqual([
-        { targetKind: 'entity', targetId: 'riverbend', descriptor: null },
-        { targetKind: 'entity', targetId: 'harbour', descriptor: null },
+        { targetKind: 'entity', targetId: 'riverbend', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'harbour', descriptor: null, decor: false },
       ]);
     });
 
@@ -118,13 +130,35 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
     });
   });
 
+  describe('edges: Decor Link classification (ADR-0069)', () => {
+    const lair = field('lair', 'entityLink');
+    const portrait: Field = { ...field('portrait', 'entityLink'), decor: true };
+
+    it('marks a `decor` Field’s edge as decor and a plain link’s as semantic', () => {
+      const doc: EntityDocument = { lair: { entityId: 'riverbend' }, portrait: { entityId: 'cover-art' } };
+      expect(derive(doc, [lair, portrait]).edges).toEqual([
+        { targetKind: 'entity', targetId: 'riverbend', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'cover-art', descriptor: null, decor: true },
+      ]);
+    });
+
+    it('upgrades a merged edge out of decor when any producer links it semantically', () => {
+      // A Thumbnail (decor) and a prose link to the same target collapse to one edge: the semantic reason
+      // to link wins, so the target is not subdued as decor. `LINKS` harvests semantic edges.
+      const doc: EntityDocument = { portrait: { entityId: 'mira' }, links: [{ entityId: 'mira' }] };
+      expect(derive(doc, [portrait, linksField]).edges).toEqual([
+        { targetKind: 'entity', targetId: 'mira', descriptor: null, decor: false },
+      ]);
+    });
+  });
+
   describe('edges: Structured Data Type (ADR-0050)', () => {
     const board = (): EntityDocument => ({ board: { tiles: [{ entityId: 'riverbend' }, { entityId: 'harbour' }] } });
 
     it('takes the edges the data-type harvests from its own value', () => {
       expect(derive(board(), [boardField]).edges).toEqual([
-        { targetKind: 'entity', targetId: 'riverbend', descriptor: null },
-        { targetKind: 'entity', targetId: 'harbour', descriptor: null },
+        { targetKind: 'entity', targetId: 'riverbend', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'harbour', descriptor: null, decor: false },
       ]);
     });
 
@@ -248,7 +282,7 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
         DATA_TYPES,
         { thumbnailFieldId: THUMB },
       ).edges;
-      expect(edges).toEqual([{ targetKind: 'entity', targetId: 'portrait-1', descriptor: null }]);
+      expect(edges).toEqual([{ targetKind: 'entity', targetId: 'portrait-1', descriptor: null, decor: false }]);
     });
   });
 
@@ -261,7 +295,7 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
       };
       const state = derive(doc, [proseField, linksField, statField]);
       expect(state.searchText).toBe('The keep at Riverbend.');
-      expect(state.edges).toEqual([{ targetKind: 'entity', targetId: 'mira', descriptor: 'Spouse' }]);
+      expect(state.edges).toEqual([{ targetKind: 'entity', targetId: 'mira', descriptor: 'Spouse', decor: false }]);
       expect(state.descriptors).toEqual(['spouse']);
       expect(state.fieldFacets).toContainEqual({ key: 'cr', value: '5', num: 5 });
     });

@@ -5,7 +5,7 @@ import { WorldGraph as WorldGraphPayload } from '@hexly/domain';
 import { ActiveWorld, entityRoute, ToasterService, WorldsClient } from '@hexly/web-core';
 import { EyebrowComponent, PageHeaderComponent, PanelComponent } from '@hexly/web-ui';
 import { GraphCanvasComponent, GraphOpen } from './components/graph-canvas.component';
-import { orphanIds, withoutOrphans } from './utils/orphans';
+import { decorEdgeCount, orphanIds, withoutDecorEdges, withoutOrphans } from './utils/orphans';
 
 /**
  * The World Graph page at `/w/:worldId/graph`: the World's readable Entities as nodes, their Entity
@@ -33,6 +33,17 @@ import { orphanIds, withoutOrphans } from './utils/orphans';
           <span class="text-sm text-ink-muted" data-testid="graph-counts">
             {{ 'worldGraph.counts' | transloco: { nodes: g.nodes.length, edges: g.edges.length } }}
           </span>
+          @if (decorCount(); as decor) {
+            <button
+              type="button"
+              [attr.aria-pressed]="showDecor()"
+              class="font-sans text-sm text-ink-strong px-2 py-1 rounded-sm hover:bg-surface-sunken aria-pressed:bg-gold/15 aria-pressed:text-gold"
+              data-testid="graph-decor-toggle"
+              (click)="showDecor.set(!showDecor())"
+            >
+              {{ 'worldGraph.showDecor' | transloco: { count: decor } }}
+            </button>
+          }
           @if (orphanCount(); as orphans) {
             <button
               type="button"
@@ -95,14 +106,38 @@ export class WorldGraphPage {
    * instant and never re-fetches.
    */
   protected readonly showOrphans = signal(false);
-  /** How many nodes the toggle would reveal; `0` hides the toggle — nothing to show. */
-  protected readonly orphanCount = computed(() => {
+  /**
+   * The show-decor-links reveal, default off (ADR-0069): **Decor Links** (a Thumbnail designation, a
+   * prose/Board image, a user "presentation only" link) are presentation, not worldbuilding relations,
+   * so they stay hidden until the reader peeks. Ephemeral by decision — never persisted. Rides the
+   * client like the orphans toggle: the whole World is in memory, so a flip is instant and never
+   * re-fetches. The server has already access-filtered both endpoints, so this filter only narrows
+   * *presentation*, never what the viewer may see.
+   */
+  protected readonly showDecor = signal(false);
+  /** How many edges the decor toggle would reveal; `0` hides the toggle — no decor to show. */
+  protected readonly decorCount = computed(() => {
     const g = this.graph();
+    return g ? decorEdgeCount(g) : 0;
+  });
+  /**
+   * The graph with Decor Links resolved: dropped unless the decor toggle is on. Orphan computation and
+   * the drawn graph both derive from *this*, so decor filtering runs **before** orphan detection — an
+   * Asset whose only edges are decor becomes an ordinary orphan and hides under the orphans toggle.
+   */
+  private readonly decorResolved = computed(() => {
+    const g = this.graph();
+    if (!g) return null;
+    return this.showDecor() ? g : withoutDecorEdges(g);
+  });
+  /** How many nodes the orphans toggle would reveal, given the current decor visibility; `0` hides it. */
+  protected readonly orphanCount = computed(() => {
+    const g = this.decorResolved();
     return g ? orphanIds(g).size : 0;
   });
-  /** The graph as drawn: orphans dropped unless the toggle is on. */
+  /** The graph as drawn: decor filtered first, then orphans dropped unless the orphans toggle is on. */
   protected readonly visibleGraph = computed(() => {
-    const g = this.graph();
+    const g = this.decorResolved();
     if (!g) return null;
     return this.showOrphans() ? g : withoutOrphans(g);
   });

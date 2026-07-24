@@ -13,7 +13,10 @@ import { linkedEntity } from '../entities/utils/linked-entity';
  * so the content-addressed asset edges are resolved to the Asset's Entity here, at read time.
  *
  * Unlike the other edge surfaces, **both** endpoints are access-filtered here: an edge the viewer
- * cannot fully see is dropped, not rendered as a dangling target.
+ * cannot fully see is dropped, not rendered as a dangling target. Each edge carries its **Decor Link**
+ * flag (ADR-0069); the payload is unfiltered on it — the client subdues decor behind an ephemeral reveal
+ * and computes orphans *after*, so the access filter always runs before the decor filter, and a
+ * decor-only Asset falls out as an ordinary orphan with no asset-specific code.
  */
 @Injectable()
 export class WorldGraphService {
@@ -33,8 +36,8 @@ export class WorldGraphService {
   /**
    * Every Entity of the World the viewer can read — filtered off the entities table, not the edge
    * table, so a link-less orphan is a node like any other. Assets are Entities (ADR-0065), so they
-   * fall out of this same query as ordinary nodes; the client's show-orphans toggle, not this read,
-   * keeps unlinked ones (bulk-minted art) from flooding the picture.
+   * fall out of this same query as ordinary nodes; the client's decor + show-orphans filters, not this
+   * read, keep unlinked ones (bulk-minted art, decor-only Assets) from flooding the picture.
    *
    * An Entity {@link linkedEntity} cannot resolve — one whose stored types are malformed — is
    * dropped rather than thrown on, so one bad row cannot 500 a whole World's graph.
@@ -69,6 +72,7 @@ export class WorldGraphService {
         source: entityEdges.sourceEntityId,
         target: entityEdges.targetId,
         descriptor: entityEdges.descriptor,
+        decor: entityEdges.decor,
       })
       .from(entityEdges)
       .where(and(eq(entityEdges.worldId, worldId), eq(entityEdges.targetKind, 'entity')))
@@ -80,6 +84,7 @@ export class WorldGraphService {
         source: entityEdges.sourceEntityId,
         target: assetIndex.entityId,
         descriptor: entityEdges.descriptor,
+        decor: entityEdges.decor,
       })
       .from(entityEdges)
       .innerJoin(

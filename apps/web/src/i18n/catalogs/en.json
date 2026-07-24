@@ -337,6 +337,7 @@
     "eyebrow": "World graph",
     "counts": "{{nodes}} entities · {{edges}} links",
     "showOrphans": "Show orphans ({{count}})",
+    "showDecor": "Show decor links ({{count}})",
     "allOrphansTitle": "Every entity is unlinked.",
     "allOrphansHint": "{{count}} orphan entities are hidden. Show orphans to see them, or link them into your world.",
     "emptyTitle": "Nothing to draw yet.",

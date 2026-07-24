@@ -17,6 +17,15 @@ export interface EntityEdge {
   /** An `entityId`, or an Asset `hash`. Dangling-allowed — never a referential constraint. */
   readonly targetId: string;
   readonly descriptor: string | null;
+  /**
+   * A **Decor Link** (CONTEXT.md → Decor Link, ADR-0069): the edge exists for presentation and carries
+   * no worldbuilding meaning, declared where the edge is born. Relation surfaces (World Graph, outbound
+   * References) hide decor by default behind a reveal; the inbound usage surface counts it regardless. A
+   * capability-URL reference (a prose image, a Board **Image**) is decor by construction; a `decor` Field
+   * (`core.field.thumbnail`, a user-defined "presentation only" link) mints decor; prose Entity Links and
+   * Board **Embeds** are always semantic.
+   */
+  readonly decor: boolean;
 }
 
 /**

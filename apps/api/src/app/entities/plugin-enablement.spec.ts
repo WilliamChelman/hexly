@@ -108,6 +108,7 @@ describe('plugin enablement — uniform absence on the server', () => {
         targetKind: 'entity',
         targetId: 'ashford-note',
         descriptor: null,
+        decor: false,
       });
       expect(state.searchText).toContain('Ashford');
     });

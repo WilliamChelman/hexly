@@ -222,6 +222,43 @@ describe('EntityWrites', () => {
     });
 
     /**
+     * Decor classification is materialized at harvest (ADR-0069): a prose image is a capability-URL
+     * reference, decor by construction, while a prose Entity Link is semantic. The flag rides the row so
+     * the read paths filter on the column, never reclassifying per read.
+     */
+    it('writes the decor flag at harvest — a prose image edge is decor, a prose link is not', () => {
+      const hash = 'a'.repeat(64);
+      writes.insert({
+        ownerId: ADA,
+        worldId: WORLD,
+        name: 'Illustrated',
+        types: ['core.type.note'],
+        tags: [],
+        document: {
+          'core.field.content': tiptapContent({
+            type: 'doc',
+            content: [
+              { type: 'paragraph', content: [{ type: 'entityLink', attrs: { entityId: 'e2' } }] },
+              { type: 'image', attrs: { src: `/assets/${WORLD}/${hash}.png` } },
+            ],
+          }),
+        },
+      });
+
+      const decorByTarget = db
+        .select({ targetKind: entityEdges.targetKind, targetId: entityEdges.targetId, decor: entityEdges.decor })
+        .from(entityEdges)
+        .where(eq(entityEdges.sourceEntityId, idOf('Illustrated')))
+        .all();
+      expect(decorByTarget).toEqual(
+        expect.arrayContaining([
+          { targetKind: 'entity', targetId: 'e2', decor: false },
+          { targetKind: 'asset', targetId: hash, decor: true },
+        ]),
+      );
+    });
+
+    /**
      * The edge keeps the descriptor as the author typed it; the `::` vocabulary folds case, as
      * Tags do.
      */

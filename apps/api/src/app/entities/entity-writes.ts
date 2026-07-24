@@ -43,8 +43,8 @@ const INITIAL_VERSION = 1;
  */
 const MAX_BOUND_PARAMS = 32766;
 
-/** Columns bound per `entity_edges` row: source, world, kind, target, descriptor. */
-const EDGE_COLUMNS = 5;
+/** Columns bound per `entity_edges` row: source, world, kind, target, descriptor, decor. */
+const EDGE_COLUMNS = 6;
 /** Columns bound per `entity_descriptors` row: entity, descriptor. */
 const DESCRIPTOR_COLUMNS = 2;
 /** Columns bound per `entity_field_facets` row: entity, world, key, value, num. */
