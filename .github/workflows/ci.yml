@@ -96,38 +96,17 @@ jobs:
           path: apps/web-e2e/playwright-report/
           retention-days: 7
 
+  # Version preview: reports the version that would be released, without cutting
+  # it. Runs on push to main/beta (post-merge) because a real preview needs the
+  # true branch/event — semantic-release's env-ci short-circuits on pull_request
+  # ("won't publish") and GitHub reserves GITHUB_* so a workflow can't spoof its
+  # way out of that on a PR. Releases are cut only via the manual release job.
   release-preview:
-    if: >-
-      github.event_name == 'pull_request' &&
-      (github.base_ref == 'main' || github.base_ref == 'beta')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: ./.github/actions/setup
-
-      - name: Release dry-run
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Tell semantic-release we're on the target branch so it analyses
-          # the commits and reports the version that would be released.
-          GITHUB_REF: refs/heads/${{ github.base_ref }}
-        run: pnpm exec semantic-release --dry-run
-
-  # Releases are intentionally NOT automated on main/beta: a push only reports
-  # the version that would be released (dry-run). Cut releases manually via the
-  # workflow_dispatch-gated `release` job below.
-  release-dry-run:
     needs: [build, e2e]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    # --dry-run publishes nothing, but on a push event semantic-release still
-    # verifies push auth (git push --dry-run), which needs write; the top-level
-    # contents:read would otherwise fail it with a 403. (On pull_request it
-    # short-circuits as a PR build before that check, so release-preview needs no
-    # such grant.)
+    # --dry-run publishes nothing, but on a push event semantic-release still runs
+    # a git push --dry-run auth probe; the top-level contents:read would 403 it.
     permissions:
       contents: write
 
