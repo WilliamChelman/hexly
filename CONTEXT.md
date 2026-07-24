@@ -219,7 +219,7 @@ The closed set of actions a given caller may perform on a specific Entity or Wor
 _Avoid_: Permissions, ACL, capabilities, grants (a grant is one input to Rights)
 
 **Entity Visibility**:
-A two-value field on every Entity: `private` (default — Owners and entity-level grants only) or `shared` (all World members). Private is absolute within the collaboration model; only a Superadmin, outside it, can reach a `private` Entity.
+A two-value field on every Entity: `private` (default — Owners and entity-level grants only) or `shared` (all World members). Private is absolute within the collaboration model; only a Superadmin, outside it, can reach a `private` Entity. Inert where **Collaboration** is off: nothing reads it, and every Entity keeps the default.
 _Avoid_: Published, public, visible
 
 **Owner**:
@@ -297,7 +297,7 @@ A Cmd/Ctrl+K overlay, reachable from anywhere, for finding Entities and Worlds a
 _Avoid_: Quick open, search bar, spotlight
 
 **Command**:
-A single invocable entry in the Command Palette. Distinct from a Tool: invoking a Command may arm a Tool, but a Command is not one.
+A single invocable action, listed in the **Command Palette** and, in the **Desktop App**, in the native app menu. Distinct from a Tool: invoking a Command may arm a Tool, but a Command is not one.
 _Avoid_: Action, shortcut
 
 **Command Prefix**:
@@ -377,12 +377,28 @@ A bundled, compiled-in unit contributing **Entity Types**, **Fields**, **Views**
 _Avoid_: Extension, addon, module, package
 
 **Instance**:
-A single self-hosted deployment of Hexly, over one Instance Directory. The unit an operator runs, configures, and backs up.
+A single self-hosted deployment of Hexly, over one Instance Directory, carrying a **Deployment Profile**. The unit an operator runs, configures, and backs up.
 _Avoid_: Server, deployment, tenant
 
 **Instance Directory**:
 The folder an operator points Hexly at, holding its database and Instance Configuration.
 _Avoid_: Data directory, data folder, db path, storage dir
+
+**Deployment Profile**:
+Which shape of deployment an **Instance** is — `desktop` or `server` — pinned by its entry point rather than configured, and read by the client to gate affordances that make sense in only one of them.
+_Avoid_: Mode, environment, platform, packaging, target
+
+**Desktop App**:
+Hexly packaged as a native application — an Electron shell hosting the API in its own process over its own **Instance Directory**. Always the `desktop` **Deployment Profile** with **Collaboration** off, and never able to reach a remote Instance.
+_Avoid_: Electron app, client, local mode, offline mode
+
+**Collaboration**:
+The sharing layer entire — World roles, entity grants, **Entity Visibility**, and Public Links — switched on or off per **Instance**. Off leaves a single **Sole User** owning everything, the sharing surfaces absent and their routes answering 404.
+_Avoid_: Sharing (one part of it), ACL, permissions, multiplayer
+
+**Sole User**:
+The one account of an **Instance** whose **Collaboration** is off, holding **Superadmin** and every **Instance Role** so no rule ever denies it. The **Desktop App** seeds and authenticates its own at first launch, with no password involved.
+_Avoid_: Local user, default user, admin, single user, anonymous
 
 **Instance Role**:
 A member of the closed set of instance-wide powers a user account may hold — `manage-users` and `create-worlds` today, orthogonal (ADR-0047). Distinct from a collaboration role (Owner, Editor…), which is a standing on a specific World or Entity.

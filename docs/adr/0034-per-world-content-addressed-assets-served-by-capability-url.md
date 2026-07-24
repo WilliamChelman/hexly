@@ -14,3 +14,11 @@ Vault import brings binary **Assets** (images, PDFs) — a subsystem Hexly had n
 
 - **Authenticated serving, S3, or DB blobs** — rejected as over-built for the scale; local files + capability URLs are the lazy path that ships.
 - **Defer binary storage, preserve only the reference as text** — considered as the v1 default, rejected: a map-heavy TTRPG vault renders too partially without its images, so Assets had to be in scope now.
+
+## Amendment: `assets.dir` overrides the root (ADR-0070)
+
+"Beside the SQLite DB" is now the _default_, not the rule. `hexly.yml` gains `assets.dir` — absolute, or relative to the Instance Directory, defaulting to `assets` — read through the existing `resolveAssetsDir` seam, with the `ASSETS_DIR` provider injecting `HEXLY_CONFIG` the way `MulterModule.registerAsync` does, so no consumer and no decorator reads config (ADR-0036).
+
+The split is safety, not convenience. ADR-0002 runs SQLite in WAL mode, and a cloud-sync daemon or network mount rewriting `hexly.db`/`-wal` under an open handle corrupts the vault — which is why ADR-0070 pins the **Desktop App**'s Instance Directory to `userData` with no picker. Asset bytes carry no such hazard: content-addressed and write-once, an unsynced or unmounted file degrades to missing bytes, never to a corrupt database. They are also the bulk of the data, so they are the part worth moving to an external drive, a NAS, or a big mounted volume — which serves the Docker operator (fast local disk for the DB) as much as the desktop user.
+
+Changing the knob **does not move existing bytes**: the new root is simply a new root, and an 8 GB cross-volume copy at boot with no progress, no cancel, and a partial-failure state where neither root is complete is worse than a deliberate move. The Desktop App therefore owns the move itself — a native picker that copies with progress, verifies by sha256, rewrites `hexly.yml`, and calls `app.relaunch()`, since config is read once at boot. Bytes stranded by a hand-edited `hexly.yml` surface as a missing-bytes indicator on the Asset rather than only in a log a desktop user never opens; presence is cheap to check, because every hash is already in the `assets` table.
