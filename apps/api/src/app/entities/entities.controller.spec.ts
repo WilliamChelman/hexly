@@ -171,6 +171,38 @@ describe('Entities endpoints', () => {
     });
   });
 
+  /**
+   * The **System-managed** create guard (ADR-0068): a raw `POST /entities` may no more mint an
+   * asset-typed Entity than a raw edit may add the asset type to a hand-made one. Only the system's own
+   * mint/import/reindex paths (which call `writes.insert` directly, not this create seam) assign it.
+   */
+  it('rejects a raw create carrying the System-managed asset type', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+
+    await ada
+      .post('/entities')
+      .send({ name: 'Fake', types: ['core.type.asset'] })
+      .expect(403);
+  });
+
+  /**
+   * The escalation the shape diff alone would miss: a create whose *document* carries a `core.field.asset`
+   * value attaches the System-managed Field through the effective set (ADR-0057), forging an `asset_index`
+   * dedup row for bytes no upload ever stored. The guard consults the effective set, so it is caught too.
+   */
+  it('rejects a raw create attaching the System-managed asset-ref Field via a crafted document', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+
+    await ada
+      .post('/entities')
+      .send({
+        name: 'Forged',
+        types: ['core.type.note'],
+        document: { 'core.field.asset': { hash: 'a'.repeat(64), ext: '.png', mime: 'image/png', size: 1 } },
+      })
+      .expect(403);
+  });
+
   it('trims surrounding whitespace off a created entity name', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
 

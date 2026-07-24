@@ -599,15 +599,30 @@ export class EntityWrites {
     for (const typeId of this.typeFields.systemManagedTypes)
       if (storedTypes.includes(typeId) !== nextTypes.includes(typeId)) return true;
 
-    const systemFields = this.typeFields.systemManagedFields;
-    if (systemFields.length === 0) return false;
     const storedDoc = JSON.parse(row.document) as EntityDocument;
     const nextDoc = change.document ?? storedDoc;
-    const idsOf = (types: readonly string[], doc: EntityDocument) =>
-      new Set(this.worldTypeFields.effectiveFields(row.worldId, types, doc).map((f) => f.id));
-    const stored = idsOf(storedTypes, storedDoc);
-    const next = idsOf(nextTypes, nextDoc);
-    return systemFields.some((fieldId) => stored.has(fieldId) !== next.has(fieldId));
+
+    const systemFields = this.typeFields.systemManagedFields;
+    if (systemFields.length > 0) {
+      const idsOf = (types: readonly string[], doc: EntityDocument) =>
+        new Set(this.worldTypeFields.effectiveFields(row.worldId, types, doc).map((f) => f.id));
+      const stored = idsOf(storedTypes, storedDoc);
+      const next = idsOf(nextTypes, nextDoc);
+      if (systemFields.some((fieldId) => stored.has(fieldId) !== next.has(fieldId))) return true;
+    }
+
+    // Hash-presence invariant (ADR-0068): the marker governs shape not value, save the one identity the
+    // value carries — an Asset's content hash. A raw edit that keeps the asset type/Field attached but
+    // guts the asset-ref value (`{}` or a stripped hash) leaves the shape untouched yet harvests the hash
+    // to null, deleting the `(worldId, hash)` dedup row and orphaning the bytes on disk (unreachable by
+    // delete, unaccounted by Reindex) — the same leak stripping the shape would cause, by another door. So
+    // a user edit may not drive an asset-typed Entity's harvested hash from non-null to null.
+    if (change.document !== undefined && this.typeFields.systemManagedTypes.some((t) => nextTypes.includes(t))) {
+      const storedHash = this.derive(storedDoc, storedTypes, row.worldId).assetHash;
+      if (storedHash !== null && this.derive(nextDoc, nextTypes, row.worldId).assetHash === null) return true;
+    }
+
+    return false;
   }
 
   /** Fire the registered deletion reapers for a just-committed single-Entity delete (ADR-0065). */

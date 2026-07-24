@@ -630,6 +630,12 @@ export class EntitiesService {
     // The effective set — hence the defaults to mint — is the types' defaults plus whatever the initial
     // document already attaches (a namespaced key no type defaults, ADR-0057).
     const fields = this.worldTypeFields.effectiveFields(worldId, req.types, req.document);
+    // System-managed shape guard on create (ADR-0068): the write choke point rejects a user *edit* that
+    // adds a System-managed type/Field, and a raw create is that same add by another door — minting an
+    // asset-typed Entity, or attaching `core.field.asset` through a crafted document key (which would forge
+    // an `asset_index` dedup row). The system's own paths — mint, importers, Reindex — insert through
+    // `writes.insert` directly, never this create seam, so they stay unaffected.
+    if (this.createsSystemManaged(req.types, fields)) throw new ForbiddenException();
     const minted = emptyEntityDocument(fields, this.typeFields.structuredDataTypes);
     // Initial document seeds over the minted defaults. Ungated: like an import, a create establishes
     // at-rest data (the Field gate is save-only). The seed is stripped of the reserved `hexly.*`
@@ -645,6 +651,19 @@ export class EntitiesService {
       document: doc,
     });
     return detailOf(row, doc);
+  }
+
+  /**
+   * Whether a user create would introduce a **System-managed** type or Field (ADR-0068) — the add the write
+   * choke point rejects for an edit, closed here for the create door too. The effective set already folds in
+   * a document-attached Field (ADR-0057), so a crafted `core.field.asset` key is caught even when no type
+   * names it. Names no type/Field of its own: it consults the registry's marker, like every other surface.
+   */
+  private createsSystemManaged(types: readonly EntityType[], fields: readonly Field[]): boolean {
+    const systemTypes = new Set(this.typeFields.systemManagedTypes);
+    if (types.some((t) => systemTypes.has(t))) return true;
+    const systemFields = new Set(this.typeFields.systemManagedFields);
+    return fields.some((f) => systemFields.has(f.id));
   }
 
   /**

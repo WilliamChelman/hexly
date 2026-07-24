@@ -494,6 +494,51 @@ describe('EntityWrites', () => {
       });
 
       /**
+       * The `entity_edges.decor` flag is derived state rebuilt by Reindex like the edges themselves
+       * (ADR-0069): an edge persisted with the wrong classification — a decor prose image stored as
+       * semantic, a semantic prose Entity Link stored as decor — is reclassified from the document alone
+       * on the next reindex, so existing Worlds classify correctly with one idempotent repair.
+       */
+      it('rebuilds the decor flag on entity_edges from the document', () => {
+        const hash = 'a'.repeat(64);
+        seedRaw(
+          'illustrated',
+          WORLD,
+          JSON.stringify({
+            'core.field.content': tiptapContent({
+              type: 'doc',
+              content: [
+                { type: 'paragraph', content: [{ type: 'entityLink', attrs: { entityId: 'e2' } }] },
+                { type: 'image', attrs: { src: `/assets/${WORLD}/${hash}.png` } },
+              ],
+            }),
+          }),
+          'note',
+        );
+        // Persist the edges with the flags flipped — the corruption a pre-ADR-0069 harvest left behind.
+        db.insert(entityEdges)
+          .values([
+            { sourceEntityId: idOf('illustrated'), worldId: WORLD, targetKind: 'entity', targetId: 'e2', decor: true },
+            { sourceEntityId: idOf('illustrated'), worldId: WORLD, targetKind: 'asset', targetId: hash, decor: false },
+          ])
+          .run();
+
+        reindexAll();
+
+        const decorByTarget = db
+          .select({ targetKind: entityEdges.targetKind, targetId: entityEdges.targetId, decor: entityEdges.decor })
+          .from(entityEdges)
+          .where(eq(entityEdges.sourceEntityId, idOf('illustrated')))
+          .all();
+        expect(decorByTarget).toEqual(
+          expect.arrayContaining([
+            { targetKind: 'entity', targetId: 'e2', decor: false },
+            { targetKind: 'asset', targetId: hash, decor: true },
+          ]),
+        );
+      });
+
+      /**
        * The one write here that lands without a nudge *and* without a `seq` bump: recomputing from
        * an unchanged document writes back what it read. Only just after a deploy adds a derivation
        * does it yield new state, and that stale window closes on the reader's next navigation.
@@ -1353,6 +1398,27 @@ describe('EntityWrites', () => {
 
       expect(result.status).toBe('ok');
       expect(rowOf(ASSET).types).toEqual([CORE_ASSET_TYPE_ID]);
+    });
+
+    it('rejects a raw edit that guts the asset-ref value to `{}`, keeping the bytes reachable', () => {
+      // The value-strip escalation (ADR-0068 hash-presence invariant): `types` omitted, so the shape diff
+      // sees no change — the asset type and Field are both still attached — yet the emptied `{}` value
+      // harvests the hash to null, which would delete the `(worldId, hash)` dedup row and orphan the bytes
+      // on disk. Shape held; the one value the marker must also hold is the Asset's identity hash.
+      const before = rowOf(ASSET);
+
+      const result = writes.mutate(ADA, ASSET, {
+        kind: 'edit',
+        version: before.version,
+        document: { [ASSET_FIELD_ID]: {} },
+      });
+
+      expect(result.status).toBe('forbidden');
+      const after = rowOf(ASSET);
+      // Nothing was written: the stored document (hence its harvested hash) is exactly as it was.
+      expect(after.document).toBe(before.document);
+      expect(after.seq).toBe(before.seq);
+      expect(emitted).toEqual([]);
     });
 
     it('leaves a non-System-managed type freely swappable', () => {
