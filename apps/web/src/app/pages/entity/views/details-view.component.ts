@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { DetailsPanelComponent } from '@hexly/web-entity';
+import { DetailsPanelComponent, ReadingSurfaceComponent } from '@hexly/web-entity';
 
 /**
  * The **Details View** (`core.view.details`, ADR-0067 — renamed from the generic Field view): the
@@ -18,15 +18,14 @@ import { DetailsPanelComponent } from '@hexly/web-entity';
   selector: 'app-details-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [DetailsPanelComponent],
+  imports: [ReadingSurfaceComponent, DetailsPanelComponent],
   template: `
-    <div class="absolute inset-0 overflow-y-auto bg-surface-sunken" data-testid="details-view">
-      <!-- Full-width stat-block: the shared Details Panel rendering, centred in a readable column
-           rather than the Dock's narrow rail (ADR-0067). -->
-      <div class="mx-auto my-6 max-w-[60rem] rounded-md border border-line shadow-1 overflow-hidden">
+    <!-- The shared Details Panel rendering, framed as a bordered card in the shared reading column (ADR-0067). -->
+    <app-reading-surface>
+      <div class="rounded-md border border-line shadow-1 overflow-hidden" data-testid="details-view">
         <app-details-panel />
       </div>
-    </div>
+    </app-reading-surface>
   `,
 })
 export class DetailsViewComponent {}

@@ -46,7 +46,8 @@ import { ViewRegistry } from '../../../entity-types/view-registry';
 @Component({
   selector: 'app-entity-dock',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'absolute top-3 right-3 bottom-3 z-10 flex items-start gap-2 pointer-events-none' },
+  // Inset 1.5rem all sides (ADR-0067): the top meets the reading column's `py-6`, so content and Dock line up.
+  host: { class: 'absolute top-6 right-6 bottom-6 z-10 flex items-start gap-2 pointer-events-none' },
   imports: [NgComponentOutlet, IconComponent, IconButtonComponent, TranslocoPipe],
   template: `
     <!-- The open Panel's card stays mounted the whole time a Panel is open — keyed off the slot, not the

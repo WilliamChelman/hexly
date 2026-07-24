@@ -26,23 +26,22 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-hidden' },
   styles: `
-    /* The Dock floats over the content (ADR-0067); a reading-column View shrinks its own main from the
-       right so the floating Dock never covers the column — as a \`right\` offset, since \`main\` is
-       \`absolute inset-0\` and padding would not move an inset-0 child. No inset while there is side
-       whitespace to float into; a narrow viewport reserves the always-visible strip (closed) or the
-       whole Dock footprint (open). A full-bleed View (no \`.reading\`) never insets — the Dock floats
-       over its corner. */
+    /* Dock-clearance inset for a reading-column View (ADR-0067): the reading surface right-pads its column
+       by this var so the full-bleed scrollbar stays at the true edge. 0 while there is whitespace to float
+       into; a narrow viewport reserves the strip (closed) or the whole Dock (open). Reserves include the
+       Dock's 1.5rem inset. Set on \`main\`, never \`.reading\` — a container query can't style the element
+       that establishes its own container; the surface inside \`main\` inherits it. */
     .reading main {
-      transition: right 200ms;
+      --reading-dock-inset: 0rem;
     }
     @container entity-body (max-width: 68rem) {
       .reading main {
-        right: 4rem;
+        --reading-dock-inset: 5rem;
       }
     }
     @container entity-body (min-width: 48rem) and (max-width: 109rem) {
       .reading.dock-open main {
-        right: 25rem;
+        --reading-dock-inset: 26rem;
       }
     }
   `,
