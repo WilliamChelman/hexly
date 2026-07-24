@@ -3,6 +3,7 @@
     "hexGrid": "Grille hexagonale"
   },
   "hexmap": {
+    "name": "Carte",
     "eyebrow": "Carte hexagonale",
     "titleLabel": "Titre de la carte",
     "rename": "Renommer la carte",

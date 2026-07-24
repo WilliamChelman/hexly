@@ -60,6 +60,7 @@
     "dangling": "Cette entité est indisponible"
   },
   "note": {
+    "name": "Note",
     "eyebrow": "Note",
     "titleLabel": "Titre de la note",
     "rename": "Renommer la note",

@@ -8,6 +8,7 @@ import { EntitiesClient, ActiveWorld, ToasterService, LocaleService } from '@hex
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { DialogRef, DialogService } from '@hexly/web-ui';
 import { providePluginContent } from '@hexly/plugin-content/web';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntityBrowserPage } from './entity-browser.page';
 
 describe('EntityBrowser', () => {
@@ -49,6 +50,8 @@ describe('EntityBrowser', () => {
       imports: [EntityBrowserPage, provideTranslocoTesting()],
       providers: [
         providePluginContent(),
+        // The hexmap plugin too: a type's name is its own plugin's copy now (#312), not app-catalog copy.
+        providePluginHexmap(),
         { provide: EntitiesClient, useValue: client },
         { provide: DialogService, useValue: dialogService },
         provideRouter([]),

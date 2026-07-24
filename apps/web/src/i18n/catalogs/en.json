@@ -38,19 +38,6 @@
     "searchPlaceholder": "Search by name, tag, or content…",
     "creating": "Creating…",
     "edited": "Edited {{date}}",
-    "type": {
-      "core": {
-        "type": {
-          "note": "Note",
-          "hex-map": "Map"
-        }
-      },
-      "dnd": {
-        "type": {
-          "monster": "Monster"
-        }
-      }
-    },
     "loadErrorTitle": "Couldn't load your library.",
     "loadErrorHint": "Something went wrong. Please try again in a moment.",
     "createError": "Couldn't create that. Please try again.",

@@ -19,7 +19,8 @@ import { CreateEntityDialogComponent } from './create-entity-dialog.component';
 
 /**
  * A split button: the primary action creates the Instance's default Type (`entities.defaultType`),
- * the arrowhead lists *every* enabled Type the {@link TypeRegistry} knows.
+ * the arrowhead lists every *creatable* Type the {@link TypeRegistry} knows — a System-managed one
+ * (ADR-0068) is never offered, the system alone mints it.
  *
  * A type declaring a **required** Field can't be minted blind, so it opens the create dialog,
  * which collects those Fields first. That is a rule about a type's *schema*: nothing here branches
@@ -100,7 +101,8 @@ export class NewEntityButtonComponent {
    */
   protected readonly defaultType = computed<EntityType | undefined>(() => {
     const configured = this.clientConfig.defaultType();
-    return this.registry.get(configured)?.id ?? this.registry.all()[0]?.id;
+    const creatable = this.registry.creatable();
+    return creatable.find((def) => def.id === configured)?.id ?? creatable[0]?.id;
   });
 
   /** The primary button's copy — the resolved Type's own create chrome, not a static string (ADR-0052). */
@@ -110,8 +112,8 @@ export class NewEntityButtonComponent {
     return type ? this.registry.chromeLabel(type, 'create') : '';
   });
 
-  /** Every enabled Type, in registration order: the bundled plugins', then the World's own. */
-  protected readonly types = this.registry.all;
+  /** Every creatable Type, in registration order: the bundled plugins', then the World's own. */
+  protected readonly types = this.registry.creatable;
 
   protected readonly creating = signal(false);
 

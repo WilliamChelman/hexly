@@ -38,19 +38,6 @@
     "searchPlaceholder": "Rechercher par nom, étiquette ou contenu…",
     "creating": "Création…",
     "edited": "Modifié le {{date}}",
-    "type": {
-      "core": {
-        "type": {
-          "note": "Note",
-          "hex-map": "Carte"
-        }
-      },
-      "dnd": {
-        "type": {
-          "monster": "Monstre"
-        }
-      }
-    },
     "loadErrorTitle": "Impossible de charger votre bibliothèque.",
     "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",
     "createError": "Création impossible. Veuillez réessayer.",

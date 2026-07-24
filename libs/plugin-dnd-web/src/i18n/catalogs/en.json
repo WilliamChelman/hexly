@@ -1,5 +1,6 @@
 {
   "monster": {
+    "name": "Monster",
     "eyebrow": "Monster",
     "titleLabel": "Monster name",
     "rename": "Rename monster",

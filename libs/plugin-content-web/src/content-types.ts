@@ -40,6 +40,7 @@ export const CONTENT_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     graphColorToken: '--color-ink-muted',
     // A plugin ships translated copy, so its chrome is its own `editor` scope keys (ADR-0049).
     labels: {
+      name: 'editor.note.name',
       eyebrow: 'editor.note.eyebrow',
       titleLabel: 'editor.note.titleLabel',
       rename: 'editor.note.rename',

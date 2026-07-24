@@ -3,6 +3,7 @@
     "monsters": "Draw Steel — Monsters"
   },
   "monster": {
+    "name": "Monster",
     "eyebrow": "Monster",
     "titleLabel": "Monster name",
     "rename": "Rename monster",

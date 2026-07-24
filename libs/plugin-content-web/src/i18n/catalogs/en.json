@@ -60,6 +60,7 @@
     "dangling": "This entity is unavailable"
   },
   "note": {
+    "name": "Note",
     "eyebrow": "Note",
     "titleLabel": "Note title",
     "rename": "Rename note",

@@ -2,6 +2,7 @@
   "dataType": {
     "surface": "Surface de tableau"
   },
+  "name": "Tableau",
   "eyebrow": "Tableau",
   "titleLabel": "Titre du tableau",
   "rename": "Renommer le tableau",

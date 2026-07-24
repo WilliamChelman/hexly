@@ -21,6 +21,7 @@ const NOTE_TYPE: TypeDefinition = {
   views: [CORE_VIEW_RICH_CONTENT],
   graphColorToken: '--color-ink-muted',
   labels: {
+    name: 'editor.note.name',
     eyebrow: 'editor.note.eyebrow',
     titleLabel: 'editor.note.titleLabel',
     rename: 'editor.note.rename',

@@ -8,6 +8,7 @@ import { firstValueFrom } from 'rxjs';
 import { DialogService } from '@hexly/web-ui';
 import { CreateCommands } from './create-commands';
 import { CreateEntityDialogComponent } from './create-entity-dialog.component';
+import { TypeRegistry } from './type-registry';
 
 describe('CreateCommands', () => {
   let provider: CreateCommands;
@@ -43,6 +44,19 @@ describe('CreateCommands', () => {
       'create-dnd.type.monster',
       'create-draw-steel.type.monster',
     ]);
+  });
+
+  it('offers no create Command for a System-managed type (ADR-0068)', async () => {
+    TestBed.inject(TypeRegistry).register({
+      id: 'core.type.asset',
+      icon: 'asset',
+      views: [],
+      graphColorToken: '--color-ink-muted',
+      systemManaged: true,
+    });
+
+    const commands = await firstValueFrom(provider.search(''));
+    expect(commands.map((c) => c.id)).not.toContain('create-core.type.asset');
   });
 
   it('opens the create dialog seeded with the Draw Steel Monster type when its Command runs', async () => {

@@ -48,6 +48,21 @@ test('pickers never offer the System-managed asset type or asset-ref field', asy
   await expect(page.getByTestId('type-add').locator('option[value="core.type.asset"]')).toHaveCount(0);
 });
 
+test('the create menu never offers the System-managed asset type, and names types by their own copy', async ({
+  page,
+}) => {
+  await enterLibrary(page);
+  await page.getByTestId('new-entity-menu').click();
+
+  // The system alone mints an Asset (ADR-0068): offering it would only produce a doomed create (403).
+  await expect(page.getByTestId('new-entity-core.type.note')).toBeVisible();
+  await expect(page.getByTestId('new-entity-core.type.asset')).toHaveCount(0);
+
+  // Each item shows the type's own shipped noun — never a raw `entityBrowser.type.<id>` key (#312).
+  await expect(page.getByTestId('new-entity-core.type.board')).toHaveText(/Board/);
+  await expect(page.getByTestId('new-entity-core.type.board')).not.toHaveText(/entityBrowser/);
+});
+
 test("an Asset's Details panel lists its System-managed type and field affordance-less", async ({ page }) => {
   const worldSeg = await enterLibrary(page);
   const worldId = idFromSegment(worldSeg); // the raw id the API keys on

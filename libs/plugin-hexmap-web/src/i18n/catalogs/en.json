@@ -3,6 +3,7 @@
     "hexGrid": "Hex grid"
   },
   "hexmap": {
+    "name": "Map",
     "eyebrow": "Hex map",
     "titleLabel": "Map title",
     "rename": "Rename map",

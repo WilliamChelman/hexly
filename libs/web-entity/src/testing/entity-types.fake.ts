@@ -32,7 +32,9 @@ export class FakeEntityTypes implements EntityTypes {
 
   name(type: string | null | undefined): string {
     const def = this.get(type);
-    return def?.labelText ?? this.translate(`entityBrowser.type.${type}`);
+    if (def?.labelText) return def.labelText;
+    if (def?.labels) return this.translate(def.labels.name);
+    return this.translate(`entityBrowser.type.${type}`);
   }
 
   chromeLabel(type: string | null | undefined, key: keyof TypeLabels): string {

@@ -7,6 +7,11 @@ import { CORE_VIEW_DETAILS, ViewPlacement } from './view-definition';
  * language, ADR-0014).
  */
 export interface TypeLabels {
+  /**
+   * The type's display **noun** ("Note", "Map", "Board") — what pickers, menus, and facets show.
+   * Shipped by the type's own plugin: the app catalog cannot know another plugin's types (#312).
+   */
+  readonly name: string;
   /** The header eyebrow tag. */
   readonly eyebrow: string;
   /** The title textbox's aria-label. */
@@ -87,6 +92,7 @@ export const GENERIC_TYPE_DEFINITION: TypeDefinition = {
   views: [CORE_VIEW_DETAILS],
   graphColorToken: '--color-ink-muted',
   labels: {
+    name: 'fields.generic.name',
     eyebrow: 'fields.generic.eyebrow',
     titleLabel: 'fields.generic.titleLabel',
     rename: 'fields.generic.rename',

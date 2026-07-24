@@ -24,6 +24,7 @@ export const ASSET_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     // must not offer the asset type and the Details panel must render it affordance-less.
     systemManaged: CORE_ASSET_TYPE.systemManaged,
     labels: {
+      name: 'asset.name',
       eyebrow: 'asset.eyebrow',
       titleLabel: 'asset.titleLabel',
       rename: 'asset.rename',

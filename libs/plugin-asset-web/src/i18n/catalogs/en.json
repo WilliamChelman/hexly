@@ -1,4 +1,5 @@
 {
+  "name": "Asset",
   "eyebrow": "Asset",
   "titleLabel": "Asset name",
   "rename": "Rename asset",
