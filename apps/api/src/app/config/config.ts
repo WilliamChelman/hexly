@@ -195,7 +195,8 @@ export interface HexlyConfig {
     plugin: Record<string, PluginConfig>;
     /**
      * Whether the Collaboration layer is on (ADR-0071): `features.collaboration`, defaulting **on**,
-     * overridden by an entry-point pin. Nothing is gated on it yet (#314) — the flag is surfaced first.
+     * overridden by an entry-point pin. Off makes the sharing and user-management routes 404
+     * (`CollaborationGuard`).
      */
     collaboration: boolean;
   };

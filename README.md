@@ -140,9 +140,12 @@ features:
       enabled: false # a disabled Plugin's Types degrade to the generic View, values intact
 ```
 
-`collaboration` is read but not yet acted on: the sharing surfaces and the 404s
-behind them land as ADR-0071 is built out, so setting it today changes nothing
-you can see.
+With `collaboration: false` the sharing and user-management endpoints — entity
+grants, owner sets, World members, both kinds of Public Link, and `/api/users` —
+answer **404**: absent, not merely hidden, so a stale browser tab or a script
+cannot mint a link into an instance you believe is private (ADR-0071). Your
+login page and the Superadmin Reindex are never gated by it. The buttons that
+reach those endpoints disappear from the UI as ADR-0071 is built out.
 
 There is deliberately **no `profile` key**: whether an instance is `desktop` or
 `server` is pinned by the entry point it was started from, so a `profile:` line

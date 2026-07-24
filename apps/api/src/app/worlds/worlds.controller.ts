@@ -48,6 +48,7 @@ import type { Response } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
 import { CanCreateWorldsGuard } from './can-create-worlds.guard';
+import { CollaborationGuard } from '../acl/collaboration.guard';
 import { aclSetResponse, ownerSetResponse } from '../acl/owner-set';
 import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
@@ -319,8 +320,12 @@ export class WorldsController {
     }
   }
 
+  // Below: the Collaboration layer (ADR-0071), gated per route because this controller also carries
+  // the ordinary World surface.
+
   // The World's ownership set (ADR-0037), for an Owner.
   @Get(':id/owners')
+  @UseGuards(CollaborationGuard)
   owners(@CurrentUser() user: AuthUser, @Param('id') id: string): string[] {
     return ownerSetResponse(this.worlds.listOwners(user.id, id), 'world');
   }
@@ -329,6 +334,7 @@ export class WorldsController {
   // Returns the updated set (200), idempotent — not a 201 (adding is set membership).
   @Post(':id/owners')
   @HttpCode(200)
+  @UseGuards(CollaborationGuard)
   addOwner(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): string[] {
     const parsed = addOwnerRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
@@ -338,6 +344,7 @@ export class WorldsController {
   // Remove an Owner, or resign your own ownership (ADR-0037). The ≥1-Owner
   // invariant refuses removing the last Owner (409).
   @Delete(':id/owners/:userId')
+  @UseGuards(CollaborationGuard)
   removeOwner(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('userId') userId: string): string[] {
     return ownerSetResponse(this.worlds.removeOwner(user.id, id, userId), 'world');
   }
@@ -346,6 +353,7 @@ export class WorldsController {
   // shared by the member routes — only removeMember can raise it, but the mapper needs
   // it either way (the World that must keep an Owner is this same World).
   @Get(':id/members')
+  @UseGuards(CollaborationGuard)
   members(@CurrentUser() user: AuthUser, @Param('id') id: string): WorldMember[] {
     return aclSetResponse(this.worlds.listMembers(user.id, id), 'world');
   }
@@ -354,6 +362,7 @@ export class WorldsController {
   // existing Instance user. Upsert — re-adding updates the role — so a 200, not a 201.
   @Post(':id/members')
   @HttpCode(200)
+  @UseGuards(CollaborationGuard)
   addMember(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): WorldMember[] {
     const parsed = addMemberRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
@@ -362,6 +371,7 @@ export class WorldsController {
 
   // Change a member's role between Contributor and World Viewer (ADR-0037, #159): Owner-only.
   @Patch(':id/members/:userId')
+  @UseGuards(CollaborationGuard)
   setMemberRole(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
@@ -376,12 +386,14 @@ export class WorldsController {
   // Remove a member (Owner-only) or leave the World yourself (ADR-0037, #159). The
   // ≥1-Owner invariant refuses a removal that would orphan the World (409).
   @Delete(':id/members/:userId')
+  @UseGuards(CollaborationGuard)
   removeMember(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('userId') userId: string): WorldMember[] {
     return aclSetResponse(this.worlds.removeMember(user.id, id, userId), 'world');
   }
 
   // The World's Public Link (ADR-0037, #162), for an Owner: the active token or null.
   @Get(':id/link')
+  @UseGuards(CollaborationGuard)
   link(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink | null {
     return aclSetResponse(this.worlds.getLink(user.id, id), 'world');
   }
@@ -390,6 +402,7 @@ export class WorldsController {
   // active link per World, so a re-mint returns the current token — idempotent, hence 200.
   @Post(':id/link')
   @HttpCode(200)
+  @UseGuards(CollaborationGuard)
   mintLink(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink {
     return aclSetResponse(this.worlds.mintLink(user.id, id), 'world');
   }
@@ -397,6 +410,7 @@ export class WorldsController {
   // Revoke the World Public Link (ADR-0037, #162): World-Owner-only, the kill-switch.
   @Delete(':id/link')
   @HttpCode(204)
+  @UseGuards(CollaborationGuard)
   revokeLink(@CurrentUser() user: AuthUser, @Param('id') id: string): void {
     aclSetResponse(this.worlds.revokeLink(user.id, id), 'world');
   }
