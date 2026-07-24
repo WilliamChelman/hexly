@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { ENTITY_SESSION, ENTITY_TYPES } from '@hexly/web-entity';
+import { ENTITY_SESSION, ENTITY_TYPES, ReadingSurfaceComponent } from '@hexly/web-entity';
 import { TranslocoService } from '@jsverse/transloco';
 import { ContentEditorComponent } from './content-editor.component';
 import { OutlineSourceDirective } from '../directives/outline-source.directive';
@@ -16,7 +16,8 @@ import { OutlineStore } from '../services/outline-store';
  * Map View gives its `HexMapStore`, ADR-0050): the store lives and dies with this View's chunk, and the
  * Dock-hosted Outline Panel reaches it through the View injector.
  *
- * `display:contents` (host `class: contents`) so the scroll column positions against the page's `<main>`.
+ * The reading-column shell is the shared {@link ReadingSurfaceComponent} (ADR-0067); this View projects
+ * only its prose body into it.
  *
  * The inline metadata block the View once rendered above prose is retired (ADR-0067): document keys now
  * render in exactly one place — the universal Details panel — so the redundant inline block is gone.
@@ -26,14 +27,11 @@ import { OutlineStore } from '../services/outline-store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
   providers: [OutlineStore],
-  imports: [ContentEditorComponent, OutlineSourceDirective],
+  imports: [ReadingSurfaceComponent, ContentEditorComponent, OutlineSourceDirective],
   template: `
-    <!-- Content body in a centred reading column; the page's grid reserves the Dock's column beside it. -->
-    <div data-content-scroll class="absolute inset-0 overflow-y-auto bg-surface-sunken">
-      <div class="max-w-[60rem] mx-auto py-6 px-6">
-        <app-content-editor appOutlineSource [ariaLabel]="editorLabel()" />
-      </div>
-    </div>
+    <app-reading-surface>
+      <app-content-editor appOutlineSource [ariaLabel]="editorLabel()" />
+    </app-reading-surface>
   `,
 })
 export class ContentViewComponent {

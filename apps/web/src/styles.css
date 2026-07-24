@@ -50,3 +50,4 @@
 @source './**/*.{html,ts}';
 @source '../../../libs/web-ui/src/**/*.{html,ts}';
 @source '../../../libs/web-core/src/**/*.{html,ts}';
+@source '../../../libs/web-entity/src/**/*.{html,ts}';
