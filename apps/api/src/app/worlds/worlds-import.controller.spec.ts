@@ -400,6 +400,7 @@ describe('Vault import endpoint', () => {
     expect(referencedBy).toEqual([
       {
         descriptor: null,
+        decor: false,
         source: { id: keep.id, name: 'Keep', types: ['core.type.note'] },
       },
     ]);

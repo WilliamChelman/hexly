@@ -10,6 +10,10 @@ import { LinkedEntity } from '@hexly/domain';
  * `entity` of `null` is the outbound dangling case — a target that is deleted, or that this viewer
  * cannot read — rendered non-navigable under the same dangling string a Content link shows. An
  * inbound row never passes `null`: its sources are access-filtered server-side.
+ *
+ * A `decor` row is a **Decor Link** (ADR-0069) — presentation, not worldbuilding meaning. Outbound it
+ * shows only once revealed; inbound it always shows, marked, so a mere thumbnail reads apart from a
+ * prose mention.
  */
 @Component({
   selector: 'app-reference-row',
@@ -43,6 +47,15 @@ import { LinkedEntity } from '@hexly/domain';
         >{{ 'fields.entityLink.dangling' | transloco }}</span
       >
     }
+    @if (decor()) {
+      <!-- The decor mark: what distinguishes a mere thumbnail/prose image from a semantic mention. -->
+      <span
+        data-testid="reference-decor-mark"
+        [attr.title]="'fields.links.decorMark' | transloco"
+        class="shrink-0 rounded-full bg-surface-sunken px-1.5 text-[0.65rem] font-semibold leading-tight text-ink-faint"
+        >{{ 'fields.links.decor' | transloco }}</span
+      >
+    }
     @if (descriptor()) {
       <span
         data-testid="link-descriptor"
@@ -57,4 +70,6 @@ export class ReferenceRowComponent {
   readonly entity = input.required<LinkedEntity | null>();
   /** The Link Descriptor, as the author spelled it. */
   readonly descriptor = input.required<string | null>();
+  /** A Decor Link (ADR-0069) — draws the presentation mark. Defaults off for a plain semantic row. */
+  readonly decor = input<boolean>(false);
 }

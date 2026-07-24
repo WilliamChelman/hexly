@@ -38,6 +38,14 @@ export class ReferencesStore {
 
   private readonly _loaded = signal<Loaded | null>(null);
 
+  /**
+   * Whether the outbound section reveals its Decor Links (ADR-0069). Ephemeral and default-hidden by
+   * decision: a peek at presentation wiring, reset on every Entity change so it never becomes a sticky
+   * mode roaming across the pages the always-open Panel follows.
+   */
+  private readonly _revealDecor = signal(false);
+  readonly revealDecor = this._revealDecor.asReadonly();
+
   /** The held list, but only while it still describes the open Entity. */
   private readonly current = computed(() => {
     const held = this._loaded();
@@ -46,10 +54,25 @@ export class ReferencesStore {
 
   /** This Entity's own links. A `target` of `null` is deleted-or-unreadable — a dangling link. */
   readonly references = computed(() => this.current()?.references ?? []);
-  /** The Entities that link here, filtered to the ones this viewer may read. */
+  /**
+   * The outbound links the relation surface shows: every reference by default *minus* Decor Links,
+   * which the reveal restores. Filtering is client-side (the payload ships decor unfiltered, "server
+   * marks, client reveals") so the reveal is instant and refetch-free.
+   */
+  readonly visibleReferences = computed(() =>
+    this._revealDecor() ? this.references() : this.references().filter((ref) => !ref.decor),
+  );
+  /** There is decor to reveal — the reveal control renders only then, never as dead chrome. */
+  readonly hasDecorReferences = computed(() => this.references().some((ref) => ref.decor));
+  /** The Entities that link here, filtered to the ones this viewer may read. Decor is kept, marked. */
   readonly referencedBy = computed(() => this.current()?.referencedBy ?? []);
   /** False until the open Entity's list has landed, so the panel tells "loading" from "nothing". */
   readonly loaded = computed(() => this.current() !== undefined);
+
+  /** Flip the ephemeral outbound decor reveal. */
+  toggleRevealDecor(): void {
+    this._revealDecor.update((revealed) => !revealed);
+  }
 
   constructor() {
     /** What the panel wants loaded — the open Entity's `(id, seq)`, or `null` while none is open. */
@@ -73,7 +96,12 @@ export class ReferencesStore {
         ),
         takeUntilDestroyed(),
       )
-      .subscribe((loaded) => this._loaded.set(loaded));
+      .subscribe((loaded) => {
+        // A fetch keys on `(id, seq)`, so a landing list is either a new Entity or this one's own save;
+        // either way the peek collapses — the reveal never survives past the list it was opened against.
+        this._revealDecor.set(false);
+        this._loaded.set(loaded);
+      });
   }
 
   /** Seed the panel directly, bypassing the fetch — the test seam, mirroring `EntitySession.adopt`. */

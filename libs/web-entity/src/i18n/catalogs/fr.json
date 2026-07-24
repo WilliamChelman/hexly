@@ -25,7 +25,10 @@
     "references": "Références",
     "referencedBy": "Référencé par",
     "referencesEmpty": "Cette entité ne renvoie à rien",
-    "referencedByEmpty": "Rien ne renvoie ici"
+    "referencedByEmpty": "Rien ne renvoie ici",
+    "showDecor": "Afficher le décor",
+    "decor": "décor",
+    "decorMark": "Lien de décor — présentation seule, pas une relation de worldbuilding"
   },
   "assetLink": {
     "set": "Définir une image…",

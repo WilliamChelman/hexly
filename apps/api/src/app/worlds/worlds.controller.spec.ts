@@ -644,8 +644,35 @@ describe('Worlds endpoints', () => {
         const note = await noteEmbedding(ada, world.id, 'Character Sheet', src);
 
         // The hash edge the Note harvested resolves to the Asset Entity at read time — usage is an inbound link.
+        // A prose image is a capability-URL reference, so the edge is decor by construction (ADR-0069) — the
+        // usage surface counts it regardless and marks it.
         expect((await ada.get(`/entities/${asset.id}/references`).expect(200)).body.referencedBy).toEqual([
-          { descriptor: null, source: { id: note, name: 'Character Sheet', types: ['core.type.note'] } },
+          { descriptor: null, decor: true, source: { id: note, name: 'Character Sheet', types: ['core.type.note'] } },
+        ]);
+      });
+
+      /**
+       * The outbound direction of the same prose image: the "stored but surface-less" special case retired
+       * (ADR-0069), so the Note's own References now resolve the hash edge to the Asset wrapper Entity — a
+       * decor edge the relation surface hides by default and the reveal restores.
+       */
+      it('surfaces a prose image as an outbound decor reference resolved to its Asset Entity', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        const asset = (await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201))
+          .body;
+        const src = `/assets/${world.id}/${asset.document['core.field.asset'].hash}.png`;
+        const note = await noteEmbedding(ada, world.id, 'Character Sheet', src);
+
+        const { references } = (await ada.get(`/entities/${note}/references`).expect(200)).body;
+        expect(references).toEqual([
+          {
+            targetId: asset.document['core.field.asset'].hash,
+            descriptor: null,
+            decor: true,
+            // Linked to the Asset's Entity id, not the opaque hash the edge stores.
+            target: expect.objectContaining({ id: asset.id, name: asset.name }),
+          },
         ]);
       });
 
@@ -699,7 +726,7 @@ describe('Worlds endpoints', () => {
         // The bytes serve again, and the Note's untouched reference resolves to the new Asset — healed for free.
         await ada.get(src).expect(200);
         expect((await ada.get(`/entities/${healed.id}/references`).expect(200)).body.referencedBy).toEqual([
-          { descriptor: null, source: { id: note, name: 'Character Sheet', types: ['core.type.note'] } },
+          { descriptor: null, decor: true, source: { id: note, name: 'Character Sheet', types: ['core.type.note'] } },
         ]);
       });
     });
@@ -964,6 +991,8 @@ describe('Worlds endpoints', () => {
         expect((await ada.get(`/entities/${portrait.id}/references`).expect(200)).body.referencedBy).toEqual([
           {
             descriptor: null,
+            // A Thumbnail designation is decor by construction (ADR-0069); usage counts it, marked.
+            decor: true,
             source: {
               id: deity.id,
               name: 'Vashenka',
@@ -1000,6 +1029,7 @@ describe('Worlds endpoints', () => {
         expect(inbound).toEqual([
           {
             descriptor: null,
+            decor: true,
             source: {
               id: deity.id,
               name: 'Vashenka',
@@ -1023,6 +1053,8 @@ describe('Worlds endpoints', () => {
           {
             targetId: ledger.id,
             descriptor: null,
+            // A Thumbnail Field mints a decor edge whatever it designates (ADR-0069).
+            decor: true,
             target: { id: ledger.id, name: 'Ledger', types: ['core.type.note'] },
           },
         ]);

@@ -58,6 +58,7 @@ describe('Entity references', () => {
         {
           targetId: mira,
           descriptor: 'spouse',
+          decor: false,
           target: { id: mira, name: 'Mira', types: ['core.type.note'] },
         },
       ]);
@@ -74,7 +75,7 @@ describe('Entity references', () => {
       await ada.delete(`/entities/${mira}`).expect(204);
 
       const { references } = await referencesOf(ada, ealdred);
-      expect(references).toEqual([{ targetId: mira, descriptor: null, target: null }]);
+      expect(references).toEqual([{ targetId: mira, descriptor: null, decor: false, target: null }]);
     });
 
     /** Unreadable and deleted are indistinguishable to the viewer — both dangle. */
@@ -93,12 +94,13 @@ describe('Entity references', () => {
         {
           targetId: secret,
           descriptor: null,
+          decor: false,
           target: { id: secret, name: 'The Cabal', types: ['core.type.note'] },
         },
       ]);
 
       const asBob = await referencesOf(bob, town);
-      expect(asBob.references).toEqual([{ targetId: secret, descriptor: null, target: null }]);
+      expect(asBob.references).toEqual([{ targetId: secret, descriptor: null, decor: false, target: null }]);
     });
 
     /**
@@ -151,7 +153,7 @@ describe('Entity references', () => {
       // And the other direction: the linked Note lists the map among its Referenced by.
       const { referencedBy } = await referencesOf(ada, harbour);
       expect(referencedBy).toEqual([
-        { descriptor: null, source: { id: map.id, name: 'The Reach', types: ['core.type.hex-map'] } },
+        { descriptor: null, decor: false, source: { id: map.id, name: 'The Reach', types: ['core.type.hex-map'] } },
       ]);
     });
   });
@@ -169,6 +171,7 @@ describe('Entity references', () => {
       expect(referencedBy).toEqual([
         {
           descriptor: 'spouse',
+          decor: false,
           source: { id: ealdred, name: 'Ealdred', types: ['core.type.note'] },
         },
       ]);
@@ -198,6 +201,7 @@ describe('Entity references', () => {
       expect(asAda.referencedBy).toEqual([
         {
           descriptor: null,
+          decor: false,
           source: {
             id: cabal,
             name: 'Secret Cabal Roster',
@@ -225,6 +229,7 @@ describe('Entity references', () => {
       expect(referencedBy).toEqual([
         {
           descriptor: null,
+          decor: false,
           source: {
             id: cabal,
             name: 'Secret Cabal Roster',
