@@ -413,6 +413,24 @@ describe('Worlds endpoints', () => {
       ]);
     });
 
+    it('rejects a raw API write stripping the Asset’s System-managed type, so its bytes stay reachable (ADR-0068)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      const minted = await ada.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201);
+
+      // A hand-crafted PUT — the strip a compliant UI never offers, so only a raw API call reaches it —
+      // that drops `core.type.asset` while keeping the asset-ref value, so it is the type set, not the
+      // document, that changes. The write choke point refuses it (403).
+      await ada
+        .put(`/entities/${minted.body.id}`)
+        .send({ types: ['core.type.note'], document: minted.body.document, tags: [], version: minted.body.version })
+        .expect(403);
+
+      // The Asset still carries its type — its bytes never became unreachable by delete / unaccounted by Reindex.
+      const after = await ada.get(`/entities/${minted.body.id}`).expect(200);
+      expect(after.body.types).toEqual(['core.type.asset']);
+    });
+
     it('dedups identical bytes to the existing Asset — no twin, the first name sticks (ADR-0065)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
