@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { basePluginConfigSchema } from '@hexly/domain';
 import * as z from 'zod';
-import { loadConfig, parseSize, PluginConfigContribution } from './config';
+import { deploymentPins, loadConfig, parseSize, pinDeployment, PluginConfigContribution } from './config';
 
 const MB = 1024 * 1024;
 
@@ -50,6 +50,7 @@ describe('parseSize', () => {
 
 describe('loadConfig', () => {
   const DEFAULTS = {
+    profile: 'server',
     import: {
       maxUpload: 500 * MB,
       maxDecompressed: 5 * 1024 * MB,
@@ -57,7 +58,7 @@ describe('loadConfig', () => {
     },
     search: { weights: { name: 10, tags: 5, content: 1 } },
     liveFollow: { heartbeatSeconds: 30 },
-    features: { plugin: {} },
+    features: { plugin: {}, collaboration: true },
     entities: { defaultType: 'core.type.note' },
   };
 
@@ -160,6 +161,88 @@ describe('loadConfig: features.plugin (ADR-0052)', () => {
     expect(() => loadConfig(dataDir('features:\n  plugin:\n    dnd:\n      enabled: "maybe"\n'), PLUGINS)).toThrow(
       /enabled/,
     );
+  });
+});
+
+describe('loadConfig: features.collaboration (ADR-0071)', () => {
+  it('defaults on, so an existing Instance upgrades with no change to its file', () => {
+    expect(loadConfig(dataDir(), PLUGINS).features.collaboration).toBe(true);
+    expect(loadConfig(':memory:', PLUGINS).features.collaboration).toBe(true);
+    expect(
+      loadConfig(dataDir('features:\n  plugin:\n    dnd:\n      enabled: false\n'), PLUGINS).features.collaboration,
+    ).toBe(true);
+  });
+
+  it('turns off from the file, beside features.plugin', () => {
+    const cfg = loadConfig(
+      dataDir('features:\n  collaboration: false\n  plugin:\n    dnd:\n      enabled: false\n'),
+      PLUGINS,
+    );
+    expect(cfg.features.collaboration).toBe(false);
+    expect(cfg.features.plugin.dnd.enabled).toBe(false);
+  });
+
+  it('fails boot on a non-boolean value, naming the key', () => {
+    expect(() => loadConfig(dataDir('features:\n  collaboration: maybe\n'), PLUGINS)).toThrow(/collaboration/);
+  });
+
+  it('lets an entry-point pin win over the file, in both directions', () => {
+    // The Desktop App pins it off and ignores the key entirely (ADR-0071).
+    expect(
+      loadConfig(dataDir('features:\n  collaboration: true\n'), PLUGINS, { collaboration: false }).features
+        .collaboration,
+    ).toBe(false);
+    expect(
+      loadConfig(dataDir('features:\n  collaboration: false\n'), PLUGINS, { collaboration: true }).features
+        .collaboration,
+    ).toBe(true);
+  });
+
+  it('leaves the file in charge when the entry point pins nothing', () => {
+    expect(
+      loadConfig(dataDir('features:\n  collaboration: false\n'), PLUGINS, { profile: 'server' }).features.collaboration,
+    ).toBe(false);
+  });
+});
+
+describe('loadConfig: profile (ADR-0071)', () => {
+  it('defaults to the server profile when the entry point pins none', () => {
+    expect(loadConfig(dataDir(), PLUGINS).profile).toBe('server');
+  });
+
+  it('resolves whichever profile the entry point pins', () => {
+    expect(loadConfig(dataDir(), PLUGINS, { profile: 'desktop' }).profile).toBe('desktop');
+    expect(loadConfig(dataDir(), PLUGINS, { profile: 'server' }).profile).toBe('server');
+  });
+
+  it('ignores a profile: key written into hexly.yml, rather than honouring it', () => {
+    // There is no config key for the Deployment Profile, so an operator cannot declare `desktop` on a
+    // multi-user Instance; the key is stripped like any unknown one, and the pin still decides.
+    expect(loadConfig(dataDir('profile: desktop\n'), PLUGINS).profile).toBe('server');
+    expect(loadConfig(dataDir('profile: server\n'), PLUGINS, { profile: 'desktop' }).profile).toBe('desktop');
+  });
+});
+
+describe('deployment pins (ADR-0071)', () => {
+  // The composition root reads the pins when the config resolves, so a spec that leaves one behind
+  // would hand its deployment to every later one.
+  afterEach(() => pinDeployment({}));
+
+  it('reads back what the entry point pinned, so ConfigModule can hand it to loadConfig', () => {
+    pinDeployment({ profile: 'desktop', collaboration: false });
+
+    expect(loadConfig(dataDir(), PLUGINS, deploymentPins())).toMatchObject({
+      profile: 'desktop',
+      features: { collaboration: false },
+    });
+  });
+
+  it('starts unpinned, which is the server profile with the file in charge of Collaboration', () => {
+    expect(deploymentPins()).toEqual({});
+    expect(loadConfig(dataDir('features:\n  collaboration: false\n'), PLUGINS, deploymentPins())).toMatchObject({
+      profile: 'server',
+      features: { collaboration: false },
+    });
   });
 });
 

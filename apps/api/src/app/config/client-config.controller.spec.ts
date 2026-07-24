@@ -1,15 +1,20 @@
 import { Test } from '@nestjs/testing';
-import { ClientConfig } from '@hexly/domain';
+import { ClientConfig, DeploymentProfile } from '@hexly/domain';
 import { ClientConfigController } from './client-config.controller';
 import { HexlyConfig, HEXLY_CONFIG } from './config';
 
-/** A HexlyConfig whose only interesting parts are the two the client channel projects. */
-function configWith(plugin: HexlyConfig['features']['plugin'], defaultType: string): HexlyConfig {
+/** A HexlyConfig whose only interesting parts are the ones the client channel projects. */
+function configWith(
+  plugin: HexlyConfig['features']['plugin'],
+  defaultType: string,
+  deployment: { profile?: DeploymentProfile; collaboration?: boolean } = {},
+): HexlyConfig {
   return {
+    profile: deployment.profile ?? 'server',
     import: { maxUpload: 0, maxDecompressed: 0, strictZipGuard: false },
     search: { weights: { name: 10, tags: 5, content: 1 } },
     liveFollow: { heartbeatSeconds: 30 },
-    features: { plugin: plugin },
+    features: { plugin: plugin, collaboration: deployment.collaboration ?? true },
     entities: { defaultType },
   };
 }
@@ -31,6 +36,8 @@ describe('ClientConfigController', () => {
     const client: ClientConfig = controller.getConfig();
 
     expect(client).toEqual({
+      profile: 'server',
+      collaboration: true,
       plugins: {
         content: { enabled: true },
         hexmap: { enabled: false },
@@ -62,5 +69,20 @@ describe('ClientConfigController', () => {
     const controller = await controllerFor(configWith({}, 'world.type.deity'));
 
     expect(controller.getConfig().entities.defaultType).toBe('world.type.deity');
+  });
+
+  it('carries the Deployment Profile and Collaboration flag (ADR-0071)', async () => {
+    const desktop = await controllerFor(configWith({}, 'core.type.note', { profile: 'desktop', collaboration: false }));
+
+    expect(desktop.getConfig().profile).toBe('desktop');
+    expect(desktop.getConfig().collaboration).toBe(false);
+  });
+
+  it('crosses the two flags independently — a server Instance may have Collaboration off', async () => {
+    // The solo self-hoster: a real login page, no sharing UI (ADR-0071).
+    const solo = await controllerFor(configWith({}, 'core.type.note', { profile: 'server', collaboration: false }));
+
+    expect(solo.getConfig().profile).toBe('server');
+    expect(solo.getConfig().collaboration).toBe(false);
   });
 });

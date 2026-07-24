@@ -130,7 +130,29 @@ search:
     name: 10 # a query word in the name outranks the same word...
     tags: 5 # ...in a tag...
     content: 1 # ...in the body. Retune if e.g. very long notes skew results.
+features:
+  collaboration: true # the sharing layer entire — World members, entity grants,
+  #                     Entity Visibility, Public Links (ADR-0071). Turn it off if
+  #                     you self-host for yourself alone; your login page stays
+  #                     either way, since that's auth, not collaboration.
+  plugin: # per-Plugin enablement (ADR-0052); every bundled Plugin is on by default
+    dnd:
+      enabled: false # a disabled Plugin's Types degrade to the generic View, values intact
 ```
+
+`collaboration` is read but not yet acted on: the sharing surfaces and the 404s
+behind them land as ADR-0071 is built out, so setting it today changes nothing
+you can see.
+
+There is deliberately **no `profile` key**: whether an instance is `desktop` or
+`server` is pinned by the entry point it was started from, so a `profile:` line
+written into `hexly.yml` is ignored (ADR-0071).
+
+Turning `collaboration` back **on** later has a consequence worth knowing before
+you do it: every Entity authored while it was off is `private` (the schema
+default), so it stays invisible to anyone you then invite. Nothing is lost —
+flipping the Visibility of what you want to share fixes it — but it is a
+deliberate step, not automatic (ADR-0071).
 
 `strictZipGuard` is a speed-vs-safety trade (ADR-0036). The default (`false`) batch-decompresses — several times faster on a large vault — and trusts the archive's declared sizes, which is right for a trusted personal/LAN instance importing your own vault. A maliciously crafted `.zip` can under-declare its size to slip past that check, so an **untrusted or public** instance should set `strictZipGuard: true`, which streams the archive and meters actual decompressed bytes to abort a zip bomb before it materializes. Either way `maxDecompressed` is enforced.
 

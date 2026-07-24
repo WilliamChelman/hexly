@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PluginConfig, PluginConfigSchema } from '@hexly/domain';
+import { DeploymentProfile, PluginConfig, PluginConfigSchema } from '@hexly/domain';
 import { parse as parseYaml } from 'yaml';
 import * as z from 'zod';
 
@@ -19,6 +19,34 @@ export const HEXLY_CONFIG = Symbol('HEXLY_CONFIG');
 export interface PluginConfigContribution {
   readonly id: string;
   readonly configSchema: PluginConfigSchema;
+}
+
+/**
+ * What a process **entry point** states about its deployment rather than what the operator configures
+ * (ADR-0071). `profile` has no `hexly.yml` key at all — so nobody can declare `profile: desktop` on a
+ * five-user server — and a pinned `collaboration` wins over `features.collaboration` in the file, which
+ * is how the Desktop App makes that flag non-negotiable.
+ */
+export interface DeploymentPins {
+  /** The Deployment Profile this entry point is; defaults to `server` when unstated. */
+  readonly profile?: DeploymentProfile;
+  /** Forces the Collaboration layer on/off, ignoring `features.collaboration`; unstated leaves the file in charge. */
+  readonly collaboration?: boolean;
+}
+
+// Module state, not a provider: Nest composes the graph at import time, before the entry point speaks
+// (ADR-0071). Unpinned is the conservative deployment, so `seed.ts` and every spec composing
+// `ConfigModule` need not restate it.
+let pinned: DeploymentPins = {};
+
+/** State this process's deployment pins (ADR-0071); call from the entry point, before creating the Nest app. */
+export function pinDeployment(pins: DeploymentPins): void {
+  pinned = pins;
+}
+
+/** The pins this process's entry point stated — empty when it stated none. */
+export function deploymentPins(): DeploymentPins {
+  return pinned;
 }
 
 const SIZE_UNITS: Record<string, number> = {
@@ -111,8 +139,16 @@ function buildConfigSchema(plugins: readonly PluginConfigContribution[]) {
         heartbeatSeconds: z.number().positive().default(30),
       })
       .prefault({}),
-    // Per-Plugin enablement (ADR-0052): `features.plugin.<id>.enabled`, composed from the bundled set.
-    features: z.object({ plugin: pluginFeaturesSchema(plugins) }).prefault({}),
+    features: z
+      .object({
+        // Per-Plugin enablement (ADR-0052): `features.plugin.<id>.enabled`, composed from the bundled set.
+        plugin: pluginFeaturesSchema(plugins),
+        // The Collaboration layer entire — sharing, World roles, Entity Visibility, Public Links
+        // (ADR-0071). Defaults **on** so an existing Instance upgrades with no change; the Desktop App
+        // turns it off through a {@link DeploymentPins} pin, never through this key.
+        collaboration: z.boolean().default(true),
+      })
+      .prefault({}),
     // The Entity Type the "New" button mints by default (ADR-0052). Resolved verbatim, with no boot-time
     // validation against the enabled set — a soft client-side fallback handles absence, so this knob
     // never fails boot and stays independent of `features.plugin`.
@@ -129,6 +165,11 @@ export type HexlyConfigRaw = z.infer<ReturnType<typeof buildConfigSchema>>;
 
 /** The processed, app-facing Instance Configuration: sizes resolved to bytes, ready to consume. */
 export interface HexlyConfig {
+  /**
+   * This Instance's Deployment Profile (ADR-0071). Not from `hexly.yml` — it comes from the entry
+   * point's {@link DeploymentPins}, and a `profile:` key in the file is stripped like any unknown key.
+   */
+  profile: DeploymentProfile;
   import: {
     /** Max uploaded `.zip` size, in bytes. */
     maxUpload: number;
@@ -152,6 +193,11 @@ export interface HexlyConfig {
      * Plugin's own schema adds. Nothing consumes it yet (#216); it is surfaced for later Seams.
      */
     plugin: Record<string, PluginConfig>;
+    /**
+     * Whether the Collaboration layer is on (ADR-0071): `features.collaboration`, defaulting **on**,
+     * overridden by an entry-point pin. Nothing is gated on it yet (#314) — the flag is surfaced first.
+     */
+    collaboration: boolean;
   };
   entities: {
     /** The Entity Type the "New" button mints by default (ADR-0052); resolved verbatim, unvalidated. */
@@ -160,8 +206,9 @@ export interface HexlyConfig {
 }
 
 /** Sizes are already validated by the schema, so `parseSize` cannot throw here. */
-function processConfig(raw: HexlyConfigRaw): HexlyConfig {
+function processConfig(raw: HexlyConfigRaw, pins: DeploymentPins): HexlyConfig {
   return {
+    profile: pins.profile ?? 'server',
     import: {
       maxUpload: parseSize(raw.import.maxUpload),
       maxDecompressed: parseSize(raw.import.maxDecompressed),
@@ -169,7 +216,10 @@ function processConfig(raw: HexlyConfigRaw): HexlyConfig {
     },
     search: { weights: { ...raw.search.weights } },
     liveFollow: { heartbeatSeconds: raw.liveFollow.heartbeatSeconds },
-    features: { plugin: raw.features.plugin },
+    features: {
+      plugin: raw.features.plugin,
+      collaboration: pins.collaboration ?? raw.features.collaboration,
+    },
     entities: { defaultType: raw.entities.defaultType },
   };
 }
@@ -182,11 +232,18 @@ function processConfig(raw: HexlyConfigRaw): HexlyConfig {
  * `plugins` is the bundled Plugin set (ADR-0052) whose schemas compose `features.plugin`; the
  * composition root supplies it. Absent (as in tests that don't exercise Plugins), `features.plugin`
  * resolves empty.
+ *
+ * `pins` is what the entry point states rather than the operator (ADR-0071): it supplies the Deployment
+ * Profile, which has no key in the file, and can override `features.collaboration`.
  */
-export function loadConfig(instanceDir: string, plugins: readonly PluginConfigContribution[] = []): HexlyConfig {
+export function loadConfig(
+  instanceDir: string,
+  plugins: readonly PluginConfigContribution[] = [],
+  pins: DeploymentPins = {},
+): HexlyConfig {
   const text = readConfigText(instanceDir);
   const raw = buildConfigSchema(plugins).parse((text === undefined ? undefined : parseYaml(text)) ?? {});
-  return processConfig(raw);
+  return processConfig(raw, pins);
 }
 
 function readConfigText(instanceDir: string): string | undefined {

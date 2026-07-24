@@ -3,11 +3,17 @@ import { extname, join } from 'node:path';
 import { Logger, RequestMethod } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { DeploymentProfile, DEPLOYMENT_PROFILES } from '@hexly/domain';
 import cookieParser from 'cookie-parser';
 import type { NextFunction, Request, Response } from 'express';
-import { AppModule } from './app/app.module';
+import { AppModule, e2eTestingEnabled } from './app/app.module';
+import { pinDeployment } from './app/config';
 
 async function bootstrap() {
+  // The Deployment Profile is pinned by the entry point, never by `hexly.yml` (ADR-0071), and this is
+  // the server binary — so an operator cannot talk a multi-user Instance into the desktop profile.
+  // Collaboration is left to `features.collaboration`; only the Desktop App pins that.
+  pinDeployment({ profile: e2ePinnedProfile() ?? 'server' });
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   // Serve every controller under `/api` so the API namespace never collides with the web app's
   // client-side routes (the SPA owns `/maps/:id`, the API owns `/api/maps/:id`). Asset serving is
@@ -25,6 +31,24 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
   Logger.log(`🚀 Hexly API is running on: http://localhost:${port}`);
+}
+
+/**
+ * The Deployment Profile an e2e run pins (ADR-0071), letting a browser project exercise the desktop cut
+ * list without Electron. Behind the same positive allowlist that gates the test endpoints (ADR-0009), so
+ * a stray env var can never put a real deploy into the desktop profile; an unrecognised value fails boot
+ * rather than falling back, since a silently-wrong profile would make a run assert the wrong cut list.
+ */
+function e2ePinnedProfile(): DeploymentProfile | undefined {
+  const value = process.env.HEXLY_E2E_PROFILE;
+  if (!e2eTestingEnabled || value === undefined) return undefined;
+  // Validate against the domain's own list, so a third profile never needs remembering here.
+  if (!DEPLOYMENT_PROFILES.includes(value as DeploymentProfile)) {
+    throw new Error(
+      `Invalid HEXLY_E2E_PROFILE: ${JSON.stringify(value)} (expected ${DEPLOYMENT_PROFILES.join(' or ')})`,
+    );
+  }
+  return value as DeploymentProfile;
 }
 
 /**

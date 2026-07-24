@@ -2,7 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { resolveInstanceDir } from '../db/db';
 import { BUNDLED_PLUGIN_CONFIGS } from '../entities/bundled-plugins';
 import { ClientConfigController } from './client-config.controller';
-import { HEXLY_CONFIG, loadConfig } from './config';
+import { deploymentPins, HEXLY_CONFIG, loadConfig } from './config';
 
 /**
  * Loads `hexly.yml` from the Data Directory once at boot and exposes it under
@@ -14,7 +14,9 @@ import { HEXLY_CONFIG, loadConfig } from './config';
   providers: [
     {
       provide: HEXLY_CONFIG,
-      useFactory: () => loadConfig(resolveInstanceDir(), BUNDLED_PLUGIN_CONFIGS),
+      // Read the entry point's pins here (not at import time): the graph is composed before
+      // `main.ts` states them, but resolved after (ADR-0071).
+      useFactory: () => loadConfig(resolveInstanceDir(), BUNDLED_PLUGIN_CONFIGS, deploymentPins()),
     },
   ],
   // The client config channel (ADR-0052) projects HEXLY_CONFIG, so it lives here.

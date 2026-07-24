@@ -1,9 +1,20 @@
 /**
+ * Which shape of deployment an Instance is (ADR-0071) — pinned by the entry point, with no `hexly.yml`
+ * key, so no operator can declare `desktop` on a multi-user Instance.
+ */
+export const DEPLOYMENT_PROFILES = ['desktop', 'server'] as const;
+export type DeploymentProfile = (typeof DEPLOYMENT_PROFILES)[number];
+
+/**
  * The client's view of the Instance Configuration (ADR-0052, Seam 4): the subset served, unauthenticated,
  * by `GET /api/config`. A projection of the server's `HexlyConfig`, not a second store — room for future
- * client knobs, today just Plugin enablement and the default create Type.
+ * client knobs, today Plugin enablement, the default create Type, and ADR-0071's two deployment knobs.
  */
 export interface ClientConfig {
+  /** This Instance's Deployment Profile (ADR-0071); the client gates profile-only affordances on it. */
+  profile: DeploymentProfile;
+  /** Whether the Collaboration layer is on (ADR-0071): sharing, World roles, Visibility, Public Links. */
+  collaboration: boolean;
   /** Each bundled Plugin, keyed by `PLUGIN_ID`; every bundled Plugin has an entry whether or not `hexly.yml` names it. */
   plugins: Record<string, ClientPluginConfig>;
   entities: {

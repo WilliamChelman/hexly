@@ -106,9 +106,16 @@ for (const u of toSeed) {
   }
 }
 
-// Serve. HEXLY_E2E=1 mounts the test-reset endpoint (and only here — ADR-0009).
+// Serve. HEXLY_E2E=1 mounts the test-reset endpoint (and only here — ADR-0009). The Deployment Profile
+// (ADR-0071) has no hexly.yml key, so a run that needs `desktop` pins it through the entry point via
+// E2E_PROFILE — the server honours it only under the same HEXLY_E2E allowlist.
 const server = spawn(process.execPath, [mainJs], {
-  env: { ...childEnv, HEXLY_E2E: '1', PORT: process.env.PORT ?? '3100' },
+  env: {
+    ...childEnv,
+    HEXLY_E2E: '1',
+    PORT: process.env.PORT ?? '3100',
+    ...(process.env.E2E_PROFILE ? { HEXLY_E2E_PROFILE: process.env.E2E_PROFILE } : {}),
+  },
   stdio: 'inherit',
 });
 

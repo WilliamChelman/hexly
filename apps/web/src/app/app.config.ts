@@ -41,7 +41,8 @@ export const appConfig: ApplicationConfig = {
     provideRouter(appRoutes),
     provideHttpClient(withInterceptors([withCredentialsInterceptor])),
     // Fetch the client config (ADR-0052) before stabilisation, ahead of the plugin providers below, so
-    // the enabled-Plugin set is settled before any registry reads it.
+    // the enabled-Plugin set is settled before any registry reads it — and, since ADR-0071 rides the
+    // same channel, so the Deployment Profile and Collaboration gates cannot flicker on first render.
     provideClientConfig(),
     // Runtime i18n (ADR-0014): one bundle ships every language; LocaleService
     // picks the active one on boot and the switcher flips it live. The loader
