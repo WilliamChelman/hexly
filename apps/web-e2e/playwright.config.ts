@@ -17,11 +17,14 @@ const urlFor = (port: number) => `http://localhost:${port}`;
 const DEFAULT_PORT = basePort;
 const PLUGIN_DISABLED_PORT = basePort + 1;
 const DEFAULT_TYPE_PORT = basePort + 2;
+const COLLAB_OFF_PORT = basePort + 3;
 
 // dnd off: its Types degrade to the generic Field View, values intact (ADR-0052).
 const DISABLE_DND_YAML = ['features:', '  plugin:', '    dnd:', '      enabled: false', ''].join('\n');
 // The "New" button mints a Hex Map by default — an enabled non-note Type (ADR-0052).
 const DEFAULT_HEXMAP_YAML = ['entities:', '  defaultType: core.type.hex-map', ''].join('\n');
+// Collaboration off (ADR-0071): the solo self-hoster — still a server profile, so it keeps its login page.
+const COLLABORATION_OFF_YAML = ['features:', '  collaboration: false', ''].join('\n');
 
 /** One `e2e-server.mjs` invocation: its own port, throwaway Instance Directory, and optional hexly.yml. */
 function server(port: number, opts: { instanceSubdir?: string; configYaml?: string } = {}) {
@@ -97,10 +100,17 @@ export default defineConfig({
     authenticated('default-type', DEFAULT_TYPE_PORT, {
       testMatch: /.*[/\\]config[/\\]default-type\.spec\.ts/,
     }),
+    // features.collaboration off (ADR-0071, #316): a run proving the Entity sharing surfaces are gone
+    // and the routes behind them 404.
+    setup('collab-off', COLLAB_OFF_PORT),
+    authenticated('collab-off', COLLAB_OFF_PORT, {
+      testMatch: /.*[/\\]config[/\\]collab-off\.spec\.ts/,
+    }),
   ],
   webServer: [
     server(DEFAULT_PORT),
     server(PLUGIN_DISABLED_PORT, { instanceSubdir: 'web-e2e-plugin-disabled', configYaml: DISABLE_DND_YAML }),
     server(DEFAULT_TYPE_PORT, { instanceSubdir: 'web-e2e-default-type', configYaml: DEFAULT_HEXMAP_YAML }),
+    server(COLLAB_OFF_PORT, { instanceSubdir: 'web-e2e-collab-off', configYaml: COLLABORATION_OFF_YAML }),
   ],
 });

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityFacets, FacetCount } from '@hexly/domain';
+import { ClientConfigStore } from '@hexly/web-core';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /** One type's Field selection (ADR-0048, #188): eq membership for enum/list/string, or a
@@ -162,6 +163,7 @@ export interface FieldRangeChange {
 export class FacetRailComponent {
   private readonly transloco = inject(TranslocoService);
   private readonly types = inject(TypeRegistry);
+  private readonly clientConfig = inject(ClientConfigStore);
 
   readonly facetCounts = input<EntityFacets>({
     type: [],
@@ -220,7 +222,9 @@ export class FacetRailComponent {
       { category: 'tag' as const, rows: counts.tag, label: (v: string) => v },
       {
         category: 'visibility' as const,
-        rows: counts.visibility,
+        // Nothing reads Visibility with Collaboration off (ADR-0071), so the category has one value to
+        // offer: emptied, it falls to the drop-empties filter below like any other exhausted category.
+        rows: this.clientConfig.isCollaborationEnabled() ? counts.visibility : [],
         label: (v: string) => this.transloco.translate(`entityBrowser.facets.${v}`),
       },
     ];

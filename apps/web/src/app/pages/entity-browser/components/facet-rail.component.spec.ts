@@ -1,8 +1,58 @@
+import { signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { EntityFacets } from '@hexly/domain';
+import { ClientConfigStore } from '@hexly/web-core';
+import { mockClientConfigStore } from '@hexly/web-core/testing';
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { FacetRailComponent } from './facet-rail.component';
+
+/** The Visibility category is gated on the Collaboration layer (ADR-0071); Type and Tag are not. */
+describe('FacetRail — the Visibility category under Collaboration (#316)', () => {
+  let collaboration: WritableSignal<boolean>;
+
+  function render(): ComponentFixture<FacetRailComponent> {
+    collaboration = signal(true);
+    TestBed.configureTestingModule({
+      imports: [FacetRailComponent, provideTranslocoTesting()],
+      providers: [{ provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration }) }],
+    });
+    const fixture = TestBed.createComponent(FacetRailComponent);
+    fixture.componentRef.setInput('facetCounts', {
+      type: [{ value: 'core.type.note', count: 4 }],
+      tag: [{ value: 'deity', count: 2 }],
+      visibility: [
+        { value: 'private', count: 3 },
+        { value: 'shared', count: 1 },
+      ],
+      fields: [],
+    } satisfies EntityFacets);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  const has = (fixture: ComponentFixture<FacetRailComponent>, tid: string) =>
+    !!(fixture.nativeElement as HTMLElement).querySelector(`[data-testid="${tid}"]`);
+
+  it('renders the Visibility category with Collaboration on', () => {
+    const fixture = render();
+
+    expect(has(fixture, 'facet-heading-visibility')).toBe(true);
+    expect(has(fixture, 'facet-visibility-private')).toBe(true);
+  });
+
+  it('drops the Visibility category with Collaboration off, keeping Type and Tag', () => {
+    const fixture = render();
+    collaboration.set(false);
+    fixture.detectChanges();
+
+    expect(has(fixture, 'facet-heading-visibility')).toBe(false);
+    expect(has(fixture, 'facet-visibility-private')).toBe(false);
+    expect(has(fixture, 'facet-visibility-shared')).toBe(false);
+    expect(has(fixture, 'facet-heading-type')).toBe(true);
+    expect(has(fixture, 'facet-heading-tag')).toBe(true);
+  });
+});
 
 /**
  * A harvested facet dimension carries a `labelKey` the rail translates in the active Locale (#235,

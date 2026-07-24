@@ -8,8 +8,21 @@ import { of, throwError } from 'rxjs';
 import { EntityDetail, WorldDetail, WorldVerb } from '@hexly/domain';
 import { emptyRichContent } from '@hexly/plugin-content';
 import { CORE_HEXMAP, HEX_GRID_FIELD } from '@hexly/plugin-hexmap';
-import { MockEntitiesClient, MockWorldsClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
-import { EntitiesClient, WorldsClient, ActiveWorld, UserDirectoryClient, AuthClient } from '@hexly/web-core';
+import {
+  MockEntitiesClient,
+  MockWorldsClient,
+  MockUserDirectoryClient,
+  MockAuthClient,
+  mockClientConfigStore,
+} from '@hexly/web-core/testing';
+import {
+  EntitiesClient,
+  WorldsClient,
+  ActiveWorld,
+  UserDirectoryClient,
+  AuthClient,
+  ClientConfigStore,
+} from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
 import { CORE_VIEW_MAP, ENTITY_SESSION, viewInstanceKey, OwnerSetComponent } from '@hexly/web-entity';
 import { CORE_VIEW_RICH_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
@@ -43,6 +56,7 @@ describe('EntityHeader', () => {
   let worlds: MockWorldsClient;
   let world: WritableSignal<WorldDetail | null>;
   let activeWorldSet: ReturnType<typeof vi.fn>;
+  let collaboration: WritableSignal<boolean>;
 
   const aldermoor: EntityDetail = {
     id: 'm1',
@@ -71,6 +85,7 @@ describe('EntityHeader', () => {
     worlds = new MockWorldsClient();
     world = signal<WorldDetail | null>(worldDetail());
     activeWorldSet = vi.fn((w: WorldDetail | null) => world.set(w));
+    collaboration = signal(true);
     await TestBed.configureTestingModule({
       imports: [EntityHeaderComponent, provideTranslocoTesting()],
       providers: [
@@ -104,6 +119,7 @@ describe('EntityHeader', () => {
           useValue: new MockUserDirectoryClient(),
         },
         { provide: AuthClient, useValue: new MockAuthClient() },
+        { provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration }) },
         provideRouter([]),
       ],
     }).compileComponents();
@@ -180,6 +196,24 @@ describe('EntityHeader', () => {
 
     openActions(fixture);
     expect(menuItem('manage-owners')).toBeNull();
+  });
+
+  // Collaboration off (ADR-0071, #316): the opener here holds every Right, including `manage`, so a
+  // Rights or Instance-Role check would read true and leak the surface.
+  it('hides the Share action and the Visibility toggle when Collaboration is off', () => {
+    collaboration.set(false);
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
+    fixture.detectChanges();
+
+    openActions(fixture);
+    expect(menuItem('manage-owners')).toBeNull();
+    expect(menuItem('visibility-toggle')).toBeNull();
+    // Only the sharing affordances go: Edit types and Pin are not about a second reader.
+    expect(menuItem('edit-types')).not.toBeNull();
+    expect(menuItem('pin-toggle')).not.toBeNull();
+    // And the dialog behind Share never mounts, so no owner set is reachable.
+    expect(fixture.debugElement.query(By.directive(OwnerSetComponent))).toBeNull();
   });
 
   it('shows the open entity name', () => {
