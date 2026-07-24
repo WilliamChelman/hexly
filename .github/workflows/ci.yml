@@ -6,34 +6,23 @@ on:
       - main
       - beta
   pull_request:
+  # Releases are cut manually: dispatch this workflow on main/beta to run the
+  # real semantic-release + Docker publish. A push only dry-runs (see `release`).
+  workflow_dispatch:
 
 permissions:
   actions: read
   contents: read
 
 jobs:
-  main:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'pnpm'
-
-      - uses: actions/cache@v4
-        id: node-modules-cache
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - run: pnpm install --frozen-lockfile
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+      - uses: ./.github/actions/setup
 
       # Persist the Nx cache across runs so the e2e job's web+api build can
       # reuse this job's cached build on a later run, avoiding a redundant rebuild.
@@ -66,21 +55,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'pnpm'
-
-      - uses: actions/cache@v4
-        id: node-modules-cache
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - run: pnpm install --frozen-lockfile
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+      - uses: ./.github/actions/setup
 
       # Persist the Nx cache across runs so this job's web+api build (triggered by
       # the e2e dependsOn) can reuse the main job's cached build on a later run,
@@ -122,21 +97,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'pnpm'
-
-      - uses: actions/cache@v4
-        id: node-modules-cache
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - run: pnpm install --frozen-lockfile
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+      - uses: ./.github/actions/setup
 
       - name: Release dry-run
         env:
@@ -146,9 +107,31 @@ jobs:
           GITHUB_REF: refs/heads/${{ github.base_ref }}
         run: pnpm exec semantic-release --dry-run
 
-  release:
-    needs: [main, e2e]
+  # Releases are intentionally NOT automated on main/beta: a push only reports
+  # the version that would be released (dry-run). Cut releases manually via the
+  # workflow_dispatch-gated `release` job below.
+  release-dry-run:
+    needs: [build, e2e]
     if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      - name: Release dry-run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm exec semantic-release --dry-run
+
+  # Real release: only ever runs on a manual workflow_dispatch (on main/beta),
+  # gated behind the same main+e2e checks a push runs.
+  release:
+    needs: [build, e2e]
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -160,21 +143,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'pnpm'
-
-      - uses: actions/cache@v4
-        id: node-modules-cache
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - run: pnpm install --frozen-lockfile
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+      - uses: ./.github/actions/setup
 
       - name: Semantic release
         id: release
