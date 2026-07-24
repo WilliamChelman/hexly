@@ -72,6 +72,14 @@ _Avoid_: Keyword, category, label
 An optional reference to an Entity by id — from a Map element, inline within Content prose, a typed **Field**, or a Board's **Embed**. A link to a missing or inaccessible Entity renders non-navigable (a dangling label or placeholder) rather than erroring.
 _Avoid_: Reference, relation, backlink
 
+**Decor Link**:
+A link that exists for presentation, carrying no worldbuilding meaning — a **Thumbnail**, an image in prose or a Board **Image** (any capability-URL reference is decor by construction). Declared by the link's producer, e.g. a flagged **Field**. Relation surfaces (the References panel, the **World Graph**) subdue Decor Links by default behind a reveal; usage readings count them always. A Board **Embed** is never decor — embedding is curatorial.
+_Avoid_: Non-semantic link, presentational link, irrelevant link
+
+**System-managed**:
+A marker on an **Entity Type** or **Field** meaning the system alone assigns and removes it — users never add, remove, attach, or detach it, on any surface or through the API; its _value_ is not the marker's concern. `core.type.asset` and `core.field.asset` carry it.
+_Avoid_: Hidden, internal, readonly, locked; hidden-from-default-listing (a separate, discoverability axis)
+
 **Link Descriptor**:
 An optional free-text label on a Content Entity Link, characterising the relationship it expresses ("spouse", "capital of"). Like a Tag, but on a link; one per link, one-way.
 _Avoid_: Relationship, relation, role, type
