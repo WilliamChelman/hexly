@@ -80,7 +80,8 @@ export class FakeEntityTypes implements EntityTypes {
     fieldIds: readonly string[] | null | undefined,
   ): Field[] {
     const present = new Set(this.effectiveFields(types, fieldIds).map((field) => field.id));
-    return [...this.fieldsById.values()].filter((field) => !present.has(field.id));
+    // Mirror the real registry: a System-managed Field (ADR-0068) is never user-attachable.
+    return [...this.fieldsById.values()].filter((field) => !present.has(field.id) && !field.systemManaged);
   }
 }
 

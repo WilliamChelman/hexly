@@ -20,6 +20,9 @@ export const ASSET_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     icon: 'asset',
     views: [CORE_VIEW_ASSET],
     graphColorToken: '--color-ink-muted',
+    // Carry the shared declaration's System-managed marker across the web seam (ADR-0068): the pickers
+    // must not offer the asset type and the Details panel must render it affordance-less.
+    systemManaged: CORE_ASSET_TYPE.systemManaged,
     labels: {
       eyebrow: 'asset.eyebrow',
       titleLabel: 'asset.titleLabel',

@@ -66,6 +66,13 @@ export interface TypeDefinition {
    * (resolved to RGBA per theme, ADR-0007).
    */
   readonly graphColorToken: string;
+  /**
+   * **System-managed** (CONTEXT.md → System-managed, ADR-0068): the marker projected across the web seam
+   * from the type's declaration (`AvailableType.systemManaged`). Surfaces derive behavior from it — the
+   * add-type pickers stop offering it, the Details panel lists it affordance-less. Set today only by the
+   * code-registered asset type; absent → an ordinary user-assignable type.
+   */
+  readonly systemManaged?: boolean;
 }
 
 /**

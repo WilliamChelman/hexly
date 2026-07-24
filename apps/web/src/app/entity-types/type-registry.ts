@@ -217,14 +217,14 @@ export class TypeRegistry implements EntityTypes {
    * every World-defined Field and enabled Plugin Field whose `id` its effective set does not already cover
    * — so the attach picker never offers a Field a type default already places, or one already attached.
    * World Fields come first (always active); a disabled Plugin's Fields drop out (they would only degrade
-   * to a plain value).
+   * to a plain value). A **System-managed** Field (ADR-0068) is never attachable: the system alone attaches it.
    */
   attachableFields(
     types: readonly string[] | null | undefined,
     fieldIds: readonly string[] | null | undefined,
   ): Field[] {
     const present = new Set(this.effectiveFields(types, fieldIds).map((field) => field.id));
-    return this.availableFields().filter((field) => !present.has(field.id));
+    return this.availableFields().filter((field) => !present.has(field.id) && !field.systemManaged);
   }
 
   /**
