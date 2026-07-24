@@ -1,0 +1,33 @@
+import { inject } from '@angular/core';
+import { CanActivateFn, Router } from '@angular/router';
+import { catchError, map, of } from 'rxjs';
+import { EntitiesClient } from '../services/entities.client';
+import { idFromSegment } from '../utils/pretty-id';
+import { entityRoute } from '../utils/routes';
+
+/**
+ * Resolves an Entity's World from its id and redirects the World-agnostic
+ * `/entities/:id` link to its canonical `/w/:worldId/entities/:id` route.
+ * Content Links don't carry their target's World — a link can point across
+ * Worlds — so it is looked up here by id only (ADR-0025). A missing or
+ * inaccessible target falls through (returns `true`) so the route's error page
+ * renders instead of redirecting.
+ */
+export const entityWorldRedirect: CanActivateFn = (route) => {
+  const id = idFromSegment(route.paramMap.get('id') ?? '');
+  const router = inject(Router);
+  return inject(EntitiesClient)
+    .list({ ids: [id] })
+    .pipe(
+      map((page) => {
+        const target = page.items[0];
+        if (!target) return true;
+        // Bare World segment; the parent activeWorldGuard heals its slug once the
+        // redirect lands under `/w/:worldId`. Entity slug is canonical from here.
+        return router.createUrlTree(entityRoute(target.worldId, id, undefined, target.name), {
+          queryParams: route.queryParams,
+        });
+      }),
+      catchError(() => of(true)),
+    );
+};

@@ -6,27 +6,23 @@ on:
       - main
       - beta
   pull_request:
+  # Releases are cut manually: dispatch this workflow on main/beta to run the
+  # real semantic-release + Docker publish. A push only dry-runs (see `release`).
+  workflow_dispatch:
 
 permissions:
   actions: read
   contents: read
 
 jobs:
-  main:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'pnpm'
-
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
 
       # Persist the Nx cache across runs so the e2e job's web+api build can
       # reuse this job's cached build on a later run, avoiding a redundant rebuild.
@@ -41,6 +37,15 @@ jobs:
       # i18n-sync is the key-drift gate (issue #50): it type-checks the tool then
       # diffs every locale catalog against en.json. run-many invokes it for the
       # one project that defines it (web), failing the build on drift.
+      # The custom ESLint rules are the guards for ADR-0020 (design tokens) and ADR-0045
+      # (the EntityWrites and WorldWrites choke points). A rule whose AST selector is typo'd
+      # matches nothing and passes silently, so the rules carry their own RuleTester suites.
+      - run: pnpm test:eslint-rules
+
+      # schema.ts is the single migration source of truth (ADR-0027): this fails the build on a
+      # hand-authored migration or a schema change that never went through `pnpm db:generate`.
+      - run: pnpm db:check
+
       - run: pnpm exec nx run-many -t lint test build i18n-sync
 
   e2e:
@@ -50,14 +55,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'pnpm'
-
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
 
       # Persist the Nx cache across runs so this job's web+api build (triggered by
       # the e2e dependsOn) can reuse the main job's cached build on a later run,
@@ -71,9 +69,16 @@ jobs:
             ${{ runner.os }}-nx-
 
       # Only chromium — the suite is a single-engine seam regression net (ADR-0009).
-      - run: pnpm exec playwright install --with-deps chromium
+      - uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
 
-      - run: pnpm exec nx e2e web-e2e
+      - run: pnpm exec playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+
+      - run: pnpm e2e
 
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -92,14 +97,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'pnpm'
-
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
 
       - name: Release dry-run
         env:
@@ -109,9 +107,31 @@ jobs:
           GITHUB_REF: refs/heads/${{ github.base_ref }}
         run: pnpm exec semantic-release --dry-run
 
-  release:
-    needs: [main, e2e]
+  # Releases are intentionally NOT automated on main/beta: a push only reports
+  # the version that would be released (dry-run). Cut releases manually via the
+  # workflow_dispatch-gated `release` job below.
+  release-dry-run:
+    needs: [build, e2e]
     if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      - name: Release dry-run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm exec semantic-release --dry-run
+
+  # Real release: only ever runs on a manual workflow_dispatch (on main/beta),
+  # gated behind the same main+e2e checks a push runs.
+  release:
+    needs: [build, e2e]
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -123,14 +143,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'pnpm'
-
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
 
       - name: Semantic release
         id: release

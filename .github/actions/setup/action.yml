@@ -1,0 +1,22 @@
+name: Setup
+description: pnpm + Node 24 + a node_modules cache, then a frozen-lockfile install. Run after checkout.
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: 'pnpm'
+
+    - uses: actions/cache@v4
+      id: node-modules-cache
+      with:
+        path: node_modules
+        key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yaml') }}
+
+    - run: pnpm install --frozen-lockfile
+      if: steps.node-modules-cache.outputs.cache-hit != 'true'
+      shell: bash

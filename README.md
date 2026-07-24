@@ -7,11 +7,11 @@ worldbuilding. Maps are persisted to user accounts and can be shared. See
 
 It's an Nx monorepo:
 
-| Path           | What it is                                                              |
-| -------------- | ---------------------------------------------------------------------- |
-| `apps/web`     | Angular front end (standalone components + signals)                     |
-| `apps/api`     | NestJS API (SQLite via Drizzle, served by Express)                      |
-| `libs/domain`  | Framework-free contracts shared by both runtimes (Zod schemas, types)   |
+| Path          | What it is                                                            |
+| ------------- | --------------------------------------------------------------------- |
+| `apps/web`    | Angular front end (standalone components + signals)                   |
+| `apps/api`    | NestJS API (SQLite via Drizzle, served by Express)                    |
+| `libs/domain` | Framework-free contracts shared by both runtimes (Zod schemas, types) |
 
 ## Self-hosting
 
@@ -88,23 +88,51 @@ are stored as argon2 hashes; the plaintext is never persisted.
 
 ### Where the data lives
 
-The API stores everything in a single SQLite file (WAL mode). The dev scripts
-pin it to `hexly.db` at the repo root via `HEXLY_DB_PATH`, so:
+You point the API at an **Instance Directory** via `HEXLY_DIR`; inside it live
+the SQLite database `hexly.db` (WAL mode) and the optional config file
+`hexly.yml` (see below). The dev scripts pin it to `hexly-data/` at the repo
+root, so:
 
-- `pnpm seed` and `pnpm dev`/`pnpm dev:api` always agree on the same file, and
+- `pnpm seed` and `pnpm dev`/`pnpm dev:api` always agree on the same folder, and
 - the database **survives rebuilds** (the API build cleans `dist/`, so the
   default in-bundle location would be wiped on every serve).
 
-`hexly.db*` is git-ignored. To start fresh, delete it and re-seed:
+`hexly-data/` is git-ignored. To start fresh, delete the db and re-seed:
 
 ```sh
-rm -f hexly.db hexly.db-wal hexly.db-shm
+rm -f hexly-data/hexly.db hexly-data/hexly.db-wal hexly-data/hexly.db-shm
 pnpm seed dev@hexly.test devpass "Dev User"
 ```
 
-Set `HEXLY_DB_PATH` to an absolute path to point at a different/shared database
-(it's honored as-is when absolute; a relative value resolves against the current
+Set `HEXLY_DIR` to an absolute path to point at a different/shared folder
+(honored as-is when absolute; a relative value resolves against the current
 working directory).
+
+### Instance configuration (`hexly.yml`)
+
+Drop an optional `hexly.yml` in the Instance Directory to tune per-instance
+settings (ADR-0036). It's the single source for these — there are no env-var
+overrides. A missing or partial file falls back to built-in defaults; an invalid
+file fails boot with the offending key named. Sizes are human-readable
+(`500mb`, `1.5gb`).
+
+```yaml
+# hexly-data/hexly.yml — all keys optional; shown with their defaults
+import:
+  maxUpload: 500mb # ceiling on an uploaded vault .zip (images ride inside it)
+  maxDecompressed: 5gb # ceiling on the inflated vault (markdown + assets); zip-bomb backstop
+  strictZipGuard:
+    false # false: fast import, guard on the zip's *declared* size.
+    # true: slower, streams and meters *actual* output to abort a
+    #       bomb mid-inflate — set on an untrusted/public instance.
+search:
+  weights: # bm25 relevance multipliers per indexed column (ADR-0035)
+    name: 10 # a query word in the name outranks the same word...
+    tags: 5 # ...in a tag...
+    content: 1 # ...in the body. Retune if e.g. very long notes skew results.
+```
+
+`strictZipGuard` is a speed-vs-safety trade (ADR-0036). The default (`false`) batch-decompresses — several times faster on a large vault — and trusts the archive's declared sizes, which is right for a trusted personal/LAN instance importing your own vault. A maliciously crafted `.zip` can under-declare its size to slip past that check, so an **untrusted or public** instance should set `strictZipGuard: true`, which streams the archive and meters actual decompressed bytes to abort a zip bomb before it materializes. Either way `maxDecompressed` is enforced.
 
 ## Build, test, lint
 
@@ -137,3 +165,15 @@ nx run-many -t test -p api,web,domain
 Full rationale: [ADR-0004](./docs/adr/0004-closed-user-set-role-based-sharing.md)
 (closed user set) and [ADR-0002](./docs/adr/0002-sqlite-json-document-storage.md)
 (SQLite storage).
+
+## Third-party notices
+
+UI glyphs are from [Lucide](https://lucide.dev), used via `@lucide/angular`.
+Lucide is ISC-licensed; the icons it derives from [Feather](https://feathericons.com)
+are MIT-licensed.
+
+> ISC License — Copyright (c) Lucide Contributors
+> MIT License — Copyright (c) 2013-present Cole Bemis (Feather)
+
+Full texts: [lucide.dev/license](https://lucide.dev/license) and the bundled
+`node_modules/@lucide/angular/LICENSE`.

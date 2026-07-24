@@ -1,0 +1,47 @@
+{
+  "plainHeading": "Other metadata",
+  "entityLink": {
+    "set": "Link an entity…",
+    "change": "Change entity…",
+    "linkedEntity": "Linked entity",
+    "remove": "Remove link",
+    "search": "Search entities…",
+    "empty": "No entities",
+    "unavailable": "Unavailable",
+    "dangling": "This entity is unavailable"
+  },
+  "details": {
+    "toggle": "Details",
+    "types": "Types",
+    "fields": "Fields",
+    "addType": "Add a type…",
+    "removeType": "Remove type {{ type }}",
+    "attachField": "Attach a field…",
+    "detachField": "Detach field {{ field }}",
+    "fieldsEmpty": "No fields"
+  },
+  "links": {
+    "toggle": "Toggle links",
+    "references": "References",
+    "referencedBy": "Referenced by",
+    "referencesEmpty": "This entity links to nothing",
+    "referencedByEmpty": "Nothing links here"
+  },
+  "assetLink": {
+    "set": "Set image…",
+    "change": "Change image…",
+    "upload": "Upload a new image",
+    "uploading": "Uploading…",
+    "uploadError": "Upload failed. Please try again.",
+    "search": "Search images…",
+    "empty": "No images"
+  },
+  "generic": {
+    "eyebrow": "Entity",
+    "titleLabel": "Entity name",
+    "rename": "Rename",
+    "editorLabel": "Entity content",
+    "create": "New entity",
+    "untitled": "Untitled entity"
+  }
+}

@@ -1,51 +1,158 @@
 import { Route } from '@angular/router';
-import { authGuard, loginGuard } from './core/guards/auth.guard';
-import { EntitySession } from './pages/entity/services/entity-session';
+import {
+  manageUsersGuard,
+  superadminGuard,
+  authGuard,
+  loginGuard,
+  entityWorldRedirect,
+  reconcileWorldSegment,
+  activeWorldGuard,
+  clearActiveWorld,
+} from '@hexly/web-core';
 
+// `title` values are transloco keys, resolved by TranslationTitleStrategy.
 export const appRoutes: Route[] = [
   {
     path: 'login',
     canActivate: [loginGuard],
-    loadComponent: () => import('./pages/login/login').then((m) => m.Login),
-    // Title key resolved by TranslationTitleStrategy to the "Hexly" brand (ADR-0014).
+    loadComponent: () => import('./pages/login/login.page').then((m) => m.LoginPage),
     title: 'auth.tabTitle',
   },
   {
-    // The Entity browser: every Entity the user owns — notes and maps — plus
-    // open / create / rename / delete (#70).
-    path: 'entities',
+    path: '',
+    pathMatch: 'full',
+    redirectTo: 'worlds',
+  },
+  {
+    // The World Index: the chooser — no auto-redirect into a World.
+    path: 'worlds',
     pathMatch: 'full',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/entity-browser/entity-browser').then(
-        (m) => m.EntityBrowser,
-      ),
-    // Title key resolved by TranslationTitleStrategy to the "Hexly" brand (ADR-0014).
-    title: 'entityBrowser.tabTitle',
+    loadComponent: () => import('./pages/worlds/worlds.page').then((m) => m.WorldsPage),
+    title: 'worldIndex.tabTitle',
   },
   {
-    // The open-Entity route (#70). The id is in the URL so a reload reopens the
-    // same Entity (#6). The routed page renders its own header now (ADR-0022):
-    // EditorShell for a hexmap, NoteView for a note.
-    path: 'entities/:id',
+    // Account-scoped, so it sits outside the World scope.
+    path: 'settings',
     canActivate: [authGuard],
-    // One EntitySession for the subtree, destroyed on leave, so open-Entity state
-    // resets implicitly (#70).
-    providers: [EntitySession],
-    // Tab title is the open Entity's name composed with the brand ("Aldermoor —
-    // Hexly") via documentTitleKey; `title` is the pre-load fallback (ADR-0014).
-    title: 'editorShell.tabTitle',
-    data: { documentTitleKey: 'editorShell.tabTitleNamed' },
-    loadComponent: () =>
-      import('./pages/entity/entity.page').then((m) => m.EntityPage),
+    loadComponent: () => import('./pages/user-settings/user-settings.page').then((m) => m.UserSettingsPage),
+    title: 'settings.tabTitle',
   },
-  { path: '', pathMatch: 'full', redirectTo: 'entities' },
+  {
+    // User management (ADR-0047). Account-scoped like Settings; the server
+    // re-checks every action.
+    path: 'users',
+    canActivate: [manageUsersGuard],
+    loadComponent: () => import('./pages/users/users.page').then((m) => m.UsersPage),
+    title: 'users.tabTitle',
+  },
+  {
+    // The Superadmin repair surface: the Reindex (ADR-0046). Superadmin-only.
+    path: 'admin',
+    canActivate: [superadminGuard],
+    loadComponent: () => import('@hexly/admin-web').then((m) => m.AdminPage),
+    title: 'admin.tabTitle',
+  },
+  {
+    // World scope: activeWorldGuard fetches and pins the active World (and
+    // self-heals the slug) before any child renders; clearActiveWorld unpins on
+    // leaving the scope so the Index never shows a stale World.
+    path: 'w/:worldId',
+    canActivate: [authGuard, activeWorldGuard],
+    canDeactivate: [clearActiveWorld],
+    loadComponent: () => import('./pages/world/world.page').then((m) => m.WorldPage),
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('./pages/world/pages/world-dashboard/world-dashboard.page').then((m) => m.WorldDashboardPage),
+        title: 'worldDashboard.tabTitle',
+      },
+      {
+        // World-level owner management; Owner-only.
+        path: 'settings',
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('./pages/world/pages/world-settings/world-settings.page').then((m) => m.WorldSettingsPage),
+        title: 'collab.owners.tabTitle',
+      },
+      {
+        path: 'entities',
+        pathMatch: 'full',
+        loadComponent: () => import('./pages/entity-browser/entity-browser.page').then((m) => m.EntityBrowserPage),
+        title: 'entityBrowser.tabTitle',
+      },
+      {
+        // The Asset Browser (ADR-0065, #282): the Entity Browser preset to the asset type — a World's
+        // uploaded media as thumbnail tiles, with upload at hand.
+        path: 'assets',
+        pathMatch: 'full',
+        loadComponent: () => import('./pages/asset-browser/asset-browser.page').then((m) => m.AssetBrowserPage),
+        title: 'assetBrowser.tabTitle',
+      },
+      {
+        // The World Graph (#181). Lazy on its own chunk: cosmos.gl is ~168 kB gzip
+        // of WebGL that nothing outside this page needs.
+        path: 'graph',
+        pathMatch: 'full',
+        loadComponent: () => import('./pages/world/pages/world-graph/world-graph.page').then((m) => m.WorldGraphPage),
+        title: 'worldGraph.tabTitle',
+      },
+      {
+        path: 'entities/:id',
+        // Reconcile a stale/hand-edited World segment against the Entity's real
+        // world_id, redirecting to the correct World on mismatch. Stays here (not
+        // in the lazy child) so its parent is still `w/:worldId` — where the guard
+        // reads the worldId segment from.
+        canActivate: [reconcileWorldSegment],
+        // The editor's providers + component live in a lazy child config so the
+        // ContentEditor barrel (TipTap) never lands in the initial bundle.
+        loadChildren: () => import('./pages/entity/entity.routes').then((m) => m.ENTITY_ROUTES),
+      },
+    ],
+  },
+  {
+    // World-agnostic Entity link target: a Content Link can cross Worlds, so this
+    // route resolves the target's World by id and redirects to the canonical
+    // `/w/:worldId/entities/:id`; a missing/inaccessible target renders the error page.
+    path: 'entities/:id',
+    canActivate: [authGuard, entityWorldRedirect],
+    loadComponent: () => import('./pages/error/error.page').then((m) => m.ErrorPage),
+    title: 'error.tabTitle',
+  },
   {
     path: 'styleguide',
-    loadComponent: () =>
-      import('./pages/styleguide/styleguide').then((m) => m.Styleguide),
-    // Title key resolved by TranslationTitleStrategy to the "Hexly" brand (ADR-0014).
+    loadComponent: () => import('./pages/styleguide/styleguide.page').then((m) => m.StyleguidePage),
     title: 'styleguide.tabTitle',
   },
-  { path: '**', redirectTo: 'entities' },
+  // Unauthenticated Public Link surface: token-scoped, read-only. Deliberately
+  // outside authGuard — possession of the token is the credential.
+  {
+    path: 'public/e/:token',
+    data: { mode: 'entity' },
+    loadComponent: () => import('./pages/public/public-entity.page').then((m) => m.PublicEntityPage),
+    title: 'publicView.tabTitle',
+  },
+  {
+    path: 'public/w/:token',
+    loadComponent: () => import('./pages/public/public-world.page').then((m) => m.PublicWorldPage),
+    title: 'publicView.tabTitle',
+  },
+  {
+    // `:entityId` (not `:id`) keeps the reused EntityPage's watchRoute from matching;
+    // PublicEntityPage marks the session externally driven and is the sole data source.
+    path: 'public/w/:token/e/:entityId',
+    data: { mode: 'worldEntity' },
+    loadComponent: () => import('./pages/public/public-entity.page').then((m) => m.PublicEntityPage),
+    title: 'publicView.tabTitle',
+  },
+  // Unmatched URLs render the error page rather than bouncing to the Index, so a
+  // wrong URL is visible, not papered over.
+  {
+    path: '**',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/error/error.page').then((m) => m.ErrorPage),
+    title: 'error.tabTitle',
+  },
 ];

@@ -2,12 +2,22 @@ services:
   hexly:
     image: ghcr.io/williamchelman/hexly:latest
     ports:
-      - "3000:3000"
+      - '3000:3000'
     volumes:
-      - hexly-data:/data
+      - ./hexly-data:/data
     environment:
-      HEXLY_DB_PATH: /data/hexly.db
+      HEXLY_DIR: /data
+      # Bootstrap Superadmin (ADR-0037). Seeded once on first start, a no-op on
+      # every restart after. Override these from the host env or a .env file.
+      HEXLY_SUPERADMIN_EMAIL: ${HEXLY_SUPERADMIN_EMAIL:-admin@hexly.local}
+      HEXLY_SUPERADMIN_PASSWORD: ${HEXLY_SUPERADMIN_PASSWORD:-change-me}
+      HEXLY_SUPERADMIN_NAME: ${HEXLY_SUPERADMIN_NAME:-Superadmin}
+    command:
+      - sh
+      - -c
+      - >-
+        node dist/apps/api/seed.js
+        "$$HEXLY_SUPERADMIN_EMAIL" "$$HEXLY_SUPERADMIN_PASSWORD" "$$HEXLY_SUPERADMIN_NAME"
+        --superadmin;
+        exec node dist/apps/api/main.js
     restart: unless-stopped
-
-volumes:
-  hexly-data:

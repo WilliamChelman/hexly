@@ -1,0 +1,19 @@
+{
+  "name": "plugin-asset-web",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/plugin-asset-web/src",
+  "prefix": "app",
+  "projectType": "library",
+  "tags": ["scope:web", "type:feature"],
+  "targets": {
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "watch": false,
+        "buildTarget": "web:build:development",
+        "tsConfig": "libs/plugin-asset-web/tsconfig.spec.json",
+        "setupFiles": ["libs/plugin-asset-web/src/test-setup.ts"]
+      }
+    }
+  }
+}

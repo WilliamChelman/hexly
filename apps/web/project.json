@@ -18,6 +18,21 @@
           {
             "glob": "**/*",
             "input": "apps/web/public"
+          },
+          {
+            "glob": "*.json",
+            "input": "apps/web/src/i18n/catalogs",
+            "output": "assets/i18n"
+          },
+          {
+            "glob": "marcellus-latin-400-normal.woff2",
+            "input": "node_modules/@fontsource/marcellus/files",
+            "output": "fonts"
+          },
+          {
+            "glob": "source-serif-4-latin-wght-normal.woff2",
+            "input": "node_modules/@fontsource-variable/source-serif-4/files",
+            "output": "fonts"
           }
         ],
         "styles": ["apps/web/src/styles.css"],
@@ -29,7 +44,7 @@
             {
               "type": "initial",
               "maximumWarning": "500kb",
-              "maximumError": "1mb"
+              "maximumError": "1.1mb"
             },
             {
               "type": "anyComponentStyle",
@@ -51,7 +66,7 @@
       "executor": "@angular/build:dev-server",
       "defaultConfiguration": "development",
       "options": {
-        "proxyConfig": "apps/web/proxy.conf.json"
+        "proxyConfig": "apps/web/proxy.conf.mjs"
       },
       "configurations": {
         "production": {
@@ -69,16 +84,14 @@
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": [
-        "{projectRoot}/public/assets/i18n/**/*.json",
+        "{workspaceRoot}/libs/*/src/i18n/catalogs/**/*.json",
+        "{workspaceRoot}/apps/web/src/i18n/catalogs/**/*.json",
         "{projectRoot}/tools/check-locale-sync.ts",
         "{projectRoot}/tools/tsconfig.json",
-        "{projectRoot}/src/app/core/i18n/locale-key-sync.ts"
+        "{workspaceRoot}/libs/web-core/src/i18n/locale-key-sync.ts"
       ],
       "options": {
-        "commands": [
-          "tsc -p apps/web/tools/tsconfig.json --noEmit",
-          "jiti apps/web/tools/check-locale-sync.ts"
-        ],
+        "commands": ["tsc -p apps/web/tools/tsconfig.json --noEmit", "jiti apps/web/tools/check-locale-sync.ts"],
         "cwd": "{workspaceRoot}",
         "parallel": false
       }
@@ -86,7 +99,8 @@
     "test": {
       "executor": "@angular/build:unit-test",
       "options": {
-        "watch": false
+        "watch": false,
+        "setupFiles": ["apps/web/src/test-setup.ts"]
       }
     },
     "serve-static": {

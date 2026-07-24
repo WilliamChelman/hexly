@@ -1,0 +1,50 @@
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ENTITY_SESSION, ENTITY_TYPES, ReadingSurfaceComponent } from '@hexly/web-entity';
+import { TranslocoService } from '@jsverse/transloco';
+import { ContentEditorComponent } from './content-editor.component';
+import { OutlineSourceDirective } from '../directives/outline-source.directive';
+import { OutlineStore } from '../services/outline-store';
+
+/**
+ * The `core.view.rich-content` renderer (ADR-0048, *Views* amendment; ADR-0051): the Content body in a
+ * centred reading column. It renders whichever prose Field placed it, reading that Field's key from
+ * `VIEW_FIELD_KEY` (the {@link ContentEditorComponent} it hosts does the read).
+ *
+ * The View's Outline is a page-Dock Panel now (ADR-0067) — declared on the View's `ViewDefinition.panels`
+ * and hosted by the page's Dock with this View's injector — so the private floating dock the View once
+ * owned is gone. The View keeps {@link OutlineStore} in `providers` (the same View-scoped ownership the
+ * Map View gives its `HexMapStore`, ADR-0050): the store lives and dies with this View's chunk, and the
+ * Dock-hosted Outline Panel reaches it through the View injector.
+ *
+ * The reading-column shell is the shared {@link ReadingSurfaceComponent} (ADR-0067); this View projects
+ * only its prose body into it.
+ *
+ * The inline metadata block the View once rendered above prose is retired (ADR-0067): document keys now
+ * render in exactly one place — the universal Details panel — so the redundant inline block is gone.
+ */
+@Component({
+  selector: 'app-content-view',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'contents' },
+  providers: [OutlineStore],
+  imports: [ReadingSurfaceComponent, ContentEditorComponent, OutlineSourceDirective],
+  template: `
+    <app-reading-surface>
+      <app-content-editor appOutlineSource [ariaLabel]="editorLabel()" />
+    </app-reading-surface>
+  `,
+})
+export class ContentViewComponent {
+  private readonly session = inject(ENTITY_SESSION);
+  private readonly types = inject(ENTITY_TYPES);
+  private readonly transloco = inject(TranslocoService);
+
+  /**
+   * The Content editor's accessible name, from the primary type (ADR-0014) — resolved, so a
+   * user-defined type contributes its authored name rather than a translated key.
+   */
+  protected readonly editorLabel = computed(() => {
+    this.transloco.activeLang(); // reactive dependency: re-resolve on a language switch
+    return this.types.chromeLabel(this.session.current()?.types?.[0], 'editorLabel');
+  });
+}

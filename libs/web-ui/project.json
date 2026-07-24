@@ -1,0 +1,19 @@
+{
+  "name": "web-ui",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/web-ui/src",
+  "prefix": "app",
+  "projectType": "library",
+  "tags": ["scope:web", "type:ui"],
+  "targets": {
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "watch": false,
+        "buildTarget": "web:build:development",
+        "tsConfig": "libs/web-ui/tsconfig.spec.json",
+        "setupFiles": ["libs/web-ui/src/test-setup.ts"]
+      }
+    }
+  }
+}

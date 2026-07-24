@@ -1,17 +1,15 @@
 import { expect, test } from './fixtures';
 
 /**
- * The language switcher works for any actor (ADR-0014), now behind the rail's
- * avatar (ADR-0022). Login itself is standalone with no rail, so an anonymous
- * actor flips the language from the reduced rail on a public page (the
- * styleguide) and the choice carries over to login. A clean slate — no session,
- * no stored locale — means the first visit reflects genuine default detection.
+ * The language switcher works for any actor (ADR-0014), behind the rail's avatar
+ * (ADR-0022). Login is standalone with no rail, so an anonymous actor flips the language
+ * from the reduced rail on a public page (the styleguide). The empty storageState is
+ * required: with no session and no stored locale, the first visit exercises genuine
+ * default detection.
  */
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test('defaults to English, flips to French via the rail, and remembers it on reload', async ({
-  page,
-}) => {
+test('defaults to English, flips to French via the rail, and remembers it on reload', async ({ page }) => {
   // The login screen renders in English on a first visit with an English browser.
   await page.goto('/login');
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
@@ -24,9 +22,7 @@ test('defaults to English, flips to French via the rail, and remembers it on rel
 
   // The switch takes effect live, in place — no reload, no navigation: the rail's
   // own avatar control is already relabelled in French on this same page.
-  await expect(
-    page.getByRole('button', { name: 'Ouvrir le menu utilisateur' }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ouvrir le menu utilisateur' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open user menu' })).toHaveCount(0);
 
   // The choice carries to the standalone login screen and persists on reload.
@@ -46,8 +42,6 @@ test.describe('with a French browser', () => {
   test('picks French on the first visit', async ({ page }) => {
     await page.goto('/login');
 
-    await expect(
-      page.getByRole('button', { name: 'Se connecter' }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible();
   });
 });

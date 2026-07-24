@@ -1,11 +1,6 @@
-/**
- * Minimal NestJS bootstrap for the Hexly API.
- * Exposes the routes defined by its controllers (e.g. `GET /health`).
- */
-
 import { existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
-import { Logger } from '@nestjs/common';
+import { Logger, RequestMethod } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
@@ -14,11 +9,12 @@ import { AppModule } from './app/app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  // Serve every controller under `/api` so the API namespace never collides
-  // with the web app's client-side routes (e.g. the SPA owns `/maps/:id` while
-  // the API owns `/api/maps/:id`). One reverse-proxy/static-host split — `/api`
-  // to this server, everything else to the SPA — works in dev and prod alike.
-  app.setGlobalPrefix('api');
+  // Serve every controller under `/api` so the API namespace never collides with the web app's
+  // client-side routes (the SPA owns `/maps/:id`, the API owns `/api/maps/:id`). Asset serving is
+  // excluded so it stays at `/assets/...`, matching the `src` written into Content (ADR-0034, ADR-0008).
+  app.setGlobalPrefix('api', {
+    exclude: [{ path: 'assets/:worldId/:file', method: RequestMethod.GET }],
+  });
   // Parse the session cookie off incoming requests (read by AuthController).
   app.use(cookieParser());
   // Run module shutdown hooks (DbModule closes the SQLite handle) on SIGTERM/SIGINT.
@@ -32,11 +28,9 @@ async function bootstrap() {
 }
 
 /**
- * Serve the built Angular SPA from this same server, so the API and the app are
- * one origin (ADR-0008). The SPA bundle sits beside the API bundle in the build
- * output (`dist/apps/api` → `dist/apps/web/browser`). When that directory is
- * absent — local dev and unit tests, where `nx serve web` owns the SPA — this is
- * a no-op, so nothing changes for the split dev setup.
+ * Serve the built Angular SPA from this same server, so the API and the app are one origin (ADR-0008).
+ * The SPA bundle sits beside the API bundle in the build output (`dist/apps/api` → `dist/apps/web/browser`).
+ * A no-op when that directory is absent — local dev and unit tests, where `nx serve web` owns the SPA.
  */
 function serveWebApp(app: NestExpressApplication): void {
   const webRoot = join(__dirname, '..', 'web', 'browser');
@@ -59,12 +53,7 @@ function serveWebApp(app: NestExpressApplication): void {
     // `/api-docs`, …). `extname` lets a missing asset 404 rather than return
     // HTML — known limit: a client route whose last segment has a dot is treated
     // as an asset and 404s, acceptable since map ids/routes are `[\w-]+` (no dots).
-    if (
-      req.method !== 'GET' ||
-      req.path === '/api' ||
-      req.path.startsWith('/api/') ||
-      extname(req.path)
-    ) {
+    if (req.method !== 'GET' || req.path === '/api' || req.path.startsWith('/api/') || extname(req.path)) {
       return next();
     }
     res.sendFile(indexHtml);

@@ -1,117 +1,452 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
-import { Component } from '@angular/core';
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import {
-  ActivatedRoute,
-  convertToParamMap,
-  Router,
-} from '@angular/router';
-import { of } from 'rxjs';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
+import { of, Subject, throwError } from 'rxjs';
 import { EntityDetail, EntityType } from '@hexly/domain';
-import { EditorShell } from './components/editor-shell';
+import { CONTENT_FORMAT } from '@hexly/plugin-content';
+import { CORE_HEXMAP, HEX_GRID_FIELD } from '@hexly/plugin-hexmap';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
+import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
+import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
-import { TitleService } from '../../core/i18n/title.service';
-import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
+import { CORE_VIEW_MAP, ENTITY_SESSION, ENTITY_TYPES, EntityDock, viewInstanceKey } from '@hexly/web-entity';
+import { TypeRegistry } from '../../entity-types/type-registry';
+import { CORE_VIEW_RICH_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
+import { ViewRegistry } from '../../entity-types/view-registry';
+import { EntityNameResolver } from '@hexly/plugin-content/web';
+import { noteDetail } from './components/note-detail.fixtures';
 import { EntityPage } from './entity.page';
+import { EntityViewStore } from './services/entity-view-store';
 
-/** A throwaway stand-in so the dispatch test never mounts the real (heavy) editor. */
-@Component({ selector: 'app-editor-shell', template: 'EDITOR' })
-class EditorShellStub {}
+/** Resolve AuthClient's boot `/auth/me` as anonymous so `whenStable()` settles. */
+function flushAuth(http: HttpTestingController) {
+  http.match('/api/auth/me').forEach((req) => req.flush(null, { status: 401, statusText: 'Unauthorized' }));
+}
 
-describe('EntityPage', () => {
+// Hexmap with a populated Content body, to prove the Note view seeds it (#75).
+const hexmapWithContent = (text: string): EntityDetail => ({
+  id: 'm1',
+  worldId: 'w1',
+  name: 'The Reach of Aldermoor',
+  types: [CORE_HEXMAP],
+  tags: [],
+  visibility: 'private',
+  version: 1,
+  seq: 1,
+  createdAt: 1,
+  updatedAt: 1,
+  // Owner opener (ADR-0039): the `edit` Right keeps the map/editor writable.
+  rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
+  document: {
+    'core.field.content': {
+      format: CONTENT_FORMAT,
+      snapshot: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+      },
+    },
+    'core.field.grid': { hexes: {}, regions: [], labels: [] },
+  },
+});
+
+// Routing/load/title/404: the page drives the session off the route's `:id`.
+describe('EntityPage routing', () => {
   let http: HttpTestingController;
+  let entities: MockEntitiesClient;
+  let bus: MockNudgeBusClient;
+  let watched: Subject<Watched<EntityDetail>>;
   let navigate: ReturnType<typeof vi.spyOn>;
 
-  const detail = (id: string, type: EntityType): EntityDetail => ({
-    id,
-    ownerId: 'u1',
-    name: type === 'note' ? 'Lady Mara' : 'Aldermoor',
-    type,
-    tags: [],
-    visibility: 'private',
-    version: 1,
-    createdAt: 1,
-    updatedAt: 1,
-    document:
-      type === 'note'
-        ? { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } }
-        : {
-            type: 'hexmap',
-            content: { format: 'tiptap-v1', snapshot: {} },
-            hexes: {},
-            regions: [],
-            labels: [],
-          },
-  });
+  const detail = (id: string, type: EntityType): EntityDetail =>
+    type === 'note'
+      ? noteDetail('Lady Mara')
+      : {
+          ...hexmapWithContent('The reach lies north.'),
+          id,
+          name: 'Aldermoor',
+        };
 
-  async function render(id: string) {
+  /** Configure the TestBed for `:id` without mounting yet, so a test can arm `entities` first. */
+  async function configure(id: string, query: Record<string, string> = {}) {
+    entities = new MockEntitiesClient();
+    bus = new MockNudgeBusClient();
+    // The store's live-follow is tested in its own spec; here the page drives the session off what
+    // EntitiesClient.watch emits, so stub it with a Subject the test pushes into.
+    watched = new Subject<Watched<EntityDetail>>();
+    entities.watch.mockReturnValue(watched);
     await TestBed.configureTestingModule({
       imports: [EntityPage, provideTranslocoTesting()],
       providers: [
+        providePluginContent(),
+        providePluginHexmap(),
         EntitySession,
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
+        { provide: ENTITY_TYPES, useExisting: TypeRegistry },
+        EntityNameResolver,
+        { provide: EntitiesClient, useValue: entities },
+        { provide: NudgeBusClient, useValue: bus },
         provideHttpClient(),
         provideHttpClientTesting(),
         {
           provide: ActivatedRoute,
-          useValue: { paramMap: of(convertToParamMap({ id })) },
+          useValue: {
+            paramMap: of(convertToParamMap({ id })),
+            queryParamMap: of(convertToParamMap(query)),
+            // ContentEditor reads the fragment for `[[Target#Heading]]` anchor scroll (ADR-0033).
+            fragment: of(null),
+          },
         },
       ],
-    })
-      .overrideComponent(EntityPage, {
-        remove: { imports: [EditorShell] },
-        add: { imports: [EditorShellStub] },
-      })
-      .compileComponents();
+    }).compileComponents();
+    TestBed.inject(ActiveWorld).set('w1');
     http = TestBed.inject(HttpTestingController);
-    navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigateByUrl')
-      .mockResolvedValue(true);
+    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+  }
+
+  function mount() {
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
     return fixture;
   }
 
-  afterEach(() => http.verify());
-
-  it('renders the note view for a note', async () => {
-    const fixture = await render('n1');
-    http.expectOne('/api/entities/n1').flush(detail('n1', 'note'));
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.querySelector('app-note-view')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('app-editor-shell')).toBeNull();
+  afterEach(() => {
+    // AuthClient's session resource fires on boot; not under test here.
+    http.match('/api/auth/me');
+    http.verify();
   });
 
-  it('renders the map editor for a hexmap', async () => {
-    const fixture = await render('m1');
-    http.expectOne('/api/entities/m1').flush(detail('m1', 'hexmap'));
+  it('shows the Content body for a note', async () => {
+    await configure('n1');
+    entities.load.mockReturnValue(of(detail('n1', 'note')));
+    const fixture = mount();
+    // The content View is the content plugin's now, fetched by the page rather than named (ADR-0051).
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('app-editor-shell')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('app-note-view')).toBeNull();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-content-editor')).not.toBeNull();
+    expect(el.querySelector('app-map-canvas')).toBeNull();
   });
 
-  it('titles the tab with the open Entity name (owned by the session, not each view)', async () => {
-    const fixture = await render('m1');
-    http.expectOne('/api/entities/m1').flush(detail('m1', 'hexmap'));
+  it('shows the map editor for a hexmap', async () => {
+    await configure('m1');
+    entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
+    const fixture = mount();
+    // The map View is a plugin's, so the page fetches its body rather than naming it (#199): the
+    // canvas arrives with its own chunk, and only its id and label were known at startup.
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_MAP);
     fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-map-canvas')).not.toBeNull();
+  });
+
+  it('restores the active View from the ?view query param (#75, ADR-0048)', async () => {
+    // A shared link with the full View id lands the hexmap on its Content view.
+    await configure('m1', { view: CORE_VIEW_RICH_CONTENT });
+    entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
+    const fixture = mount();
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-content-editor')).not.toBeNull();
+    expect(el.querySelector('app-map-canvas')).toBeNull();
+  });
+
+  it('restores the View of a Field of a Structured Data Type — Field key and all — from ?view (ADR-0050)', async () => {
+    // A map View is bound to the Field it renders, so the param carries both: a reload or a shared link
+    // has to land on *this* grid, not merely on "a map".
+    await configure('m1', { view: viewInstanceKey({ viewId: CORE_VIEW_MAP, fieldKey: HEX_GRID_FIELD.id }) });
+    entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
+    const fixture = mount();
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_MAP);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-map-canvas')).not.toBeNull();
+    expect(fixture.debugElement.injector.get(EntityViewStore).activeView()).toEqual({
+      viewId: CORE_VIEW_MAP,
+      fieldKey: HEX_GRID_FIELD.id,
+    });
+  });
+
+  it('titles the tab with the open Entity name (owned by the session, not the view)', async () => {
+    await configure('m1');
+    entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
+    const fixture = mount();
+    fixture.detectChanges();
+    flushAuth(http);
     await fixture.whenStable();
     fixture.detectChanges();
 
     expect(TestBed.inject(TitleService).documentName()).toBe('Aldermoor');
   });
 
-  it('returns to the library when the Entity fails to load', async () => {
-    const fixture = await render('gone');
-    http
-      .expectOne('/api/entities/gone')
-      .flush(null, { status: 404, statusText: 'Not Found' });
+  it('blanks to an unavailable state when the followed Entity is evicted (ADR-0044)', async () => {
+    await configure('n1');
+    entities.load.mockReturnValue(of(detail('n1', 'note')));
+    const fixture = mount();
+    fixture.detectChanges();
+    TestBed.tick(); // settle the reconciler's follow subscription
+
+    // The server evicted this follower (private flip, revoked grant, or delete).
+    watched.next(EVICTED);
     fixture.detectChanges();
 
-    expect(navigate).toHaveBeenCalledWith('/entities');
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-content-editor')).toBeNull();
+    expect(el.querySelector('[data-testid="entity-unavailable"]')).not.toBeNull();
+  });
+
+  it('returns to the World’s library when the Entity fails to load', async () => {
+    await configure('gone');
+    entities.load.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+    const fixture = mount();
+    fixture.detectChanges();
+
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities']);
+  });
+});
+
+// Layout: the body the page lays out for each Entity type/surface, driven off an
+// adopted Entity (no routing). Routing lives in the suite above.
+describe('EntityPage layout', () => {
+  let http: HttpTestingController;
+
+  beforeEach(async () => {
+    // The page Dock persists its open-Panel choice to auth-scoped localStorage; clear it so one test's
+    // toggle never restores an open (fetching) Panel into the next test's mount (ADR-0067).
+    localStorage.clear();
+    await TestBed.configureTestingModule({
+      imports: [EntityPage, provideTranslocoTesting()],
+      providers: [
+        providePluginContent(),
+        providePluginHexmap(),
+        EntitySession,
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
+        { provide: ENTITY_TYPES, useExisting: TypeRegistry },
+        EntityNameResolver,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+      ],
+    }).compileComponents();
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => localStorage.clear());
+
+  afterEach(() => {
+    // AuthClient's session resource fires on boot; not under test here.
+    http.match('/api/auth/me');
+    http.verify();
+  });
+
+  /**
+   * Open the page on a Hex Map and await the map View's lazy chunk — the canvas is only in the DOM
+   * once the `loadComponent` fetch the page kicked off on activation resolves (#199).
+   */
+  async function mountMap() {
+    TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
+    const fixture = TestBed.createComponent(EntityPage);
+    fixture.detectChanges();
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_MAP);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  /**
+   * Open the page on a note and await the content View's lazy chunk — the editor and its dock are the
+   * content plugin's now, fetched by the page on activation rather than named (ADR-0051).
+   */
+  async function mountNote() {
+    TestBed.inject(EntitySession).adopt(noteDetail('Lady Mara'));
+    const fixture = TestBed.createComponent(EntityPage);
+    fixture.detectChanges();
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('arms the non-destructive Select tool by default', async () => {
+    const fixture = await mountMap();
+
+    // Maps open armed with Select so a stray first click never paints (#27).
+    const select = (fixture.nativeElement as HTMLElement).querySelector('[data-testid=tool-select]');
+    expect(select?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('boots to a clear map: a full-bleed canvas, the Dock strip’s Map toggles, and the Dock closed', async () => {
+    const fixture = await mountMap();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const dock = fixture.debugElement.injector.get(EntityDock);
+    // Canvas and palette present; the map's Inspector/Regions toggles are on the page Dock strip now
+    // (ADR-0067), and the Dock is closed by default (ADR-0013, story 20).
+    expect(el.querySelector('app-map-canvas')).not.toBeNull();
+    expect(el.querySelector('app-tool-palette')).not.toBeNull();
+    expect(el.querySelector('[data-testid=map-inspector-toggle]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=map-regions-toggle]')).not.toBeNull();
+    expect(dock.openPanel()).toBeNull();
+    // No Panel body mounted while the Dock is closed (its lazy body never fetched).
+    expect(el.querySelector('app-inspector')).toBeNull();
+    expect(el.querySelector('app-regions-panel')).toBeNull();
+  });
+
+  /**
+   * The Content View contributes its Outline to the page Dock now (ADR-0067, #297): its toggle sits on
+   * the Dock strip beside References/Details, and clicking it claims the Dock's one open slot. The Panel's
+   * lazy body renders in the app with the running View's injector — proven end-to-end (outline.spec) — but
+   * is left unmounted here so no unflushed fetch fires, mirroring the References Panel spec below.
+   */
+  it('toggles the Content View Outline from the page Dock', async () => {
+    const fixture = await mountNote();
+    const el = fixture.nativeElement as HTMLElement;
+    const dock = fixture.debugElement.injector.get(EntityDock);
+
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid=outline-toggle]');
+    expect(toggle).not.toBeNull();
+    expect(dock.openPanel()).toBeNull();
+
+    toggle!.click();
+    fixture.detectChanges();
+    expect(dock.openPanel()?.id).toBe('core.panel.outline');
+
+    // A second click on the active toggle closes the Dock, as it always did.
+    toggle!.click();
+    fixture.detectChanges();
+    expect(dock.openPanel()).toBeNull();
+  });
+
+  /**
+   * References is a universal page-owned Dock Panel (ADR-0067): its toggle sits on the strip, and
+   * clicking it claims the Dock's one open slot (its lazy body renders in the app — proven end-to-end,
+   * and by the Panel's own spec — but is left unmounted here so no unflushed fetch fires).
+   */
+  it('opens and closes the References Panel from the page Dock', async () => {
+    const fixture = await mountNote();
+    const el = fixture.nativeElement as HTMLElement;
+    const dock = fixture.debugElement.injector.get(EntityDock);
+
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid=references-toggle]');
+    expect(toggle).not.toBeNull();
+    expect(dock.openPanel()).toBeNull();
+
+    toggle!.click();
+    fixture.detectChanges();
+    expect(dock.openPanel()?.id).toBe('core.panel.references');
+
+    // A second click on the active toggle closes the Dock.
+    toggle!.click();
+    fixture.detectChanges();
+    expect(dock.openPanel()).toBeNull();
+  });
+
+  /** The Dock's toggle strip is page chrome, present on every View — the Map included (ADR-0067). */
+  it('shows the References toggle on the Map View too', async () => {
+    const fixture = await mountMap();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('[data-testid=dock-strip]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=references-toggle]')).not.toBeNull();
+  });
+
+  it('shows the hex canvas in the Map view, not the Content editor', async () => {
+    const fixture = await mountMap();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-map-canvas')).not.toBeNull();
+    expect(el.querySelector('app-content-editor')).toBeNull();
+  });
+
+  it('swaps the canvas for the Content editor in the Note view, seeded with the map’s Content', async () => {
+    const fixture = await mountMap(); // mounts on the grid (the empty route leaves the default map view)
+    // Flip to the Content view after mount, as the header's toggle would.
+    fixture.debugElement.injector.get(EntityViewStore).setView(CORE_VIEW_RICH_CONTENT);
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    // Content view: the editor takes the body, canvas gone.
+    expect(el.querySelector('app-content-editor')).not.toBeNull();
+    expect(el.querySelector('app-map-canvas')).toBeNull();
+    const surface = el.querySelector('[data-testid=note-content]') as HTMLElement;
+    expect(surface.textContent).toContain('The reach lies north.');
+  });
+
+  /**
+   * The Map View contributes its Regions Panel to the page Dock (ADR-0067, #298): its toggle sits on the
+   * Dock strip, and clicking it claims the Dock's one open slot. The Panel's lazy body renders in the app
+   * with the running View's injector — proven end-to-end (region-inspector-persist.spec) — but is left
+   * unmounted here so no unflushed fetch fires, mirroring the Content View Outline spec above.
+   */
+  it('opens the Regions Panel from the closed default via the Dock strip', async () => {
+    const fixture = await mountMap();
+    const el = fixture.nativeElement as HTMLElement;
+    const dock = fixture.debugElement.injector.get(EntityDock);
+
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid=map-regions-toggle]');
+    expect(toggle).not.toBeNull();
+    expect(dock.openPanel()).toBeNull();
+
+    toggle!.click();
+    fixture.detectChanges();
+    expect(dock.openPanel()?.id).toBe('core.panel.map-regions');
+
+    // A second click on the active toggle closes the Dock.
+    toggle!.click();
+    fixture.detectChanges();
+    expect(dock.openPanel()).toBeNull();
+  });
+
+  it('shows the open note’s name, with no map canvas', () => {
+    TestBed.inject(EntitySession).adopt(noteDetail('Lady Mara'));
+    const fixture = TestBed.createComponent(EntityPage);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Lady Mara');
+    // A note has no grid: the content view renders, never the map canvas.
+    expect(el.querySelector('app-map-canvas')).toBeNull();
+  });
+
+  it('mounts the shared Content editor for a note, seeded with its stored Content', async () => {
+    TestBed.inject(EntitySession).adopt({
+      ...noteDetail('Lady Mara'),
+      document: {
+        'core.field.content': {
+          format: 'tiptap-v1',
+          snapshot: {
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Lady Mara rules the north.' }],
+              },
+            ],
+          },
+        },
+      },
+    });
+    const fixture = TestBed.createComponent(EntityPage);
+    fixture.detectChanges();
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_RICH_CONTENT);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-content-editor')).not.toBeNull();
+    const surface = el.querySelector('[data-testid=note-content]') as HTMLElement;
+    expect(surface.textContent).toContain('Lady Mara rules the north.');
+  });
+
+  it('mounts the tag editor for the open note', () => {
+    TestBed.inject(EntitySession).adopt(noteDetail('Lady Mara'));
+    const fixture = TestBed.createComponent(EntityPage);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=entity-tags]')).not.toBeNull();
   });
 });

@@ -1,0 +1,90 @@
+import { Component, computed, inject } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { filter, map, of, switchMap, timer } from 'rxjs';
+import { AppShellStore } from '@hexly/web-core';
+import { CommandPaletteComponent } from '@hexly/command-palette-web';
+import { NavRailComponent } from './shell/nav-rail.component';
+import { ToasterComponent } from './shell/toaster.component';
+import { IconComponent } from '@hexly/web-ui';
+
+/** How long `full` loading must persist before the curtain shows (debounce). */
+const FULL_CURTAIN_DELAY_MS = 150;
+
+/** Application root. The only persistent chrome is the {@link NavRailComponent} (ADR-0022). */
+@Component({
+  selector: 'app-root',
+  host: { class: 'flex h-screen' },
+  imports: [RouterOutlet, NavRailComponent, ToasterComponent, CommandPaletteComponent, IconComponent],
+  template: `
+    @if (navigated() && !shell.standalone()) {
+      <app-nav-rail />
+    }
+    <!--
+      Outlet is the scroll container so the docked rail stays put while pages
+      scroll. Not a landmark: each page owns its own <main>.
+    -->
+    <div class="flex-1 min-w-0 overflow-auto">
+      <router-outlet />
+    </div>
+
+    <!--
+      Full curtain: a blocking, text-free wash (e.g. a language switch re-rendering
+      the whole UI). Debounced so a cached, instant switch never flashes it.
+    -->
+    @if (showFull()) {
+      <div
+        class="fixed inset-0 z-50 grid place-items-center bg-bg-deep"
+        data-testid="app-loading"
+        role="status"
+        aria-busy="true"
+      >
+        <span class="text-gold animate-pulse [filter:drop-shadow(0_0_12px_var(--color-glow))]">
+          <app-icon name="logo" [size]="64" />
+        </span>
+      </div>
+    }
+
+    <!--
+      Subtle-loading fallback: on standalone pages (e.g. login) the rail is hidden,
+      so its pulsing brand mark can't carry the subtle indicator — show a discreet
+      corner pulse instead. When the rail is present, it owns this signal.
+    -->
+    @if (showSubtleFallback()) {
+      <div
+        class="fixed bottom-4 right-4 z-40 text-gold animate-pulse [filter:drop-shadow(0_0_6px_var(--color-glow))]"
+        data-testid="app-loading-subtle"
+        role="status"
+        aria-busy="true"
+      >
+        <app-icon name="logo" [size]="22" />
+      </div>
+    }
+    <app-toaster />
+    <app-command-palette />
+  `,
+})
+export class AppComponent {
+  protected readonly shell = inject(AppShellStore);
+
+  // Debounce so a cached (instant) language switch never flashes the curtain;
+  // switchMap cancels the pending timer if loading resolves early.
+  protected readonly showFull = toSignal(
+    toObservable(this.shell.loading).pipe(
+      switchMap((level) => (level === 'full' ? timer(FULL_CURTAIN_DELAY_MS).pipe(map(() => true)) : of(false))),
+    ),
+    { initialValue: false },
+  );
+
+  protected readonly showSubtleFallback = computed(() => this.shell.loading() === 'subtle' && this.shell.standalone());
+
+  // Wait for first navigation so the landing page's `standalone` flag is set,
+  // preventing the rail flash on cold /login loads.
+  protected readonly navigated = toSignal(
+    inject(Router).events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map(() => true),
+    ),
+    { initialValue: false },
+  );
+}

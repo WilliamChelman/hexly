@@ -1,0 +1,231 @@
+import { provideTranslocoTesting } from '../../testing/transloco-testing';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
+import { of } from 'rxjs';
+import { defineField, EntityDetail, WorldSummary } from '@hexly/domain';
+import { emptyRichContent } from '@hexly/plugin-content';
+import { ActiveWorld, EntitiesClient, WorldStore } from '@hexly/web-core';
+import { MockEntitiesClient } from '@hexly/web-core/testing';
+import { DialogRef } from '@hexly/web-ui';
+import { CreateEntityDialogComponent, CreateEntityDialogData } from './create-entity-dialog.component';
+import { TypeRegistry } from './type-registry';
+import { TypeDefinition } from '@hexly/web-entity';
+import { CORE_VIEW_RICH_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
+
+/** The required Field the monster type references by id (ADR-0054); set on the registry where it registers. */
+const lairField = defineField({
+  id: 'test.field.lair',
+  label: 'Lair',
+  dataType: { kind: 'string' },
+  required: true,
+});
+
+/** A plugin-style type declaring one required Field — to exercise the create-time required-Fields form. */
+const monster: TypeDefinition = {
+  id: 'test.type.monster',
+  icon: 'label',
+  views: [CORE_VIEW_RICH_CONTENT],
+  fieldRefs: ['test.field.lair'],
+  graphColorToken: '--color-ink-muted',
+  labels: {
+    eyebrow: 'monster.eyebrow',
+    titleLabel: 'monster.titleLabel',
+    rename: 'monster.rename',
+    editorLabel: 'monster.editorLabel',
+    create: 'monster.create',
+    untitled: 'monster.untitled',
+  },
+};
+
+function world(id: string, name: string): WorldSummary {
+  return {
+    id,
+    name,
+    owners: ['u1'],
+    rights: ['read', 'manage'],
+    createdAt: 1,
+    updatedAt: 1,
+  };
+}
+
+describe('CreateEntityDialog', () => {
+  let entitiesClient: MockEntitiesClient;
+  let navigate: ReturnType<typeof vi.spyOn>;
+  let dialogRef: DialogRef<CreateEntityDialogData>;
+
+  // The dialog seeds itself from `DialogRef.data` at creation (no more open-state signal), so a
+  // seeded type's registration must land via `setup` *before* the component is built.
+  function render(
+    worlds: WorldSummary[],
+    activeWorldId: string | null,
+    seedType = 'core.type.note',
+    setup?: () => void,
+  ) {
+    entitiesClient = new MockEntitiesClient();
+    dialogRef = new DialogRef<CreateEntityDialogData>({ type: seedType });
+    vi.spyOn(dialogRef, 'close');
+    TestBed.configureTestingModule({
+      imports: [CreateEntityDialogComponent, provideTranslocoTesting()],
+      providers: [
+        providePluginContent(),
+        providePluginHexmap(),
+        provideRouter([]),
+        { provide: EntitiesClient, useValue: entitiesClient },
+        { provide: WorldStore, useValue: { worlds: () => worlds } },
+        { provide: DialogRef, useValue: dialogRef },
+      ],
+    });
+    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    TestBed.inject(ActiveWorld).set(activeWorldId);
+    setup?.();
+    const fixture = TestBed.createComponent(CreateEntityDialogComponent);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  function q(fixture: ReturnType<typeof render>, testid: string) {
+    return fixture.nativeElement.querySelector(`[data-testid="${testid}"]`);
+  }
+
+  it('opens seeded, prefilled to the active World', () => {
+    const fixture = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')], 'w2');
+
+    expect(fixture.nativeElement.querySelector('dialog')?.open).toBe(true);
+    const select: HTMLSelectElement = q(fixture, 'create-entity-world');
+    expect(select.value).toBe('w2');
+  });
+
+  it("falls back to the first loaded World when there's no active World", () => {
+    const fixture = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')], null, 'core.type.hex-map');
+
+    const select: HTMLSelectElement = q(fixture, 'create-entity-world');
+    expect(select.value).toBe('w1');
+  });
+
+  it('creates the Entity in the selected World and navigates to it', () => {
+    const fixture = render([world('w1', 'Aldermoor')], 'w1');
+    const created: EntityDetail = {
+      id: 'e1',
+      name: 'The Reach',
+      worldId: 'w1',
+      types: ['core.type.note'],
+      tags: [],
+      visibility: 'private',
+      version: 1,
+      seq: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      document: { content: emptyRichContent() },
+    };
+    entitiesClient.create.mockReturnValue(of(created));
+
+    const nameInput: HTMLInputElement = q(fixture, 'create-entity-name');
+    nameInput.value = 'The Reach';
+    nameInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    (q(fixture, 'create-entity-submit') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    // The seeded type rides as a one-element ordered set; no EntityDocument (core types declare no Fields).
+    expect(entitiesClient.create).toHaveBeenCalledWith('The Reach', ['core.type.note'], 'w1', undefined);
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'e1']);
+    expect(dialogRef.close).toHaveBeenCalled();
+  });
+
+  it('lets the author add a second type before creating, sending the ordered set (#189)', () => {
+    const fixture = render([world('w1', 'Aldermoor')], 'w1');
+    entitiesClient.create.mockReturnValue(
+      of({
+        id: 'e1',
+        name: 'Untitled note',
+        worldId: 'w1',
+        types: ['core.type.note', 'core.type.hex-map'],
+        tags: [],
+        visibility: 'private',
+        version: 1,
+        seq: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        document: { content: emptyRichContent() },
+      } as EntityDetail),
+    );
+
+    // Add the hexmap type through the embedded editor's picker.
+    const add: HTMLSelectElement = q(fixture, 'type-add');
+    add.value = 'core.type.hex-map';
+    add.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    (q(fixture, 'create-entity-submit') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(entitiesClient.create).toHaveBeenCalledWith(
+      'Untitled note',
+      ['core.type.note', 'core.type.hex-map'],
+      'w1',
+      undefined,
+    );
+  });
+
+  it('collects a seeded required-Field type’s Fields, gating Create until supplied (#189)', () => {
+    // Seeded with the required-Field type (as a "Create Monster" command would), registered before build.
+    const fixture = render([world('w1', 'Aldermoor')], 'w1', 'test.type.monster', () => {
+      const registry = TestBed.inject(TypeRegistry);
+      registry.setWorldFields([lairField]);
+      registry.register(monster);
+    });
+    entitiesClient.create.mockReturnValue(
+      of({
+        id: 'e1',
+        name: 'Balthazar',
+        worldId: 'w1',
+        types: ['test.type.monster'],
+        tags: [],
+        visibility: 'private',
+        version: 1,
+        seq: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        document: { 'core.field.content': emptyRichContent(), 'test.field.lair': 'Sunken keep' },
+      } as EntityDetail),
+    );
+
+    const nameInput: HTMLInputElement = q(fixture, 'create-entity-name');
+    nameInput.value = 'Balthazar';
+    nameInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    // Create is inert until the seeded type's required Field is filled — no dead-end (#189).
+    const submit = q(fixture, 'create-entity-submit') as HTMLButtonElement;
+    expect(submit.getAttribute('aria-disabled')).toBe('true');
+    submit.click();
+    fixture.detectChanges();
+    expect(entitiesClient.create).not.toHaveBeenCalled();
+
+    // Fill the required Field, rendered inline in the dialog.
+    const lair = (q(fixture, 'create-field-test.field.lair') as HTMLElement).querySelector('input') as HTMLInputElement;
+    lair.value = 'Sunken keep';
+    lair.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(submit.getAttribute('aria-disabled')).toBeNull();
+
+    submit.click();
+    fixture.detectChanges();
+    // The collected value rides the create as initial EntityDocument.
+    expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['test.type.monster'], 'w1', {
+      'test.field.lair': 'Sunken keep',
+    });
+  });
+
+  it('closes without creating anything on cancel', () => {
+    const fixture = render([world('w1', 'Aldermoor')], 'w1');
+
+    (q(fixture, 'create-entity-cancel') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(entitiesClient.create).not.toHaveBeenCalled();
+    expect(dialogRef.close).toHaveBeenCalled();
+  });
+});

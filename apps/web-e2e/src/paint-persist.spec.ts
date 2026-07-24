@@ -1,64 +1,33 @@
-import { expect, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, savedGrid, test } from './fixtures';
 
 /**
- * The keystone journey: it crosses every seam — the session cookie on API calls,
- * canvas input, a versioned save, and a load on reload. Map state lives as Canvas
- * pixels (ADR-0003), so we assert on the model-derived hex count and prove the
- * round trip by reloading; a direct API read confirms the persisted document
- * (ADR-0009).
+ * Map state lives as Canvas pixels (ADR-0003), so there is nothing in the DOM to assert on:
+ * we go through the model-derived hex count, plus a direct API read of the persisted document.
  */
-test('paints a hex, saves, and the hex survives a reload', async ({
-  page,
-  request,
-}) => {
-  await page.goto('/entities');
-  await page.getByTestId('new-map').click();
+test('paints a hex, saves, and the hex survives a reload', async ({ page, request }) => {
+  await enterLibrary(page);
+  const mapId = await createEntity(page, 'core.type.hex-map');
 
-  // Creating a map opens the editor at /entities/:id.
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop();
-
-  // A map opens armed with the non-destructive Select tool, so a stray first
-  // click never paints (issue #27).
+  // A map opens armed with Select, so a stray click never paints (issue #27).
   await page.getByRole('img', { name: 'Hex map' }).click();
   await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');
 
-  // Arm the Terrain tool to reveal its swatches, then pick a non-default terrain
-  // so the saved document proves our selection rather than the default ('forest').
+  // Pick a non-default terrain so the saved document proves our selection.
   await page.getByTestId('tool-terrain').click();
-  await page
-    .getByRole('group', { name: 'Terrain' })
-    .getByRole('button', { name: 'Ocean' })
-    .click();
+  await page.getByRole('group', { name: 'Terrain' }).getByRole('button', { name: 'Ocean' }).click();
 
   await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');
 
-  // Paint the centre hex (the canvas centres the world origin on load).
   await page.getByRole('img', { name: 'Hex map' }).click();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  // Wait on the real save round-trip (not just the button text, which rests at
-  // 'Save' and would let the reload below race an in-flight PUT).
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.getByTestId('save').click();
-  await saved;
-  // The button has also left its busy state.
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await flushSave(page);
 
-  // The seam under test: a fresh load re-fetches and re-renders the saved map.
   await page.reload();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  // And the persisted document really holds that one hex, with our terrain.
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = Object.values(detail.document.hexes) as Array<{
+  const grid = await savedGrid(request, mapId);
+  const hexes = Object.values(grid.hexes) as Array<{
     terrain: string;
   }>;
   expect(hexes).toHaveLength(1);

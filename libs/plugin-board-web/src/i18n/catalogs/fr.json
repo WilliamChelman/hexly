@@ -1,0 +1,96 @@
+{
+  "dataType": {
+    "surface": "Surface de tableau"
+  },
+  "eyebrow": "Tableau",
+  "titleLabel": "Titre du tableau",
+  "rename": "Renommer le tableau",
+  "editorLabel": "Notes du tableau",
+  "create": "Créer un tableau",
+  "untitled": "Tableau sans titre",
+  "view": {
+    "surface": "Tableau"
+  },
+  "canvas": {
+    "label": "Surface de tableau",
+    "element": "Élément de tableau",
+    "elementBox": "Élément boîte",
+    "elementText": "Élément bloc de texte",
+    "elementImage": "Élément image",
+    "elementEmbed": "Élément intégration",
+    "textBlock": "Bloc de texte",
+    "image": "Image",
+    "missingAsset": "Image manquante",
+    "imageLoading": "Chargement de l’image…",
+    "imageRetry": "Réessayer",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom avant",
+    "zoomOut": "Zoom arrière",
+    "fit": "Ajuster au contenu",
+    "resetZoom": "Réinitialiser le zoom à 100 %"
+  },
+  "embed": {
+    "openTarget": "Ouvrir la cible"
+  },
+  "controls": {
+    "resize": "Redimensionner",
+    "fitWidth": "Ajuster la largeur",
+    "fitHeight": "Ajuster la hauteur",
+    "fitBoth": "Ajuster les deux",
+    "fitImage": "Ajuster à l’image",
+    "lockRatio": "Verrouiller les proportions",
+    "order": "Ordre d’empilement"
+  },
+  "toolPalette": {
+    "tools": "Outils",
+    "select": "Sélection",
+    "box": "Boîte",
+    "text": "Texte",
+    "image": "Image",
+    "embed": "Intégration",
+    "undo": "Annuler",
+    "redo": "Rétablir"
+  },
+  "imagePicker": {
+    "title": "Ajouter une image",
+    "upload": "Téléverser un fichier",
+    "uploading": "Téléversement…",
+    "uploadError": "Échec du téléversement. Réessayez.",
+    "existing": "Choisir une image existante",
+    "search": "Rechercher des images",
+    "loading": "Chargement des images…",
+    "empty": "Aucune image téléversée pour l’instant.",
+    "noMatches": "Aucune image ne correspond à votre recherche.",
+    "cancel": "Annuler"
+  },
+  "embedPicker": {
+    "title": "Intégrer une entité",
+    "target": "Entité à intégrer",
+    "searchPlaceholder": "Rechercher des entités…",
+    "noMatches": "Aucune entité correspondante.",
+    "chosenTarget": "Intégration de",
+    "view": "Vue à afficher",
+    "defaultView": "Vue par défaut",
+    "confirm": "Ajouter l’intégration",
+    "cancel": "Annuler"
+  },
+  "inspector": {
+    "title": "Inspecteur",
+    "emptyHint": "Sélectionnez un élément pour modifier sa géométrie et son ordre d’empilement.",
+    "selectedElement": "Élément sélectionné",
+    "x": "X",
+    "y": "Y",
+    "width": "Largeur",
+    "height": "Hauteur",
+    "order": "Ordre d’empilement",
+    "toFront": "Premier plan",
+    "bringForward": "Avancer",
+    "sendBackward": "Reculer",
+    "toBack": "Arrière-plan",
+    "embedView": "Vue intégrée",
+    "deleteElement": "Supprimer l’élément",
+    "multiTitle": "Sélection",
+    "selectedCount": "sélectionnés",
+    "deleteAll": "Tout supprimer"
+  }
+}

@@ -1,73 +1,58 @@
-import { expect, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
- * The Region select-and-edit journey (issue #39): a Region selected on the canvas
- * with the universal Select tool, renamed in the Inspector — the only place a
- * Region's details are edited (CONTEXT.md → Inspector, ADR-0011) — survives a save
- * and reload. Like the other entity journeys it crosses every seam: canvas
- * selection, the Inspector edit, a versioned save, and a load on reload. We prove
- * the round trip with a direct API read of the persisted document (ADR-0009) and
- * confirm the Inspector re-renders the renamed Region after re-selecting it.
+ * The Inspector is the only place a Region's details are edited (CONTEXT.md → Inspector, ADR-0011).
  */
 test('selects a Region on the canvas, renames it in the Inspector, and the rename survives a reload', async ({
   page,
   request,
 }) => {
-  await page.goto('/entities');
-  await page.getByTestId('new-map').click();
-
-  // Creating a map opens the editor at /entities/:id.
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop();
+  await enterLibrary(page);
+  const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
+  // Measure while the Dock is closed: the world origin sits at this full-width centre and stays put
+  // there when a Panel later pushes the map narrower (the canvas does not re-centre, ADR-0067), so
+  // `box.width/2` keeps targeting origin (0,0) — the geometric centre of the pushed canvas would not.
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('canvas not laid out');
+  const origin = { x: box.width / 2, y: box.height / 2 };
 
-  // Seed a Region from the Regions panel (ADR-0012): open the rail's Regions panel and
-  // create one. New Region mints 'Region 1', selects it, and arms the Add brush, so a
-  // click on the centre hex (the canvas centres the world origin on load, so a plain
-  // click lands on (0,0)) paints (0,0) into its membership.
-  await page.getByTestId('rail-regions').click();
+  // Create Region from the Regions Panel on the page Dock (ADR-0012, ADR-0067). New Region arms the Add brush.
+  await page.getByTestId('map-regions-toggle').click();
   await page.getByTestId('new-region').click();
-  await canvas.click();
+  await canvas.click({ position: origin });
 
-  // Now the journey under test: select that Region on the canvas with the universal
-  // Select tool. Clicking (0,0) — a Void coordinate inside the Region — selects it
-  // (ADR-0011), so the Inspector opens on its name field.
+  // Select that Region on the canvas. Clicking (0,0) — a Void inside the Region —
+  // selects it (ADR-0011), opening the Inspector on its name field.
   await page.getByTestId('tool-select').click();
-  await canvas.click();
+  await canvas.click({ position: origin });
   await expect(page.getByTestId('region-name')).toHaveValue('Region 1');
 
-  // Edit the selected Region's name in the Inspector. Tab blurs the field, which
-  // fires the (change) the Inspector commits on.
+  // Tab blurs the field, firing the (change) the Inspector commits on.
   const name = page.getByTestId('region-name');
   await name.fill('The Whisperwood');
   await name.press('Tab');
 
-  // Wait on the real save round-trip (not just the button text, which rests at
-  // 'Save' and would let the reload below race an in-flight PUT).
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.getByTestId('save').click();
-  await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await flushSave(page);
 
-  // The seam under test: a fresh load re-fetches the saved map.
   await page.reload();
 
-  // The persisted document really holds the renamed Region with its membership.
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.regions).toHaveLength(1);
-  expect(detail.document.regions[0].name).toBe('The Whisperwood');
-  expect(detail.document.regions[0].hexes).toEqual({ '0,0': true });
+  const grid = await savedGrid(request, mapId);
+  expect(grid.regions).toHaveLength(1);
+  expect(grid.regions[0].name).toBe('The Whisperwood');
+  expect(grid.regions[0].hexes).toEqual({ '0,0': true });
 
-  // The reloaded map boots in Select (issue #27). Clicking the centre re-selects the
-  // re-rendered Region, and the Inspector shows its persisted, renamed value.
+  // The reloaded map boots in Select (issue #27). Wait for the re-fetched document to land in the
+  // remembered Regions Panel (the region listed by its renamed value) so the canvas store holds its
+  // membership, then click origin. Scope the assertion to the Inspector's <input> — selecting swaps
+  // the Regions Panel (a same-testid <span>) for the Inspector, and toHaveValue fatally rejects the
+  // transient <span> rather than awaiting the <input>.
+  await expect(page.getByTestId('region-name')).toHaveText('The Whisperwood');
+  // A no-position click hits the canvas's geometric centre — which post-reload *is* the origin: the
+  // remembered Regions Panel is open from the first render, so the canvas centres origin on its
+  // already-narrow width (unlike the mid-session clicks above, where the map had centred full-width
+  // before the Panel pushed it).
   await canvas.click();
-  await expect(page.getByTestId('region-name')).toHaveValue('The Whisperwood');
+  await expect(page.locator('input[data-testid="region-name"]')).toHaveValue('The Whisperwood');
 });

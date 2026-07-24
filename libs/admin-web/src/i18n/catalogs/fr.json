@@ -1,0 +1,19 @@
+{
+  "tabTitle": "Admin — Hexly",
+  "heading": "Réparation de l'instance",
+  "reindex": {
+    "heading": "Réparation",
+    "description": "Recalcule le texte de recherche, les Descripteurs de lien et les liens de chaque Entité à partir de son contenu. Peut être lancé à tout moment sans risque.",
+    "submit": "Réindexer toutes les Entités",
+    "progress": "Réindexation… {{walked}} / {{total}}"
+  },
+  "toast": {
+    "reindexed": "{count, plural, one {# entité réindexée} other {# entités réindexées}}",
+    "reindexedWithFailures": "{count, plural, one {# entité réindexée} other {# entités réindexées}}. {failed, plural, one {# entité illisible a été ignorée} other {# entités illisibles ont été ignorées}}.",
+    "reindexAborted": "La réindexation s'est interrompue avant la fin. Rien n'est perdu — relancez-la pour reprendre.",
+    "error": "Une erreur est survenue."
+  },
+  "error": {
+    "reindex-running": "Une réindexation est déjà en cours sur cette instance."
+  }
+}

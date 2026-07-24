@@ -1,0 +1,195 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1782605130297,
+      "tag": "0000_amused_nomad",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1783107081043,
+      "tag": "0001_supreme_sersi",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783154340108,
+      "tag": "0002_past_randall_flagg",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1783179486303,
+      "tag": "0003_symmetric_owner_sets",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1783202111358,
+      "tag": "0004_elite_sleepwalker",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1783202211358,
+      "tag": "0005_open_hearth",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1783244378859,
+      "tag": "0006_smart_maddog",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1783247591642,
+      "tag": "0007_fold_entity_owners",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1783250515623,
+      "tag": "0008_complex_ink",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1783263034824,
+      "tag": "0009_dry_lila_cheney",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1783283071327,
+      "tag": "0010_world_creation_capability",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1783366544377,
+      "tag": "0011_remove_home_entity",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1783603384294,
+      "tag": "0012_sequence_keyed_nudges",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1783635812876,
+      "tag": "0013_entity_edge_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1783750021044,
+      "tag": "0014_add_user_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1783750034063,
+      "tag": "0015_drop_admin_flags",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1783750035063,
+      "tag": "0016_core_types_flip",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1783793291603,
+      "tag": "0017_field_facets",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1783806324669,
+      "tag": "0018_world_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1783888977265,
+      "tag": "0019_world_type_views",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1784150387238,
+      "tag": "0020_tiresome_george_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1784229520265,
+      "tag": "0021_third_silver_surfer",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1784300000000,
+      "tag": "0022_world_type_field_refs",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1784302434119,
+      "tag": "0023_drop_entities_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1784475692561,
+      "tag": "0024_silent_jack_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1784681437777,
+      "tag": "0025_low_exiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1784729287646,
+      "tag": "0026_mean_junta",
+      "breakpoints": true
+    }
+  ]
+}

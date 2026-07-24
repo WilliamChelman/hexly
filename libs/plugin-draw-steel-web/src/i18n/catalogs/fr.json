@@ -1,0 +1,123 @@
+{
+  "importer": {
+    "monsters": "Draw Steel — Monstres"
+  },
+  "monster": {
+    "eyebrow": "Monstre",
+    "titleLabel": "Nom du monstre",
+    "rename": "Renommer le monstre",
+    "editorLabel": "Description du monstre",
+    "create": "Nouveau monstre",
+    "untitled": "Monstre sans titre",
+    "loreHint": "Passez à la vue Note pour la description, les tactiques et les notes de ce monstre.",
+    "view": {
+      "statBlock": "Bloc de stats"
+    }
+  },
+  "statBlock": {
+    "dataType": "Bloc de stats",
+    "facet": {
+      "role": "Rôle",
+      "organization": "Organisation",
+      "level": "Niveau",
+      "ev": "VR",
+      "keywords": "Mot-clé"
+    },
+    "stat": {
+      "might": "Puissance",
+      "agility": "Agilité",
+      "reason": "Raison",
+      "intuition": "Intuition",
+      "presence": "Présence",
+      "stamina": "Vigueur",
+      "size": "Taille",
+      "stability": "Stabilité",
+      "speed": "Vitesse",
+      "save": "Sauvegarde",
+      "turns": "Tours",
+      "free_strike": "Attaque gratuite",
+      "movement_types": "Déplacement",
+      "condition_immunities": "Immunités aux états",
+      "with_captain": "Avec capitaine",
+      "role": "Rôle",
+      "organization": "Organisation",
+      "level": "Niveau",
+      "ev": "VR",
+      "keywords": "Mots-clés"
+    },
+    "evForMinions": "pour quatre sbires",
+    "addDamageType": "Ajouter un type…",
+    "addKeyword": "Ajouter un mot-clé…",
+    "addMovement": "Ajouter un déplacement…",
+    "addCondition": "Ajouter un état…",
+    "addTrait": "Ajouter un trait",
+    "traitName": "Nom du trait",
+    "traitEffect": "Effet",
+    "removeTrait": "Retirer le trait",
+    "moveUp": "Monter",
+    "moveDown": "Descendre",
+    "noTraits": "Aucun trait",
+    "addAbility": "Ajouter une capacité",
+    "removeAbility": "Retirer la capacité",
+    "noAbilities": "Aucune capacité",
+    "abilityName": "Nom de la capacité",
+    "abilityType": "Type",
+    "abilityCategory": "Catégorie",
+    "abilityCategoryNone": "Aucune",
+    "abilityMalice": "Malveillance",
+    "abilityMaliceHint": "ex. 3",
+    "abilityKeywords": "Mots-clés",
+    "abilityDistance": "Distance",
+    "abilityDistanceHint": "ex. Corps à corps 1",
+    "abilityTarget": "Cible",
+    "abilityTargetHint": "ex. Une créature",
+    "abilityTrigger": "Déclencheur",
+    "abilityTriggerHint": "Quand la capacité peut être utilisée",
+    "abilityEffect": "Effet",
+    "abilityEffectHint": "Ce que fait la capacité",
+    "powerRoll": "Jet de puissance",
+    "addPowerRoll": "Ajouter un jet de puissance",
+    "removePowerRoll": "Retirer le jet de puissance",
+    "tier": {
+      "t1": "Palier 1",
+      "t2": "Palier 2",
+      "t3": "Palier 3"
+    },
+    "abilityTypeOption": {
+      "main": "Action principale",
+      "maneuver": "Manœuvre",
+      "freeManeuver": "Manœuvre gratuite",
+      "triggered": "Action déclenchée",
+      "freeTriggered": "Action déclenchée gratuite",
+      "move": "Action de déplacement",
+      "none": "Aucune action",
+      "villain": "Action de vilain"
+    },
+    "abilityCategoryOption": {
+      "signature": "Signature",
+      "heroic": "Héroïque",
+      "villain": "Vilain",
+      "maliceAncestry": "Malveillance / Lignée"
+    },
+    "remove": "Retirer",
+    "startEditing": "Modifier les stats",
+    "doneEditing": "Terminer",
+    "section": {
+      "immunities": "Immunité",
+      "weaknesses": "Faiblesse",
+      "abilities": "Capacités",
+      "traits": "Traits"
+    },
+    "damage": {
+      "acid": "Acide",
+      "cold": "Froid",
+      "corruption": "Corruption",
+      "fire": "Feu",
+      "holy": "Sacré",
+      "lightning": "Foudre",
+      "poison": "Poison",
+      "psychic": "Psychique",
+      "sonic": "Sonique"
+    }
+  }
+}

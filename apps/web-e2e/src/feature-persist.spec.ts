@@ -1,63 +1,32 @@
-import { expect, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
- * The Feature journey (issue #7): a feature placed on a hex survives a save and
- * reload. Like the paint journey it crosses every seam — canvas input, a
- * versioned save, and a load on reload. Map state lives as Canvas pixels
- * (ADR-0003), so we assert on the model-derived hex count and prove the round
- * trip with a direct API read of the persisted document (ADR-0009).
+ * A feature placed on a hex survives a save and reload. Canvas pixels are opaque to
+ * Playwright (ADR-0003), so we assert on the model-derived hex count and on a direct
+ * API read of the persisted document (ADR-0009).
  */
-test('places a feature on a hex, saves, and the feature survives a reload', async ({
-  page,
-  request,
-}) => {
-  await page.goto('/entities');
-  await page.getByTestId('new-map').click();
-
-  // Creating a map opens the editor at /entities/:id.
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop();
+test('places a feature on a hex, saves, and the feature survives a reload', async ({ page, request }) => {
+  await enterLibrary(page);
+  const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
-  // A Feature rides on an existing Hex, so paint the centre hex first. A map opens
-  // armed with Select (issue #27), so arm the Terrain tool before painting (the
-  // canvas centres the world origin on load, so a plain click lands on (0,0)).
+  // A Feature rides on an existing Hex, so paint the centre hex first (issue #27).
   await page.getByTestId('tool-terrain').click();
   await canvas.click();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  // Arm the Feature tool to reveal its library, pick Settlement, and place it on
-  // that same hex.
   await page.getByTestId('tool-feature').click();
-  await page
-    .getByRole('group', { name: 'Features' })
-    .getByRole('button', { name: 'Settlement' })
-    .click();
+  await page.getByRole('group', { name: 'Features' }).getByRole('button', { name: 'Settlement' }).click();
   await canvas.click();
 
-  // Wait on the real save round-trip (not just the button text, which rests at
-  // 'Save' and would let the reload below race an in-flight PUT).
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.getByTestId('save').click();
-  await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await flushSave(page);
 
-  // The seam under test: a fresh load re-fetches and re-renders the saved map.
   await page.reload();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  // And the persisted document really holds that hex with its feature, the
-  // single feature referenced by its stable library id.
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = Object.values(detail.document.hexes) as Array<{
+  const grid = await savedGrid(request, mapId);
+  const hexes = Object.values(grid.hexes) as Array<{
     terrain: string;
     feature?: { ref: string };
   }>;

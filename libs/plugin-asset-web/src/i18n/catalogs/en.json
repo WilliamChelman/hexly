@@ -1,0 +1,55 @@
+{
+  "eyebrow": "Asset",
+  "titleLabel": "Asset name",
+  "rename": "Rename asset",
+  "editorLabel": "Asset notes",
+  "create": "Create Asset",
+  "untitled": "Untitled asset",
+  "view": {
+    "asset": "Asset",
+    "label": "Asset"
+  },
+  "field": {
+    "thumbnail": "Thumbnail"
+  },
+  "stats": {
+    "heading": "Asset stats",
+    "dimensions": "Dimensions",
+    "orientation": "Orientation",
+    "dominantColor": "Dominant color",
+    "mime": "Type",
+    "size": "Size"
+  },
+  "kind": {
+    "image": "Image",
+    "pdf": "PDF",
+    "audio": "Audio",
+    "other": "Other"
+  },
+  "orientation": {
+    "landscape": "Landscape",
+    "portrait": "Portrait",
+    "square": "Square"
+  },
+  "hue": {
+    "red": "Red",
+    "orange": "Orange",
+    "yellow": "Yellow",
+    "green": "Green",
+    "cyan": "Cyan",
+    "blue": "Blue",
+    "purple": "Purple",
+    "pink": "Pink",
+    "black": "Black",
+    "gray": "Gray",
+    "white": "White"
+  },
+  "prose": {
+    "heading": "Notes"
+  },
+  "facet": {
+    "kind": "Kind",
+    "orientation": "Orientation",
+    "hue": "Color"
+  }
+}

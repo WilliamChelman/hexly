@@ -1,20 +1,14 @@
-import { expect, test, waitForSave } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
-/**
- * Full-stack note round-trip: real TipTap keyboard input → versioned save → reload
- * re-renders stored Content. Verifies the opaque snapshot via the API (ADR-0009/0019).
- */
-test('types into a note, saves, and the Content survives a reload', async ({
-  page,
-  request,
-}) => {
-  await page.goto('/entities');
-  await page.getByTestId('new-note').click();
+/** Full-stack note round-trip; the persisted snapshot is opaque (ADR-0009/0019). */
+test('types into a note, saves, and the Content survives a reload', async ({ page, request }) => {
+  await enterLibrary(page);
+  await page.getByTestId('new-default-entity').click();
 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const noteId = page.url().split('/').pop();
+  const noteId = entityIdFromUrl(page);
 
-  // Click below the text (60% down) to prove the whole box focuses the editor, not just prose.
+  // Click 60% down to prove the whole box focuses the editor.
   const surface = page.getByTestId('note-content');
   const content = 'Lady Mara rules the northern reach.';
   const box = await surface.boundingBox();
@@ -22,21 +16,18 @@ test('types into a note, saves, and the Content survives a reload', async ({
   await page.keyboard.type(content);
   await expect(surface).toContainText(content);
 
-  // Wait on the HTTP response, not just the button text — the reload can't race an in-flight PUT.
-  const saved = waitForSave(page);
-  await page.getByTestId('save').click();
-  await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await flushSave(page);
 
   await page.reload();
   await expect(page.getByTestId('note-content')).toContainText(content);
-  await expect(page.getByTestId('note-title')).toHaveText('Untitled note');
+  await expect(page.getByTestId('title')).toHaveText('Untitled note');
 
-  // Confirm the snapshot was stored opaquely — format tag present, text inside.
   const res = await request.get(`/api/entities/${noteId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
-  expect(detail.document.type).toBe('note');
-  expect(detail.document.content.format).toBe('tiptap-v1'); // mirrors CONTENT_FORMAT
-  expect(JSON.stringify(detail.document.content.snapshot)).toContain(content);
+  // A note's Entity Type lives in the entity-level `types` set, not in the body — which is
+  // `{ content, metadata }` for every Entity (ADR-0050). `core.type.note` is the primary type.
+  expect(detail.types).toContain('core.type.note');
+  expect(detail.document['core.field.content'].format).toBe('tiptap-v3'); // mirrors CONTENT_FORMAT
+  expect(JSON.stringify(detail.document['core.field.content'].snapshot)).toContain(content);
 });

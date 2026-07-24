@@ -1,0 +1,96 @@
+{
+  "dataType": {
+    "surface": "Board surface"
+  },
+  "eyebrow": "Board",
+  "titleLabel": "Board title",
+  "rename": "Rename board",
+  "editorLabel": "Board notes",
+  "create": "Create Board",
+  "untitled": "Untitled board",
+  "view": {
+    "surface": "Board"
+  },
+  "canvas": {
+    "label": "Board surface",
+    "element": "Board element",
+    "elementBox": "Box element",
+    "elementText": "Text block element",
+    "elementImage": "Image element",
+    "elementEmbed": "Embed element",
+    "textBlock": "Text block",
+    "image": "Image",
+    "missingAsset": "Missing image",
+    "imageLoading": "Loading image…",
+    "imageRetry": "Retry",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit content",
+    "resetZoom": "Reset zoom to 100%"
+  },
+  "embed": {
+    "openTarget": "Open target"
+  },
+  "controls": {
+    "resize": "Resize",
+    "fitWidth": "Fit width",
+    "fitHeight": "Fit height",
+    "fitBoth": "Fit both",
+    "fitImage": "Fit to image",
+    "lockRatio": "Lock aspect ratio",
+    "order": "Stacking order"
+  },
+  "toolPalette": {
+    "tools": "Tools",
+    "select": "Select",
+    "box": "Box",
+    "text": "Text",
+    "image": "Image",
+    "embed": "Embed",
+    "undo": "Undo",
+    "redo": "Redo"
+  },
+  "imagePicker": {
+    "title": "Add image",
+    "upload": "Upload a file",
+    "uploading": "Uploading…",
+    "uploadError": "Upload failed. Try again.",
+    "existing": "Choose existing",
+    "search": "Search images",
+    "loading": "Loading images…",
+    "empty": "No images uploaded yet.",
+    "noMatches": "No images match your search.",
+    "cancel": "Cancel"
+  },
+  "embedPicker": {
+    "title": "Embed an entity",
+    "target": "Entity to embed",
+    "searchPlaceholder": "Search entities…",
+    "noMatches": "No matching entities.",
+    "chosenTarget": "Embedding",
+    "view": "View to render",
+    "defaultView": "Default view",
+    "confirm": "Add embed",
+    "cancel": "Cancel"
+  },
+  "inspector": {
+    "title": "Inspector",
+    "emptyHint": "Select an element to edit its geometry and stacking order.",
+    "selectedElement": "Selected element",
+    "x": "X",
+    "y": "Y",
+    "width": "Width",
+    "height": "Height",
+    "order": "Stacking order",
+    "toFront": "To front",
+    "bringForward": "Forward",
+    "sendBackward": "Backward",
+    "toBack": "To back",
+    "embedView": "Embedded view",
+    "deleteElement": "Delete element",
+    "multiTitle": "Selection",
+    "selectedCount": "selected",
+    "deleteAll": "Delete all"
+  }
+}

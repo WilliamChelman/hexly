@@ -1,0 +1,75 @@
+{
+  "view": {
+    "content": "Contenu"
+  },
+  "dataType": {
+    "richContent": "Prose"
+  },
+  "slashMenu": {
+    "label": "Insérer un bloc",
+    "empty": "Aucun bloc correspondant",
+    "text": "Texte",
+    "heading1": "Titre 1",
+    "heading2": "Titre 2",
+    "heading3": "Titre 3",
+    "heading4": "Titre 4",
+    "heading5": "Titre 5",
+    "heading6": "Titre 6",
+    "bulletList": "Liste à puces",
+    "orderedList": "Liste numérotée",
+    "blockquote": "Citation",
+    "codeBlock": "Bloc de code",
+    "horizontalRule": "Séparateur",
+    "callout": "Encadré",
+    "table": "Tableau",
+    "taskList": "Liste de tâches",
+    "image": "Image",
+    "entityLink": "Lier une entité"
+  },
+  "entityPicker": {
+    "label": "Lier une entité",
+    "empty": "Aucune entité correspondante"
+  },
+  "descriptorPicker": {
+    "label": "Décrire ce lien",
+    "empty": "Saisir un descripteur",
+    "create": "(nouveau)"
+  },
+  "displayPicker": {
+    "label": "Texte affiché",
+    "empty": "Saisir le texte affiché",
+    "remove": "Retirer le texte affiché"
+  },
+  "headingPicker": {
+    "label": "Lier à un titre",
+    "empty": "Saisir un titre",
+    "remove": "Retirer le lien vers le titre"
+  },
+  "formatMenu": {
+    "label": "Mise en forme",
+    "bold": "Gras",
+    "italic": "Italique",
+    "underline": "Souligné",
+    "strike": "Barré",
+    "code": "Code en ligne",
+    "highlight": "Surlignage",
+    "link": "Lien",
+    "linkPlaceholder": "Collez ou saisissez une URL"
+  },
+  "entityLink": {
+    "dangling": "Cette entité est indisponible"
+  },
+  "note": {
+    "eyebrow": "Note",
+    "titleLabel": "Titre de la note",
+    "rename": "Renommer la note",
+    "editorLabel": "Contenu de la note",
+    "create": "Créer une note",
+    "untitled": "Note sans titre"
+  },
+  "outline": {
+    "title": "Plan",
+    "toggle": "Afficher/masquer le plan",
+    "empty": "Aucun titre pour l’instant"
+  }
+}

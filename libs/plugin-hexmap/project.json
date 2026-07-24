@@ -1,0 +1,8 @@
+{
+  "name": "plugin-hexmap",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/plugin-hexmap/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {}
+}

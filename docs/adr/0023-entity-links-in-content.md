@@ -4,9 +4,11 @@ An Entity Link (CONTEXT.md) can now live **inline in prose Content**, not just o
 
 Adding a schema node changes the `tiptap-v1` extension contract (ADR-0019), so the `format` tag **bumps to `tiptap-v2`**. `contentSchema` accepts both `tiptap-v1` and `tiptap-v2`; reads load either losslessly (the node is additive, so a v1 doc simply has none and needs no transform); saves always write `tiptap-v2`. This is the first format bump and establishes the dual-read migration pattern.
 
+**Update — `tiptap-v3` (ADR-0033):** to carry Obsidian wikilink semantics, `entityLink` gains two optional attrs. `display` holds `[[Target|display text]]` custom text and, when set, renders **statically** in place of the live target name (the live name still renders when it's unset) — the one exception to the live-name rule, needed because narrative TTRPG prose leans on custom link phrasing. `heading` holds a `[[Target#Heading]]` anchor; navigation opens the target and best-effort scrolls to the first heading whose text matches, and it round-trips verbatim. Block anchors (`#^id`) are dropped on import. Both attrs are additive (`tiptap-v3` per ADR-0019).
+
 ## Insertion and characterisation — three inline triggers (`@tiptap/suggestion`)
 
-- **`@`** — autocomplete over a client-side filter of `EntitiesClient.list()` (owner-scoped, no search endpoint); pick inserts the `entityLink` atom.
+- **`@`** — autocomplete over a server-side name search (`EntitiesClient.list({ q })`, owner-scoped, ADR-0025), so a library past one page is still fully linkable; pick inserts the `entityLink` atom.
 - **`/link`** — a slash-menu item that inserts `@` and lets the mention suggestion drive the same picker (one picker, not two).
 - **`::`** — arms a descriptor autocomplete **only when the node immediately before the cursor is an `entityLink`** (elsewhere it is literal text); selecting/typing sets that link's `descriptor` attr. This is the single mechanism for both setting (cursor sits after the link right after insert) and editing (move after any link, type `::` again). Removing a link is plain atom deletion (backspace).
 
@@ -31,7 +33,7 @@ This self-prunes: removing the last use of a descriptor and saving drops its row
 
 ## Consequences
 
-- The id→name resolver reads the owner's entity list; a link to an entity the user can't see (future cross-owner sharing) resolves to its stored `label` as a dangling link — consistent with "ids are not referentially enforced."
+- The id→name resolver fetches only the ids notes reference, coalescing a render's worth of links into one batched `list({ ids })` call (chunked to the page cap) rather than loading the whole library; this lifts the earlier one-page ceiling on resolvable links. A link to an entity the user can't see (future cross-owner sharing) returns nothing for that id and resolves to its stored `label` as a dangling link — consistent with "ids are not referentially enforced."
 - Deleting an entity does not clean up links pointing at it; they render dangling. No backlink index or referential cascade (out of scope). A descriptor is a one-way annotation on its link instance — characterising A→B as "spouse" does not create B→A.
 - The save payload and `entities` write path grow a `descriptors: string[]` field and the `entity_descriptors` index write; both ride the existing version-checked save transaction.
 - Navigating a link discards unsaved edits in the current note — identical to the existing "back to library" link; a global unsaved-changes guard is separate, deferred work.

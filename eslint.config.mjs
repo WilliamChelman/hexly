@@ -14,7 +14,27 @@ export default [
         'error',
         {
           enforceBuildableLibDependency: true,
-          allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$'],
+          // web-core exposes its test doubles via a secondary entry point that
+          // is deliberately kept out of the production barrel (the mocks lean on
+          // the ambient `vi` global); allow specs to reach it.
+          // The two pure utils below (pretty-id, locale-key-sync) are reached by
+          // direct file path from non-Angular runtimes (Playwright fixtures, the
+          // jiti-run i18n-sync tool) that must not drag in the barrel's Angular
+          // services layer; neither runtime resolves the tsconfig `paths` alias,
+          // so a relative import is used and waived here.
+          // admin-web hosts a lazily-routed page (its barrel is `import()`-ed by the route), which
+          // marks the whole project lazy. Its `/i18n` entry must still be imported eagerly (ADR-0049,
+          // the route `title` needs the scope before the page loads); that entry carries only the
+          // scope declaration and JSON loaders, so it never drags the page barrel into the eager bundle.
+          allow: [
+            '^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$',
+            '@hexly/web-core/testing',
+            '@hexly/admin-web/i18n',
+            '^.*/libs/web-core/src/(utils/pretty-id|i18n/locale-key-sync)$',
+          ],
+          // ponytail: layering (core←ui←app) holds by construction and review;
+          // left permissive because a type:* matrix would need every existing
+          // lib (domain/immer/obsidian) tagged. Tighten when that's worth doing.
           depConstraints: [
             {
               sourceTag: '*',
@@ -26,17 +46,21 @@ export default [
     },
   },
   {
-    files: [
-      '**/*.ts',
-      '**/*.tsx',
-      '**/*.cts',
-      '**/*.mts',
-      '**/*.js',
-      '**/*.jsx',
-      '**/*.cjs',
-      '**/*.mjs',
-    ],
+    files: ['**/*.ts', '**/*.tsx', '**/*.cts', '**/*.mts', '**/*.js', '**/*.jsx', '**/*.cjs', '**/*.mjs'],
     // Override or add rules here
-    rules: {},
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'immer',
+              message:
+                "Import from '@hexly/immer' instead — it boots enablePatches() and is the single Immer entrypoint.",
+            },
+          ],
+        },
+      ],
+    },
   },
 ];

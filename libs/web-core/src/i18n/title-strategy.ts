@@ -1,0 +1,38 @@
+import { inject, Injectable } from '@angular/core';
+import { ActivatedRouteSnapshot, RouterStateSnapshot, TitleStrategy } from '@angular/router';
+import { TitleService } from './title.service';
+
+/**
+ * The router's title hook (ADR-0014): it reads the active route's title intent and
+ * hands it to {@link TitleService}. A route's `title` is a translation key; a route
+ * may additionally declare `data.documentTitleKey`, a brand template with a `{{name}}`
+ * slot the page fills via {@link TitleService.setDocumentName} (the editor reads
+ * `"Aldermoor — Hexly"`).
+ *
+ * A route with no `title` leaves the current tab title untouched.
+ */
+@Injectable()
+export class TranslationTitleStrategy extends TitleStrategy {
+  private readonly titles = inject(TitleService);
+
+  override updateTitle(snapshot: RouterStateSnapshot): void {
+    const key = this.buildTitle(snapshot);
+    if (key === undefined) return;
+    this.titles.setRouteTitle({
+      key,
+      namedKey: this.documentTitleKey(snapshot),
+    });
+  }
+
+  /**
+   * The `documentTitleKey` declared by a route in the activated primary chain,
+   * or `undefined` when none opts its title into the open document's name.
+   */
+  private documentTitleKey(snapshot: RouterStateSnapshot): string | undefined {
+    for (let route: ActivatedRouteSnapshot | null = snapshot.root; route; route = route.firstChild) {
+      const key = route.data['documentTitleKey'];
+      if (typeof key === 'string') return key;
+    }
+    return undefined;
+  }
+}

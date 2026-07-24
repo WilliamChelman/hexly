@@ -1,0 +1,1 @@
+ALTER TABLE `entities` ADD `fields` text DEFAULT '[]' NOT NULL;

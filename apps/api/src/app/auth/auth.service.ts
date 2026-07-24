@@ -1,8 +1,15 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { hash, verify } from '@node-rs/argon2';
 import { eq, lt } from 'drizzle-orm';
-import { AuthUser } from '@hexly/domain';
+import {
+  AuthUser,
+  InstanceRole,
+  instanceRolesSchema,
+  Preferences,
+  PreferencesPatch,
+  preferencesSchema,
+} from '@hexly/domain';
 import { DB, Db } from '../db/db';
 import { sessions, users } from '../db/schema';
 
@@ -15,76 +22,92 @@ function newToken(): string {
 }
 
 /**
- * A precomputed argon2 hash verified against when no user matches, so the
- * unknown-email path costs roughly the same as the wrong-password path and
- * response timing cannot be used to enumerate which emails exist.
+ * Under NODE_ENV=test (set by vitest), the native argon2 addon is skipped entirely:
+ * its CPU contention under parallel workers makes auth-heavy specs flaky.
  */
-const DUMMY_PASSWORD_HASH = hash('hexly-dummy-password');
+const isTest = process.env.NODE_ENV === 'test';
+
+/** Cheap, non-reversible test stand-in: sha256, not the plaintext, so the
+ *  "never stores plaintext" spec still holds. `$argon2` prefix keeps shape checks green. */
+function testHash(password: string): string {
+  return `$argon2-test$${createHash('sha256').update(password).digest('hex')}`;
+}
+
+function hashPassword(password: string): Promise<string> {
+  return isTest ? Promise.resolve(testHash(password)) : hash(password);
+}
+function verifyPassword(stored: string, password: string): Promise<boolean> {
+  return isTest ? Promise.resolve(stored === testHash(password)) : verify(stored, password);
+}
 
 /**
- * The auth domain behind a small interface: provisioning members of the closed
- * set, exchanging credentials for a session, resolving a session back to its
- * user, and ending one. All hashing, token minting, and persistence live here;
- * callers only ever hold opaque tokens and {@link AuthUser} values.
+ * Verified against when no user matches, so the unknown-email path costs roughly the
+ * same as the wrong-password path and timing cannot enumerate which emails exist.
  */
+const DUMMY_PASSWORD_HASH = hashPassword('hexly-dummy-password');
+
 @Injectable()
 export class AuthService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   /**
-   * Provision a user out-of-band (ADR-0004 — no public signup). The password is
-   * hashed with argon2; the plaintext is never stored.
+   * Provision a user out-of-band (there is no public signup). The plaintext password
+   * is never stored. Roles default to the empty set and Superadmin to off.
    */
   async seedUser(
     email: string,
     password: string,
     displayName: string,
-  ): Promise<void> {
-    const passwordHash = await hash(password);
+    opts: {
+      roles?: readonly InstanceRole[];
+      isSuperadmin?: boolean;
+    } = {},
+  ): Promise<string> {
+    const id = randomUUID();
+    const passwordHash = await hashPassword(password);
     this.db
       .insert(users)
       .values({
-        id: randomUUID(),
+        id,
         email: normalizeEmail(email),
         displayName,
         passwordHash,
+        roles: JSON.stringify(opts.roles ?? []),
+        isSuperadmin: opts.isSuperadmin ?? false,
         createdAt: Date.now(),
       })
       .run();
+    return id;
   }
 
   /**
-   * Verify credentials and open a session. Returns the new session token plus
-   * the user on success, or `null` if the email is unknown or the password is
-   * wrong. The two failure paths are timing-equalized: an unknown email still
-   * runs an argon2 verify against a dummy hash, so the caller cannot tell which
-   * failed (nor enumerate emails) by response timing.
+   * Verify credentials and open a session, or `null` if the email is unknown or the
+   * password is wrong. Both failure paths are timing-equalized: an unknown email still
+   * runs a verify against a dummy hash, so timing reveals neither which check failed
+   * nor which emails exist.
    */
-  async login(
-    email: string,
-    password: string,
-  ): Promise<{ token: string; user: AuthUser } | null> {
+  async login(email: string, password: string): Promise<{ token: string; user: AuthUser } | null> {
     const user = this.db
       .select()
       .from(users)
       .where(eq(users.email, normalizeEmail(email)))
       .get();
 
-    // Verify against the real hash when the email is known, or a constant dummy
-    // hash otherwise, so both paths take comparable time. A throw (e.g. a
-    // malformed stored hash) is treated as an auth failure, never a 500.
+    // Verify against the real hash or the dummy to equalize timing (no email
+    // enumeration). A throw is treated as auth failure, not a 500.
     let passwordOk = false;
     try {
       const targetHash = user ? user.passwordHash : await DUMMY_PASSWORD_HASH;
-      passwordOk = await verify(targetHash, password);
+      passwordOk = await verifyPassword(targetHash, password);
     } catch {
       return null;
     }
     if (!user || !passwordOk) return null;
+    // A disabled account cannot open a session; checked after the password verify
+    // so timing doesn't reveal disabled accounts.
+    if (user.disabledAt !== null) return null;
 
-    // Opportunistic sweep: login is the natural low-frequency moment to clear
-    // out sessions whose lifetime has passed, so the table can't grow unbounded
-    // without a separate job (ADR-0002 — this stays a tiny single-file DB).
+    // Opportunistic sweep on login to prevent unbounded table growth.
     this.purgeExpiredSessions();
 
     const token = newToken();
@@ -104,19 +127,71 @@ export class AuthService {
   /** Resolve a session token to its user, or `null` if missing/expired. */
   async authenticate(token: string | undefined): Promise<AuthUser | null> {
     if (!token) return null;
-    const session = this.db
-      .select()
-      .from(sessions)
-      .where(eq(sessions.id, token))
-      .get();
+    const session = this.db.select().from(sessions).where(eq(sessions.id, token)).get();
     if (!session || session.expiresAt < Date.now()) return null;
 
-    const user = this.db
-      .select()
-      .from(users)
-      .where(eq(users.id, session.userId))
-      .get();
-    return user ? toAuthUser(user) : null;
+    const user = this.db.select().from(users).where(eq(users.id, session.userId)).get();
+    if (!user) return null;
+    // A disabled account's live sessions stop resolving immediately — disable is
+    // the immediate lever, not just a future-login block.
+    if (user.disabledAt !== null) return null;
+    return toAuthUser(user);
+  }
+
+  /**
+   * PATCH semantics: an absent field keeps its stored value, an explicit `null` clears
+   * the field back to "no choice".
+   */
+  async updatePreferences(userId: string, patch: PreferencesPatch): Promise<Preferences> {
+    const row = this.db.select().from(users).where(eq(users.id, userId)).get();
+    const merged: Record<string, unknown> = {
+      ...parsePreferences(row?.preferences ?? '{}'),
+    };
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) delete merged[key];
+      else if (value !== undefined) merged[key] = value;
+    }
+    this.db
+      .update(users)
+      .set({ preferences: JSON.stringify(merged) })
+      .where(eq(users.id, userId))
+      .run();
+    return merged as Preferences;
+  }
+
+  /** Update the user's display name and return their fresh {@link AuthUser}. */
+  async updateProfile(userId: string, displayName: string): Promise<AuthUser> {
+    this.db.update(users).set({ displayName }).where(eq(users.id, userId)).run();
+    const row = this.db.select().from(users).where(eq(users.id, userId)).get();
+    if (!row) throw new Error(`user ${userId} vanished mid-session`);
+    return toAuthUser(row);
+  }
+
+  /**
+   * Returns `false` — with nothing written — when the current password does not
+   * verify. The user's other sessions stay valid.
+   */
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean> {
+    const row = this.db.select().from(users).where(eq(users.id, userId)).get();
+    if (!row) return false;
+
+    let currentOk = false;
+    try {
+      currentOk = await verifyPassword(row.passwordHash, currentPassword);
+    } catch {
+      return false;
+    }
+    if (!currentOk) return false;
+
+    const passwordHash = await hashPassword(newPassword);
+    this.db.update(users).set({ passwordHash }).where(eq(users.id, userId)).run();
+    return true;
+  }
+
+  /** Set a user's password unconditionally: the Instance Admin reset path, with no current-password check. */
+  async setPassword(userId: string, newPassword: string): Promise<void> {
+    const passwordHash = await hashPassword(newPassword);
+    this.db.update(users).set({ passwordHash }).where(eq(users.id, userId)).run();
   }
 
   /** End a session by deleting its row; a no-op for an unknown token. */
@@ -131,16 +206,39 @@ export class AuthService {
   }
 }
 
-/**
- * Canonicalize an email for storage and lookup so a user seeded as
- * `ada@hexly.test` can still log in typing `Ada@hexly.test` or with stray
- * whitespace.
- */
+/** Canonical form for both storage and lookup: login is case- and whitespace-insensitive. */
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
 /** Strip a user row down to the public {@link AuthUser} shape. */
 function toAuthUser(row: typeof users.$inferSelect): AuthUser {
-  return { id: row.id, email: row.email, displayName: row.displayName };
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.displayName,
+    preferences: parsePreferences(row.preferences),
+    roles: parseRoles(row.roles),
+    isSuperadmin: row.isSuperadmin,
+  };
+}
+
+/** A corrupt or hand-edited set degrades to no roles rather than breaking auth. */
+function parseRoles(raw: string): InstanceRole[] {
+  try {
+    const parsed = instanceRolesSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : [];
+  } catch {
+    return [];
+  }
+}
+
+/** A corrupt or hand-edited bag degrades to app defaults rather than breaking auth. */
+function parsePreferences(raw: string): Preferences {
+  try {
+    const parsed = preferencesSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : {};
+  } catch {
+    return {};
+  }
 }

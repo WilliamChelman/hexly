@@ -1,0 +1,19 @@
+{
+  "name": "plugin-content-web",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/plugin-content-web/src",
+  "prefix": "app",
+  "projectType": "library",
+  "tags": ["scope:web", "type:feature"],
+  "targets": {
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "watch": false,
+        "buildTarget": "web:build:development",
+        "tsConfig": "libs/plugin-content-web/tsconfig.spec.json",
+        "setupFiles": ["libs/plugin-content-web/src/test-setup.ts"]
+      }
+    }
+  }
+}

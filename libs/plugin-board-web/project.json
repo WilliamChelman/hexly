@@ -1,0 +1,19 @@
+{
+  "name": "plugin-board-web",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/plugin-board-web/src",
+  "prefix": "app",
+  "projectType": "library",
+  "tags": ["scope:web", "type:feature"],
+  "targets": {
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "watch": false,
+        "buildTarget": "web:build:development",
+        "tsConfig": "libs/plugin-board-web/tsconfig.spec.json",
+        "setupFiles": ["libs/plugin-board-web/src/test-setup.ts"]
+      }
+    }
+  }
+}

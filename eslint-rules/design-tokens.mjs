@@ -1,66 +1,36 @@
 /**
  * Hexly design-token ESLint rules (ADR-0020).
  *
- * The design tokens and Tailwind's theme are one source of truth: every
- * utility-shaped token is declared in the `@theme` block (styles.css) or, for
- * the theme-variant / non-utility tokens, in tokens.css. These rules are the
- * load-bearing guard the ADR calls for — without them, aligning to Tailwind
- * silently *widens* the spacing vocabulary (every multiplier step becomes
- * reachable) and token typos fail silently (`var(--danger)` resolves to
- * nothing). stylelint can't help here: component styles are CSS-in-TS template
- * strings, so the check lives in ESLint over the string/template literals.
+ * no-unknown-design-token — every `var(--…)` must resolve to a token defined in
+ * web-styles/index.css or tokens.css (or a private `--_…` component-local variable).
+ * A token typo fails silently in CSS (`var(--danger)` resolves to nothing), and
+ * stylelint can't see it: component styles are CSS-in-TS template strings, so the
+ * check runs in ESLint over string/template literals.
  *
- *   no-unknown-design-token — every `var(--…)` must resolve to a defined token
- *                             (or a private `--_…` component-local variable).
- *   no-off-scale-spacing    — spacing utilities (p-/m-/gap-/…) may only use the
- *                             curated steps; the multiplier fallback is fenced.
- *
- * The allowlist *and* the curated spacing scale are both read from styles.css +
- * tokens.css at lint time, so the curation lives in the CSS and these rules
- * stay in sync automatically (add a `--spacing-10` key and `p-10` is allowed;
- * remove `--spacing-9` and `p-9` is rejected — no edit here required).
+ * The allowlist is read from the CSS files at lint time.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 
-const TOKEN_FILES = ['apps/web/src/styles.css', 'apps/web/src/styles/tokens.css'];
+const TOKEN_FILES = ['libs/web-styles/src/index.css', 'libs/web-styles/src/tokens.css'];
 
 /**
- * Tailwind built-ins a component may legitimately reference by name. Only names
- * Tailwind actually emits as a `--…` custom property belong here: bare
- * `--spacing` / `--radius` are NOT emitted once the @theme declares explicit
- * `--spacing-N` / `--radius-*` keys, so allowlisting them would let a typo like
- * `var(--spacing)` (meant `--spacing-4`) resolve to nothing yet pass the rule.
+ * Tailwind built-ins a component may reference by name. `--spacing` is the base unit
+ * of Tailwind's default scale — scoped styles spell a spacing value `calc(var(--spacing) * N)`
+ * (ADR-0030) — and is the only spacing var, so it can't be a typo for anything. `--radius`
+ * stays off the list: @theme declares explicit `--radius-*` keys, so a bare `var(--radius)`
+ * resolves to nothing and must still be flagged.
  */
-const BUILTIN_TOKENS = ['font-sans', 'font-serif', 'font-mono'];
-
-/** Spacing/whitespace utility prefixes whose step must stay on the curated scale. */
-const SPACING_PREFIXES = [
-  'p', 'px', 'py', 'pt', 'pb', 'pl', 'pr',
-  'm', 'mx', 'my', 'mt', 'mb', 'ml', 'mr',
-  'gap', 'gap-x', 'gap-y', 'space-x', 'space-y',
-];
-// Longest prefix first so `gap-x-2` matches `gap-x` (step `2`), not `gap` (step
-// `x-2`): JS alternation takes the first branch that lets the overall match
-// succeed, and a bare `gap` + `-(.+)` would otherwise swallow `x-2` as the step
-// and flag a perfectly valid utility as off-scale.
-const SPACING_RE = new RegExp(
-  `^-?(${[...SPACING_PREFIXES].sort((a, b) => b.length - a.length).join('|')})-(.+)$`,
-);
-/** Steps always valid regardless of the curated scale (Tailwind universals). */
-const UNIVERSAL_STEPS = ['0', 'auto'];
+const BUILTIN_TOKENS = ['font-sans', 'font-serif', 'font-mono', 'spacing'];
 
 let cache = null;
 /**
- * Read the curated token set + spacing scale + shadow utilities from the CSS source of truth.
+ * Read the token set + shadow utilities from the CSS files.
  *
- * Returns `{ sig, tokens, spacingSteps, shadowUtilities }`. The cache is keyed by the resolved
- * file mtimes, so editing a token file invalidates it — a long-lived ESLint
- * server / Nx daemon picks up a new or renamed token without a restart. A load
- * that managed to read *no* file is deliberately NOT cached: otherwise a single
- * early call from a cwd whose walk-up can't reach the repo would poison every
- * later file with a builtins-only set and fail the whole lint on false
- * positives (`var(--color-ink)` & co. reported "unknown").
+ * The cache is keyed by file mtimes, so a long-lived ESLint server / Nx daemon picks up
+ * a new or renamed token without a restart. A load that read *no* file is never cached:
+ * one early call from a cwd whose walk-up misses the repo would otherwise poison every
+ * later file with a builtins-only set and fail the lint on false positives.
  */
 function loadCss(cwd) {
   // Find the repo root by walking up from cwd until the token files resolve.
@@ -84,7 +54,6 @@ function loadCss(cwd) {
   if (cache && cache.sig === sig) return cache;
 
   const tokens = new Set(BUILTIN_TOKENS);
-  const spacingSteps = new Set(UNIVERSAL_STEPS);
   const shadowUtilities = new Set();
   let readAny = false;
   for (const rel of TOKEN_FILES) {
@@ -92,9 +61,6 @@ function loadCss(cwd) {
       const txt = fs.readFileSync(path.join(base, rel), 'utf8');
       readAny = true;
       for (const m of txt.matchAll(/--([a-z0-9][a-z0-9-]*)\s*:/g)) tokens.add(m[1]);
-      // The curated spacing scale *is* whatever `--spacing-<step>` keys exist,
-      // so the off-scale rule tracks the @theme instead of a hardcoded list.
-      for (const m of txt.matchAll(/--spacing-([a-z0-9]+)\s*:/g)) spacingSteps.add(m[1]);
       // Shadow utilities are the `@utility shadow-*` declarations; only these
       // respect the [data-theme] reassignment — Tailwind's built-ins bake a
       // light-mode value (ADR-0021).
@@ -103,22 +69,29 @@ function loadCss(cwd) {
       /* token file not found from this cwd */
     }
   }
-  const result = { sig, tokens, spacingSteps, shadowUtilities };
+  const result = { sig, tokens, shadowUtilities };
   if (readAny) cache = result; // never cache a total-failure load (avoids poisoning)
   return result;
 }
 
-/** Pull the raw text out of a string Literal or a TemplateLiteral node. */
+/**
+ * Raw text of a string Literal or TemplateLiteral node, with CSS block comments stripped:
+ * a comment word like "shadow" or a `var(--…)` shown in an example would otherwise trip
+ * the token/shadow scans. Class names never live in comments, so the drop is safe.
+ */
 function textOf(node) {
-  if (node.type === 'Literal') return typeof node.value === 'string' ? node.value : null;
-  if (node.type === 'TemplateLiteral') return node.quasis.map((q) => q.value.raw).join(' ');
-  return null;
+  let text = null;
+  if (node.type === 'Literal') text = typeof node.value === 'string' ? node.value : null;
+  if (node.type === 'TemplateLiteral') text = node.quasis.map((q) => q.value.raw).join(' ');
+  return text === null ? null : text.replace(/\/\*[\s\S]*?\*\//g, ' ');
 }
 
 const noUnknownDesignToken = {
   meta: {
     type: 'problem',
-    docs: { description: 'Disallow var(--…) references to undefined design tokens (ADR-0020).' },
+    docs: {
+      description: 'Disallow var(--…) references to undefined design tokens (ADR-0020).',
+    },
     schema: [],
     messages: {
       unknown:
@@ -145,61 +118,13 @@ const noUnknownDesignToken = {
   },
 };
 
-const noOffScaleSpacing = {
-  meta: {
-    type: 'problem',
-    docs: { description: 'Disallow off-scale Tailwind spacing utilities; keep the curated scale (ADR-0020).' },
-    schema: [],
-    messages: {
-      offScale:
-        'Off-scale spacing utility `{{cls}}`. Hexly\'s spacing scale is curated (steps px, 1–9); use an on-scale step, an arbitrary `[…]` value, or var(--spacing-N) (ADR-0020).',
-    },
-  },
-  create(context) {
-    const { spacingSteps } = loadCss(context.cwd ?? process.cwd());
-    function scan(node, text) {
-      // Tokenise like HTML/class text so only standalone class tokens are tested;
-      // CSS such as `var(--spacing-2)` never yields a bare `p-2` token. Brackets
-      // are deliberately NOT delimiters, so an arbitrary value stays one token
-      // (`p-[10px]`) and is recognised by the `[`-step opt-out below.
-      for (const tok of text.split(/[\s"'`=<>(){},;:]+/)) {
-        const m = SPACING_RE.exec(tok);
-        if (!m) continue;
-        const step = m[2];
-        if (step.startsWith('[')) continue; // explicit arbitrary value — intentional opt-out
-        if (!spacingSteps.has(step)) {
-          context.report({ node, messageId: 'offScale', data: { cls: tok } });
-        }
-      }
-    }
-    return {
-      // Angular inline templates are template literals full of class attributes.
-      TemplateLiteral(node) {
-        const text = textOf(node);
-        if (text) scan(node, text);
-      },
-      // Plain string class lists too — notably `host: { class: '…' }` (ADR-0020's
-      // composite-shell allowance) and inline `class="…"` markup strings — but
-      // NOT every unrelated string literal, which would flag e.g. a `pt-BR`
-      // locale as off-scale `pt` spacing.
-      Literal(node) {
-        if (typeof node.value !== 'string') return;
-        const p = node.parent;
-        const isClassProp =
-          !!p &&
-          p.type === 'Property' &&
-          p.value === node &&
-          (p.key.name === 'class' || p.key.value === 'class');
-        if (isClassProp || node.value.includes('class=')) scan(node, node.value);
-      },
-    };
-  },
-};
-
 const noBuiltinShadow = {
   meta: {
     type: 'problem',
-    docs: { description: 'Disallow Tailwind built-in shadow-* utilities; use the project\'s shadow-1/2/3/inset tokens (ADR-0021).' },
+    docs: {
+      description:
+        "Disallow Tailwind built-in shadow-* utilities; use the project's shadow-1/2/3/inset tokens (ADR-0021).",
+    },
     schema: [],
     messages: {
       builtin:
@@ -212,6 +137,7 @@ const noBuiltinShadow = {
       for (const tok of text.split(/[\s"'`=<>(){},;:]+/)) {
         if (!tok.startsWith('shadow-') && tok !== 'shadow') continue;
         if (tok.includes('[')) continue; // explicit arbitrary value — intentional opt-out
+        if (tok === 'shadow-none') continue; // no shadow at all — nothing themeable to bake
         if (!shadowUtilities.has(tok)) {
           context.report({ node, messageId: 'builtin', data: { cls: tok } });
         }
@@ -226,11 +152,11 @@ const noBuiltinShadow = {
         if (typeof node.value !== 'string') return;
         const p = node.parent;
         const isClassProp =
-          !!p &&
-          p.type === 'Property' &&
-          p.value === node &&
-          (p.key.name === 'class' || p.key.value === 'class');
-        if (isClassProp || node.value.includes('class=')) scan(node, node.value);
+          !!p && p.type === 'Property' && p.value === node && (p.key.name === 'class' || p.key.value === 'class');
+        if (isClassProp || node.value.includes('class=')) {
+          const t = textOf(node);
+          if (t) scan(node, t);
+        }
       },
     };
   },
@@ -239,7 +165,6 @@ const noBuiltinShadow = {
 export default {
   rules: {
     'no-unknown-design-token': noUnknownDesignToken,
-    'no-off-scale-spacing': noOffScaleSpacing,
     'no-builtin-shadow': noBuiltinShadow,
   },
 };

@@ -1,0 +1,96 @@
+{
+  "dataType": {
+    "hexGrid": "Grille hexagonale"
+  },
+  "hexmap": {
+    "eyebrow": "Carte hexagonale",
+    "titleLabel": "Titre de la carte",
+    "rename": "Renommer la carte",
+    "editorLabel": "Notes de la carte",
+    "create": "Créer une carte",
+    "untitled": "Carte sans titre",
+    "view": {
+      "map": "Carte"
+    }
+  },
+  "toolPalette": {
+    "tools": "Outils",
+    "select": "Sélection",
+    "pick": "Pointer",
+    "marquee": "Rectangle",
+    "terrain": "Terrain",
+    "feature": "Caractéristique",
+    "label": "Étiquette",
+    "erase": "Effacer",
+    "undo": "Annuler",
+    "redo": "Rétablir",
+    "terrainGroup": "Terrain",
+    "featureGroup": "Caractéristiques",
+    "clearFeature": "Retirer la caractéristique",
+    "selectGroup": "Sélection"
+  },
+  "inspector": {
+    "title": "Inspecteur",
+    "selectedLabel": "Étiquette sélectionnée",
+    "selectedRegion": "Région sélectionnée",
+    "selectedHex": "Hex sélectionné",
+    "selectedFeature": "Caractéristique sélectionnée",
+    "text": "Texte",
+    "size": "Taille",
+    "rotation": "Rotation (°)",
+    "x": "X",
+    "y": "Y",
+    "name": "Nom",
+    "tags": "Tags",
+    "tagsEmpty": "Aucun tag",
+    "color": "Couleur",
+    "membership": "Appartenance",
+    "membershipDirection": "Direction d’appartenance",
+    "add": "Ajouter",
+    "remove": "Retirer",
+    "deleteLabel": "Supprimer l’étiquette",
+    "deleteRegion": "Supprimer la région",
+    "deleteHex": "Supprimer le hex",
+    "deleteFeature": "Supprimer la caractéristique",
+    "emptyHint": "Choisissez l’outil Sélection et cliquez sur un Hex, une Caractéristique ou une Étiquette pour l’inspecter. Placez une Étiquette avec l’outil Étiquette, puis sélectionnez-la ici pour modifier son texte, sa taille, sa rotation et sa position.",
+    "multiTitle": "Sélection",
+    "selectedCount": "sélectionnés",
+    "kindHexCount": "{count, plural, one {# hexagone} other {# hexagones}}",
+    "kindFeatureCount": "{count, plural, one {# caractéristique} other {# caractéristiques}}",
+    "kindRegionCount": "{count, plural, one {# région} other {# régions}}",
+    "kindLabelCount": "{count, plural, one {# étiquette} other {# étiquettes}}",
+    "deleteAll": "Tout supprimer"
+  },
+  "regionsPanel": {
+    "title": "Régions",
+    "newRegion": "Nouvelle région",
+    "emptyHint": "Aucune région pour le moment. Utilisez Nouvelle région pour en créer une, puis peignez ses hex membres depuis l’Inspecteur."
+  },
+  "statusBar": {
+    "connecting": "Connexion…",
+    "apiError": "Impossible de joindre l’API.",
+    "hexCount": "{count, plural, one {# hex} other {# hex}}"
+  },
+  "canvas": {
+    "void": "Vide",
+    "noHex": "Aucun hex",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom avant",
+    "zoomOut": "Zoom arrière",
+    "fit": "Ajuster la carte",
+    "label": "Carte hexagonale"
+  },
+  "moveBlocked": "Déplacement bloqué — un obstacle gêne le passage.",
+  "terrain": {
+    "grass": "Prairie",
+    "forest": "Forêt",
+    "ocean": "Océan",
+    "mountain": "Montagnes",
+    "desert": "Désert",
+    "sky": "Ciel"
+  },
+  "feature": {
+    "settlement": "Colonie",
+    "ruin": "Ruine"
+  }
+}

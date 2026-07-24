@@ -1,21 +1,27 @@
 /**
- * Out-of-band user provisioning for the closed set (ADR-0004) — there is no
- * signup endpoint, so this is how members are added. Boots a standalone Nest
- * context and delegates to the same {@link AuthService.seedUser} the tests
- * exercise. Run against the configured `HEXLY_DB_PATH`:
+ * Out-of-band user provisioning for the closed set (ADR-0004) — there is no signup endpoint, so
+ * this is how members are added. Run against the configured `HEXLY_DIR`:
  *
- *   node dist/apps/api/seed.js <email> <password> "<display name>"
+ *   node dist/apps/api/seed.js <email> <password> "<display name>" [--superadmin]
+ *
+ * `--superadmin` seeds the setup Superadmin (ADR-0037), outside the collaboration model: seed at
+ * least one at setup or no account holds the repair capability. Every other account is a plain
+ * member. `--with-world` also mints a starter World owned by the new user; off by default.
  */
 
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { AuthService } from './app/auth/auth.service';
+import { WorldsService } from './app/worlds/worlds.service';
 
 async function seed() {
-  const [email, password, displayName] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const isSuperadmin = args.includes('--superadmin');
+  const withWorld = args.includes('--with-world');
+  const [email, password, displayName] = args.filter((a) => !a.startsWith('--'));
   if (!email || !password || !displayName) {
-    Logger.error('Usage: seed <email> <password> <displayName>');
+    Logger.error('Usage: seed <email> <password> <displayName> [--superadmin] [--with-world]');
     process.exitCode = 1;
     return;
   }
@@ -24,11 +30,24 @@ async function seed() {
     logger: ['error', 'warn', 'log'],
   });
   try {
-    await app.get(AuthService).seedUser(email, password, displayName);
-    Logger.log(`Seeded user ${email}`);
+    const userId = await app.get(AuthService).seedUser(email, password, displayName, {
+      isSuperadmin,
+      roles: ['create-worlds'],
+    });
+    if (withWorld) {
+      app.get(WorldsService).mintWorld(userId, `${displayName}'s World`);
+    }
+    Logger.log(`Seeded ${isSuperadmin ? 'Superadmin' : 'user'} ${email}${withWorld ? ' with a starter World' : ''}`);
   } catch (err) {
-    Logger.error(`Could not seed ${email}: ${(err as Error).message}`);
-    process.exitCode = 1;
+    const message = (err as Error).message;
+    // Idempotent boot-seed: the container runs this on every start, so an already
+    // seeded email is a no-op, not a failure. Anything else is a real error.
+    if (/UNIQUE constraint failed: users\.email/.test(message)) {
+      Logger.log(`${email} already seeded, skipping`);
+    } else {
+      Logger.error(`Could not seed ${email}: ${message}`);
+      process.exitCode = 1;
+    }
   } finally {
     await app.close();
   }

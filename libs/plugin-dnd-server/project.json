@@ -1,0 +1,8 @@
+{
+  "name": "plugin-dnd-server",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/plugin-dnd-server/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {}
+}

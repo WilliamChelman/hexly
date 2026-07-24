@@ -1,0 +1,8 @@
+{
+  "name": "plugin-board",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/plugin-board/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {}
+}

@@ -1,0 +1,55 @@
+{
+  "eyebrow": "Ressource",
+  "titleLabel": "Nom de la ressource",
+  "rename": "Renommer la ressource",
+  "editorLabel": "Notes de la ressource",
+  "create": "Créer une ressource",
+  "untitled": "Ressource sans titre",
+  "view": {
+    "asset": "Ressource",
+    "label": "Ressource"
+  },
+  "field": {
+    "thumbnail": "Vignette"
+  },
+  "stats": {
+    "heading": "Statistiques",
+    "dimensions": "Dimensions",
+    "orientation": "Orientation",
+    "dominantColor": "Couleur dominante",
+    "mime": "Type",
+    "size": "Taille"
+  },
+  "kind": {
+    "image": "Image",
+    "pdf": "PDF",
+    "audio": "Audio",
+    "other": "Autre"
+  },
+  "orientation": {
+    "landscape": "Paysage",
+    "portrait": "Portrait",
+    "square": "Carré"
+  },
+  "hue": {
+    "red": "Rouge",
+    "orange": "Orange",
+    "yellow": "Jaune",
+    "green": "Vert",
+    "cyan": "Cyan",
+    "blue": "Bleu",
+    "purple": "Violet",
+    "pink": "Rose",
+    "black": "Noir",
+    "gray": "Gris",
+    "white": "Blanc"
+  },
+  "prose": {
+    "heading": "Notes"
+  },
+  "facet": {
+    "kind": "Type",
+    "orientation": "Orientation",
+    "hue": "Couleur"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "plainHeading": "Autres métadonnées",
+  "entityLink": {
+    "set": "Lier une entité…",
+    "change": "Changer d’entité…",
+    "linkedEntity": "Entité liée",
+    "remove": "Retirer le lien",
+    "search": "Rechercher des entités…",
+    "empty": "Aucune entité",
+    "unavailable": "Indisponible",
+    "dangling": "Cette entité est indisponible"
+  },
+  "details": {
+    "toggle": "Détails",
+    "types": "Types",
+    "fields": "Champs",
+    "addType": "Ajouter un type…",
+    "removeType": "Retirer le type {{ type }}",
+    "attachField": "Attacher un champ…",
+    "detachField": "Détacher le champ {{ field }}",
+    "fieldsEmpty": "Aucun champ"
+  },
+  "links": {
+    "toggle": "Afficher/masquer les liens",
+    "references": "Références",
+    "referencedBy": "Référencé par",
+    "referencesEmpty": "Cette entité ne renvoie à rien",
+    "referencedByEmpty": "Rien ne renvoie ici"
+  },
+  "assetLink": {
+    "set": "Définir une image…",
+    "change": "Changer d’image…",
+    "upload": "Téléverser une nouvelle image",
+    "uploading": "Téléversement…",
+    "uploadError": "Échec du téléversement. Veuillez réessayer.",
+    "search": "Rechercher des images…",
+    "empty": "Aucune image"
+  },
+  "generic": {
+    "eyebrow": "Entité",
+    "titleLabel": "Nom de l’entité",
+    "rename": "Renommer",
+    "editorLabel": "Contenu de l’entité",
+    "create": "Nouvelle entité",
+    "untitled": "Entité sans titre"
+  }
+}

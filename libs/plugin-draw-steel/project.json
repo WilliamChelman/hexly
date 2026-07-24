@@ -1,0 +1,8 @@
+{
+  "name": "plugin-draw-steel",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/plugin-draw-steel/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {}
+}

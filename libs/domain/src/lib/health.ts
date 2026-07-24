@@ -1,9 +1,4 @@
-/**
- * Liveness payload exchanged between the API and the web client.
- *
- * It lives in the framework-agnostic domain lib (no Angular, no NestJS) so
- * both runtimes share a single source of truth for its shape — see ADR-0001.
- */
+/** Liveness payload exchanged between the API and the web client. */
 export type HealthState = 'ok';
 
 export interface HealthStatus {

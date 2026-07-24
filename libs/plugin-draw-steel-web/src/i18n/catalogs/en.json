@@ -1,0 +1,123 @@
+{
+  "importer": {
+    "monsters": "Draw Steel — Monsters"
+  },
+  "monster": {
+    "eyebrow": "Monster",
+    "titleLabel": "Monster name",
+    "rename": "Rename monster",
+    "editorLabel": "Monster lore",
+    "create": "New monster",
+    "untitled": "Untitled monster",
+    "loreHint": "Switch to the Note view for this monster's lore, tactics, and director notes.",
+    "view": {
+      "statBlock": "Stat block"
+    }
+  },
+  "statBlock": {
+    "dataType": "Stat block",
+    "facet": {
+      "role": "Role",
+      "organization": "Organization",
+      "level": "Level",
+      "ev": "EV",
+      "keywords": "Keyword"
+    },
+    "stat": {
+      "might": "Might",
+      "agility": "Agility",
+      "reason": "Reason",
+      "intuition": "Intuition",
+      "presence": "Presence",
+      "stamina": "Stamina",
+      "size": "Size",
+      "stability": "Stability",
+      "speed": "Speed",
+      "save": "Save",
+      "turns": "Turns",
+      "free_strike": "Free strike",
+      "movement_types": "Movement",
+      "condition_immunities": "Condition immunities",
+      "with_captain": "With Captain",
+      "role": "Role",
+      "organization": "Organization",
+      "level": "Level",
+      "ev": "EV",
+      "keywords": "Keywords"
+    },
+    "evForMinions": "for four minions",
+    "addDamageType": "Add type…",
+    "addKeyword": "Add keyword…",
+    "addMovement": "Add movement…",
+    "addCondition": "Add condition…",
+    "addTrait": "Add trait",
+    "traitName": "Trait name",
+    "traitEffect": "Effect",
+    "removeTrait": "Remove trait",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "noTraits": "No traits",
+    "addAbility": "Add ability",
+    "removeAbility": "Remove ability",
+    "noAbilities": "No abilities",
+    "abilityName": "Ability name",
+    "abilityType": "Type",
+    "abilityCategory": "Category",
+    "abilityCategoryNone": "None",
+    "abilityMalice": "Malice",
+    "abilityMaliceHint": "e.g. 3",
+    "abilityKeywords": "Keywords",
+    "abilityDistance": "Distance",
+    "abilityDistanceHint": "e.g. Melee 1",
+    "abilityTarget": "Target",
+    "abilityTargetHint": "e.g. One creature",
+    "abilityTrigger": "Trigger",
+    "abilityTriggerHint": "When the ability may be used",
+    "abilityEffect": "Effect",
+    "abilityEffectHint": "What the ability does",
+    "powerRoll": "Power roll",
+    "addPowerRoll": "Add power roll",
+    "removePowerRoll": "Remove power roll",
+    "tier": {
+      "t1": "Tier 1",
+      "t2": "Tier 2",
+      "t3": "Tier 3"
+    },
+    "abilityTypeOption": {
+      "main": "Main action",
+      "maneuver": "Maneuver",
+      "freeManeuver": "Free maneuver",
+      "triggered": "Triggered action",
+      "freeTriggered": "Free triggered action",
+      "move": "Move action",
+      "none": "No action",
+      "villain": "Villain action"
+    },
+    "abilityCategoryOption": {
+      "signature": "Signature",
+      "heroic": "Heroic",
+      "villain": "Villain",
+      "maliceAncestry": "Malice / Ancestry"
+    },
+    "remove": "Remove",
+    "startEditing": "Edit stats",
+    "doneEditing": "Done editing",
+    "section": {
+      "immunities": "Immunity",
+      "weaknesses": "Weakness",
+      "abilities": "Abilities",
+      "traits": "Traits"
+    },
+    "damage": {
+      "acid": "Acid",
+      "cold": "Cold",
+      "corruption": "Corruption",
+      "fire": "Fire",
+      "holy": "Holy",
+      "lightning": "Lightning",
+      "poison": "Poison",
+      "psychic": "Psychic",
+      "sonic": "Sonic"
+    }
+  }
+}

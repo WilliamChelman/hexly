@@ -18,8 +18,13 @@ describe('no-builtin-shadow', () => {
       valid: [
         // Arbitrary values are always fine (explicit opt-out).
         { code: 'const c = `class="shadow-[0_2px_4px_rgba(0,0,0,0.2)]"`' },
+        // shadow-none draws no shadow — nothing themeable to bake.
+        { code: 'const c = `class="focus-visible:shadow-none"`' },
         // Non-shadow tokens aren't touched.
         { code: 'const c = `class="rounded-md border border-line"`' },
+        // The word "shadow" inside a CSS comment is prose, not a utility — the
+        // styles-block comment scan strips comments first (ADR-0031).
+        { code: 'const c = `:host { /* layered glow shadow */ color: red; }`' },
       ],
       invalid: [
         {

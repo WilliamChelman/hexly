@@ -1,4 +1,29 @@
 import baseConfig from '../../eslint.config.mjs';
 
-// E2E uses the workspace's base lint config as-is.
-export default [...baseConfig];
+export default [
+  ...baseConfig,
+  {
+    // The e2e project drives the real web app, so it may reuse the app's own framework-free
+    // helpers (pretty-URL codec, View-instance codec) directly by file path.
+    files: ['**/*.ts'],
+    rules: {
+      '@nx/enforce-module-boundaries': [
+        'error',
+        {
+          enforceBuildableLibDependency: true,
+          allow: [
+            '^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$',
+            '^.*/libs/web-core/src/utils/pretty-id$',
+            '^.*/libs/web-entity/src/utils/view-instance$',
+          ],
+          depConstraints: [
+            {
+              sourceTag: '*',
+              onlyDependOnLibsWithTags: ['*'],
+            },
+          ],
+        },
+      ],
+    },
+  },
+];
