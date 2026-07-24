@@ -5,6 +5,11 @@
   "prefix": "app",
   "sourceRoot": "apps/web/src",
   "tags": [],
+  "cli": {
+    "cache": {
+      "environment": "all"
+    }
+  },
   "targets": {
     "build": {
       "executor": "@angular/build:application",

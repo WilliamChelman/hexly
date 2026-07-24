@@ -24,14 +24,21 @@ jobs:
 
       - uses: ./.github/actions/setup
 
-      # Persist the Nx cache across runs so the e2e job's web+api build can
-      # reuse this job's cached build on a later run, avoiding a redundant rebuild.
+      # Persist the Nx task cache (skips unchanged tasks) plus Angular's esbuild
+      # cache (speeds the builds that DO run). Angular only writes .angular/cache
+      # in CI because apps/web sets cli.cache.environment "all". The SHA suffix
+      # makes each run save a fresh entry (GH Actions cache is immutable per key);
+      # restore-keys fall back to the latest prior entry. A per-job prefix keeps
+      # build's and e2e's caches distinct so neither job's save is a no-op against
+      # the other's identical key.
       - uses: actions/cache@v4
         with:
-          path: .nx/cache
-          key: ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          path: |
+            .nx/cache
+            .angular/cache
+          key: ${{ runner.os }}-nx-build-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-nx-build-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-nx-
 
       # i18n-sync is the key-drift gate (issue #50): it type-checks the tool then
@@ -57,15 +64,17 @@ jobs:
 
       - uses: ./.github/actions/setup
 
-      # Persist the Nx cache across runs so this job's web+api build (triggered by
-      # the e2e dependsOn) can reuse the main job's cached build on a later run,
-      # avoiding a redundant rebuild.
+      # Same cache strategy as the build job, under a distinct e2e prefix so this
+      # job's web+api build (triggered by the e2e dependsOn) persists its own warm
+      # cache. Falls back to any Nx cache (incl. build's) via the shared prefix.
       - uses: actions/cache@v4
         with:
-          path: .nx/cache
-          key: ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          path: |
+            .nx/cache
+            .angular/cache
+          key: ${{ runner.os }}-nx-e2e-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-nx-e2e-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-nx-
 
       # Only chromium — the suite is a single-engine seam regression net (ADR-0009).
@@ -114,6 +123,13 @@ jobs:
     needs: [build, e2e]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    # --dry-run publishes nothing, but on a push event semantic-release still
+    # verifies push auth (git push --dry-run), which needs write; the top-level
+    # contents:read would otherwise fail it with a 403. (On pull_request it
+    # short-circuits as a PR build before that check, so release-preview needs no
+    # such grant.)
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
