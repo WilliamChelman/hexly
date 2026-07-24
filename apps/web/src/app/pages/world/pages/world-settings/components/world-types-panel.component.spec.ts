@@ -171,7 +171,7 @@ describe('WorldTypesPanel', () => {
       .queryAll(By.css('[data-testid^="newfield-kind-option-"]'))
       .map((card) => (card.nativeElement as HTMLElement).getAttribute('data-testid') ?? '')
       .map((testid) => testid.replace('newfield-kind-option-', ''));
-    expect(kinds).toEqual(['string', 'number', 'boolean', 'date', 'enum', CORE_HEX_GRID]);
+    expect(kinds).toEqual(['string', 'number', 'boolean', 'date', 'enum', 'entityLink', CORE_HEX_GRID]);
   });
 
   it('reflects an existing type’s referenced Fields and view order when editing', () => {

@@ -392,7 +392,8 @@
       "number": "Number",
       "boolean": "Yes / No",
       "date": "Date",
-      "enum": "Choice"
+      "enum": "Choice",
+      "entityLink": "Entity link"
     },
     "loadError": "Couldn't load this world's custom types.",
     "createError": "Couldn't create that type. Please try again.",
@@ -421,6 +422,8 @@
     "typeLabel": "Type",
     "required": "Required",
     "facetable": "Filterable",
+    "decor": "Presentation only",
+    "decorHint": "Hide this link by default on the graph and outbound references — for cover art and other presentation links.",
     "options": "Options",
     "optionsHint": "Comma-separated",
     "save": "Save",
@@ -430,7 +433,8 @@
       "number": "Number",
       "boolean": "Yes / No",
       "date": "Date",
-      "enum": "Choice"
+      "enum": "Choice",
+      "entityLink": "Entity link"
     },
     "loadError": "Couldn't load this world's custom fields.",
     "createError": "Couldn't create that field. Please try again.",

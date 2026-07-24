@@ -16,12 +16,13 @@ const BUILT_IN_GLYPHS: Record<string, string> = {
   boolean: '✓',
   date: '◷',
   enum: '☰',
+  entityLink: '→',
 };
 
 /**
  * The Data-Type cards the code-less forms offer (#191, #230): the built-ins first, then each enabled
  * plugin's Structured Data Type, and — when editing — any `unoffered` kind the form can't author
- * (a `list`/`entityLink`, or a dropped plugin's kind) so the card isn't lost on a round trip. `label`
+ * (a `list`, or a dropped plugin's kind) so the card isn't lost on a round trip. `label`
  * resolves a built-in under `builtInPrefix` and a structured one via its `labelKey`; `translate` and
  * `sourceLabels` are supplied by the host so this stays free of a transloco dependency.
  */

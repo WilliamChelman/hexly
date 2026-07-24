@@ -5,13 +5,14 @@ import { FieldDataType, isStructuredKind } from '@hexly/domain';
  * (#191, #230). Shared by the World Fields editor and the World Types editor's inline new-Field
  * sub-form, so a new built-in (or a change to enum-option parsing) is authored in one place.
  */
-export const BUILT_IN_KINDS = ['string', 'number', 'boolean', 'date', 'enum'] as const;
+export const BUILT_IN_KINDS = ['string', 'number', 'boolean', 'date', 'enum', 'entityLink'] as const;
 export type BuiltInKind = (typeof BUILT_IN_KINDS)[number];
 
 /**
  * A form's picked `kind` (+ an enum's comma-separated `options`) → a {@link FieldDataType}. A `kind`
  * left untouched hands back the `stored` data-type verbatim, so a `list`'s item type or an
- * `entityLink`'s target-type constraint (authored through the API, not this form) survives a round trip.
+ * `entityLink`'s target-type constraint (only the constraint is authored through the API, not this form)
+ * survives a round trip.
  */
 export function toFieldDataType(kind: string, options: string, stored?: FieldDataType): FieldDataType {
   if (kind === 'enum')
@@ -24,8 +25,11 @@ export function toFieldDataType(kind: string, options: string, stored?: FieldDat
     };
   if (stored?.kind === kind) return stored;
   if (isStructuredKind(kind)) return { kind };
+  // A freshly-picked entityLink is unconstrained (any Entity is a valid target); the target-type
+  // constraint is API-only, so a round trip keeps it via the `stored` branch above.
+  if (kind === 'entityLink') return { kind: 'entityLink' };
   // The remaining built-ins the picker offers are the scalars — one literal kind each, no payload.
-  return { kind: kind as Exclude<BuiltInKind, 'enum'> };
+  return { kind: kind as Exclude<BuiltInKind, 'enum' | 'entityLink'> };
 }
 
 /**

@@ -392,7 +392,8 @@
       "number": "Nombre",
       "boolean": "Oui / Non",
       "date": "Date",
-      "enum": "Choix"
+      "enum": "Choix",
+      "entityLink": "Lien d'entité"
     },
     "loadError": "Impossible de charger les types personnalisés de ce monde.",
     "createError": "Impossible de créer ce type. Veuillez réessayer.",
@@ -421,6 +422,8 @@
     "typeLabel": "Type",
     "required": "Requis",
     "facetable": "Filtrable",
+    "decor": "Présentation seule",
+    "decorHint": "Masquer ce lien par défaut sur le graphe et les références sortantes — pour les illustrations et autres liens de présentation.",
     "options": "Options",
     "optionsHint": "Séparées par des virgules",
     "save": "Enregistrer",
@@ -430,7 +433,8 @@
       "number": "Nombre",
       "boolean": "Oui / Non",
       "date": "Date",
-      "enum": "Choix"
+      "enum": "Choix",
+      "entityLink": "Lien d'entité"
     },
     "loadError": "Impossible de charger les champs personnalisés de ce monde.",
     "createError": "Impossible de créer ce champ. Veuillez réessayer.",
