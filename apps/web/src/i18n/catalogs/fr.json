@@ -38,19 +38,6 @@
     "searchPlaceholder": "Rechercher par nom, étiquette ou contenu…",
     "creating": "Création…",
     "edited": "Modifié le {{date}}",
-    "type": {
-      "core": {
-        "type": {
-          "note": "Note",
-          "hex-map": "Carte"
-        }
-      },
-      "dnd": {
-        "type": {
-          "monster": "Monstre"
-        }
-      }
-    },
     "loadErrorTitle": "Impossible de charger votre bibliothèque.",
     "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",
     "createError": "Création impossible. Veuillez réessayer.",
@@ -337,6 +324,7 @@
     "eyebrow": "Graphe du monde",
     "counts": "{{nodes}} entités · {{edges}} liens",
     "showOrphans": "Afficher les orphelins ({{count}})",
+    "showDecor": "Afficher les liens décoratifs ({{count}})",
     "allOrphansTitle": "Aucune entité n'est reliée.",
     "allOrphansHint": "{{count}} entités orphelines sont masquées. Affichez les orphelins pour les voir, ou reliez-les à votre monde.",
     "emptyTitle": "Rien à dessiner pour l'instant.",
@@ -391,7 +379,8 @@
       "number": "Nombre",
       "boolean": "Oui / Non",
       "date": "Date",
-      "enum": "Choix"
+      "enum": "Choix",
+      "entityLink": "Lien d'entité"
     },
     "loadError": "Impossible de charger les types personnalisés de ce monde.",
     "createError": "Impossible de créer ce type. Veuillez réessayer.",
@@ -420,6 +409,8 @@
     "typeLabel": "Type",
     "required": "Requis",
     "facetable": "Filtrable",
+    "decor": "Présentation seule",
+    "decorHint": "Masquer ce lien par défaut sur le graphe et les références sortantes — pour les illustrations et autres liens de présentation.",
     "options": "Options",
     "optionsHint": "Séparées par des virgules",
     "save": "Enregistrer",
@@ -429,7 +420,8 @@
       "number": "Nombre",
       "boolean": "Oui / Non",
       "date": "Date",
-      "enum": "Choix"
+      "enum": "Choix",
+      "entityLink": "Lien d'entité"
     },
     "loadError": "Impossible de charger les champs personnalisés de ce monde.",
     "createError": "Impossible de créer ce champ. Veuillez réessayer.",

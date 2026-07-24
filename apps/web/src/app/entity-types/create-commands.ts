@@ -25,7 +25,8 @@ export class CreateCommands implements CommandProvider {
 
   search(query: string): Observable<readonly Command[]> {
     const q = query.trim().toLowerCase();
-    const commands: Command[] = this.types.all().map((def) => ({
+    // `creatable`, not `all`: a System-managed type (ADR-0068) gets no create Command.
+    const commands: Command[] = this.types.creatable().map((def) => ({
       id: `create-${def.id}`,
       label: this.types.chromeLabel(def.id, 'create'),
       run: () => this.dialogs.open(CreateEntityDialogComponent, { type: def.id }),

@@ -51,17 +51,20 @@ import { FieldControlComponent } from '@hexly/web-entity';
                   ↓
                 </button>
               }
-              <!-- The last type can't be removed — every Entity keeps a primary type (typesSchema.min(1)). -->
-              <button
-                type="button"
-                class="-mr-1 leading-none opacity-70 hover:opacity-100 cursor-pointer bg-transparent border-0 text-current disabled:opacity-30 disabled:cursor-not-allowed"
-                [disabled]="types().length <= 1"
-                [attr.aria-label]="'entityTypes.removeLabel' | transloco: { type: typeLabel(type) }"
-                [attr.data-testid]="'type-remove-' + type"
-                (click)="remove(type)"
-              >
-                &times;
-              </button>
+              <!-- The last type can't be removed — every Entity keeps a primary type (typesSchema.min(1)) — and a
+                   System-managed type carries no remove at all: the system alone assigns/removes it (ADR-0068). -->
+              @if (!isSystemManaged(type)) {
+                <button
+                  type="button"
+                  class="-mr-1 leading-none opacity-70 hover:opacity-100 cursor-pointer bg-transparent border-0 text-current disabled:opacity-30 disabled:cursor-not-allowed"
+                  [disabled]="types().length <= 1"
+                  [attr.aria-label]="'entityTypes.removeLabel' | transloco: { type: typeLabel(type) }"
+                  [attr.data-testid]="'type-remove-' + type"
+                  (click)="remove(type)"
+                >
+                  &times;
+                </button>
+              }
             }
           </app-chip>
         }
@@ -150,12 +153,15 @@ export class EntityTypesEditorComponent {
   protected readonly pendingFields = signal<readonly Field[]>([]);
   protected readonly pendingMetadata = signal<EntityDocument>({});
 
-  /** The registered types not already carried — the add picker's options. */
+  /**
+   * The registered types not already carried — the add picker's options. A System-managed type is never
+   * offered: the system alone assigns it (ADR-0068).
+   */
   protected readonly addable = computed(() =>
     this.registry
       .all()
-      .map((d) => d.id)
-      .filter((id) => !this.types().includes(id)),
+      .filter((d) => !d.systemManaged && !this.types().includes(d.id))
+      .map((d) => d.id),
   );
 
   protected readonly pendingValid = computed(
@@ -173,6 +179,11 @@ export class EntityTypesEditorComponent {
   /** A friendly label: a registered type's name (authored, for a user-defined one), else the raw id. */
   protected typeLabel(type: string): string {
     return this.registry.get(type) ? this.registry.chromeLabel(type, 'eyebrow') : type;
+  }
+
+  /** Whether the type is System-managed (ADR-0068) — the system alone assigns/removes it, so no remove renders. */
+  protected isSystemManaged(type: string): boolean {
+    return !!this.registry.get(type)?.systemManaged;
   }
 
   /** Swap a type up one place; reaching index 0 re-primaries it. */

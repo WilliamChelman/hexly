@@ -28,4 +28,8 @@ export const CORE_ASSET_TYPE: PluginTypeDefinition = defineType({
   // until the asset type is explicitly selected. A generic Type Definition capability, not an asset special
   // case — the Browser omits any type that sets it and names none.
   hiddenFromDefaultListing: true,
+  // System-managed (ADR-0068): the upload/mint path alone assigns and removes the asset type. Stripping it from
+  // a real Asset would orphan its bytes on disk, so the write choke point rejects a user-initiated change to it.
+  // A separate axis from hiddenFromDefaultListing — the asset type carries both.
+  systemManaged: true,
 });

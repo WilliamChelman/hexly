@@ -25,7 +25,10 @@
     "references": "References",
     "referencedBy": "Referenced by",
     "referencesEmpty": "This entity links to nothing",
-    "referencedByEmpty": "Nothing links here"
+    "referencedByEmpty": "Nothing links here",
+    "showDecor": "Show decor",
+    "decor": "decor",
+    "decorMark": "Decor Link — presentation only, not a worldbuilding relation"
   },
   "assetLink": {
     "set": "Set image…",
@@ -37,6 +40,7 @@
     "empty": "No images"
   },
   "generic": {
+    "name": "Entity",
     "eyebrow": "Entity",
     "titleLabel": "Entity name",
     "rename": "Rename",

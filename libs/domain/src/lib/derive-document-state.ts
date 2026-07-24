@@ -87,7 +87,12 @@ export function deriveDocumentState(
   const edges = new Map<string, EntityEdge>();
   const addEdge = (edge: EntityEdge) => {
     const key = `${edge.targetKind}\0${edge.targetId}\0${edge.descriptor?.toLowerCase() ?? ''}`;
-    if (!edges.has(key)) edges.set(key, edge);
+    const existing = edges.get(key);
+    // First spelling of a descriptor wins the row (ADR-0046). Decor is the exception: an edge is decor
+    // only if *every* producer that mints it is decor, so a semantic reason to link (a prose Entity Link
+    // to the same target a Thumbnail also names) upgrades the merged edge out of decor (ADR-0069).
+    if (!existing) edges.set(key, edge);
+    else if (existing.decor && !edge.decor) edges.set(key, { ...existing, decor: false });
   };
 
   // Facets dedup on (key, value) so a value repeated within one Entity — a list with dupes, or a scalar
@@ -106,9 +111,13 @@ export function deriveDocumentState(
   // Field materialises its value. Both are lenses over the built-in Field data-types, no structure needed.
   // The **Thumbnail** Field is one such link (ADR-0066): the same shape-valid values feed its designation,
   // so its target is picked out here by key rather than parsed a second time.
+  // A `decor` Field's edge is a **Decor Link** (ADR-0069): the producer declares decor-ness on the Field
+  // (`core.field.thumbnail`, a user-defined "presentation only" link), so it rides the same harvest.
+  const decorFieldIds = new Set(fields.filter((field) => field.decor).map((field) => field.id));
   let thumbnailEntityId: string | null = null;
   for (const { key, value } of entityLinkFieldValues(fields, doc)) {
-    if (value.entityId) addEdge({ targetKind: 'entity', targetId: value.entityId, descriptor: null });
+    if (value.entityId)
+      addEdge({ targetKind: 'entity', targetId: value.entityId, descriptor: null, decor: decorFieldIds.has(key) });
     if (key === options.thumbnailFieldId) thumbnailEntityId = value.entityId || null;
   }
   for (const field of fields) {

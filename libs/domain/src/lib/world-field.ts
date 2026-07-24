@@ -66,13 +66,17 @@ export function worldFieldSegment(id: string): string {
  * POST /worlds/:id/fields (ADR-0056): the Field body plus an editable `segment`, never a client-chosen
  * id/key — the server derives `world.field.<segment>` and returns the resolved Field.
  */
-export const createWorldFieldRequestSchema = fieldSchemaSchema.extend({
-  segment: z
-    .string()
-    .trim()
-    .min(1)
-    .refine((segment) => slugifyFieldSegment(segment).length > 0, 'A Field segment must slug to a non-empty key'),
-});
+export const createWorldFieldRequestSchema = fieldSchemaSchema
+  // `systemManaged` is a system concept the system alone sets (ADR-0068), never user-authored — a World Owner
+  // can't mint an un-detachable Field, so the flag is not part of the request body.
+  .omit({ systemManaged: true })
+  .extend({
+    segment: z
+      .string()
+      .trim()
+      .min(1)
+      .refine((segment) => slugifyFieldSegment(segment).length > 0, 'A Field segment must slug to a non-empty key'),
+  });
 
 export type CreateWorldFieldRequest = z.infer<typeof createWorldFieldRequestSchema>;
 
@@ -80,6 +84,6 @@ export type CreateWorldFieldRequest = z.infer<typeof createWorldFieldRequestSche
  * PATCH /worlds/:id/fields/:fieldId. The id/key is immutable (a path param, ADR-0056): the body carries
  * the editable attributes without a key or id, so renaming is label-only.
  */
-export const updateWorldFieldRequestSchema = fieldSchemaSchema;
+export const updateWorldFieldRequestSchema = fieldSchemaSchema.omit({ systemManaged: true });
 
 export type UpdateWorldFieldRequest = z.infer<typeof updateWorldFieldRequestSchema>;

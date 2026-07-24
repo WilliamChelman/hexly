@@ -103,4 +103,10 @@ export interface AvailableType {
    * absent → the ordinary always-listed type.
    */
   readonly hiddenFromDefaultListing?: boolean;
+  /**
+   * **System-managed** (CONTEXT.md → System-managed, ADR-0068): the marker projected across the web seam so
+   * the add-type picker can stop offering it and the Details panel render it affordance-less. Set today only
+   * by the code-registered asset type; absent → an ordinary user-assignable type.
+   */
+  readonly systemManaged?: boolean;
 }

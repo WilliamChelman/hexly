@@ -29,6 +29,14 @@ export interface PluginTypeDefinition {
    * type, so the Browser honours the declaration alone. Absent → the ordinary always-listed type.
    */
   readonly hiddenFromDefaultListing?: boolean;
+  /**
+   * **System-managed** (CONTEXT.md → System-managed, ADR-0068): the system alone assigns and removes this
+   * type, in both directions — set only on a code-registered type (`core.type.asset`), never authored. A
+   * separate axis from {@link hiddenFromDefaultListing} (the asset type carries both): discoverability and
+   * user-assignability are different questions. Surfaces derive behavior from it and the write choke point
+   * rejects a user-initiated add/remove; it crosses the web seam via `AvailableType`.
+   */
+  readonly systemManaged?: boolean;
 }
 
 const pluginTypeSchema = z.object({
@@ -36,6 +44,7 @@ const pluginTypeSchema = z.object({
   label: nameSchema,
   fieldRefs: fieldRefsSchema,
   hiddenFromDefaultListing: z.boolean().optional(),
+  systemManaged: z.boolean().optional(),
 });
 
 /**
@@ -47,6 +56,8 @@ export function defineType(definition: {
   readonly label: string;
   readonly fieldRefs?: readonly string[];
   readonly hiddenFromDefaultListing?: boolean;
+  /** **System-managed** (ADR-0068): the system alone assigns/removes it. Code-registered types only. */
+  readonly systemManaged?: boolean;
 }): PluginTypeDefinition {
   return Object.freeze(pluginTypeSchema.parse(definition));
 }

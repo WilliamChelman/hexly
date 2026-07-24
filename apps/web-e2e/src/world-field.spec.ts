@@ -9,6 +9,7 @@ import {
   openDetails,
   test,
 } from './fixtures';
+import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 /**
  * A World Owner authors a reusable `world.field.element` Field once, then attaches it to one deity but not
@@ -76,4 +77,73 @@ test('authors world.field.element, attaches it to one deity but not another, and
   const savedNote = await flushSave(page);
   expect((await savedNote.json()).document).toMatchObject({ 'world.field.element': 'ice' });
   expect(pelor).not.toEqual(note); // two distinct Entities of two unrelated types, one shared Field
+});
+
+/**
+ * A worldbuilder classifies their own Entity-Link Field as decor via the World field editor's "presentation
+ * only" checkbox (ADR-0069, #310) — the same edge-level mechanism `core.field.thumbnail` uses. A "Portrait"
+ * link then subdues on the World Graph exactly as a Thumbnail does, so its target falls out as an ordinary
+ * orphan; a plain "Ally" Entity-Link Field stays a semantic, default-visible relation. The checkbox drives
+ * the classification through the World field request DTOs and the ordinary harvest — no asset-specific code.
+ */
+test('a user Entity-Link Field flagged "presentation only" produces Decor Links; an un-flagged one stays semantic', async ({
+  page,
+}) => {
+  const prettyWorld = await enterLibrary(page);
+  const worldId = idFromSegment(prettyWorld); // the raw id the entities must be created under
+
+  // Author two user Entity-Link Fields: "Portrait" flagged presentation-only (decor), "Ally" left semantic.
+  await authorWorldField(page, prettyWorld, {
+    segment: 'portrait',
+    label: 'Portrait',
+    kind: 'entityLink',
+    decor: true,
+  });
+  // The code-less editor now offers the entityLink kind; the Fields list labels its Data Type.
+  await expect(page.getByTestId('field-type-world.field.portrait')).toHaveText('Entity link');
+  await authorWorldField(page, prettyWorld, { segment: 'ally', label: 'Ally', kind: 'entityLink' });
+
+  // The Fields are World-scoped (#191), so the linking Entities must be created in *this* World for
+  // `world.field.*` to resolve as Entity Links (and classify) at harvest — pass its raw id explicitly.
+  const ally = await page.request.post('/api/entities', {
+    data: { name: 'Rivertown', types: ['core.type.note'], worldId },
+  });
+  expect(ally.ok(), `${ally.status()} ${await ally.text()}`).toBeTruthy();
+  const allyId = (await ally.json()).id as string;
+
+  const portrait = await page.request.post('/api/entities', {
+    data: { name: 'Ancestor', types: ['core.type.note'], worldId },
+  });
+  expect(portrait.ok(), `${portrait.status()} ${await portrait.text()}`).toBeTruthy();
+  const portraitId = (await portrait.json()).id as string;
+
+  // The source links both — Ally (semantic) and Portrait (decor) — through the two user Fields.
+  const source = await page.request.post('/api/entities', {
+    data: {
+      name: 'Hero',
+      types: ['core.type.note'],
+      worldId,
+      document: {
+        'world.field.ally': { entityId: allyId, label: 'Rivertown' },
+        'world.field.portrait': { entityId: portraitId, label: 'Ancestor' },
+      },
+    },
+  });
+  expect(source.ok(), `${source.status()} ${await source.text()}`).toBeTruthy();
+
+  await page.goto(`/w/${prettyWorld}/graph`);
+
+  // Default: only the semantic Ally edge draws; the decor Portrait edge is hidden, so Ancestor is an orphan and out.
+  const counts = page.getByTestId('graph-counts');
+  await expect(counts).toContainText('2 entities');
+  await expect(counts).toContainText('1 links');
+
+  // Reveal decor: the Portrait edge returns and Ancestor with it — proof the checkbox drove classification
+  // through the DTO and the harvest, subduing only the presentation link.
+  const decorToggle = page.getByTestId('graph-decor-toggle');
+  await expect(decorToggle).toHaveAttribute('aria-pressed', 'false');
+  await decorToggle.click();
+  await expect(decorToggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(counts).toContainText('3 entities');
+  await expect(counts).toContainText('2 links');
 });

@@ -29,6 +29,7 @@ const monster: TypeDefinition = {
   fieldRefs: ['test.field.lair'],
   graphColorToken: '--color-ink-muted',
   labels: {
+    name: 'monster.name',
     eyebrow: 'monster.eyebrow',
     titleLabel: 'monster.titleLabel',
     rename: 'monster.rename',

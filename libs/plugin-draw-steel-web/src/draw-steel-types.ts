@@ -33,6 +33,7 @@ export const DS_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     // whose every label is its one authored name (#191).
     // Chrome copy under the `drawSteel` scope (see `draw-steel-translations.ts` for the camel-cased name).
     labels: {
+      name: 'drawSteel.monster.name',
       eyebrow: 'drawSteel.monster.eyebrow',
       titleLabel: 'drawSteel.monster.titleLabel',
       rename: 'drawSteel.monster.rename',

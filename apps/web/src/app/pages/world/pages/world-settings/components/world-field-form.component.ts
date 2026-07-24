@@ -41,6 +41,12 @@ interface Draft {
   options: string;
   required: boolean;
   facetable: boolean;
+  /**
+   * **Decor Link** (ADR-0069): an `entityLink` Field's edges are presentation-only — hidden by default on
+   * the graph and outbound References so a "Portrait" link doesn't re-flood them with asset nodes. Only
+   * meaningful for an `entityLink` kind; ignored otherwise.
+   */
+  decor: boolean;
   /** The data-type the Field was loaded with, kept whole so a `list`/`entityLink` survives a round trip. */
   stored?: FieldDataType;
 }
@@ -114,6 +120,17 @@ interface Draft {
         </label>
       }
 
+      <!-- Decor is an edge-level classification meaningful only on an entityLink (ADR-0069): a
+           "presentation only" link is hidden by default on relation surfaces, the same mechanism
+           the core Thumbnail Field uses. -->
+      @if (d.kind === 'entityLink') {
+        <label class="field-flag">
+          <input type="checkbox" data-testid="field-decor" [formField]="fieldForm.decor" />
+          {{ 'worldFields.decor' | transloco }}
+        </label>
+        <p class="field-hint">{{ 'worldFields.decorHint' | transloco }}</p>
+      }
+
       <div class="form-actions">
         <button appButton type="button" data-testid="field-cancel" (click)="cancelled.emit()">
           {{ 'worldFields.cancel' | transloco }}
@@ -179,6 +196,7 @@ export class WorldFieldFormComponent {
           options: field.dataType.kind === 'enum' ? field.dataType.options.join(', ') : '',
           required: field.required,
           facetable: field.facetable,
+          decor: field.decor ?? false,
           stored: field.dataType,
         }
       : {
@@ -190,6 +208,7 @@ export class WorldFieldFormComponent {
           options: '',
           required: false,
           facetable: false,
+          decor: false,
         };
   });
   protected readonly fieldForm = form(this.draftModel);
@@ -281,10 +300,14 @@ export class WorldFieldFormComponent {
  */
 function toFieldBody(d: Draft): UpdateWorldFieldRequest {
   const structured = isStructuredKind(d.kind);
+  const entityLink = d.kind === 'entityLink';
   return {
     label: d.label.trim(),
     dataType: toFieldDataType(d.kind, d.options, d.stored),
     required: !structured && d.required,
     facetable: !structured && d.facetable,
+    // Decor rides only an entityLink (ADR-0069); sent explicitly (false off a link, false off a
+    // non-link) so re-saving a field always reclassifies its edges through the harvest/Reindex path.
+    decor: entityLink && d.decor,
   };
 }

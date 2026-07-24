@@ -9,7 +9,7 @@ import { DeleteEntityDialogComponent, DeleteEntityDialogData } from './delete-en
 
 /** A viewer-visible inbound reference — the shape the usage list names. */
 function inbound(id: string, name: string): InboundReference {
-  return { descriptor: null, source: { id, name, types: ['core.type.note'] } };
+  return { descriptor: null, decor: false, source: { id, name, types: ['core.type.note'] } };
 }
 
 describe('DeleteEntityDialog', () => {

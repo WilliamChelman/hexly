@@ -12,7 +12,7 @@ function world(nodes: string[], edges: string[] = []): WorldGraph {
     edges: edges.map((e) => {
       const [left, target] = e.split('>');
       const [source, descriptor] = left.split('-');
-      return { source, target, descriptor: descriptor ?? null };
+      return { source, target, descriptor: descriptor ?? null, decor: false };
     }),
   };
 }

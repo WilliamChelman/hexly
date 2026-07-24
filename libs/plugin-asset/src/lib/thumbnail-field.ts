@@ -36,4 +36,7 @@ export const THUMBNAIL_FIELD: Field = defineField({
   dataType: { kind: 'entityLink', targetTypes: [CORE_ASSET_TYPE_ID] },
   required: false,
   facetable: false,
+  // A Thumbnail is a **Decor Link** (ADR-0069): cover art is presentation, not a worldbuilding relation, so
+  // its edge is hidden by default on the graph and outbound References. The producer declares decor-ness here.
+  decor: true,
 });

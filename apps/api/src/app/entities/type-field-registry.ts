@@ -22,11 +22,14 @@ interface RegisteredType {
   readonly label?: string;
   /** The generic hidden-from-default-listing capability (ADR-0065); absent → always listed. */
   readonly hiddenFromDefaultListing?: boolean;
+  /** **System-managed** (ADR-0068): the system alone assigns/removes it; absent → user-assignable. */
+  readonly systemManaged?: boolean;
 }
 
-/** Optional per-type capability flags a code-registered type may declare (ADR-0065). */
+/** Optional per-type capability flags a code-registered type may declare (ADR-0065, ADR-0068). */
 export interface TypeCapabilities {
   readonly hiddenFromDefaultListing?: boolean;
+  readonly systemManaged?: boolean;
 }
 
 /**
@@ -63,6 +66,7 @@ export class TypeFieldRegistry {
     for (const type of enabledPluginTypes(config))
       this.register(type.id, type.fieldRefs, type.label, {
         hiddenFromDefaultListing: type.hiddenFromDefaultListing,
+        systemManaged: type.systemManaged,
       });
   }
 
@@ -90,7 +94,12 @@ export class TypeFieldRegistry {
    * registration. Returns an unregister fn.
    */
   register(typeId: string, fieldRefs: readonly string[], label?: string, capabilities?: TypeCapabilities): () => void {
-    this.byType.set(typeId, { fieldRefs, label, hiddenFromDefaultListing: capabilities?.hiddenFromDefaultListing });
+    this.byType.set(typeId, {
+      fieldRefs,
+      label,
+      hiddenFromDefaultListing: capabilities?.hiddenFromDefaultListing,
+      systemManaged: capabilities?.systemManaged,
+    });
     return () => this.byType.delete(typeId);
   }
 
@@ -124,13 +133,14 @@ export class TypeFieldRegistry {
 
   /** Every registered plugin type as an {@link AvailableType} — label defaults to the id. */
   plugins(): AvailableType[] {
-    return [...this.byType.entries()].map(([id, { fieldRefs, label, hiddenFromDefaultListing }]) => ({
+    return [...this.byType.entries()].map(([id, { fieldRefs, label, hiddenFromDefaultListing, systemManaged }]) => ({
       id,
       label: label ?? id,
       source: 'plugin',
       fieldRefs,
-      // Carry the capability through so surfaces honour it generically (ADR-0065); omit when unset.
+      // Carry the capabilities through so surfaces honour them generically (ADR-0065, ADR-0068); omit when unset.
       ...(hiddenFromDefaultListing ? { hiddenFromDefaultListing: true } : {}),
+      ...(systemManaged ? { systemManaged: true } : {}),
     }));
   }
 
@@ -141,5 +151,23 @@ export class TypeFieldRegistry {
    */
   get hiddenDefaultTypes(): readonly string[] {
     return [...this.byType.entries()].filter(([, t]) => t.hiddenFromDefaultListing).map(([id]) => id);
+  }
+
+  /**
+   * The ids of every **System-managed** type (ADR-0068) — the set the entity write choke point diffs the
+   * incoming type set against, rejecting a user-initiated add or remove. Only code-registered types set the
+   * marker; a World's user-defined types never do (the request that authors one cannot carry it).
+   */
+  get systemManagedTypes(): readonly string[] {
+    return [...this.byType.entries()].filter(([, t]) => t.systemManaged).map(([id]) => id);
+  }
+
+  /**
+   * The ids of every **System-managed** Field (ADR-0068) — the set the choke point diffs the incoming
+   * effective Field set against, rejecting a user-initiated attach or detach. Instance-wide and
+   * code-registered only; a World-defined Field never carries the marker.
+   */
+  get systemManagedFields(): readonly string[] {
+    return [...this.fieldsById.values()].filter((f) => f.systemManaged).map((f) => f.id);
   }
 }

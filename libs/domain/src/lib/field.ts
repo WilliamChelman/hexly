@@ -167,6 +167,22 @@ export const fieldSchemaSchema = z.object({
    * body, say. Absent means "take the data-type's default"; see {@link vaultSlotOf}.
    */
   vault: z.object({ slot: vaultSlotSchema }).optional(),
+  /**
+   * **System-managed** (CONTEXT.md → System-managed, ADR-0068): the system alone attaches and detaches this
+   * Field, in both directions — set only on a code-registered Field (`core.field.asset`), never authored.
+   * Surfaces *derive* behavior from it (pickers don't offer it, the Details panel renders it affordance-less),
+   * and the entity write choke point rejects a user-initiated attach/detach of it. The marker crosses the web
+   * seam by riding {@link Field}; the original leak was that a marker never did. Governs shape, not value.
+   */
+  systemManaged: z.boolean().optional(),
+  /**
+   * **Decor Link** (CONTEXT.md → Decor Link, ADR-0069): this Field's Entity-Link edges exist for
+   * presentation and carry no worldbuilding meaning. `core.field.thumbnail` sets it; the World-scoped
+   * field editor exposes it as a checkbox (default off) so a user-defined "Portrait" link doesn't
+   * re-flood the graph. Classifies the *edge* at harvest ({@link deriveDocumentState}); relation surfaces
+   * hide decor by default, usage surfaces count it. Only meaningful on an `entityLink` Field.
+   */
+  decor: z.boolean().optional(),
 });
 
 export type FieldSchema = z.infer<typeof fieldSchemaSchema>;
@@ -197,6 +213,10 @@ export function defineField(definition: {
   readonly required?: boolean;
   readonly facetable?: boolean;
   readonly vault?: { slot: VaultSlot };
+  /** **System-managed** (ADR-0068): the system alone attaches/detaches it. Code-registered Fields only. */
+  readonly systemManaged?: boolean;
+  /** **Decor Link** (ADR-0069): this Field's edges are presentation-only. `core.field.thumbnail` sets it. */
+  readonly decor?: boolean;
 }): Field {
   return Object.freeze(fieldSchema.parse(definition));
 }

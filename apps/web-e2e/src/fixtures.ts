@@ -203,12 +203,13 @@ export async function authorWorldType(
  * Author a reusable World-defined Field in a World's settings (ADR-0054, #230, ADR-0056), and land back
  * on the Fields list with it saved. `segment` is the `world.`-less key the form slugs into `world.field.<segment>`
  * (its id *and* document key); the label drives it but the fixture sets it explicitly. `kind` defaults to
- * the form's `string`; `options` fills an enum's comma-separated list.
+ * the form's `string`; `options` fills an enum's comma-separated list. `decor` (ADR-0069) checks the
+ * "presentation only" box, offered only on an `entityLink` kind.
  */
 export async function authorWorldField(
   page: Page,
   worldId: string,
-  field: { segment: string; label: string; kind?: string; options?: string },
+  field: { segment: string; label: string; kind?: string; options?: string; decor?: boolean },
 ): Promise<void> {
   await page.goto(`/w/${worldId}/settings`);
   // Settings is a master/detail layout; the type/field editors live under the Schema section.
@@ -218,6 +219,7 @@ export async function authorWorldField(
   await page.getByTestId('field-key-input').fill(field.segment);
   if (field.kind) await page.getByTestId(`field-kind-option-${field.kind}`).click();
   if (field.options !== undefined) await page.getByTestId('field-options').fill(field.options);
+  if (field.decor) await page.getByTestId('field-decor').check();
   await page.getByTestId('field-save').click();
   await expect(page.getByTestId(`field-world.field.${field.segment}`)).toBeVisible();
 }

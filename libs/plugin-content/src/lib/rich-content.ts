@@ -75,17 +75,21 @@ export const richContentBase = {
         const entityId = node.attrs?.['entityId'];
         if (typeof entityId !== 'string') return;
         // A blank or absent descriptor is no descriptor — the same edge as an unadorned link.
+        // A prose Entity Link is always semantic (ADR-0069): the writer authored it as meaning.
         edges.push({
           targetKind: 'entity',
           targetId: entityId,
           descriptor: descriptorSchema.safeParse(node.attrs?.['descriptor']).data ?? null,
+          decor: false,
         });
         return;
       }
       if (node.type === 'image') {
+        // A prose image is a capability-URL reference — decor by construction (ADR-0069): a byte-serving
+        // URL is presentation, never a worldbuilding relation.
         const src = node.attrs?.['src'];
         const hash = typeof src === 'string' ? assetHashFromUrl(src) : null;
-        if (hash) edges.push({ targetKind: 'asset', targetId: hash, descriptor: null });
+        if (hash) edges.push({ targetKind: 'asset', targetId: hash, descriptor: null, decor: true });
       }
     });
     return edges;

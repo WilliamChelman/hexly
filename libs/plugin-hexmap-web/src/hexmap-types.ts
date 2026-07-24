@@ -60,6 +60,7 @@ export const HEXMAP_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     // A plugin ships translated copy, so its chrome is transloco keys (ADR-0049) — unlike a
     // user-defined type, whose every label is its one authored name (#191).
     labels: {
+      name: 'map.hexmap.name',
       eyebrow: 'map.hexmap.eyebrow',
       titleLabel: 'map.hexmap.titleLabel',
       rename: 'map.hexmap.rename',

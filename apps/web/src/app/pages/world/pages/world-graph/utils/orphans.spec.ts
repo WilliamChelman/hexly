@@ -1,13 +1,17 @@
 import { WorldGraph } from '@hexly/domain';
-import { orphanIds, withoutOrphans } from './orphans';
+import { decorEdgeCount, orphanIds, withoutDecorEdges, withoutOrphans } from './orphans';
 
-/** A World of `nodes`, linked by `edges` given as `'source>target'`. */
+/**
+ * A World of `nodes`, linked by `edges` given as `'source>target'`. A trailing `!` marks a Decor Link
+ * (`'ealdred>portrait!'`), so a spec can express decor-vs-semantic edges tersely.
+ */
 function world(nodes: string[], edges: string[] = []): WorldGraph {
   return {
     nodes: nodes.map((name) => ({ id: name.toLowerCase(), name, types: ['core.type.note'] })),
     edges: edges.map((e) => {
-      const [source, target] = e.split('>');
-      return { source, target, descriptor: null };
+      const decor = e.endsWith('!');
+      const [source, target] = (decor ? e.slice(0, -1) : e).split('>');
+      return { source, target, descriptor: null, decor };
     }),
   };
 }
@@ -41,5 +45,43 @@ describe('withoutOrphans', () => {
   it('returns the graph unchanged when there are no orphans', () => {
     const graph = world(['A', 'B'], ['a>b']);
     expect(withoutOrphans(graph)).toBe(graph);
+  });
+});
+
+describe('withoutDecorEdges (ADR-0069)', () => {
+  it('drops decor edges and keeps semantic ones', () => {
+    const graph = world(['Ealdred', 'Mira', 'Portrait'], ['ealdred>mira', 'ealdred>portrait!']);
+    const shown = withoutDecorEdges(graph);
+    expect(shown.edges).toEqual([{ source: 'ealdred', target: 'mira', descriptor: null, decor: false }]);
+    // Nodes are untouched — orphan computation is what drops the now-unlinked Portrait.
+    expect(shown.nodes).toBe(graph.nodes);
+  });
+
+  /** No decor, no copy: the same object flows through so the canvas need not remount. */
+  it('returns the graph unchanged when there are no decor edges', () => {
+    const graph = world(['A', 'B'], ['a>b']);
+    expect(withoutDecorEdges(graph)).toBe(graph);
+  });
+
+  /**
+   * The decision that makes assets fall out with no asset-specific code (ADR-0069): a node whose only
+   * edge is decor is *not* an orphan on the full graph, but *becomes* one once decor is filtered — so the
+   * decor filter must run before orphan computation.
+   */
+  it('turns a decor-only node into an orphan once decor is filtered', () => {
+    const graph = world(['Ealdred', 'Portrait'], ['ealdred>portrait!']);
+    expect(orphanIds(graph)).toEqual(new Set()); // inbound decor edge → not an orphan on the raw graph
+    expect(orphanIds(withoutDecorEdges(graph))).toEqual(new Set(['ealdred', 'portrait']));
+  });
+
+  /** An Asset deliberately Embedded (semantic) keeps its edge, so it survives the decor filter. */
+  it('keeps a node reached by a semantic edge even when it also has decor edges', () => {
+    const graph = world(['Board', 'Asset'], ['board>asset', 'board>asset!']);
+    expect(orphanIds(withoutDecorEdges(graph))).toEqual(new Set());
+  });
+
+  it('counts decor edges', () => {
+    expect(decorEdgeCount(world(['A', 'B', 'C'], ['a>b', 'a>c!']))).toBe(1);
+    expect(decorEdgeCount(world(['A', 'B'], ['a>b']))).toBe(0);
   });
 });

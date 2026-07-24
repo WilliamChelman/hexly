@@ -1,0 +1,1 @@
+ALTER TABLE `entity_edges` ADD `decor` integer DEFAULT false NOT NULL;

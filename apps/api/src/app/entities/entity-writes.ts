@@ -43,8 +43,8 @@ const INITIAL_VERSION = 1;
  */
 const MAX_BOUND_PARAMS = 32766;
 
-/** Columns bound per `entity_edges` row: source, world, kind, target, descriptor. */
-const EDGE_COLUMNS = 5;
+/** Columns bound per `entity_edges` row: source, world, kind, target, descriptor, decor. */
+const EDGE_COLUMNS = 6;
 /** Columns bound per `entity_descriptors` row: entity, descriptor. */
 const DESCRIPTOR_COLUMNS = 2;
 /** Columns bound per `entity_field_facets` row: entity, world, key, value, num. */
@@ -558,6 +558,10 @@ export class EntityWrites {
           ? decision.isOwner
           : decision.canWrite;
     if (!permitted) return { status: 'forbidden' };
+    // The System-managed shape guard (ADR-0068): a user write may not add or remove a System-managed type
+    // or Field. System writes (insert/importOverwrite/reindexChunk) take no `userId` and never reach here,
+    // so mint, importers, and Reindex assign the asset type/field freely.
+    if (this.violatesSystemManaged(decision.row, change)) return { status: 'forbidden' };
 
     const result = this.transact(() => {
       const applied = this.apply(access, decision.row, change);
@@ -572,6 +576,53 @@ export class EntityWrites {
     if (change.kind === 'delete' && result.status === 'ok') this.reapDeletion(result.row);
 
     return result;
+  }
+
+  /**
+   * Whether `change` is a user-initiated add or remove of a **System-managed** type or Field (ADR-0068) —
+   * the one shape change only the system may make, because stripping the asset type/field would orphan an
+   * Asset's bytes on disk (unreachable by delete, unaccounted by Reindex).
+   *
+   * Diffs the *shape*, not the value: the incoming type set against the stored one, and the incoming
+   * effective Field set against the stored one. The effective set is derived from types + document
+   * (ADR-0057), so a raw write attaching `core.field.asset` to a plain Entity (a new document key) is caught
+   * as an add, and one dropping `core.type.asset` from the type set as a remove. Only `edit` carries either,
+   * so every other kind — and any edit touching neither — is unaffected. The document key's *value* is never
+   * inspected: `core.field.asset` is structured with no inline control, so it is unreachable by hand-editing.
+   */
+  private violatesSystemManaged(row: EntityRow, change: EntityChange): boolean {
+    if (change.kind !== 'edit') return false;
+    if (change.types === undefined && change.document === undefined) return false;
+
+    const storedTypes = row.types;
+    const nextTypes = change.types ?? storedTypes;
+    for (const typeId of this.typeFields.systemManagedTypes)
+      if (storedTypes.includes(typeId) !== nextTypes.includes(typeId)) return true;
+
+    const storedDoc = JSON.parse(row.document) as EntityDocument;
+    const nextDoc = change.document ?? storedDoc;
+
+    const systemFields = this.typeFields.systemManagedFields;
+    if (systemFields.length > 0) {
+      const idsOf = (types: readonly string[], doc: EntityDocument) =>
+        new Set(this.worldTypeFields.effectiveFields(row.worldId, types, doc).map((f) => f.id));
+      const stored = idsOf(storedTypes, storedDoc);
+      const next = idsOf(nextTypes, nextDoc);
+      if (systemFields.some((fieldId) => stored.has(fieldId) !== next.has(fieldId))) return true;
+    }
+
+    // Hash-presence invariant (ADR-0068): the marker governs shape not value, save the one identity the
+    // value carries — an Asset's content hash. A raw edit that keeps the asset type/Field attached but
+    // guts the asset-ref value (`{}` or a stripped hash) leaves the shape untouched yet harvests the hash
+    // to null, deleting the `(worldId, hash)` dedup row and orphaning the bytes on disk (unreachable by
+    // delete, unaccounted by Reindex) — the same leak stripping the shape would cause, by another door. So
+    // a user edit may not drive an asset-typed Entity's harvested hash from non-null to null.
+    if (change.document !== undefined && this.typeFields.systemManagedTypes.some((t) => nextTypes.includes(t))) {
+      const storedHash = this.derive(storedDoc, storedTypes, row.worldId).assetHash;
+      if (storedHash !== null && this.derive(nextDoc, nextTypes, row.worldId).assetHash === null) return true;
+    }
+
+    return false;
   }
 
   /** Fire the registered deletion reapers for a just-committed single-Entity delete (ADR-0065). */

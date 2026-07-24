@@ -1,4 +1,5 @@
 import { defineField, EntityDocument, ReindexFailure, emptyEntityDocument } from '@hexly/domain';
+import { ASSET_FIELD_ID, CORE_ASSET_TYPE_ID } from '@hexly/plugin-asset';
 import { emptyRichContent, tiptapContent } from '@hexly/plugin-content';
 import { and, eq } from 'drizzle-orm';
 import { createDb, Db } from '../db/db';
@@ -218,6 +219,43 @@ describe('EntityWrites', () => {
           descriptor: 'spouse',
         },
       ]);
+    });
+
+    /**
+     * Decor classification is materialized at harvest (ADR-0069): a prose image is a capability-URL
+     * reference, decor by construction, while a prose Entity Link is semantic. The flag rides the row so
+     * the read paths filter on the column, never reclassifying per read.
+     */
+    it('writes the decor flag at harvest — a prose image edge is decor, a prose link is not', () => {
+      const hash = 'a'.repeat(64);
+      writes.insert({
+        ownerId: ADA,
+        worldId: WORLD,
+        name: 'Illustrated',
+        types: ['core.type.note'],
+        tags: [],
+        document: {
+          'core.field.content': tiptapContent({
+            type: 'doc',
+            content: [
+              { type: 'paragraph', content: [{ type: 'entityLink', attrs: { entityId: 'e2' } }] },
+              { type: 'image', attrs: { src: `/assets/${WORLD}/${hash}.png` } },
+            ],
+          }),
+        },
+      });
+
+      const decorByTarget = db
+        .select({ targetKind: entityEdges.targetKind, targetId: entityEdges.targetId, decor: entityEdges.decor })
+        .from(entityEdges)
+        .where(eq(entityEdges.sourceEntityId, idOf('Illustrated')))
+        .all();
+      expect(decorByTarget).toEqual(
+        expect.arrayContaining([
+          { targetKind: 'entity', targetId: 'e2', decor: false },
+          { targetKind: 'asset', targetId: hash, decor: true },
+        ]),
+      );
     });
 
     /**
@@ -453,6 +491,51 @@ describe('EntityWrites', () => {
           { key: 'kind', value: 'image', num: null },
           { key: 'orientation', value: 'landscape', num: null },
         ]);
+      });
+
+      /**
+       * The `entity_edges.decor` flag is derived state rebuilt by Reindex like the edges themselves
+       * (ADR-0069): an edge persisted with the wrong classification — a decor prose image stored as
+       * semantic, a semantic prose Entity Link stored as decor — is reclassified from the document alone
+       * on the next reindex, so existing Worlds classify correctly with one idempotent repair.
+       */
+      it('rebuilds the decor flag on entity_edges from the document', () => {
+        const hash = 'a'.repeat(64);
+        seedRaw(
+          'illustrated',
+          WORLD,
+          JSON.stringify({
+            'core.field.content': tiptapContent({
+              type: 'doc',
+              content: [
+                { type: 'paragraph', content: [{ type: 'entityLink', attrs: { entityId: 'e2' } }] },
+                { type: 'image', attrs: { src: `/assets/${WORLD}/${hash}.png` } },
+              ],
+            }),
+          }),
+          'note',
+        );
+        // Persist the edges with the flags flipped — the corruption a pre-ADR-0069 harvest left behind.
+        db.insert(entityEdges)
+          .values([
+            { sourceEntityId: idOf('illustrated'), worldId: WORLD, targetKind: 'entity', targetId: 'e2', decor: true },
+            { sourceEntityId: idOf('illustrated'), worldId: WORLD, targetKind: 'asset', targetId: hash, decor: false },
+          ])
+          .run();
+
+        reindexAll();
+
+        const decorByTarget = db
+          .select({ targetKind: entityEdges.targetKind, targetId: entityEdges.targetId, decor: entityEdges.decor })
+          .from(entityEdges)
+          .where(eq(entityEdges.sourceEntityId, idOf('illustrated')))
+          .all();
+        expect(decorByTarget).toEqual(
+          expect.arrayContaining([
+            { targetKind: 'entity', targetId: 'e2', decor: false },
+            { targetKind: 'asset', targetId: hash, decor: true },
+          ]),
+        );
       });
 
       /**
@@ -1224,6 +1307,148 @@ describe('EntityWrites', () => {
     expect(now.version).toBe(afterFirst.version);
     expect(now.seq).toBe(afterFirst.seq);
     expect(emitted).toEqual([]);
+  });
+
+  /**
+   * The **System-managed** shape guard (ADR-0068): a user write may not add or remove `core.type.asset`
+   * or `core.field.asset`, in either direction — stripping either from a real Asset would orphan its bytes
+   * on disk (unreachable by delete, unaccounted by Reindex). This is the one below-UI seam the Playwright
+   * suite cannot reach (spec #305), because a compliant UI never attempts the strip; the raw write does.
+   *
+   * The system's own paths never reach `mutate` — mint (`insert`), importers (`importOverwrite`), and
+   * Reindex (`reindexChunk`) take no `userId` — so they assign the asset type/field freely, as the
+   * `insert`/`reindexChunk` tests above and the asset mint spec attest.
+   */
+  describe('System-managed shape guard (ADR-0068)', () => {
+    const ASSET = 'asset-1';
+    // A minted-shaped asset-ref value: a real Asset carries `core.type.asset` in its type set and this value
+    // at the `core.field.asset` key, so dropping the type turns the key into a would-be attached extra.
+    const ASSET_VALUE = {
+      hash: 'a'.repeat(64),
+      ext: '.png',
+      mime: 'image/png',
+      size: 11,
+      stats: { width: 10, height: 10, orientation: 'square', dominantColor: '#c81818' },
+    };
+    const ASSET_DOC: EntityDocument = { [ASSET_FIELD_ID]: ASSET_VALUE };
+
+    beforeEach(() => seedAsset(ASSET));
+
+    it('rejects a raw edit removing the asset type from a real Asset, writing nothing', () => {
+      const before = rowOf(ASSET);
+
+      const result = writes.mutate(ADA, ASSET, {
+        kind: 'edit',
+        version: before.version,
+        types: ['core.type.note'],
+        document: ASSET_DOC,
+      });
+
+      expect(result.status).toBe('forbidden');
+      const after = rowOf(ASSET);
+      expect(after.types).toEqual([CORE_ASSET_TYPE_ID]);
+      expect(after.seq).toBe(before.seq);
+      expect(emitted).toEqual([]);
+    });
+
+    it('rejects a raw edit adding the asset type to a hand-made Entity', () => {
+      const result = writes.mutate(ADA, ENTITY, {
+        kind: 'edit',
+        types: ['core.type.note', CORE_ASSET_TYPE_ID],
+      });
+
+      expect(result.status).toBe('forbidden');
+      expect(rowOf(ENTITY).types).toEqual(['core.type.note']);
+    });
+
+    it('rejects a raw edit attaching the asset-ref Field to a hand-made Entity', () => {
+      // Attachment is derived from the document key (ADR-0057): a `core.field.asset` key on a note that never
+      // defaults it resolves into the effective set as an attached extra — the add the guard rejects.
+      const result = writes.mutate(ADA, ENTITY, {
+        kind: 'edit',
+        document: { [ASSET_FIELD_ID]: ASSET_VALUE },
+      });
+
+      expect(result.status).toBe('forbidden');
+    });
+
+    it('rejects a raw edit detaching the asset-ref Field from a real Asset', () => {
+      // Dropping both the type and its document key strips `core.field.asset` from the effective set.
+      const before = rowOf(ASSET);
+
+      const result = writes.mutate(ADA, ASSET, {
+        kind: 'edit',
+        version: before.version,
+        types: ['core.type.note'],
+        document: {},
+      });
+
+      expect(result.status).toBe('forbidden');
+    });
+
+    it('allows a content edit that keeps the asset type and asset-ref — shape held, value untouched', () => {
+      const before = rowOf(ASSET);
+
+      const result = writes.mutate(ADA, ASSET, {
+        kind: 'edit',
+        version: before.version,
+        // Same type set and asset-ref; only the prose changes. The marker governs shape, not value.
+        document: { ...ASSET_DOC, 'core.field.content': emptyRichContent() },
+      });
+
+      expect(result.status).toBe('ok');
+      expect(rowOf(ASSET).types).toEqual([CORE_ASSET_TYPE_ID]);
+    });
+
+    it('rejects a raw edit that guts the asset-ref value to `{}`, keeping the bytes reachable', () => {
+      // The value-strip escalation (ADR-0068 hash-presence invariant): `types` omitted, so the shape diff
+      // sees no change — the asset type and Field are both still attached — yet the emptied `{}` value
+      // harvests the hash to null, which would delete the `(worldId, hash)` dedup row and orphan the bytes
+      // on disk. Shape held; the one value the marker must also hold is the Asset's identity hash.
+      const before = rowOf(ASSET);
+
+      const result = writes.mutate(ADA, ASSET, {
+        kind: 'edit',
+        version: before.version,
+        document: { [ASSET_FIELD_ID]: {} },
+      });
+
+      expect(result.status).toBe('forbidden');
+      const after = rowOf(ASSET);
+      // Nothing was written: the stored document (hence its harvested hash) is exactly as it was.
+      expect(after.document).toBe(before.document);
+      expect(after.seq).toBe(before.seq);
+      expect(emitted).toEqual([]);
+    });
+
+    it('leaves a non-System-managed type freely swappable', () => {
+      const result = writes.mutate(ADA, ENTITY, { kind: 'edit', types: ['core.type.hex-map'] });
+
+      expect(result.status).toBe('ok');
+      expect(rowOf(ENTITY).types).toEqual(['core.type.hex-map']);
+    });
+
+    /** A real Asset seeded raw (as mint's `insert` would leave it), so `mutate`'s guard is observed alone. */
+    function seedAsset(id: string): void {
+      const now = Date.now();
+      db.insert(entities)
+        .values({
+          id,
+          worldId: WORLD,
+          name: id,
+          types: [CORE_ASSET_TYPE_ID],
+          tags: [],
+          visibility: 'shared',
+          version: 1,
+          seq: 1,
+          document: JSON.stringify(ASSET_DOC),
+          contentText: '',
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+      db.insert(entityGrants).values({ entityId: id, userId: ADA, role: 'owner' }).run();
+    }
   });
 
   /**

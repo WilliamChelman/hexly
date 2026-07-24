@@ -68,7 +68,9 @@ describe('ReferencesPanel', () => {
 
   it('lists a resolved outbound target as a link to it, with its Link Descriptor', () => {
     const { el } = mount({
-      references: [{ targetId: 'mira', descriptor: 'spouse', target: { id: 'mira', name: 'Mira', types: [NOTE] } }],
+      references: [
+        { targetId: 'mira', descriptor: 'spouse', decor: false, target: { id: 'mira', name: 'Mira', types: [NOTE] } },
+      ],
     });
 
     const item = el.querySelector('[data-testid=reference-out]');
@@ -84,9 +86,10 @@ describe('ReferencesPanel', () => {
         {
           targetId: 'mira',
           descriptor: null,
+          decor: false,
           target: { id: 'mira', name: 'Mira', types: [NOTE], thumbnailUrl: '/assets/w1/abc.thumb.webp' },
         },
-        { targetId: 'gwen', descriptor: null, target: { id: 'gwen', name: 'Gwen', types: [NOTE] } },
+        { targetId: 'gwen', descriptor: null, decor: false, target: { id: 'gwen', name: 'Gwen', types: [NOTE] } },
       ],
     });
 
@@ -98,7 +101,7 @@ describe('ReferencesPanel', () => {
 
   /** A deleted or unreadable target is indistinguishable, and neither is navigable (#78). */
   it('renders an unresolved outbound target as a non-navigable dangling label', () => {
-    const { el } = mount({ references: [{ targetId: 'gone', descriptor: null, target: null }] });
+    const { el } = mount({ references: [{ targetId: 'gone', descriptor: null, decor: false, target: null }] });
 
     const item = el.querySelector('[data-testid=reference-out]');
     expect(item?.querySelector('a')).toBeNull();
@@ -107,12 +110,67 @@ describe('ReferencesPanel', () => {
 
   it('lists each inbound source as a link back to it', () => {
     const { el } = mount({
-      referencedBy: [{ descriptor: 'capital of', source: { id: 'avalon', name: 'Avalon', types: [NOTE] } }],
+      referencedBy: [
+        { descriptor: 'capital of', decor: false, source: { id: 'avalon', name: 'Avalon', types: [NOTE] } },
+      ],
     });
 
     const item = el.querySelector('[data-testid=reference-in]');
     expect(item?.textContent).toContain('Avalon');
     expect(item?.querySelector('a')?.getAttribute('href')).toBe('/entities/avalon');
+  });
+
+  /**
+   * The outbound section is a *relation* surface (ADR-0069): a Decor Link — a Thumbnail designation, a
+   * prose image — is hidden by default, and the ephemeral reveal shows it on demand. A semantic row is
+   * never hidden.
+   */
+  it('hides an outbound Decor Link until the reveal is toggled', () => {
+    const { el, fixture } = mount({
+      references: [
+        { targetId: 'mira', descriptor: null, decor: false, target: { id: 'mira', name: 'Mira', types: [NOTE] } },
+        { targetId: 'crest', descriptor: null, decor: true, target: { id: 'crest', name: 'Crest', types: [NOTE] } },
+      ],
+    });
+
+    // Default: the semantic row shows, the decor row is hidden, and the reveal control is offered.
+    expect(el.querySelectorAll('[data-testid=reference-out]')).toHaveLength(1);
+    expect(el.textContent).toContain('Mira');
+    expect(el.textContent).not.toContain('Crest');
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid=references-decor-toggle]');
+    expect(toggle).not.toBeNull();
+
+    // Reveal: the decor row joins, marked as decor to set it apart from a semantic relation.
+    toggle?.click();
+    fixture.detectChanges();
+    expect(el.querySelectorAll('[data-testid=reference-out]')).toHaveLength(2);
+    expect(el.textContent).toContain('Crest');
+    expect(el.querySelector('[data-testid=reference-decor-mark]')).not.toBeNull();
+  });
+
+  /** No decor to reveal → no dead control. */
+  it('offers no reveal control when nothing outbound is decor', () => {
+    const { el } = mount({
+      references: [
+        { targetId: 'mira', descriptor: null, decor: false, target: { id: 'mira', name: 'Mira', types: [NOTE] } },
+      ],
+    });
+
+    expect(el.querySelector('[data-testid=references-decor-toggle]')).toBeNull();
+  });
+
+  /**
+   * The inbound section is a *usage* surface (ADR-0069): it never filters, so a decor edge shows
+   * unconditionally — marked, so a mere thumbnail reads apart from a prose mention.
+   */
+  it('shows an inbound Decor Link unconditionally, visually marked', () => {
+    const { el } = mount({
+      referencedBy: [{ descriptor: null, decor: true, source: { id: 'deity', name: 'Vashenka', types: [NOTE] } }],
+    });
+
+    const item = el.querySelector('[data-testid=reference-in]');
+    expect(item?.textContent).toContain('Vashenka');
+    expect(item?.querySelector('[data-testid=reference-decor-mark]')).not.toBeNull();
   });
 
   /** "Nothing links here" is a claim about the edge index, not about the fetch: it must not appear before the list lands. */
@@ -147,7 +205,9 @@ describe('ReferencesPanel', () => {
    */
   it('drops a held list when a different Entity is opened', () => {
     const { el } = mount({
-      references: [{ targetId: 'mira', descriptor: null, target: { id: 'mira', name: 'Mira', types: [NOTE] } }],
+      references: [
+        { targetId: 'mira', descriptor: null, decor: false, target: { id: 'mira', name: 'Mira', types: [NOTE] } },
+      ],
     });
     expect(el.querySelector('[data-testid=reference-out]')).not.toBeNull();
 

@@ -54,6 +54,12 @@ export class TypeRegistry implements EntityTypes {
   /** Every *enabled* definition, in registration order (the bundled plugins', then World types). */
   readonly all = computed(() => this.definitions().filter((def) => this.plugins.isTypeActive(def.id)));
 
+  /**
+   * The types a user may create — {@link all} minus the **System-managed** ones (ADR-0068), which the
+   * system alone mints. What every create surface (split button, palette command) offers.
+   */
+  readonly creatable = computed(() => this.all().filter((def) => !def.systemManaged));
+
   constructor() {
     // Every code type is a bundled plugin's (ADR-0051); a disabled one drops from every output here.
     for (const def of inject(PLUGIN_TYPES, { optional: true }) ?? []) this.register(def);
@@ -217,27 +223,31 @@ export class TypeRegistry implements EntityTypes {
    * every World-defined Field and enabled Plugin Field whose `id` its effective set does not already cover
    * — so the attach picker never offers a Field a type default already places, or one already attached.
    * World Fields come first (always active); a disabled Plugin's Fields drop out (they would only degrade
-   * to a plain value).
+   * to a plain value). A **System-managed** Field (ADR-0068) is never attachable: the system alone attaches it.
    */
   attachableFields(
     types: readonly string[] | null | undefined,
     fieldIds: readonly string[] | null | undefined,
   ): Field[] {
     const present = new Set(this.effectiveFields(types, fieldIds).map((field) => field.id));
-    return this.availableFields().filter((field) => !present.has(field.id));
+    return this.availableFields().filter((field) => !present.has(field.id) && !field.systemManaged);
   }
 
   /**
-   * A type's **display name** — the noun every surface shows for it ("Note", "Hex Map", "Deity").
+   * A type's **display name** — the noun every surface shows for it ("Note", "Map", "Deity").
    * A **user-defined type's name is authored data, never a transloco key**: its `labelText` is
-   * returned verbatim, while a code-registered type's name is looked up as `entityBrowser.type.<id>`.
+   * returned verbatim. A code-registered type's noun is its own `labels.name` copy, shipped in its
+   * plugin's catalog — the app catalog cannot know every plugin's types (#312), so the
+   * `entityBrowser.type.<id>` lookup is only the unregistered-type last resort.
    *
    * Read it through the `typeName` pipe in a template; call it directly from a `computed` that also
    * tracks `transloco.activeLang()`, so the name re-resolves on a language switch.
    */
   name(type: string | null | undefined): string {
     const def = this.get(type);
-    return def?.labelText ?? this.transloco.translate(`entityBrowser.type.${type}`);
+    if (def?.labelText) return def.labelText;
+    if (def?.labels) return this.transloco.translate(def.labels.name);
+    return this.transloco.translate(`entityBrowser.type.${type}`);
   }
 
   /**

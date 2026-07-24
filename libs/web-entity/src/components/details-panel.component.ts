@@ -47,8 +47,9 @@ import { FieldControlComponent } from './field-control.component';
           [attr.data-testid]="'detail-type-' + type.id"
         >
           {{ type.label }}
-          <!-- Remove is edit-only, and never the last type — every Entity keeps a primary (typesSchema.min(1)). -->
-          @if (writable() && typeRows().length > 1) {
+          <!-- Remove is edit-only, never the last type (every Entity keeps a primary, typesSchema.min(1)), and
+               never a System-managed type: the system alone assigns/removes it (ADR-0068), so it lists affordance-less. -->
+          @if (writable() && typeRows().length > 1 && !type.systemManaged) {
             <button
               type="button"
               class="-mr-1 leading-none opacity-70 hover:opacity-100 cursor-pointer bg-transparent border-0 text-current"
@@ -88,8 +89,9 @@ import { FieldControlComponent } from './field-control.component';
               <span class="text-danger" aria-hidden="true">&nbsp;*</span>
             }
           </span>
-          <!-- Detach is offered only for an attached extra; a type-default Field is dropped by removing its type. -->
-          @if (writable() && row.attached) {
+          <!-- Detach is offered only for an attached extra (a type-default Field is dropped by removing its type),
+               and never a System-managed Field: the system alone attaches/detaches it (ADR-0068), so it lists affordance-less. -->
+          @if (writable() && row.attached && !row.field.systemManaged) {
             <button
               type="button"
               class="leading-none opacity-70 hover:opacity-100 cursor-pointer bg-transparent border-0 text-ink-muted"
@@ -159,19 +161,27 @@ export class DetailsPanelComponent {
   /** The open Entity's World, scoping an Entity-Link Field picker to same-World targets (#190). */
   protected readonly worldId = computed(() => this.session.current()?.worldId);
 
-  /** The live type set as labelled rows — a registered type by its name, an unknown/disabled one by its raw id. */
+  /**
+   * The live type set as labelled rows — a registered type by its name, an unknown/disabled one by its raw id.
+   * A System-managed type (ADR-0068) still lists here, but flagged so its remove × does not render.
+   */
   protected readonly typeRows = computed(() => {
     this.transloco.activeLang(); // re-resolve labels on a language switch
-    return this.session.types().map((type) => ({ id: type, label: this.typeLabel(type) }));
+    return this.session
+      .types()
+      .map((type) => ({ id: type, label: this.typeLabel(type), systemManaged: !!this.types.get(type)?.systemManaged }));
   });
 
-  /** The registered types not already carried — the add picker's offer. */
+  /**
+   * The registered types not already carried — the add picker's offer. A System-managed type is never
+   * offered: the system alone assigns it (ADR-0068).
+   */
   protected readonly addableTypes = computed(() => {
     this.transloco.activeLang();
     const present = new Set(this.session.types());
     return this.types
       .all()
-      .filter((def) => !present.has(def.id))
+      .filter((def) => !present.has(def.id) && !def.systemManaged)
       .map((def) => ({ id: def.id, label: this.typeLabel(def.id) }));
   });
 
@@ -182,6 +192,8 @@ export class DetailsPanelComponent {
    * Each effective Field as a render row: its label, whether it is an attached extra, and its shape. A
    * Structured Data Type Field is edited on its own View, never a form row (ADR-0050) — so a type-default
    * one (a note's prose) is left off entirely, while an attached one still shows as a detachable label row.
+   * A **System-managed** Field (ADR-0068) always lists — affordance-less, no detach — even when it is a
+   * structured type-default (the asset-ref on an Asset), because the panel's contract is showing the shape.
    */
   protected readonly fieldRows = computed(() => {
     this.transloco.activeLang();
@@ -193,7 +205,7 @@ export class DetailsPanelComponent {
         attached: attached.has(field.id),
         structured: isStructuredDataType(field.dataType),
       }))
-      .filter((row) => !row.structured || row.attached);
+      .filter((row) => !row.structured || row.attached || !!row.field.systemManaged);
   });
 
   /** Registered Fields the effective set does not already cover — the attach picker's offer. */

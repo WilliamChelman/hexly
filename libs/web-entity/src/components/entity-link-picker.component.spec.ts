@@ -21,6 +21,7 @@ function codeType(id: string, fieldRefs: readonly string[] = []): TypeDefinition
     fieldRefs,
     graphColorToken: '--color-ink-muted',
     labels: {
+      name: `${id}.name`,
       eyebrow: `${id}.eyebrow`,
       titleLabel: `${id}.titleLabel`,
       rename: `${id}.rename`,

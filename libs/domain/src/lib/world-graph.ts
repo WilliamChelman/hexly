@@ -14,6 +14,12 @@ export interface WorldGraphEdge {
   readonly source: string;
   readonly target: string;
   readonly descriptor: string | null;
+  /**
+   * A **Decor Link** (ADR-0069): presentation, not worldbuilding meaning. The graph hides decor edges
+   * behind an ephemeral "show decor links" reveal, and computes orphans *after* filtering them — so an
+   * Asset whose only edges are decor falls out of the default graph as an ordinary orphan.
+   */
+  readonly decor: boolean;
 }
 
 /**

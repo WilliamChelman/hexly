@@ -32,6 +32,7 @@ function definition(id: string, fieldRefs: readonly string[] = []): TypeDefiniti
     fieldRefs,
     graphColorToken: '--color-ink-muted',
     labels: {
+      name: `${id}.name`,
       eyebrow: `${id}.eyebrow`,
       titleLabel: `${id}.titleLabel`,
       rename: `${id}.rename`,
@@ -445,13 +446,27 @@ describe('TypeRegistry', () => {
       expect(registry.chromeLabel('world.type.deity', 'eyebrow')).toBe('Deity');
     });
 
-    it('resolves a code type’s name and chrome through its transloco keys', () => {
+    it('resolves a code type’s name and chrome through its own transloco keys', () => {
       registry.register(definition('pathfinder.type.monster'));
 
-      // The testing catalog has no copy for these, so transloco echoes the key — proving the *key*
-      // path is taken for a code type (and, by contrast, is never taken for a user-defined one).
-      expect(registry.name('pathfinder.type.monster')).toBe('entityBrowser.type.pathfinder.type.monster');
+      // The testing catalog has no copy for these, so transloco echoes the key — proving a code type's
+      // name reads its *own* `labels.name` (its plugin ships that copy, #312), never the app catalog,
+      // which cannot know another plugin's types (and, by contrast, never a user-defined one's).
+      expect(registry.name('pathfinder.type.monster')).toBe('pathfinder.type.monster.name');
       expect(registry.chromeLabel('pathfinder.type.monster', 'create')).toBe('pathfinder.type.monster.create');
+    });
+
+    it('falls back to the app catalog key only for an unregistered type', () => {
+      expect(registry.name('pathfinder.type.monster')).toBe('entityBrowser.type.pathfinder.type.monster');
+    });
+  });
+
+  describe('creatable', () => {
+    it('excludes a System-managed type from the create offer, while `all` keeps it (ADR-0068)', () => {
+      registry.register({ ...definition('core.type.asset'), systemManaged: true });
+
+      expect(registry.all().some((def) => def.id === 'core.type.asset')).toBe(true);
+      expect(registry.creatable().some((def) => def.id === 'core.type.asset')).toBe(false);
     });
   });
 });

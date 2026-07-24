@@ -17,6 +17,15 @@ export interface EntityEdge {
   /** An `entityId`, or an Asset `hash`. Dangling-allowed — never a referential constraint. */
   readonly targetId: string;
   readonly descriptor: string | null;
+  /**
+   * A **Decor Link** (CONTEXT.md → Decor Link, ADR-0069): the edge exists for presentation and carries
+   * no worldbuilding meaning, declared where the edge is born. Relation surfaces (World Graph, outbound
+   * References) hide decor by default behind a reveal; the inbound usage surface counts it regardless. A
+   * capability-URL reference (a prose image, a Board **Image**) is decor by construction; a `decor` Field
+   * (`core.field.thumbnail`, a user-defined "presentation only" link) mints decor; prose Entity Links and
+   * Board **Embeds** are always semantic.
+   */
+  readonly decor: boolean;
 }
 
 /**
@@ -39,12 +48,19 @@ export interface LinkedEntity {
 /**
  * One of this Entity's own links (*References*). `target` is `null` when it is deleted or the
  * viewer cannot read it — indistinguishable, and both render as the existing non-navigable
- * dangling label. Asset edges are stored but have no surface, so they never appear here.
+ * dangling label. Asset edges (a prose image, a Board Image) surface here too now (ADR-0069) —
+ * the "stored but surface-less" special case retired — resolved to their Asset wrapper Entity.
  */
 export interface OutboundReference {
   readonly targetId: string;
   readonly descriptor: string | null;
   readonly target: LinkedEntity | null;
+  /**
+   * A **Decor Link** (ADR-0069). The outbound section is a *relation* surface, so it hides decor by
+   * default behind an ephemeral reveal — a Thumbnail designation or a prose image isn't "what this
+   * Entity relates to".
+   */
+  readonly decor: boolean;
 }
 
 /**
@@ -54,6 +70,12 @@ export interface OutboundReference {
 export interface InboundReference {
   readonly descriptor: string | null;
   readonly source: LinkedEntity;
+  /**
+   * A **Decor Link** (ADR-0069). The inbound section is a *usage* surface, so it never filters decor —
+   * it marks it visually. This is what lets an Asset's usage list (and the delete confirmation it
+   * feeds, ADR-0065) count every Entity that merely displays it.
+   */
+  readonly decor: boolean;
 }
 
 /** `GET /entities/:id/references`: both directions of one Entity's links, resolved per viewer. */

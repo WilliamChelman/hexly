@@ -468,23 +468,45 @@ export class EntitiesService {
   /**
    * This Entity's links. A LEFT JOIN under the read filter resolves each target's *current* name;
    * a target that is deleted, or that the viewer cannot read, yields NULL columns and so a `null`
-   * target. Asset edges are stored but surface-less, so `entity` targets alone are selected.
+   * target.
+   *
+   * Asset edges surface here now (ADR-0069) — the "stored but surface-less" special case retired: an
+   * `asset` edge keys on the content `hash`, so `edgeAsset` resolves it to the Asset's wrapper Entity
+   * (in the edge's World) exactly as {@link inbound} resolves a viewed Asset's hash. A deleted Asset
+   * leaves the edge dangling, like any unresolved target. They are decor by construction, so the
+   * relation surface hides them by default and the reveal shows them.
    */
   private outbound(access: EntityAccess, id: string): OutboundReference[] {
     // Resolve each target's Thumbnail exactly as a list does (ADR-0066), so a link list reads visually.
     const { ownAsset, fieldAsset, fieldKind, columns: thumbnailColumns } = thumbnailJoin();
+    // The resolver for `asset` edges: hash + World → the Asset's wrapper Entity id. Its `entityId` is
+    // the target for an asset edge; an `entity` edge names its target id directly (COALESCE below).
+    const edgeAsset = alias(assetIndex, 'edge_asset');
+    const targetEntityId = sql`coalesce(${edgeAsset.entityId}, ${entityEdges.targetId})`;
     return (
       this.db
         .select({
           targetId: entityEdges.targetId,
           descriptor: entityEdges.descriptor,
+          decor: entityEdges.decor,
+          // The resolved target Entity id — equals `targetId` for an entity edge, the Asset wrapper's
+          // id for an asset edge — so an asset row links to its Entity, not its opaque hash.
+          id: entities.id,
           name: entities.name,
           types: entities.types,
           worldId: entities.worldId,
           ...thumbnailColumns,
         })
         .from(entityEdges)
-        .leftJoin(entities, and(eq(entities.id, entityEdges.targetId), access.filter))
+        .leftJoin(
+          edgeAsset,
+          and(
+            eq(entityEdges.targetKind, 'asset'),
+            eq(edgeAsset.hash, entityEdges.targetId),
+            eq(edgeAsset.worldId, entityEdges.worldId),
+          ),
+        )
+        .leftJoin(entities, and(sql`${entities.id} = ${targetEntityId}`, access.filter))
         .leftJoin(ownAsset, eq(ownAsset.entityId, entities.id))
         .leftJoin(
           fieldKind,
@@ -495,7 +517,7 @@ export class EntitiesService {
           ),
         )
         .leftJoin(fieldAsset, eq(fieldAsset.entityId, fieldKind.entityId))
-        .where(and(eq(entityEdges.sourceEntityId, id), eq(entityEdges.targetKind, 'entity')))
+        .where(eq(entityEdges.sourceEntityId, id))
         // Resolved targets by name; the dangling ones last, where they read as a footnote. `targetId`
         // is the final tiebreak, so two Entities sharing a name — or two descriptors to one target —
         // hold a stable order between reads (as `list` does with `asc(entities.id)`).
@@ -509,13 +531,15 @@ export class EntitiesService {
         .map((row) => ({
           targetId: row.targetId,
           descriptor: row.descriptor,
+          decor: row.decor,
           // An Entity whose stored types can't be read reads as a dangling target, same as an
           // unreadable or deleted one: the reference is there, the thing at the end of it is not.
-          // A resolved target carries a worldId, so the Thumbnail URL keys off *its* World.
+          // A resolved target carries a worldId, so the Thumbnail URL keys off *its* World. The
+          // resolved id (not the raw hash of an asset edge) is what the row links to.
           target:
             row.name === null
               ? null
-              : linkedEntity(row.targetId, row.name, row.types, resolveThumbnailUrl(row, row.worldId ?? '')),
+              : linkedEntity(row.id, row.name, row.types, resolveThumbnailUrl(row, row.worldId ?? '')),
         }))
     );
   }
@@ -555,6 +579,7 @@ export class EntitiesService {
         .select({
           sourceId: entities.id,
           descriptor: entityEdges.descriptor,
+          decor: entityEdges.decor,
           name: entities.name,
           types: entities.types,
           worldId: entities.worldId,
@@ -580,7 +605,7 @@ export class EntitiesService {
         // dangle: a row whose source has no drawable type drops out entirely.
         .flatMap((row) => {
           const source = linkedEntity(row.sourceId, row.name, row.types, resolveThumbnailUrl(row, row.worldId));
-          return source ? [{ descriptor: row.descriptor, source }] : [];
+          return source ? [{ descriptor: row.descriptor, source, decor: row.decor }] : [];
         })
     );
   }
@@ -605,6 +630,12 @@ export class EntitiesService {
     // The effective set — hence the defaults to mint — is the types' defaults plus whatever the initial
     // document already attaches (a namespaced key no type defaults, ADR-0057).
     const fields = this.worldTypeFields.effectiveFields(worldId, req.types, req.document);
+    // System-managed shape guard on create (ADR-0068): the write choke point rejects a user *edit* that
+    // adds a System-managed type/Field, and a raw create is that same add by another door — minting an
+    // asset-typed Entity, or attaching `core.field.asset` through a crafted document key (which would forge
+    // an `asset_index` dedup row). The system's own paths — mint, importers, Reindex — insert through
+    // `writes.insert` directly, never this create seam, so they stay unaffected.
+    if (this.createsSystemManaged(req.types, fields)) throw new ForbiddenException();
     const minted = emptyEntityDocument(fields, this.typeFields.structuredDataTypes);
     // Initial document seeds over the minted defaults. Ungated: like an import, a create establishes
     // at-rest data (the Field gate is save-only). The seed is stripped of the reserved `hexly.*`
@@ -620,6 +651,19 @@ export class EntitiesService {
       document: doc,
     });
     return detailOf(row, doc);
+  }
+
+  /**
+   * Whether a user create would introduce a **System-managed** type or Field (ADR-0068) — the add the write
+   * choke point rejects for an edit, closed here for the create door too. The effective set already folds in
+   * a document-attached Field (ADR-0057), so a crafted `core.field.asset` key is caught even when no type
+   * names it. Names no type/Field of its own: it consults the registry's marker, like every other surface.
+   */
+  private createsSystemManaged(types: readonly EntityType[], fields: readonly Field[]): boolean {
+    const systemTypes = new Set(this.typeFields.systemManagedTypes);
+    if (types.some((t) => systemTypes.has(t))) return true;
+    const systemFields = new Set(this.typeFields.systemManagedFields);
+    return fields.some((f) => systemFields.has(f.id));
   }
 
   /**

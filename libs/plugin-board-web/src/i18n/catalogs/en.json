@@ -2,6 +2,7 @@
   "dataType": {
     "surface": "Board surface"
   },
+  "name": "Board",
   "eyebrow": "Board",
   "titleLabel": "Board title",
   "rename": "Rename board",

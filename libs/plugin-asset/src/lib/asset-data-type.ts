@@ -114,4 +114,8 @@ export const ASSET_FIELD: Field = defineField({
   dataType: { kind: CORE_ASSET },
   required: false,
   facetable: false,
+  // System-managed (ADR-0068): the upload/mint path alone attaches the asset-ref Field. Detaching it would
+  // orphan the Asset's bytes, so the write choke point rejects a user-initiated attach/detach — the marker
+  // governs the slot, not the value (the ref is structured, with no inline control to hand-edit anyway).
+  systemManaged: true,
 });

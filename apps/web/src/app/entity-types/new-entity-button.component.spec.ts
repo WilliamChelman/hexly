@@ -58,6 +58,7 @@ function worldType(id: string, fieldRefs: string[]): TypeDefinition {
     fieldRefs,
     graphColorToken: '--color-ink-muted',
     labels: {
+      name: `${id}.name`,
       eyebrow: `${id}.eyebrow`,
       titleLabel: `${id}.titleLabel`,
       rename: `${id}.rename`,
@@ -213,6 +214,24 @@ describe('NewEntityButton', () => {
     // authored name verbatim for a user-defined one.
     expect(menuItem('core.type.hex-map')?.textContent).toContain('Map');
     expect(menuItem('world.type.deity')?.textContent).toContain('Deity');
+  });
+
+  it('never offers a System-managed Type — not in the menu, not as the primary default (ADR-0068)', () => {
+    // The system alone mints an Asset (ADR-0068): offering it here only produces a doomed create (403).
+    TestBed.inject(TypeRegistry).register({
+      id: 'core.type.asset',
+      icon: 'asset',
+      views: [],
+      graphColorToken: '--color-ink-muted',
+      systemManaged: true,
+    });
+    // Even configured as the Instance default, it must not resolve as the primary action.
+    defaultType.set('core.type.asset');
+    const fixture = render();
+
+    expect(primaryButton(fixture)?.textContent).toContain('Create Note');
+    openMenu(fixture);
+    expect(menuItem('core.type.asset')).toBeNull();
   });
 
   it('creates the Type a menu item names and opens it, with no per-type branch', () => {
