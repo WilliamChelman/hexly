@@ -6,9 +6,9 @@
   "author": "William Chelman",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "HEXLY_DIR=hexly-data nx run-many -t serve -p api,web",
-    "dev:api": "HEXLY_DIR=hexly-data nx serve api",
-    "dev:web": "nx serve web",
+    "dev": "NODE_OPTIONS=\"--import $PWD/scripts/name-nx-processes.mjs\" HEXLY_DIR=hexly-data nx run-many -t serve -p api,web",
+    "dev:api": "NODE_OPTIONS=\"--import $PWD/scripts/name-nx-processes.mjs\" HEXLY_DIR=hexly-data nx serve api",
+    "dev:web": "NODE_OPTIONS=\"--import $PWD/scripts/name-nx-processes.mjs\" nx serve web",
     "dev:desktop": "nx serve desktop",
     "package:desktop": "nx run desktop:package",
     "native:electron": "nx run desktop:rebuild-native",

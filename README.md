@@ -107,6 +107,24 @@ pnpm dev:api    # NestJS API only
 pnpm dev:web    # Angular app only
 ```
 
+### Finding a dev process
+
+The dev scripts name every process nx forks, so they are greppable instead of a
+row of identical `node` entries:
+
+```sh
+$ pgrep -fl hexly:
+hexly:web:serve         # the Angular dev server
+hexly:api:serve         # nx supervising the API
+hexly:api:serve:app     # the API server itself — the one listening on :3000
+```
+
+`pkill -f hexly:` clears a stuck run. Naming happens in
+`scripts/name-nx-processes.mjs`, preloaded via `NODE_OPTIONS`; the long-lived nx
+daemon is deliberately left out of it. Note that `pnpm dev` leaves the previous
+`:app` process behind on each API rebuild — an nx `run-many` quirk, not a
+symptom of the naming.
+
 ## The Desktop App
 
 `apps/desktop` is an Electron shell whose **main process boots the same Nest `AppModule`** on an
