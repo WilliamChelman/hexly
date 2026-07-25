@@ -9,6 +9,7 @@ import { buildContextMenuTemplate } from './context-menu';
 import { routeLinks } from './external-links';
 import { APP_NAME, pinInstanceDir } from './instance-dir';
 import { CANCEL_MOVE_ASSETS, MENU_COMMAND, MOVE_ASSETS, MOVE_ASSETS_PROGRESS, RENEW_SESSION } from './ipc';
+import { describeLoopLag, loopLagSettings, startLoopLagProbe, watchRequests } from './loop-lag';
 import { buildAppMenuTemplate } from './menu';
 import { type AssetStorageMoveOutcome, assetFileStore, moveAssetStorage, throttleProgress } from './move-assets';
 import { revealFolder } from './reveal-folder';
@@ -61,6 +62,16 @@ const PROGRESS_INTERVAL_MS = 100;
  */
 const RELAUNCH_DELAY_MS = 600;
 
+/**
+ * The tripwire ADR-0070 left itself for the `utilityProcess` decision (#329). Main's loop serves every HTTP
+ * response as well as the windows, so "does Nest need to move out of main?" is a question about which
+ * handlers hold that loop — and this is what answers it in numbers. Armed here, before anything that can
+ * block: the boot migrations are the first long block of a launch.
+ */
+const lagProbe = startLoopLagProbe(loopLagSettings(process.env), (reading) =>
+  console.log(`[hexly] ${describeLoopLag(reading)}`),
+);
+
 // Pinned before anything reads `userData`: both the Instance Directory and the single-instance lock hang
 // off it, so a later packaged `productName` must not silently move the Instance (ADR-0070).
 electron.setName(APP_NAME);
@@ -87,20 +98,28 @@ if (!electron.requestSingleInstanceLock()) {
  * and the login page is never rendered.
  */
 async function boot(): Promise<void> {
-  instanceDir = pinInstanceDir(electron.getPath('userData'));
-  // Beside `userData`, not inside the Instance Directory: where a window sat is this machine's business, and
-  // the Instance Directory is the folder a user copies to back their worldbuilding up (ADR-0070).
-  windowStatePath = join(electron.getPath('userData'), 'window-state.json');
-  installAppMenu();
-  // Session-wide and before any window exists, so every editable surface in every window is covered.
-  const languages = enableSpellChecker(session.defaultSession, electron.getLocale());
-  console.log(`[hexly] spellchecking ${languages.join(', ') || 'off: no dictionary is available'}`);
-  host = await startApiHost();
-  await mintSessionCookie(host);
-  console.log(`[hexly] hosting ${instanceDir} on ${host.origin}`);
-  // Over HTTP from the API we just started, never `file://`, which breaks both the cookie and the
-  // single-origin assumption (ADR-0070).
-  await openWindow(host.origin);
+  // Labelled, because migrations (ADR-0027) are the longest synchronous stretch a launch has, and lag
+  // reported with nothing in flight would otherwise be the only trace of them (#329).
+  const booting = lagProbe.during('boot');
+  try {
+    instanceDir = pinInstanceDir(electron.getPath('userData'));
+    // Beside `userData`, not inside the Instance Directory: where a window sat is this machine's business, and
+    // the Instance Directory is the folder a user copies to back their worldbuilding up (ADR-0070).
+    windowStatePath = join(electron.getPath('userData'), 'window-state.json');
+    installAppMenu();
+    // Session-wide and before any window exists, so every editable surface in every window is covered.
+    const languages = enableSpellChecker(session.defaultSession, electron.getLocale());
+    console.log(`[hexly] spellchecking ${languages.join(', ') || 'off: no dictionary is available'}`);
+    host = await startApiHost();
+    watchRequests(host.server, lagProbe);
+    await mintSessionCookie(host);
+    console.log(`[hexly] hosting ${instanceDir} on ${host.origin}`);
+    // Over HTTP from the API we just started, never `file://`, which breaks both the cookie and the
+    // single-origin assumption (ADR-0070).
+    await openWindow(host.origin);
+  } finally {
+    booting();
+  }
 }
 
 /** Open the Sole User's session and put it where the renderer will send it. */
@@ -252,6 +271,9 @@ async function moveAssets(event: Electron.IpcMainInvokeEvent): Promise<AssetStor
   const dir = instanceDir;
   const cancel = new AbortController();
   assetMove = cancel;
+  // Gigabytes of hashing and copying is main's own work, so the probe would otherwise attribute the lag it
+  // causes to nothing at all (#329).
+  const moving = lagProbe.during('move asset storage');
   try {
     const outcome = await moveAssetStorage({
       from: host.assetsDir,
@@ -271,6 +293,7 @@ async function moveAssets(event: Electron.IpcMainInvokeEvent): Promise<AssetStor
     return outcome;
   } finally {
     assetMove = undefined;
+    moving();
   }
 }
 

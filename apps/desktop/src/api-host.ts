@@ -16,6 +16,11 @@ export interface ApiHost {
    * app rather than recomputed, so the folder main offers to move is by construction the one being served.
    */
   readonly assetsDir: string;
+  /**
+   * The listening server, so main can see what its own event loop is answering (#329) — the instrument sits
+   * out here rather than as Nest middleware, because the loop being served is main's problem, not the API's.
+   */
+  readonly server: Server;
   /** Close the app, running the shutdown hooks that close the SQLite handle (ADR-0027). */
   close(): Promise<void>;
 }
@@ -39,6 +44,7 @@ export async function startApiHost(): Promise<ApiHost> {
     origin: `http://${LOOPBACK}:${boundPort(server.address())}`,
     auth: app.get(AuthService),
     assetsDir: app.get<string>(ASSETS_DIR),
+    server,
     close: async () => {
       // `server.close()` waits for open connections and a live-follow SSE stream never ends (ADR-0044),
       // so quitting with an Entity open would hang. The renderer goes away with us.

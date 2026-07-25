@@ -125,6 +125,22 @@ pnpm dev:desktop       # builds the SPA + the shell, then opens the window
 it, and a `secure` cookie is never stored over plain `http://127.0.0.1`, so the Sole User's session
 would silently fail to stick. The production _build_ ships without the literal env value.
 
+### Watching main's event loop
+
+Main's loop serves every HTTP response as well as the windows, so a slow handler is felt as a frozen menu
+bar. The shell watches itself for it (ADR-0070, #329): any stretch past **100 ms** is logged with what main
+had in hand, ranked so the likeliest culprit reads first, and anything too short to have caused the block is
+counted rather than named.
+
+```
+[hexly] event-loop lag 1514ms peak in 2157ms — POST /api/worlds/import 1499ms, +45 too short to have held it
+```
+
+```sh
+HEXLY_LOOP_LAG=off pnpm dev:desktop   # silence it
+HEXLY_LOOP_LAG=25 pnpm dev:desktop    # report above 25ms instead, for a measuring run
+```
+
 ### Native modules and the ABI switch
 
 `better-sqlite3` is a classic C++ addon, so its binary must match the ABI of the runtime that opens the
