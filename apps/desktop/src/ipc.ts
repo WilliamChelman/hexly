@@ -12,3 +12,15 @@ export const RENEW_SESSION = 'hexly:renew-session';
  * (ADR-0070).
  */
 export const MENU_COMMAND = 'hexly:menu-command';
+
+/**
+ * Move the Asset bytes to a folder the user picks, and relaunch into it (#326). Main's, not the renderer's:
+ * it owns the native picker, the filesystem and `hexly.yml`, none of which the SPA can reach.
+ */
+export const MOVE_ASSETS = 'hexly:move-assets';
+
+/** How far that copy has got, main → renderer, so a surface can hold the user through gigabytes. */
+export const MOVE_ASSETS_PROGRESS = 'hexly:move-assets-progress';
+
+/** Cancel the copy in flight. `send`, not `invoke`: there is nothing to answer, and the caller is waiting. */
+export const CANCEL_MOVE_ASSETS = 'hexly:cancel-move-assets';

@@ -1,6 +1,6 @@
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { AuthService, createApiApp, pinDeployment } from '../../api/src/host';
+import { ASSETS_DIR, AuthService, createApiApp, pinDeployment } from '../../api/src/host';
 
 /** Loopback, never `0.0.0.0`: unreachable from the LAN, and it opens no firewall hole (ADR-0070). */
 const LOOPBACK = '127.0.0.1';
@@ -11,6 +11,11 @@ export interface ApiHost {
   readonly origin: string;
   /** How main holds the Sole User's identity — the same service every route resolves sessions through. */
   readonly auth: AuthService;
+  /**
+   * Where this Instance's Asset bytes are, as `ASSETS_DIR` resolved `assets.dir` (#324). Read off the running
+   * app rather than recomputed, so the folder main offers to move is by construction the one being served.
+   */
+  readonly assetsDir: string;
   /** Close the app, running the shutdown hooks that close the SQLite handle (ADR-0027). */
   close(): Promise<void>;
 }
@@ -33,6 +38,7 @@ export async function startApiHost(): Promise<ApiHost> {
   return {
     origin: `http://${LOOPBACK}:${boundPort(server.address())}`,
     auth: app.get(AuthService),
+    assetsDir: app.get<string>(ASSETS_DIR),
     close: async () => {
       // `server.close()` waits for open connections and a live-follow SSE stream never ends (ADR-0044),
       // so quitting with an Entity open would hang. The renderer goes away with us.

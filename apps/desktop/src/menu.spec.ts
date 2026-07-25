@@ -3,6 +3,7 @@ import {
   AppMenuActions,
   buildAppMenuTemplate,
   GO_TO_WORLDS,
+  MOVE_ASSET_STORAGE,
   NEW_WINDOW,
   OPEN_COMMAND_PALETTE,
   REVEAL_DATA_FOLDER,
@@ -94,6 +95,13 @@ describe('buildAppMenuTemplate', () => {
       expect(itemById(menu('linux'), REVEAL_DATA_FOLDER).label).toBe('Open Data Folder');
     });
 
+    /** Beside revealing the data folder, because both answer "where does my worldbuilding live?" (#326). */
+    it('offers the Asset-storage move from File, on every platform', () => {
+      for (const platform of ['darwin', 'win32', 'linux'] as const) {
+        expect(submenu(menu(platform), 'File').map((item) => item.id)).toContain(MOVE_ASSET_STORAGE);
+      }
+    });
+
     it('offers pasteAndMatchStyle only where the role exists', () => {
       expect(submenu(menu('darwin'), 'Edit').map((i) => i.role)).toContain('pasteAndMatchStyle');
       expect(submenu(menu('linux'), 'Edit').map((i) => i.role)).not.toContain('pasteAndMatchStyle');
@@ -144,8 +152,11 @@ describe('buildAppMenuTemplate', () => {
 
       choose(itemById(template, OPEN_COMMAND_PALETTE));
       choose(itemById(template, GO_TO_WORLDS));
+      // Main owns the picker and the bytes, but the copy needs a surface to report progress on and be
+      // cancelled from — so this one goes through the renderer too (#326).
+      choose(itemById(template, MOVE_ASSET_STORAGE));
 
-      expect(actions.invoked).toEqual([OPEN_COMMAND_PALETTE, GO_TO_WORLDS]);
+      expect(actions.invoked).toEqual([OPEN_COMMAND_PALETTE, GO_TO_WORLDS, MOVE_ASSET_STORAGE]);
     });
 
     /** Opening a window is main's own business — it owns the window list — so no renderer round trip either. */

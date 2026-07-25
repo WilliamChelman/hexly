@@ -15,16 +15,19 @@ The dividing line, stated once: **policy questions read a flag; capability quest
 
 ## The two cut lists
 
-| Affordance                                                                      | Gated on              |
-| ------------------------------------------------------------------------------- | --------------------- |
-| Login page, `/login` route, Sign in / Sign out, 401 → re-mint                   | `profile === desktop` |
-| Change password, Profile section (email, display name)                          | `profile === desktop` |
-| Native menus, multi-window, spellcheck, Reveal data folder, asset-folder picker | `profile === desktop` |
-| Entity share dialog + `manage-owners`, owner set, member set                    | `collaboration` off   |
-| World and Entity Public Link, `/public/**` routes                               | `collaboration` off   |
-| Entity Visibility toggle, and the Visibility Facet                              | `collaboration` off   |
-| `/users` and its Command Palette entry                                          | `collaboration` off   |
-| `/admin` — Superadmin Reindex                                                   | neither: always on    |
+| Affordance                                                    | Gated on              |
+| ------------------------------------------------------------- | --------------------- |
+| Login page, `/login` route, Sign in / Sign out, 401 → re-mint | `profile === desktop` |
+| Change password, Profile section (email, display name)        | `profile === desktop` |
+| Native menus, multi-window, spellcheck, Reveal data folder    | `profile === desktop` |
+| Asset-folder picker                                           | the bridge's presence |
+| Entity share dialog + `manage-owners`, owner set, member set  | `collaboration` off   |
+| World and Entity Public Link, `/public/**` routes             | `collaboration` off   |
+| Entity Visibility toggle, and the Visibility Facet            | `collaboration` off   |
+| `/users` and its Command Palette entry                        | `collaboration` off   |
+| `/admin` — Superadmin Reindex                                 | neither: always on    |
+
+The **asset-folder picker** moved rows when it was built (#326): it was filed under the profile here, and the profile is the wrong test by this ADR's own rule. Moving Asset storage needs a native picker, a filesystem and a `hexly.yml` to rewrite — a capability, not a policy — so it checks for the preload bridge, exactly as re-minting a session does. The visible consequence is that the `profile: desktop` _browser_ run below does not offer it, which is right: there is nothing behind it there.
 
 **Reindex stays** on both. ADR-0037 gives the Superadmin repair, not administration, and on the Desktop App the user _is_ the operator — there is no shell to recover from, so cutting it would leave a drifted vault with no in-app remedy. **Live-follow stays** for the reason ADR-0070 gives: multi-window.
 

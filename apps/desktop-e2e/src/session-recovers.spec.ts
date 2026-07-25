@@ -7,19 +7,25 @@ import { expect, test } from './desktop-app';
  *
  * `window` here is the app's Page, so the browser-side globals below are reached through `globalThis`.
  */
-test('the preload bridge offers a session re-mint and the menu channel, and nothing else', async ({ launch }) => {
+test('the preload bridge offers only what the renderer cannot do itself', async ({ launch }) => {
   const { window } = await launch();
 
   // The bridge is main's whole surface to the renderer, and it grows a member only when the renderer cannot
-  // do the job itself: re-minting a session (#321) and hearing the native menu's clicks (#322). Its presence
-  // is still what the client tests instead of reading a flag (ADR-0071).
+  // do the job itself: re-minting a session (#321), hearing the native menu's clicks (#322), and moving the
+  // Asset bytes — a native picker, a filesystem and a `hexly.yml` write (#326). Its presence is still what the
+  // client tests instead of reading a flag (ADR-0071).
   // Described rather than returned: a function does not survive the trip out of the page.
   const members = await window.evaluate(() =>
     Object.entries((globalThis as unknown as { hexly: Record<string, unknown> }).hexly).map(
       ([name, member]) => `${name}: ${typeof member}`,
     ),
   );
-  expect(members).toEqual(['renewSession: function', 'onMenuCommand: function']);
+  expect(members).toEqual([
+    'renewSession: function',
+    'onMenuCommand: function',
+    'moveAssetStorage: function',
+    'cancelAssetStorageMove: function',
+  ]);
 });
 
 test('a session deleted under the app is re-minted on the next navigation, where the user was', async ({ launch }) => {

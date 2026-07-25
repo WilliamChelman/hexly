@@ -4,11 +4,13 @@ import './no-production-env';
 import { join } from 'node:path';
 import { app as electron, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell } from 'electron';
 import { ApiHost, startApiHost } from './api-host';
+import { writeAssetsDir } from './assets-dir';
 import { buildContextMenuTemplate } from './context-menu';
 import { routeLinks } from './external-links';
 import { pinInstanceDir } from './instance-dir';
-import { MENU_COMMAND, RENEW_SESSION } from './ipc';
+import { CANCEL_MOVE_ASSETS, MENU_COMMAND, MOVE_ASSETS, MOVE_ASSETS_PROGRESS, RENEW_SESSION } from './ipc';
 import { buildAppMenuTemplate } from './menu';
+import { type AssetMoveProgress, type AssetStorageMoveOutcome, assetFileStore, moveAssetStorage } from './move-assets';
 import { revealFolder } from './reveal-folder';
 import { writeSessionCookie } from './session-cookie';
 import { closeSoleUserSession, openSoleUserSession } from './sole-user';
@@ -47,6 +49,21 @@ let lastFocused: BrowserWindow | undefined;
 /** The geometry of the launch's first window, which is the only one remembered — {@link openWindow} says why. */
 let geometry: GeometryTracker | undefined;
 
+/** The Asset-storage move in flight, if any: one at a time, and the handle the renderer's Cancel pulls. */
+let assetMove: AbortController | undefined;
+
+/**
+ * How often progress reaches the renderer. A folder of ten thousand small files would otherwise send ten
+ * thousand messages, each costing a change-detection pass, to redraw a bar that moves in fractions of a pixel.
+ */
+const PROGRESS_INTERVAL_MS = 100;
+
+/**
+ * How long the reply to `MOVE_ASSETS` gets before the relaunch tears the renderer down. Enough for the dialog
+ * to say what is about to happen: a window that vanished mid-copy would read as a crash, not as a restart.
+ */
+const RELAUNCH_DELAY_MS = 600;
+
 // Pinned before anything reads `userData`: both the Instance Directory and the single-instance lock hang
 // off it, so a later packaged `productName` must not silently move the Instance (ADR-0070).
 electron.setName('Hexly');
@@ -61,6 +78,9 @@ if (!electron.requestSingleInstanceLock()) {
   electron.on('window-all-closed', () => electron.quit());
   electron.on('before-quit', beginQuit);
   ipcMain.handle(RENEW_SESSION, renewSession);
+  ipcMain.handle(MOVE_ASSETS, moveAssets);
+  // `on`, not `handle`: the caller is already awaiting the move, and the abort is what answers it.
+  ipcMain.on(CANCEL_MOVE_ASSETS, () => assetMove?.abort());
   electron.whenReady().then(boot).catch(failToStart);
 }
 
@@ -215,6 +235,80 @@ function reportWindowFailure(err: unknown): void {
 async function renewSession(): Promise<void> {
   if (!host) return;
   await mintSessionCookie(host);
+}
+
+/**
+ * Move this Instance's Asset bytes to a folder the user picks (#326). Main's half of it is everything the SPA
+ * cannot reach: the native picker, the copy, the `hexly.yml` write and the relaunch — while the renderer owns
+ * the surface that reports progress and offers Cancel.
+ *
+ * One at a time. Two copies out of one root would report over each other, and the second would rewrite the
+ * config the first is still working towards.
+ *
+ * A `reason` is English only, as the menu's labels are (ADR-0070): main has no transloco catalog, and most of
+ * what lands here is a filesystem message anyway. The renderer supplies the localised sentence above it.
+ */
+async function moveAssets(event: Electron.IpcMainInvokeEvent): Promise<AssetStorageMoveOutcome> {
+  if (assetMove) return { status: 'failed', reason: 'A move of the Asset folder is already running.' };
+  if (!host || !instanceDir) return { status: 'failed', reason: 'Hexly is still starting up.' };
+
+  const dir = instanceDir;
+  const cancel = new AbortController();
+  assetMove = cancel;
+  try {
+    const outcome = await moveAssetStorage({
+      from: host.assetsDir,
+      store: assetFileStore(),
+      signal: cancel.signal,
+      chooseFolder: () => chooseAssetFolder(BrowserWindow.fromWebContents(event.sender)),
+      // Guarded: a window closed mid-copy would otherwise make `send` throw, and a torn-down surface is not
+      // a copy failure — the quit that follows a last window closing is what ends this move.
+      onProgress: throttled((progress) => {
+        if (!event.sender.isDestroyed()) event.sender.send(MOVE_ASSETS_PROGRESS, progress);
+      }),
+      recordNewRoot: (chosen) => writeAssetsDir(dir, chosen),
+    });
+    // Config is read once at boot (ADR-0036), so applying the new root is a restart — and it is ours to
+    // perform rather than something the user has to know to do (ADR-0070).
+    if (outcome.status === 'moved') relaunchSoon();
+    return outcome;
+  } finally {
+    assetMove = undefined;
+  }
+}
+
+/** The native folder picker, modal to the window that asked when there is one. */
+async function chooseAssetFolder(parent: BrowserWindow | null): Promise<string | undefined> {
+  const options: Electron.OpenDialogOptions = {
+    title: 'Choose a folder for Hexly’s Assets',
+    // `createDirectory` so the user can make the folder here rather than leaving to make it first.
+    properties: ['openDirectory', 'createDirectory'],
+    buttonLabel: 'Move Assets Here',
+  };
+  const chosen = await (parent ? dialog.showOpenDialog(parent, options) : dialog.showOpenDialog(options));
+  return chosen.canceled ? undefined : chosen.filePaths[0];
+}
+
+/** Report at most once per {@link PROGRESS_INTERVAL_MS}; the outcome, not a last report, is what ends the story. */
+function throttled(report: (progress: AssetMoveProgress) => void): (progress: AssetMoveProgress) => void {
+  let last = 0;
+  return (progress) => {
+    const now = Date.now();
+    if (now - last < PROGRESS_INTERVAL_MS) return;
+    last = now;
+    report(progress);
+  };
+}
+
+/**
+ * Restart into the new configuration. `quit`, not `exit`: the relaunch has to go through the ordered shutdown
+ * that revokes the session and closes the SQLite handle, or the next launch inherits an open database.
+ */
+function relaunchSoon(): void {
+  setTimeout(() => {
+    electron.relaunch();
+    electron.quit();
+  }, RELAUNCH_DELAY_MS);
 }
 
 /**

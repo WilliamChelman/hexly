@@ -17,6 +17,15 @@ class FakeBridge implements DesktopBridge {
     return () => (this.unsubscribed = true);
   }
 
+  /** Present because the bridge has them; a menu click is all this spec drives. */
+  moveAssetStorage(): Promise<never> {
+    return Promise.reject(new Error('Not this spec’s business'));
+  }
+
+  cancelAssetStorageMove(): void {
+    // Nothing to cancel here.
+  }
+
   /** A user choosing a menu item, as main reports it. */
   click(commandId: string): void {
     if (!this.listener) throw new Error('Nothing is listening for menu clicks');

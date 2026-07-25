@@ -16,6 +16,7 @@ export interface AppMenuActions {
  */
 export const OPEN_COMMAND_PALETTE = 'open-command-palette';
 export const GO_TO_WORLDS = 'go-worlds';
+export const MOVE_ASSET_STORAGE = 'move-asset-storage';
 
 /** The ids of the items main acts on itself, so a spec can find them without matching a label. */
 export const NEW_WINDOW = 'new-window';
@@ -93,6 +94,10 @@ function fileMenu(platform: NodeJS.Platform, actions: AppMenuActions): MenuItemC
       { id: NEW_WINDOW, label: 'New Window', accelerator: 'CmdOrCtrl+Shift+N', click: () => actions.openNewWindow() },
       { type: 'separator' },
       { id: REVEAL_DATA_FOLDER, label: revealLabel(platform), click: () => actions.revealDataFolder() },
+      // Beside revealing the folder, because both answer "where is my data?" — but a Command, not one of main's
+      // own actions: the copy takes minutes and needs a surface to report progress on and be cancelled from,
+      // which is the renderer's (#326). Main still owns the picker and the bytes.
+      commandItem(MOVE_ASSET_STORAGE, 'Move Asset Storage…', actions),
       { type: 'separator' },
       // Quit lives in the app menu on macOS, so this menu ends at closing the window there.
       mac ? { role: 'close' } : { role: 'quit' },

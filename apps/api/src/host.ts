@@ -24,6 +24,9 @@ export { pinDeployment } from './app/config';
 export type { DeploymentPins } from './app/config';
 export { AuthService } from './app/auth/auth.service';
 export { SESSION_COOKIE } from './app/auth/auth.controller';
+// The resolved Assets root (ADR-0034), so an embedder that offers to *move* those bytes (#326) reads the same
+// truth every consumer does rather than re-deriving `assets.dir` against the Instance Directory.
+export { ASSETS_DIR } from './app/assets/assets.service';
 
 /** What an entry point decides about the app itself, as opposed to where it listens. */
 export interface ApiAppOptions {

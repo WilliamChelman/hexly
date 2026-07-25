@@ -562,5 +562,14 @@
       "superadmin-managed-by-superadmin": "Seul un Superadmin peut gérer un compte Superadmin.",
       "user-not-found": "Ce compte n'existe plus."
     }
+  },
+  "assetStorage": {
+    "heading": "Déplacer le stockage des Assets",
+    "command": "Déplacer le stockage des Assets…",
+    "choosing": "Choisissez un dossier pour vos Assets…",
+    "copying": "Copie de {{copied}} fichiers sur {{total}}…",
+    "cancelling": "Arrêt en cours…",
+    "moved": "{{count}} fichiers copiés vers {{folder}}. Hexly va redémarrer pour les utiliser.",
+    "failedTitle": "Le déplacement a été interrompu et vos Assets sont restés où ils étaient."
   }
 }
