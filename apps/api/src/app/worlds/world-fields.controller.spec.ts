@@ -24,7 +24,9 @@ describe('World user-defined Field endpoints (ADR-0054, #230)', () => {
 
     app = moduleRef.createNestApplication();
     app.use(cookieParser());
-    await app.init();
+    // Listen for real: supertest otherwise churns an ephemeral port per request, and a reused loopback
+    // 4-tuple still in TIME_WAIT is RST as `socket hang up`.
+    await app.listen(0);
 
     await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', { roles: ['create-worlds'] });
   });

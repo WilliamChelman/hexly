@@ -92,7 +92,8 @@ export class WorldsController {
   /**
    * Import an Obsidian vault `.zip` into a fresh World (ADR-0033). Multer buffers the upload in
    * memory; the import pre-extracts Asset Stats/thumbnails (sharp, async, ADR-0065) then persists in
-   * one synchronous transaction, and the {@link ImportSummary} reports what landed and what was lost.
+   * chunked transactions that each commit and yield (ADR-0046), and the {@link ImportSummary} reports
+   * what landed and what was lost.
    */
   @Post('import')
   // Import mints a World, so it needs the World Creation capability too (ADR-0040).

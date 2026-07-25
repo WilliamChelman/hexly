@@ -6,13 +6,18 @@ import { entityIdFromUrl, expect, segRe, test, type Page } from './fixtures';
  * by the segment and switching Worlds re-scopes the list.
  */
 
-/** Create a World from the Index and land on its Dashboard (the World root). Returns its id. */
-async function createWorldFromIndex(page: Page): Promise<{ id: string }> {
+/**
+ * Create a World from the Index and land on its Dashboard (the World root). Returns its id.
+ * Create prompts for a name; leaving it blank takes the untitled default.
+ */
+async function createWorldFromIndex(page: Page, name?: string): Promise<{ id: string }> {
   await page.goto('/');
   const created = page.waitForResponse(
     (r) => r.url().endsWith('/api/worlds') && r.request().method() === 'POST' && r.ok(),
   );
   await page.getByTestId('create-world').click();
+  if (name) await page.getByTestId('create-world-name').fill(name);
+  await page.getByTestId('confirm-create-world').click();
   const world = await (await created).json();
   // Creating a World lands on its root (the Dashboard, ADR-0043), not a seeded note.
   await page.waitForURL(new RegExp(`/w/${segRe(world.id)}(/|$)`));
@@ -37,12 +42,14 @@ test('the World Index lists reachable Worlds; creating one lands on its root', a
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /Welcome back/ })).toBeVisible();
 
-  const world = await createWorldFromIndex(page);
+  const world = await createWorldFromIndex(page, 'Aldermoor');
   // A fresh World seeds no Entities (ADR-0043) — creation lands on the World root.
   await expect(page).toHaveURL(new RegExp(`/w/${segRe(world.id)}(/|$)`));
 
   await page.goto('/');
   await expect(page.getByTestId(`world-${world.id}`)).toBeVisible();
+  // The name the prompt collected is the World's own, not the untitled default.
+  await expect(page.getByTestId(`world-${world.id}`)).toHaveAttribute('aria-label', 'Aldermoor');
   await expect(page.getByTestId(`owned-${world.id}`)).toBeVisible();
 
   // Activating the card lands on the World Dashboard — the World root (ADR-0043).

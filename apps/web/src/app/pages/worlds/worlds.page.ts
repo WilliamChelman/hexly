@@ -78,7 +78,7 @@ import {
         variant="primary"
         data-testid="create-world"
         [disabled]="creating()"
-        (click)="create()"
+        (click)="promptCreate()"
       >
         <app-icon name="plus" [size]="16" />
         {{ (creating() ? 'worldIndex.creating' : 'worlds.new') | transloco }}
@@ -236,7 +236,7 @@ import {
                 type="button"
                 class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-gold hover:border-gold bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-gold)] focus-visible:[outline-offset:-2px]"
                 [disabled]="creating()"
-                (click)="create()"
+                (click)="promptCreate()"
               >
                 <app-icon name="plus" [size]="24" />
                 <span class="font-display text-md">{{ 'worlds.new' | transloco }}</span>
@@ -269,6 +269,52 @@ import {
           }
         </section>
       </main>
+    }
+
+    @if (naming()) {
+      <!-- Naming is the first act of worldbuilding, so create asks before it writes;
+           an unnamed World still lands, under the untitled default. -->
+      <app-dialog
+        [open]="true"
+        [heading]="'worldIndex.createHeading' | transloco"
+        (closed)="cancelCreate()"
+        data-testid="create-world-modal"
+      >
+        <label class="flex flex-col gap-1 text-sm text-ink-muted">
+          {{ 'worldIndex.createNameLabel' | transloco }}
+          <input
+            type="text"
+            appAutofocus
+            appInput
+            data-testid="create-world-name"
+            [value]="newName()"
+            [attr.placeholder]="'worlds.untitled' | transloco"
+            (input)="newName.set($any($event.target).value)"
+            (keydown.enter)="create()"
+          />
+        </label>
+        <button
+          dialogFooter
+          type="button"
+          appButton
+          variant="default"
+          data-testid="cancel-create-world"
+          (click)="cancelCreate()"
+        >
+          {{ 'common.cancel' | transloco }}
+        </button>
+        <button
+          dialogFooter
+          type="button"
+          appButton
+          variant="primary"
+          data-testid="confirm-create-world"
+          [disabled]="creating()"
+          (click)="create()"
+        >
+          {{ (creating() ? 'worldIndex.creating' : 'common.create') | transloco }}
+        </button>
+      </app-dialog>
     }
 
     @if (pendingDelete(); as target) {
@@ -397,6 +443,8 @@ export class WorldsPage {
   protected readonly exportingId = signal<string | null>(null);
   protected readonly importSummary = signal<ImportSummary | null>(null);
   protected readonly renamingId = signal<string | null>(null);
+  protected readonly naming = signal(false);
+  protected readonly newName = signal('');
   protected readonly pendingDelete = signal<{
     id: string;
     name: string;
@@ -481,14 +529,29 @@ export class WorldsPage {
     });
   }
 
+  /** Open the name prompt; the World is written only once the author confirms. */
+  protected promptCreate(): void {
+    this.newName.set('');
+    this.naming.set(true);
+  }
+
+  protected cancelCreate(): void {
+    this.naming.set(false);
+  }
+
+  /** A blank name falls back to the untitled default, as elsewhere at create time. */
   protected create(): void {
     if (this.creating()) return;
     this.creating.set(true);
     this.store
-      .create(this.transloco.translate('worlds.untitled'))
+      .create(this.newName().trim() || this.transloco.translate('worlds.untitled'))
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
-        next: (world) => this.router.navigate(worldDashboardRoute(world.id, world.name)),
+        next: (world) => {
+          this.naming.set(false);
+          this.router.navigate(worldDashboardRoute(world.id, world.name));
+        },
+        // The prompt stays open on failure, so a retry keeps the typed name.
         error: () => this.toaster.show(this.transloco.translate('worlds.createError'), 'error'),
       });
   }

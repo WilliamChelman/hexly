@@ -40,7 +40,9 @@ describe('Asset serving endpoint', () => {
       .useValue(dir)
       .compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    // Listen for real: supertest otherwise churns an ephemeral port per request, and a reused loopback
+    // 4-tuple still in TIME_WAIT is RST as `socket hang up`.
+    await app.listen(0);
     seedUserAndWorld(db);
   });
 
@@ -90,7 +92,9 @@ describe('Asset bytes root from hexly.yml (ADR-0070)', () => {
       .useValue(db)
       .compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    // Listen for real: supertest otherwise churns an ephemeral port per request, and a reused loopback
+    // 4-tuple still in TIME_WAIT is RST as `socket hang up`.
+    await app.listen(0);
     seedUserAndWorld(db);
   }
 
@@ -150,7 +154,9 @@ describe('Missing Asset bytes (#325)', () => {
       .useValue(dir)
       .compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    // Listen for real: supertest otherwise churns an ephemeral port per request, and a reused loopback
+    // 4-tuple still in TIME_WAIT is RST as `socket hang up`.
+    await app.listen(0);
     seedUserAndWorld(db);
   });
 

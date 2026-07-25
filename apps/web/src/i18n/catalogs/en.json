@@ -295,6 +295,8 @@
     "subhead": "Pick up where you left off, or chart somewhere new.",
     "continue": "Continue",
     "creating": "Creating…",
+    "createHeading": "Name your world",
+    "createNameLabel": "World name",
     "owned": "Owned",
     "member": "Member",
     "loadErrorTitle": "Couldn't load your worlds.",

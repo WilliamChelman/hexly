@@ -24,6 +24,8 @@ test('Format Locale roams via the account and reflows the entity browser date', 
     (r) => r.url().endsWith('/api/worlds') && r.request().method() === 'POST' && r.ok(),
   );
   await page.getByTestId('create-world').click();
+  // Create prompts for a name; the untitled default will do here.
+  await page.getByTestId('confirm-create-world').click();
   const world = await (await created).json();
   await page.goto(`/w/${world.id}/entities`);
   await page.getByTestId('new-default-entity').click();

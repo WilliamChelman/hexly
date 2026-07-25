@@ -16,6 +16,7 @@ test('an edit made in one run is there after a relaunch', async ({ launch }) => 
     (res) => res.url().endsWith('/api/worlds') && res.request().method() === 'POST' && res.ok(),
   );
   await first.window.getByTestId('create-world').click();
+  await first.window.getByTestId('confirm-create-world').click();
   const world = await (await created).json();
   await first.window.waitForURL(/\/w\/[^/]+/);
 

@@ -13,6 +13,7 @@ test('a second window opens on the same Instance, and an edit in one appears liv
 
   // A World and an Entity, so both windows have the same thing open.
   await run.window.getByTestId('create-world').click();
+  await run.window.getByTestId('confirm-create-world').click();
   await run.window.waitForURL(/\/w\/[^/]+/);
   await run.window.getByTestId('new-default-entity').click();
   await run.window.waitForURL(/\/entities\/[\w-]+$/);
