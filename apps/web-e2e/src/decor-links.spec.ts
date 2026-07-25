@@ -65,20 +65,23 @@ test('hides Decor Links by default and reveals them behind the show-decor toggle
   await expect(counts).toContainText('2 entities');
   await expect(counts).toContainText('1 links');
 
-  const decorToggle = page.getByTestId('graph-decor-toggle');
-  await expect(decorToggle).toHaveAttribute('aria-pressed', 'false');
+  // Both reveals live in the graph's floating filters menu, which closes on select — one open per flip.
+  const filters = page.getByTestId('graph-filters');
+  await filters.click();
+  await expect(page.getByTestId('graph-decor-toggle')).toHaveAttribute('aria-checked', 'false');
 
   // Reveal decor: the Thumbnail edge returns, and the Asset with it — no longer an orphan, drawn connected.
-  await decorToggle.click();
-  await expect(decorToggle).toHaveAttribute('aria-pressed', 'true');
+  await page.getByTestId('graph-decor-toggle').click();
   await expect(counts).toContainText('3 entities');
   await expect(counts).toContainText('2 links');
 
   // Hide decor again; the orphans toggle alone surfaces the Asset as an isolated node — its edge stays decor.
-  await decorToggle.click();
-  await expect(decorToggle).toHaveAttribute('aria-pressed', 'false');
-  const orphansToggle = page.getByTestId('graph-orphans-toggle');
-  await orphansToggle.click();
+  await filters.click();
+  await expect(page.getByTestId('graph-decor-toggle')).toHaveAttribute('aria-checked', 'true');
+  await page.getByTestId('graph-decor-toggle').click();
+  await expect(counts).toContainText('2 entities');
+  await filters.click();
+  await page.getByTestId('graph-orphans-toggle').click();
   await expect(counts).toContainText('3 entities');
   await expect(counts).toContainText('1 links');
 });
@@ -129,5 +132,6 @@ test('keeps a Board-Embedded Asset on the graph by default (Embed is semantic)',
   const counts = page.getByTestId('graph-counts');
   await expect(counts).toContainText('2 entities');
   await expect(counts).toContainText('1 links');
-  await expect(page.getByTestId('graph-decor-toggle')).toHaveCount(0);
+  // Nothing hidden — no decor edge, no orphan — so the filters menu has nothing to offer and stays away.
+  await expect(page.getByTestId('graph-filters')).toHaveCount(0);
 });

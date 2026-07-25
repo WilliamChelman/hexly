@@ -3,7 +3,16 @@ import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { WorldGraph as WorldGraphPayload } from '@hexly/domain';
 import { ActiveWorld, entityRoute, ToasterService, WorldsClient } from '@hexly/web-core';
-import { EyebrowComponent, PageHeaderComponent, PanelComponent } from '@hexly/web-ui';
+import {
+  ButtonComponent,
+  EyebrowComponent,
+  IconComponent,
+  MenuItemCheckboxDirective,
+  MenuPanelDirective,
+  MenuTriggerDirective,
+  PageHeaderComponent,
+  PanelComponent,
+} from '@hexly/web-ui';
 import { GraphCanvasComponent, GraphOpen } from './components/graph-canvas.component';
 import { decorEdgeCount, orphanIds, withoutDecorEdges, withoutOrphans } from './utils/orphans';
 
@@ -18,7 +27,18 @@ import { decorEdgeCount, orphanIds, withoutDecorEdges, withoutOrphans } from './
 @Component({
   selector: 'app-world-graph',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, EyebrowComponent, PageHeaderComponent, PanelComponent, GraphCanvasComponent],
+  imports: [
+    TranslocoPipe,
+    ButtonComponent,
+    EyebrowComponent,
+    IconComponent,
+    MenuTriggerDirective,
+    MenuPanelDirective,
+    MenuItemCheckboxDirective,
+    PageHeaderComponent,
+    PanelComponent,
+    GraphCanvasComponent,
+  ],
   host: { class: 'flex flex-col h-full bg-surface-sunken' },
   template: `
     <app-page-header sticky>
@@ -33,33 +53,11 @@ import { decorEdgeCount, orphanIds, withoutDecorEdges, withoutOrphans } from './
           <span class="text-sm text-ink-muted" data-testid="graph-counts">
             {{ 'worldGraph.counts' | transloco: { nodes: g.nodes.length, edges: g.edges.length } }}
           </span>
-          @if (decorCount(); as decor) {
-            <button
-              type="button"
-              [attr.aria-pressed]="showDecor()"
-              class="font-sans text-sm text-ink-strong px-2 py-1 rounded-sm hover:bg-surface-sunken aria-pressed:bg-gold/15 aria-pressed:text-gold"
-              data-testid="graph-decor-toggle"
-              (click)="showDecor.set(!showDecor())"
-            >
-              {{ 'worldGraph.showDecor' | transloco: { count: decor } }}
-            </button>
-          }
-          @if (orphanCount(); as orphans) {
-            <button
-              type="button"
-              [attr.aria-pressed]="showOrphans()"
-              class="font-sans text-sm text-ink-strong px-2 py-1 rounded-sm hover:bg-surface-sunken aria-pressed:bg-gold/15 aria-pressed:text-gold"
-              data-testid="graph-orphans-toggle"
-              (click)="showOrphans.set(!showOrphans())"
-            >
-              {{ 'worldGraph.showOrphans' | transloco: { count: orphans } }}
-            </button>
-          }
         </div>
       }
     </app-page-header>
 
-    <main class="flex-1 min-h-0 p-6">
+    <main class="relative flex-1 min-h-0 p-6">
       @if (isEmpty()) {
         <section
           class="h-full flex flex-col items-center justify-center gap-3 text-center text-ink-muted"
@@ -87,7 +85,53 @@ import { decorEdgeCount, orphanIds, withoutDecorEdges, withoutOrphans } from './
           <app-graph-canvas [graph]="g" (open)="openEntity($event)" />
         </div>
       }
+
+      <!-- The filters float over the graph's top-right corner rather than sitting in the page header:
+           they belong to the drawing, and the header shouldn't grow a control per filter we add. A
+           sibling of the panel (never a child) — the canvas panel is overflow-hidden. -->
+      @if (hasFilters()) {
+        <button
+          type="button"
+          appButton
+          size="sm"
+          icon
+          class="absolute top-9 right-9 z-10"
+          data-testid="graph-filters"
+          [appMenuTrigger]="filtersMenu"
+          [title]="'worldGraph.filters' | transloco"
+          [attr.aria-label]="'worldGraph.filters' | transloco"
+        >
+          <app-icon name="settings" [size]="16" />
+        </button>
+      }
     </main>
+
+    <ng-template #filtersMenu>
+      <div appMenuPanel>
+        @if (decorCount(); as decor) {
+          <button
+            type="button"
+            appMenuItemCheckbox
+            data-testid="graph-decor-toggle"
+            [checked]="showDecor()"
+            (triggered)="showDecor.set(!showDecor())"
+          >
+            {{ 'worldGraph.showDecor' | transloco: { count: decor } }}
+          </button>
+        }
+        @if (orphanCount(); as orphans) {
+          <button
+            type="button"
+            appMenuItemCheckbox
+            data-testid="graph-orphans-toggle"
+            [checked]="showOrphans()"
+            (triggered)="showOrphans.set(!showOrphans())"
+          >
+            {{ 'worldGraph.showOrphans' | transloco: { count: orphans } }}
+          </button>
+        }
+      </div>
+    </ng-template>
   `,
 })
 export class WorldGraphPage {
@@ -141,6 +185,12 @@ export class WorldGraphPage {
     if (!g) return null;
     return this.showOrphans() ? g : withoutOrphans(g);
   });
+  /**
+   * Whether the filters menu has anything to offer — its trigger stays away otherwise, the way each
+   * toggle used to hide on a `0` count. Read off both counts, so a World with neither decor nor
+   * orphans shows a bare graph.
+   */
+  protected readonly hasFilters = computed(() => this.decorCount() > 0 || this.orphanCount() > 0);
   /** Gates the empty state on a resolved read, so it never flashes before the payload lands. */
   protected readonly isEmpty = computed(() => this.graph()?.nodes.length === 0);
   /** Every node is an orphan and the toggle is off — a whole World hidden, not an empty one. */

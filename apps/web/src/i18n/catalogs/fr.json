@@ -332,6 +332,7 @@
     "tabTitle": "Hexly — Graphe",
     "eyebrow": "Graphe du monde",
     "counts": "{{nodes}} entités · {{edges}} liens",
+    "filters": "Filtres du graphe",
     "showOrphans": "Afficher les orphelins ({{count}})",
     "showDecor": "Afficher les liens décoratifs ({{count}})",
     "allOrphansTitle": "Aucune entité n'est reliée.",
