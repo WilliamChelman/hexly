@@ -25,6 +25,8 @@ import {
   entityListQuerySchema,
   EntityPage,
   EntityReferences,
+  LocalGraph,
+  localGraphQuerySchema,
   parseFieldFilters,
   patchEntityRequestSchema,
   PublicLink,
@@ -37,6 +39,7 @@ import { SessionAuthGuard } from '../auth/session-auth.guard';
 import { decodeCursor } from './utils/decode-cursor';
 import { encodeCursor } from './utils/encode-cursor';
 import { EntitiesService } from './entities.service';
+import { LocalGraphService } from './local-graph.service';
 
 /**
  * The Entity REST surface (ADR-0018). Every route is owner-scoped: the guard resolves the session to
@@ -46,7 +49,10 @@ import { EntitiesService } from './entities.service';
 @Controller('entities')
 @UseGuards(SessionAuthGuard)
 export class EntitiesController {
-  constructor(private readonly entities: EntitiesService) {}
+  constructor(
+    private readonly entities: EntitiesService,
+    private readonly localGraphs: LocalGraphService,
+  ) {}
 
   @Get()
   list(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityPage {
@@ -132,6 +138,20 @@ export class EntitiesController {
     const references = this.entities.references(user.id, id);
     if (!references) throw new NotFoundException();
     return references;
+  }
+
+  /**
+   * This Entity's **Local Graph** (ADR-0072) — the World Graph narrowed to its neighbourhood, `depth`
+   * hops out (default 1). Both endpoints of every edge are access-filtered, like the World-wide read,
+   * so the walk only ever crosses Entities this caller may see.
+   */
+  @Get(':id/graph')
+  localGraph(@CurrentUser() user: AuthUser, @Param('id') id: string, @Query() query: unknown): LocalGraph {
+    const parsed = localGraphQuerySchema.safeParse(query);
+    if (!parsed.success) throw new BadRequestException();
+    const graph = this.localGraphs.localGraph(user.id, id, parsed.data.depth);
+    if (!graph) throw new NotFoundException();
+    return graph;
   }
 
   @Put(':id')

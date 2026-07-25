@@ -9,6 +9,7 @@ import {
   EntityType,
   GrantRole,
   EntityDocument,
+  LocalGraph,
   PublicLink,
 } from '@hexly/domain';
 import { EntityFacetParams, EntityListParams } from '../services/entities.client';
@@ -34,6 +35,11 @@ export class MockEntitiesClient {
   // without stubbing; override per test to exercise the referencing-Entities list.
   references = vi.fn<(id: string) => Observable<EntityReferences>>(() =>
     of<EntityReferences>({ references: [], referencedBy: [] }),
+  );
+  // Defaults to the centre alone (ADR-0072) so a spec that mounts the Local Graph panel without caring
+  // about the drawing still renders; override per test to exercise a neighbourhood.
+  localGraph = vi.fn<(id: string, depth: number) => Observable<LocalGraph>>((id, depth) =>
+    of<LocalGraph>({ center: id, depth, nodes: [], edges: [] }),
   );
   create =
     vi.fn<

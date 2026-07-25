@@ -15,6 +15,7 @@ import {
   CORE_PANEL_DETAILS,
   CORE_VIEW_DETAILS,
   EntityDock,
+  GraphWarmPool,
   PANEL_FILTER,
   PanelDefinition,
   PanelId,
@@ -113,6 +114,10 @@ export class EntityDockComponent {
   });
 
   constructor() {
+    // The Local Graph Panel is a toggle away on every Entity page: warm its graph while the reader
+    // reads, so opening it never freezes the page on WebGL bring-up (GraphWarmPool).
+    inject(GraphWarmPool).warmUp();
+
     // Feed the derived availability into the page-scoped Dock, which resolves the open slot against it
     // (close-don't-substitute when the remembered Panel drops out of the set).
     effect(() => this.dock.setAvailable(this.availablePanels()));

@@ -5,7 +5,13 @@ import { EMPTY, catchError, combineLatest, of, switchMap, tap } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityNudge, StaleNudge } from '@hexly/domain';
 import { PublicClient, PublicEntityMode, AppShellStore, EVICTED } from '@hexly/web-core';
-import { CORE_PANEL_REFERENCES, ENTITY_SESSION, PANEL_FILTER, PanelFilter } from '@hexly/web-entity';
+import {
+  CORE_PANEL_LOCAL_GRAPH,
+  CORE_PANEL_REFERENCES,
+  ENTITY_SESSION,
+  PANEL_FILTER,
+  PanelFilter,
+} from '@hexly/web-entity';
 import { EntitySession } from '../entity/services/entity-session';
 import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { PublicEntityNameResolver } from './services/public-entity-name-resolver';
@@ -33,11 +39,17 @@ interface Followed {
     EntitySession,
     { provide: ENTITY_SESSION, useExisting: EntitySession },
     { provide: EntityNameResolver, useClass: PublicEntityNameResolver },
-    // The page Dock filters References out here (ADR-0067): it needs `/entities/:id/references`, which
-    // answers an authenticated user, and this Entity's Public Link grants no scope beyond itself. Every
-    // other Panel — the read-only Details panel, the Content View's Outline — still flows through, since
-    // Details shows the same substance the fallback Details View already gives any reader.
-    { provide: PANEL_FILTER, useValue: ((panel) => panel.id !== CORE_PANEL_REFERENCES) satisfies PanelFilter },
+    // The page Dock filters the two link-index Panels out here (ADR-0067, ADR-0072): References needs
+    // `/entities/:id/references` and the Local Graph `/entities/:id/graph`, both of which answer an
+    // authenticated user, and this Entity's Public Link grants no scope beyond itself — a graph of its
+    // neighbourhood would be exactly the cross-Entity reach the link withholds. Every other Panel — the
+    // read-only Details panel, the Content View's Outline — still flows through, since Details shows the
+    // same substance the fallback Details View already gives any reader.
+    {
+      provide: PANEL_FILTER,
+      useValue: ((panel) =>
+        panel.id !== CORE_PANEL_REFERENCES && panel.id !== CORE_PANEL_LOCAL_GRAPH) satisfies PanelFilter,
+    },
   ],
   imports: [TranslocoPipe, RouterLink, EntityPage],
   template: `

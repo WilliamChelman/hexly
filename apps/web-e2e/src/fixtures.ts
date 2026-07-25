@@ -109,15 +109,22 @@ export function waitForSave(page: Page): Promise<Response> {
 }
 
 /**
- * Flush a pending autosave and wait for it to commit: Cmd/Ctrl+S, await the PUT, and confirm the
- * status chip settles on 'Saved'. Returns the PUT Response, whose body carries the saved payload.
+ * Flush a pending autosave and wait for it to commit: Cmd/Ctrl+S, then confirm the status chip
+ * settles on 'Saved'. Returns the *last* PUT Response — an earlier debounced autosave may land in
+ * the same window with a stale payload, so the first PUT is not necessarily the flushed one.
  */
 export async function flushSave(page: Page): Promise<Response> {
-  const saved = waitForSave(page);
+  const saves: Response[] = [];
+  const collect = (res: Response) => {
+    if (res.request().method() === 'PUT' && /\/api\/entities\/[\w-]+$/.test(res.url()) && res.ok()) saves.push(res);
+  };
+  page.on('response', collect);
+  const first = waitForSave(page);
   await page.keyboard.press('ControlOrMeta+s');
-  const res = await saved;
+  await first;
   await expect(page.getByTestId('save-status')).toHaveText('Saved');
-  return res;
+  page.off('response', collect);
+  return saves[saves.length - 1];
 }
 
 /** Open the entity header's actions overflow menu (Visibility, Pin, Share). */

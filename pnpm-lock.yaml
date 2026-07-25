@@ -53,6 +53,12 @@ importers:
       '@lucide/angular':
         specifier: ^1.23.0
         version: 1.23.0(@angular/common@21.2.17(@angular/core@21.2.17(@angular/compiler@21.2.17)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.17(@angular/compiler@21.2.17)(rxjs@7.8.2))
+      '@luma.gl/core':
+        specifier: ~9.2.6
+        version: 9.2.6
+      '@luma.gl/webgl':
+        specifier: ~9.2.6
+        version: 9.2.6(@luma.gl/core@9.2.6)
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.27(reflect-metadata@0.2.2)(rxjs@7.8.2)

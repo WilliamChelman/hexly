@@ -9,14 +9,14 @@ import {
   output,
   viewChild,
 } from '@angular/core';
-import type { Graph } from '@cosmos.gl/graph';
+import type { Graph, GraphConfig } from '@cosmos.gl/graph';
 import { LinkedEntity, WorldGraph } from '@hexly/domain';
-import { CORE_NOTE } from '@hexly/plugin-content';
 import { Logger, ThemeService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
-import { GraphPayload, graphPayload } from '../utils/graph-payload';
-import { LabelGrid, selectLabels } from '../utils/select-labels';
-import { TypeRegistry } from '../../../../../entity-types/type-registry';
-import { TypeDefinition } from '@hexly/web-entity';
+import { GraphWarmPool, WarmGraph } from './graph-warm-pool';
+import { GraphPayload, graphPayload } from './graph-payload';
+import { LabelGrid, selectLabels } from './select-labels';
+import { ENTITY_TYPES } from '../models/entity-types';
+import { GENERIC_TYPE_DEFINITION, TypeDefinition } from '../models/type-definition';
 
 /**
  * The declutter: at most one Entity label per {@link LABEL_GRID.pointCell} of screen, and one Link
@@ -49,14 +49,35 @@ const SETTLED_ALPHA = 0.05;
 const SIMULATION_DECAY = 1500;
 
 /**
- * Wait for the layout to contract before framing it. cosmos.gl's default 250 ms fits the seed
- * *ring*, and the simulation then pulls the graph into a fraction of that box — leaving a speck in
- * the middle of an empty canvas until the reader zooms.
+ * The camera **keeps the cooling layout framed** — and it *judges* the framing rather than tracking it. A
+ * single fit cannot hold the drawing (cosmos.gl's `fitViewOnInit` frames the seed *ring*, and the simulation
+ * then contracts, expands and drifts well past whatever box any one fit chose; a Dock-panel-sized box has
+ * no slack to absorb the difference and the drawing sails out of view). But re-fitting on a timer is worse:
+ * chasing a layout that moves every frame makes the whole graph bounce, which is far more uncomfortable to
+ * watch than a graph sitting slightly off-centre.
+ *
+ * So the framing is *tested* every {@link REFRAME_CHECK_MS} and only corrected when it is genuinely wrong —
+ * the drawing has left the viewport, or shrunk below {@link REFRAME_MIN_COVERAGE} of it. Between those, the
+ * camera holds perfectly still. The reader's camera always wins: checking stops for good at their first pan,
+ * zoom or drag ({@link viewPinned}).
  */
-const FIT_VIEW_DELAY_MS = 1200;
+const REFRAME_CHECK_MS = 700;
 
-/** How long the settle re-fit takes to glide the graph into frame. */
-const FIT_MS = 250;
+/** How long a correction takes to glide — shorter than {@link REFRAME_CHECK_MS}, so no check lands mid-glide. */
+const REFRAME_GLIDE_MS = 400;
+
+/**
+ * Slack left around the drawing on each correction — wider than cosmos.gl's own `fitView` default, so a
+ * layout still growing does not overflow again on the very next check and earn a second correction.
+ */
+const REFRAME_PADDING = 0.15;
+
+/**
+ * The share of the viewport the drawing must keep (in its larger dimension) before the camera zooms back
+ * in. A correction leaves it at ~70 %, so the layout has to contract by a third to earn the next one —
+ * which is what turns continuous chasing into a handful of deliberate re-framings.
+ */
+const REFRAME_MIN_COVERAGE = 0.5;
 
 /**
  * How long the label loop stays awake past the last pan wheel event. A trackpad swipe fires a burst
@@ -98,7 +119,7 @@ interface Palette {
   readonly background: string;
   /** RGBA node colour per Entity type, keyed by type id — the registry's `graphColorToken` resolved (ADR-0048). */
   readonly byType: ReadonlyMap<string, [number, number, number, number]>;
-  /** Fallback node colour for an unregistered type — the core note's hue, matching the old non-hexmap default. */
+  /** Fallback node colour for an unregistered type — the generic type's hue, as every other chrome resolves it. */
   readonly node: [number, number, number, number];
   readonly link: [number, number, number, number];
 }
@@ -112,8 +133,9 @@ function palette(defs: readonly TypeDefinition[]): Palette {
   return {
     background: token(style, '--color-surface-sunken', '#ece0c0'),
     byType,
-    // An unregistered type reads as a note, exactly as the old note/hexmap ternary did.
-    node: byType.get(CORE_NOTE) ?? toRgba(token(style, '--color-ink-muted', FALLBACK_NODE_COLOR)),
+    // An unregistered, absent, or disabled type paints with the generic definition's hue — the same
+    // fallback `TypeRegistry.resolve` gives every other surface, so the graph needs no plugin of its own.
+    node: toRgba(token(style, GENERIC_TYPE_DEFINITION.graphColorToken, FALLBACK_NODE_COLOR)),
     link: toRgba(token(style, '--color-line-strong', '#b89a62')),
   };
 }
@@ -157,12 +179,25 @@ interface Mounted {
   readonly payload: GraphPayload;
   /** The buffer the graph was seeded with, re-read from the GPU every frame by the label pass. */
   readonly positions: Float32Array;
+  /** The pool entry this mount adopted, if any — single-use, handed back on destroy. */
+  readonly adopted: WarmGraph | null;
 }
 
 /**
- * The World Graph's renderer: a GPU force simulation (cosmos.gl) under a DOM label overlay.
- * cosmos.gl renders **no text at all**, so every label here is DOM we own. The library is
- * dynamically imported — ~168 kB gzip of WebGL that renders nothing server-side.
+ * How much bigger the {@link GraphCanvasComponent.center} Entity draws, in the same units as the
+ * degree-derived base size — enough that "the Entity this graph is about" reads at a glance in a
+ * panel-sized Local Graph (ADR-0072), without the hub sizing losing its meaning.
+ */
+const CENTER_SIZE_BOOST = 6;
+
+/**
+ * The graph renderer both graph surfaces draw through — the World Graph page and the Local Graph Panel
+ * (ADR-0072): a GPU force simulation (cosmos.gl) under a DOM label overlay. cosmos.gl renders **no text
+ * at all**, so every label here is DOM we own. The library is dynamically imported — ~168 kB gzip of
+ * WebGL that renders nothing server-side.
+ *
+ * It reads the registered types through {@link ENTITY_TYPES}, not `apps/web`'s registry, so a graph can
+ * be drawn from this lib (the Panel) as well as from the page.
  */
 /** A reader's click on a node: the Entity to open, and whether a modifier asked for a new tab. */
 export interface GraphOpen {
@@ -184,6 +219,11 @@ export interface GraphOpen {
 })
 export class GraphCanvasComponent {
   readonly graph = input.required<WorldGraph>();
+  /**
+   * The Entity the drawing is *about*, drawn larger than its degree alone would earn it — the Local
+   * Graph's centre (ADR-0072). `null` for a whole-World graph, which is about no one Entity.
+   */
+  readonly center = input<string | null>(null);
   /** The Entity a reader clicked, for the page to navigate to. */
   readonly open = output<GraphOpen>();
 
@@ -191,7 +231,8 @@ export class GraphCanvasComponent {
   private readonly overlayEl = viewChild.required<ElementRef<HTMLDivElement>>('overlay');
   private readonly theme = inject(ThemeService);
   private readonly logger = inject(Logger);
-  private readonly types = inject(TypeRegistry);
+  private readonly types = inject(ENTITY_TYPES);
+  private readonly pool = inject(GraphWarmPool);
 
   private mounted: Mounted | null = null;
   /** The label loop's rAF id; `0` means it has parked itself, waiting on {@link wake} to restart. */
@@ -217,17 +258,19 @@ export class GraphCanvasComponent {
   constructor() {
     effect((onCleanup) => {
       const graph = this.graph();
+      // Read here, not inside `mount`: a new centre is a new drawing, so it remounts like a new graph.
+      const center = this.center();
       const host = this.hostEl().nativeElement;
       const overlay = this.overlayEl().nativeElement;
 
       let stale = false;
       this.teardown();
-      this.mount(graph, host).then(
+      this.mount(graph, center, host).then(
         (mounted) => {
           // The label loop starts here, past the stale check, and never inside `mount`. A mount
           // that resolves stale is destroyed on the spot; a loop started before this branch would
           // outlive it, projecting labels off a destroyed WebGL graph every frame, forever.
-          if (stale) return void mounted?.cosmos.destroy();
+          if (stale) return void (mounted && this.destroyMount(mounted));
           this.mounted = mounted;
           if (mounted) {
             this.paintLabels(mounted, host, overlay);
@@ -264,26 +307,33 @@ export class GraphCanvasComponent {
     cosmos.render();
   }
 
-  private async mount(graph: WorldGraph, host: HTMLDivElement): Promise<Mounted | null> {
+  private async mount(graph: WorldGraph, center: string | null, host: HTMLDivElement): Promise<Mounted | null> {
     const { Graph } = await import('@cosmos.gl/graph');
     if (graph.nodes.length === 0) return null;
 
     const payload = graphPayload(graph);
     const { nodes, degrees, links } = payload;
-    /** The settle re-fit happens once, on the first tick that cools past the threshold. */
-    let fitted = false;
+    /** The settled mark is set once, on the first tick that cools past the threshold. */
+    let settled = false;
+    /** When the camera last followed the layout — the {@link REFRAME_MS} throttle's clock. */
+    let reframedAt = 0;
     const colors = palette(this.types.all());
+    // `graphPayload` re-orders the nodes, so the centre's *point index* is only knowable from its output.
+    const centerIndex = center === null ? -1 : nodes.findIndex((n) => n.id === center);
 
     const positions = new Float32Array(nodes.length * 2);
     const sizes = new Float32Array(nodes.length);
     for (let i = 0; i < nodes.length; i++) {
-      // Seed on a ring rather than a point, so the simulation has somewhere to push from.
+      // Seed on a ring rather than a point, so the simulation has somewhere to push from — except the
+      // centre, seeded at the middle of the space, which is where it will be pinned.
       const angle = (i / nodes.length) * Math.PI * 2;
-      positions[i * 2] = SPACE / 2 + Math.cos(angle) * 500;
-      positions[i * 2 + 1] = SPACE / 2 + Math.sin(angle) * 500;
+      positions[i * 2] = SPACE / 2 + (i === centerIndex ? 0 : Math.cos(angle) * 500);
+      positions[i * 2 + 1] = SPACE / 2 + (i === centerIndex ? 0 : Math.sin(angle) * 500);
       // Square-rooted, so a hub reads as bigger without a degree-109 Entity swallowing the view.
       // The base is the click target: below ~8 units a leaf Entity is a speck that's hard to hit.
-      sizes[i] = 8 + Math.min(9, Math.sqrt(degrees[i]) * 2.2);
+      // The centre takes a boost on top: in a Local Graph it is the one node the reader is oriented by,
+      // and at depth 1 every node has the same degree-1 look otherwise.
+      sizes[i] = 8 + Math.min(9, Math.sqrt(degrees[i]) * 2.2) + (nodes[i].id === center ? CENTER_SIZE_BOOST : 0);
     }
 
     // Commit the focus grey-out only once the pointer settles: each over/out reschedules the same
@@ -306,11 +356,16 @@ export class GraphCanvasComponent {
       }, HOVER_DEBOUNCE_MS);
     };
 
-    const cosmos = new Graph(host, {
+    // Adopt the pool's pre-warmed graph when one is free: its context creation and shader compile
+    // then happened at browser idle, not on this click (see {@link GraphWarmPool}).
+    const adopted = this.pool.claim();
+
+    const config: GraphConfig = {
       backgroundColor: colors.background,
       enableDrag: true,
+      // The seed ring is what this frames; the follow camera below takes over from the first tick, so the
+      // default delay is right — a longer one would only stall the first frame.
       fitViewOnInit: true,
-      fitViewDelay: FIT_VIEW_DELAY_MS,
       simulationDecay: SIMULATION_DECAY,
       // A World's layout should be the same picture every time it is opened.
       randomSeed: 42,
@@ -348,27 +403,63 @@ export class GraphCanvasComponent {
       onDrag: () => cosmos.start(REHEAT_ALPHA),
       onDragEnd: () => (this.interacting = false),
       onSimulationTick: (alpha) => {
-        // This marks the layout as *readable*, not as finished: the simulation runs on until alpha
-        // crosses 1e-3 (`onSimulationEnd`), so the re-fit fires here, at a legible threshold, rather
-        // than tens of seconds later. The label loop tracks the points until that real end.
-        if (alpha > SETTLED_ALPHA || fitted) return;
-        fitted = true;
-        // `fitViewOnInit` frames the *seed* ring, and the simulation then contracts the graph to a
-        // fraction of it — leaving a speck in the middle of an empty canvas. Re-fit once, on settle —
-        // but never once the reader has grabbed the viewport, or the camera jumps out from under them.
-        if (!this.viewPinned) cosmos.fitView(FIT_MS);
+        // Judge the framing at a slow cadence and correct it only when it is wrong — never once the reader
+        // has grabbed the viewport, or the camera jumps out from under them.
+        const now = performance.now();
+        if (!this.viewPinned && now - reframedAt >= REFRAME_CHECK_MS && misframed(cosmos, host)) {
+          reframedAt = now;
+          cosmos.fitView(REFRAME_GLIDE_MS, REFRAME_PADDING);
+        }
+        // The settled mark says the layout is *readable*, not finished: the simulation runs on until alpha
+        // crosses 1e-3 (`onSimulationEnd`), so it is set here, at a legible threshold, rather than tens of
+        // seconds later. The label loop tracks the points until that real end.
+        if (alpha > SETTLED_ALPHA || settled) return;
+        settled = true;
         host.dataset['settled'] = 'true'; // A hook for tests waiting on the layout.
       },
-    });
+    };
+
+    let cosmos: Graph;
+    if (adopted) {
+      cosmos = adopted.graph;
+      // The canvas lives in the warm div: give it the host's box, under the label overlay.
+      adopted.div.style.cssText = 'width:100%;height:100%;';
+      host.prepend(adopted.div);
+      cosmos.setConfig(config);
+    } else {
+      cosmos = new Graph(host, config);
+    }
 
     cosmos.setPointPositions(positions);
     cosmos.setPointColors(pointColors(nodes, colors));
     cosmos.setPointSizes(sizes);
     cosmos.setLinks(links);
     cosmos.setLinkColors(linkColors(links.length / 2, colors));
-    cosmos.render();
+    // Pin the centre where it was seeded, at the middle of the space: it takes no force, so the layout
+    // arranges *around* it and can never drift away as a whole, and the Entity the drawing is about stays
+    // where the reader looked for it. It still pulls its neighbours (a pinned point keeps acting on the
+    // others) and cosmos keeps it draggable, so a reader who wants it elsewhere may still move it — which
+    // is the one thing that should override this.
+    if (centerIndex >= 0) cosmos.setPinnedPoints([centerIndex]);
+    if (adopted) {
+      // Past its init and parked, its warm-render simulation already *ended* — `render(alpha)` and
+      // `unpause()` resume nothing then; only `start()` runs a finished simulation again. Frame the
+      // seed ring by hand, as `fitViewOnInit` would have.
+      cosmos.unpause();
+      cosmos.render();
+      cosmos.start(1);
+      cosmos.fitView(0, REFRAME_PADDING);
+    } else {
+      cosmos.render();
+    }
 
-    return { cosmos, payload, positions };
+    return { cosmos, payload, positions, adopted };
+  }
+
+  /** Destroy a mount's graph; an adopted one goes back to the pool, which owns its teardown. */
+  private destroyMount(mounted: Mounted): void {
+    mounted.cosmos.destroy();
+    if (mounted.adopted) this.pool.release(mounted.adopted);
   }
 
   /**
@@ -550,9 +641,47 @@ export class GraphCanvasComponent {
     this.labels = [];
     const overlay = this.overlayEl?.()?.nativeElement;
     if (overlay) overlay.textContent = '';
-    this.mounted?.cosmos.destroy();
+    if (this.mounted) this.destroyMount(this.mounted);
     this.mounted = null;
   }
+}
+
+/**
+ * Whether the drawing needs re-framing: it has left the viewport, or contracted into less than
+ * {@link REFRAME_MIN_COVERAGE} of it. The whole point of asking is to *not* move the camera the rest of the
+ * time — see {@link REFRAME_CHECK_MS}.
+ *
+ * Both boxes are compared in space units, the coordinates the simulation works in, so the answer is
+ * independent of zoom. A degenerate extent (every point at one spot, before the layout has spread) reads as
+ * uncovered, which is harmless: fitting a box the camera already holds glides nowhere.
+ */
+function misframed(cosmos: Graph, host: HTMLDivElement): boolean {
+  const points = cosmos.getPointPositions();
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < points.length; i += 2) {
+    minX = Math.min(minX, points[i]);
+    maxX = Math.max(maxX, points[i]);
+    minY = Math.min(minY, points[i + 1]);
+    maxY = Math.max(maxY, points[i + 1]);
+  }
+  if (!Number.isFinite(minX)) return false; // Nothing drawn yet — nothing to frame.
+
+  // The viewport's own corners, read through the live transform (space y runs opposite screen y).
+  const [ax, ay] = cosmos.screenToSpacePosition([0, 0]);
+  const [bx, by] = cosmos.screenToSpacePosition([host.clientWidth, host.clientHeight]);
+  const viewMinX = Math.min(ax, bx);
+  const viewMaxX = Math.max(ax, bx);
+  const viewMinY = Math.min(ay, by);
+  const viewMaxY = Math.max(ay, by);
+
+  if (minX < viewMinX || maxX > viewMaxX || minY < viewMinY || maxY > viewMaxY) return true;
+  // Coverage on the *larger* dimension, so a wide, flat layout is not re-fitted forever for the slack
+  // above and below it that no framing can remove.
+  const coverage = Math.max((maxX - minX) / (viewMaxX - viewMinX), (maxY - minY) / (viewMaxY - viewMinY));
+  return coverage < REFRAME_MIN_COVERAGE;
 }
 
 /** Flip an edge label that would otherwise read upside-down. */

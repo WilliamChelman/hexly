@@ -13,8 +13,15 @@ import {
   PageHeaderComponent,
   PanelComponent,
 } from '@hexly/web-ui';
-import { GraphCanvasComponent, GraphOpen } from './components/graph-canvas.component';
-import { decorEdgeCount, orphanIds, withoutDecorEdges, withoutOrphans } from './utils/orphans';
+import {
+  decorEdgeCount,
+  GraphCanvasComponent,
+  GraphWarmPool,
+  GraphOpen,
+  orphanIds,
+  withoutDecorEdges,
+  withoutOrphans,
+} from '@hexly/web-entity';
 
 /**
  * The World Graph page at `/w/:worldId/graph`: the World's readable Entities as nodes, their Entity
@@ -197,6 +204,9 @@ export class WorldGraphPage {
   protected readonly allHidden = computed(() => !this.isEmpty() && this.visibleGraph()?.nodes.length === 0);
 
   constructor() {
+    // Warm the drawing while the payload is in flight (GraphWarmPool).
+    inject(GraphWarmPool).warmUp();
+
     const worldId = this.activeWorld.worldId();
     if (!worldId) return; // activeWorldGuard pins it before this page renders.
     this.worlds.graph(worldId).subscribe({
