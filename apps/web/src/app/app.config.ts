@@ -6,6 +6,7 @@ import { provideTranslocoMessageformat } from '@jsverse/transloco-messageformat'
 import { appRoutes } from './app.routes';
 import {
   withCredentialsInterceptor,
+  sessionRenewalInterceptor,
   translocoAppConfig,
   TranslocoHttpLoader,
   TranslationTitleStrategy,
@@ -39,7 +40,8 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(appRoutes),
-    provideHttpClient(withInterceptors([withCredentialsInterceptor])),
+    // Credentials first, so the retry the renewal issues inherits them (ADR-0004, ADR-0070).
+    provideHttpClient(withInterceptors([withCredentialsInterceptor, sessionRenewalInterceptor])),
     // Fetch the client config (ADR-0052) before stabilisation, ahead of the plugin providers below, so
     // the enabled-Plugin set is settled before any registry reads it — and, since ADR-0071 rides the
     // same channel, so the Deployment Profile and Collaboration gates cannot flicker on first render.

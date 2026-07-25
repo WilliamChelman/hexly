@@ -16,6 +16,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app/app.module';
+import { loopbackOnly } from './loopback-only';
 
 // The deployment pins an entry point states before the graph resolves (ADR-0071), and the credential
 // -free session primitives an embedder mints the Sole User's session with (ADR-0070).
@@ -24,13 +25,27 @@ export type { DeploymentPins } from './app/config';
 export { AuthService } from './app/auth/auth.service';
 export { SESSION_COOKIE } from './app/auth/auth.controller';
 
+/** What an entry point decides about the app itself, as opposed to where it listens. */
+export interface ApiAppOptions {
+  /**
+   * Turn on the DNS-rebinding wall (`loopback-only.ts`). The Desktop App does, being the only caller of
+   * its own socket; a server serves whatever hostname its operator points at it, so it must not.
+   */
+  readonly loopbackOnly?: boolean;
+}
+
 /**
  * Create the Nest app with everything both entry points want, ready to `listen`. The caller pins its
  * {@link DeploymentPins} *before* calling this: the graph is composed at import time but resolved
  * here (ADR-0071).
+ *
+ * There is no `enableCors()` here, and **its absence is load-bearing** — it is the second of the two walls
+ * that make the Desktop App's loopback socket acceptable (ADR-0008, ADR-0070).
  */
-export async function createApiApp(): Promise<NestExpressApplication> {
+export async function createApiApp(options: ApiAppOptions = {}): Promise<NestExpressApplication> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Before every other middleware, so a rebound request reaches neither a controller nor the SPA below.
+  if (options.loopbackOnly) app.use(loopbackOnly());
   // Serve every controller under `/api` so the API namespace never collides with the web app's
   // client-side routes (the SPA owns `/maps/:id`, the API owns `/api/maps/:id`). Asset serving is
   // excluded so it stays at `/assets/...`, matching the `src` written into Content (ADR-0034, ADR-0008).

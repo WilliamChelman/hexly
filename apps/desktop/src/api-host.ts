@@ -23,9 +23,11 @@ export async function startApiHost(): Promise<ApiHost> {
   // Both knobs pinned by this entry point (ADR-0071): `profile` has no `hexly.yml` key, and Collaboration
   // is an override, so a `features.collaboration: true` in this Instance's file is ignored.
   pinDeployment({ profile: 'desktop', collaboration: false });
-  const app = await createApiApp();
-  // Port 0 makes a visited web page scan ~16k ports to find us: cost, not security. The walls are the
-  // session cookie and the absence of CORS, plus the Host/Origin rejection #321 adds (ADR-0070).
+  // The Host/Origin wall is this entry point's to ask for: we bind loopback and are the only caller of our
+  // own socket, so anything addressing us by another name has been rebound at us (ADR-0070).
+  const app = await createApiApp({ loopbackOnly: true });
+  // Port 0 makes a visited web page scan ~16k ports to find us: cost, not security. The walls that matter
+  // are the session cookie, the absence of CORS, and the Host/Origin rejection above (ADR-0070).
   await app.listen(0, LOOPBACK);
   const server: Server = app.getHttpServer();
   return {
