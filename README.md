@@ -7,11 +7,12 @@ worldbuilding. Maps are persisted to user accounts and can be shared. See
 
 It's an Nx monorepo:
 
-| Path          | What it is                                                            |
-| ------------- | --------------------------------------------------------------------- |
-| `apps/web`    | Angular front end (standalone components + signals)                   |
-| `apps/api`    | NestJS API (SQLite via Drizzle, served by Express)                    |
-| `libs/domain` | Framework-free contracts shared by both runtimes (Zod schemas, types) |
+| Path           | What it is                                                            |
+| -------------- | --------------------------------------------------------------------- |
+| `apps/web`     | Angular front end (standalone components + signals)                   |
+| `apps/api`     | NestJS API (SQLite via Drizzle, served by Express)                    |
+| `apps/desktop` | Electron shell hosting that same API in-process (the Desktop App)     |
+| `libs/domain`  | Framework-free contracts shared by both runtimes (Zod schemas, types) |
 
 ## Self-hosting
 
@@ -68,6 +69,40 @@ Run them separately if you prefer:
 pnpm dev:api    # NestJS API only
 pnpm dev:web    # Angular app only
 ```
+
+## The Desktop App
+
+`apps/desktop` is an Electron shell whose **main process boots the same Nest `AppModule`** on an
+ephemeral loopback port and points a window at it (ADR-0070), so one process serves the API, the SPA
+and the Asset URLs exactly as the container does. It pins the `desktop` Deployment Profile and
+Collaboration **off** (ADR-0071 — a `features.collaboration: true` in that Instance's `hexly.yml` is
+ignored), keeps its Instance Directory in the platform's application-support folder, and seeds and
+authenticates a **Sole User** at first launch. There is no login screen and no password.
+
+```sh
+pnpm native:electron   # once: rebuild better-sqlite3 against Electron's ABI (see below)
+pnpm dev:desktop       # builds the SPA + the shell, then opens the window
+```
+
+`NODE_ENV` is deliberately never `production` in the shell: the session cookie's `secure` flag keys on
+it, and a `secure` cookie is never stored over plain `http://127.0.0.1`, so the Sole User's session
+would silently fail to stick. The production _build_ ships without the literal env value.
+
+### Native modules and the ABI switch
+
+`better-sqlite3` is a classic C++ addon, so its binary must match the ABI of the runtime that opens the
+database — **Electron's, not Node's** — and one `node_modules` holds one build. So the two flavours are
+a switch, not a coexistence:
+
+```sh
+pnpm native:electron   # for pnpm dev:desktop
+pnpm native:node       # back to plain Node: pnpm dev, nx test api, nx e2e web-e2e
+```
+
+Run `pnpm native:node` before the API tests or the browser e2e suite, or they fail to load the addon.
+`sharp` and `@node-rs/argon2` are Node-API modules and ride along unchanged. On macOS the rebuild also
+ad-hoc re-signs the addon (`scripts/sign-native-addons.mjs`) — the code-signing monitor kills Electron
+outright when it `dlopen`s the linker-signed prebuild.
 
 ## Seeding a user (required to log in)
 

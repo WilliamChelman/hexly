@@ -1,0 +1,43 @@
+{
+  "name": "desktop",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/desktop/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "webpack-cli build",
+        "env": {
+          "NODE_ENV": "production"
+        },
+        "cwd": "apps/desktop"
+      },
+      "configurations": {
+        "development": {
+          "env": {
+            "NODE_ENV": "development"
+          }
+        }
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "nx:run-commands",
+      "dependsOn": ["build", "web:build"],
+      "options": {
+        "command": "electron dist/apps/desktop/main.js",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "rebuild-native": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["electron-rebuild --force --only better-sqlite3", "node scripts/sign-native-addons.mjs"],
+        "parallel": false,
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  },
+  "tags": []
+}

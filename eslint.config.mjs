@@ -26,11 +26,16 @@ export default [
           // marks the whole project lazy. Its `/i18n` entry must still be imported eagerly (ADR-0049,
           // the route `title` needs the scope before the page loads); that entry carries only the
           // scope declaration and JSON loaders, so it never drags the page barrel into the eager bundle.
+          // The Desktop App's Electron main is a second entry point onto the *same* Nest app, hosted
+          // in-process (ADR-0070), so `apps/desktop` genuinely depends on `apps/api`. It reaches it
+          // through exactly one file — `apps/api/src/host.ts`, the embedding surface — which is a
+          // tighter boundary than extracting the composition root into a lib for one consumer.
           allow: [
             '^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$',
             '@hexly/web-core/testing',
             '@hexly/admin-web/i18n',
             '^.*/libs/web-core/src/(utils/pretty-id|i18n/locale-key-sync)$',
+            '^\\.\\./\\.\\./api/src/host$',
           ],
           // ponytail: layering (core←ui←app) holds by construction and review;
           // left permissive because a type:* matrix would need every existing
