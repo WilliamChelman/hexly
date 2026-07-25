@@ -37,6 +37,43 @@ docker exec hexly-hexly-1 node dist/apps/api/seed.js <email> <password> "<displa
 docker compose pull && docker compose up -d
 ```
 
+## Installing the Desktop App
+
+Every [release](https://github.com/WilliamChelman/hexly/releases/latest) carries one installer per platform
+beside that container image — the same Hexly, running on your own machine over its own **Instance Directory** in
+your user profile, with no account and no login (ADR-0070):
+
+| Platform              | File                                    |
+| --------------------- | --------------------------------------- |
+| macOS (Apple Silicon) | `Hexly-<version>-macos-arm64.dmg`       |
+| Windows               | `Hexly-<version>-windows-x64.exe`       |
+| Linux                 | `Hexly-<version>-linux-x86_64.AppImage` |
+
+Each is a ~150 MB download: it carries its own Electron and its own Node modules, so there is nothing else to
+install.
+
+**The builds are unsigned, and therefore have no auto-update** — the macOS updater refuses to update an unsigned
+bundle, so the two are one decision (ADR-0070). Updating means downloading a later installer and opening it; the
+Instance Directory stays where it is.
+
+Being unsigned also means every platform warns you the first time you open one. **That warning is expected — the
+download is not broken** — and each platform has its own way through:
+
+- **macOS.** Open the `.dmg` and drag **Hexly** into Applications. The first open is refused, saying the
+  developer cannot be verified. Open **System Settings → Privacy & Security**, scroll to the message naming
+  Hexly, click **Open Anyway**, then confirm at the prompt. Recent macOS (15 and later) has removed the old
+  Finder right-click → **Open** bypass, so this is the route. It opens normally from then on.
+- **Windows.** SmartScreen shows "Windows protected your PC" and hides the run button behind **More info** —
+  click that, then **Run anyway**. The installer needs no administrator rights; it installs for you alone.
+- **Linux.** The AppImage needs the executable bit before a double-click does anything:
+  `chmod +x Hexly-*.AppImage`. There is nothing to install and no root involved.
+
+That Instance Directory sits in the platform's application-support folder — `~/Library/Application Support/Hexly/hexly`
+on macOS, `%APPDATA%\Hexly\hexly` on Windows, `~/.config/Hexly/hexly` on Linux — and is the folder to copy to back
+your Worlds up. The **File** menu's reveal item opens it for you (named for your platform's file manager).
+Asset bytes can be moved off it from the same menu (**Move Asset Storage…**); the database stays put
+deliberately — ADR-0070 explains why a synced folder is the one place it must not be.
+
 ---
 
 ## Prerequisites
@@ -126,9 +163,26 @@ release builds one artifact per runner. And it leaves `node_modules` on Electron
 `pnpm native:node` afterwards.
 
 Builds are **unsigned, and therefore have no auto-update** — the macOS updater refuses to update an
-unsigned bundle, so the two are one decision (ADR-0070). Every platform will warn about the download; on
-recent macOS the route is System Settings → Privacy & Security → **Open Anyway**, the Finder right-click
-bypass having been removed.
+unsigned bundle, so the two are one decision (ADR-0070). See
+[Installing the Desktop App](#installing-the-desktop-app) for what a user meets on each platform, and say it
+there rather than only here.
+
+### Cutting a release
+
+`workflow_dispatch` on `ci.yml` (main or beta) is the whole release: semantic-release cuts the tag and a
+**draft** GitHub Release, the container image goes to `ghcr.io`, then the `desktop` matrix packages the app on a
+macOS, a Windows and a Linux runner and attaches one installer each — `HEXLY_VERSION` is what names them, since
+semantic-release writes no version back into `package.json`. The `publish-release` job is the only thing that
+undrafts, and it runs only if all three legs did: a platform whose build failed leaves an unpublished draft and
+a red run rather than a release quietly short a download (#328). Each leg runs the same post-package smoke check
+`pnpm package:desktop` does locally, so the platform that cannot thumbnail fails there instead of on a user's
+machine. Nothing signs anything; the macOS installer is Apple Silicon only, being what `macos-latest` is.
+
+Three warnings show up on every green build and mean nothing is wrong — **default Electron icon is used** (no icon
+asset exists yet), **platform-specific optional dependencies not bundled** listing every _other_ platform's
+`sharp`/libvips/`@node-rs` binaries (which is per-platform packaging working, and the reason for the matrix), and
+a suggestion to remove `@electron/rebuild` as an excess dependency (it is not: `npmRebuild: false` means that
+package is the one doing our forced rebuild).
 
 ## Seeding a user (required to log in)
 

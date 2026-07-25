@@ -1,6 +1,14 @@
 name: Setup
 description: pnpm + Node 24 + a node_modules cache, then a frozen-lockfile install. Run after checkout.
 
+inputs:
+  native-abi:
+    description: >
+      Which runtime's ABI this job leaves node_modules on: `node`, or `electron` for a job that packages the
+      Desktop App. One node_modules holds one better-sqlite3 build (ADR-0070), so the two flavours cannot share a
+      cache key.
+    default: node
+
 runs:
   using: composite
   steps:
@@ -15,7 +23,7 @@ runs:
       id: node-modules-cache
       with:
         path: node_modules
-        key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yaml') }}
+        key: ${{ runner.os }}-node-modules-${{ inputs.native-abi }}-${{ hashFiles('pnpm-lock.yaml') }}
 
     - run: pnpm install --frozen-lockfile
       if: steps.node-modules-cache.outputs.cache-hit != 'true'

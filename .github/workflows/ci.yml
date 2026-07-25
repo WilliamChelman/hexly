@@ -123,7 +123,9 @@ jobs:
         run: pnpm exec semantic-release --dry-run
 
   # Real release: only ever runs on a manual workflow_dispatch (on main/beta),
-  # gated behind the same main+e2e checks a push runs.
+  # gated behind the same main+e2e checks a push runs. Cuts the release as a
+  # *draft* (`draftRelease` in release.config.js) — `publish-release` below
+  # undrafts it once the desktop artifacts are attached (#328).
   release:
     needs: [build, e2e]
     if: github.event_name == 'workflow_dispatch'
@@ -131,6 +133,10 @@ jobs:
     permissions:
       contents: write
       packages: write
+    # The tag the desktop matrix labels its artifacts with, and the release it
+    # attaches them to. Empty when there was nothing to release.
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
 
     steps:
       - uses: actions/checkout@v4
@@ -149,7 +155,7 @@ jobs:
           pnpm exec semantic-release
           NEXT=$(git tag --sort=-version:refname | head -1)
           if [ "$PREV" != "$NEXT" ] && [ -n "$NEXT" ]; then
-            echo "tag=$NEXT" >> $GITHUB_OUTPUT
+            echo "tag=$NEXT" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Log in to ghcr.io
@@ -184,3 +190,110 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # One release is one place (#328, ADR-0070): the Desktop App's installers land on the
+  # same GitHub Release as the container image above. One runner per platform, because
+  # each installs its own platform's native binaries — `sharp`'s prebuilds and libvips
+  # are per-platform optional dependencies and `better-sqlite3` is rebuilt against the
+  # local toolchain — so nothing here cross-builds.
+  desktop:
+    needs: release
+    if: needs.release.outputs.tag
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    strategy:
+      # No sibling is cancelled: each platform's leg is the only signal that platform's
+      # download exists, and a cancelled leg would be indistinguishable from a broken one.
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            ext: dmg
+            wrapper: ''
+          - runner: windows-latest
+            ext: exe
+            wrapper: ''
+          # Electron opens a real window, even for a smoke check, and a runner has no display.
+          - runner: ubuntu-latest
+            ext: AppImage
+            wrapper: xvfb-run -a
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+        with:
+          # `desktop:package` rebuilds better-sqlite3 for Electron's ABI, so this job's
+          # node_modules must never answer for — or be saved under — the test jobs' key.
+          native-abi: electron
+
+      # Builds the SPA and the shell, rebuilds the native addon for Electron, runs
+      # electron-builder, then *opens the artifact and uses it*: a World created, an image
+      # thumbnailed, a password hashed (#327). The native modules are the packaging risk
+      # and a build cannot vouch for them, so that check is this leg's gate.
+      - name: Package the Desktop App
+        shell: bash
+        env:
+          # What the artifacts are named and what the app reports as its version; without
+          # it every release's downloads would be `0.0.0` (electron-builder.config.js).
+          HEXLY_VERSION: ${{ needs.release.outputs.tag }}
+        run: ${{ matrix.wrapper }} pnpm exec nx run desktop:package
+
+      - name: Attach the installer to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+          EXT: ${{ matrix.ext }}
+        # Matched by the version `artifactName` puts in the name, so this uploads what *this*
+        # run built rather than whatever `dist/desktop` happens to hold — and a glob that
+        # matched nothing fails the leg instead of leaving the release one download short.
+        # `gh` finds the draft by tag: the releases-by-tag endpoint hides drafts, and gh
+        # falls back to listing them.
+        run: |
+          shopt -s nullglob
+          artifacts=(dist/desktop/*-"${TAG#v}"-*."$EXT")
+          if [ "${#artifacts[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one .$EXT for $TAG in dist/desktop, found: ${artifacts[*]:-none}"
+            exit 1
+          fi
+          gh release upload "$TAG" "${artifacts[0]}" --clobber
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: desktop-package-report-${{ matrix.runner }}
+          path: apps/desktop-e2e/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The one step that makes a release visible, and it runs only if every leg above did —
+  # so a release is never published short a download, a failed platform leaving a draft
+  # and a red run instead (#328). Retry with "Re-run failed jobs", which reuses this tag;
+  # a fresh dispatch would find nothing left to release.
+  publish-release:
+    needs: [release, desktop]
+    if: needs.release.outputs.tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+        # The downloads are unsigned, so every platform warns about them, and a user who
+        # meets that warning with no explanation concludes the download is broken. So the
+        # workaround travels *with* the release rather than only in the README.
+        run: |
+          NOTES="$RUNNER_TEMP/notes.md"
+          gh release view "$TAG" --json body -q .body > "$NOTES"
+          printf '\n---\n\n' >> "$NOTES"
+          cat .github/desktop-download-notes.md >> "$NOTES"
+          gh release edit "$TAG" --notes-file "$NOTES" --draft=false

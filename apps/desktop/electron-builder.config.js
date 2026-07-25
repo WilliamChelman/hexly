@@ -24,6 +24,16 @@ const releaseVersion = process.env.HEXLY_VERSION?.replace(/^v/, '');
  */
 const arch = [process.arch === 'arm64' ? 'arm64' : 'x64'];
 
+/**
+ * One name per download, on the one Releases page three runners upload to (#328). electron-builder's defaults
+ * name for the *product* and leave the platform to the extension — and on Windows put a space in it — so each
+ * target states its own: `Hexly-1.4.0-macos-arm64.dmg`. The arch is never elided; it decides whether a download
+ * runs at all. Single-quoted on purpose: the `${...}` are electron-builder's macros, not this file's — and it
+ * spells `${arch}` per extension, so an AppImage's is `x86_64` where the dmg's is `x64` (the README's download
+ * table names them).
+ */
+const artifactName = (platform) => '${productName}-${version}-' + platform + '-${arch}.${ext}';
+
 module.exports = {
   appId: 'io.github.williamchelman.hexly',
   /**
@@ -78,6 +88,7 @@ module.exports = {
   publish: null,
   mac: {
     target: [{ target: 'dmg', arch }],
+    artifactName: artifactName('macos'),
     category: 'public.app-category.productivity',
     /**
      * Explicitly unsigned: `null` means "do not go looking for an identity", so a developer who happens to
@@ -91,10 +102,12 @@ module.exports = {
   },
   win: {
     target: [{ target: 'nsis', arch }],
+    artifactName: artifactName('windows'),
   },
   linux: {
     /** AppImage: no package manager, no root, closest thing Linux has to "download and open". */
     target: [{ target: 'AppImage', arch }],
+    artifactName: artifactName('linux'),
     category: 'Office',
     /** Stated, not derived from the package name, so the smoke check knows what to launch. */
     executableName: 'hexly',

@@ -2,10 +2,17 @@ import config from '../electron-builder.config.js';
 import { APP_NAME } from './instance-dir';
 
 /**
- * The three packaging facts that fail *silently* or *late* if they drift. Everything else about a package is
+ * The packaging facts that fail *silently* or *late* if they drift. Everything else about a package is
  * asserted by opening one — `apps/desktop-e2e/src/packaged/packaged-app.spec.ts` does that after every build.
  */
 describe('the electron-builder configuration', () => {
+  const originalVersion = process.env.HEXLY_VERSION;
+
+  afterEach(() => {
+    if (originalVersion === undefined) delete process.env.HEXLY_VERSION;
+    else process.env.HEXLY_VERSION = originalVersion;
+  });
+
   it('names the artifact what main names the app', () => {
     // The bundle's name and the app's own name are the same name, and every path derived from the bundle — the
     // packaged smoke check's included — is spelled from the former.
@@ -31,5 +38,37 @@ describe('the electron-builder configuration', () => {
     expect(config.publish).toBeNull();
     expect(config.mac.identity).toBeNull();
     expect(config.mac.notarize).toBe(false);
+  });
+
+  // Three runners upload three artifacts to one Releases page (#328), and the release workflow attaches each by
+  // globbing `*-$VERSION-*.<ext>` — so a dropped macro is not cosmetic: it attaches nothing, on a release that
+  // otherwise succeeded.
+  it.each([
+    ['mac', 'macos'],
+    ['win', 'windows'],
+    ['linux', 'linux'],
+  ] as const)('names the %s artifact for its platform, version and arch', (target, platform) => {
+    const artifactName: string = config[target].artifactName;
+
+    expect(artifactName).toContain(`-${platform}-`);
+    expect(artifactName.startsWith('${productName}-${version}-')).toBe(true);
+    // What tells an Apple Silicon download from an Intel one.
+    expect(artifactName).toContain('${arch}');
+  });
+
+  it('labels the artifact with the release version when a release has one to give', async () => {
+    // `HEXLY_VERSION` is how the release workflow names what it just tagged; without it every artifact of every
+    // release is `0.0.0`, since semantic-release writes no version back into `package.json`.
+    process.env.HEXLY_VERSION = 'v9.8.7';
+    vi.resetModules();
+
+    const released = (await import('../electron-builder.config.js')).default;
+
+    expect(released.extraMetadata.version).toBe('9.8.7');
+  });
+
+  it('leaves the version to `package.json` otherwise', () => {
+    // A developer's local package is honestly `0.0.0` rather than wearing a release's number.
+    expect(config.extraMetadata.version).toBeUndefined();
   });
 });
