@@ -7,6 +7,7 @@ import { assetSummaryOf, readAssetValue } from '@hexly/plugin-asset';
 import { asc, eq, inArray } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { assetIndex, entities } from '../db/schema';
+import { AssetBytesRegistry } from '../entities/asset-bytes-registry';
 import { DeletedEntity, EntityDeletionRegistry } from '../entities/entity-deletion-registry';
 
 /** DI token for the on-disk Assets root, resolved by `resolveAssetsDir` (ADR-0034). */
@@ -56,15 +57,38 @@ export class AssetsService implements OnModuleInit {
     @Inject(DB) private readonly db: Db,
     @Inject(ASSETS_DIR) private readonly dir: string,
     private readonly deletions: EntityDeletionRegistry,
+    private readonly bytePresence: AssetBytesRegistry,
   ) {}
 
   /**
-   * Register the Asset byte reaper on the Entity deletion hooks (ADR-0065): deleting an Asset Entity is the
-   * ordinary Entity delete, and this is what makes it take the bytes/thumbnail with it. `EntityWrites` fires
-   * it post-commit; dedup guarantees one Entity per hash, so the bytes are safely orphaned once it is gone.
+   * Register the two hooks the `entities` module holds for a byte-owning subsystem, so it never learns what
+   * an Asset is.
+   *
+   * The deletion reaper (ADR-0065): deleting an Asset Entity is the ordinary Entity delete, and this is what
+   * makes it take the bytes/thumbnail with it. `EntityWrites` fires it post-commit; dedup guarantees one
+   * Entity per hash, so the bytes are safely orphaned once it is gone.
+   *
+   * The byte-presence probe (#325): this service alone knows the resolved Assets root, so it answers "are
+   * these bytes here?" for the reads that mark a missing Asset.
    */
   onModuleInit(): void {
     this.deletions.register((deleted) => this.reap(deleted));
+    this.bytePresence.register((worldId, hash, ext) => this.bytesPresent(worldId, hash, ext));
+  }
+
+  /**
+   * Whether an Asset's bytes are on disk under the resolved Assets root (#325, ADR-0034). One stat at the
+   * hash-derived path — never a directory listing and never a rehash — which is what makes it affordable per
+   * read: the address comes off the derived dedup index, so nothing walks the tree looking for it.
+   *
+   * The thumbnail is deliberately not consulted: it is a regenerable cache that can outlive (or never exist
+   * beside) the original, so only the original answers the question the user is asking. Path-traversal-safe
+   * like {@link read} — an address that is not a single path segment is "not there".
+   */
+  bytesPresent(worldId: string, hash: string, ext: string): boolean {
+    const file = hash + ext;
+    if (basename(worldId) !== worldId || basename(file) !== file) return false;
+    return existsSync(join(this.dir, worldId, file));
   }
 
   /**

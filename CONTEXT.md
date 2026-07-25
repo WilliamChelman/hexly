@@ -52,6 +52,10 @@ _Avoid_: Metadata (retired); frontmatter (a projection, not a synonym); properti
 An **Entity** carrying the `core.type.asset` type — a binary file (an image today; PDFs, audio later) wrapped as the unit users browse, rename, tag, share, and delete. Two access layers, deliberately distinct: the Entity sits under the ordinary sharing model, while its **bytes** are served by an unguessable capability link (ADR-0034, ADR-0065).
 _Avoid_: Attachment, file, blob, media, upload; Asset Entity (an Asset _is_ an Entity)
 
+**Missing Bytes**:
+The state of an **Asset** whose bytes are not under the resolved Assets root — an unmounted volume, a relocated `assets.dir`, a half-synced folder. A named state, not an error: content-addressed write-once bytes degrade to _missing_, never to corrupt, so the Entity, its **Asset Stats** and its prose are all intact and the fix is restoring the file. Checked per read as one stat at the address the dedup index already holds, so it clears without a **Reindex**.
+_Avoid_: Broken, corrupt, orphaned, dangling (a dead **Entity Link**, not this), lost
+
 **Asset Stats**:
 Mechanical facts derived from an **Asset**'s bytes — an image's dimensions, orientation, and dominant color; later a PDF's page count, an audio file's duration. Computed, never authored.
 _Avoid_: Metadata (overloaded), EXIF, properties, stats (bare, in prose about anything else)

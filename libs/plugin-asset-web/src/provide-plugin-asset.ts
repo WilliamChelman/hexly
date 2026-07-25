@@ -1,5 +1,5 @@
 import { EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
-import { LucideFile, LucideFileText, LucideImage, LucideMusic } from '@lucide/angular';
+import { LucideFile, LucideFileText, LucideImage, LucideImageOff, LucideMusic } from '@lucide/angular';
 import { providePlugin } from '@hexly/web-entity';
 import { lucideGlyph, provideIcons } from '@hexly/web-ui';
 import { ASSET_DATA_TYPE, ASSET_FIELD, PLUGIN_ID, THUMBNAIL_FIELD } from '@hexly/plugin-asset';
@@ -21,12 +21,15 @@ import { ASSET_TYPE_DEFINITIONS, CORE_VIEW_ASSET } from './asset-types';
 export function providePluginAsset(): EnvironmentProviders {
   return makeEnvironmentProviders([
     // The icon-card glyphs the Asset View falls back to per kind (ADR-0065): `asset` (image) is the type's
-    // own icon; the rest cover the non-image kinds that render as an icon card today.
+    // own icon; the rest cover the non-image kinds that render as an icon card today. `asset-missing` is not
+    // a kind — it marks an Asset whose bytes are not under the Assets root (#325), so it must read as absence
+    // rather than as another file type.
     provideIcons([
       lucideGlyph('asset', LucideImage),
       lucideGlyph('asset-pdf', LucideFileText),
       lucideGlyph('asset-audio', LucideMusic),
       lucideGlyph('asset-file', LucideFile),
+      lucideGlyph('asset-missing', LucideImageOff),
     ]),
     providePlugin({
       id: PLUGIN_ID,

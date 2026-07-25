@@ -16,7 +16,8 @@
     "emptyTitle": "No assets yet.",
     "emptyHint": "Upload an image to begin.",
     "noMatchTitle": "No assets match your search.",
-    "noMatchHint": "Try a different name, kind, or Tag."
+    "noMatchHint": "Try a different name, kind, or Tag.",
+    "missing": "File missing"
   },
   "auth": {
     "tabTitle": "Hexly — Sign in",

@@ -16,7 +16,8 @@
     "emptyTitle": "Aucune ressource pour le moment.",
     "emptyHint": "Téléversez une image pour commencer.",
     "noMatchTitle": "Aucune ressource ne correspond à votre recherche.",
-    "noMatchHint": "Essayez un autre nom, type ou étiquette."
+    "noMatchHint": "Essayez un autre nom, type ou étiquette.",
+    "missing": "Fichier absent"
   },
   "auth": {
     "tabTitle": "Hexly — Se connecter",

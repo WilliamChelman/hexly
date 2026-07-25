@@ -45,6 +45,10 @@
     "gray": "Gris",
     "white": "Blanc"
   },
+  "missing": {
+    "title": "Ce fichier n'est pas là où Hexly l'attend",
+    "hint": "Ses octets ne sont pas dans le dossier des ressources. Reconnectez le disque ou remettez le fichier en place — tout le reste de cette ressource est intact."
+  },
   "prose": {
     "heading": "Notes"
   },

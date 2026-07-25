@@ -14,6 +14,7 @@
  */
 
 import * as z from 'zod';
+import type { AssetBytesRef } from './asset';
 import type { EntityEdge } from './entity-edges';
 import type { FieldDataType } from './field';
 import { KindedId, kindedIdRegex } from './kinded-id';
@@ -142,11 +143,12 @@ export interface StructuredDataType {
    */
   harvestFacets?(value: unknown): readonly HarvestedFacet[];
   /**
-   * The content address of the stored bytes this value wraps (ADR-0065): an Asset's content `hash`,
-   * mirrored to the derived `(worldId, hash) → entity` index at the write choke point — the dedup key an
-   * upload resolves against. Absent for every data-type but the asset-ref, which alone owns bytes.
+   * The content address of the stored bytes this value wraps (ADR-0065): an Asset's content `hash` and the
+   * `ext` it is stored under, mirrored to the derived `(worldId, hash) → entity` index at the write choke
+   * point — the dedup key an upload resolves against, and (#325) the full byte address a read checks for
+   * presence. Absent for every data-type but the asset-ref, which alone owns bytes.
    */
-  harvestAssetHash?(value: unknown): string | null;
+  harvestAssetRef?(value: unknown): AssetBytesRef | null;
   /**
    * How this value takes its place in an exported Markdown file (CONTEXT.md → Vault Projection). The
    * data-type supplies the default slot; a Field may override it. `core.datatype.rich-content` projects to the
@@ -172,7 +174,7 @@ export function defineStructuredDataType<T>(definition: {
   readonly extractText?: (value: T) => string;
   readonly facetDimensions?: readonly FacetDimension[];
   readonly harvestFacets?: (value: T) => readonly HarvestedFacet[];
-  readonly harvestAssetHash?: (value: T) => string | null;
+  readonly harvestAssetRef?: (value: T) => AssetBytesRef | null;
   /**
    * The data-type's default {@link VaultProjection}. Its converters see the value *unparsed* (cast to
    * `T`), unlike {@link harvestEdges}/{@link extractText}: an export must tolerate a value this build
@@ -185,7 +187,7 @@ export function defineStructuredDataType<T>(definition: {
   };
 }): StructuredDataType {
   const id = structuredDataTypeIdSchema.parse(definition.id);
-  const { valueSchema, empty, harvestEdges, extractText, facetDimensions, harvestFacets, harvestAssetHash, vault } =
+  const { valueSchema, empty, harvestEdges, extractText, facetDimensions, harvestFacets, harvestAssetRef, vault } =
     definition;
   const declaredFacetKeys = new Set((facetDimensions ?? []).map((dimension) => dimension.key));
   return Object.freeze<StructuredDataType>({
@@ -212,10 +214,10 @@ export function defineStructuredDataType<T>(definition: {
         return parsed.success ? harvestFacets(parsed.data).filter((row) => declaredFacetKeys.has(row.key)) : [];
       },
     }),
-    ...(harvestAssetHash && {
-      harvestAssetHash: (value: unknown) => {
+    ...(harvestAssetRef && {
+      harvestAssetRef: (value: unknown) => {
         const parsed = valueSchema.safeParse(value);
-        return parsed.success ? harvestAssetHash(parsed.data) : null;
+        return parsed.success ? harvestAssetRef(parsed.data) : null;
       },
     }),
     ...(vault && {

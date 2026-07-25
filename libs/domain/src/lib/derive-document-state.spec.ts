@@ -58,11 +58,20 @@ const STATBLOCK = defineStructuredDataType({
   harvestFacets: (sb) => [{ key: 'cr', value: String(sb.cr), num: sb.cr }],
 });
 
-const DATA_TYPES = structuredDataTypeSet([BOARD, LINKS, PROSE, STATBLOCK]);
+/** A structured data-type that owns bytes (stands in for `core.datatype.asset`, ADR-0065/#325). */
+const BYTES = defineStructuredDataType({
+  id: 'test.datatype.bytes',
+  valueSchema: z.object({ hash: z.string(), ext: z.string() }),
+  empty: () => ({ hash: '', ext: '' }),
+  harvestAssetRef: (ref) => (ref.hash ? { hash: ref.hash, ext: ref.ext } : null),
+});
+
+const DATA_TYPES = structuredDataTypeSet([BOARD, LINKS, PROSE, STATBLOCK, BYTES]);
 const boardField = field('board', 'test.datatype.board');
 const linksField = field('links', 'test.datatype.links');
 const proseField = field('prose', 'test.datatype.prose');
 const statField = field('stats', 'test.datatype.stat-block');
+const bytesField = field('bytes', 'test.datatype.bytes');
 
 const derive = (doc: EntityDocument, fields: readonly Field[] = [], dataTypes = DATA_TYPES) =>
   deriveDocumentState(doc, fields, dataTypes);
@@ -283,6 +292,20 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
         { thumbnailFieldId: THUMB },
       ).edges;
       expect(edges).toEqual([{ targetKind: 'entity', targetId: 'portrait-1', descriptor: null, decor: false }]);
+    });
+  });
+
+  // The dedup index keys on the hash, but the *file* is `<hash><ext>` — so the derivation carries both, and
+  // a presence check is one hash-addressed stat rather than a listing of the World's folder (#325).
+  describe('assetRef: the whole byte address of the bytes a value wraps (ADR-0065, #325)', () => {
+    it('harvests the hash and the stored extension together', () => {
+      const state = derive({ bytes: { hash: 'f'.repeat(64), ext: '.png' } }, [bytesField]);
+      expect(state.assetRef).toEqual({ hash: 'f'.repeat(64), ext: '.png' });
+    });
+
+    it('is null for a document that owns no bytes, and for a bare pre-mint ref', () => {
+      expect(derive({ prose: { text: 'no bytes here' } }, [proseField]).assetRef).toBeNull();
+      expect(derive({ bytes: { hash: '', ext: '' } }, [bytesField]).assetRef).toBeNull();
     });
   });
 

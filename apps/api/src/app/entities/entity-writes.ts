@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import {
+  AssetBytesRef,
   DocumentDerivedState,
   EntityEdge,
   FieldFacetValue,
@@ -465,18 +466,20 @@ export class EntityWrites {
     this.replaceEdges(id, worldId, derived.edges);
     this.replaceFieldFacets(id, worldId, derived.fieldFacets);
     this.replaceImportSource(id, worldId, derived.importSource);
-    this.replaceAssetIndex(id, worldId, derived.assetHash);
+    this.replaceAssetIndex(id, worldId, derived.assetRef);
   }
 
   /**
-   * Replace the Entity's **Asset dedup index** row with the freshly derived content hash (self-pruning,
+   * Replace the Entity's **Asset dedup index** row with the freshly derived byte address (self-pruning,
    * ADR-0065): an asset-ref-carrying document materialises one row keyed on the bytes' hash, clearing the
    * ref removes it, and the FK cascade drops it with the Entity. Derived, never authoritative — an index
-   * over the document like the edge and provenance sets, so `worldId` is denormalised off the source.
+   * over the document like the edge and provenance sets, so `worldId` is denormalised off the source. The
+   * `ext` rides along so a read can stat the exact file (#325); rewriting the row is what heals a pre-#325
+   * row's unknown extension, no separate backfill.
    */
-  private replaceAssetIndex(id: string, worldId: string, hash: string | null): void {
+  private replaceAssetIndex(id: string, worldId: string, ref: AssetBytesRef | null): void {
     this.db.delete(assetIndex).where(eq(assetIndex.entityId, id)).run();
-    if (hash) this.db.insert(assetIndex).values({ entityId: id, worldId, hash }).run();
+    if (ref) this.db.insert(assetIndex).values({ entityId: id, worldId, hash: ref.hash, ext: ref.ext }).run();
   }
 
   /**
@@ -618,8 +621,8 @@ export class EntityWrites {
     // delete, unaccounted by Reindex) — the same leak stripping the shape would cause, by another door. So
     // a user edit may not drive an asset-typed Entity's harvested hash from non-null to null.
     if (change.document !== undefined && this.typeFields.systemManagedTypes.some((t) => nextTypes.includes(t))) {
-      const storedHash = this.derive(storedDoc, storedTypes, row.worldId).assetHash;
-      if (storedHash !== null && this.derive(nextDoc, nextTypes, row.worldId).assetHash === null) return true;
+      const storedRef = this.derive(storedDoc, storedTypes, row.worldId).assetRef;
+      if (storedRef !== null && this.derive(nextDoc, nextTypes, row.worldId).assetRef === null) return true;
     }
 
     return false;

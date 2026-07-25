@@ -1,0 +1,1 @@
+ALTER TABLE `asset_index` ADD `ext` text;

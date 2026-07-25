@@ -52,6 +52,7 @@ import {
   worlds,
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config';
+import { AssetBytesRegistry } from './asset-bytes-registry';
 import { EntityWrites, InsertEntityInput } from './entity-writes';
 import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
@@ -134,7 +135,25 @@ export class EntitiesService {
     private readonly writes: EntityWrites,
     private readonly typeFields: TypeFieldRegistry,
     private readonly worldTypeFields: WorldTypeFields,
+    private readonly assetBytes: AssetBytesRegistry,
   ) {}
+
+  /**
+   * Attach the missing-bytes state to a freshly read detail (#325, ADR-0034): one PK lookup on the derived
+   * dedup index for the byte address, then one stat through the {@link AssetBytesRegistry} probe — so
+   * `entities` marks the state without learning where bytes live. Only an Entity that owns bytes has an
+   * index row, so everything else pays one indexed miss and carries no flag. Computed per read, which is
+   * what makes restoring the file clear the state with no Reindex.
+   */
+  private withAssetBytesState(detail: EntityDetail): EntityDetail {
+    const ref = this.db
+      .select({ hash: assetIndex.hash, ext: assetIndex.ext })
+      .from(assetIndex)
+      .where(eq(assetIndex.entityId, detail.id))
+      .get();
+    if (!ref || !this.assetBytes.missing(detail.worldId, ref.hash, ref.ext)) return detail;
+    return { ...detail, assetBytesMissing: true };
+  }
 
   /**
    * One reader-scoped page of summaries, metadata only. Stable sort (newest first,
@@ -212,8 +231,14 @@ export class EntitiesService {
       // non-Asset with no designation carries none. The field target's URL keys off *its* World (an
       // entity-link stays in-World, so it equals the row's, but the resolved index is authoritative).
       if (opts.withThumbnails) {
-        const thumbnailUrl = resolveThumbnailUrl(row as typeof row & ThumbnailRow, row.worldId);
+        const assetRow = row as typeof row & ThumbnailRow;
+        const thumbnailUrl = resolveThumbnailUrl(assetRow, row.worldId);
         if (thumbnailUrl) summary = { ...summary, thumbnailUrl };
+        // The missing-bytes state (#325) rides the same opt-in: a read that draws an Asset's imagery is
+        // exactly the read that must say so when the file is not there, and only its rows pay the stat.
+        // Own bytes only — a broken Thumbnail *designation* is the designated Asset's story, not this row's.
+        if (this.assetBytes.missing(row.worldId, assetRow.ownAssetHash, assetRow.ownAssetExt))
+          summary = { ...summary, assetBytesMissing: true };
       }
       if (!opts.withRights) return summary;
       // The predicate columns arrive as SQLite 0/1; rightsOf reads them truthily.
@@ -443,7 +468,9 @@ export class EntitiesService {
     // Rights let the editor gate itself: a Viewer opens read-only, an entity-level
     // Editor (canWrite false, canEditSubstance true) opens writable. canManage rides
     // the owner-only gate so the Share dialog is only offered to actual Owners.
-    return decision?.canRead ? { ...toDetail(decision.row), rights: access.rightsOf(decision) } : null;
+    return decision?.canRead
+      ? this.withAssetBytesState({ ...toDetail(decision.row), rights: access.rightsOf(decision) })
+      : null;
   }
 
   /**
@@ -1003,7 +1030,7 @@ export class EntitiesService {
       .get();
     if (!link) return null;
     const row = this.db.select().from(entities).where(eq(entities.id, link.entityId)).get();
-    return row ? { ...toDetail(row), rights: [...READ_ONLY_RIGHTS] } : null;
+    return row ? this.withAssetBytesState({ ...toDetail(row), rights: [...READ_ONLY_RIGHTS] }) : null;
   }
 
   /**
@@ -1017,7 +1044,7 @@ export class EntitiesService {
       .from(entities)
       .where(and(eq(entities.id, id), eq(entities.worldId, worldId), sharedVisibility))
       .get();
-    return row ? { ...toDetail(row), rights: [...READ_ONLY_RIGHTS] } : null;
+    return row ? this.withAssetBytesState({ ...toDetail(row), rights: [...READ_ONLY_RIGHTS] }) : null;
   }
 
   /** Summaries of a World's `shared` Entities, ordered like {@link list}. */
@@ -1210,13 +1237,21 @@ function thumbnailJoin() {
     ownAsset,
     fieldAsset,
     fieldKind,
-    columns: { ownAssetHash: ownAsset.hash, fieldAssetHash: fieldAsset.hash, fieldAssetWorldId: fieldAsset.worldId },
+    columns: {
+      ownAssetHash: ownAsset.hash,
+      // The own-bytes address is projected whole (#325): `hash` resolves the thumbnail URL, `hash + ext` is
+      // the file a read stats to mark a missing Asset — one join answering both.
+      ownAssetExt: ownAsset.ext,
+      fieldAssetHash: fieldAsset.hash,
+      fieldAssetWorldId: fieldAsset.worldId,
+    },
   };
 }
 
 /** The columns {@link resolveThumbnailUrl} reads off a {@link thumbnailJoin} row. */
 interface ThumbnailRow {
   readonly ownAssetHash?: string | null;
+  readonly ownAssetExt?: string | null;
   readonly fieldAssetHash?: string | null;
   readonly fieldAssetWorldId?: string | null;
 }

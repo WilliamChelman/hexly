@@ -101,7 +101,8 @@ describe('Superadmin repair surface', () => {
     const done = await pollUntilDone(ada);
 
     expect(done).toMatchObject({ status: 'succeeded', failures: [] });
-    expect(assetHashRows()).toEqual([{ entityId: asset.id, worldId, hash }]);
+    // Reindex rebuilds the whole byte address, so a pre-#325 row's unknown `ext` heals with the walk.
+    expect(assetHashRows()).toEqual([{ entityId: asset.id, worldId, hash, ext: '.png' }]);
     // A statless PNG still faces the Browser rail by kind (ADR-0065).
     expect(facetsOf(asset.id)).toContainEqual({ key: 'kind', value: 'image' });
   });
@@ -218,10 +219,15 @@ describe('Superadmin repair surface', () => {
       .map((r) => r.targetId);
   }
 
-  /** The rebuilt `(worldId, hash) → entity` dedup rows (ADR-0065). */
+  /** The rebuilt `(worldId, hash) → entity` dedup rows, byte address included (ADR-0065, #325). */
   function assetHashRows() {
     return db
-      .select({ entityId: assetIndex.entityId, worldId: assetIndex.worldId, hash: assetIndex.hash })
+      .select({
+        entityId: assetIndex.entityId,
+        worldId: assetIndex.worldId,
+        hash: assetIndex.hash,
+        ext: assetIndex.ext,
+      })
       .from(assetIndex)
       .all();
   }

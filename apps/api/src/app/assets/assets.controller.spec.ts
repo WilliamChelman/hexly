@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import request from 'supertest';
 import { createDb, DB, Db } from '../db/db';
 import { ConfigModule } from '../config/config.module';
+import { EntitiesService } from '../entities/entities.service';
 import { AssetMintService } from './asset-mint.service';
 import { AssetsModule } from './assets.module';
 import { ASSETS_DIR, AssetsService } from './assets.service';
@@ -130,5 +131,96 @@ describe('Asset bytes root from hexly.yml (ADR-0070)', () => {
 
     await request(app.getHttpServer()).get(url).expect(200);
     expect(existsSync(join(instanceDir, 'assets', 'world-1'))).toBe(true);
+  });
+});
+
+/**
+ * Missing Asset bytes (#325, ADR-0034 amendment). Changing `assets.dir` moves no existing bytes, and an
+ * external volume can be unmounted — so bytes go absent while the Entity, its Stats and its prose stay
+ * perfectly intact. The read model must be able to say which of the two happened, and say it live: the state
+ * is one stat off the address the dedup index already holds, so restoring the file heals it with no Reindex.
+ */
+describe('Missing Asset bytes (#325)', () => {
+  let app: INestApplication;
+  let db: Db;
+  let dir: string;
+
+  beforeEach(async () => {
+    db = createDb(':memory:');
+    dir = mkdtempSync(join(tmpdir(), 'hexly-assets-missing-'));
+    const moduleRef = await Test.createTestingModule({ imports: [ConfigModule, AssetsModule] })
+      .overrideProvider(DB)
+      .useValue(db)
+      .overrideProvider(ASSETS_DIR)
+      .useValue(dir)
+      .compile();
+    app = moduleRef.createNestApplication();
+    await app.init();
+    seedUserAndWorld(db);
+  });
+
+  afterEach(async () => {
+    await app.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  /** Mint an Asset the ordinary way and hand back its id plus the on-disk path of its bytes. */
+  async function mintAsset(): Promise<{ id: string; bytesPath: string }> {
+    const mint = app.get(AssetMintService);
+    const { entity } = mint.mint('u1', 'world-1', 'Portrait.png', PNG, await mint.extract('Portrait.png', PNG));
+    const ref = entity.document['core.field.asset'] as { hash: string; ext: string };
+    return { id: entity.id, bytesPath: join(dir, 'world-1', ref.hash + ref.ext) };
+  }
+
+  it('marks the Asset missing once its bytes leave the root, and unmarks it when they come back', async () => {
+    const { id, bytesPath } = await mintAsset();
+    const entities = app.get(EntitiesService);
+
+    // A healthy Asset carries no flag at all — visually unchanged from before this state existed.
+    expect(entities.load('u1', id)?.assetBytesMissing).toBeUndefined();
+
+    rmSync(bytesPath);
+    expect(entities.load('u1', id)?.assetBytesMissing).toBe(true);
+
+    // Restoring the file clears it on the next read — no Reindex, because nothing derived went stale.
+    writeFileSync(bytesPath, PNG);
+    expect(entities.load('u1', id)?.assetBytesMissing).toBeUndefined();
+  });
+
+  it('marks it on the thumbnail-bearing list read too — the Asset Browser draws its grid off that', async () => {
+    const { id, bytesPath } = await mintAsset();
+    const entities = app.get(EntitiesService);
+    // Exactly the read the Asset Browser issues: the type facet pinned to the asset type (which is
+    // hidden-from-default-listing, ADR-0065) and thumbnails opted in.
+    const tileFor = () =>
+      entities
+        .list('u1', {
+          offset: 0,
+          limit: 10,
+          worldId: 'world-1',
+          type: ['core.type.asset'],
+          withThumbnails: true,
+        })
+        .items.find((item) => item.id === id);
+
+    expect(tileFor()).toBeDefined();
+    expect(tileFor()?.assetBytesMissing).toBeUndefined();
+
+    rmSync(bytesPath);
+    expect(tileFor()?.assetBytesMissing).toBe(true);
+    // The thumbnail URL still resolves off the index — the state is what tells the grid not to draw it.
+    expect(tileFor()?.thumbnailUrl).toBeDefined();
+  });
+
+  it('never cries missing over the thumbnail cache alone — only the original answers the question', async () => {
+    const { id } = await mintAsset();
+    const entities = app.get(EntitiesService);
+
+    // A thumbnail is regenerable and may never have existed (a PDF, bytes sharp could not parse); losing it
+    // must not read as "your file is gone", because the serving route falls back to the original.
+    const hash = (entities.load('u1', id)?.document['core.field.asset'] as { hash: string }).hash;
+    rmSync(join(dir, 'world-1', `${hash}.thumb.webp`), { force: true });
+
+    expect(entities.load('u1', id)?.assetBytesMissing).toBeUndefined();
   });
 });

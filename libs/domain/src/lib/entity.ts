@@ -338,6 +338,14 @@ export interface EntitySummary {
    * the serving route when no thumbnail was minted, so it is always safe to use as a tile `src`.
    */
   readonly thumbnailUrl?: string;
+  /**
+   * Set when this Entity's *own* content-addressed bytes are absent from the resolved Assets root (#325,
+   * ADR-0034) — the missing-bytes state its surfaces name, so an unmounted drive or a hand-edited
+   * `assets.dir` reads as "your file is elsewhere", never as a corrupted World. Computed per read as one
+   * hash-addressed stat off the dedup index, so restoring the file clears it on the next read with no
+   * Reindex; absent for a healthy Asset and for every Entity that owns no bytes.
+   */
+  readonly assetBytesMissing?: boolean;
 }
 
 /** What `GET /entities/:id` and saves return. */
