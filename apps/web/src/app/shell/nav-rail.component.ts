@@ -5,7 +5,14 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { AuthClient, WorldStore, ActiveWorld, AuthScopedStorage, AppShellStore } from '@hexly/web-core';
+import {
+  AuthClient,
+  WorldStore,
+  ActiveWorld,
+  AuthScopedStorage,
+  AppShellStore,
+  ClientConfigStore,
+} from '@hexly/web-core';
 import { ButtonComponent, CartoucheComponent, IconComponent } from '@hexly/web-ui';
 import { UserMenuComponent } from './user-menu.component';
 import { WorldSwitcherComponent } from './world-switcher.component';
@@ -158,6 +165,7 @@ export class NavRailComponent {
   private readonly worlds = inject(WorldStore);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly rail = inject(NavRailStore);
+  private readonly clientConfig = inject(ClientConfigStore);
 
   protected readonly isAuthenticated = this.auth.isAuthenticated;
   protected readonly loading = inject(AppShellStore).loading;
@@ -172,8 +180,8 @@ export class NavRailComponent {
     if (this.activeWorldId()) return [];
     return [
       ...STATIC_ENTRIES,
-      // User management: manage-users role or Superadmin — the same gate the route enforces.
-      ...(this.auth.canManageUsers()
+      // User management: on the Collaboration cut list (ADR-0071), then the same role pair `/users` enforces.
+      ...(this.clientConfig.isCollaborationEnabled() && this.auth.canManageUsers()
         ? [
             {
               link: '/users',
@@ -183,7 +191,7 @@ export class NavRailComponent {
             },
           ]
         : []),
-      // The Superadmin repair surface — Superadmin only.
+      // The Superadmin repair surface — Superadmin only, and on neither cut list (ADR-0071).
       ...(this.auth.isSuperadmin()
         ? [
             {

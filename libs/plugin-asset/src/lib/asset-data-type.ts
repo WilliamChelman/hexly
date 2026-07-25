@@ -6,8 +6,8 @@
  * It harvests three **Facet** dimensions from the asset-ref (ADR-0055/0065): `kind` (from the mime), and —
  * from the **Asset Stats** an extractor wrote — `orientation` and a bucketed named `hue` (the dominant color
  * is stored as a value in stats; the facet is the bucket, see {@link bucketHue}). It carries no text and no
- * edges. It alone owns bytes, so it is the one data-type that {@link StructuredDataType.harvestAssetHash}
- * — the content `hash` mirrored to the derived `(worldId, hash) → entity` dedup index at the write choke point.
+ * edges. It alone owns bytes, so it is the one data-type that {@link StructuredDataType.harvestAssetRef}
+ * — the `hash` + `ext` mirrored to the derived `(worldId, hash) → entity` dedup index at the write choke point.
  *
  * Its **Vault Projection** is `omit`: the asset-ref is not serialized into a Markdown file — the bytes ride
  * the export's binary passthrough under the Entity's `name + ext` (ADR-0033/ADR-0065), and re-import re-mints
@@ -90,9 +90,10 @@ export const ASSET_DATA_TYPE = defineStructuredDataType({
     }
     return rows;
   },
-  // The one data-type that owns bytes: its content hash keys the per-World dedup index (ADR-0065). An
-  // empty placeholder ref (no hash yet) contributes nothing.
-  harvestAssetHash: (value: AssetValue) => value.hash || null,
+  // The one data-type that owns bytes: its content hash keys the per-World dedup index (ADR-0065) and its
+  // pinned `ext` completes the on-disk address a read stats for presence (#325). An empty placeholder ref
+  // (no hash yet) contributes nothing.
+  harvestAssetRef: (value: AssetValue) => (value.hash ? { hash: value.hash, ext: value.ext } : null),
   // The ref is derived from the bytes, not authored prose: it is written nowhere in the Markdown export;
   // the bytes are the export's binary passthrough, re-minting the ref by hash on re-import.
   vault: { slot: 'omit' },

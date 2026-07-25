@@ -1,13 +1,35 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import { createDb } from './db';
+import { createDb, resolveAssetsDir } from './db';
 
 /** Apply one migration file's SQL to a raw connection (`--> statement-breakpoint` is a comment). */
 function applyMigration(sqlite: Database.Database, file: string): void {
   sqlite.exec(readFileSync(resolve(__dirname, 'migrations', file), 'utf8'));
 }
+
+/** The one home of the absolute/relative/absent rule for `assets.dir` (ADR-0034 amendment). */
+describe('resolveAssetsDir (ADR-0034, ADR-0070)', () => {
+  it('defaults to the `assets` folder inside the Instance Directory — no `assets.dir`, no change', () => {
+    expect(resolveAssetsDir('/srv/hexly')).toBe(join('/srv/hexly', 'assets'));
+  });
+
+  it('takes a configured absolute path as-is', () => {
+    expect(resolveAssetsDir('/srv/hexly', '/Volumes/Vault/hexly-assets')).toBe('/Volumes/Vault/hexly-assets');
+  });
+
+  it('resolves a configured relative path against the Instance Directory', () => {
+    expect(resolveAssetsDir('/srv/hexly', '../big/assets')).toBe('/srv/big/assets');
+    expect(resolveAssetsDir('/srv/hexly', 'media')).toBe('/srv/hexly/media');
+  });
+
+  it('falls back to a throwaway temp dir for a :memory: Instance, which reads no hexly.yml at all', () => {
+    const dir = resolveAssetsDir(':memory:');
+    expect(existsSync(dir)).toBe(true);
+    expect(dir).not.toContain(':memory:');
+  });
+});
 
 describe('createDb boot migration (ADR-0027)', () => {
   it('builds the full schema on a fresh in-memory DB', () => {

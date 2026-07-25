@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonComponent, DialogComponent } from '@hexly/web-ui';
 import { GrantSetComponent, OwnerSetComponent, PublicLinkComponent } from '@hexly/web-entity';
+import { ClientConfigStore } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
 
 /**
@@ -9,6 +10,9 @@ import { EntitySession } from '../services/entity-session';
  * Public Link — the owner-only sharing surface. Driven by the {@link open} input; its content mounts
  * only while open, so it never fetches owners/grants for a closed dialog. {@link resigned} fires when
  * the caller resigns ownership, which can cost reach to the Entity — the caller navigates away.
+ *
+ * The surface guards itself on the Collaboration layer (ADR-0071), so no host can mount three parts
+ * whose endpoints 404.
  *
  * `display:contents` (host) so the wrapper adds no box to the header's layout.
  */
@@ -18,7 +22,7 @@ import { EntitySession } from '../services/entity-session';
   host: { class: 'contents' },
   imports: [ButtonComponent, DialogComponent, GrantSetComponent, OwnerSetComponent, PublicLinkComponent, TranslocoPipe],
   template: `
-    @if (open() && entityId(); as id) {
+    @if (open() && collaboration() && entityId(); as id) {
       <app-dialog [open]="true" [heading]="'collab.owners.heading' | transloco" (closed)="closed.emit()">
         <app-owner-set kind="entity" [id]="id" (resigned)="resigned.emit()" />
         <!-- Named per-Entity grants (ADR-0037, #161): the surgical layer below ownership —
@@ -54,6 +58,7 @@ import { EntitySession } from '../services/entity-session';
 })
 export class EntityShareDialogComponent {
   private readonly session = inject(EntitySession);
+  private readonly clientConfig = inject(ClientConfigStore);
 
   /** Whether the dialog is shown; the caller owns this state (toggled from the actions menu). */
   readonly open = input(false);
@@ -64,4 +69,7 @@ export class EntityShareDialogComponent {
 
   /** The open Entity's id — the sharing target; empty when none is open. */
   protected readonly entityId = computed(() => this.session.current()?.id ?? '');
+
+  /** Whether the Collaboration layer is on (ADR-0071) — with it off there is nothing to share. */
+  protected readonly collaboration = computed(() => this.clientConfig.isCollaborationEnabled());
 }

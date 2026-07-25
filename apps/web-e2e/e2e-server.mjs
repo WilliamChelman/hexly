@@ -89,11 +89,23 @@ const childEnv = {
 // before the users exist). The grantee is optional — the loop skips it if unset.
 // Only the login user gets a starter World: `enterLibrary` reaches its library by
 // clicking a World card on the Index, so the suite is dead without one.
-const toSeed = [{ ...user, withWorld: true }, ...(grantee.email ? [grantee] : [])];
+// E2E_SOLE_USER gives the login user the Sole User's shape (ADR-0071), so a Collaboration-off
+// absence cannot be a role check's doing.
+const toSeed = [
+  { ...user, withWorld: true, soleUser: !!process.env.E2E_SOLE_USER },
+  ...(grantee.email ? [grantee] : []),
+];
 for (const u of toSeed) {
   const seeded = spawnSync(
     process.execPath,
-    [seedJs, u.email, u.password, u.name, ...(u.withWorld ? ['--with-world'] : [])],
+    [
+      seedJs,
+      u.email,
+      u.password,
+      u.name,
+      ...(u.withWorld ? ['--with-world'] : []),
+      ...(u.soleUser ? ['--sole-user'] : []),
+    ],
     { env: childEnv, stdio: 'inherit' },
   );
   if (seeded.error) {
@@ -106,9 +118,15 @@ for (const u of toSeed) {
   }
 }
 
-// Serve. HEXLY_E2E=1 mounts the test-reset endpoint (and only here — ADR-0009).
+// Serve. HEXLY_E2E=1 mounts the test-reset endpoint (and only here — ADR-0009). The Deployment Profile
+// has no hexly.yml key (ADR-0071), so E2E_PROFILE pins it, honoured under the same allowlist.
 const server = spawn(process.execPath, [mainJs], {
-  env: { ...childEnv, HEXLY_E2E: '1', PORT: process.env.PORT ?? '3100' },
+  env: {
+    ...childEnv,
+    HEXLY_E2E: '1',
+    PORT: process.env.PORT ?? '3100',
+    ...(process.env.E2E_PROFILE ? { HEXLY_E2E_PROFILE: process.env.E2E_PROFILE } : {}),
+  },
   stdio: 'inherit',
 });
 

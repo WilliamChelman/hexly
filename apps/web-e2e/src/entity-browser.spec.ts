@@ -1,4 +1,5 @@
 import { createEntity, enterLibrary, entityIdFromUrl, expect, openEntityActions, segRe, test } from './fixtures';
+import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 test('a note round-trips: create → appears → open → rename → delete', async ({ page }) => {
   await enterLibrary(page);
@@ -75,4 +76,45 @@ test('creating a map opens the map editor, not the note view', async ({ page }) 
   // App navigation lives in the rail now (ADR-0022): Library returns to the browser.
   await page.getByRole('link', { name: 'Library' }).click();
   await expect(page).toHaveURL(/\/entities$/);
+});
+
+// A real 1×1 PNG — enough for the mint to wrap it in an Asset Entity; no Stats are read here.
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+/**
+ * The hidden-from-default-listing exclusion (ADR-0065) at the surface it exists for. An Asset shares its
+ * name with the Entity it illustrates, so the search box was where the exclusion used to come undone.
+ */
+test('the browser’s search box keeps Assets out of the listing; the type facet opts them in', async ({ page }) => {
+  const worldId = idFromSegment(await enterLibrary(page));
+
+  // An Asset and an ordinary Entity that answer the same search term.
+  const uploaded = await page.request.post(`/api/worlds/${worldId}/assets`, {
+    multipart: { file: { name: 'Aldermoor.png', mimeType: 'image/png', buffer: PNG } },
+  });
+  expect(uploaded.ok(), `${uploaded.status()} ${await uploaded.text()}`).toBeTruthy();
+  const assetId = (await uploaded.json()).id as string;
+  const created = await page.request.post('/api/entities', {
+    data: { name: 'Aldermoor Keep', types: ['core.type.note'], worldId },
+  });
+  expect(created.ok(), `${created.status()} ${await created.text()}`).toBeTruthy();
+  const noteId = (await created.json()).id as string;
+
+  // Default listing: the note, never the Asset.
+  await page.reload();
+  await expect(page.getByTestId(`open-${noteId}`)).toBeVisible();
+  await expect(page.getByTestId(`open-${assetId}`)).toHaveCount(0);
+
+  // Searching the shared name keeps it that way — the search box is part of the listing.
+  await page.getByTestId('entity-search').fill('aldermoor');
+  await expect(page.getByTestId(`open-${noteId}`)).toBeVisible();
+  await expect(page.getByTestId(`open-${assetId}`)).toHaveCount(0);
+
+  // The type facet is the opt-in surface: it counts the Asset all along, and selecting it lists it.
+  await page.getByTestId('facet-type-core.type.asset').click();
+  await expect(page.getByTestId(`open-${assetId}`)).toBeVisible();
+  await expect(page.getByTestId(`open-${noteId}`)).toHaveCount(0);
 });

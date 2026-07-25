@@ -12,9 +12,10 @@ describe('core.datatype.asset', () => {
     expect(ASSET_DATA_TYPE.id).toBe(CORE_ASSET);
   });
 
-  it('harvests the content hash for the dedup index (ADR-0065)', () => {
-    // The one data-type that owns bytes: its hash keys the (worldId, hash) → entity index.
-    expect(ASSET_DATA_TYPE.harvestAssetHash?.(value)).toBe(HASH);
+  it('harvests the whole byte address for the dedup index (ADR-0065, #325)', () => {
+    // The one data-type that owns bytes: its hash keys the (worldId, hash) → entity index, and the pinned
+    // `ext` completes the address a read stats for presence (#325).
+    expect(ASSET_DATA_TYPE.harvestAssetRef?.(value)).toEqual({ hash: HASH, ext: '.png' });
     // No edges or text — an Asset's prose is the Content Field's, not the ref's.
     expect(ASSET_DATA_TYPE.harvestEdges).toBeUndefined();
     expect(ASSET_DATA_TYPE.extractText).toBeUndefined();
@@ -47,9 +48,9 @@ describe('core.datatype.asset', () => {
     expect(ASSET_DATA_TYPE.harvestFacets?.(emptyAssetValue())).toEqual([]);
   });
 
-  it('yields no hash for an empty placeholder ref or an unparseable value (forward-only)', () => {
-    expect(ASSET_DATA_TYPE.harvestAssetHash?.(emptyAssetValue())).toBeNull();
-    expect(ASSET_DATA_TYPE.harvestAssetHash?.({ nonsense: true })).toBeNull();
+  it('yields no byte address for an empty placeholder ref or an unparseable value (forward-only)', () => {
+    expect(ASSET_DATA_TYPE.harvestAssetRef?.(emptyAssetValue())).toBeNull();
+    expect(ASSET_DATA_TYPE.harvestAssetRef?.({ nonsense: true })).toBeNull();
   });
 
   it('projects to `omit` — the ref rides no Markdown file; the bytes are the export passthrough', () => {

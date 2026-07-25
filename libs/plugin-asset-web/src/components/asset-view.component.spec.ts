@@ -29,7 +29,7 @@ function assetValue(overrides: Partial<AssetValue> = {}): AssetValue {
 }
 
 /** An Asset EntityDetail carrying `value` at the asset-ref key. */
-function assetDetail(value: AssetValue): EntityDetail {
+function assetDetail(value: AssetValue, overrides: Partial<EntityDetail> = {}): EntityDetail {
   return {
     id: 'asset-1',
     worldId: 'world-1',
@@ -42,6 +42,7 @@ function assetDetail(value: AssetValue): EntityDetail {
     createdAt: 0,
     updatedAt: 0,
     document: { [ASSET_FIELD_ID]: value },
+    ...overrides,
   };
 }
 
@@ -62,9 +63,9 @@ describe('AssetViewComponent', () => {
     }).compileComponents();
   });
 
-  function render(value: AssetValue) {
+  function render(value: AssetValue, overrides: Partial<EntityDetail> = {}) {
     const session = TestBed.inject(FakeEntitySession);
-    session.loadDetail(assetDetail(value));
+    session.loadDetail(assetDetail(value, overrides));
     const fixture = TestBed.createComponent(AssetViewComponent);
     fixture.detectChanges();
     return { session, fixture };
@@ -95,6 +96,33 @@ describe('AssetViewComponent', () => {
 
     expect(fixture.nativeElement.querySelector('[data-testid=asset-image]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid=asset-icon-card]')).not.toBeNull();
+  });
+
+  it('names the missing-bytes state and requests no bytes when the server reports them absent (#325)', () => {
+    const { fixture } = render(assetValue(), { assetBytesMissing: true });
+
+    const missing = fixture.nativeElement.querySelector('[data-testid=asset-missing]') as HTMLElement | null;
+    expect(missing).not.toBeNull();
+    expect(missing?.textContent).toContain("This file isn't where Hexly expects it");
+    expect(fixture.nativeElement.querySelector('[data-testid=asset-image]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=asset-icon-card]')).toBeNull();
+  });
+
+  it('says nothing about missing bytes for a non-image Asset whose bytes are present (#325)', () => {
+    // The icon card means "not an image", not "not there": the two states must stay distinguishable.
+    const { fixture } = render(assetValue({ ext: '.pdf', mime: 'application/pdf', stats: null }));
+
+    expect(fixture.nativeElement.querySelector('[data-testid=asset-missing]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=asset-icon-card]')).not.toBeNull();
+  });
+
+  it('still shows the Stats and prose of a missing-bytes Asset — none of that was lost (#325)', () => {
+    const { fixture } = render(assetValue(), { assetBytesMissing: true });
+
+    expect(fixture.nativeElement.querySelector('[data-testid=asset-stat-dimensions]')?.textContent).toContain(
+      '1920 × 1080',
+    );
+    expect(fixture.debugElement.query(By.directive(ContentEditorComponent))).not.toBeNull();
   });
 
   it('shows the mechanical Asset Stats (dimensions, dominant color, size)', () => {

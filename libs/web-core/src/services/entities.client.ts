@@ -28,7 +28,10 @@ export type EntityListParams = Partial<EntityListQuery>;
 export const ENTITY_NUDGE_DEBOUNCE_MS = 150;
 
 /** The subset of list params the Facet-count read narrows against — no paging. */
-export type EntityFacetParams = Pick<EntityListParams, 'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId'>;
+export type EntityFacetParams = Pick<
+  EntityListParams,
+  'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId' | 'includeHidden'
+>;
 
 /**
  * HTTP client for the entities API.
@@ -241,5 +244,8 @@ function facetParams(opts: EntityFacetParams): HttpParams {
   // Filter-by-Field: each `key:op:value` token repeats, like the other facet params.
   for (const f of opts.field ?? []) params = params.append('field', f);
   if (opts.worldId) params = params.set('worldId', opts.worldId);
+  // Opt-in to hidden-from-default-listing types (ADR-0065) — set by the by-name pickers, not by a browse.
+  // On both reads, so a rail's counts and its list agree about them.
+  if (opts.includeHidden) params = params.set('includeHidden', '1');
   return params;
 }

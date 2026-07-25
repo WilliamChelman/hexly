@@ -172,6 +172,27 @@ describe('EntitiesClient', () => {
     req.flush({ items: [], nextCursor: null });
   });
 
+  /**
+   * The hidden-from-default-listing opt-in (ADR-0065), carried on both reads so a rail's counts and the
+   * list they annotate can never disagree about hidden types. A browse omits it and keeps the exclusion.
+   */
+  it('serializes the includeHidden opt-in on both the list and the Facet read, only when asked', () => {
+    client.list({ q: 'sigil', includeHidden: true }).subscribe();
+    const listReq = http.expectOne((r) => r.url === '/api/entities');
+    expect(listReq.request.params.get('includeHidden')).toBe('1');
+    listReq.flush({ items: [], nextCursor: null });
+
+    client.facets({ includeHidden: true }).subscribe();
+    const facetReq = http.expectOne((r) => r.url === '/api/entities/facets');
+    expect(facetReq.request.params.get('includeHidden')).toBe('1');
+    facetReq.flush({ type: [], tag: [], visibility: [], fields: [] });
+
+    client.list({ q: 'sigil' }).subscribe();
+    const plain = http.expectOne((r) => r.url === '/api/entities');
+    expect(plain.request.params.has('includeHidden')).toBe(false);
+    plain.flush({ items: [], nextCursor: null });
+  });
+
   it('fetches Facet counts from /api/entities/facets under the active filters (#155)', () => {
     const facets = {
       type: [{ value: 'note', count: 3 }],

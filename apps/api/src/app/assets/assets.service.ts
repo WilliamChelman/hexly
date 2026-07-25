@@ -7,9 +7,10 @@ import { assetSummaryOf, readAssetValue } from '@hexly/plugin-asset';
 import { asc, eq, inArray } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { assetIndex, entities } from '../db/schema';
+import { AssetBytesRegistry } from '../entities/asset-bytes-registry';
 import { DeletedEntity, EntityDeletionRegistry } from '../entities/entity-deletion-registry';
 
-/** DI token for the on-disk Assets root (`<instanceDir>/assets`, or a temp dir for `:memory:`). */
+/** DI token for the on-disk Assets root, resolved by `resolveAssetsDir` (ADR-0034). */
 export const ASSETS_DIR = Symbol('ASSETS_DIR');
 
 /**
@@ -56,15 +57,31 @@ export class AssetsService implements OnModuleInit {
     @Inject(DB) private readonly db: Db,
     @Inject(ASSETS_DIR) private readonly dir: string,
     private readonly deletions: EntityDeletionRegistry,
+    private readonly assetBytes: AssetBytesRegistry,
   ) {}
 
   /**
    * Register the Asset byte reaper on the Entity deletion hooks (ADR-0065): deleting an Asset Entity is the
    * ordinary Entity delete, and this is what makes it take the bytes/thumbnail with it. `EntityWrites` fires
    * it post-commit; dedup guarantees one Entity per hash, so the bytes are safely orphaned once it is gone.
+   *
+   * And the byte-presence probe (#325): this service alone knows the resolved Assets root, so `entities`
+   * never learns what an Asset is.
    */
   onModuleInit(): void {
     this.deletions.register((deleted) => this.reap(deleted));
+    this.assetBytes.register((worldId, hash, ext) => this.bytesPresent(worldId, hash, ext));
+  }
+
+  /**
+   * Whether an Asset's bytes are on disk (#325, ADR-0034): one stat at the hash-derived path, cheap enough to
+   * run per read. The regenerable thumbnail is deliberately not consulted, and an address that is not a
+   * single path segment reads as "not there", as in {@link read}.
+   */
+  bytesPresent(worldId: string, hash: string, ext: string): boolean {
+    const file = hash + ext;
+    if (basename(worldId) !== worldId || basename(file) !== file) return false;
+    return existsSync(join(this.dir, worldId, file));
   }
 
   /**

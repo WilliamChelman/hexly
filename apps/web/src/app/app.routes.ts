@@ -1,9 +1,12 @@
 import { Route } from '@angular/router';
 import {
+  collaborationGuard,
   manageUsersGuard,
   superadminGuard,
   authGuard,
   loginGuard,
+  serverProfileGuard,
+  desktopProfileGuard,
   entityWorldRedirect,
   reconcileWorldSegment,
   activeWorldGuard,
@@ -13,10 +16,19 @@ import {
 // `title` values are transloco keys, resolved by TranslationTitleStrategy.
 export const appRoutes: Route[] = [
   {
+    // No password exists in the desktop profile, so the profile guard bounces this page (ADR-0071).
     path: 'login',
-    canActivate: [loginGuard],
+    canActivate: [serverProfileGuard, loginGuard],
     loadComponent: () => import('./pages/login/login.page').then((m) => m.LoginPage),
     title: 'auth.tabTitle',
+  },
+  {
+    // Where the desktop profile's unrecoverable session lands, since /login cannot help it (ADR-0070).
+    // Desktop-only: a server has a sign-in to fall back on (ADR-0071).
+    path: 'session-error',
+    canActivate: [desktopProfileGuard],
+    loadComponent: () => import('./pages/session-error/session-error.page').then((m) => m.SessionErrorPage),
+    title: 'auth.sessionError.tabTitle',
   },
   {
     path: '',
@@ -40,9 +52,9 @@ export const appRoutes: Route[] = [
   },
   {
     // User management (ADR-0047). Account-scoped like Settings; the server
-    // re-checks every action.
+    // re-checks every action. Collaboration off cuts it entirely (ADR-0071).
     path: 'users',
-    canActivate: [manageUsersGuard],
+    canActivate: [collaborationGuard, manageUsersGuard],
     loadComponent: () => import('./pages/users/users.page').then((m) => m.UsersPage),
     title: 'users.tabTitle',
   },
@@ -127,15 +139,18 @@ export const appRoutes: Route[] = [
     title: 'styleguide.tabTitle',
   },
   // Unauthenticated Public Link surface: token-scoped, read-only. Deliberately
-  // outside authGuard — possession of the token is the credential.
+  // outside authGuard — possession of the token is the credential — but on the
+  // Collaboration cut list (ADR-0071): with the layer off no token can exist.
   {
     path: 'public/e/:token',
+    canActivate: [collaborationGuard],
     data: { mode: 'entity' },
     loadComponent: () => import('./pages/public/public-entity.page').then((m) => m.PublicEntityPage),
     title: 'publicView.tabTitle',
   },
   {
     path: 'public/w/:token',
+    canActivate: [collaborationGuard],
     loadComponent: () => import('./pages/public/public-world.page').then((m) => m.PublicWorldPage),
     title: 'publicView.tabTitle',
   },
@@ -143,6 +158,7 @@ export const appRoutes: Route[] = [
     // `:entityId` (not `:id`) keeps the reused EntityPage's watchRoute from matching;
     // PublicEntityPage marks the session externally driven and is the sole data source.
     path: 'public/w/:token/e/:entityId',
+    canActivate: [collaborationGuard],
     data: { mode: 'worldEntity' },
     loadComponent: () => import('./pages/public/public-entity.page').then((m) => m.PublicEntityPage),
     title: 'publicView.tabTitle',

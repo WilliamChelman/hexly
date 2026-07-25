@@ -16,7 +16,8 @@
     "emptyTitle": "Aucune ressource pour le moment.",
     "emptyHint": "Téléversez une image pour commencer.",
     "noMatchTitle": "Aucune ressource ne correspond à votre recherche.",
-    "noMatchHint": "Essayez un autre nom, type ou étiquette."
+    "noMatchHint": "Essayez un autre nom, type ou étiquette.",
+    "missing": "Fichier absent"
   },
   "auth": {
     "tabTitle": "Hexly — Se connecter",
@@ -25,7 +26,13 @@
     "password": "Mot de passe",
     "signIn": "Se connecter",
     "signingIn": "Connexion…",
-    "invalidCredentials": "E-mail ou mot de passe incorrect."
+    "invalidCredentials": "E-mail ou mot de passe incorrect.",
+    "sessionError": {
+      "tabTitle": "Hexly — Session indisponible",
+      "eyebrow": "Hexly",
+      "heading": "Cette session ne peut pas continuer.",
+      "hint": "Hexly n'a pas pu confirmer votre session, et cette application n'a pas de connexion de secours. Redémarrez Hexly pour en ouvrir une nouvelle."
+    }
   },
   "entityBrowser": {
     "tabTitle": "Hexly — Votre bibliothèque",
@@ -554,6 +561,19 @@
       "self-manage-users-revoke": "Vous ne pouvez pas retirer votre propre accès de gestion des utilisateurs.",
       "superadmin-managed-by-superadmin": "Seul un Superadmin peut gérer un compte Superadmin.",
       "user-not-found": "Ce compte n'existe plus."
+    }
+  },
+  "assetStorage": {
+    "heading": "Déplacer le stockage des Assets",
+    "command": "Déplacer le stockage des Assets…",
+    "choosing": "Choisissez un dossier pour vos Assets…",
+    "copying": "Copie de {{copied}} fichiers sur {{total}}…",
+    "cancelling": "Arrêt en cours…",
+    "moved": "{{count}} fichiers copiés vers {{folder}}. Hexly va redémarrer pour les utiliser.",
+    "failedTitle": "Le déplacement n'a pas abouti : Hexly utilise toujours le dossier d'Assets précédent.",
+    "refused": {
+      "same-folder": "Ce dossier est déjà celui où Hexly conserve vos Assets.",
+      "nested-folders": "Ce dossier et le dossier d'Assets actuel se contiennent l'un l'autre. Choisissez-en un à l'extérieur."
     }
   }
 }

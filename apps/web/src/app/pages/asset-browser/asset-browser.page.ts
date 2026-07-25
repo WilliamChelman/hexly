@@ -70,6 +70,9 @@ const SEARCH_DEBOUNCE_MS = 150;
  * Entity model). Search (FTS `q`), the kind / orientation / hue dimensions and Tags are the same Facets the
  * Board image picker reuses; the type facet is pinned, so it is hidden from the rail. Upload mints (or
  * dedups to) an Asset through the ordinary path and refreshes page one.
+ *
+ * A tile whose Asset reports **Missing Bytes** (#325, ADR-0034) names that state instead of drawing a `src`
+ * the server has already said it cannot serve.
  */
 @Component({
   selector: 'app-asset-browser',
@@ -149,7 +152,19 @@ const SEARCH_DEBOUNCE_MS = 150;
                     [attr.aria-label]="asset.name"
                     [title]="asset.name"
                   >
-                    @if (asset.thumbnailUrl) {
+                    <!-- Missing Bytes take the tile ahead of the thumbnail (#325): the state came from the
+                         server, so the request is known to 404. -->
+                    @if (asset.assetBytesMissing) {
+                      <span
+                        class="flex h-full flex-col items-center justify-center gap-1 border border-dashed border-gold text-gold"
+                        [attr.data-testid]="'asset-missing-' + asset.id"
+                      >
+                        <app-icon name="asset-missing" [size]="28" />
+                        <span class="px-1 text-center text-[0.65rem] leading-tight">{{
+                          'assetBrowser.missing' | transloco
+                        }}</span>
+                      </span>
+                    } @else if (asset.thumbnailUrl) {
                       <img
                         class="w-full h-full object-cover"
                         loading="lazy"

@@ -51,8 +51,10 @@ export function searchEntities(
       const cached = cache.get(q);
       // Deferred so a take-first consumer that unsubscribes on the cached paint
       // never fires the request at all (see below).
+      // includeHidden: this helper backs pickers, not browses, so an Asset stays findable by name
+      // (ADR-0065) — ranked below ordinary matches server-side.
       const fresh$ = defer(() =>
-        client.list({ q, limit: SEARCH_LIMIT, ...(opts.thumbnails ? { thumbnails: true } : {}) }),
+        client.list({ q, limit: SEARCH_LIMIT, includeHidden: true, ...(opts.thumbnails ? { thumbnails: true } : {}) }),
       ).pipe(
         map((page) => page.items),
         // tap only runs on a successful emission, so failed searches never cache;

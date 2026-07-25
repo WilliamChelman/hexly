@@ -12,6 +12,16 @@ export function assetUrl(worldId: string, hash: string, ext: string): string {
 }
 
 /**
+ * The complete on-disk address of a stored Asset's bytes: content `hash` plus the `ext` pinned at first store
+ * (ADR-0034), since the hash alone names no file (#325).
+ */
+export interface AssetBytesRef {
+  readonly hash: string;
+  /** The stored extension, carrying its own leading dot (`'.png'`). */
+  readonly ext: string;
+}
+
+/**
  * The suffix a thumbnail is stored and served under, beside its source at a hash-derived path (ADR-0065).
  * A thumbnail is a regenerable cache — no row, no identity — so its path is derived from the source hash,
  * never stored; the serving route falls back to the original bytes when the thumb is absent.

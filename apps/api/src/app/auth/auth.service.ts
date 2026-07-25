@@ -110,18 +110,35 @@ export class AuthService {
     // Opportunistic sweep on login to prevent unbounded table growth.
     this.purgeExpiredSessions();
 
+    return { token: this.mintSession(user.id), user: toAuthUser(user) };
+  }
+
+  /**
+   * Open a session with no credential check, for a caller whose identity is already established: the Desktop
+   * App mints the Sole User's at launch (ADR-0070), so no route special-cases loopback. `expiresAt` defaults
+   * to the standard TTL.
+   */
+  mintSession(userId: string, opts: { expiresAt?: number } = {}): string {
     const token = newToken();
     this.db
       .insert(sessions)
       .values({
         id: token,
-        userId: user.id,
+        userId,
         createdAt: Date.now(),
-        expiresAt: Date.now() + SESSION_TTL_MS,
+        expiresAt: opts.expiresAt ?? Date.now() + SESSION_TTL_MS,
       })
       .run();
+    return token;
+  }
 
-    return { token, user: toAuthUser(user) };
+  /** How a caller with no password provisions-or-reuses a user (the Desktop App's Sole User, ADR-0070). */
+  findUserIdByEmail(email: string): string | undefined {
+    return this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, normalizeEmail(email)))
+      .get()?.id;
   }
 
   /** Resolve a session token to its user, or `null` if missing/expired. */
@@ -198,6 +215,11 @@ export class AuthService {
   async logout(token: string | undefined): Promise<void> {
     if (!token) return;
     this.db.delete(sessions).where(eq(sessions.id, token)).run();
+  }
+
+  /** End every session a user holds. The Desktop App clears the Sole User's on launch (ADR-0070). */
+  async logoutAll(userId: string): Promise<void> {
+    this.db.delete(sessions).where(eq(sessions.userId, userId)).run();
   }
 
   /** Delete every session whose expiry has passed. Safe to call any time. */

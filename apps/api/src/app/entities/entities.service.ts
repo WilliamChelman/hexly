@@ -52,6 +52,7 @@ import {
   worlds,
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config';
+import { AssetBytesRegistry } from './asset-bytes-registry';
 import { EntityWrites, InsertEntityInput } from './entity-writes';
 import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
@@ -98,12 +99,17 @@ export interface ListOptions {
    * the caller explicitly selected, so a hidden type surfaces the moment it is selected in the type facet.
    */
   readonly excludedTypes?: readonly string[];
+  /**
+   * Keep hidden-from-default-listing types (ADR-0065) in the result set — opt-in, set by the by-name
+   * pickers, never by a browse: the Entity Browser's search box is part of the listing, so `q` lifts nothing.
+   */
+  readonly includeHidden?: boolean;
 }
 
 /** The filter state a facet-count read narrows against — the list filters minus paging/ids. */
 export type FacetOptions = Pick<
   ListOptions,
-  'worldId' | 'q' | 'type' | 'tags' | 'visibility' | 'fields' | 'excludedTypes'
+  'worldId' | 'q' | 'type' | 'tags' | 'visibility' | 'fields' | 'excludedTypes' | 'includeHidden'
 >;
 
 /** Everything {@link filters} reads — shared by the paged list and the facet-count reads. */
@@ -134,7 +140,23 @@ export class EntitiesService {
     private readonly writes: EntityWrites,
     private readonly typeFields: TypeFieldRegistry,
     private readonly worldTypeFields: WorldTypeFields,
+    private readonly assetBytes: AssetBytesRegistry,
   ) {}
+
+  /**
+   * Attach the missing-bytes state to a detail (#325, ADR-0034): one indexed lookup for the byte address plus
+   * one stat through the {@link AssetBytesRegistry} probe, computed per read so restoring the file clears the
+   * state with no Reindex.
+   */
+  private withAssetBytesState(detail: EntityDetail): EntityDetail {
+    const ref = this.db
+      .select({ hash: assetIndex.hash, ext: assetIndex.ext })
+      .from(assetIndex)
+      .where(eq(assetIndex.entityId, detail.id))
+      .get();
+    if (!ref || !this.assetBytes.missing(detail.worldId, ref.hash, ref.ext)) return detail;
+    return { ...detail, assetBytesMissing: true };
+  }
 
   /**
    * One reader-scoped page of summaries, metadata only. Stable sort (newest first,
@@ -195,9 +217,11 @@ export class EntitiesService {
       .where(and(access.filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined))
       // With a query: best match first (bm25 ascending), id for a stable page boundary;
       // otherwise newest first. Weight order must match the FTS DDL: name, tags, content_text.
+      // Hidden types (ADR-0065) sort last, ahead of relevance: an Asset must not outrank the Entity whose
+      // name it shares. A tier, not a bm25 penalty, so the order is explainable rather than tuned.
       .orderBy(
         ...(match
-          ? [sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`, asc(entities.id)]
+          ? [...this.hiddenLast(), sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`, asc(entities.id)]
           : [desc(entities.updatedAt), asc(entities.id)]),
       )
       .limit(opts.limit + 1)
@@ -212,8 +236,13 @@ export class EntitiesService {
       // non-Asset with no designation carries none. The field target's URL keys off *its* World (an
       // entity-link stays in-World, so it equals the row's, but the resolved index is authoritative).
       if (opts.withThumbnails) {
-        const thumbnailUrl = resolveThumbnailUrl(row as typeof row & ThumbnailRow, row.worldId);
+        const assetRow = row as typeof row & ThumbnailRow;
+        const thumbnailUrl = resolveThumbnailUrl(assetRow, row.worldId);
         if (thumbnailUrl) summary = { ...summary, thumbnailUrl };
+        // The missing-bytes state (#325) rides the same opt-in, so only rows that draw imagery pay the stat.
+        // Own bytes only: a broken Thumbnail designation is the designated Asset's story, not this row's.
+        if (this.assetBytes.missing(row.worldId, assetRow.ownAssetHash, assetRow.ownAssetExt))
+          summary = { ...summary, assetBytesMissing: true };
       }
       if (!opts.withRights) return summary;
       // The predicate columns arrive as SQLite 0/1; rightsOf reads them truthily.
@@ -243,8 +272,8 @@ export class EntitiesService {
     // The hidden-type exclusion (ADR-0065) rides every count *but* the type facet's: the type facet is the
     // opt-in surface, so a hidden type must still be counted over the full universe there — otherwise it
     // would never appear to be selected into view. Every sibling category resolves the exclusion exactly as
-    // `list` does — via the shared helper — so the rail can never contradict the results it annotates: a
-    // name search (`q`) lifts the exclusion on both sides, so an Asset matched by name is counted here too.
+    // `list` does — via the shared helper, on the same signals — so the rail can never contradict the
+    // results it annotates: a name search leaves the exclusion standing on both sides.
     const scoped: FacetOptions = { ...opts, excludedTypes: this.resolveExcludedTypes(opts) };
     return {
       // Drop a category's own selection before counting it (drill-down). No hidden-type exclusion here.
@@ -260,12 +289,21 @@ export class EntitiesService {
    * Resolve the hidden-from-default-listing exclusion (ADR-0065) for a read — the single source both
    * {@link list} and {@link facets} route through, so the paged results and the Facet rail annotating them
    * can never drift. The exclusion self-lifts for a hidden type the caller selects (see
-   * {@link excludedHiddenTypes}), and lifts *entirely* when `ids` or `q` is present: neither an id lookup
-   * nor a name search is a "default listing" — pins and the `/entities/:id` redirect guard resolve an Asset
-   * by id, and Quick Open matches it by name, treating an Asset like any Entity. `facets` carries no `ids`.
+   * {@link excludedHiddenTypes}), and lifts *entirely* on two signals: `ids`, since an id lookup is no
+   * listing (pins, the `/entities/:id` redirect guard), and the caller's `includeHidden`, which the by-name
+   * pickers set. A name search alone lifts nothing — a browse's search box is part of its listing.
    */
-  private resolveExcludedTypes(opts: Pick<FilterOptions, 'ids' | 'q' | 'type'>): string[] {
-    return opts.ids || opts.q ? [] : this.excludedHiddenTypes(opts.type);
+  private resolveExcludedTypes(opts: Pick<FilterOptions, 'ids' | 'includeHidden' | 'type'>): string[] {
+    return opts.ids || opts.includeHidden ? [] : this.excludedHiddenTypes(opts.type);
+  }
+
+  /**
+   * The leading search sort key demoting hidden-from-default-listing types (ADR-0065): `EXISTS(...)` is 0
+   * for an ordinary Entity and 1 for a hidden-typed one, so ascending puts ordinary first. Names no type.
+   */
+  private hiddenLast(): SQL[] {
+    const hidden = this.typeFields.hiddenDefaultTypes;
+    return hidden.length ? [sql`${hasAny(entities.types, hidden)}`] : [];
   }
 
   /**
@@ -443,7 +481,9 @@ export class EntitiesService {
     // Rights let the editor gate itself: a Viewer opens read-only, an entity-level
     // Editor (canWrite false, canEditSubstance true) opens writable. canManage rides
     // the owner-only gate so the Share dialog is only offered to actual Owners.
-    return decision?.canRead ? { ...toDetail(decision.row), rights: access.rightsOf(decision) } : null;
+    return decision?.canRead
+      ? this.withAssetBytesState({ ...toDetail(decision.row), rights: access.rightsOf(decision) })
+      : null;
   }
 
   /**
@@ -675,7 +715,7 @@ export class EntitiesService {
    */
   detailById(id: string): EntityDetail | null {
     const row = this.db.select().from(entities).where(eq(entities.id, id)).get();
-    return row ? toDetail(row) : null;
+    return row ? this.withAssetBytesState(toDetail(row)) : null;
   }
 
   /**
@@ -713,9 +753,10 @@ export class EntitiesService {
       case 'forbidden':
         throw new ForbiddenException();
       case 'conflict':
-        return { status: 'conflict', current: toDetail(result.row) };
+        return { status: 'conflict', current: this.withAssetBytesState(toDetail(result.row)) };
       case 'ok':
-        return { status: 'saved', entity: detailOf(result.row, req.document) };
+        // A save response replaces the client's open Entity wholesale, so it must carry the state too (#325).
+        return { status: 'saved', entity: this.withAssetBytesState(detailOf(result.row, req.document)) };
     }
   }
 
@@ -804,10 +845,10 @@ export class EntitiesService {
     // shared Entity goes private), so recompute Rights post-update. Cold path.
     const access = entityAccess(this.db, userId);
     const after = access.decide(id);
-    return {
+    return this.withAssetBytesState({
       ...toDetail(result.row),
       ...(after && { rights: access.rightsOf(after) }),
-    };
+    });
   }
 
   /**
@@ -1003,7 +1044,7 @@ export class EntitiesService {
       .get();
     if (!link) return null;
     const row = this.db.select().from(entities).where(eq(entities.id, link.entityId)).get();
-    return row ? { ...toDetail(row), rights: [...READ_ONLY_RIGHTS] } : null;
+    return row ? this.withAssetBytesState({ ...toDetail(row), rights: [...READ_ONLY_RIGHTS] }) : null;
   }
 
   /**
@@ -1017,7 +1058,7 @@ export class EntitiesService {
       .from(entities)
       .where(and(eq(entities.id, id), eq(entities.worldId, worldId), sharedVisibility))
       .get();
-    return row ? { ...toDetail(row), rights: [...READ_ONLY_RIGHTS] } : null;
+    return row ? this.withAssetBytesState({ ...toDetail(row), rights: [...READ_ONLY_RIGHTS] }) : null;
   }
 
   /** Summaries of a World's `shared` Entities, ordered like {@link list}. */
@@ -1210,13 +1251,20 @@ function thumbnailJoin() {
     ownAsset,
     fieldAsset,
     fieldKind,
-    columns: { ownAssetHash: ownAsset.hash, fieldAssetHash: fieldAsset.hash, fieldAssetWorldId: fieldAsset.worldId },
+    columns: {
+      ownAssetHash: ownAsset.hash,
+      // `hash + ext` is the file a read stats to mark a missing Asset (#325); one join answers both.
+      ownAssetExt: ownAsset.ext,
+      fieldAssetHash: fieldAsset.hash,
+      fieldAssetWorldId: fieldAsset.worldId,
+    },
   };
 }
 
 /** The columns {@link resolveThumbnailUrl} reads off a {@link thumbnailJoin} row. */
 interface ThumbnailRow {
   readonly ownAssetHash?: string | null;
+  readonly ownAssetExt?: string | null;
   readonly fieldAssetHash?: string | null;
   readonly fieldAssetWorldId?: string | null;
 }

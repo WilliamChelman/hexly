@@ -5,6 +5,8 @@
   "entities": "Entities",
   "worlds": "Worlds",
   "commands": "Commands",
+  "openPalette": "Command Palette",
+  "goToWorlds": "Go to Worlds",
   "goToUsers": "Go to Users",
   "goToAdmin": "Go to Admin",
   "goToStyleguide": "Go to Styleguide",

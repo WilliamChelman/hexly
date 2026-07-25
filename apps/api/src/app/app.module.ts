@@ -16,8 +16,10 @@ import { TestModule } from './test/test.module';
  * Gates the e2e-only test endpoints (a destructive DB reset) — ADR-0009. Positive allowlist,
  * not `NODE_ENV !== 'production'`: an unset or unknown NODE_ENV (the default in a real deploy)
  * must fail closed, so the routes stay physically absent even if HEXLY_E2E=1 leaks in.
+ *
+ * Exported so `main.ts` gates its e2e Deployment Profile pin on the same allowlist (ADR-0071).
  */
-const e2eTestingEnabled =
+export const e2eTestingEnabled =
   process.env.HEXLY_E2E === '1' && (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development');
 
 @Module({

@@ -30,6 +30,7 @@ import {
   PublicLink,
   saveEntityRequestSchema,
 } from '@hexly/domain';
+import { CollaborationGuard } from '../acl/collaboration.guard';
 import { aclSetResponse, ownerSetResponse } from '../acl/owner-set';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
@@ -51,7 +52,8 @@ export class EntitiesController {
   list(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityPage {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { cursor, limit, ids, q, type, tag, visibility, field, worldId, rights, thumbnails } = parsed.data;
+    const { cursor, limit, ids, q, type, tag, visibility, field, worldId, rights, thumbnails, includeHidden } =
+      parsed.data;
 
     // Absent cursor is page one; undecodable is a 400 (ADR-0001).
     const offset = cursor === undefined ? 0 : decodeCursor(cursor);
@@ -70,6 +72,7 @@ export class EntitiesController {
       worldId,
       withRights: rights,
       withThumbnails: thumbnails,
+      includeHidden,
     });
     return { items, nextCursor: hasMore ? encodeCursor(offset + limit) : null };
   }
@@ -99,7 +102,7 @@ export class EntitiesController {
   facets(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityFacets {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { q, type, tag, visibility, field, worldId } = parsed.data;
+    const { q, type, tag, visibility, field, worldId, includeHidden } = parsed.data;
     return this.entities.facets(user.id, {
       q,
       type,
@@ -107,6 +110,8 @@ export class EntitiesController {
       visibility,
       fields: parseFieldFilters(field),
       worldId,
+      // Threaded so a rail can never annotate a list it disagrees with about hidden types (ADR-0065).
+      includeHidden,
     });
   }
 
@@ -165,8 +170,12 @@ export class EntitiesController {
     if (!this.entities.delete(user.id, id)) throw new NotFoundException();
   }
 
+  // Below: the Collaboration layer (ADR-0071), gated per route because this controller also carries
+  // the ordinary Entity surface.
+
   // The Entity's ownership set (ADR-0037), for an Owner.
   @Get(':id/owners')
+  @UseGuards(CollaborationGuard)
   owners(@CurrentUser() user: AuthUser, @Param('id') id: string): string[] {
     return ownerSetResponse(this.entities.listOwners(user.id, id), 'entity');
   }
@@ -175,6 +184,7 @@ export class EntitiesController {
   // Returns the updated set (200), idempotent — not a 201 (adding is set membership).
   @Post(':id/owners')
   @HttpCode(200)
+  @UseGuards(CollaborationGuard)
   addOwner(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): string[] {
     const parsed = addOwnerRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
@@ -184,6 +194,7 @@ export class EntitiesController {
   // Remove an Owner, or resign your own ownership (ADR-0037). The ≥1-Owner
   // invariant refuses removing the last Owner (409).
   @Delete(':id/owners/:userId')
+  @UseGuards(CollaborationGuard)
   removeOwner(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('userId') userId: string): string[] {
     return ownerSetResponse(this.entities.removeOwner(user.id, id, userId), 'entity');
   }
@@ -192,6 +203,7 @@ export class EntitiesController {
   // so the `last-owner` arm aclSetResponse maps is unreachable here — the 'entity' kind
   // it tags is never emitted.
   @Get(':id/grants')
+  @UseGuards(CollaborationGuard)
   grants(@CurrentUser() user: AuthUser, @Param('id') id: string): EntityGrant[] {
     return aclSetResponse(this.entities.listGrants(user.id, id), 'entity');
   }
@@ -200,6 +212,7 @@ export class EntitiesController {
   // an existing user (member or not). Upsert — re-granting updates the role — so 200.
   @Post(':id/grants')
   @HttpCode(200)
+  @UseGuards(CollaborationGuard)
   addGrant(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): EntityGrant[] {
     const parsed = addGrantRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
@@ -208,12 +221,14 @@ export class EntitiesController {
 
   // Revoke a grant (ADR-0037, #161): Owner-only. Revocation is how entity-level access ends.
   @Delete(':id/grants/:userId')
+  @UseGuards(CollaborationGuard)
   removeGrant(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('userId') userId: string): EntityGrant[] {
     return aclSetResponse(this.entities.removeGrant(user.id, id, userId), 'entity');
   }
 
   // The Entity's per-entity Public Link (ADR-0037, #162), for an Owner: the active token or null.
   @Get(':id/link')
+  @UseGuards(CollaborationGuard)
   link(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink | null {
     return aclSetResponse(this.entities.getLink(user.id, id), 'entity');
   }
@@ -222,6 +237,7 @@ export class EntitiesController {
   // active link per Entity, so a re-mint returns the current token — idempotent, hence 200.
   @Post(':id/link')
   @HttpCode(200)
+  @UseGuards(CollaborationGuard)
   mintLink(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink {
     return aclSetResponse(this.entities.mintLink(user.id, id), 'entity');
   }
@@ -229,6 +245,7 @@ export class EntitiesController {
   // Revoke the per-entity Public Link (ADR-0037, #162): Owner-only, the kill-switch.
   @Delete(':id/link')
   @HttpCode(204)
+  @UseGuards(CollaborationGuard)
   revokeLink(@CurrentUser() user: AuthUser, @Param('id') id: string): void {
     aclSetResponse(this.entities.revokeLink(user.id, id), 'entity');
   }

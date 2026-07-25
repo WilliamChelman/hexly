@@ -12,6 +12,7 @@
  * and gets an empty state.
  */
 
+import type { AssetBytesRef } from './asset';
 import { descriptorsSchema } from './entity';
 import { EntityEdge } from './entity-edges';
 import {
@@ -45,11 +46,12 @@ export interface DocumentDerivedState {
    */
   readonly importSource: ImportSource | null;
   /**
-   * The content `hash` of the bytes an Asset's asset-ref wraps, or `null` (ADR-0065) — mirrored to the
-   * derived `(worldId, hash) → entity` index at the write choke point, the dedup key an upload resolves
-   * against. Harvested from the one **Structured Data Type** that owns bytes, like edges and facets.
+   * The byte address of the bytes an Asset's asset-ref wraps, or `null` (ADR-0065) — mirrored to the derived
+   * `(worldId, hash) → entity` index at the write choke point, the dedup key an upload resolves against, with
+   * the `ext` completing the address a read stats for presence (#325). Harvested from the one **Structured
+   * Data Type** that owns bytes, like edges and facets.
    */
-  readonly assetHash: string | null;
+  readonly assetRef: AssetBytesRef | null;
   /**
    * The `entityId` the **Thumbnail** Field designates, or `null` (CONTEXT.md → Thumbnail, ADR-0066) —
    * mirrored to the nullable `thumbnail_entity_id` column at the write choke point so a list resolves the
@@ -132,13 +134,13 @@ export function deriveDocumentState(
   // and reads each value once, where three separate walks read it three times.
   const textParts: (string | undefined)[] = [];
   // At most one Field wraps stored bytes (an Asset's asset-ref); the first non-null address wins.
-  let assetHash: string | null = null;
+  let assetRef: AssetBytesRef | null = null;
   for (const { field, dataType } of resolvedStructuredDataTypeFields(fields, dataTypes)) {
     const value = readField(doc, field);
     for (const edge of dataType.harvestEdges?.(value) ?? []) addEdge(edge);
     textParts.push(dataType.extractText?.(value));
     for (const row of dataType.harvestFacets?.(value) ?? []) addFacet(row);
-    assetHash ??= dataType.harvestAssetHash?.(value) ?? null;
+    assetRef ??= dataType.harvestAssetRef?.(value) ?? null;
   }
 
   const edgeList = [...edges.values()];
@@ -151,7 +153,7 @@ export function deriveDocumentState(
     fieldFacets,
     // Provenance is a plain reserved key, read forward-only: an absent or ill-shaped stamp is `null`.
     importSource: readImportSource(doc) ?? null,
-    assetHash,
+    assetRef,
     thumbnailEntityId,
   };
 }

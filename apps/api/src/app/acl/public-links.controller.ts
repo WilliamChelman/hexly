@@ -1,14 +1,16 @@
-import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, UseGuards } from '@nestjs/common';
 import { EntityDetail, PublicWorldView } from '@hexly/domain';
+import { CollaborationGuard } from './collaboration.guard';
 import { PublicLinksService } from './public-links.service';
 
 /**
- * The unauthenticated Public Link read surface (ADR-0037). Unguarded — no
- * {@link SessionAuthGuard} — and GET-only: possession of the token is the sole credential, so any
- * write verb hits no route (404). An unresolved (revoked/never-minted) token is a 404,
- * indistinguishable from a bad token — no existence leak (ADR-0004).
+ * The unauthenticated Public Link read surface (ADR-0037). No {@link SessionAuthGuard} — and GET-only:
+ * possession of the token is the sole credential, so any write verb hits no route (404). An unresolved
+ * (revoked/never-minted) token is a 404, indistinguishable from a bad token — no existence leak
+ * (ADR-0004). The whole surface is Collaboration, so the gate sits on the class (ADR-0071).
  */
 @Controller('public')
+@UseGuards(CollaborationGuard)
 export class PublicLinksController {
   constructor(private readonly links: PublicLinksService) {}
 

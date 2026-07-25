@@ -5,6 +5,8 @@
   "entities": "Entités",
   "worlds": "Mondes",
   "commands": "Commandes",
+  "openPalette": "Palette de commandes",
+  "goToWorlds": "Aller aux mondes",
   "goToUsers": "Aller aux utilisateurs",
   "goToAdmin": "Aller à l'administration",
   "goToStyleguide": "Aller au guide de style",

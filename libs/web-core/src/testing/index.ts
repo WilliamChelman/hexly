@@ -1,6 +1,7 @@
 export * from '../i18n/test-catalogs';
 export * from '../i18n/transloco-testing';
 export * from './auth-client.mock';
+export * from './client-config-store.mock';
 export * from './entities-client.mock';
 export * from './nudge-bus.mock';
 export * from './user-directory-client.mock';

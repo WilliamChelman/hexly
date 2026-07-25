@@ -86,6 +86,17 @@ describe('EntitySearchPicker', () => {
     expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1' }));
   });
 
+  /**
+   * A picker is no browse: an Asset stays pickable by name (a Board Embed of one, a pinned one), unlike in
+   * the Entity Browser's own listing (ADR-0065). The server ranks hidden types last, so they never lead.
+   */
+  it('opts into hidden-from-default-listing types, as a by-name picker', () => {
+    const fixture = TestBed.createComponent(Host);
+    fixture.detectChanges();
+
+    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ includeHidden: true }));
+  });
+
   it('re-searches as the query changes and narrows the options', () => {
     const fixture = TestBed.createComponent(Host);
     fixture.detectChanges();

@@ -60,7 +60,6 @@ import { EntityViewStore } from '../services/entity-view-store';
             data-testid="title"
             role="textbox"
             aria-multiline="false"
-            spellcheck="false"
             [attr.tabindex]="editable() ? 0 : null"
             [attr.contenteditable]="editable() ? 'plaintext-only' : null"
             [attr.aria-label]="titleLabel()"

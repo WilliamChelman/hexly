@@ -1,10 +1,19 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRouteSnapshot, convertToParamMap, RouterStateSnapshot, UrlTree } from '@angular/router';
+import {
+  ActivatedRouteSnapshot,
+  CanActivateFn,
+  convertToParamMap,
+  RouterStateSnapshot,
+  UrlTree,
+} from '@angular/router';
 import { firstValueFrom, isObservable, Observable } from 'rxjs';
-import { AuthUser } from '@hexly/domain';
+import { AuthUser, DeploymentProfile } from '@hexly/domain';
 import { authGuard, loginGuard, manageUsersGuard, superadminGuard } from './auth.guard';
 import { AuthClient } from '../services/auth.client';
+import { ClientConfigStore } from '../services/client-config.store';
 import { MockAuthClient } from '../testing/auth-client.mock';
+import { mockClientConfigStore } from '../testing/client-config-store.mock';
 
 const ada: AuthUser = {
   id: 'u1',
@@ -145,6 +154,48 @@ describe('superadminGuard', () => {
   it('allows a Superadmin', async () => {
     auth.setUser(superadmin);
     expect(await settle(run())).toBe(true);
+  });
+});
+
+// Every case above runs without a ClientConfigStore override, so it reads the fall-open `server`
+// profile — the login page with its return URL, exactly as before ADR-0071.
+describe('the desktop profile has no login page to send anyone to (ADR-0071)', () => {
+  let auth: MockAuthClient;
+
+  beforeEach(() => {
+    auth = new MockAuthClient();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: AuthClient, useValue: auth },
+        {
+          provide: ClientConfigStore,
+          useValue: mockClientConfigStore({ profile: signal<DeploymentProfile>('desktop') }),
+        },
+      ],
+    });
+  });
+
+  function run(guard: CanActivateFn, url: string) {
+    return TestBed.runInInjectionContext(() => guard({} as ActivatedRouteSnapshot, { url } as RouterStateSnapshot));
+  }
+
+  const guards: readonly [string, CanActivateFn][] = [
+    ['authGuard', authGuard],
+    ['manageUsersGuard', manageUsersGuard],
+    ['superadminGuard', superadminGuard],
+  ];
+
+  for (const [name, guard] of guards) {
+    it(`sends ${name} to the unrecoverable-session error, with no returnUrl to come back to`, async () => {
+      const value = await settle(run(guard, '/atlas/42'));
+      expect(value).toBeInstanceOf(UrlTree);
+      expect((value as UrlTree).toString()).toBe('/session-error');
+    });
+  }
+
+  it('still lets an authenticated user through — the Sole User has a genuine session (ADR-0070)', async () => {
+    auth.setUser(superadmin);
+    expect(await settle(run(authGuard, '/atlas/42'))).toBe(true);
   });
 });
 

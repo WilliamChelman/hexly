@@ -1426,6 +1426,127 @@ describe('Entities endpoints', () => {
     });
   });
 
+  /**
+   * The hidden-from-default-listing capability (ADR-0065) end to end. Exercised through a *test* type that
+   * declares it, never the asset type: the rule is generic, and the asset type is only its first taker.
+   */
+  describe('hidden-from-default-listing types (ADR-0065)', () => {
+    beforeEach(() => {
+      app.get(TypeFieldRegistry).register('test.type.hidden', [], 'Hidden', { hiddenFromDefaultListing: true });
+    });
+
+    async function hidden(agent: Awaited<ReturnType<typeof signIn>>, name: string) {
+      const res = await agent
+        .post('/entities')
+        .send({ name, types: ['test.type.hidden'] })
+        .expect(201);
+      return res.body.id as string;
+    }
+    async function ordinary(agent: Awaited<ReturnType<typeof signIn>>, name: string) {
+      const res = await agent
+        .post('/entities')
+        .send({ name, types: ['core.type.note'] })
+        .expect(201);
+      return res.body.id as string;
+    }
+    const names = (res: { body: { items: { name: string }[] } }) => res.body.items.map((e) => e.name).sort();
+    const order = (res: { body: { items: { name: string }[] } }) => res.body.items.map((e) => e.name);
+
+    it('excludes a hidden type from the default listing, leaving ordinary Entities untouched', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await hidden(ada, 'Sigil art');
+      await ordinary(ada, 'Aldermoor');
+
+      expect(names(await ada.get('/entities').expect(200))).toEqual(['Aldermoor']);
+    });
+
+    /** The regression this exists for: a name search is part of the listing, so it lifts nothing. */
+    it('keeps a hidden type out of a name search — the browser’s search box is still the listing', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await hidden(ada, 'Aldermoor sigil');
+      await ordinary(ada, 'Aldermoor Keep');
+
+      expect(names(await ada.get('/entities').query({ q: 'aldermoor' }).expect(200))).toEqual(['Aldermoor Keep']);
+    });
+
+    it('surfaces a hidden type in a name search when the caller opts in (includeHidden)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await hidden(ada, 'Aldermoor sigil');
+      await ordinary(ada, 'Aldermoor Keep');
+
+      const res = await ada.get('/entities').query({ q: 'aldermoor', includeHidden: '1' }).expect(200);
+      expect(names(res)).toEqual(['Aldermoor Keep', 'Aldermoor sigil']);
+    });
+
+    /**
+     * The ranking tier: 'Aldermoor' is the tighter bm25 match (an exact, shorter name), so relevance alone
+     * would float the hidden Entity to the top of the picker — above the Entity it illustrates.
+     */
+    it('ranks a hidden-typed match below an ordinary one, however much better it matches', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await hidden(ada, 'Aldermoor');
+      await ordinary(ada, 'Aldermoor Keep and the long road east');
+
+      const res = await ada.get('/entities').query({ q: 'aldermoor', includeHidden: '1' }).expect(200);
+      expect(order(res)).toEqual(['Aldermoor Keep and the long road east', 'Aldermoor']);
+    });
+
+    it('surfaces a hidden type once its own type is selected in the type facet', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await hidden(ada, 'Sigil art');
+      await ordinary(ada, 'Aldermoor');
+
+      const res = await ada.get('/entities').query({ type: 'test.type.hidden' }).expect(200);
+      expect(names(res)).toEqual(['Sigil art']);
+    });
+
+    it('resolves a hidden type by id — an id lookup is no listing (pins, the redirect guard)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const id = await hidden(ada, 'Sigil art');
+
+      const res = await ada
+        .get('/entities')
+        .query({ ids: [id] })
+        .expect(200);
+      expect(names(res)).toEqual(['Sigil art']);
+    });
+
+    it('counts a hidden type in the type facet but in no sibling category, search or not', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const sigil = await hidden(ada, 'Aldermoor sigil');
+      await ada
+        .put(`/entities/${sigil}`)
+        .send({ document: {}, version: 1, tags: ['heraldry'] })
+        .expect(200);
+      await ordinary(ada, 'Aldermoor Keep');
+      const worldId = (await ada.get(`/entities/${sigil}`)).body.worldId;
+
+      // The type facet is the opt-in surface, so it counts the hidden type over the full universe.
+      const facets = await ada.get('/entities/facets').query({ worldId }).expect(200);
+      const types = facets.body.type as { value: string; count: number }[];
+      expect(types.find((t) => t.value === 'test.type.hidden')).toEqual({ value: 'test.type.hidden', count: 1 });
+      // Its Tag is not counted: the sibling categories annotate the listing, which excludes it.
+      expect(facets.body.tag).toEqual([]);
+
+      // Same under a name search — the exclusion no longer lifts on either side, so the rail still agrees.
+      const searched = await ada.get('/entities/facets').query({ worldId, q: 'aldermoor' }).expect(200);
+      expect(searched.body.tag).toEqual([]);
+    });
+
+    it('lets a rail opt in alongside its list, so counts and results agree (includeHidden)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const sigil = await hidden(ada, 'Aldermoor sigil');
+      await ada
+        .put(`/entities/${sigil}`)
+        .send({ document: {}, version: 1, tags: ['heraldry'] })
+        .expect(200);
+      const worldId = (await ada.get(`/entities/${sigil}`)).body.worldId;
+
+      const facets = await ada.get('/entities/facets').query({ worldId, includeHidden: '1' }).expect(200);
+      expect(facets.body.tag).toEqual([{ value: 'heraldry', count: 1 }]);
+    });
+  });
+
   describe('Field facets by presence + filter-by-Field (#188, #231)', () => {
     // A plugin-style type declaring two facetable Fields — an enum and a number — plus a
     // non-facetable one, registered the same way a bundled plugin (or a World-defined type) would.

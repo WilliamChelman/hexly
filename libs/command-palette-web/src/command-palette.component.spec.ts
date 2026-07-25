@@ -5,8 +5,9 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { COMMAND_PALETTE_TEST_CATALOGS } from './i18n/test-catalogs';
 import { Command, CommandProvider } from './command';
+import { CommandDirectory } from './command-directory';
 import { CommandRegistry } from './command-registry';
-import { COMMAND_PROVIDERS, CommandPaletteComponent } from './command-palette.component';
+import { COMMAND_PROVIDERS, CommandPaletteComponent, OPEN_COMMAND_PALETTE } from './command-palette.component';
 
 function dispatchCmdK(): void {
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
@@ -47,6 +48,17 @@ describe('CommandPalette', () => {
     dispatchCmdK();
     fixture.detectChanges();
     expect(dialogEl(fixture).open).toBe(false);
+  });
+
+  it('opens as a Command reachable by id, which is how the native menu opens it', () => {
+    // The Desktop App's menu item displays ⌘K without binding it and clicks through to this Command
+    // instead, so the chord above stays the dispatcher's (ADR-0070).
+    const fixture = render();
+
+    expect(TestBed.inject(CommandDirectory).invoke(OPEN_COMMAND_PALETTE)).toBe(true);
+    fixture.detectChanges();
+
+    expect(dialogEl(fixture).open).toBe(true);
   });
 
   it('opens while focus is in a text field — the chord is registered inEditable', () => {

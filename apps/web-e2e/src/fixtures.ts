@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { test as base, expect, type APIRequestContext, type Page, type Response } from '@playwright/test';
 // The app's own pretty-URL codec (ADR-0042). Imported by file path, not via the @hexly/web-core
 // barrel: the barrel re-exports the Angular services layer, which must stay out of the Playwright
@@ -28,6 +29,12 @@ export const test = base.extend<{ resetDb: void }>({
 });
 
 export { expect };
+
+/**
+ * The Instance Directory this run's server booted against, derived exactly as `e2e-server.mjs` does so the
+ * two cannot drift. A spec needs it to reach the same filesystem the API reads (#325).
+ */
+export const instanceDir = process.env.E2E_INSTANCE_DIR ?? join(__dirname, '..', '..', '..', 'tmp', 'web-e2e');
 
 /** The open Entity's canonical id, decoded from the last pretty URL segment `slug-base62(id)` (ADR-0042). */
 export function entityIdFromUrl(page: Page): string {

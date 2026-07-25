@@ -69,6 +69,15 @@ describe('entityListQuerySchema Facet params (#155)', () => {
     expect(parsed.tag).toBeUndefined();
     expect(parsed.visibility).toBeUndefined();
   });
+
+  // The hidden-from-default-listing opt-in (ADR-0065): absent reads false, so a browse that says nothing
+  // keeps the exclusion — the safe default for any surface that forgets to ask.
+  it('reads includeHidden as a boolean flag, false when absent', () => {
+    expect(entityListQuerySchema.parse({ includeHidden: '1' }).includeHidden).toBe(true);
+    expect(entityListQuerySchema.parse({ includeHidden: 'true' }).includeHidden).toBe(true);
+    expect(entityListQuerySchema.parse({ includeHidden: '0' }).includeHidden).toBe(false);
+    expect(entityListQuerySchema.parse({}).includeHidden).toBe(false);
+  });
 });
 
 describe('createEntityRequestSchema', () => {

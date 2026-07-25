@@ -45,6 +45,10 @@
     "gray": "Gray",
     "white": "White"
   },
+  "missing": {
+    "title": "This file isn't where Hexly expects it",
+    "hint": "Its bytes aren't in the assets folder. Reconnect the drive or put the file back — everything else about this asset is intact."
+  },
   "prose": {
     "heading": "Notes"
   },

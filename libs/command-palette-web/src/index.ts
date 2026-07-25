@@ -5,4 +5,5 @@
  */
 export * from './command';
 export * from './command-registry';
+export * from './command-directory';
 export * from './command-palette.component';

@@ -9,17 +9,17 @@ import {
   Signal,
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { ClientConfig, ClientPluginConfig } from '@hexly/domain';
+import { ClientConfig, ClientPluginConfig, DeploymentProfile } from '@hexly/domain';
 
 /**
- * The browser's end of the client config channel (ADR-0052, Seam 4): the enabled-Plugin set and default
- * create Type, hydrated once at boot from `GET /api/config`. Signals, not a resource, so a future live
- * path (ADR-0044) can push a fresh set in without touching the readers.
+ * The browser's end of the client config channel (ADR-0052, Seam 4): the enabled-Plugin set, the default
+ * create Type, and ADR-0071's Deployment Profile and Collaboration flag, hydrated once at boot from
+ * `GET /api/config`. Signals, not a resource, so a future live path (ADR-0044) can push a fresh set in
+ * without touching the readers.
  *
- * Owns the enablement predicate the Type/View registries filter through — {@link isPluginEnabled} —
- * rather than exposing the raw set for them to interpret. Until {@link init} resolves (or if it fails),
- * every Plugin reads as enabled: the boot fetch is an `APP_INITIALIZER`, so nothing sees the unresolved
- * state in the app, and a failed fetch falls open to today's behaviour rather than blanking every Plugin.
+ * Owns a predicate per flag rather than exposing raw values for callers to interpret. Until {@link init}
+ * resolves (or if it fails) every gate falls open; the boot fetch is an `APP_INITIALIZER`, so nothing in the
+ * app sees the unresolved state.
  */
 @Injectable({ providedIn: 'root' })
 export class ClientConfigStore {
@@ -31,6 +31,9 @@ export class ClientConfigStore {
   private readonly configsSignal = signal<Readonly<Record<string, ClientPluginConfig>>>({});
   private readonly defaultTypeSignal = signal<string | undefined>(undefined);
   private readonly loadedSignal = signal(false);
+  // Fall-open seeds, so an unresolved fetch and a failed one need no separate handling.
+  private readonly collaborationSignal = signal(true);
+  private readonly profileSignal = signal<DeploymentProfile>('server');
 
   /** The enabled bundled Plugins' ids; empty until {@link init} resolves. */
   readonly enabledPlugins: Signal<ReadonlySet<string>> = this.enabledSignal.asReadonly();
@@ -48,7 +51,20 @@ export class ClientConfigStore {
     return !this.loadedSignal() || this.enabledSignal().has(id);
   }
 
-  /** Fetch `/api/config` and populate the signals; a failed fetch leaves the boot defaults (all enabled). */
+  /** Reads on until config loads, and if the fetch fails (ADR-0071). */
+  isCollaborationEnabled(): boolean {
+    return this.collaborationSignal();
+  }
+
+  /**
+   * A policy question, so it reads the flag; capability questions check the bridge instead (ADR-0071).
+   * Reads `server` until config loads, and if the fetch fails.
+   */
+  isDesktopProfile(): boolean {
+    return this.profileSignal() === 'desktop';
+  }
+
+  /** Fetch `/api/config` and populate the signals; a failed fetch leaves the boot defaults (all gates open). */
   async init(): Promise<void> {
     try {
       const http = this.injector.get(HttpClient);
@@ -59,9 +75,12 @@ export class ClientConfigStore {
       this.enabledSignal.set(new Set(enabledIds));
       this.configsSignal.set(config.plugins);
       this.defaultTypeSignal.set(config.entities.defaultType);
+      // Defaulted again: a payload that omits a flag must not close a gate (ADR-0071).
+      this.collaborationSignal.set(config.collaboration ?? true);
+      this.profileSignal.set(config.profile ?? 'server');
       this.loadedSignal.set(true);
     } catch {
-      /* no channel means no enablement info; the signals keep their boot defaults, filtering stays off */
+      /* no channel means no config; the signals keep their boot defaults, so every gate falls open */
     }
   }
 }

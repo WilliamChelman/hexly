@@ -6,6 +6,7 @@ import { provideTranslocoMessageformat } from '@jsverse/transloco-messageformat'
 import { appRoutes } from './app.routes';
 import {
   withCredentialsInterceptor,
+  sessionRenewalInterceptor,
   translocoAppConfig,
   TranslocoHttpLoader,
   TranslationTitleStrategy,
@@ -34,14 +35,17 @@ import { providePluginDrawSteel } from '@hexly/plugin-draw-steel/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { TypeRegistry } from './entity-types/type-registry';
 import { provideBuiltInCommands } from './shell/built-in-commands';
+import { provideDesktopMenuCommands } from './shell/desktop-menu-commands';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(appRoutes),
-    provideHttpClient(withInterceptors([withCredentialsInterceptor])),
+    // Credentials first, so the retry the renewal issues inherits them (ADR-0004, ADR-0070).
+    provideHttpClient(withInterceptors([withCredentialsInterceptor, sessionRenewalInterceptor])),
     // Fetch the client config (ADR-0052) before stabilisation, ahead of the plugin providers below, so
-    // the enabled-Plugin set is settled before any registry reads it.
+    // the enabled-Plugin set is settled before any registry reads it — and the ADR-0071 gates cannot
+    // flicker on first render.
     provideClientConfig(),
     // Runtime i18n (ADR-0014): one bundle ships every language; LocaleService
     // picks the active one on boot and the switcher flips it live. The loader
@@ -83,6 +87,8 @@ export const appConfig: ApplicationConfig = {
     // The Command Palette's built-in Providers (ADR-0032), registered for the
     // app's lifetime by the palette when it mounts.
     provideBuiltInCommands(),
+    // The native menu's clicks arrive as invocations of those same Commands (ADR-0070); inert in a browser.
+    provideDesktopMenuCommands(),
     // The read contract a lib injects to ask what Entity Types exist (ADR-0048).
     { provide: ENTITY_TYPES, useExisting: TypeRegistry },
     // The Entity View Outlet host a plugin transcludes another Entity through, and the resolver naming a

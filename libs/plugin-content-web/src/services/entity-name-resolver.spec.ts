@@ -92,7 +92,9 @@ describe('EntityNameResolver', () => {
 
     const items = await resolver.search('aval');
 
-    expect(client.list).toHaveBeenCalledWith({ q: 'aval', limit: 20 });
+    // includeHidden: the `@`-mention picker matches every Entity by name, Assets included (ADR-0065) —
+    // the hidden-from-default-listing exclusion governs a browse, and this is not one.
+    expect(client.list).toHaveBeenCalledWith({ q: 'aval', limit: 20, includeHidden: true });
     expect(items.map((e) => e.id)).toEqual(['n1']);
   });
 });

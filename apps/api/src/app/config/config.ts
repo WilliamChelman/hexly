@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PluginConfig, PluginConfigSchema } from '@hexly/domain';
+import { DeploymentProfile, PluginConfig, PluginConfigSchema } from '@hexly/domain';
 import { parse as parseYaml } from 'yaml';
 import * as z from 'zod';
 
@@ -19,6 +19,30 @@ export const HEXLY_CONFIG = Symbol('HEXLY_CONFIG');
 export interface PluginConfigContribution {
   readonly id: string;
   readonly configSchema: PluginConfigSchema;
+}
+
+/**
+ * What a process entry point states about its deployment rather than what the operator configures
+ * (ADR-0071): `profile` has no `hexly.yml` key at all, and a pin beats `features.collaboration`.
+ */
+export interface DeploymentPins {
+  /** The Deployment Profile this entry point is; defaults to `server` when unstated. */
+  readonly profile?: DeploymentProfile;
+  /** Forces the Collaboration layer on/off, ignoring `features.collaboration`; unstated leaves the file in charge. */
+  readonly collaboration?: boolean;
+}
+
+// Module state, not a provider: Nest composes the graph at import time, before the entry point speaks
+// (ADR-0071).
+let pinned: DeploymentPins = {};
+
+/** State this process's deployment pins (ADR-0071); call from the entry point, before creating the Nest app. */
+export function pinDeployment(pins: DeploymentPins): void {
+  pinned = pins;
+}
+
+export function deploymentPins(): DeploymentPins {
+  return pinned;
 }
 
 const SIZE_UNITS: Record<string, number> = {
@@ -91,6 +115,9 @@ function buildConfigSchema(plugins: readonly PluginConfigContribution[]) {
         strictZipGuard: z.boolean().default(false),
       })
       .prefault({}),
+    // Where Asset bytes live (ADR-0034 amendment); neither defaulted nor resolved here, `resolveAssetsDir`
+    // owns both.
+    assets: z.object({ dir: z.string().min(1).optional() }).prefault({}),
     // Full-text search relevance tuning (ADR-0035). bm25 multiplies each indexed column's
     // contribution by its weight, so a name hit outranks a body hit at the same frequency.
     search: z
@@ -111,8 +138,14 @@ function buildConfigSchema(plugins: readonly PluginConfigContribution[]) {
         heartbeatSeconds: z.number().positive().default(30),
       })
       .prefault({}),
-    // Per-Plugin enablement (ADR-0052): `features.plugin.<id>.enabled`, composed from the bundled set.
-    features: z.object({ plugin: pluginFeaturesSchema(plugins) }).prefault({}),
+    features: z
+      .object({
+        // Per-Plugin enablement (ADR-0052): `features.plugin.<id>.enabled`, composed from the bundled set.
+        plugin: pluginFeaturesSchema(plugins),
+        // The Collaboration layer (ADR-0071); defaults on so an existing Instance upgrades unchanged.
+        collaboration: z.boolean().default(true),
+      })
+      .prefault({}),
     // The Entity Type the "New" button mints by default (ADR-0052). Resolved verbatim, with no boot-time
     // validation against the enabled set — a soft client-side fallback handles absence, so this knob
     // never fails boot and stays independent of `features.plugin`.
@@ -129,6 +162,8 @@ export type HexlyConfigRaw = z.infer<ReturnType<typeof buildConfigSchema>>;
 
 /** The processed, app-facing Instance Configuration: sizes resolved to bytes, ready to consume. */
 export interface HexlyConfig {
+  /** From the entry point's {@link DeploymentPins}, never from `hexly.yml` (ADR-0071). */
+  profile: DeploymentProfile;
   import: {
     /** Max uploaded `.zip` size, in bytes. */
     maxUpload: number;
@@ -136,6 +171,10 @@ export interface HexlyConfig {
     maxDecompressed: number;
     /** Meter actual decompressed output (airtight, slower) vs. trust the zip's declared sizes (fast). */
     strictZipGuard: boolean;
+  };
+  assets: {
+    /** Verbatim as the file states it; `resolveAssetsDir` turns it into `ASSETS_DIR` (ADR-0034 amendment). */
+    dir?: string;
   };
   search: {
     /** bm25 per-column multipliers (ADR-0035): higher = that column influences relevance more. */
@@ -152,6 +191,8 @@ export interface HexlyConfig {
      * Plugin's own schema adds. Nothing consumes it yet (#216); it is surfaced for later Seams.
      */
     plugin: Record<string, PluginConfig>;
+    /** Off makes the sharing and user-management routes 404 (`CollaborationGuard`, ADR-0071). */
+    collaboration: boolean;
   };
   entities: {
     /** The Entity Type the "New" button mints by default (ADR-0052); resolved verbatim, unvalidated. */
@@ -160,16 +201,21 @@ export interface HexlyConfig {
 }
 
 /** Sizes are already validated by the schema, so `parseSize` cannot throw here. */
-function processConfig(raw: HexlyConfigRaw): HexlyConfig {
+function processConfig(raw: HexlyConfigRaw, pins: DeploymentPins): HexlyConfig {
   return {
+    profile: pins.profile ?? 'server',
     import: {
       maxUpload: parseSize(raw.import.maxUpload),
       maxDecompressed: parseSize(raw.import.maxDecompressed),
       strictZipGuard: raw.import.strictZipGuard,
     },
+    assets: { dir: raw.assets.dir },
     search: { weights: { ...raw.search.weights } },
     liveFollow: { heartbeatSeconds: raw.liveFollow.heartbeatSeconds },
-    features: { plugin: raw.features.plugin },
+    features: {
+      plugin: raw.features.plugin,
+      collaboration: pins.collaboration ?? raw.features.collaboration,
+    },
     entities: { defaultType: raw.entities.defaultType },
   };
 }
@@ -182,11 +228,17 @@ function processConfig(raw: HexlyConfigRaw): HexlyConfig {
  * `plugins` is the bundled Plugin set (ADR-0052) whose schemas compose `features.plugin`; the
  * composition root supplies it. Absent (as in tests that don't exercise Plugins), `features.plugin`
  * resolves empty.
+ *
+ * `pins` is what the entry point states rather than the operator (ADR-0071).
  */
-export function loadConfig(instanceDir: string, plugins: readonly PluginConfigContribution[] = []): HexlyConfig {
+export function loadConfig(
+  instanceDir: string,
+  plugins: readonly PluginConfigContribution[] = [],
+  pins: DeploymentPins = {},
+): HexlyConfig {
   const text = readConfigText(instanceDir);
   const raw = buildConfigSchema(plugins).parse((text === undefined ? undefined : parseYaml(text)) ?? {});
-  return processConfig(raw);
+  return processConfig(raw, pins);
 }
 
 function readConfigText(instanceDir: string): string | undefined {

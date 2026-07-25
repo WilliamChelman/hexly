@@ -1,11 +1,12 @@
 import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { BreakpointObserver, BreakpointState } from '@angular/cdk/layout';
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { BehaviorSubject, Observable, map, of } from 'rxjs';
-import { AuthClient, WorldsClient, ActiveWorld } from '@hexly/web-core';
-import { MockAuthClient, MockWorldsClient } from '@hexly/web-core/testing';
+import { AuthUser, INSTANCE_ROLES } from '@hexly/domain';
+import { AuthClient, WorldsClient, ActiveWorld, ClientConfigStore } from '@hexly/web-core';
+import { MockAuthClient, MockWorldsClient, mockClientConfigStore } from '@hexly/web-core/testing';
 import { NavRailComponent } from './nav-rail.component';
 import { NavRailStore } from './nav-rail.store';
 
@@ -26,10 +27,12 @@ class FakeBreakpointObserver {
 describe('NavRail', () => {
   let viewport: FakeBreakpointObserver;
   let auth: MockAuthClient;
+  let collaboration: ReturnType<typeof signal<boolean>>;
 
   beforeEach(async () => {
     localStorage.clear();
     auth = new MockAuthClient();
+    collaboration = signal(true);
     viewport = new FakeBreakpointObserver();
     const worldsClient = new MockWorldsClient();
     // The expanded rail mounts the World switcher, which loads the world list
@@ -46,6 +49,7 @@ describe('NavRail', () => {
         { provide: BreakpointObserver, useValue: viewport },
         { provide: AuthClient, useValue: auth },
         { provide: WorldsClient, useValue: worldsClient },
+        { provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration }) },
       ],
     }).compileComponents();
   });
@@ -55,7 +59,7 @@ describe('NavRail', () => {
     document.querySelectorAll('.cdk-overlay-container').forEach((el) => el.remove());
   });
 
-  function signIn(displayName = 'Ada Lovelace'): void {
+  function signIn(displayName = 'Ada Lovelace', powers: Partial<Pick<AuthUser, 'roles' | 'isSuperadmin'>> = {}): void {
     auth.setUser({
       id: 'u1',
       email: 'ada@hexly.test',
@@ -63,7 +67,13 @@ describe('NavRail', () => {
       preferences: {},
       roles: ['create-worlds'],
       isSuperadmin: false,
+      ...powers,
     });
+  }
+
+  /** The Sole User's shape (ADR-0071): Superadmin holding every Instance Role, so every role check reads true. */
+  function signInSoleUser(): void {
+    signIn('Ada Lovelace', { roles: [...INSTANCE_ROLES], isSuperadmin: true });
   }
 
   function render() {
@@ -118,6 +128,24 @@ describe('NavRail', () => {
     expect(q(fixture, 'nav-entities')).toBeNull();
     expect(q(fixture, 'nav-world-settings')).toBeNull();
     expect(fixture.nativeElement.querySelector('app-world-switcher')).toBeNull();
+  });
+
+  it('offers user management and the repair surface to a Sole-User-shaped account', () => {
+    signInSoleUser();
+    const fixture = render();
+
+    expect((q(fixture, 'nav-users') as HTMLAnchorElement)?.getAttribute('href')).toBe('/users');
+    expect((q(fixture, 'nav-admin') as HTMLAnchorElement)?.getAttribute('href')).toBe('/admin');
+  });
+
+  it('drops user management once Collaboration is off, keeping the repair surface (ADR-0071)', () => {
+    // Same account: every role check still reads true, so only the flag can cut Users.
+    signInSoleUser();
+    collaboration.set(false);
+    const fixture = render();
+
+    expect(q(fixture, 'nav-users')).toBeNull();
+    expect((q(fixture, 'nav-admin') as HTMLAnchorElement)?.getAttribute('href')).toBe('/admin');
   });
 
   // Manage-gated World Settings + Library building now live in WorldLayout (ADR-0041);

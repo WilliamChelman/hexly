@@ -84,7 +84,13 @@ export class EntitySearchPickerComponent {
     effect((onCleanup) => {
       const types = this.types();
       const sub = this.entitiesClient
-        .list({ q: this.query().trim(), worldId: this.worldId(), type: types?.length ? [...types] : undefined })
+        .list({
+          q: this.query().trim(),
+          worldId: this.worldId(),
+          type: types?.length ? [...types] : undefined,
+          // A picker is no browse: an Embed of an Asset and a pinned Asset stay pickable by name (ADR-0065).
+          includeHidden: true,
+        })
         .subscribe({
           next: (page) => this.options.set(page.items),
           error: () => this.options.set([]),

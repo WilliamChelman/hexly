@@ -65,6 +65,9 @@ __screenshots__/
 /apps/web-e2e/test-results
 /apps/web-e2e/playwright-report
 /apps/web-e2e/blob-report
+/apps/desktop-e2e/test-results
+/apps/desktop-e2e/playwright-report
+/apps/desktop-e2e/blob-report
 /playwright/.cache
 .playwright-mcp/
 hexly-data/

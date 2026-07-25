@@ -1,7 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal } from '@angular/core';
 import { Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ActiveWorld } from '@hexly/web-core';
+import { ActiveWorld, ClientConfigStore } from '@hexly/web-core';
 import { EyebrowComponent, PanelComponent, IconComponent, IconName } from '@hexly/web-ui';
 import { OwnerSetComponent, MemberSetComponent, PublicLinkComponent } from '@hexly/web-entity';
 import { WorldTypesPanelComponent } from './components/world-types-panel.component';
@@ -10,12 +10,20 @@ import { WorldImportsPanelComponent } from './components/world-imports-panel.com
 
 type Section = 'access' | 'schema' | 'imports' | 'sharing';
 
+interface SectionItem {
+  readonly section: Section;
+  readonly icon: IconName;
+  readonly label: string;
+}
+
 /**
  * The World settings page: a master/detail layout whose in-page rail navigates between setting
  * groups so only one is on screen at a time, rather than a single long scroll. The active World id
  * comes from {@link ActiveWorld}, pinned by the `w/:worldId` resolver (ADR-0028). Every surface is
  * Owner-only (ADR-0039): a non-Owner who reaches this page sees load errors, not controls. Resigning
  * can cost the user reach to this World, so it drops back to the World Index.
+ *
+ * With Collaboration off (ADR-0071) the rail carries only the schema and imports groups.
  */
 @Component({
   selector: 'app-world-settings',
@@ -37,7 +45,7 @@ type Section = 'access' | 'schema' | 'imports' | 'sharing';
       <div class="layout">
         <nav class="rail" [attr.aria-label]="'nav.settingsSections' | transloco">
           <span appEyebrow class="rail-eyebrow">{{ 'nav.worldSettings' | transloco }}</span>
-          @for (item of items; track item.section) {
+          @for (item of items(); track item.section) {
             <button
               type="button"
               class="rail-item"
@@ -137,15 +145,25 @@ type Section = 'access' | 'schema' | 'imports' | 'sharing';
 })
 export class WorldSettingsPage {
   private readonly router = inject(Router);
+  private readonly clientConfig = inject(ClientConfigStore);
   readonly worldId = inject(ActiveWorld).worldId;
-  readonly active = signal<Section>('access');
 
-  readonly items: { section: Section; icon: IconName; label: string }[] = [
-    { section: 'access', icon: 'user', label: 'collab.members.heading' },
-    { section: 'schema', icon: 'label', label: 'worldTypes.heading' },
-    { section: 'imports', icon: 'download', label: 'imports.heading' },
-    { section: 'sharing', icon: 'share', label: 'collab.publicLink.worldHeading' },
-  ];
+  readonly items = computed<readonly SectionItem[]>(() => {
+    const collaboration = this.clientConfig.isCollaborationEnabled();
+    return [
+      ...(collaboration
+        ? [{ section: 'access' as const, icon: 'user' as const, label: 'collab.members.heading' }]
+        : []),
+      { section: 'schema' as const, icon: 'label' as const, label: 'worldTypes.heading' },
+      { section: 'imports' as const, icon: 'download' as const, label: 'imports.heading' },
+      ...(collaboration
+        ? [{ section: 'sharing' as const, icon: 'share' as const, label: 'collab.publicLink.worldHeading' }]
+        : []),
+    ];
+  });
+
+  /** The open group; derived from {@link items} so a cut section can never stay selected. */
+  readonly active = linkedSignal<Section>(() => this.items()[0].section);
 
   leave(): void {
     this.router.navigate(['/']);

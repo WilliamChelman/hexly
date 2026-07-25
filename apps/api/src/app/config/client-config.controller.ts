@@ -24,6 +24,9 @@ export class ClientConfigController {
   @Get('config')
   getConfig(): ClientConfig {
     return {
+      // ADR-0071's two knobs; neither is a secret, so this unauthenticated channel is their home.
+      profile: this.config.profile,
+      collaboration: this.config.features.collaboration,
       // `features.plugin` has an entry per bundled Plugin (the schema prefaults one); `enabled` always
       // crosses, and the whitelisted client knobs a Plugin declares (the Board's `maxEmbedDepth`,
       // ADR-0062) ride alongside — every other server-only knob stays server-side.

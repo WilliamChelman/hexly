@@ -38,14 +38,17 @@ describe('EntityQuickOpen', () => {
     expect(provider.prefix).toBe('');
   });
 
-  it('searches globally — not scoped to any World — opting into thumbnails', async () => {
+  it('searches globally — not scoped to any World — opting into thumbnails and hidden types', async () => {
     entitiesClient.list.mockReturnValue(of({ items: [entity('e1', 'Aldermoor')], nextCursor: null }));
 
     const commands = await firstValueFrom(provider.search('alder'));
 
+    // includeHidden: Quick Open matches an Asset by name like any Entity (ADR-0065), unlike a browse —
+    // the server ranks those matches last, so they never crowd the top of the palette.
     expect(entitiesClient.list).toHaveBeenCalledWith({
       q: 'alder',
       limit: 20,
+      includeHidden: true,
       thumbnails: true,
     });
     expect(commands).toEqual([expect.objectContaining({ id: 'e1', label: 'Aldermoor' })]);

@@ -19,6 +19,7 @@ import {
   setUserRolesRequestSchema,
   UserAccount,
 } from '@hexly/domain';
+import { CollaborationGuard } from '../acl/collaboration.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
 import { ManageUsersGuard, SuperadminGuard } from './manage-users.guard';
@@ -31,9 +32,12 @@ import { UsersService } from './users.service';
  *
  * The public user *directory* (id + displayName, for pickers) is a separate
  * controller at `/users/directory`; this surface carries the email.
+ *
+ * {@link CollaborationGuard} is listed first, so where the layer is off the routes read as absent rather
+ * than unauthorized (ADR-0071).
  */
 @Controller('users')
-@UseGuards(SessionAuthGuard, ManageUsersGuard)
+@UseGuards(CollaborationGuard, SessionAuthGuard, ManageUsersGuard)
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 

@@ -1,7 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { MIN_PASSWORD_LENGTH } from '@hexly/domain';
-import { FormatLocale, Locale, LocaleService, AuthClient, ThemeService, Theme, ToasterService } from '@hexly/web-core';
+import {
+  FormatLocale,
+  Locale,
+  LocaleService,
+  AuthClient,
+  ClientConfigStore,
+  ThemeService,
+  Theme,
+  ToasterService,
+} from '@hexly/web-core';
 import {
   EyebrowComponent,
   FieldComponent,
@@ -17,6 +26,9 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
 /**
  * User Settings: Preferences (applied instantly through the same signals the user menu writes)
  * plus the self-service profile forms. Email is the login identity and stays read-only.
+ *
+ * In the desktop profile only the Preferences survive: no password to change, no identity to edit
+ * (ADR-0071).
  */
 @Component({
   selector: 'app-user-settings',
@@ -90,80 +102,83 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
         </label>
       </div>
 
-      <h2 class="settings-heading text-xl">
-        {{ 'settings.profile.heading' | transloco }}
-      </h2>
-      <div appPanel class="settings-panel">
-        <div appField [label]="'settings.profile.email' | transloco">
-          <span class="text-sm text-ink" data-testid="email">{{ user()?.email }}</span>
-          <span class="settings-hint">{{ 'settings.profile.emailHint' | transloco }}</span>
+      <!-- Account management, cut whole in the desktop profile: no password exists anywhere (ADR-0071). -->
+      @if (!desktop()) {
+        <h2 class="settings-heading text-xl">
+          {{ 'settings.profile.heading' | transloco }}
+        </h2>
+        <div appPanel class="settings-panel">
+          <div appField [label]="'settings.profile.email' | transloco">
+            <span class="text-sm text-ink" data-testid="email">{{ user()?.email }}</span>
+            <span class="settings-hint">{{ 'settings.profile.emailHint' | transloco }}</span>
+          </div>
+          <form (submit)="saveProfile($event)">
+            <label appField [label]="'settings.profile.displayName' | transloco">
+              <span class="flex gap-2">
+                <input
+                  appInput
+                  type="text"
+                  class="flex-1"
+                  data-testid="display-name"
+                  [value]="displayName()"
+                  (input)="displayName.set($any($event.target).value)"
+                />
+                <button
+                  type="submit"
+                  appButton
+                  data-testid="save-profile"
+                  [disabled]="savingProfile() || !displayName().trim()"
+                >
+                  {{ 'settings.profile.save' | transloco }}
+                </button>
+              </span>
+            </label>
+          </form>
         </div>
-        <form (submit)="saveProfile($event)">
-          <label appField [label]="'settings.profile.displayName' | transloco">
-            <span class="flex gap-2">
+
+        <h2 class="settings-heading text-xl">
+          {{ 'settings.password.heading' | transloco }}
+        </h2>
+        <div appPanel class="settings-panel">
+          <form class="flex flex-col gap-4" (submit)="changePassword($event)">
+            <label appField [label]="'settings.password.current' | transloco">
               <input
                 appInput
-                type="text"
-                class="flex-1"
-                data-testid="display-name"
-                [value]="displayName()"
-                (input)="displayName.set($any($event.target).value)"
+                type="password"
+                autocomplete="current-password"
+                data-testid="current-password"
+                [value]="currentPassword()"
+                (input)="currentPassword.set($any($event.target).value)"
               />
+            </label>
+            <label appField [label]="'settings.password.new' | transloco">
+              <input
+                appInput
+                type="password"
+                autocomplete="new-password"
+                data-testid="new-password"
+                [value]="newPassword()"
+                (input)="newPassword.set($any($event.target).value)"
+              />
+            </label>
+            @if (passwordError(); as error) {
+              <p class="text-sm text-danger" role="alert" data-testid="password-error">
+                {{ 'settings.password.' + error | transloco }}
+              </p>
+            }
+            <span>
               <button
                 type="submit"
                 appButton
-                data-testid="save-profile"
-                [disabled]="savingProfile() || !displayName().trim()"
+                data-testid="change-password"
+                [disabled]="changingPassword() || !currentPassword() || !newPassword()"
               >
-                {{ 'settings.profile.save' | transloco }}
+                {{ 'settings.password.submit' | transloco }}
               </button>
             </span>
-          </label>
-        </form>
-      </div>
-
-      <h2 class="settings-heading text-xl">
-        {{ 'settings.password.heading' | transloco }}
-      </h2>
-      <div appPanel class="settings-panel">
-        <form class="flex flex-col gap-4" (submit)="changePassword($event)">
-          <label appField [label]="'settings.password.current' | transloco">
-            <input
-              appInput
-              type="password"
-              autocomplete="current-password"
-              data-testid="current-password"
-              [value]="currentPassword()"
-              (input)="currentPassword.set($any($event.target).value)"
-            />
-          </label>
-          <label appField [label]="'settings.password.new' | transloco">
-            <input
-              appInput
-              type="password"
-              autocomplete="new-password"
-              data-testid="new-password"
-              [value]="newPassword()"
-              (input)="newPassword.set($any($event.target).value)"
-            />
-          </label>
-          @if (passwordError(); as error) {
-            <p class="text-sm text-danger" role="alert" data-testid="password-error">
-              {{ 'settings.password.' + error | transloco }}
-            </p>
-          }
-          <span>
-            <button
-              type="submit"
-              appButton
-              data-testid="change-password"
-              [disabled]="changingPassword() || !currentPassword() || !newPassword()"
-            >
-              {{ 'settings.password.submit' | transloco }}
-            </button>
-          </span>
-        </form>
-      </div>
+          </form>
+        </div>
+      }
     </section>
   `,
   styles: `
@@ -187,6 +202,7 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
 })
 export class UserSettingsPage {
   private readonly auth = inject(AuthClient);
+  private readonly clientConfig = inject(ClientConfigStore);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   protected readonly locale = inject(LocaleService);
@@ -195,6 +211,9 @@ export class UserSettingsPage {
   protected readonly user = this.auth.currentUser;
   protected readonly theme = this.themeService.theme;
   protected readonly lang = this.locale.lang;
+
+  /** Whether this deployment has an account to manage at all (ADR-0071). */
+  protected readonly desktop = computed(() => this.clientConfig.isDesktopProfile());
 
   /** Format Locale options labelled via Intl in the active UI language, with a
    * date preview — no per-tag copy to translate. Computed so the ~28 Intl

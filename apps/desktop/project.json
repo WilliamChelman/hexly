@@ -1,0 +1,55 @@
+{
+  "name": "desktop",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/desktop/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "webpack-cli build",
+        "env": {
+          "NODE_ENV": "production"
+        },
+        "cwd": "apps/desktop"
+      },
+      "configurations": {
+        "development": {
+          "env": {
+            "NODE_ENV": "development"
+          }
+        }
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "nx:run-commands",
+      "dependsOn": ["build", "web:build"],
+      "options": {
+        "command": "electron dist/apps/desktop/main.js",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "rebuild-native": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["electron-rebuild --force --only better-sqlite3", "node scripts/sign-native-addons.mjs"],
+        "parallel": false,
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "package": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build", "web:build", "rebuild-native"],
+      "options": {
+        "commands": [
+          "electron-builder --config apps/desktop/electron-builder.config.js",
+          "playwright test -c apps/desktop-e2e/playwright.packaged.config.ts"
+        ],
+        "parallel": false,
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  },
+  "tags": []
+}

@@ -4,8 +4,9 @@ import { By } from '@angular/platform-browser';
 import { HttpErrorResponse } from '@angular/common/http';
 import { map, of, throwError, timer } from 'rxjs';
 import { ImporterSummary, ImportRunSummary } from '@hexly/domain';
-import { ToasterService, WorldsClient } from '@hexly/web-core';
-import { MockWorldsClient } from '@hexly/web-core/testing';
+import { signal } from '@angular/core';
+import { ClientConfigStore, ToasterService, WorldsClient } from '@hexly/web-core';
+import { MockWorldsClient, mockClientConfigStore } from '@hexly/web-core/testing';
 import { WorldImportsPanelComponent } from './world-imports-panel.component';
 
 /** Matches the panel's own poll interval; one `tick` of it advances the reconcile by one poll. */
@@ -37,6 +38,7 @@ function runSummary(partial: Partial<ImportRunSummary> = {}): ImportRunSummary {
 describe('WorldImportsPanel', () => {
   let worlds: MockWorldsClient;
   let toaster: ToasterService;
+  let collaboration: ReturnType<typeof signal<boolean>>;
   let fixture: ComponentFixture<WorldImportsPanelComponent>;
 
   // Draw Steel's real Importer: its label is a transloco key resolved through the plugin's web catalogs.
@@ -44,12 +46,16 @@ describe('WorldImportsPanel', () => {
 
   beforeEach(async () => {
     worlds = new MockWorldsClient();
+    collaboration = signal(true);
     worlds.importers.mockReturnValue(of<ImporterSummary[]>([monsters]));
     // Idle on load so the run button is live; a spec that rejoins a run overrides this.
     worlds.importStatus.mockReturnValue(of(runSummary()));
     await TestBed.configureTestingModule({
       imports: [WorldImportsPanelComponent, provideTranslocoTesting()],
-      providers: [{ provide: WorldsClient, useValue: worlds }],
+      providers: [
+        { provide: WorldsClient, useValue: worlds },
+        { provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration }) },
+      ],
     }).compileComponents();
     toaster = TestBed.inject(ToasterService);
     vi.useFakeTimers();
@@ -94,6 +100,20 @@ describe('WorldImportsPanel', () => {
     select.value = 'private';
     select.dispatchEvent(new Event('change'));
     fixture.detectChanges();
+
+    click('importer-run-draw-steel.importer.monsters');
+
+    expect(worlds.runImport).toHaveBeenCalledWith('w1', 'draw-steel.importer.monsters', 'private');
+  });
+
+  it('with Collaboration off offers no Visibility and imports at the schema default', () => {
+    collaboration.set(false);
+    worlds.runImport.mockReturnValue(of(runSummary({ importer: monsters.id, status: 'running' })));
+    render();
+
+    // The row is not sharing; only its Visibility choice is cut (ADR-0071).
+    expect(has('importer-draw-steel.importer.monsters')).toBe(true);
+    expect(has('importer-visibility-draw-steel.importer.monsters')).toBe(false);
 
     click('importer-run-draw-steel.importer.monsters');
 

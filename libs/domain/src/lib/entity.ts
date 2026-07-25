@@ -254,6 +254,12 @@ export const entityListQuerySchema = z.object({
     .string()
     .optional()
     .transform((v) => v === '1' || v === 'true'),
+  // Opt-in: keep hidden-from-default-listing types (ADR-0065) in the result set — the exclusion is a
+  // *browse* rule, so the by-name pickers ask for them explicitly and a `q` alone no longer lifts it.
+  includeHidden: z
+    .string()
+    .optional()
+    .transform((v) => v === '1' || v === 'true'),
   limit: z.coerce
     .number()
     .int()
@@ -338,6 +344,11 @@ export interface EntitySummary {
    * the serving route when no thumbnail was minted, so it is always safe to use as a tile `src`.
    */
   readonly thumbnailUrl?: string;
+  /**
+   * Set when this Entity's own bytes are absent from the resolved Assets root (#325, ADR-0034). Computed per
+   * read, so restoring the file clears it with no Reindex; absent for an Entity that owns no bytes.
+   */
+  readonly assetBytesMissing?: boolean;
 }
 
 /** What `GET /entities/:id` and saves return. */

@@ -9,13 +9,14 @@ import {
   MenuTriggerDirective,
 } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
-import { ActiveWorld } from '@hexly/web-core';
+import { ActiveWorld, ClientConfigStore } from '@hexly/web-core';
 
 /**
  * The open Entity's actions overflow menu: Visibility, Pin, and Share behind one trigger.
  * The trigger shows only when the caller has at least one of them; each item is independently
  * guarded. Visibility and Pin act in place; Share is the header's dialog surface, so this only
- * emits {@link share} and the header opens it.
+ * emits {@link share} and the header opens it. Share and Visibility also need the Collaboration
+ * layer (ADR-0071); Edit types and Pin do not.
  *
  * `display:contents` (host) so the trigger sits directly in the page header's action row.
  */
@@ -33,7 +34,7 @@ import { ActiveWorld } from '@hexly/web-core';
     TranslocoPipe,
   ],
   template: `
-    @if (editable() || canPin() || manageable()) {
+    @if (editable() || canPin() || shareable()) {
       <button
         type="button"
         appButton
@@ -58,7 +59,9 @@ import { ActiveWorld } from '@hexly/web-core';
               {{ 'entityTypes.editTypes' | transloco }}
             </span>
           </button>
+        }
 
+        @if (visibilityToggleable()) {
           <!-- Visibility toggle (ADR-0037, #160): an Owner flips the Entity between
              private and shared. A non-Owner's flip is refused server-side (403). -->
           <button
@@ -91,7 +94,7 @@ import { ActiveWorld } from '@hexly/web-core';
           </button>
         }
 
-        @if (manageable()) {
+        @if (shareable()) {
           <!-- Share (owner/grant/link management) is an owner-only power (ADR-0037) — hidden
              for every non-Owner opener, including writers (an entity-level Editor, a World
              Owner) whose write access wouldn't carry the owner-gated dialog endpoints. -->
@@ -109,6 +112,7 @@ import { ActiveWorld } from '@hexly/web-core';
 export class EntityActionsMenuComponent {
   private readonly session = inject(EntitySession);
   private readonly activeWorld = inject(ActiveWorld);
+  private readonly clientConfig = inject(ClientConfigStore);
 
   /** Open the owner/grant/link Share dialog — owned by the header, its dialog surface. */
   readonly share = output<void>();
@@ -120,10 +124,18 @@ export class EntityActionsMenuComponent {
   protected readonly editable = this.session.writable;
 
   /**
-   * Whether the caller owns the open Entity (ADR-0037) — gates the Share item, whose dialog
-   * (owners, grants, Public Link) is owner-only server-side.
+   * Whether the caller owns the open Entity (ADR-0037): the dialog behind Share (owners, grants,
+   * Public Link) is owner-only server-side.
    */
-  protected readonly manageable = this.session.manageable;
+  private readonly manageable = this.session.manageable;
+
+  /** Whether to offer Share: an Owner, and a Collaboration layer to share into (ADR-0071). */
+  protected readonly shareable = computed(() => this.manageable() && this.clientConfig.isCollaborationEnabled());
+
+  /** Whether to offer the Visibility toggle: a writer, and a Collaboration layer that reads the column. */
+  protected readonly visibilityToggleable = computed(
+    () => this.editable() && this.clientConfig.isCollaborationEnabled(),
+  );
 
   /** Whether the open Entity is `shared` (drives the toggle's checked state and label). */
   protected readonly shared = computed(() => this.session.current()?.visibility === 'shared');
