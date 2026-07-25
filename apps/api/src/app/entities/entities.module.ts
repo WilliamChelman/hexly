@@ -7,6 +7,7 @@ import { EntitiesController } from './entities.controller';
 import { EntitiesService } from './entities.service';
 import { EntityDeletionRegistry } from './entity-deletion-registry';
 import { EntityWrites } from './entity-writes';
+import { LocalGraphService } from './local-graph.service';
 import { TypeFieldRegistry } from './type-field-registry';
 import { WorldFields } from './world-fields';
 import { WorldTypeFields } from './world-type-fields';
@@ -16,6 +17,7 @@ import { WorldTypeFields } from './world-type-fields';
   controllers: [EntitiesController],
   providers: [
     EntitiesService,
+    LocalGraphService,
     EntityWrites,
     EntityDeletionRegistry,
     AssetBytesRegistry,

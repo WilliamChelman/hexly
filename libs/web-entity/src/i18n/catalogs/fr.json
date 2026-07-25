@@ -30,6 +30,17 @@
     "decor": "décor",
     "decorMark": "Lien de décor — présentation seule, pas une relation de worldbuilding"
   },
+  "localGraph": {
+    "toggle": "Graphe local",
+    "title": "Graphe local",
+    "depth": "Profondeur",
+    "depthOption": "Profondeur {{ depth }}",
+    "counts": "{{ nodes }} entités · {{ edges }} liens",
+    "loading": "Chargement…",
+    "filters": "Filtres du graphe",
+    "showDecor": "Afficher les liens de décor",
+    "isolated": "Rien ne relie cette entité"
+  },
   "assetLink": {
     "set": "Définir une image…",
     "change": "Changer d’image…",

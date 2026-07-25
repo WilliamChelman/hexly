@@ -200,6 +200,10 @@ _Avoid_: World selector, world dropdown
 A per-World view of its Entities as nodes and their Entity Links as edges, access-filtered per viewer (an edge shows only when both endpoints are readable). A derived, read-only view.
 _Avoid_: web, network, mind map, relationship map, world map (collides with Hex Map)
 
+**Local Graph**:
+The **World Graph** narrowed to one Entity's neighbourhood — every Entity within a chosen **depth** of hops (undirected, semantic edges only, so a **Decor Link** never widens it) and the edges between those. A Panel on the Entity page, not a page of its own (ADR-0072).
+_Avoid_: Neighbourhood graph, ego graph, mini map, subgraph; local map (collides with Hex Map)
+
 **World Owner**:
 A user holding full control of a World — membership, roles, the public link, rename/delete, and full control over every `shared` Entity in it; no special access to others' `private` Entities. A symmetric set of one or more, all equal; the last cannot be removed.
 _Avoid_: Admin, GM (user vocabulary), co-owner

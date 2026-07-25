@@ -140,10 +140,10 @@ test('a user Entity-Link Field flagged "presentation only" produces Decor Links;
 
   // Reveal decor: the Portrait edge returns and Ancestor with it — proof the checkbox drove classification
   // through the DTO and the harvest, subduing only the presentation link.
+  await page.getByTestId('graph-filters').click();
   const decorToggle = page.getByTestId('graph-decor-toggle');
-  await expect(decorToggle).toHaveAttribute('aria-pressed', 'false');
+  await expect(decorToggle).toHaveAttribute('aria-checked', 'false');
   await decorToggle.click();
-  await expect(decorToggle).toHaveAttribute('aria-pressed', 'true');
   await expect(counts).toContainText('3 entities');
   await expect(counts).toContainText('2 links');
 });

@@ -36,12 +36,17 @@ test('hides orphan entities behind a generic show-orphans toggle', async ({ page
   await expect(counts).toContainText('2 entities');
   await expect(counts).toContainText('1 links');
 
+  // The toggle lives in the graph's floating filters menu, which closes on select — so reading its
+  // state means opening the menu again.
+  const filters = page.getByTestId('graph-filters');
+  await filters.click();
   const toggle = page.getByTestId('graph-orphans-toggle');
-  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
 
   // Flip it: the orphan joins the picture, the edge count holds.
   await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await expect(counts).toContainText('3 entities');
   await expect(counts).toContainText('1 links');
+  await filters.click();
+  await expect(page.getByTestId('graph-orphans-toggle')).toHaveAttribute('aria-checked', 'true');
 });

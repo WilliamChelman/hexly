@@ -12,6 +12,7 @@ import {
   EntityType,
   GrantRole,
   EntityDocument,
+  LocalGraph,
   PublicLink,
   Visibility,
 } from '@hexly/domain';
@@ -172,6 +173,17 @@ export class EntitiesClient {
    */
   references(id: string): Observable<EntityReferences> {
     return this.http.get<EntityReferences>(`/api/entities/${id}/references`);
+  }
+
+  /**
+   * This Entity's **Local Graph** (ADR-0072) — the World Graph narrowed to its neighbourhood, `depth`
+   * hops out. Server-bounded, so the payload stays proportional to the neighbourhood rather than to the
+   * World; a depth change is therefore a refetch, not a client-side filter.
+   */
+  localGraph(id: string, depth: number): Observable<LocalGraph> {
+    return this.http.get<LocalGraph>(`/api/entities/${id}/graph`, {
+      params: new HttpParams().set('depth', depth),
+    });
   }
 
   // Owner's Link Descriptor vocabulary — DISTINCT, last-saved state.

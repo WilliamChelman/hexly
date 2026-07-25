@@ -10,17 +10,25 @@ export interface LabelView {
   readonly maxY: number;
 }
 
-/** Declutter cell edges, in screen pixels, and a ceiling on how many labels one frame may draw. */
+/** Declutter cell edges, in screen pixels, and a cap on how many labels each election may return. */
 export interface LabelGrid {
   readonly pointCell: number;
   readonly linkCell: number;
   readonly max: number;
+  /**
+   * At or under this many visible points the election is skipped and every visible node is
+   * labelled: a sparse view — a Local Graph at depth 1, a deep zoom — has room for every name,
+   * and the grid would still drop some of them (neighbours sharing a cell by anchor accident).
+   */
+  readonly sparse: number;
 }
 
 /** Point indices into `payload.nodes`, and link indices into `payload.descriptors`. */
 export interface LabelSelection {
   readonly points: readonly number[];
   readonly links: readonly number[];
+  /** How many points sit inside the view box — the crowd the label layer's opacity is a function of. */
+  readonly visiblePoints: number;
 }
 
 /**
@@ -45,18 +53,22 @@ export function selectLabels(
   // Elect one winner per space cell, over *every* node — not just the visible ones, so a node
   // scrolling into view arrives already holding (or already having lost) its cell.
   const winners = new Map<string, number>();
+  const inView: number[] = [];
   for (let i = 0; i < payload.nodes.length; i++) {
+    if (visible(positions[i * 2], positions[i * 2 + 1], view)) inView.push(i);
     const key = cellKey(positions[i * 2], positions[i * 2 + 1], cell);
     const held = winners.get(key);
     if (held === undefined || beats(degrees[i], i, degrees[held], held)) winners.set(key, i);
   }
 
-  const points = [...winners.values()]
-    .filter((i) => visible(positions[i * 2], positions[i * 2 + 1], view))
-    .sort((a, b) => degrees[b] - degrees[a] || a - b)
-    .slice(0, grid.max);
+  // A sparse view needs no declutter — every name has room, so every visible node is labelled.
+  const elected =
+    inView.length <= grid.sparse
+      ? inView
+      : [...winners.values()].filter((i) => visible(positions[i * 2], positions[i * 2 + 1], view));
+  const points = elected.sort((a, b) => degrees[b] - degrees[a] || a - b).slice(0, grid.max);
 
-  return { points, links: selectLinks(payload, positions, view, grid) };
+  return { points, links: selectLinks(payload, positions, view, grid), visiblePoints: inView.length };
 }
 
 /**

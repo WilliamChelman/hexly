@@ -93,17 +93,19 @@ describe('PublicEntityPage', () => {
   });
 
   /**
-   * References is not a panel this context can serve: the endpoint answers a `CurrentUser`, and a
-   * Public Link grants no scope beyond its own Entity — the fetch could only ever 403. The read-only
-   * Details panel stays, though (ADR-0067): it shows the same substance the fallback Details View gives
-   * any reader.
+   * Neither link-index panel is one this context can serve: References and the Local Graph (ADR-0072) both
+   * read a `/entities/:id/…` endpoint that answers a `CurrentUser`, and a Public Link grants no scope beyond
+   * its own Entity — the fetch could only ever 403, and a graph of the neighbourhood is exactly the
+   * cross-Entity reach the link withholds. The read-only Details panel stays, though (ADR-0067): it shows
+   * the same substance the fallback Details View gives any reader.
    */
-  it('offers the Outline and a read-only Details panel, but not References', async () => {
+  it('offers the Outline and a read-only Details panel, but neither References nor the Local Graph', async () => {
     const el = await render();
 
     expect(el.querySelector('[data-testid=outline-toggle]')).not.toBeNull();
     expect(el.querySelector('[data-testid=details-toggle]')).not.toBeNull();
     expect(el.querySelector('[data-testid=references-toggle]')).toBeNull();
+    expect(el.querySelector('[data-testid=local-graph-toggle]')).toBeNull();
   });
 
   it('shows the dead-link panel when the token does not resolve', async () => {

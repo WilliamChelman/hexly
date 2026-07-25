@@ -120,6 +120,8 @@
     "@jsverse/transloco": "^8.4.0",
     "@jsverse/transloco-messageformat": "8.4.0",
     "@lucide/angular": "^1.23.0",
+    "@luma.gl/core": "~9.2.6",
+    "@luma.gl/webgl": "~9.2.6",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
