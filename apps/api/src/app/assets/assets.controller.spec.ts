@@ -212,6 +212,23 @@ describe('Missing Asset bytes (#325)', () => {
     expect(tileFor()?.thumbnailUrl).toBeDefined();
   });
 
+  it('keeps saying so through a save and a rename — a write response replaces the client’s open Entity', async () => {
+    const { id, bytesPath } = await mintAsset();
+    const entities = app.get(EntitiesService);
+    const open = entities.load('u1', id);
+    if (!open) throw new Error('minted Asset did not load');
+
+    rmSync(bytesPath);
+
+    // Autosave on the Asset's prose: the client holds this response as `current`, so a bare detail here
+    // would unsay the state while the file is still gone.
+    const saved = entities.save('u1', id, { document: open.document, version: open.version });
+    expect(saved.status).toBe('saved');
+    expect(saved.status === 'saved' && saved.entity.assetBytesMissing).toBe(true);
+
+    expect(entities.patch('u1', id, { name: 'Renamed' })?.assetBytesMissing).toBe(true);
+  });
+
   it('never cries missing over the thumbnail cache alone — only the original answers the question', async () => {
     const { id } = await mintAsset();
     const entities = app.get(EntitiesService);

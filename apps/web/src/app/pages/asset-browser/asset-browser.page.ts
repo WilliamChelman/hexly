@@ -71,9 +71,8 @@ const SEARCH_DEBOUNCE_MS = 150;
  * Board image picker reuses; the type facet is pinned, so it is hidden from the rail. Upload mints (or
  * dedups to) an Asset through the ordinary path and refreshes page one.
  *
- * A tile whose Asset reports **Missing Bytes** (#325) says so rather than drawing a blank frame: the grid is
- * where a user notices a whole shelf of stranded art at once, which is exactly when "your files are
- * elsewhere" must not read as "your World is corrupt".
+ * A tile whose Asset reports **Missing Bytes** (#325, ADR-0034) names that state instead of drawing a frame
+ * whose `src` the server has already said it cannot serve.
  */
 @Component({
   selector: 'app-asset-browser',
@@ -153,10 +152,8 @@ const SEARCH_DEBOUNCE_MS = 150;
                     [attr.aria-label]="asset.name"
                     [title]="asset.name"
                   >
-                    <!-- Missing bytes are their own tile, ahead of the thumbnail (#325): the server says the
-                         file is not under the resolved Assets root, so the grid names that instead of drawing
-                         a blank frame the user would read as data loss. No src in this state — we know it
-                         404s. The dashed frame carries the state at a glance; the label names it. -->
+                    <!-- Missing Bytes take the tile, ahead of the thumbnail (#325). Emitting no src is the
+                         point: the state came from the server, so the request is known to 404. -->
                     @if (asset.assetBytesMissing) {
                       <span
                         class="flex h-full flex-col items-center justify-center gap-1 border border-dashed border-gold text-gold"

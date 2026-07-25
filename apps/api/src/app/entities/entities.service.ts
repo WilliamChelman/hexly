@@ -702,7 +702,7 @@ export class EntitiesService {
    */
   detailById(id: string): EntityDetail | null {
     const row = this.db.select().from(entities).where(eq(entities.id, id)).get();
-    return row ? toDetail(row) : null;
+    return row ? this.withAssetBytesState(toDetail(row)) : null;
   }
 
   /**
@@ -740,9 +740,12 @@ export class EntitiesService {
       case 'forbidden':
         throw new ForbiddenException();
       case 'conflict':
-        return { status: 'conflict', current: toDetail(result.row) };
+        return { status: 'conflict', current: this.withAssetBytesState(toDetail(result.row)) };
       case 'ok':
-        return { status: 'saved', entity: detailOf(result.row, req.document) };
+        // Every detail the client will hold as `current` carries the state (#325) — a save response replaces
+        // the open Entity wholesale, so omitting it here would silently unsay "your bytes are missing" the
+        // moment autosave fires on a stranded Asset's prose.
+        return { status: 'saved', entity: this.withAssetBytesState(detailOf(result.row, req.document)) };
     }
   }
 
@@ -831,10 +834,10 @@ export class EntitiesService {
     // shared Entity goes private), so recompute Rights post-update. Cold path.
     const access = entityAccess(this.db, userId);
     const after = access.decide(id);
-    return {
+    return this.withAssetBytesState({
       ...toDetail(result.row),
       ...(after && { rights: access.rightsOf(after) }),
-    };
+    });
   }
 
   /**

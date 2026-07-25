@@ -1,6 +1,6 @@
 import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { enterLibrary, expect, openEntity, test } from './fixtures';
+import { enterLibrary, expect, flushSave, instanceDir, openEntity, test } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 // A real 20×8 solid-color PNG — sharp parses it at mint, so the Asset gets Stats and a thumbnail.
@@ -8,11 +8,6 @@ const PNG_20x8 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAABQAAAAICAIAAAB2/0i6AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAFUlEQVQYlWOwyTtBNmIY1XxiiAQYACBM50E1XKcYAAAAAElFTkSuQmCC',
   'base64',
 );
-
-// The Instance Directory this run's server booted against, derived exactly as `e2e-server.mjs` does — the
-// spec reaches the same filesystem the API reads, which is how it can strand bytes the way an unmounted
-// drive or a hand-edited `assets.dir` does (ADR-0034 amendment).
-const instanceDir = process.env.E2E_INSTANCE_DIR ?? join(__dirname, '..', '..', '..', 'tmp', 'web-e2e');
 
 /**
  * Missing Asset bytes (#325, ADR-0034 amendment). `assets.dir` moves no existing bytes and an external
@@ -53,6 +48,13 @@ test('an Asset whose bytes are stranded says so on its page and in the Browser, 
   await expect(page.getByTestId('asset-icon-card')).toHaveCount(0);
   // And the Asset's own facts are still there — nothing was lost, which is the point of saying "missing".
   await expect(page.getByTestId('asset-stat-dimensions')).toContainText('20 × 8');
+
+  // Autosave must not unsay it: a save response replaces the client's open Entity wholesale, so authoring
+  // prose on a stranded Asset would otherwise clear the state while the file is still gone.
+  await page.getByTestId('note-content').click();
+  await page.keyboard.type('Where did this go?');
+  await flushSave(page);
+  await expect(missing).toBeVisible();
 
   // The Browser grid marks the same Asset, so the state is visible where Assets are shown, not only on open.
   await page.getByTestId('nav-assets').click();

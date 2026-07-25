@@ -57,7 +57,7 @@ export class AssetsService implements OnModuleInit {
     @Inject(DB) private readonly db: Db,
     @Inject(ASSETS_DIR) private readonly dir: string,
     private readonly deletions: EntityDeletionRegistry,
-    private readonly bytePresence: AssetBytesRegistry,
+    private readonly assetBytes: AssetBytesRegistry,
   ) {}
 
   /**
@@ -73,7 +73,7 @@ export class AssetsService implements OnModuleInit {
    */
   onModuleInit(): void {
     this.deletions.register((deleted) => this.reap(deleted));
-    this.bytePresence.register((worldId, hash, ext) => this.bytesPresent(worldId, hash, ext));
+    this.assetBytes.register((worldId, hash, ext) => this.bytesPresent(worldId, hash, ext));
   }
 
   /**

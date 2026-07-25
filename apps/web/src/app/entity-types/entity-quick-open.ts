@@ -50,8 +50,9 @@ export class EntityQuickOpen implements CommandProvider {
       label: entity.name,
       // The primary type (CONTEXT.md → Entity Type) as the quick-open hint.
       hint: entity.types[0],
-      // The resolved Thumbnail (ADR-0066), present only when one resolved; absent → an unchanged row.
-      thumbnailUrl: entity.thumbnailUrl,
+      // The resolved Thumbnail (ADR-0066), present only when one resolved; absent → an unchanged row. Own
+      // bytes reported as **Missing Bytes** (#325) count as unresolved: the URL is known to 404.
+      thumbnailUrl: entity.assetBytesMissing ? undefined : entity.thumbnailUrl,
       route,
       run: () => void this.router.navigate(route),
     };

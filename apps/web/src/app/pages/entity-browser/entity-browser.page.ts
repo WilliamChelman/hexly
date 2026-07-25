@@ -199,6 +199,8 @@ export class EntityBrowserPage {
       rights: entity.rights,
       // The resolved Thumbnail (ADR-0066), when the list opted in; absent → the card shows the type icon.
       thumbnailUrl: entity.thumbnailUrl,
+      // Own bytes the server could not find (#325) — the card falls back to the sigil rather than a 404 image.
+      assetBytesMissing: entity.assetBytesMissing,
     })),
   );
   protected readonly nextCursor = signal<string | null>(null);

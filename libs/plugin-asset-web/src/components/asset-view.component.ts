@@ -19,9 +19,8 @@ const KIND_ICONS: Record<string, IconName> = {
  * gracefully with zero new machinery. It backs both the **Asset detail page** and, through the Entity View
  * Outlet's transclusion (ADR-0062), a Board **Embed** of an Asset.
  *
- * An Asset whose bytes are absent from the resolved Assets root renders a third thing (#325): a named
- * missing-bytes state ahead of the mime dispatch, so a stranded file reads as "elsewhere" rather than as a
- * broken image. Its Stats and prose still render — those are document facts, and none of them was lost.
+ * **Missing Bytes** (#325, ADR-0034) renders a third thing, ahead of the mime dispatch. Stats and prose still
+ * render: they are document facts, and the state exists to say they survived.
  *
  * It is the detail page's main content in one View: the rendered image/icon, the mechanical **Asset
  * Stats**, and the canonical **Content** prose (the very {@link ContentEditorComponent} an Entity's
@@ -45,10 +44,8 @@ const KIND_ICONS: Record<string, IconName> = {
              icon card — the same fallback a broken/deleted URL degrades to, so one missing Asset never blanks
              the page (mirrors the Board Image element).
 
-             Missing bytes come first and are their own state, not that fallback (#325): the server told us the
-             file is not under the resolved Assets root, so the page says "elsewhere, not lost" instead of
-             degrading silently and leaving the user to read a blank tile as a corrupted World. Nothing is
-             requested in this state — a fetch we know will 404 buys only console noise. -->
+             Missing Bytes precede the mime dispatch and are their own state, never that fallback (#325). No
+             src is emitted: the server already told us it 404s. -->
         @if (bytesMissing()) {
           <div
             class="mx-auto flex w-full max-w-sm flex-col items-center gap-2 rounded-md border border-dashed border-gold bg-surface px-6 py-10 text-center"
@@ -147,10 +144,8 @@ export class AssetViewComponent {
   protected readonly mime = computed(() => this.value()?.mime ?? '');
 
   /**
-   * Whether the server found no bytes at the Asset's address (#325, ADR-0034) — a *distinguishable* state,
-   * unlike the icon-card fallback: it means the file is not under the resolved Assets root (an unmounted
-   * drive, a moved `assets.dir`), so the World is intact and the fix is restoring the file. Recomputed on
-   * every read of the Entity, which is why restoring it clears the state with no Reindex.
+   * **Missing Bytes** as the server computed it on this read (#325) — distinct from the icon-card fallback,
+   * which also means "not an image". Recomputed per read, so a restored file clears it with no Reindex.
    */
   protected readonly bytesMissing = computed(() => this.session.current()?.assetBytesMissing === true);
 
