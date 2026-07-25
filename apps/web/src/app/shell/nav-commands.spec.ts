@@ -1,21 +1,28 @@
 import { provideTranslocoTesting } from '../../testing/transloco-testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { InstanceRole } from '@hexly/domain';
-import { AuthClient } from '@hexly/web-core';
-import { MockAuthClient } from '@hexly/web-core/testing';
+import { INSTANCE_ROLES, InstanceRole } from '@hexly/domain';
+import { AuthClient, ClientConfigStore } from '@hexly/web-core';
+import { MockAuthClient, mockClientConfigStore } from '@hexly/web-core/testing';
 import { NavCommands } from './nav-commands';
 
 describe('NavCommands', () => {
   let provider: NavCommands;
   let auth: MockAuthClient;
+  let collaboration: ReturnType<typeof signal<boolean>>;
 
   beforeEach(() => {
     auth = new MockAuthClient();
+    collaboration = signal(true);
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
-      providers: [provideRouter([]), { provide: AuthClient, useValue: auth }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthClient, useValue: auth },
+        { provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration }) },
+      ],
     });
     provider = TestBed.inject(NavCommands);
   });
@@ -52,6 +59,15 @@ describe('NavCommands', () => {
     signIn([]);
     const commands = await firstValueFrom(provider.search(''));
     expect(commands.map((c) => c.id)).toEqual(['go-styleguide']);
+  });
+
+  it('drops Go to Users once Collaboration is off, keeping the repair surface', async () => {
+    // The Sole User's shape (ADR-0071): Superadmin and every Instance Role, so both role checks read
+    // true. Only the flag can cut Users — and it must not cut the Reindex with it.
+    signIn([...INSTANCE_ROLES], true);
+    collaboration.set(false);
+    const commands = await firstValueFrom(provider.search(''));
+    expect(commands.map((c) => c.id)).toEqual(['go-admin', 'go-styleguide']);
   });
 
   it('carries the route so the row is an openable anchor', async () => {

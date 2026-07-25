@@ -1,4 +1,5 @@
 export * from './guards/auth.guard';
+export * from './guards/collaboration.guard';
 export * from './guards/entity-world-redirect.guard';
 export * from './guards/reconcile-world-segment.guard';
 export * from './i18n/core-translations';

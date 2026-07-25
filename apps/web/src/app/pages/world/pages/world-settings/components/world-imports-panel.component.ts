@@ -4,7 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { switchMap, takeWhile, timer } from 'rxjs';
 import { ImporterErrorCode, ImporterSummary, ImportRunSummary, Visibility } from '@hexly/domain';
-import { HexlyDatePipe, ToasterService, WorldsClient } from '@hexly/web-core';
+import { ClientConfigStore, HexlyDatePipe, ToasterService, WorldsClient } from '@hexly/web-core';
 import { ButtonComponent, SelectComponent } from '@hexly/web-ui';
 
 /** How often a running reconcile is polled — the reindex cadence (ADR-0046), one at a time per World. */
@@ -23,7 +23,8 @@ type ImporterStatusLine =
 /**
  * The generic World-Owner Imports panel (ADR-0060): it lists whatever {@link Importer}s the enabled
  * Plugins registered for this World and, per row, offers Import/Reimport, Remove, and a
- * shared/private Visibility. Importer-agnostic — the label is the summary's transloco key piped
+ * shared/private Visibility (cut with the rest of Visibility when Collaboration is off, ADR-0071).
+ * Importer-agnostic — the label is the summary's transloco key piped
  * through, so a Plugin (e.g. Draw Steel) supplies its copy via its web catalogs and this panel never
  * names it. The reconcile outlives the request that starts it, so the panel follows the one run per
  * World by polling; the server's status is the source of truth for whether one is in flight.
@@ -67,18 +68,22 @@ type ImporterStatusLine =
             }
           </div>
 
-          <select
-            appSelect
-            class="importer-visibility"
-            [attr.aria-label]="'imports.visibility' | transloco"
-            [attr.data-testid]="'importer-visibility-' + imp.id"
-            [value]="visibilityFor(imp.id)"
-            [disabled]="running()"
-            (change)="setVisibility(imp.id, $event)"
-          >
-            <option value="shared">{{ 'imports.shared' | transloco }}</option>
-            <option value="private">{{ 'imports.private' | transloco }}</option>
-          </select>
+          <!-- The per-run Visibility goes with every other Visibility affordance when Collaboration
+               is off (ADR-0071); the row itself is not sharing. -->
+          @if (collaboration()) {
+            <select
+              appSelect
+              class="importer-visibility"
+              [attr.aria-label]="'imports.visibility' | transloco"
+              [attr.data-testid]="'importer-visibility-' + imp.id"
+              [value]="visibilityFor(imp.id)"
+              [disabled]="running()"
+              (change)="setVisibility(imp.id, $event)"
+            >
+              <option value="shared">{{ 'imports.shared' | transloco }}</option>
+              <option value="private">{{ 'imports.private' | transloco }}</option>
+            </select>
+          }
 
           <button
             appButton
@@ -139,6 +144,10 @@ export class WorldImportsPanelComponent implements OnInit {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly clientConfig = inject(ClientConfigStore);
+
+  /** Whether the Collaboration layer is on (ADR-0071) — with it off an import has no Visibility to choose. */
+  protected readonly collaboration = computed(() => this.clientConfig.isCollaborationEnabled());
 
   protected readonly importers = signal<readonly ImporterSummary[]>([]);
   /** The World's one import run as last seen from the server; `null` until fetched. Drives the busy state. */
@@ -168,7 +177,9 @@ export class WorldImportsPanelComponent implements OnInit {
   }
 
   protected visibilityFor(importerId: string): Visibility {
-    return this.visibility()[importerId] ?? 'shared';
+    // No toggle means no intent to honour, so an import mints at the schema default like every other
+    // write path — Visibility left inert (ADR-0071).
+    return this.visibility()[importerId] ?? (this.collaboration() ? 'shared' : 'private');
   }
 
   protected setVisibility(importerId: string, event: Event): void {

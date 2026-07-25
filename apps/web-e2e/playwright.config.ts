@@ -27,7 +27,7 @@ const DEFAULT_HEXMAP_YAML = ['entities:', '  defaultType: core.type.hex-map', ''
 const COLLABORATION_OFF_YAML = ['features:', '  collaboration: false', ''].join('\n');
 
 /** One `e2e-server.mjs` invocation: its own port, throwaway Instance Directory, and optional hexly.yml. */
-function server(port: number, opts: { instanceSubdir?: string; configYaml?: string } = {}) {
+function server(port: number, opts: { instanceSubdir?: string; configYaml?: string; soleUser?: boolean } = {}) {
   return {
     command: 'node apps/web-e2e/e2e-server.mjs',
     url: urlFor(port),
@@ -49,6 +49,8 @@ function server(port: number, opts: { instanceSubdir?: string; configYaml?: stri
       E2E_GRANTEE_NAME: TEST_GRANTEE.displayName,
       ...(opts.instanceSubdir ? { E2E_INSTANCE_DIR: join(workspaceRoot, 'tmp', opts.instanceSubdir) } : {}),
       ...(opts.configYaml ? { E2E_CONFIG_YAML: opts.configYaml } : {}),
+      // The Sole User's shape: Superadmin holding every Instance Role (ADR-0071).
+      ...(opts.soleUser ? { E2E_SOLE_USER: '1' } : {}),
     },
   };
 }
@@ -100,8 +102,9 @@ export default defineConfig({
     authenticated('default-type', DEFAULT_TYPE_PORT, {
       testMatch: /.*[/\\]config[/\\]default-type\.spec\.ts/,
     }),
-    // features.collaboration off (ADR-0071, #316): a run proving the Entity sharing surfaces are gone
-    // and the routes behind them 404.
+    // features.collaboration off (ADR-0071, #316, #317): a run proving the Entity and World sharing
+    // surfaces and instance user management are gone, and the routes behind them 404 — driven by a
+    // Sole-User-shaped account, so no Instance Role check can be doing the hiding.
     setup('collab-off', COLLAB_OFF_PORT),
     authenticated('collab-off', COLLAB_OFF_PORT, {
       testMatch: /.*[/\\]config[/\\]collab-off\.spec\.ts/,
@@ -111,6 +114,10 @@ export default defineConfig({
     server(DEFAULT_PORT),
     server(PLUGIN_DISABLED_PORT, { instanceSubdir: 'web-e2e-plugin-disabled', configYaml: DISABLE_DND_YAML }),
     server(DEFAULT_TYPE_PORT, { instanceSubdir: 'web-e2e-default-type', configYaml: DEFAULT_HEXMAP_YAML }),
-    server(COLLAB_OFF_PORT, { instanceSubdir: 'web-e2e-collab-off', configYaml: COLLABORATION_OFF_YAML }),
+    server(COLLAB_OFF_PORT, {
+      instanceSubdir: 'web-e2e-collab-off',
+      configYaml: COLLABORATION_OFF_YAML,
+      soleUser: true,
+    }),
   ],
 });

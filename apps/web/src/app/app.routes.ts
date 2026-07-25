@@ -1,5 +1,6 @@
 import { Route } from '@angular/router';
 import {
+  collaborationGuard,
   manageUsersGuard,
   superadminGuard,
   authGuard,
@@ -40,9 +41,9 @@ export const appRoutes: Route[] = [
   },
   {
     // User management (ADR-0047). Account-scoped like Settings; the server
-    // re-checks every action.
+    // re-checks every action. Collaboration off cuts it entirely (ADR-0071).
     path: 'users',
-    canActivate: [manageUsersGuard],
+    canActivate: [collaborationGuard, manageUsersGuard],
     loadComponent: () => import('./pages/users/users.page').then((m) => m.UsersPage),
     title: 'users.tabTitle',
   },
@@ -127,15 +128,18 @@ export const appRoutes: Route[] = [
     title: 'styleguide.tabTitle',
   },
   // Unauthenticated Public Link surface: token-scoped, read-only. Deliberately
-  // outside authGuard — possession of the token is the credential.
+  // outside authGuard — possession of the token is the credential — but on the
+  // Collaboration cut list (ADR-0071): with the layer off no token can exist.
   {
     path: 'public/e/:token',
+    canActivate: [collaborationGuard],
     data: { mode: 'entity' },
     loadComponent: () => import('./pages/public/public-entity.page').then((m) => m.PublicEntityPage),
     title: 'publicView.tabTitle',
   },
   {
     path: 'public/w/:token',
+    canActivate: [collaborationGuard],
     loadComponent: () => import('./pages/public/public-world.page').then((m) => m.PublicWorldPage),
     title: 'publicView.tabTitle',
   },
@@ -143,6 +147,7 @@ export const appRoutes: Route[] = [
     // `:entityId` (not `:id`) keeps the reused EntityPage's watchRoute from matching;
     // PublicEntityPage marks the session externally driven and is the sole data source.
     path: 'public/w/:token/e/:entityId',
+    canActivate: [collaborationGuard],
     data: { mode: 'worldEntity' },
     loadComponent: () => import('./pages/public/public-entity.page').then((m) => m.PublicEntityPage),
     title: 'publicView.tabTitle',

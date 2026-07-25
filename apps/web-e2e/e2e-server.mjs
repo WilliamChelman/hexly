@@ -89,11 +89,23 @@ const childEnv = {
 // before the users exist). The grantee is optional — the loop skips it if unset.
 // Only the login user gets a starter World: `enterLibrary` reaches its library by
 // clicking a World card on the Index, so the suite is dead without one.
-const toSeed = [{ ...user, withWorld: true }, ...(grantee.email ? [grantee] : [])];
+// E2E_SOLE_USER gives the login user the Sole User's shape (ADR-0071), so a run asserting a
+// Collaboration-off absence cannot be passing on a role check instead of the flag.
+const toSeed = [
+  { ...user, withWorld: true, soleUser: !!process.env.E2E_SOLE_USER },
+  ...(grantee.email ? [grantee] : []),
+];
 for (const u of toSeed) {
   const seeded = spawnSync(
     process.execPath,
-    [seedJs, u.email, u.password, u.name, ...(u.withWorld ? ['--with-world'] : [])],
+    [
+      seedJs,
+      u.email,
+      u.password,
+      u.name,
+      ...(u.withWorld ? ['--with-world'] : []),
+      ...(u.soleUser ? ['--sole-user'] : []),
+    ],
     { env: childEnv, stdio: 'inherit' },
   );
   if (seeded.error) {
