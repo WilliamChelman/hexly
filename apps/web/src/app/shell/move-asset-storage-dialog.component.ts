@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { type AssetStorageMoveProgress, DESKTOP_BRIDGE } from '@hexly/web-core';
+import { type AssetStorageMoveProgress, type AssetStorageMoveRefusal, DESKTOP_BRIDGE } from '@hexly/web-core';
 import { ButtonComponent, DialogComponent, DialogRef } from '@hexly/web-ui';
 
 /**
@@ -64,7 +64,10 @@ type MoveState = 'choosing' | 'copying' | 'cancelling' | 'moved' | 'failed';
             <p class="m-0 text-sm text-ink" data-testid="asset-move-failed">
               {{ 'assetStorage.failedTitle' | transloco }}
             </p>
-            <p class="m-0 text-sm text-ink-muted" data-testid="asset-move-reason">{{ reason() }}</p>
+            <!-- Our own refusal is a code with copy of its own; a filesystem message can only be passed through. -->
+            <p class="m-0 text-sm text-ink-muted" data-testid="asset-move-reason">
+              {{ refusal() ? ('assetStorage.refused.' + refusal() | transloco) : reason() }}
+            </p>
           }
         }
       </div>
@@ -89,6 +92,7 @@ export class MoveAssetStorageDialogComponent {
   protected readonly state = signal<MoveState>('choosing');
   private readonly progress = signal<AssetStorageMoveProgress | null>(null);
   protected readonly reason = signal('');
+  protected readonly refusal = signal<AssetStorageMoveRefusal | null>(null);
   protected readonly moved = signal({ count: 0, folder: '' });
 
   protected readonly counts = computed(() => ({
@@ -125,6 +129,10 @@ export class MoveAssetStorageDialogComponent {
         this.reason.set(outcome.reason);
         this.state.set('failed');
         return;
+      case 'refused':
+        this.refusal.set(outcome.refusal);
+        this.state.set('failed');
+        return;
       default:
         // Dismissed or cancelled: the user's own gesture, and the Assets are exactly where they were.
         this.dialogRef.close();
@@ -142,11 +150,12 @@ export class MoveAssetStorageDialogComponent {
   }
 
   /**
-   * Escape or the backdrop. During a copy that is a cancel: leaving a gigabyte-scale copy running with no
-   * surface reporting it — and a relaunch waiting at the end of it — is the one outcome to rule out.
+   * Escape or the backdrop. Unless the move has already settled, that is a cancel: leaving a gigabyte-scale copy
+   * running with no surface reporting it — and a relaunch waiting at the end of it — is the one outcome to rule
+   * out. Which is why it covers `choosing` too, where the copy has not started but is about to.
    */
   protected dismiss(): void {
-    if (this.state() === 'copying') this.cancel();
+    if (this.state() === 'choosing' || this.state() === 'copying') this.cancel();
     this.dialogRef.close();
   }
 }

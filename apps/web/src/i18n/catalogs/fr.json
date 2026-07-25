@@ -570,6 +570,10 @@
     "copying": "Copie de {{copied}} fichiers sur {{total}}…",
     "cancelling": "Arrêt en cours…",
     "moved": "{{count}} fichiers copiés vers {{folder}}. Hexly va redémarrer pour les utiliser.",
-    "failedTitle": "Le déplacement a été interrompu et vos Assets sont restés où ils étaient."
+    "failedTitle": "Le déplacement n'a pas abouti : Hexly utilise toujours le dossier d'Assets précédent.",
+    "refused": {
+      "same-folder": "Ce dossier est déjà celui où Hexly conserve vos Assets.",
+      "nested-folders": "Ce dossier et le dossier d'Assets actuel se contiennent l'un l'autre. Choisissez-en un à l'extérieur."
+    }
   }
 }

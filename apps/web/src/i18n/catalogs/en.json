@@ -570,6 +570,10 @@
     "copying": "Copying {{copied}} of {{total}} files…",
     "cancelling": "Stopping…",
     "moved": "Copied {{count}} files to {{folder}}. Hexly will restart to use them.",
-    "failedTitle": "The move was stopped and your Assets were left where they are."
+    "failedTitle": "The move didn't finish, so Hexly is still using the Asset folder it was using before.",
+    "refused": {
+      "same-folder": "That folder is already where Hexly keeps your Assets.",
+      "nested-folders": "That folder and the current Asset folder contain one another. Choose one outside it."
+    }
   }
 }

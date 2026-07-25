@@ -3,6 +3,9 @@ import { InjectionToken } from '@angular/core';
 /**
  * How far main's copy of the Asset bytes has got (#326). The counters are what finished; `file` is the one in
  * flight, so a surface can name the work rather than only measure it.
+ *
+ * The shell's `AssetMoveProgress` is the other end of this wire; the two are restated rather than shared for
+ * the reason the bridge's global name is — no build joins the two bundles.
  */
 export interface AssetStorageMoveProgress {
   readonly file: string;
@@ -13,6 +16,13 @@ export interface AssetStorageMoveProgress {
 }
 
 /**
+ * Why the shell would not attempt a move at all. A code, because this refusal is Hexly's own and this is the
+ * half of the app with a translation catalogue — a `failed` `reason`, by contrast, is a filesystem message in
+ * whatever words the platform used.
+ */
+export type AssetStorageMoveRefusal = 'same-folder' | 'nested-folders';
+
+/**
  * How a move of the Asset storage ended. `dismissed` is the user closing the native picker — not a failure and
  * nothing to report; anything but `moved` means the Assets are still exactly where they were. Restated from
  * the shell's own union for the reason the bridge's global name is: no build joins the two bundles.
@@ -21,6 +31,7 @@ export type AssetStorageMoveOutcome =
   | { readonly status: 'moved'; readonly to: string; readonly files: number; readonly bytes: number }
   | { readonly status: 'cancelled' }
   | { readonly status: 'dismissed' }
+  | { readonly status: 'refused'; readonly refusal: AssetStorageMoveRefusal }
   | { readonly status: 'failed'; readonly reason: string };
 
 /** The Desktop App's preload bridge, as the renderer sees it — main's whole surface to the client. */

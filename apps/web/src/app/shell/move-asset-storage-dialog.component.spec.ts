@@ -110,7 +110,7 @@ describe('MoveAssetStorageDialogComponent', () => {
   });
 
   /** Escape must not leave a gigabyte-scale copy running with a relaunch waiting at the end of it. */
-  it('treats being dismissed mid-copy as a cancel', () => {
+  it('treats being dismissed before the move settles as a cancel', () => {
     const fixture = render();
     bridge.progress();
     fixture.detectChanges();
@@ -144,6 +144,17 @@ describe('MoveAssetStorageDialogComponent', () => {
     expect(closes).toBe(0);
   });
 
+  /** Our own refusal has copy of its own, because unlike a filesystem message it is ours to translate. */
+  it('says a refusal in the app’s own words rather than passing a sentence through from the shell', async () => {
+    const fixture = render();
+
+    bridge.finish({ status: 'refused', refusal: 'same-folder' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(text(fixture, 'asset-move-reason')).toBe('That folder is already where Hexly keeps your Assets.');
+  });
+
   it('names what failed and says the Assets were left alone', async () => {
     const fixture = render();
 
@@ -152,7 +163,8 @@ describe('MoveAssetStorageDialogComponent', () => {
     fixture.detectChanges();
 
     expect(text(fixture, 'asset-move-reason')).toContain('ENOSPC');
-    expect(text(fixture, 'asset-move-failed')).toContain('left where they are');
+    // True of every unsuccessful outcome, the copied-but-unswitched one included: nothing switched.
+    expect(text(fixture, 'asset-move-failed')).toContain('still using the Asset folder it was using before');
     // Dismissed by hand, not automatically: a message nobody read is the same as no message.
     fixture.nativeElement.querySelector('[data-testid="asset-move-close"]').click();
     expect(closes).toBe(1);

@@ -10,7 +10,7 @@ import { routeLinks } from './external-links';
 import { pinInstanceDir } from './instance-dir';
 import { CANCEL_MOVE_ASSETS, MENU_COMMAND, MOVE_ASSETS, MOVE_ASSETS_PROGRESS, RENEW_SESSION } from './ipc';
 import { buildAppMenuTemplate } from './menu';
-import { type AssetMoveProgress, type AssetStorageMoveOutcome, assetFileStore, moveAssetStorage } from './move-assets';
+import { type AssetStorageMoveOutcome, assetFileStore, moveAssetStorage, throttleProgress } from './move-assets';
 import { revealFolder } from './reveal-folder';
 import { writeSessionCookie } from './session-cookie';
 import { closeSoleUserSession, openSoleUserSession } from './sole-user';
@@ -52,10 +52,7 @@ let geometry: GeometryTracker | undefined;
 /** The Asset-storage move in flight, if any: one at a time, and the handle the renderer's Cancel pulls. */
 let assetMove: AbortController | undefined;
 
-/**
- * How often progress reaches the renderer. A folder of ten thousand small files would otherwise send ten
- * thousand messages, each costing a change-detection pass, to redraw a bar that moves in fractions of a pixel.
- */
+/** How often progress reaches the renderer — {@link throttleProgress} says why it is throttled at all. */
 const PROGRESS_INTERVAL_MS = 100;
 
 /**
@@ -263,9 +260,9 @@ async function moveAssets(event: Electron.IpcMainInvokeEvent): Promise<AssetStor
       chooseFolder: () => chooseAssetFolder(BrowserWindow.fromWebContents(event.sender)),
       // Guarded: a window closed mid-copy would otherwise make `send` throw, and a torn-down surface is not
       // a copy failure — the quit that follows a last window closing is what ends this move.
-      onProgress: throttled((progress) => {
+      onProgress: throttleProgress((progress) => {
         if (!event.sender.isDestroyed()) event.sender.send(MOVE_ASSETS_PROGRESS, progress);
-      }),
+      }, PROGRESS_INTERVAL_MS),
       recordNewRoot: (chosen) => writeAssetsDir(dir, chosen),
     });
     // Config is read once at boot (ADR-0036), so applying the new root is a restart — and it is ours to
@@ -287,17 +284,6 @@ async function chooseAssetFolder(parent: BrowserWindow | null): Promise<string |
   };
   const chosen = await (parent ? dialog.showOpenDialog(parent, options) : dialog.showOpenDialog(options));
   return chosen.canceled ? undefined : chosen.filePaths[0];
-}
-
-/** Report at most once per {@link PROGRESS_INTERVAL_MS}; the outcome, not a last report, is what ends the story. */
-function throttled(report: (progress: AssetMoveProgress) => void): (progress: AssetMoveProgress) => void {
-  let last = 0;
-  return (progress) => {
-    const now = Date.now();
-    if (now - last < PROGRESS_INTERVAL_MS) return;
-    last = now;
-    report(progress);
-  };
 }
 
 /**

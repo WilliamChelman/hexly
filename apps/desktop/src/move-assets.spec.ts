@@ -6,6 +6,7 @@ import {
   assetsMoveRefusal,
   copyAssetTree,
   moveAssetStorage,
+  throttleProgress,
 } from './move-assets';
 
 const OLD = '/instance/assets';
@@ -71,13 +72,13 @@ function storeWithAssets(): FakeStore {
 
 describe('assetsMoveRefusal', () => {
   it('refuses the folder the Assets are already in, which is an 8 GB copy that changes nothing', () => {
-    expect(assetsMoveRefusal(OLD, OLD)).toContain('already');
-    expect(assetsMoveRefusal(OLD, `${OLD}/`)).toContain('already');
+    expect(assetsMoveRefusal(OLD, OLD)).toBe('same-folder');
+    expect(assetsMoveRefusal(OLD, `${OLD}/`)).toBe('same-folder');
   });
 
   it('refuses either folder containing the other, since the old bytes deliberately stay put', () => {
-    expect(assetsMoveRefusal(OLD, `${OLD}/inner`)).toContain('contain one another');
-    expect(assetsMoveRefusal(`${NEW}/inner`, NEW)).toContain('contain one another');
+    expect(assetsMoveRefusal(OLD, `${OLD}/inner`)).toBe('nested-folders');
+    expect(assetsMoveRefusal(`${NEW}/inner`, NEW)).toBe('nested-folders');
   });
 
   it('allows a sibling whose name merely starts the same', () => {
@@ -178,8 +179,24 @@ describe('copyAssetTree', () => {
 
     const outcome = await copyAssetTree(store, { from: OLD, to: `${OLD}/inner` });
 
-    expect(outcome).toEqual({ status: 'failed', reason: expect.stringContaining('contain one another') });
+    // A code, not a sentence: the renderer holds the catalogue that turns it into words (ADR-0070).
+    expect(outcome).toEqual({ status: 'refused', refusal: 'nested-folders' });
     expect(store.written).toEqual([]);
+  });
+
+  /**
+   * The natural second attempt after a move that failed: the same folder, holding some of it already. Undoing
+   * our own writes must not turn into deleting the user's files.
+   */
+  it('never takes back a file that was in the chosen folder before this move', async () => {
+    const store = storeWithAssets();
+    store.bytes.set(`${NEW}/world-1/aaa.png`, 'a map');
+    store.refuses.add(`${OLD}/world-2/bbb.pdf`);
+
+    await copyAssetTree(store, { from: OLD, to: NEW });
+
+    expect(store.removed).not.toContain(`${NEW}/world-1/aaa.png`);
+    expect(store.bytes.get(`${NEW}/world-1/aaa.png`)).toBe('a map');
   });
 
   it('picks up an Asset written to the old root while the copy was running', async () => {
@@ -262,5 +279,40 @@ describe('moveAssetStorage', () => {
       status: 'failed',
       reason: expect.stringContaining('EACCES: permission denied'),
     });
+  });
+});
+
+describe('throttleProgress', () => {
+  const REPORT: AssetMoveProgress = {
+    file: 'world-1/aaa.png',
+    copiedFiles: 1,
+    totalFiles: 4,
+    copiedBytes: 1,
+    totalBytes: 4,
+  };
+
+  /** A clock a spec winds by hand, rather than a spec that waits. */
+  function at(times: number[]): () => number {
+    let index = 0;
+    return () => times[index++];
+  }
+
+  it('reports the first one straight away, so a surface is never blank while work is happening', () => {
+    const reported: AssetMoveProgress[] = [];
+    const report = throttleProgress((progress) => void reported.push(progress), 100, at([0]));
+
+    report(REPORT);
+
+    expect(reported).toEqual([REPORT]);
+  });
+
+  it('drops what falls inside the window and resumes after it', () => {
+    const reported: AssetMoveProgress[] = [];
+    const report = throttleProgress((progress) => void reported.push(progress), 100, at([1000, 1050, 1099, 1100]));
+
+    for (let i = 0; i < 4; i++) report({ ...REPORT, copiedFiles: i });
+
+    // Ten thousand small files must not buy ten thousand change-detection passes; the outcome has the last word.
+    expect(reported.map((progress) => progress.copiedFiles)).toEqual([0, 3]);
   });
 });

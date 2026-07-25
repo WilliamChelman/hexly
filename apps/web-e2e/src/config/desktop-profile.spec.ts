@@ -129,6 +129,12 @@ test('the Collaboration cut list is hidden here too, as the Desktop App pins it 
   await page.getByTestId('command-palette-input').fill('>go');
   await expect(page.getByTestId('command-palette-option-go-admin')).toBeVisible();
   await expect(page.getByTestId('command-palette-option-go-users')).toHaveCount(0);
+
+  // And the one affordance this profile does *not* get by being this profile: moving the Asset storage needs a
+  // native picker and a `hexly.yml` to rewrite, so it checks for the preload bridge, which a browser has not
+  // got (#326, ADR-0071). Absent here, and absent for the right reason.
+  await page.getByTestId('command-palette-input').fill('>asset');
+  await expect(page.getByTestId('command-palette-option-move-asset-storage')).toHaveCount(0);
   await page.keyboard.press('Escape');
 
   await page.goto('/users');

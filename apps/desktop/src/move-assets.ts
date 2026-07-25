@@ -54,12 +54,20 @@ export interface AssetMovePlan {
 }
 
 /**
- * `moved` is the only outcome that has earned the right to rewrite `hexly.yml`; the other two mean the
+ * Why a move must not be attempted. A **code**, not a sentence: this one is ours to explain, and the renderer
+ * is the half of the app with a translation catalog (ADR-0070) — unlike a filesystem message, which arrives in
+ * whatever words the platform used and can only be passed through.
+ */
+export type AssetMoveRefusal = 'same-folder' | 'nested-folders';
+
+/**
+ * `moved` is the only outcome that has earned the right to rewrite `hexly.yml`; every other one means the
  * original root is still the truth. `reason` names what failed, since the user's next move is to fix it.
  */
 export type AssetMoveOutcome =
   | { readonly status: 'moved'; readonly to: string; readonly files: number; readonly bytes: number }
   | { readonly status: 'cancelled' }
+  | { readonly status: 'refused'; readonly refusal: AssetMoveRefusal }
   | { readonly status: 'failed'; readonly reason: string };
 
 /**
@@ -74,12 +82,11 @@ const PASSES = 2;
  * dressed as an 8 GB copy, and one nested inside the other makes "the old bytes stay put" (which is the
  * recovery story) mean a new root that contains its own predecessor.
  */
-export function assetsMoveRefusal(from: string, to: string): string | undefined {
+export function assetsMoveRefusal(from: string, to: string): AssetMoveRefusal | undefined {
   const oldRoot = resolve(from);
   const newRoot = resolve(to);
-  if (oldRoot === newRoot) return `${to} is already where this Instance keeps its Assets.`;
-  if (encloses(oldRoot, newRoot) || encloses(newRoot, oldRoot))
-    return `${to} and ${from} contain one another. Choose a folder outside the current Asset folder.`;
+  if (oldRoot === newRoot) return 'same-folder';
+  if (encloses(oldRoot, newRoot) || encloses(newRoot, oldRoot)) return 'nested-folders';
   return undefined;
 }
 
@@ -98,7 +105,7 @@ function encloses(parent: string, child: string): boolean {
  */
 export async function copyAssetTree(store: AssetFileStore, plan: AssetMovePlan): Promise<AssetMoveOutcome> {
   const refusal = assetsMoveRefusal(plan.from, plan.to);
-  if (refusal) return { status: 'failed', reason: refusal };
+  if (refusal) return { status: 'refused', refusal };
 
   /** Verified at the new root. The pass filter and the progress counters both mean *finished*. */
   const copied = new Set<string>();
@@ -107,6 +114,9 @@ export async function copyAssetTree(store: AssetFileStore, plan: AssetMovePlan):
   let copiedBytes = 0;
 
   try {
+    // What was at the new root before this move: a folder the user has moved into before, most likely. Not ours
+    // to take back on a cancel, which is the difference between undoing our own writes and deleting their files.
+    const theirs = new Set((await store.list(plan.to)).map((file) => file.path));
     for (let pass = 0; pass < PASSES; pass++) {
       const remaining = (await store.list(plan.from)).filter((file) => !copied.has(file.path));
       if (!remaining.length) break;
@@ -116,7 +126,7 @@ export async function copyAssetTree(store: AssetFileStore, plan: AssetMovePlan):
       for (const file of remaining) {
         if (plan.signal?.aborted) return await abandon(store, plan.to, attempted, { status: 'cancelled' });
         plan.onProgress?.({ file: file.path, copiedFiles: copied.size, totalFiles, copiedBytes, totalBytes });
-        attempted.add(file.path);
+        if (!theirs.has(file.path)) attempted.add(file.path);
         await copyVerified(store, plan, file.path);
         copied.add(file.path);
         copiedBytes += file.size;
@@ -128,6 +138,27 @@ export async function copyAssetTree(store: AssetFileStore, plan: AssetMovePlan):
     return await abandon(store, plan.to, attempted, { status: 'failed', reason: describe(err) });
   }
   return { status: 'moved', to: plan.to, files: copied.size, bytes: copiedBytes };
+}
+
+/**
+ * Wrap `report` so it fires at most once per `intervalMs` — the first one straight away, then no more than one
+ * per window. A folder of ten thousand small files would otherwise send ten thousand messages to the surface
+ * drawing them, each costing a change-detection pass, to move a bar by fractions of a pixel. The report that
+ * gets dropped is never the last word: the outcome is.
+ */
+export function throttleProgress(
+  report: (progress: AssetMoveProgress) => void,
+  intervalMs: number,
+  /** A `Date.now`, so a spec drives the clock instead of waiting on it. */
+  now: () => number = Date.now,
+): (progress: AssetMoveProgress) => void {
+  let last: number | undefined;
+  return (progress) => {
+    const at = now();
+    if (last !== undefined && at - last < intervalMs) return;
+    last = at;
+    report(progress);
+  };
 }
 
 /** What one move of the Asset storage needs from the shell around it. */
