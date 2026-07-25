@@ -104,6 +104,32 @@ Run `pnpm native:node` before the API tests or the browser e2e suite, or they fa
 ad-hoc re-signs the addon (`scripts/sign-native-addons.mjs`) — the code-signing monitor kills Electron
 outright when it `dlopen`s the linker-signed prebuild.
 
+### Packaging an installable app
+
+```sh
+pnpm package:desktop   # → dist/desktop/
+```
+
+One command, four steps: rebuild `better-sqlite3` for Electron's ABI, build the shell and the SPA, run
+electron-builder (`apps/desktop/electron-builder.config.js`), then **open the package and use it** —
+`apps/desktop-e2e/src/packaged/packaged-app.spec.ts` creates a World, thumbnails an image and hashes a
+password inside the artifact, so a package whose native modules did not come along fails the build that
+made it. Re-run just that part with:
+
+```sh
+pnpm exec playwright test -c apps/desktop-e2e/playwright.packaged.config.ts
+```
+
+Two things to expect. It builds for **this** machine's platform and architecture only — `sharp`'s
+prebuilts and libvips are per-platform optional dependencies, so an install here holds binaries for here;
+release builds one artifact per runner. And it leaves `node_modules` on Electron's ABI, so run
+`pnpm native:node` afterwards.
+
+Builds are **unsigned, and therefore have no auto-update** — the macOS updater refuses to update an
+unsigned bundle, so the two are one decision (ADR-0070). Every platform will warn about the download; on
+recent macOS the route is System Settings → Privacy & Security → **Open Anyway**, the Finder right-click
+bypass having been removed.
+
 ## Seeding a user (required to log in)
 
 There is **no public signup** — Hexly serves a small, closed set of users who

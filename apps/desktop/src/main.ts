@@ -7,7 +7,7 @@ import { ApiHost, startApiHost } from './api-host';
 import { writeAssetsDir } from './assets-dir';
 import { buildContextMenuTemplate } from './context-menu';
 import { routeLinks } from './external-links';
-import { pinInstanceDir } from './instance-dir';
+import { APP_NAME, pinInstanceDir } from './instance-dir';
 import { CANCEL_MOVE_ASSETS, MENU_COMMAND, MOVE_ASSETS, MOVE_ASSETS_PROGRESS, RENEW_SESSION } from './ipc';
 import { buildAppMenuTemplate } from './menu';
 import { type AssetStorageMoveOutcome, assetFileStore, moveAssetStorage, throttleProgress } from './move-assets';
@@ -63,7 +63,7 @@ const RELAUNCH_DELAY_MS = 600;
 
 // Pinned before anything reads `userData`: both the Instance Directory and the single-instance lock hang
 // off it, so a later packaged `productName` must not silently move the Instance (ADR-0070).
-electron.setName('Hexly');
+electron.setName(APP_NAME);
 
 // A single-instance lock: two processes booting migrations over one SQLite file is a race (ADR-0027).
 if (!electron.requestSingleInstanceLock()) {

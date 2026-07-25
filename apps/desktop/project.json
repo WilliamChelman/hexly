@@ -37,6 +37,18 @@
         "parallel": false,
         "cwd": "{workspaceRoot}"
       }
+    },
+    "package": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build", "web:build", "rebuild-native"],
+      "options": {
+        "commands": [
+          "electron-builder --config apps/desktop/electron-builder.config.js",
+          "playwright test -c apps/desktop-e2e/playwright.packaged.config.ts"
+        ],
+        "parallel": false,
+        "cwd": "{workspaceRoot}"
+      }
     }
   },
   "tags": []

@@ -2,6 +2,13 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
+ * The application name, which decides *which* application-support folder {@link pinInstanceDir} sits in — so
+ * main sets it before anything reads `userData`, and a packaged launch shares the dev launch's Instance
+ * whatever the artifact ends up called (ADR-0070). `packaging.spec.ts` keeps the two names in step anyway.
+ */
+export const APP_NAME = 'Hexly';
+
+/**
  * Pin this process's Instance Directory to `<application support>/hexly`, creating it on a first launch,
  * and return it. Not user-choosable, and the pin is the safety property: a sync daemon or network mount
  * rewriting `hexly.db`/`-wal` under an open WAL handle corrupts the Instance, so the folder a picker

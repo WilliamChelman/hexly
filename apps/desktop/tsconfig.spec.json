@@ -5,7 +5,10 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "types": ["vitest/globals", "node"],
-    "target": "es2021"
+    "target": "es2021",
+    // `packaging.spec.ts` reads `electron-builder.config.js`, which is JavaScript because it carries the
+    // comments that record why the app is unsigned and what must not drift.
+    "allowJs": true
   },
   "include": ["src/**/*.spec.ts", "src/**/*.test.ts", "src/**/*.d.ts"]
 }

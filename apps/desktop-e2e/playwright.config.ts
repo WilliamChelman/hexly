@@ -15,6 +15,8 @@ import { defineConfig } from '@playwright/test';
  */
 export default defineConfig({
   testDir: join(__dirname, 'src'),
+  // The packaged smoke check needs an artifact this gate does not build; `playwright.packaged.config.ts` owns it.
+  testIgnore: '**/packaged/**',
   // One shell at a time: each launch holds an Instance's SQLite handle, and the second-launch fact needs
   // the only other process running to be the one it started.
   fullyParallel: false,
