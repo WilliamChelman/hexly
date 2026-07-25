@@ -12,6 +12,7 @@ function configWith(
   return {
     profile: deployment.profile ?? 'server',
     import: { maxUpload: 0, maxDecompressed: 0, strictZipGuard: false },
+    assets: {},
     search: { weights: { name: 10, tags: 5, content: 1 } },
     liveFollow: { heartbeatSeconds: 30 },
     features: { plugin: plugin, collaboration: deployment.collaboration ?? true },

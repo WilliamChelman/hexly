@@ -9,7 +9,7 @@ import { DB, Db } from '../db/db';
 import { assetIndex, entities } from '../db/schema';
 import { DeletedEntity, EntityDeletionRegistry } from '../entities/entity-deletion-registry';
 
-/** DI token for the on-disk Assets root (`<instanceDir>/assets`, or a temp dir for `:memory:`). */
+/** DI token for the on-disk Assets root, resolved by `resolveAssetsDir` (ADR-0034). */
 export const ASSETS_DIR = Symbol('ASSETS_DIR');
 
 /**

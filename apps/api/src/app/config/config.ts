@@ -119,6 +119,9 @@ function buildConfigSchema(plugins: readonly PluginConfigContribution[]) {
         strictZipGuard: z.boolean().default(false),
       })
       .prefault({}),
+    // Where Asset bytes live (ADR-0034 amendment). Neither defaulted nor resolved here: the
+    // `resolveAssetsDir` seam owns both, so absent stays absent through the loader.
+    assets: z.object({ dir: z.string().min(1).optional() }).prefault({}),
     // Full-text search relevance tuning (ADR-0035). bm25 multiplies each indexed column's
     // contribution by its weight, so a name hit outranks a body hit at the same frequency.
     search: z
@@ -178,6 +181,13 @@ export interface HexlyConfig {
     /** Meter actual decompressed output (airtight, slower) vs. trust the zip's declared sizes (fast). */
     strictZipGuard: boolean;
   };
+  assets: {
+    /**
+     * Where Asset bytes are stored, verbatim as the file states it (ADR-0034 amendment) — `resolveAssetsDir`
+     * turns it into the `ASSETS_DIR` consumers use, since this barrel imports nothing from the app graph.
+     */
+    dir?: string;
+  };
   search: {
     /** bm25 per-column multipliers (ADR-0035): higher = that column influences relevance more. */
     weights: { name: number; tags: number; content: number };
@@ -215,6 +225,7 @@ function processConfig(raw: HexlyConfigRaw, pins: DeploymentPins): HexlyConfig {
       maxDecompressed: parseSize(raw.import.maxDecompressed),
       strictZipGuard: raw.import.strictZipGuard,
     },
+    assets: { dir: raw.assets.dir },
     search: { weights: { ...raw.search.weights } },
     liveFollow: { heartbeatSeconds: raw.liveFollow.heartbeatSeconds },
     features: {

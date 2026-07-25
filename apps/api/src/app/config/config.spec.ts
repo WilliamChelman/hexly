@@ -60,6 +60,8 @@ describe('loadConfig', () => {
     liveFollow: { heartbeatSeconds: 30 },
     features: { plugin: {}, collaboration: true },
     entities: { defaultType: 'core.type.note' },
+    // No `assets.dir`: absent stays absent, and the assets seam supplies the default root.
+    assets: {},
   };
 
   it('falls back to defaults when no file is present', () => {
@@ -243,6 +245,28 @@ describe('deployment pins (ADR-0071)', () => {
       profile: 'server',
       features: { collaboration: false },
     });
+  });
+});
+
+describe('loadConfig: assets.dir (ADR-0034, ADR-0070)', () => {
+  it('is absent by default, so an existing Instance keeps its `assets` folder with no migration', () => {
+    expect(loadConfig(dataDir(), PLUGINS).assets.dir).toBeUndefined();
+    expect(loadConfig(':memory:', PLUGINS).assets.dir).toBeUndefined();
+  });
+
+  it('loads an absolute path — Asset bytes on an external drive, the database left where it is', () => {
+    expect(loadConfig(dataDir('assets:\n  dir: /Volumes/Vault/hexly-assets\n'), PLUGINS).assets.dir).toBe(
+      '/Volumes/Vault/hexly-assets',
+    );
+  });
+
+  it('loads a relative path verbatim, for the assets seam to resolve against the Instance Directory', () => {
+    expect(loadConfig(dataDir('assets:\n  dir: ../shared/assets\n'), PLUGINS).assets.dir).toBe('../shared/assets');
+  });
+
+  it('fails boot on an empty or wrong-typed value, naming the key', () => {
+    expect(() => loadConfig(dataDir('assets:\n  dir: ""\n'), PLUGINS)).toThrow(/dir/);
+    expect(() => loadConfig(dataDir('assets:\n  dir: true\n'), PLUGINS)).toThrow(/dir/);
   });
 });
 

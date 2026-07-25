@@ -160,6 +160,10 @@ import:
     false # false: fast import, guard on the zip's *declared* size.
     # true: slower, streams and meters *actual* output to abort a
     #       bomb mid-inflate — set on an untrusted/public instance.
+assets:
+  dir: /Volumes/big-disk/hexly-assets # where Asset bytes are stored (ADR-0034);
+  #     absolute, or relative to the Instance Directory. Omit the key — the default —
+  #     and they stay in the `assets` folder beside hexly.db.
 search:
   weights: # bm25 relevance multipliers per indexed column (ADR-0035)
     name: 10 # a query word in the name outranks the same word...
@@ -191,6 +195,17 @@ you do it: every Entity authored while it was off is `private` (the schema
 default), so it stays invisible to anyone you then invite. Nothing is lost —
 flipping the Visibility of what you want to share fixes it — but it is a
 deliberate step, not automatic (ADR-0071).
+
+`assets.dir` moves **Asset bytes only** — the database stays in the Instance
+Directory, on purpose: assets are the bulk of the data and safe to park on an
+external drive, a NAS, or a mounted volume, whereas the same volume under
+`hexly.db` risks a corrupt vault (ADR-0034, ADR-0070). The worst an unmounted or
+stale assets volume costs you is **missing bytes**.
+
+Changing `assets.dir` **does not move the bytes you already have**: it is read
+once at boot and simply becomes the new root, so Assets stored under the old one
+read as missing until you move them. Moving them is your own operation — stop the
+instance, copy `<old-root>/<worldId>/…` into the new root, restart.
 
 `strictZipGuard` is a speed-vs-safety trade (ADR-0036). The default (`false`) batch-decompresses — several times faster on a large vault — and trusts the archive's declared sizes, which is right for a trusted personal/LAN instance importing your own vault. A maliciously crafted `.zip` can under-declare its size to slip past that check, so an **untrusted or public** instance should set `strictZipGuard: true`, which streams the archive and meters actual decompressed bytes to abort a zip bomb before it materializes. Either way `maxDecompressed` is enforced.
 
