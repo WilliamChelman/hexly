@@ -85,6 +85,15 @@ describe('LocalGraphPanel', () => {
     return { fixture, el: fixture.nativeElement as HTMLElement, store };
   }
 
+  /** Open the filters menu and hand back its decor row — CDK stamps it into the overlay, not the panel. */
+  function openFilters(fixture: ComponentFixture<LocalGraphPanelComponent>, el: HTMLElement): HTMLElement {
+    el.querySelector<HTMLButtonElement>('[data-testid=local-graph-filters]')?.click();
+    fixture.detectChanges();
+    const row = document.querySelector<HTMLElement>('[data-testid=local-graph-decor-toggle]');
+    if (!row) throw new Error('the filters menu offered no decor row');
+    return row;
+  }
+
   /** The default read is one hop, and the drawing knows which Entity it is about. */
   it('asks for one hop by default and draws the neighbourhood around the open Entity', () => {
     const { fixture, el } = mount(graph(['n1', 'mira'], ['n1>mira']));
@@ -96,20 +105,37 @@ describe('LocalGraphPanel', () => {
     expect(fixture.debugElement.query(By.directive(GraphCanvasComponent)).componentInstance.center()).toBe('n1');
   });
 
-  /** The depth is a *server* bound (ADR-0072), so choosing another one refetches rather than filtering. */
-  it('refetches at the chosen depth, and holds no drawing until it lands', () => {
+  /**
+   * The depth is a *server* bound (ADR-0072), so choosing another one refetches rather than filtering —
+   * and the drawing already up is *kept* while that read is in flight. Unmounting the canvas would make
+   * the next mount rebuild cosmos.gl's WebGL context and recompile its shaders on the main thread, which
+   * is the whole cost the warm pool exists to avoid. The counts, the one precise claim a graph held at
+   * the old depth would misreport, stand down instead, behind a loading mark.
+   */
+  it('keeps the loaded drawing up while a depth refetch is in flight', () => {
     const { fixture, el } = mount(graph(['n1', 'mira'], ['n1>mira']));
     http.expectOne('/api/entities/n1/graph?depth=1');
+    const canvas = el.querySelector('[data-testid=graph-canvas]');
+    expect(canvas).not.toBeNull();
 
     el.querySelector<HTMLButtonElement>('[data-testid=local-graph-depth-2]')?.click();
     fixture.detectChanges();
 
-    expect(http.expectOne('/api/entities/n1/graph?depth=2').request.method).toBe('GET');
-    // The one-hop graph would misreport the control's reading, so it is withheld rather than redrawn.
+    const pending = http.expectOne('/api/entities/n1/graph?depth=2');
+    expect(pending.request.method).toBe('GET');
+    // The very same element, not a re-created one: no teardown happened.
+    expect(el.querySelector('[data-testid=graph-canvas]')).toBe(canvas);
+    expect(el.querySelector('[data-testid=local-graph-loading]')).not.toBeNull();
     expect(el.querySelector('[data-testid=local-graph-counts]')).toBeNull();
     expect(el.querySelector<HTMLButtonElement>('[data-testid=local-graph-depth-2]')?.getAttribute('aria-pressed')).toBe(
       'true',
     );
+
+    pending.flush(graph(['n1', 'mira', 'thorn'], ['n1>mira', 'mira>thorn'], 2));
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid=local-graph-loading]')).toBeNull();
+    expect(el.querySelector('[data-testid=local-graph-counts]')?.textContent).toContain('3 entities');
   });
 
   /** Every hop the read allows is one click away, and the current one reads off the control. */
@@ -150,7 +176,9 @@ describe('LocalGraphPanel', () => {
 
   /**
    * A Decor Link (ADR-0069) is hidden by default and revealed on demand — and because the read never walks
-   * decor, revealing it can only add a line, never a node.
+   * decor, revealing it can only add a line, never a node. The reveal is a CDK checkbox row of the same
+   * floating filters menu the World Graph page carries, so the filter reads the same to a screen reader on
+   * either surface (ADR-0007).
    */
   it('hides a Decor Link behind an ephemeral reveal', () => {
     const { fixture, el } = mount(graph(['n1', 'mira', 'crest'], ['n1>mira', 'n1>crest!']));
@@ -159,20 +187,22 @@ describe('LocalGraphPanel', () => {
     expect(counts()).toContain('3 entities');
     expect(counts()).toContain('1 links');
 
-    const toggle = el.querySelector<HTMLButtonElement>('[data-testid=local-graph-decor-toggle]');
-    expect(toggle).not.toBeNull();
-    toggle?.click();
+    const toggle = openFilters(fixture, el);
+    expect(toggle.getAttribute('role')).toBe('menuitemcheckbox');
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    toggle.click();
     fixture.detectChanges();
 
     expect(counts()).toContain('3 entities');
     expect(counts()).toContain('2 links');
+    expect(openFilters(fixture, el).getAttribute('aria-checked')).toBe('true');
   });
 
   /** No decor in the neighbourhood → no dead control. */
   it('offers no reveal control when nothing in the neighbourhood is decor', () => {
     const { el } = mount(graph(['n1', 'mira'], ['n1>mira']));
 
-    expect(el.querySelector('[data-testid=local-graph-decor-toggle]')).toBeNull();
+    expect(el.querySelector('[data-testid=local-graph-filters]')).toBeNull();
   });
 
   /**

@@ -3,7 +3,7 @@ import { WorldGraph } from '@hexly/domain';
 import { entityAccess } from '../acl/entity-access';
 import { worldAccess } from '../acl/world-access';
 import { DB, Db } from '../db/db';
-import { graphEdges, graphNodes } from '../entities/utils/graph-reads';
+import { worldGraphRead } from '../entities/utils/graph-reads';
 
 /**
  * The World Graph read (ADR-0046): a World's readable Entities as nodes, the derived edge index
@@ -16,8 +16,8 @@ import { graphEdges, graphNodes } from '../entities/utils/graph-reads';
  * and computes orphans *after*, so the access filter always runs before the decor filter, and a
  * decor-only Asset falls out as an ordinary orphan with no asset-specific code.
  *
- * The node and edge reads themselves live in `entities/utils/graph-reads`, shared with the Local Graph
- * (ADR-0072) — the same projection, bounded to one Entity's neighbourhood.
+ * The read itself lives in `entities/utils/graph-reads`, shared with the Local Graph (ADR-0072) — the
+ * same projection, bounded there to one Entity's neighbourhood.
  */
 @Injectable()
 export class WorldGraphService {
@@ -26,10 +26,6 @@ export class WorldGraphService {
   /** The whole readable World. `null` when the World is unreachable — the 404 gate. */
   graph(userId: string, worldId: string): WorldGraph | null {
     if (!worldAccess(this.db, userId).decideMeta(worldId)?.reachable) return null;
-    const nodes = graphNodes(this.db, entityAccess(this.db, userId), worldId);
-    return {
-      nodes,
-      edges: graphEdges(this.db, worldId, new Set(nodes.map((n) => n.id))),
-    };
+    return worldGraphRead(this.db, entityAccess(this.db, userId), worldId);
   }
 }

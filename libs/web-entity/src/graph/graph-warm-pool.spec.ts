@@ -60,13 +60,13 @@ describe('GraphWarmPool', () => {
     expect(factory).toHaveBeenCalledTimes(1);
   });
 
-  it('release disposes the adopted graph and warms the next', async () => {
+  it('retire destroys the adopted graph and warms the next', async () => {
     const pool = TestBed.inject(GraphWarmPool);
     pool.warmUp();
     await settle();
     const adopted = pool.claim();
 
-    pool.release(adopted as WarmGraph);
+    pool.retire(adopted as WarmGraph);
     await settle();
 
     expect(adopted?.dispose).toHaveBeenCalled();

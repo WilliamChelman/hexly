@@ -36,7 +36,10 @@
     "depth": "Profondeur",
     "depthOption": "Profondeur {{ depth }}",
     "counts": "{{ nodes }} entités · {{ edges }} liens",
-    "isolated": "Cette entité ne renvoie à rien"
+    "loading": "Chargement…",
+    "filters": "Filtres du graphe",
+    "showDecor": "Afficher les liens de décor",
+    "isolated": "Rien ne relie cette entité"
   },
   "assetLink": {
     "set": "Définir une image…",

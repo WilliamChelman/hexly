@@ -4,7 +4,9 @@ export * from './details-panel.component';
 export * from './entity-link-picker.component';
 export * from './entity-search-picker.component';
 export * from './grant-set.component';
-export * from './local-graph-panel.component';
+// `local-graph-panel.component` is deliberately absent: it is reached only through its Panel's
+// `loadComponent` (ADR-0067), and re-exporting it here would pull the graph canvas back onto the
+// eager surface the deferral exists to keep it off.
 export * from './member-set.component';
 export * from './owner-set.component';
 export * from './public-link.component';

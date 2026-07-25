@@ -11,7 +11,10 @@ export interface WarmGraph {
   readonly div: HTMLDivElement;
   /** Resolves if the GPU drops the context — the entry is then dead. */
   readonly lost: Promise<void>;
-  /** Tear down everything the warm-up built: the graph, its device, its div. */
+  /**
+   * Tear down everything the warm-up built: the graph, its device, its div. The pool's to call — an
+   * adopter hands the entry back to {@link GraphWarmPool.retire} instead.
+   */
   readonly dispose: () => void;
 }
 
@@ -83,8 +86,13 @@ function onIdle(work: () => void): void {
  * even on a reused context (measured; ANGLE caches nothing across instances). So the only way to
  * open the Local Graph Panel (ADR-0072) without freezing the page is to hand the mount a graph
  * that has already rendered once: a surface that may soon draw one calls {@link warmUp}; the mount
- * {@link claim}s the live instance and reconfigures it; its teardown {@link release}s it —
- * single-use, destroyed there — and the pool warms the next at the following idle.
+ * {@link claim}s the live instance and reconfigures it, and hands it back to {@link retire} when it is
+ * done. Everything handed out stays the pool's to tear down — the graph, its device and its div.
+ *
+ * **A retired graph is destroyed, never handed out again**: cosmos.gl has no reset. `randomSeed` and
+ * `initialZoomLevel` are init-only — `setConfig` restores whatever the instance was constructed with —
+ * so a second adopter could not be given the deterministic layout the canvas configures, and would
+ * inherit the previous drawing's simulation seed. The pool warms a fresh one at the next idle instead.
  *
  * A miss ({@link claim} returning `null`) is always safe — the mount then builds its own graph,
  * exactly as it would without the pool.
@@ -112,8 +120,8 @@ export class GraphWarmPool {
     return warm;
   }
 
-  /** An adopted graph is single-use: tear it down and warm the next one. */
-  release(adopted: WarmGraph): void {
+  /** Take an adopted graph back and destroy it — it cannot be re-pooled (see the class doc) — then warm the next. */
+  retire(adopted: WarmGraph): void {
     adopted.dispose();
     this.warmUp();
   }

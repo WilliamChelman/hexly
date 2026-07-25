@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { LocalGraph, WorldGraphEdge } from '@hexly/domain';
 import { entityAccess } from '../acl/entity-access';
 import { DB, Db } from '../db/db';
-import { graphEdges, graphNodes } from './utils/graph-reads';
+import { worldGraphRead } from './utils/graph-reads';
 
 /**
  * The Local Graph read (ADR-0072): the World Graph narrowed to one Entity's neighbourhood, `depth`
@@ -19,16 +19,17 @@ export class LocalGraphService {
 
   /**
    * One Entity's neighbourhood. `null` when the Entity is unreachable — the same existence-preserving
-   * 404 gate as `EntitiesService.load`, so an Entity someone else owns stays indistinguishable from
-   * one that does not exist.
+   * 404 gate as `EntitiesService.load`, so an Entity someone else owns stays indistinguishable from one
+   * that does not exist. It is the World gate too: reading an Entity takes a grant on it or membership
+   * of its World, and either makes that World reachable (ADR-0024/0037), so `WorldGraphService`'s
+   * explicit check would refuse nothing here.
    */
   localGraph(userId: string, id: string, depth: number): LocalGraph | null {
     const access = entityAccess(this.db, userId);
     const center = access.decide(id);
     if (!center?.canRead) return null;
 
-    const nodes = graphNodes(this.db, access, center.row.worldId);
-    const edges = graphEdges(this.db, center.row.worldId, new Set(nodes.map((n) => n.id)));
+    const { nodes, edges } = worldGraphRead(this.db, access, center.row.worldId);
     const kept = neighbourhood(id, edges, depth);
 
     return {

@@ -11,8 +11,10 @@ export * from './models/plugin';
 export * from './models/type-definition';
 export * from './panels/universal-panels';
 export * from './services/entity-dock';
-export * from './services/local-graph-store';
+// `services/local-graph-store` stays off the barrel with the Panel that provides it — both are
+// deferred behind `LOCAL_GRAPH_PANEL.loadComponent`.
 export * from './services/references-store';
 export * from './utils/user-type-views';
 export * from './models/view-definition';
+export * from './navigation/open-entity';
 export * from './utils/view-instance';

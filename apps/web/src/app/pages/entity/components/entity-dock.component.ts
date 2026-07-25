@@ -13,6 +13,7 @@ import { NgComponentOutlet } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
 import {
   CORE_PANEL_DETAILS,
+  CORE_PANEL_LOCAL_GRAPH,
   CORE_VIEW_DETAILS,
   EntityDock,
   GraphWarmPool,
@@ -91,6 +92,7 @@ export class EntityDockComponent {
   private readonly viewStore = inject(EntityViewStore);
   private readonly session = inject(EntitySession);
   private readonly panelFilter = inject(PANEL_FILTER);
+  private readonly graphPool = inject(GraphWarmPool);
 
   /** Lazily-fetched Panel bodies, keyed by Panel id; never evicted (a component class is stable). */
   private readonly loaded = signal<ReadonlyMap<PanelId, Type<unknown>>>(new Map());
@@ -114,9 +116,13 @@ export class EntityDockComponent {
   });
 
   constructor() {
-    // The Local Graph Panel is a toggle away on every Entity page: warm its graph while the reader
-    // reads, so opening it never freezes the page on WebGL bring-up (GraphWarmPool).
-    inject(GraphWarmPool).warmUp();
+    // The Local Graph Panel is a toggle away, so its graph is warmed while the reader reads rather
+    // than on the click (GraphWarmPool). Gated on the Panel being offered here: the warm-up holds a
+    // live WebGL context for as long as the page does, which a surface that cannot open the Panel
+    // (a Public Link page, ADR-0072) must not pay. `warmUp` is idempotent, so re-runs are free.
+    effect(() => {
+      if (this.availablePanels().some((panel) => panel.id === CORE_PANEL_LOCAL_GRAPH)) this.graphPool.warmUp();
+    });
 
     // Feed the derived availability into the page-scoped Dock, which resolves the open slot against it
     // (close-don't-substitute when the remembered Panel drops out of the set).

@@ -36,7 +36,10 @@
     "depth": "Depth",
     "depthOption": "Depth {{ depth }}",
     "counts": "{{ nodes }} entities · {{ edges }} links",
-    "isolated": "This entity links to nothing"
+    "loading": "Loading…",
+    "filters": "Graph filters",
+    "showDecor": "Show decor links",
+    "isolated": "Nothing links to or from this entity"
   },
   "assetLink": {
     "set": "Set image…",

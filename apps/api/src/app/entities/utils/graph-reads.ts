@@ -1,16 +1,21 @@
 import { and, asc, eq } from 'drizzle-orm';
-import { LinkedEntity, WorldGraphEdge } from '@hexly/domain';
+import { LinkedEntity, WorldGraph, WorldGraphEdge } from '@hexly/domain';
 import { EntityAccess } from '../../acl/entity-access';
 import { Db } from '../../db/db';
 import { assetIndex, entities, entityEdges } from '../../db/schema';
 import { linkedEntity } from './linked-entity';
 
 /**
- * The two reads every graph projection of a World is built from (ADR-0046) — the whole-World
- * {@link WorldGraphService} and the Entity-centred Local Graph (ADR-0072) alike. Plain functions over a
- * `Db`, like {@link linkedEntity} beside them, so both callers share one definition of "what a node is"
- * and "what an edge is" without either feature module depending on the other's.
+ * A World's nodes and edges, as every graph projection of it reads them (ADR-0046) — the whole-World
+ * {@link WorldGraphService} returns this, the Entity-centred Local Graph (ADR-0072) narrows it to one
+ * neighbourhood. A plain function over a `Db`, like {@link linkedEntity} beside it, so one definition of
+ * "what a node is" and "what an edge is" serves both; `worlds` reaches into `entities/utils` for it
+ * rather than either service owning a second copy.
  */
+export function worldGraphRead(db: Db, access: EntityAccess, worldId: string): WorldGraph {
+  const nodes = graphNodes(db, access, worldId);
+  return { nodes, edges: graphEdges(db, worldId, nodes) };
+}
 
 /**
  * Every Entity of the World the viewer can read — filtered off the entities table, not the edge
@@ -21,7 +26,7 @@ import { linkedEntity } from './linked-entity';
  * An Entity {@link linkedEntity} cannot resolve — one whose stored types are malformed — is
  * dropped rather than thrown on, so one bad row cannot 500 a whole World's graph.
  */
-export function graphNodes(db: Db, access: EntityAccess, worldId: string): LinkedEntity[] {
+function graphNodes(db: Db, access: EntityAccess, worldId: string): LinkedEntity[] {
   return db
     .select({ id: entities.id, name: entities.name, types: entities.types })
     .from(entities)
@@ -45,7 +50,9 @@ export function graphNodes(db: Db, access: EntityAccess, worldId: string): Linke
  * `worldId` is denormalized onto an edge to serve the indexed `WHERE worldId = ? AND targetKind = ?`
  * (`idx_entity_edges_world`).
  */
-export function graphEdges(db: Db, worldId: string, nodeIds: ReadonlySet<string>): WorldGraphEdge[] {
+function graphEdges(db: Db, worldId: string, nodes: readonly LinkedEntity[]): WorldGraphEdge[] {
+  const nodeIds = new Set(nodes.map((n) => n.id));
+
   const entityEdgesRows = db
     .select({
       source: entityEdges.sourceEntityId,

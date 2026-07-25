@@ -124,7 +124,12 @@ export async function flushSave(page: Page): Promise<Response> {
   await first;
   await expect(page.getByTestId('save-status')).toHaveText('Saved');
   page.off('response', collect);
-  return saves[saves.length - 1];
+
+  // `collect` is registered before the waiter, so the PUT that resolved `first` is already in here —
+  // an empty list would mean that invariant broke, not that the caller may get `undefined`.
+  const last = saves.at(-1);
+  if (!last) throw new Error('flushSave: the save that settled the status chip was not observed');
+  return last;
 }
 
 /** Open the entity header's actions overflow menu (Visibility, Pin, Share). */

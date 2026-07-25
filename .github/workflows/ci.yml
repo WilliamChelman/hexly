@@ -14,20 +14,46 @@ permissions:
   actions: read
   contents: read
 
-# What the lint/test/build jobs below run their target over. A PR only needs the projects its
-# diff reaches; a push to main/beta and a release dispatch cover the whole workspace. This is
-# the substitute for a warm task cache: Nx keys its local cache in a sqlite db that lives
-# outside `.nx/cache` and is scoped to the machine id, so `actions/cache` cannot restore it
-# (nx.dev/troubleshooting/unknown-local-cache) — every run starts cold no matter what.
-# `pull_request.base.sha` can trail the branch tip the merge ref was built from, which only ever
-# widens the diff, never narrows it. Left unquoted at each use site on purpose — it has to split
-# into two words for the `affected` case.
+# What lint/test/build run their target over: a PR only needs the projects its diff reaches, a push to
+# main/beta and a release dispatch the whole workspace. Left unquoted at each use site on purpose — it
+# has to split into two words for the `affected` case.
 env:
   SCOPE: >-
     ${{ github.event_name == 'pull_request' && format('affected --base={0}', github.event.pull_request.base.sha) ||
     'run-many' }}
 
 jobs:
+  # Whether this run's diff reaches the e2e suite — the one target `$SCOPE` cannot carry, since `e2e`
+  # runs sharded rather than through one `nx affected` invocation. A push to main/beta and a release
+  # dispatch always run it; a PR that touches neither web-e2e nor anything it depends on skips it.
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      e2e: ${{ steps.affected.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      - id: affected
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          EVENT: ${{ github.event_name }}
+        # web-e2e implicitly depends on web and api (project.json), so a change to either reaches it.
+        run: |
+          if [ "$EVENT" != 'pull_request' ]; then
+            echo 'e2e=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          affected=$(pnpm exec nx show projects --affected --base="$BASE" --json)
+          if printf '%s' "$affected" | grep -q '"web-e2e"'; then
+            echo 'e2e=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'e2e=false' >> "$GITHUB_OUTPUT"
+          fi
+
   # The workspace-level gates plus every project's lint. No Angular cache: ESLint reads none.
   lint:
     runs-on: ubuntu-latest
@@ -97,6 +123,10 @@ jobs:
   # (ADR-0009) — so shards, not workers, are how it gets faster. Every shard boots its own
   # servers and rebuilds web+api, so the fixed cost per shard bounds how far this pays.
   e2e:
+    needs: scope
+    # Skipped on a PR the suite's projects are untouched by; the release jobs below only ever run on
+    # events where `scope` answers `true`, so their `needs: e2e` never waits on a skipped job.
+    if: needs.scope.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     strategy:
       # A red shard is the signal; cancelling its siblings would hide the rest of the failures.
@@ -110,15 +140,10 @@ jobs:
 
       - uses: ./.github/actions/setup
 
-      # Angular's esbuild cache, which speeds the web build this job's `dependsOn` triggers.
-      # Angular only writes .angular/cache in CI because apps/web sets cli.cache.environment
-      # "all". The SHA (and here the shard, since a key is immutable and the shards would race
-      # for one) makes each run save a fresh entry; restore-keys fall back to the newest prior
-      # one, and the per-job prefix keeps one job's save from being a no-op against another's.
-      # `.nx/cache` is deliberately absent: Nx keys its task cache in a sqlite db that lives
-      # outside that directory and is scoped to the machine id, so a restored cache is rejected
-      # as "Unrecognized Cache Artifacts" and every task re-runs. `affected` is what keeps CI
-      # off untouched projects instead.
+      # Angular's esbuild cache, for the web build this job's `dependsOn` triggers (apps/web sets
+      # cli.cache.environment "all", or Angular would not write it in CI). A cache key is immutable, so
+      # the SHA — and the shard, which would otherwise race its siblings for one key — makes each save
+      # fresh; restore-keys fall back to the newest prior entry.
       - uses: actions/cache@v4
         with:
           path: .angular/cache

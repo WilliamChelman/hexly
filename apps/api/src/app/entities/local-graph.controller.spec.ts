@@ -15,9 +15,7 @@ import { EntitiesModule } from './entities.module';
 
 /**
  * `GET /entities/:id/graph` — the **Local Graph** (ADR-0072): the World Graph narrowed to one Entity's
- * neighbourhood, `depth` hops out. Access-filtered like the World-wide read, so the walk only crosses
- * Entities the viewer may see; traversal is undirected and **semantic-only** (ADR-0069), so a Decor Link
- * never widens the picture — only annotates it.
+ * neighbourhood, walked undirected over semantic edges only (ADR-0069).
  */
 describe('Local Graph', () => {
   let app: INestApplication;
@@ -47,7 +45,6 @@ describe('Local Graph', () => {
     await app.close();
   });
 
-  /** The default read: the centre and what it links to directly, nothing further out. */
   it('draws the centre and its direct neighbours at the default depth', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
@@ -65,7 +62,6 @@ describe('Local Graph', () => {
     expect(drawn(graph)).toEqual(['Ealdred —spouse→ Mira']);
   });
 
-  /** A hop is a hop in either direction: "what is this Entity's neighbourhood" is not a question about authorship. */
   it('walks edges in both directions', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
@@ -80,7 +76,6 @@ describe('Local Graph', () => {
     expect(drawn(graph)).toEqual(['Ealdred —spouse→ Mira']);
   });
 
-  /** A deeper read reaches further out, and draws every edge between the nodes it kept. */
   it('reaches one hop further per depth', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
@@ -102,22 +97,18 @@ describe('Local Graph', () => {
     expect(drawn(three)).toEqual(['Avalon → Thornwood', 'Ealdred → Mira', 'Mira → Avalon']);
   });
 
-  /** A reader asking for more depth than exists wants everything, so the ceiling clamps rather than 400s. */
-  it('clamps a depth over the ceiling, and refuses a non-positive one', async () => {
+  // Depth is clamped, not refused (ADR-0072).
+  it('clamps a depth outside the range, and refuses a non-numeric one', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     const ealdred = await makeEntity(ada, world, 'Ealdred');
 
     expect((await graphOf(ada, ealdred, 99)).depth).toBe(LOCAL_GRAPH_MAX_DEPTH);
-    await ada.get(`/entities/${ealdred}/graph?depth=0`).expect(400);
+    expect((await graphOf(ada, ealdred, 0)).depth).toBe(1);
+    expect((await graphOf(ada, ealdred, -3)).depth).toBe(1);
     await ada.get(`/entities/${ealdred}/graph?depth=deep`).expect(400);
   });
 
-  /**
-   * A **Decor Link** (ADR-0069) is presentation, so it never widens the neighbourhood — but one between
-   * nodes the semantic walk already reached is carried, flagged, for the client's reveal. That is what
-   * keeps the drawing connected: every node has a semantic path to the centre.
-   */
   it('never widens the neighbourhood over a Decor Link, but carries one between included nodes', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
@@ -147,10 +138,6 @@ describe('Local Graph', () => {
     expect(drawn(two)).toEqual(['Ealdred → Mira', 'Ealdred → Portrait', 'Mira → Portrait']);
   });
 
-  /**
-   * The walk crosses the graph the *viewer* sees, so a `private` Entity is not a bridge: it is absent as a
-   * node, and so is everything only reachable through it — never a ghost node, never a leaked name.
-   */
   it('never crosses an Entity the viewer cannot read', async () => {
     const ada = await signIn('ada@hexly.test');
     const bob = await signIn('bob@hexly.test');
@@ -176,7 +163,6 @@ describe('Local Graph', () => {
     expect(asBob.edges).toEqual([]);
   });
 
-  /** The centre is always a node, even with nothing linked to it — a graph of one. */
   it('draws an unlinked Entity as itself alone', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
@@ -188,7 +174,6 @@ describe('Local Graph', () => {
     expect(graph.edges).toEqual([]);
   });
 
-  /** The same existence-preserving gate as the Entity read: unreachable is indistinguishable from absent. */
   it('404s for an Entity the caller cannot reach', async () => {
     const ada = await signIn('ada@hexly.test');
     const bob = await signIn('bob@hexly.test');

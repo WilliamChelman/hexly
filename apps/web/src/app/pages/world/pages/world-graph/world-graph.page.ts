@@ -18,6 +18,7 @@ import {
   GraphCanvasComponent,
   GraphWarmPool,
   GraphOpen,
+  openEntityRoute,
   orphanIds,
   withoutDecorEdges,
   withoutOrphans,
@@ -215,17 +216,10 @@ export class WorldGraphPage {
     });
   }
 
-  /** A Ctrl/Cmd (or middle) click opens the Entity in a new tab, as the modifier does on any link. */
   protected openEntity({ id, newTab }: GraphOpen): void {
     const worldId = this.activeWorld.worldId();
     if (!worldId) return;
     const name = this.graph()?.nodes.find((n) => n.id === id)?.name;
-    const route = entityRoute(worldId, id, this.worldName() ?? undefined, name);
-    if (newTab) {
-      const url = this.router.serializeUrl(this.router.createUrlTree(route));
-      window.open(url, '_blank', 'noopener');
-      return;
-    }
-    void this.router.navigate(route);
+    openEntityRoute(this.router, entityRoute(worldId, id, this.worldName() ?? undefined, name), newTab);
   }
 }

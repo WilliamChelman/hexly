@@ -37,9 +37,9 @@ export const DETAILS_PANEL: PanelDefinition = {
 
 /**
  * **Local Graph**, the third universal Panel (ADR-0072) — present on every View: the World Graph's
- * drawing centred on the open Entity, `depth` hops out. It sits beside References because they answer the
- * same question in two registers — a list of names, and the shape those names make. Deferred like the
- * others, which also keeps cosmos.gl's WebGL renderer off any surface that never opens it.
+ * drawing centred on the open Entity, `depth` hops out. Deferred like the others (ADR-0067): the panel's
+ * body, its store and the canvas component are fetched on first open, not with the lib. Only the *code*
+ * — a page that offers this Panel warms the WebGL renderer ahead of the click (`GraphWarmPool`).
  */
 export const LOCAL_GRAPH_PANEL: PanelDefinition = {
   id: CORE_PANEL_LOCAL_GRAPH,
