@@ -22,6 +22,17 @@ import { TypeFieldRegistry } from '../entities/type-field-registry';
 import { VaultUnzipper } from './vault-unzipper';
 import { WorldsService } from './worlds.service';
 
+/** Notes (or Assets) per transaction, and the granularity at which the import yields — the Reindex size (ADR-0046). */
+export const CHUNK_SIZE = 200;
+
+/** Hand the event loop back between chunks, so an import's synchronous writes are not all this process does. */
+const yieldToEventLoop = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+/** Slice into {@link CHUNK_SIZE} pages — one transaction and one yield each. */
+function* chunksOf<T>(items: readonly T[]): Generator<readonly T[]> {
+  for (let i = 0; i < items.length; i += CHUNK_SIZE) yield items.slice(i, i + CHUNK_SIZE);
+}
+
 /**
  * Vault import (ADR-0033, ADR-0051): unzip a `.zip` server-side and turn each markdown file into an
  * Entity in a brand-new World named after the upload — a plain Note, unless its frontmatter stamps the
@@ -29,10 +40,11 @@ import { WorldsService } from './worlds.service';
  * body below the frontmatter, or the frontmatter YAML — resolved off the type/data-type registry the API
  * composes; the converter lives behind the data-type, so this service imports no content plugin.
  *
- * Runs synchronously. Two-pass: pass 1 splits every file's frontmatter from its body and assigns it an
- * id; pass 2 converts each body Field, resolving each `[[wikilink]]` to the id of the note it names
- * (dangling when none matches) before persisting. Continue-on-error: a file that can't be read or named
- * is skipped and tallied, never aborting the import.
+ * Two-pass: pass 1 splits every file's frontmatter from its body and assigns it an id; pass 2 converts
+ * each body Field, resolving each `[[wikilink]]` to the id of the note it names (dangling when none
+ * matches) before persisting in chunks that each commit and yield (ADR-0046). Continue-on-error: a file
+ * that can't be read or named is skipped and tallied, never aborting the import. The request awaits the
+ * whole walk — no job to poll, unlike the Reindex.
  */
 @Injectable()
 export class VaultImportService {
@@ -101,86 +113,97 @@ export class VaultImportService {
     let linksResolved = 0;
     let linksDangling = 0;
     let assetsStored = 0;
-    // One transaction for the whole persist pass: SQLite runs at synchronous=FULL (WAL), so a
-    // per-note implicit transaction would fsync once each. Makes the *notes* all-or-nothing, but
-    // not the import: the World was already committed by mintWorld, and the asset store's writeFileSync
-    // isn't transactional — a throw here leaves an empty World and written asset files behind.
-    this.db.transaction(() => {
-      // Mint an Asset for EVERY binary in the zip, not only the ones a note embeds (ADR-0065): an imported
-      // vault is immediately browsable, and a re-imported export re-mints its `assets/` folder by hash so
-      // references heal even where prose lost the reference. Deduped per `(worldId, hash)` — twin files
-      // collapse to one Entity, first (path-sorted, for determinism) name winning — and the resulting
-      // `path → URL` map lets each note's storeAsset resolve its src to the already-minted capability URL.
-      const assetUrls = new Map<string, string>();
-      for (const assetPath of Object.keys(assetFiles).sort()) {
-        const minted = this.assetMint.mint(
-          ownerId,
-          worldId,
-          assetPath,
-          assetFiles[assetPath],
-          extractions.get(assetPath) ?? { stats: null, thumbnail: null },
-        );
-        if (!minted.deduped) assetsStored++;
-        assetUrls.set(assetPath, minted.url);
-      }
+    // Chunked commits, like the Reindex walk (ADR-0046): better-sqlite3 is synchronous, so one
+    // transaction over a whole vault would pin the event loop. Costs the notes their all-or-nothing — a
+    // throw leaves the committed chunks behind, as in the reconcile. No per-World lock the way a reimport
+    // needs one: the World is minted fresh here, so nothing else writes it across the yields.
 
-      for (const note of notes) {
-        const noteDir = posix.dirname(note.path);
-        const context: VaultImportContext = {
-          resolveLink: (label) => {
-            const id = index.resolve(label);
-            if (id) linksResolved++;
-            else linksDangling++;
-            return id;
-          },
-          storeAsset: (src) => {
-            if (!src || isExternalUrl(src)) return null;
-            const assetPath = assetIndex.resolve(src, noteDir);
-            // The Asset was already minted above; rewrite the note's src to its capability URL (ADR-0065).
-            return assetPath ? (assetUrls.get(assetPath) ?? null) : null;
-          },
-          degrade,
-        };
+    // Mint an Asset for EVERY binary in the zip, not only the ones a note embeds (ADR-0065): an imported
+    // vault is immediately browsable, and a re-imported export re-mints its `assets/` folder by hash so
+    // references heal even where prose lost the reference. Deduped per `(worldId, hash)` — twin files
+    // collapse to one Entity, first (path-sorted, for determinism) name winning — and the resulting
+    // `path → URL` map lets each note's storeAsset resolve its src to the already-minted capability URL.
+    // Every Asset mints before the first note: a note may embed one from any chunk.
+    const assetUrls = new Map<string, string>();
+    for (const assetPaths of chunksOf(Object.keys(assetFiles).sort())) {
+      this.db.transaction(() => {
+        for (const assetPath of assetPaths) {
+          const minted = this.assetMint.mint(
+            ownerId,
+            worldId,
+            assetPath,
+            assetFiles[assetPath],
+            extractions.get(assetPath) ?? { stats: null, thumbnail: null },
+          );
+          if (!minted.deduped) assetsStored++;
+          assetUrls.set(assetPath, minted.url);
+        }
+      });
+      await yieldToEventLoop();
+    }
 
-        const types = toTypes(note.frontmatter[HEXLY_TYPE_KEY], defaultType);
-        // Resolve body Fields from the stamped types over the effective-set path (id → Field, ADR-0054),
-        // with the default type appended as the lowest-priority fallback: a foreign or unregistered-type
-        // note still lands its prose in `content` rather than losing it, while a type that references
-        // `content` itself keeps its own projection (deduped by key, primary type first). No default type
-        // → no fallback. The body Fields come from the stamped types alone — the document is being built
-        // here, so there is nothing yet to derive attachments from (`doc: {}`, ADR-0057). A namespaced
-        // frontmatter key becomes an attachment naturally once the imported document is read back.
-        const fields = resolveEffectiveFields({
-          types: defaultType ? [...types, defaultType] : [...types],
-          doc: {},
-          fieldResolver: this.typeFields.fieldResolver,
-          typeFieldRefs: this.typeFields.typeFieldRefs,
-        });
-        const bodyValues = bodyToFields({ body: note.body, fields, dataTypes, context });
+    // `index` spans every note (pass 1), so a wikilink still resolves across a chunk boundary.
+    for (const chunk of chunksOf(notes)) {
+      this.db.transaction(() => {
+        for (const note of chunk) {
+          const noteDir = posix.dirname(note.path);
+          const context: VaultImportContext = {
+            resolveLink: (label) => {
+              const id = index.resolve(label);
+              if (id) linksResolved++;
+              else linksDangling++;
+              return id;
+            },
+            storeAsset: (src) => {
+              if (!src || isExternalUrl(src)) return null;
+              const assetPath = assetIndex.resolve(src, noteDir);
+              // The Asset was already minted above; rewrite the note's src to its capability URL (ADR-0065).
+              return assetPath ? (assetUrls.get(assetPath) ?? null) : null;
+            },
+            degrade,
+          };
 
-        const { tags, ...rest } = note.frontmatter;
-        // Reserved `hexly.*` frontmatter is provenance a Hexly export writes (type/sourcePath), consumed
-        // here and re-derived on the next export — never stored back as author EntityDocument (ADR-0033).
-        // A frontmatter key a body Field also fills is dropped: the body is authoritative for it.
-        const passThrough = Object.fromEntries(
-          Object.entries(rest).filter(([key]) => !key.startsWith(HEXLY_METADATA_PREFIX) && !(key in bodyValues)),
-        );
-        const doc: EntityDocument = {
-          ...passThrough,
-          ...bodyValues,
-          'hexly.sourcePath': note.path,
-        };
-        this.entities.importEntity({
-          ownerId,
-          worldId,
-          id: note.id,
-          name: note.name,
-          types,
-          tags: toTags(tags),
-          document: doc,
-        });
-      }
-    });
+          const types = toTypes(note.frontmatter[HEXLY_TYPE_KEY], defaultType);
+          // Resolve body Fields from the stamped types over the effective-set path (id → Field, ADR-0054),
+          // with the default type appended as the lowest-priority fallback: a foreign or unregistered-type
+          // note still lands its prose in `content` rather than losing it, while a type that references
+          // `content` itself keeps its own projection (deduped by key, primary type first). No default type
+          // → no fallback. The body Fields come from the stamped types alone — the document is being built
+          // here, so there is nothing yet to derive attachments from (`doc: {}`, ADR-0057). A namespaced
+          // frontmatter key becomes an attachment naturally once the imported document is read back.
+          const fields = resolveEffectiveFields({
+            types: defaultType ? [...types, defaultType] : [...types],
+            doc: {},
+            fieldResolver: this.typeFields.fieldResolver,
+            typeFieldRefs: this.typeFields.typeFieldRefs,
+          });
+          const bodyValues = bodyToFields({ body: note.body, fields, dataTypes, context });
+
+          const { tags, ...rest } = note.frontmatter;
+          // Reserved `hexly.*` frontmatter is provenance a Hexly export writes (type/sourcePath), consumed
+          // here and re-derived on the next export — never stored back as author EntityDocument (ADR-0033).
+          // A frontmatter key a body Field also fills is dropped: the body is authoritative for it.
+          const passThrough = Object.fromEntries(
+            Object.entries(rest).filter(([key]) => !key.startsWith(HEXLY_METADATA_PREFIX) && !(key in bodyValues)),
+          );
+          const doc: EntityDocument = {
+            ...passThrough,
+            ...bodyValues,
+            'hexly.sourcePath': note.path,
+          };
+          this.entities.importEntity({
+            ownerId,
+            worldId,
+            id: note.id,
+            name: note.name,
+            types,
+            tags: toTags(tags),
+            document: doc,
+          });
+        }
+      });
+      await yieldToEventLoop();
+    }
 
     return {
       worldId,

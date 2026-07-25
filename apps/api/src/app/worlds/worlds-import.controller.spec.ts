@@ -16,6 +16,7 @@ import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from '../entities/entities.module';
 import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from './worlds.module';
+import { CHUNK_SIZE } from './vault-import.service';
 
 /** Build an in-memory `.zip` from a vault-relative path → text (or raw bytes) map. */
 function vaultZip(files: Record<string, string | Uint8Array>): Buffer {
@@ -726,6 +727,75 @@ describe('Vault import endpoint', () => {
     // It carries its lore, and the reserved `hexly.*` key isn't persisted as author EntityDocument.
     expect(JSON.stringify(note.body.document['core.field.content'].snapshot)).toContain('The frontier realm.');
     expect(note.body.document).not.toHaveProperty('hexly.isHome');
+  });
+
+  it('imports a vault larger than one chunk, resolving wikilinks across the chunk boundary', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    // A chunk is a commit unit, not a resolution scope. Zip entry order is persist order, so Alpha and
+    // Omega land in different chunks.
+    const fillers = CHUNK_SIZE + 3;
+    const files: Record<string, string> = { 'Alpha Note.md': '# Alpha Note\n\n[[Omega Note]]' };
+    for (let i = 0; i < fillers; i++) files[`Filler ${String(i).padStart(3, '0')}.md`] = 'Filler.';
+    files['Omega Note.md'] = '# Omega Note\n\n[[Alpha Note]]';
+    const zip = vaultZip(files);
+
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+    const worldId = res.body.worldId;
+
+    expect(res.body).toMatchObject({
+      notesImported: fillers + 2,
+      filesSkipped: 0,
+      linksResolved: 2,
+      linksDangling: 0,
+    });
+    const world = await ada.get(`/worlds/${worldId}`).expect(200);
+    expect(world.body.entityCount).toBe(fillers + 2);
+
+    // A name search, not the plain listing: past ENTITY_LIST_MAX_LIMIT one page can't hold the vault.
+    const findByName = async (name: string) => {
+      const list = await ada.get('/entities').query({ worldId, q: name }).expect(200);
+      const summary = (list.body.items as { id: string; name: string }[]).find((e) => e.name === name);
+      expect(summary, `no imported Entity named ${name}`).toBeDefined();
+      const detail = await ada.get(`/entities/${summary?.id}`).expect(200);
+      return { id: summary?.id, links: entityLinks(detail.body.document['core.field.content'].snapshot) };
+    };
+
+    const alpha = await findByName('Alpha Note');
+    const omega = await findByName('Omega Note');
+    expect(alpha.links[0].attrs['entityId']).toBe(omega.id);
+    expect(omega.links[0].attrs['entityId']).toBe(alpha.id);
+  });
+
+  it('mints every Asset before the first note chunk, so a note resolves an Asset from a later chunk', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    // The note embeds the last Asset in path-sorted order — a per-chunk URL map leaves its src unrewritten.
+    const lastAsset = CHUNK_SIZE + 4;
+    const files: Record<string, string | Uint8Array> = {
+      'Hero.md': `Hero\n\n![[asset-${String(lastAsset).padStart(3, '0')}.png]]`,
+    };
+    for (let i = 0; i <= lastAsset; i++) {
+      // Distinct bytes per file so none dedups away against another (ADR-0065).
+      files[`assets/asset-${String(i).padStart(3, '0')}.png`] = new Uint8Array([
+        0x89,
+        0x50,
+        0x4e,
+        0x47,
+        i >> 8,
+        i & 0xff,
+      ]);
+    }
+    const zip = vaultZip(files);
+
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+    const worldId = res.body.worldId;
+    expect(res.body.assetsStored).toBe(lastAsset + 1);
+
+    const images = await imagesOf(ada, worldId, 'Hero');
+    expect(images[0]).toMatch(new RegExp(`^/assets/${worldId}/[0-9a-f]{64}\\.png$`));
+    const served = await ada.get(images[0]).buffer().expect(200);
+    expect(new Uint8Array(served.body)).toEqual(
+      new Uint8Array([0x89, 0x50, 0x4e, 0x47, lastAsset >> 8, lastAsset & 0xff]),
+    );
   });
 
   it('refuses the import route without a session cookie', async () => {
