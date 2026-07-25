@@ -807,16 +807,45 @@ describe('Worlds endpoints', () => {
         expect(byId.map((e: { id: string }) => e.id)).toEqual([asset.id]);
       });
 
-      it('matches a hidden-type Asset by name — Quick Open treats an Asset like any Entity (#282)', async () => {
+      it('matches a hidden-type Asset by name only for a caller that asks — a browse search does not (#282)', async () => {
         const ada = await signIn('ada@hexly.test', 'correct horse');
         const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
         const asset = (await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Sigil.png').expect(201)).body;
 
-        // Quick Open searches by name (FTS `q`) with no type selected. A name search is not a default
-        // listing, so the hidden-type exclusion lifts and the Asset matches — ADR-0065's "Quick Open ...
-        // treats Assets like any Entity".
-        const byName = (await ada.get('/entities').query({ worldId: world.id, q: 'Sigil' }).expect(200)).body.items;
-        expect(byName.map((e: { id: string }) => e.id)).toContain(asset.id);
+        // The Entity Browser's search box is part of the listing the capability keeps Assets out of, so a
+        // bare name search leaves the exclusion standing — it no longer lifts on `q` alone.
+        const browsed = (await ada.get('/entities').query({ worldId: world.id, q: 'Sigil' }).expect(200)).body.items;
+        expect(browsed.map((e: { id: string }) => e.id)).not.toContain(asset.id);
+
+        // Quick Open is no browse: it opts in (`includeHidden`), and there an Asset matches by name like any
+        // Entity — ADR-0065's "Quick Open ... treats Assets like any Entity", now asked for explicitly.
+        const picked = (
+          await ada.get('/entities').query({ worldId: world.id, q: 'Sigil', includeHidden: '1' }).expect(200)
+        ).body.items;
+        expect(picked.map((e: { id: string }) => e.id)).toContain(asset.id);
+      });
+
+      /**
+       * The ranking half of the opt-in: an Asset shares the name of the Entity it illustrates and its short
+       * name is the tighter bm25 match, so relevance alone would head the palette with it (ADR-0065).
+       */
+      it('ranks a name-matched Asset below the ordinary Entities it shares a name with', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
+        await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Sigil.png').expect(201);
+        const note = (
+          await ada
+            .post('/entities')
+            .send({ name: 'Sigil of the Drowned Court', types: ['core.type.note'], worldId: world.id })
+            .expect(201)
+        ).body;
+
+        const items = (
+          await ada.get('/entities').query({ worldId: world.id, q: 'Sigil', includeHidden: '1' }).expect(200)
+        ).body.items;
+        // The mint names the Asset off the file stem, so it is the exact-match, shortest-name row.
+        expect(items.map((e: { name: string }) => e.name)).toEqual(['Sigil of the Drowned Court', 'Sigil']);
+        expect(items[0].id).toBe(note.id);
       });
 
       it('lists the asset type in the type facet with a count even when unselected, so it can be opted into', async () => {
@@ -837,7 +866,7 @@ describe('Worlds endpoints', () => {
         expect(fieldKeys(base)).toEqual([]);
       });
 
-      it('counts a name-matched hidden-type Asset in the sibling facets, matching the list a name search returns (#284)', async () => {
+      it('keeps the rail and the list agreeing about a name-matched Asset, opted in or not (#284)', async () => {
         const ada = await signIn('ada@hexly.test', 'correct horse');
         const world = (await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body;
         const asset = (await ada.post(`/worlds/${world.id}/assets`).attach('file', PNG, 'Dragon.png').expect(201)).body;
@@ -847,15 +876,24 @@ describe('Worlds endpoints', () => {
           .send({ version: asset.version, tags: ['bestiary'], document: asset.document })
           .expect(200);
 
-        // A name search (`q`) with no type selected lifts the hidden-type exclusion on both seams (ADR-0065).
+        // A browse search excludes the Asset, so the sibling facets annotating it must not count it —
+        // both seams read the exclusion off the same signals, so neither can drift from the other.
         const listed = (await ada.get('/entities').query({ worldId: world.id, q: 'Dragon' }).expect(200)).body.items;
-        expect(listed.map((e: { id: string }) => e.id)).toContain(asset.id);
-
-        // The Facet rail must not contradict those results: the Asset is counted in visibility and tag.
+        expect(listed.map((e: { id: string }) => e.id)).not.toContain(asset.id);
         const facets = (await ada.get('/entities/facets').query({ worldId: world.id, q: 'Dragon' }).expect(200)).body;
+        expect(facets.tag).toEqual([]);
+
+        // Opted in, both sides include it — the Asset lists, and the rail counts it in visibility and tag.
+        const opted = (
+          await ada.get('/entities').query({ worldId: world.id, q: 'Dragon', includeHidden: '1' }).expect(200)
+        ).body.items;
+        expect(opted.map((e: { id: string }) => e.id)).toContain(asset.id);
+        const optedFacets = (
+          await ada.get('/entities/facets').query({ worldId: world.id, q: 'Dragon', includeHidden: '1' }).expect(200)
+        ).body;
         // The upload default is `shared` (ADR-0065), so it's counted there.
-        expect(facets.visibility).toContainEqual({ value: 'shared', count: 1 });
-        expect(facets.tag).toContainEqual({ value: 'bestiary', count: 1 });
+        expect(optedFacets.visibility).toContainEqual({ value: 'shared', count: 1 });
+        expect(optedFacets.tag).toContainEqual({ value: 'bestiary', count: 1 });
       });
 
       it('surfaces kind / orientation / hue / Tag facets with counts once the asset type is selected', async () => {

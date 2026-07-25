@@ -99,12 +99,17 @@ export interface ListOptions {
    * the caller explicitly selected, so a hidden type surfaces the moment it is selected in the type facet.
    */
   readonly excludedTypes?: readonly string[];
+  /**
+   * Keep hidden-from-default-listing types (ADR-0065) in the result set — opt-in, set by the by-name
+   * pickers, never by a browse: the Entity Browser's search box is part of the listing, so `q` lifts nothing.
+   */
+  readonly includeHidden?: boolean;
 }
 
 /** The filter state a facet-count read narrows against — the list filters minus paging/ids. */
 export type FacetOptions = Pick<
   ListOptions,
-  'worldId' | 'q' | 'type' | 'tags' | 'visibility' | 'fields' | 'excludedTypes'
+  'worldId' | 'q' | 'type' | 'tags' | 'visibility' | 'fields' | 'excludedTypes' | 'includeHidden'
 >;
 
 /** Everything {@link filters} reads — shared by the paged list and the facet-count reads. */
@@ -212,9 +217,11 @@ export class EntitiesService {
       .where(and(access.filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined))
       // With a query: best match first (bm25 ascending), id for a stable page boundary;
       // otherwise newest first. Weight order must match the FTS DDL: name, tags, content_text.
+      // Hidden types (ADR-0065) sort last, ahead of relevance: an Asset must not outrank the Entity whose
+      // name it shares. A tier, not a bm25 penalty, so the order is explainable rather than tuned.
       .orderBy(
         ...(match
-          ? [sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`, asc(entities.id)]
+          ? [...this.hiddenLast(), sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`, asc(entities.id)]
           : [desc(entities.updatedAt), asc(entities.id)]),
       )
       .limit(opts.limit + 1)
@@ -265,8 +272,8 @@ export class EntitiesService {
     // The hidden-type exclusion (ADR-0065) rides every count *but* the type facet's: the type facet is the
     // opt-in surface, so a hidden type must still be counted over the full universe there — otherwise it
     // would never appear to be selected into view. Every sibling category resolves the exclusion exactly as
-    // `list` does — via the shared helper — so the rail can never contradict the results it annotates: a
-    // name search (`q`) lifts the exclusion on both sides, so an Asset matched by name is counted here too.
+    // `list` does — via the shared helper, on the same signals — so the rail can never contradict the
+    // results it annotates: a name search leaves the exclusion standing on both sides.
     const scoped: FacetOptions = { ...opts, excludedTypes: this.resolveExcludedTypes(opts) };
     return {
       // Drop a category's own selection before counting it (drill-down). No hidden-type exclusion here.
@@ -282,12 +289,21 @@ export class EntitiesService {
    * Resolve the hidden-from-default-listing exclusion (ADR-0065) for a read — the single source both
    * {@link list} and {@link facets} route through, so the paged results and the Facet rail annotating them
    * can never drift. The exclusion self-lifts for a hidden type the caller selects (see
-   * {@link excludedHiddenTypes}), and lifts *entirely* when `ids` or `q` is present: neither an id lookup
-   * nor a name search is a "default listing" — pins and the `/entities/:id` redirect guard resolve an Asset
-   * by id, and Quick Open matches it by name, treating an Asset like any Entity. `facets` carries no `ids`.
+   * {@link excludedHiddenTypes}), and lifts *entirely* on two signals: `ids`, since an id lookup is no
+   * listing (pins, the `/entities/:id` redirect guard), and the caller's `includeHidden`, which the by-name
+   * pickers set. A name search alone lifts nothing — a browse's search box is part of its listing.
    */
-  private resolveExcludedTypes(opts: Pick<FilterOptions, 'ids' | 'q' | 'type'>): string[] {
-    return opts.ids || opts.q ? [] : this.excludedHiddenTypes(opts.type);
+  private resolveExcludedTypes(opts: Pick<FilterOptions, 'ids' | 'includeHidden' | 'type'>): string[] {
+    return opts.ids || opts.includeHidden ? [] : this.excludedHiddenTypes(opts.type);
+  }
+
+  /**
+   * The leading search sort key demoting hidden-from-default-listing types (ADR-0065): `EXISTS(...)` is 0
+   * for an ordinary Entity and 1 for a hidden-typed one, so ascending puts ordinary first. Names no type.
+   */
+  private hiddenLast(): SQL[] {
+    const hidden = this.typeFields.hiddenDefaultTypes;
+    return hidden.length ? [sql`${hasAny(entities.types, hidden)}`] : [];
   }
 
   /**

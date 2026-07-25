@@ -52,7 +52,8 @@ export class EntitiesController {
   list(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityPage {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { cursor, limit, ids, q, type, tag, visibility, field, worldId, rights, thumbnails } = parsed.data;
+    const { cursor, limit, ids, q, type, tag, visibility, field, worldId, rights, thumbnails, includeHidden } =
+      parsed.data;
 
     // Absent cursor is page one; undecodable is a 400 (ADR-0001).
     const offset = cursor === undefined ? 0 : decodeCursor(cursor);
@@ -71,6 +72,7 @@ export class EntitiesController {
       worldId,
       withRights: rights,
       withThumbnails: thumbnails,
+      includeHidden,
     });
     return { items, nextCursor: hasMore ? encodeCursor(offset + limit) : null };
   }
@@ -100,7 +102,7 @@ export class EntitiesController {
   facets(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityFacets {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { q, type, tag, visibility, field, worldId } = parsed.data;
+    const { q, type, tag, visibility, field, worldId, includeHidden } = parsed.data;
     return this.entities.facets(user.id, {
       q,
       type,
@@ -108,6 +110,8 @@ export class EntitiesController {
       visibility,
       fields: parseFieldFilters(field),
       worldId,
+      // Threaded so a rail can never annotate a list it disagrees with about hidden types (ADR-0065).
+      includeHidden,
     });
   }
 

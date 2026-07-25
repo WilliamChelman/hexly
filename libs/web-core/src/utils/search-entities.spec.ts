@@ -28,7 +28,21 @@ describe('searchEntities', () => {
     query$.next('a');
 
     expect(await result).toEqual([summary('n1')]);
-    expect(list).toHaveBeenCalledWith({ q: 'a', limit: 20 });
+    expect(list).toHaveBeenCalledWith({ q: 'a', limit: 20, includeHidden: true });
+  });
+
+  /**
+   * A by-name picker is no browse, so it opts into hidden-from-default-listing types (ADR-0065) — an Asset
+   * stays reachable by name here even though the Entity Browser's own search box no longer surfaces it.
+   */
+  it('opts into hidden-from-default-listing types on every search', async () => {
+    const list = vi.fn().mockReturnValue(of({ items: [summary('n1')], nextCursor: null }));
+    const query$ = new Subject<string>();
+    const result = firstValueFrom(searchEntities({ list } as unknown as EntitiesClient, query$).pipe(share()));
+    query$.next('a');
+
+    await result;
+    expect(list).toHaveBeenCalledWith(expect.objectContaining({ includeHidden: true }));
   });
 
   it('opts the read into thumbnails when asked', async () => {
@@ -40,7 +54,7 @@ describe('searchEntities', () => {
     query$.next('a');
 
     await result;
-    expect(list).toHaveBeenCalledWith({ q: 'a', limit: 20, thumbnails: true });
+    expect(list).toHaveBeenCalledWith({ q: 'a', limit: 20, includeHidden: true, thumbnails: true });
   });
 
   it('revalidates a repeated query when only the thumbnail changed', async () => {
