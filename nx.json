@@ -6,10 +6,11 @@
       "default",
       "!{projectRoot}/.eslintrc.json",
       "!{projectRoot}/eslint.config.mjs",
+      "!{workspaceRoot}/eslint-rules/*.mjs",
       "!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
       "!{projectRoot}/tsconfig.spec.json"
     ],
-    "sharedGlobals": []
+    "sharedGlobals": ["{workspaceRoot}/eslint-rules/*.mjs"]
   },
   "plugins": [
     {

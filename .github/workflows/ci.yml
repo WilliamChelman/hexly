@@ -14,36 +14,31 @@ permissions:
   actions: read
   contents: read
 
+# What the lint/test/build jobs below run their target over. A PR only needs the projects its
+# diff reaches; a push to main/beta and a release dispatch cover the whole workspace. This is
+# the substitute for a warm task cache: Nx keys its local cache in a sqlite db that lives
+# outside `.nx/cache` and is scoped to the machine id, so `actions/cache` cannot restore it
+# (nx.dev/troubleshooting/unknown-local-cache) — every run starts cold no matter what.
+# `pull_request.base.sha` can trail the branch tip the merge ref was built from, which only ever
+# widens the diff, never narrows it. Left unquoted at each use site on purpose — it has to split
+# into two words for the `affected` case.
+env:
+  SCOPE: >-
+    ${{ github.event_name == 'pull_request' && format('affected --base={0}', github.event.pull_request.base.sha) ||
+    'run-many' }}
+
 jobs:
-  build:
+  # The workspace-level gates plus every project's lint. No Angular cache: ESLint reads none.
+  lint:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth 0 so `affected` can diff against the PR's base.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - uses: ./.github/actions/setup
 
-      # Persist the Nx task cache (skips unchanged tasks) plus Angular's esbuild
-      # cache (speeds the builds that DO run). Angular only writes .angular/cache
-      # in CI because apps/web sets cli.cache.environment "all". The SHA suffix
-      # makes each run save a fresh entry (GH Actions cache is immutable per key);
-      # restore-keys fall back to the latest prior entry. A per-job prefix keeps
-      # build's and e2e's caches distinct so neither job's save is a no-op against
-      # the other's identical key.
-      - uses: actions/cache@v4
-        with:
-          path: |
-            .nx/cache
-            .angular/cache
-          key: ${{ runner.os }}-nx-build-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-nx-build-${{ hashFiles('pnpm-lock.yaml') }}-
-            ${{ runner.os }}-nx-
-
-      # i18n-sync is the key-drift gate (issue #50): it type-checks the tool then
-      # diffs every locale catalog against en.json. run-many invokes it for the
-      # one project that defines it (web), failing the build on drift.
       # The custom ESLint rules are the guards for ADR-0020 (design tokens) and ADR-0045
       # (the EntityWrites and WorldWrites choke points). A rule whose AST selector is typo'd
       # matches nothing and passes silently, so the rules carry their own RuleTester suites.
@@ -53,9 +48,12 @@ jobs:
       # hand-authored migration or a schema change that never went through `pnpm db:generate`.
       - run: pnpm db:check
 
-      - run: pnpm exec nx run-many -t lint test build i18n-sync
+      # i18n-sync is the key-drift gate (issue #50): it type-checks the tool then diffs every
+      # locale catalog against en.json. Only web defines it, and its inputs name every lib's
+      # catalogs, so a catalog edit anywhere reaches it through `affected`.
+      - run: pnpm exec nx $SCOPE -t lint i18n-sync
 
-  e2e:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,18 +62,70 @@ jobs:
 
       - uses: ./.github/actions/setup
 
-      # Same cache strategy as the build job, under a distinct e2e prefix so this
-      # job's web+api build (triggered by the e2e dependsOn) persists its own warm
-      # cache. Falls back to any Nx cache (incl. build's) via the shared prefix.
+      # vitest-angular bundles each Angular project before running it, so the unit tests want
+      # the same esbuild cache the builds do. See the e2e job for the key strategy.
       - uses: actions/cache@v4
         with:
-          path: |
-            .nx/cache
-            .angular/cache
-          key: ${{ runner.os }}-nx-e2e-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          path: .angular/cache
+          key: ${{ runner.os }}-ng-test-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-nx-e2e-${{ hashFiles('pnpm-lock.yaml') }}-
-            ${{ runner.os }}-nx-
+            ${{ runner.os }}-ng-test-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-ng-
+
+      - run: pnpm exec nx $SCOPE -t test
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      - uses: actions/cache@v4
+        with:
+          path: .angular/cache
+          key: ${{ runner.os }}-ng-build-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ng-build-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-ng-
+
+      - run: pnpm exec nx $SCOPE -t build
+
+  # The suite is serial by construction — one seeded DB per server, reset between tests
+  # (ADR-0009) — so shards, not workers, are how it gets faster. Every shard boots its own
+  # servers and rebuilds web+api, so the fixed cost per shard bounds how far this pays.
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      # A red shard is the signal; cancelling its siblings would hide the rest of the failures.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      # Angular's esbuild cache, which speeds the web build this job's `dependsOn` triggers.
+      # Angular only writes .angular/cache in CI because apps/web sets cli.cache.environment
+      # "all". The SHA (and here the shard, since a key is immutable and the shards would race
+      # for one) makes each run save a fresh entry; restore-keys fall back to the newest prior
+      # one, and the per-job prefix keeps one job's save from being a no-op against another's.
+      # `.nx/cache` is deliberately absent: Nx keys its task cache in a sqlite db that lives
+      # outside that directory and is scoped to the machine id, so a restored cache is rejected
+      # as "Unrecognized Cache Artifacts" and every task re-runs. `affected` is what keeps CI
+      # off untouched projects instead.
+      - uses: actions/cache@v4
+        with:
+          path: .angular/cache
+          key: ${{ runner.os }}-ng-e2e-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}-${{ matrix.shard }}
+          restore-keys: |
+            ${{ runner.os }}-ng-e2e-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-ng-
 
       # Only chromium — the suite is a single-engine seam regression net (ADR-0009).
       - uses: actions/cache@v4
@@ -87,12 +137,12 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
 
-      - run: pnpm e2e
+      - run: pnpm exec nx e2e web-e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: apps/web-e2e/playwright-report/
           retention-days: 7
 
@@ -102,7 +152,7 @@ jobs:
   # ("won't publish") and GitHub reserves GITHUB_* so a workflow can't spoof its
   # way out of that on a PR. Releases are cut only via the manual release job.
   release-preview:
-    needs: [build, e2e]
+    needs: [lint, test, build, e2e]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     # --dry-run publishes nothing, but on a push event semantic-release still runs
@@ -123,10 +173,10 @@ jobs:
         run: pnpm exec semantic-release --dry-run
 
   # Real release: only ever runs on a manual workflow_dispatch (on main/beta),
-  # gated behind the same main+e2e checks a push runs. Cuts a draft; `publish-release`
+  # gated behind the same checks a push runs. Cuts a draft; `publish-release`
   # undrafts it once the desktop artifacts are attached (#328).
   release:
-    needs: [build, e2e]
+    needs: [lint, test, build, e2e]
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
