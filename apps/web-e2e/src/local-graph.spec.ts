@@ -83,6 +83,11 @@ test('the Local Graph panel says so when the open Entity links to nothing', asyn
  * creation + shader compile (~700ms measured without the warm-up).
  */
 test('opening the panel does not block the main thread', async ({ page }) => {
+  // cosmos.gl cools its layout once per animation frame, so the settled mark is ~930 *frames* away
+  // however fast they come: ~8 s on a 120 Hz display, ~16 s at 60 Hz, longer on CI's headless
+  // compositor. The wait below is sized for the slow end, and this test's budget for the wait.
+  test.setTimeout(90_000);
+
   await page.addInitScript(() => {
     (window as unknown as { __longtasks: number[] }).__longtasks = [];
     new PerformanceObserver((list) => {
@@ -115,7 +120,7 @@ test('opening the panel does not block the main thread', async ({ page }) => {
   await expect(page.getByTestId('graph-canvas')).toBeVisible();
   // An adopted graph must still run its physics: the settled mark only appears once the force
   // simulation has actually ticked the layout past the readable threshold.
-  await expect(page.getByTestId('graph-canvas')).toHaveAttribute('data-settled', 'true', { timeout: 15_000 });
+  await expect(page.getByTestId('graph-canvas')).toHaveAttribute('data-settled', 'true', { timeout: 60_000 });
   await page.waitForTimeout(1200);
 
   const blocks = await page.evaluate(
