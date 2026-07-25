@@ -1,16 +1,32 @@
 import type { MenuItemConstructorOptions } from 'electron';
-import { AppMenuActions, buildAppMenuTemplate, GO_TO_WORLDS, OPEN_COMMAND_PALETTE, REVEAL_DATA_FOLDER } from './menu';
+import {
+  AppMenuActions,
+  buildAppMenuTemplate,
+  GO_TO_WORLDS,
+  NEW_WINDOW,
+  OPEN_COMMAND_PALETTE,
+  REVEAL_DATA_FOLDER,
+} from './menu';
 
 /** What the menu asked the shell to do, in order. */
-function recorder(): AppMenuActions & { readonly invoked: string[]; readonly revealed: number } {
+function recorder(): AppMenuActions & {
+  readonly invoked: string[];
+  readonly revealed: number;
+  readonly opened: number;
+} {
   const invoked: string[] = [];
   let revealed = 0;
+  let opened = 0;
   return {
     invoked,
     get revealed() {
       return revealed;
     },
+    get opened() {
+      return opened;
+    },
     invokeCommand: (id) => void invoked.push(id),
+    openNewWindow: () => void opened++,
     revealDataFolder: () => void revealed++,
   };
 }
@@ -65,6 +81,13 @@ describe('buildAppMenuTemplate', () => {
       }
     });
 
+    /** Where every platform's user looks for it, and the only surface a second window is offered from. */
+    it('offers New Window from File on every platform', () => {
+      for (const platform of ['darwin', 'win32', 'linux'] as const) {
+        expect(submenu(menu(platform), 'File').map((item) => item.id)).toContain(NEW_WINDOW);
+      }
+    });
+
     it('names the reveal gesture the way the platform does', () => {
       expect(itemById(menu('darwin'), REVEAL_DATA_FOLDER).label).toBe('Reveal Data Folder in Finder');
       expect(itemById(menu('win32'), REVEAL_DATA_FOLDER).label).toBe('Show Data Folder in File Explorer');
@@ -94,13 +117,16 @@ describe('buildAppMenuTemplate', () => {
     });
 
     /**
-     * The invariant the design rests on (ADR-0070), asserted over the whole tree rather than the one item we
-     * happen to ship, so a later item cannot quietly bind a chord.
+     * The invariant the design rests on (ADR-0070), stated from the side that scales: whatever the menu grows, a
+     * bound chord belongs to a native role or to an action main performs itself — never to an item the
+     * renderer's dispatcher acts on. Nothing new can bind one without failing here.
      */
-    it('displays without registering every accelerator on an item it dispatches itself', () => {
+    it('binds a chord only for a role or for one of main’s own actions', () => {
       for (const platform of ['darwin', 'win32', 'linux'] as const) {
-        const dispatched = everyItem(menu(platform)).filter((item) => item.click && item.accelerator);
-        for (const item of dispatched) expect(item.registerAccelerator).toBe(false);
+        const bound = everyItem(menu(platform)).filter(
+          (item) => item.click && item.accelerator && item.registerAccelerator !== false,
+        );
+        expect(bound.map((item) => item.id)).toEqual([NEW_WINDOW]);
       }
     });
 
@@ -120,6 +146,17 @@ describe('buildAppMenuTemplate', () => {
       choose(itemById(template, GO_TO_WORLDS));
 
       expect(actions.invoked).toEqual([OPEN_COMMAND_PALETTE, GO_TO_WORLDS]);
+    });
+
+    /** Opening a window is main's own business — it owns the window list — so no renderer round trip either. */
+    it('asks the shell for a second window on this Instance', () => {
+      const actions = recorder();
+      const template = menu('darwin', actions);
+
+      choose(itemById(template, NEW_WINDOW));
+
+      expect(actions.opened).toBe(1);
+      expect(actions.invoked).toEqual([]);
     });
 
     it('asks the shell to reveal the Instance Directory', () => {

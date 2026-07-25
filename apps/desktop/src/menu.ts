@@ -4,6 +4,8 @@ import type { MenuItemConstructorOptions } from 'electron';
 export interface AppMenuActions {
   /** Hand a Command id to the renderer, where the Palette's Command and the dispatcher live (ADR-0070). */
   invokeCommand(commandId: string): void;
+  /** Open a second window on this Instance, so a Note can be read beside the Hex Map that links to it. */
+  openNewWindow(): void;
   /** Open the Instance Directory in the platform's file manager. */
   revealDataFolder(): void;
 }
@@ -15,7 +17,8 @@ export interface AppMenuActions {
 export const OPEN_COMMAND_PALETTE = 'open-command-palette';
 export const GO_TO_WORLDS = 'go-worlds';
 
-/** The Reveal item's id, so a spec can find it without matching a label. */
+/** The ids of the items main acts on itself, so a spec can find them without matching a label. */
+export const NEW_WINDOW = 'new-window';
 export const REVEAL_DATA_FOLDER = 'reveal-data-folder';
 
 /**
@@ -74,14 +77,21 @@ function macAppMenu(): MenuItemConstructorOptions {
 }
 
 /**
- * Reveal the Instance Directory: backing up worldbuilding is then copying one folder, without having to
- * know where the platform keeps application support data (ADR-0070).
+ * Two of main's own gestures, neither of them a Command: a second window on this Instance, and revealing the
+ * Instance Directory — backing up worldbuilding is then copying one folder, without having to know where the
+ * platform keeps application support data (ADR-0070).
+ *
+ * These bind their chords for real, unlike {@link commandItem}: the action is main's, so there is no renderer
+ * dispatcher to take it away from. `Shift` is in the chord because ⌘N is worth leaving to a future in-app
+ * "new Entity", which is the more likely thing a worldbuilder reaches for.
  */
 function fileMenu(platform: NodeJS.Platform, actions: AppMenuActions): MenuItemConstructorOptions {
   const mac = platform === 'darwin';
   return {
     label: 'File',
     submenu: [
+      { id: NEW_WINDOW, label: 'New Window', accelerator: 'CmdOrCtrl+Shift+N', click: () => actions.openNewWindow() },
+      { type: 'separator' },
       { id: REVEAL_DATA_FOLDER, label: revealLabel(platform), click: () => actions.revealDataFolder() },
       { type: 'separator' },
       // Quit lives in the app menu on macOS, so this menu ends at closing the window there.

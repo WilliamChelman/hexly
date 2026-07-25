@@ -30,7 +30,10 @@ export interface DesktopRun {
   readonly window: Page;
   /** The loopback origin this run bound — an ephemeral port (ADR-0070), so never twice the same. */
   readonly origin: string;
-  /** Everything main has written so far. */
+  /**
+   * Everything main has written since Playwright handed the process over, which is *after* `whenReady` — so an
+   * early `boot` line can be missing, and this is a diagnostic rather than something to assert against.
+   */
   output(): string;
   /** Quit as the user does: the ordered shutdown revokes the session and closes the SQLite handle. */
   close(): Promise<void>;
@@ -72,6 +75,20 @@ export const test = base.extend<{ userDataDir: string; launch: () => Promise<Des
 });
 
 export { expect };
+
+/**
+ * Choose an application-menu item the way a user does: `MenuItem.click` *is* the handler main gave it, so
+ * calling it is the click. Read off the live `Menu`, so a spec exercises the menu Electron built rather than
+ * the template it was built from.
+ */
+export function clickMenuItem(app: ElectronApplication, id: string): Promise<void> {
+  return app.evaluate(({ Menu }, itemId) => {
+    const item = Menu.getApplicationMenu()?.getMenuItemById(itemId);
+    if (!item) throw new Error(`No menu item with id "${itemId}"`);
+    // Electron types `click` as the handler it will be called with; ours reads none of its arguments.
+    (item.click as unknown as () => void)();
+  }, id);
+}
 
 /**
  * Launch the Desktop App against `userDataDir`, resolving once its window is loaded at the API's origin.

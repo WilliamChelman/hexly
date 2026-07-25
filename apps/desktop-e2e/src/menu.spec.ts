@@ -1,5 +1,5 @@
 import type { ElectronApplication } from '@playwright/test';
-import { expect, test } from './desktop-app';
+import { clickMenuItem, expect, test } from './desktop-app';
 
 /** One menu item, as much of it as survives the trip out of the main process. */
 interface ItemSnapshot {
@@ -33,16 +33,6 @@ function readMenu(app: ElectronApplication): Promise<readonly MenuSnapshot[]> {
       })),
     })),
   );
-}
-
-/** Choose a menu item the way a user does: `MenuItem.click` *is* the handler, so calling it is the click. */
-function clickMenuItem(app: ElectronApplication, id: string): Promise<void> {
-  return app.evaluate(({ Menu }, itemId) => {
-    const item = Menu.getApplicationMenu()?.getMenuItemById(itemId);
-    if (!item) throw new Error(`No menu item with id "${itemId}"`);
-    // Electron types `click` as the handler it will be called with; ours reads none of its arguments.
-    (item.click as unknown as () => void)();
-  }, id);
 }
 
 /**
@@ -125,6 +115,12 @@ test('the menu displays the Palette chord without registering it, and leaves the
   // And the backup affordance: one folder to copy. Not clicked — that opens a file manager over the run.
   const reveal = itemsOf(menu, 'File').find((item) => item.id === 'reveal-data-folder');
   expect(reveal?.label).toMatch(/Data Folder/);
+
+  // The other side of the invariant: main performs New Window itself, so its chord *is* bound — the renderer's
+  // dispatcher never claimed it, and there is nothing for the OS to take away.
+  const newWindow = itemsOf(menu, 'File').find((item) => item.id === 'new-window');
+  expect(newWindow?.accelerator).toBe('CmdOrCtrl+Shift+N');
+  expect(newWindow?.registersAccelerator).toBe(true);
 });
 
 test('the displayed chord dispatches in the renderer, and the menu item runs the same Command', async ({ launch }) => {

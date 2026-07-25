@@ -225,6 +225,22 @@ describe('EntityHeader', () => {
     expect(fixture.nativeElement.textContent).toContain('The Whisperwood');
   });
 
+  /**
+   * A name is prose too, so it is spell-checked like the Content below it (#323, ADR-0070) — the Desktop App's
+   * spellchecker is session-wide, and an opt-out here would be the one field it could not reach.
+   */
+  it('leaves the name field spell-checked', () => {
+    open(aldermoor);
+
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
+    fixture.detectChanges();
+
+    // The absence of the opt-out is the whole claim: `spellcheck` is inherited, and only an explicit `false`
+    // here could exempt the field. (jsdom implements the attribute but not the IDL property.)
+    const title = fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement;
+    expect(title.getAttribute('spellcheck')).toBeNull();
+  });
+
   it('mounts the tag editor for the open entity', () => {
     open(aldermoor);
 

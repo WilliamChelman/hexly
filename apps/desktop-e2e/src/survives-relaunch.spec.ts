@@ -39,3 +39,29 @@ test('an edit made in one run is there after a relaunch', async ({ launch }) => 
   await second.window.waitForURL(/\/worlds$/);
   await expect(second.window.getByTestId(`world-${world.id}`)).toHaveAttribute('aria-label', RENAMED);
 });
+
+/**
+ * The other thing a relaunch should carry: a native window reopens at the size and position it was left
+ * (ADR-0070). Read as the shell sees it, since geometry is main's business and the renderer has no view of it.
+ */
+test('the window reopens at the size and position it was left', async ({ launch }) => {
+  const first = await launch();
+  await first.window.waitForURL(/\/worlds$/);
+
+  // Nothing near the default 1440×900, so no fresh launch could produce this by accident. Read back rather than
+  // assumed: a window manager may adjust what it was asked for, and what it settled on is what has to reappear.
+  const left = await first.app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    window.setBounds({ x: 140, y: 90, width: 1024, height: 720 });
+    return window.getBounds();
+  });
+  expect(left).toMatchObject({ width: 1024, height: 720 });
+
+  // Quit as the user does — which reaches `app.exit`, emitting no window `close`, so only the flush saves this.
+  await first.close();
+
+  const second = await launch();
+  const reopened = await second.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+
+  expect(reopened).toEqual(left);
+});
