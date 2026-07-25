@@ -143,10 +143,10 @@ export interface StructuredDataType {
    */
   harvestFacets?(value: unknown): readonly HarvestedFacet[];
   /**
-   * The content address of the stored bytes this value wraps (ADR-0065): an Asset's content `hash` and the
-   * `ext` it is stored under, mirrored to the derived `(worldId, hash) → entity` index at the write choke
-   * point — the dedup key an upload resolves against, and (#325) the full byte address a read checks for
-   * presence. Absent for every data-type but the asset-ref, which alone owns bytes.
+   * The content address of the stored bytes this value wraps (ADR-0065): `hash` plus the `ext` it is stored
+   * under, mirrored to the derived `(worldId, hash) → entity` index at the write choke point — the dedup key
+   * an upload resolves against, and the address a read stats for presence (#325). Absent for every data-type
+   * but the asset-ref, which alone owns bytes.
    */
   harvestAssetRef?(value: unknown): AssetBytesRef | null;
   /**

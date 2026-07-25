@@ -46,10 +46,10 @@ export interface DocumentDerivedState {
    */
   readonly importSource: ImportSource | null;
   /**
-   * The byte address of the bytes an Asset's asset-ref wraps, or `null` (ADR-0065) — mirrored to the
-   * derived `(worldId, hash) → entity` index at the write choke point: the `hash` is the dedup key an
-   * upload resolves against, the `ext` completes the on-disk address a read stats for presence (#325).
-   * Harvested from the one **Structured Data Type** that owns bytes, like edges and facets.
+   * The byte address of the bytes an Asset's asset-ref wraps, or `null` (ADR-0065) — mirrored to the derived
+   * `(worldId, hash) → entity` index at the write choke point, the dedup key an upload resolves against, with
+   * the `ext` completing the address a read stats for presence (#325). Harvested from the one **Structured
+   * Data Type** that owns bytes, like edges and facets.
    */
   readonly assetRef: AssetBytesRef | null;
   /**

@@ -19,9 +19,8 @@ import {
  * action. Offered to everyone, anonymous public-link viewers included (ADR-0014);
  * the session row is Sign out when authenticated, Login otherwise.
  *
- * The desktop profile keeps the preferences and drops both the session row and the identity
- * (ADR-0071): there is no account to sign out of and no name anyone can see or edit, so the trigger
- * falls back to the same anonymous icon it already had.
+ * The desktop profile keeps the preferences and drops both the session row and the identity (ADR-0071):
+ * there is no account to sign out of and no name to show.
  */
 @Component({
   selector: 'app-user-menu',
@@ -135,10 +134,8 @@ export class UserMenuComponent {
   /** Whether this deployment offers a session to manage at all (ADR-0071). */
   protected readonly desktop = computed(() => this.clientConfig.isDesktopProfile());
 
-  /**
-   * The user *as an identity to show* — `null` in the desktop profile even though a Sole User is
-   * signed in: with the Profile section cut there is nothing behind the name to open (ADR-0071).
-   */
+  /** The user *as an identity to show* — `null` in the desktop profile even though a Sole User is signed
+   * in: with the Profile section cut there is nothing behind the name to open (ADR-0071). */
   protected readonly identity = computed(() => (this.desktop() ? null : this.user()));
 
   /** The languages offered, sourced from {@link LocaleService}, and the active one. */

@@ -9,10 +9,7 @@ function applyMigration(sqlite: Database.Database, file: string): void {
   sqlite.exec(readFileSync(resolve(__dirname, 'migrations', file), 'utf8'));
 }
 
-/**
- * The Asset-bytes root seam (ADR-0034 amendment, ADR-0070): `hexly.yml`'s `assets.dir` reaches it
- * through the `ASSETS_DIR` provider, so this is the one place the absolute/relative/absent rule lives.
- */
+/** The one home of the absolute/relative/absent rule for `assets.dir` (ADR-0034 amendment). */
 describe('resolveAssetsDir (ADR-0034, ADR-0070)', () => {
   it('defaults to the `assets` folder inside the Instance Directory — no `assets.dir`, no change', () => {
     expect(resolveAssetsDir('/srv/hexly')).toBe(join('/srv/hexly', 'assets'));

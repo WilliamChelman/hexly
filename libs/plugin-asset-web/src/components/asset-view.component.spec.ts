@@ -98,21 +98,18 @@ describe('AssetViewComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid=asset-icon-card]')).not.toBeNull();
   });
 
-  // #325: an Asset whose bytes are not under the resolved Assets root says so, in its own named state —
-  // never the icon-card fallback (which also means "not an image") and never a broken-image glyph.
   it('names the missing-bytes state and requests no bytes when the server reports them absent (#325)', () => {
     const { fixture } = render(assetValue(), { assetBytesMissing: true });
 
     const missing = fixture.nativeElement.querySelector('[data-testid=asset-missing]') as HTMLElement | null;
     expect(missing).not.toBeNull();
     expect(missing?.textContent).toContain("This file isn't where Hexly expects it");
-    // Distinguishable: neither the image renderer (which would 404) nor the kind icon card.
     expect(fixture.nativeElement.querySelector('[data-testid=asset-image]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid=asset-icon-card]')).toBeNull();
   });
 
   it('says nothing about missing bytes for a non-image Asset whose bytes are present (#325)', () => {
-    // The icon card is "not an image", not "not there" — the two must stay distinguishable.
+    // The icon card means "not an image", not "not there": the two states must stay distinguishable.
     const { fixture } = render(assetValue({ ext: '.pdf', mime: 'application/pdf', stats: null }));
 
     expect(fixture.nativeElement.querySelector('[data-testid=asset-missing]')).toBeNull();

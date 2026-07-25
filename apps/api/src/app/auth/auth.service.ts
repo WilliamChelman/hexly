@@ -114,11 +114,9 @@ export class AuthService {
   }
 
   /**
-   * Open a session with no credential check, for a caller that has already established identity by
-   * other means: the Desktop App's main process mints the Sole User's at launch (ADR-0070), so
-   * `SessionAuthGuard` finds a genuine session and no route special-cases loopback. `expiresAt`
-   * defaults to the standard TTL — the Desktop App passes one no sweep will reap, since the Sole
-   * User has no password to re-authenticate with.
+   * Open a session with no credential check, for a caller whose identity is already established: the Desktop
+   * App mints the Sole User's at launch (ADR-0070), so no route special-cases loopback. `expiresAt` defaults
+   * to the standard TTL.
    */
   mintSession(userId: string, opts: { expiresAt?: number } = {}): string {
     const token = newToken();
@@ -134,10 +132,7 @@ export class AuthService {
     return token;
   }
 
-  /**
-   * The id registered for an email, or `undefined` — how a caller with no password provisions-or-reuses
-   * a user (the Desktop App's first-launch Sole User seeding, ADR-0070).
-   */
+  /** How a caller with no password provisions-or-reuses a user (the Desktop App's Sole User, ADR-0070). */
   findUserIdByEmail(email: string): string | undefined {
     return this.db
       .select({ id: users.id })

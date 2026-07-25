@@ -1,7 +1,6 @@
 import type { MenuItemConstructorOptions } from 'electron';
 import { buildContextMenuTemplate, type ContextMenuActions, type ContextMenuTarget } from './context-menu';
 
-/** A right-click, described the way Electron describes one. */
 function target(overrides: Partial<ContextMenuTarget> = {}): ContextMenuTarget {
   return {
     misspelledWord: '',
@@ -91,7 +90,7 @@ describe('buildContextMenuTemplate', () => {
     const selectedInProse = target({ editFlags: { canCut: true, canCopy: true, canPaste: true } });
     expect(labels(buildContextMenuTemplate(selectedInProse, recorder()))).toEqual(['cut', 'copy', 'paste']);
 
-    // Selected text on a read-only page: copying it is the only thing on offer.
+    // Selected text on a read-only page.
     const selectedInReading = target({ editFlags: { canCut: false, canCopy: true, canPaste: false } });
     expect(labels(buildContextMenuTemplate(selectedInReading, recorder()))).toEqual(['copy']);
   });

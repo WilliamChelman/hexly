@@ -1,12 +1,10 @@
 /**
- * Where a navigation belongs (ADR-0070). `internal` is our own loopback origin, which is everything the SPA
- * needs; `external` is the user's own link, and belongs to the system browser. `refused` is the third answer a
- * two-way split would miss: Content is authored text, and a `file:` or `javascript:` URL in it has no business
- * being followed here *or* handed to a browser.
+ * Where a navigation belongs (ADR-0070). `refused` is the third answer a two-way split would miss: a `file:`
+ * or `javascript:` URL in authored Content has no business being followed here *or* handed to a browser.
  */
 export type LinkDestination = 'internal' | 'external' | 'refused';
 
-/** The schemes worth handing to the platform: a web link, or a mail address a Content link may carry. */
+/** `mailto:` because a Content link may carry a mail address. */
 const HANDED_OFF_SCHEMES = ['http:', 'https:', 'mailto:'];
 
 export function linkDestination(url: string, appOrigin: string): LinkDestination {
@@ -26,27 +24,22 @@ export interface UrlOpener {
   openExternal(url: string): Promise<void>;
 }
 
-/** What the shell does with a link that is not a navigation of the current window. */
 export interface LinkTargets {
-  /** Open one of our own URLs in a second window — what a `target="_blank"` inside the SPA asks for. */
+  /** What a `target="_blank"` inside the SPA asks for. */
   openWindow(url: string): void;
 }
 
-/** The two ways a link leaves the current page, as much of `WebContents` as intercepting them needs. */
+/** As much of `WebContents` as intercepting the two ways a link leaves the page needs. */
 export interface NavigatingContents {
   setWindowOpenHandler(handler: (details: { url: string }) => { action: 'deny' }): void;
   on(event: 'will-navigate', listener: (event: { preventDefault(): void }, url: string) => void): unknown;
 }
 
 /**
- * Route every link leaving `contents` to where it belongs (ADR-0070). Both paths need intercepting and they
- * are genuinely different: `setWindowOpenHandler` sees a `target="_blank"` or `window.open`, `will-navigate`
- * sees a plain click or a `location` assignment in the page. An internal navigation in place is simply
- * allowed through — the SPA's router is what the window is for.
- *
- * A `window.open` on one of our own URLs is answered by a second Hexly window rather than by Electron's
- * `action: 'allow'`, so it is the same window everywhere else opens: our preload, our geometry, and these
- * same handlers on it.
+ * Both paths need intercepting and differ (ADR-0070): `setWindowOpenHandler` sees a `target="_blank"` or
+ * `window.open`, `will-navigate` sees a plain click or a `location` assignment. A `window.open` on one of our
+ * own URLs gets a second Hexly window rather than Electron's `action: 'allow'`, so it carries our preload,
+ * geometry and handlers.
  */
 export function routeLinks(
   contents: NavigatingContents,
@@ -63,8 +56,7 @@ export function routeLinks(
         void openExternally(shell, url);
         break;
     }
-    // Always `deny`: Electron's own new window would inherit this one's preferences rather than be built the
-    // way `openWindow` builds every other window.
+    // Always `deny`: Electron's own new window would inherit this one's preferences instead of `openWindow`'s.
     return { action: 'deny' };
   });
 
@@ -77,10 +69,7 @@ export function routeLinks(
   });
 }
 
-/**
- * Hand `url` to the platform's default handler. A refusal is reported rather than thrown: the click has no
- * surface to fail on, and the window it declined to navigate is still exactly where the user left it.
- */
+/** A refusal is reported rather than thrown: the click has no surface to fail on. */
 export async function openExternally(shell: UrlOpener, url: string): Promise<void> {
   try {
     await shell.openExternal(url);

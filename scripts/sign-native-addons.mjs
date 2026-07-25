@@ -1,17 +1,12 @@
 // @ts-check
 /**
- * Ad-hoc re-sign the native addons the Desktop App loads, after an Electron rebuild. macOS only; a
- * no-op everywhere else.
- *
- * The prebuilt `better_sqlite3.node` that `electron-rebuild` installs is *linker-signed*, and macOS's
- * code-signing monitor answers Electron's `dlopen` of it with `SIGKILL (Code Signature Invalid)` — the
- * process dies mid-boot with no JS error to catch. `codesign --force --sign -` replaces that with a plain
- * ad-hoc signature, which loads. Packaging does the same thing through electron-builder; this is the dev
- * half of ADR-0070's "native modules are the packaging risk".
+ * Ad-hoc re-sign the native addons the Desktop App loads, after an Electron rebuild. macOS only; a no-op
+ * everywhere else. The prebuilt `better_sqlite3.node` `electron-rebuild` installs is linker-signed, and
+ * macOS answers Electron's `dlopen` of it with `SIGKILL (Code Signature Invalid)` — no JS error to catch;
+ * an ad-hoc signature loads (ADR-0070, the dev half of what electron-builder does at packaging).
  *
  * Paired with `electron-rebuild --force`: its `.forge-meta` marker still claims the Electron ABI after
- * `pnpm native:node` has swapped the binary underneath, so without `--force` the rebuild is skipped and
- * the app dies on a NODE_MODULE_VERSION mismatch.
+ * `pnpm native:node` swapped the binary underneath, so without `--force` the rebuild is skipped.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';

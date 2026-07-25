@@ -9,7 +9,6 @@ import {
   REVEAL_DATA_FOLDER,
 } from './menu';
 
-/** What the menu asked the shell to do, in order. */
 function recorder(): AppMenuActions & {
   readonly invoked: string[];
   readonly revealed: number;
@@ -46,7 +45,6 @@ function submenu(template: MenuItemConstructorOptions[], label: string): MenuIte
   return found.submenu;
 }
 
-/** Every item in the tree, so an invariant can be asserted over all of them at once. */
 function everyItem(template: MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
   return template.flatMap((item) => [item, ...(Array.isArray(item.submenu) ? everyItem(item.submenu) : [])]);
 }
@@ -57,7 +55,7 @@ function itemById(template: MenuItemConstructorOptions[], id: string): MenuItemC
   return found;
 }
 
-/** Choose the item as a user does. Electron hands `click` a MenuItem and a window; ours read neither. */
+/** Electron hands `click` a MenuItem and a window; ours read neither. */
 function choose(item: MenuItemConstructorOptions): void {
   const click = item.click as unknown as (() => void) | undefined;
   if (!click) throw new Error(`Item "${item.id ?? item.label}" does nothing when chosen`);
@@ -112,7 +110,7 @@ describe('buildAppMenuTemplate', () => {
     it('leaves clipboard, zoom, reload, devtools, window and quit to native roles', () => {
       const template = menu('darwin');
       const roles = everyItem(template).map((item) => item.role);
-      // Clipboard first: on macOS these are what make cut/copy/paste work inside web content at all.
+      // On macOS these roles are what make cut/copy/paste work inside web content at all.
       expect(roles).toEqual(expect.arrayContaining(['cut', 'copy', 'paste', 'selectAll']));
       expect(roles).toEqual(expect.arrayContaining(['resetZoom', 'zoomIn', 'zoomOut']));
       expect(roles).toEqual(expect.arrayContaining(['reload', 'forceReload', 'toggleDevTools']));
@@ -125,9 +123,8 @@ describe('buildAppMenuTemplate', () => {
     });
 
     /**
-     * The invariant the design rests on (ADR-0070), stated from the side that scales: whatever the menu grows, a
-     * bound chord belongs to a native role or to an action main performs itself — never to an item the
-     * renderer's dispatcher acts on. Nothing new can bind one without failing here.
+     * The invariant the design rests on (ADR-0070): a bound chord belongs to a native role or to an action main
+     * performs itself, never to an item the renderer's dispatcher acts on.
      */
     it('binds a chord only for a role or for one of main’s own actions', () => {
       for (const platform of ['darwin', 'win32', 'linux'] as const) {
@@ -152,8 +149,8 @@ describe('buildAppMenuTemplate', () => {
 
       choose(itemById(template, OPEN_COMMAND_PALETTE));
       choose(itemById(template, GO_TO_WORLDS));
-      // Main owns the picker and the bytes, but the copy needs a surface to report progress on and be
-      // cancelled from — so this one goes through the renderer too (#326).
+      // The copy needs a surface to report progress on and be cancelled from, so it goes through the renderer
+      // too (#326).
       choose(itemById(template, MOVE_ASSET_STORAGE));
 
       expect(actions.invoked).toEqual([OPEN_COMMAND_PALETTE, GO_TO_WORLDS, MOVE_ASSET_STORAGE]);

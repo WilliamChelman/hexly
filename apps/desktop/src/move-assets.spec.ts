@@ -12,21 +12,17 @@ import {
 const OLD = '/instance/assets';
 const NEW = '/Volumes/Big/hexly-assets';
 
-/** Stands in for the sha256: the bytes themselves, which is all a spec needs to tell a match from a mismatch. */
+/** Stands in for the sha256: the bytes themselves. */
 function digestOf(bytes: string): string {
   return `sha256(${bytes})`;
 }
 
-/**
- * Both Asset roots in one Map, since a move reads one and writes the other. State-holding, so a class rather
- * than a recorder: what a spec asserts is what ended up where, and what was taken back.
- */
+/** Both Asset roots in one Map, since a move reads one and writes the other. */
 class FakeStore implements AssetFileStore {
   readonly written: string[] = [];
   readonly removed: string[] = [];
   /** Paths whose copy lands truncated bytes — a volume that filled up, or a mount that dropped mid-write. */
   readonly truncates = new Set<string>();
-  /** Paths the filesystem refuses outright. */
   readonly refuses = new Set<string>();
   /** Run before each copy, so a spec can cancel, or write to the old root, while the move is in flight. */
   onCopy?: (path: string) => void;
@@ -152,7 +148,7 @@ describe('copyAssetTree', () => {
     const outcome = await copyAssetTree(store, { from: OLD, to: NEW });
 
     expect(outcome).toEqual({ status: 'failed', reason: expect.stringContaining('no space left on device') });
-    // The file that failed is taken back too: a write that stopped part-way is exactly what leaves a partial one.
+    // The file that failed is taken back too: a write that stopped part-way leaves a partial one.
     expect(store.removed).toEqual([
       `${NEW}/world-1/aaa.png`,
       `${NEW}/world-1/aaa.thumb.webp`,
@@ -169,7 +165,6 @@ describe('copyAssetTree', () => {
     const outcome = await copyAssetTree(store, { from: OLD, to: NEW, signal: cancel.signal });
 
     expect(outcome).toEqual({ status: 'cancelled' });
-    // Both: the one that landed, and the one the abort interrupted part-way through.
     expect(store.removed).toEqual([`${NEW}/world-1/aaa.png`, `${NEW}/world-1/aaa.thumb.webp`]);
     expect(store.bytes.get(`${OLD}/world-1/aaa.png`)).toBe('a map');
   });
@@ -184,10 +179,7 @@ describe('copyAssetTree', () => {
     expect(store.written).toEqual([]);
   });
 
-  /**
-   * The natural second attempt after a move that failed: the same folder, holding some of it already. Undoing
-   * our own writes must not turn into deleting the user's files.
-   */
+  /** Undoing our own writes must not turn into deleting files the chosen folder already held. */
   it('never takes back a file that was in the chosen folder before this move', async () => {
     const store = storeWithAssets();
     store.bytes.set(`${NEW}/world-1/aaa.png`, 'a map');
@@ -213,7 +205,6 @@ describe('copyAssetTree', () => {
 });
 
 describe('moveAssetStorage', () => {
-  /** The shell around one move: a picker that answers `chosen`, and a `hexly.yml` write that is recorded. */
   function shell(store: FakeStore, chosen: string | undefined, options: { refuseWrite?: string } = {}) {
     const recorded: string[] = [];
     const move: AssetStorageMove = {
@@ -247,7 +238,7 @@ describe('moveAssetStorage', () => {
     expect(recorded).toEqual([]);
   });
 
-  /** The safety property in one assertion: a failed copy never becomes a pointer at half a tree. */
+  /** A failed copy must never become a pointer at half a tree. */
   it('leaves the original location in effect when a copy fails', async () => {
     const store = storeWithAssets();
     store.truncates.add(`${OLD}/world-1/aaa.png`);
@@ -267,10 +258,7 @@ describe('moveAssetStorage', () => {
     expect(recorded).toEqual([]);
   });
 
-  /**
-   * The one state a relaunch must not paper over: the bytes are all at the new root and the config still names
-   * the old one. Nothing is lost, but only the user can fix a file that will not take a write.
-   */
+  /** The one state a relaunch must not paper over: bytes at the new root, config still naming the old one. */
   it('names the copied-but-unswitched state when hexly.yml will not take the write', async () => {
     const store = storeWithAssets();
     const { move } = shell(store, NEW, { refuseWrite: 'EACCES: permission denied' });
@@ -312,7 +300,7 @@ describe('throttleProgress', () => {
 
     for (let i = 0; i < 4; i++) report({ ...REPORT, copiedFiles: i });
 
-    // Ten thousand small files must not buy ten thousand change-detection passes; the outcome has the last word.
+    // Ten thousand small files must not buy ten thousand change-detection passes.
     expect(reported.map((progress) => progress.copiedFiles)).toEqual([0, 3]);
   });
 });

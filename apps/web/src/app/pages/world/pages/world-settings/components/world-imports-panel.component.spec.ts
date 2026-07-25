@@ -111,7 +111,7 @@ describe('WorldImportsPanel', () => {
     worlds.runImport.mockReturnValue(of(runSummary({ importer: monsters.id, status: 'running' })));
     render();
 
-    // The row itself stays — an import is not sharing — but its Visibility choice is cut (ADR-0071).
+    // The row is not sharing; only its Visibility choice is cut (ADR-0071).
     expect(has('importer-draw-steel.importer.monsters')).toBe(true);
     expect(has('importer-visibility-draw-steel.importer.monsters')).toBe(false);
 

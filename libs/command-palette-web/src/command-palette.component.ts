@@ -29,9 +29,8 @@ import { CommandRegistry, CommandSection } from './command-registry';
 export const COMMAND_PROVIDERS = new InjectionToken<readonly CommandProvider[]>('COMMAND_PROVIDERS');
 
 /**
- * Opening the Palette, as a Command reachable by id — so the Desktop App's native menu item opens it by
- * invoking a Command like any other, rather than the shell reaching into the renderer (ADR-0070). The chord
- * stays the dispatcher's: the menu only *displays* it.
+ * Opening the Palette as a Command id, so the Desktop App's native menu invokes it like any other Command
+ * rather than reaching into the renderer; the chord stays the dispatcher's (ADR-0070).
  */
 export const OPEN_COMMAND_PALETTE = 'open-command-palette';
 
@@ -201,9 +200,7 @@ export class CommandPaletteComponent {
     // The Palette mounts once for the app's lifetime, so there's nothing to unregister.
     for (const provider of this.builtIns) this.registry.register(provider);
 
-    // Opening is itself a Command, so a second surface — the Desktop App's native menu — invokes it by id
-    // instead of owning the chord (ADR-0070). `set`, not the chord's toggle: choosing "Command Palette" from
-    // a menu means open it, and the item is reachable while the palette's own dialog holds the keyboard.
+    // `set`, not the chord's toggle: choosing "Command Palette" from a menu means open it (ADR-0070).
     const transloco = this.transloco;
     this.directory.register({
       id: OPEN_COMMAND_PALETTE,

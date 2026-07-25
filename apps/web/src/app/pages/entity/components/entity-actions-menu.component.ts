@@ -129,10 +129,7 @@ export class EntityActionsMenuComponent {
    */
   private readonly manageable = this.session.manageable;
 
-  /**
-   * Whether to offer Share: an Owner, and a Collaboration layer to share into (ADR-0071). The flag,
-   * never a Rights or Instance-Role check in its place — the Sole User passes those.
-   */
+  /** Whether to offer Share: an Owner, and a Collaboration layer to share into (ADR-0071). */
   protected readonly shareable = computed(() => this.manageable() && this.clientConfig.isCollaborationEnabled());
 
   /** Whether to offer the Visibility toggle: a writer, and a Collaboration layer that reads the column. */

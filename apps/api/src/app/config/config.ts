@@ -22,10 +22,8 @@ export interface PluginConfigContribution {
 }
 
 /**
- * What a process **entry point** states about its deployment rather than what the operator configures
- * (ADR-0071). `profile` has no `hexly.yml` key at all — so nobody can declare `profile: desktop` on a
- * five-user server — and a pinned `collaboration` wins over `features.collaboration` in the file, which
- * is how the Desktop App makes that flag non-negotiable.
+ * What a process entry point states about its deployment rather than what the operator configures
+ * (ADR-0071): `profile` has no `hexly.yml` key at all, and a pin beats `features.collaboration`.
  */
 export interface DeploymentPins {
   /** The Deployment Profile this entry point is; defaults to `server` when unstated. */
@@ -35,8 +33,7 @@ export interface DeploymentPins {
 }
 
 // Module state, not a provider: Nest composes the graph at import time, before the entry point speaks
-// (ADR-0071). Unpinned is the conservative deployment, so `seed.ts` and every spec composing
-// `ConfigModule` need not restate it.
+// (ADR-0071).
 let pinned: DeploymentPins = {};
 
 /** State this process's deployment pins (ADR-0071); call from the entry point, before creating the Nest app. */
@@ -44,7 +41,6 @@ export function pinDeployment(pins: DeploymentPins): void {
   pinned = pins;
 }
 
-/** The pins this process's entry point stated — empty when it stated none. */
 export function deploymentPins(): DeploymentPins {
   return pinned;
 }
@@ -119,8 +115,8 @@ function buildConfigSchema(plugins: readonly PluginConfigContribution[]) {
         strictZipGuard: z.boolean().default(false),
       })
       .prefault({}),
-    // Where Asset bytes live (ADR-0034 amendment). Neither defaulted nor resolved here: the
-    // `resolveAssetsDir` seam owns both, so absent stays absent through the loader.
+    // Where Asset bytes live (ADR-0034 amendment); neither defaulted nor resolved here, `resolveAssetsDir`
+    // owns both.
     assets: z.object({ dir: z.string().min(1).optional() }).prefault({}),
     // Full-text search relevance tuning (ADR-0035). bm25 multiplies each indexed column's
     // contribution by its weight, so a name hit outranks a body hit at the same frequency.
@@ -146,9 +142,7 @@ function buildConfigSchema(plugins: readonly PluginConfigContribution[]) {
       .object({
         // Per-Plugin enablement (ADR-0052): `features.plugin.<id>.enabled`, composed from the bundled set.
         plugin: pluginFeaturesSchema(plugins),
-        // The Collaboration layer entire — sharing, World roles, Entity Visibility, Public Links
-        // (ADR-0071). Defaults **on** so an existing Instance upgrades with no change; the Desktop App
-        // turns it off through a {@link DeploymentPins} pin, never through this key.
+        // The Collaboration layer (ADR-0071); defaults on so an existing Instance upgrades unchanged.
         collaboration: z.boolean().default(true),
       })
       .prefault({}),
@@ -168,10 +162,7 @@ export type HexlyConfigRaw = z.infer<ReturnType<typeof buildConfigSchema>>;
 
 /** The processed, app-facing Instance Configuration: sizes resolved to bytes, ready to consume. */
 export interface HexlyConfig {
-  /**
-   * This Instance's Deployment Profile (ADR-0071). Not from `hexly.yml` — it comes from the entry
-   * point's {@link DeploymentPins}, and a `profile:` key in the file is stripped like any unknown key.
-   */
+  /** From the entry point's {@link DeploymentPins}, never from `hexly.yml` (ADR-0071). */
   profile: DeploymentProfile;
   import: {
     /** Max uploaded `.zip` size, in bytes. */
@@ -182,10 +173,7 @@ export interface HexlyConfig {
     strictZipGuard: boolean;
   };
   assets: {
-    /**
-     * Where Asset bytes are stored, verbatim as the file states it (ADR-0034 amendment) — `resolveAssetsDir`
-     * turns it into the `ASSETS_DIR` consumers use, since this barrel imports nothing from the app graph.
-     */
+    /** Verbatim as the file states it; `resolveAssetsDir` turns it into `ASSETS_DIR` (ADR-0034 amendment). */
     dir?: string;
   };
   search: {
@@ -203,11 +191,7 @@ export interface HexlyConfig {
      * Plugin's own schema adds. Nothing consumes it yet (#216); it is surfaced for later Seams.
      */
     plugin: Record<string, PluginConfig>;
-    /**
-     * Whether the Collaboration layer is on (ADR-0071): `features.collaboration`, defaulting **on**,
-     * overridden by an entry-point pin. Off makes the sharing and user-management routes 404
-     * (`CollaborationGuard`).
-     */
+    /** Off makes the sharing and user-management routes 404 (`CollaborationGuard`, ADR-0071). */
     collaboration: boolean;
   };
   entities: {
@@ -245,8 +229,7 @@ function processConfig(raw: HexlyConfigRaw, pins: DeploymentPins): HexlyConfig {
  * composition root supplies it. Absent (as in tests that don't exercise Plugins), `features.plugin`
  * resolves empty.
  *
- * `pins` is what the entry point states rather than the operator (ADR-0071): it supplies the Deployment
- * Profile, which has no key in the file, and can override `features.collaboration`.
+ * `pins` is what the entry point states rather than the operator (ADR-0071).
  */
 export function loadConfig(
   instanceDir: string,

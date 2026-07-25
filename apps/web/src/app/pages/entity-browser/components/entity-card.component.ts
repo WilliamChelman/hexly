@@ -61,9 +61,8 @@ export interface EntityCardVm {
       <span class="absolute left-0 top-0 bottom-0 w-1.5 {{ bar() }}"></span>
       <!-- The Thumbnail stands in for the type icon so a card is recognizable by sight (ADR-0066);
            absent — no designation, no own bytes, or a dangling link the server already dropped — the
-           primary type's sigil renders instead, never a broken image. Own bytes the server reports as
-           **Missing Bytes** count as absent (#325): the URL resolves but is known to 404. The card is not
-           where that state is named — the Asset's own View is — it just must not draw a broken image. -->
+           primary type's sigil renders instead, never a broken image. Own bytes reported as **Missing
+           Bytes** count as absent (#325): the URL resolves but is known to 404. -->
       @if (card().thumbnailUrl && !card().assetBytesMissing) {
         <img
           class="shrink-0 size-12 rounded-full object-cover bg-surface-sunken"

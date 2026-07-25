@@ -6,10 +6,7 @@ export interface PathOpener {
 
 /**
  * Show `dir` in the platform's file manager, so backing up worldbuilding is copying one folder (ADR-0070).
- * `openPath`, not `showItemInFolder`: the folder itself is what the user asked for, not its parent.
- *
- * A refusal is reported rather than thrown — the menu item has no surface to fail on, and a missing folder is
- * not worth an error box.
+ * A refusal is reported rather than thrown, as the menu item has no surface to fail on.
  */
 export async function revealFolder(shell: PathOpener, dir: string): Promise<void> {
   const failure = await shell.openPath(dir);

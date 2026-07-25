@@ -24,8 +24,8 @@ const DESKTOP_PORT = basePort + 4;
 const DISABLE_DND_YAML = ['features:', '  plugin:', '    dnd:', '      enabled: false', ''].join('\n');
 // The "New" button mints a Hex Map by default — an enabled non-note Type (ADR-0052).
 const DEFAULT_HEXMAP_YAML = ['entities:', '  defaultType: core.type.hex-map', ''].join('\n');
-// Collaboration off (ADR-0071): the solo self-hoster — still a server profile, so it keeps its login page.
-// Also the desktop run's yaml: that run's profile is pinned by the boot script, since the profile has no key.
+// Collaboration off (ADR-0071): still a server profile, so it keeps its login page. Shared with the
+// desktop run, whose profile the boot script pins instead — there is no hexly.yml key for it.
 const COLLABORATION_OFF_YAML = ['features:', '  collaboration: false', ''].join('\n');
 
 /** One `e2e-server.mjs` invocation: its own port, throwaway Instance Directory, and optional hexly.yml. */
@@ -79,8 +79,7 @@ function authenticated(name: string, port: number, extra: { testMatch?: RegExp; 
 
 /**
  * The setup project that logs into `port`'s server and persists its session (ADR-0009). `testMatch`
- * because how a run authenticates depends on its config: the desktop profile has no login page to
- * drive, so it posts to the login endpoint instead (ADR-0071).
+ * varies because the desktop profile has no login page to drive (ADR-0071).
  */
 function setup(name: string, port: number, testMatch = /.*[/\\]auth\.setup\.ts/) {
   return { name: `setup-${name}`, testMatch, use: { baseURL: urlFor(port) } };
@@ -118,16 +117,14 @@ export default defineConfig({
     authenticated('default-type', DEFAULT_TYPE_PORT, {
       testMatch: /.*[/\\]config[/\\]default-type\.spec\.ts/,
     }),
-    // features.collaboration off (ADR-0071, #316, #317): a run proving the Entity and World sharing
-    // surfaces and instance user management are gone, and the routes behind them 404 — driven by a
-    // Sole-User-shaped account, so no Instance Role check can be doing the hiding.
+    // features.collaboration off (ADR-0071, #316, #317), driven by a Sole-User-shaped account so no
+    // Instance Role check can be doing the hiding.
     setup('collab-off', COLLAB_OFF_PORT),
     authenticated('collab-off', COLLAB_OFF_PORT, {
       testMatch: /.*[/\\]config[/\\]collab-off\.spec\.ts/,
     }),
     // The desktop Deployment Profile (ADR-0071, #318), pinned by the boot script and paired with
-    // Collaboration off as the Desktop App pins both. Its setup posts to the login endpoint, since
-    // this profile renders no login page to drive.
+    // Collaboration off as the Desktop App pins both; its setup posts to the login endpoint.
     setup('desktop', DESKTOP_PORT, /.*[/\\]desktop-auth\.setup\.ts/),
     authenticated('desktop', DESKTOP_PORT, {
       testMatch: /.*[/\\]config[/\\]desktop-profile\.spec\.ts/,

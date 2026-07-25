@@ -10,16 +10,12 @@ interface ItemSnapshot {
   readonly registersAccelerator: boolean;
 }
 
-/** The application menu, one level of submenu deep — which is as deep as it goes. */
 interface MenuSnapshot {
   readonly label: string;
   readonly items: readonly ItemSnapshot[];
 }
 
-/**
- * The live `Menu` in main, described. Everything here is asserted against the menu Electron actually built,
- * not the template it was built from — `apps/desktop/src/menu.spec.ts` covers the template.
- */
+/** The menu Electron actually built, not the template — `apps/desktop/src/menu.spec.ts` covers the template. */
 function readMenu(app: ElectronApplication): Promise<readonly MenuSnapshot[]> {
   return app.evaluate(({ Menu }) =>
     (Menu.getApplicationMenu()?.items ?? []).map((item) => ({
@@ -36,15 +32,12 @@ function readMenu(app: ElectronApplication): Promise<readonly MenuSnapshot[]> {
 }
 
 /**
- * The items whose action lives in the renderer — the ones that must never bind a chord. Ids restated because
- * a spec in this project cannot import from another app's source.
+ * The items whose action lives in the renderer, so must never bind a chord; ids restated because a spec here
+ * cannot import from another app's source.
  */
 const DISPATCHED_ITEMS = ['open-command-palette', 'go-worlds'];
 
-/**
- * Roles that must reach the platform with a chord attached. Lower-cased, because Electron lower-cases a role
- * as it builds the item — these are not the template's spellings.
- */
+/** Roles that must reach the platform with a chord; lower-cased, as Electron lower-cases a role it builds. */
 const NATIVE_CHORDS = [
   'cut',
   'copy',
@@ -83,41 +76,36 @@ test('the menu displays the Palette chord without registering it, and leaves the
   const run = await launch();
   const menu = await readMenu(run.app);
 
-  // The structure the platform expects — the app menu is macOS's, and only macOS's.
+  // The app menu is macOS's, and only macOS's.
   expect(menu.map((m) => m.label)).toEqual(
     process.platform === 'darwin'
       ? ['Hexly', 'File', 'Edit', 'View', 'Go', 'Window']
       : ['File', 'Edit', 'View', 'Go', 'Window'],
   );
 
-  // Displayed, not bound.
   const palette = everyItem(menu).find((item) => item.id === 'open-command-palette');
   expect(palette?.accelerator).toBe('CmdOrCtrl+K');
   expect(palette?.registersAccelerator).toBe(false);
 
-  // And that holds for every item the renderer acts on, chord shown or not.
   const dispatched = everyItem(menu).filter((item) => DISPATCHED_ITEMS.includes(item.id));
   expect(dispatched.map((item) => `${item.id}: ${item.registersAccelerator}`)).toEqual([
     'open-command-palette: false',
     'go-worlds: false',
   ]);
 
-  // Clipboard, zoom, reload, devtools, window and quit reach the platform with its own chord attached — on
-  // macOS this menu is what makes cut/copy/paste work inside web content at all. Whether Electron *registers*
-  // a role's accelerator is Electron's call: it leaves the clipboard ones to macOS's text-editing responder
-  // chain, which is why ⌘C reaches the page at all. Every occurrence, since `close` sits in two menus.
+  // On macOS this menu is what makes cut/copy/paste work inside web content at all. Every occurrence, since
+  // `close` sits in two menus.
   const chordless = NATIVE_CHORDS.filter((role) => {
     const items = everyItem(menu).filter((item) => item.role === role);
     return !items.length || items.some((item) => !item.accelerator);
   });
   expect(chordless).toEqual([]);
 
-  // And the backup affordance: one folder to copy. Not clicked — that opens a file manager over the run.
+  // Not clicked: that opens a file manager over the run.
   const reveal = itemsOf(menu, 'File').find((item) => item.id === 'reveal-data-folder');
   expect(reveal?.label).toMatch(/Data Folder/);
 
-  // The other side of the invariant: main performs New Window itself, so its chord *is* bound — the renderer's
-  // dispatcher never claimed it, and there is nothing for the OS to take away.
+  // Main performs New Window itself, so its chord *is* bound: the renderer's dispatcher never claimed it.
   const newWindow = itemsOf(menu, 'File').find((item) => item.id === 'new-window');
   expect(newWindow?.accelerator).toBe('CmdOrCtrl+Shift+N');
   expect(newWindow?.registersAccelerator).toBe(true);
@@ -126,25 +114,21 @@ test('the menu displays the Palette chord without registering it, and leaves the
 test('the displayed chord dispatches in the renderer, and the menu item runs the same Command', async ({ launch }) => {
   const run = await launch();
   await run.window.waitForURL(/\/worlds$/);
-  // Rendered, not merely routed: the URL changes before the SPA is listening, and a keydown sent into that gap
-  // is simply dropped.
+  // Rendered, not merely routed: a keydown sent before the SPA is listening is simply dropped.
   await expect(run.window.getByTestId('worlds-empty')).toBeVisible();
 
-  // The renderer's half of "displayed, not bound". Playwright delivers this keydown straight to the page, so
-  // what it proves is that the dispatcher answers the chord; that the OS is not holding it is the flag above,
-  // and the modal/editable gating that ownership buys is `shortcut.service.spec.ts` (ADR-0063).
+  // Playwright delivers this keydown straight to the page, so it proves only that the dispatcher answers the
+  // chord; the modal/editable gating is `shortcut.service.spec.ts` (ADR-0063).
   await run.window.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
   await expect(run.window.getByTestId('command-palette-input')).toBeVisible();
   await run.window.keyboard.press('Escape');
   await expect(run.window.getByTestId('command-palette-input')).toBeHidden();
 
-  // The menu's half: the item opens that same Palette, through IPC and the Command it names.
   await clickMenuItem(run.app, 'open-command-palette');
   await expect(run.window.getByTestId('command-palette-input')).toBeVisible();
   await run.window.keyboard.press('Escape');
 
-  // A Command the Palette lists too — one implementation, two surfaces. From somewhere else first, so the
-  // navigation is a claim worth making.
+  // From somewhere else first, so the navigation is a claim worth making.
   await run.window.goto(`${run.origin}/settings`);
   await expect(run.window.getByTestId('theme-light')).toBeVisible();
 
@@ -156,8 +140,8 @@ test('the displayed chord dispatches in the renderer, and the menu item runs the
 test('the bridge hands the renderer the menu channel, unsubscribe included', async ({ launch }) => {
   const { window } = await launch();
 
-  // `onMenuCommand` returns its own unsubscribe, and a function survives the trip out of the preload world
-  // only because `contextBridge` proxies it — worth pinning, since nothing else in the bridge does this.
+  // A returned function survives the trip out of the preload world only because `contextBridge` proxies it, and
+  // nothing else in the bridge does this.
   const unsubscribeType = await window.evaluate(() => {
     const bridge = (globalThis as unknown as { hexly: { onMenuCommand(l: (id: string) => void): () => void } }).hexly;
     const stop = bridge.onMenuCommand(() => undefined);

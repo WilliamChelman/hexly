@@ -17,11 +17,9 @@ import { ClientConfig, ClientPluginConfig, DeploymentProfile } from '@hexly/doma
  * `GET /api/config`. Signals, not a resource, so a future live path (ADR-0044) can push a fresh set in
  * without touching the readers.
  *
- * Owns a predicate per flag — {@link isPluginEnabled}, {@link isCollaborationEnabled},
- * {@link isDesktopProfile} — rather than exposing raw values for callers to interpret. Until {@link init}
- * resolves (or if it fails), every gate **falls open**: every Plugin reads enabled, Collaboration reads
- * on, and the profile reads `server`. The boot fetch is an `APP_INITIALIZER`, so nothing in the app sees
- * the unresolved state, and a failed fetch degrades to today's behaviour rather than blanking the UI.
+ * Owns a predicate per flag rather than exposing raw values for callers to interpret. Until {@link init}
+ * resolves (or if it fails) every gate falls open; the boot fetch is an `APP_INITIALIZER`, so nothing in the
+ * app sees the unresolved state.
  */
 @Injectable({ providedIn: 'root' })
 export class ClientConfigStore {
@@ -33,7 +31,7 @@ export class ClientConfigStore {
   private readonly configsSignal = signal<Readonly<Record<string, ClientPluginConfig>>>({});
   private readonly defaultTypeSignal = signal<string | undefined>(undefined);
   private readonly loadedSignal = signal(false);
-  // Seeded with the fall-open answers, so an unresolved fetch and a failed one need no separate handling.
+  // Fall-open seeds, so an unresolved fetch and a failed one need no separate handling.
   private readonly collaborationSignal = signal(true);
   private readonly profileSignal = signal<DeploymentProfile>('server');
 
@@ -53,18 +51,14 @@ export class ClientConfigStore {
     return !this.loadedSignal() || this.enabledSignal().has(id);
   }
 
-  /**
-   * Whether the Collaboration layer is on (ADR-0071) — the gate for sharing, World roles, Entity
-   * Visibility and Public Links; reactive. Reads **on** until config loads, and if the fetch fails.
-   */
+  /** Reads on until config loads, and if the fetch fails (ADR-0071). */
   isCollaborationEnabled(): boolean {
     return this.collaborationSignal();
   }
 
   /**
-   * Whether this Instance runs the `desktop` Deployment Profile (ADR-0071) — a *policy* question, so it
-   * reads the flag; "can I re-mint a session?" is a capability question and checks the bridge instead.
-   * Reads **server** until config loads, and if the fetch fails.
+   * A policy question, so it reads the flag; capability questions check the bridge instead (ADR-0071).
+   * Reads `server` until config loads, and if the fetch fails.
    */
   isDesktopProfile(): boolean {
     return this.profileSignal() === 'desktop';
@@ -81,8 +75,7 @@ export class ClientConfigStore {
       this.enabledSignal.set(new Set(enabledIds));
       this.configsSignal.set(config.plugins);
       this.defaultTypeSignal.set(config.entities.defaultType);
-      // Defaulted again, not just typed: a payload that omits a flag must not close a gate ADR-0071
-      // says falls open.
+      // Defaulted again: a payload that omits a flag must not close a gate (ADR-0071).
       this.collaborationSignal.set(config.collaboration ?? true);
       this.profileSignal.set(config.profile ?? 'server');
       this.loadedSignal.set(true);

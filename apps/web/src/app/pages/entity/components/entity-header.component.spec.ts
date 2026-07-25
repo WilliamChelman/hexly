@@ -198,8 +198,7 @@ describe('EntityHeader', () => {
     expect(menuItem('manage-owners')).toBeNull();
   });
 
-  // Collaboration off (ADR-0071, #316): the opener here holds every Right, including `manage`, so a
-  // Rights or Instance-Role check would read true and leak the surface.
+  // The opener holds every Right, including `manage`, so a Rights check would read true (ADR-0071, #316).
   it('hides the Share action and the Visibility toggle when Collaboration is off', () => {
     collaboration.set(false);
     open(aldermoor);
@@ -209,10 +208,9 @@ describe('EntityHeader', () => {
     openActions(fixture);
     expect(menuItem('manage-owners')).toBeNull();
     expect(menuItem('visibility-toggle')).toBeNull();
-    // Only the sharing affordances go: Edit types and Pin are not about a second reader.
+    // Edit types and Pin are not sharing.
     expect(menuItem('edit-types')).not.toBeNull();
     expect(menuItem('pin-toggle')).not.toBeNull();
-    // And the dialog behind Share never mounts, so no owner set is reachable.
     expect(fixture.debugElement.query(By.directive(OwnerSetComponent))).toBeNull();
   });
 
@@ -225,18 +223,15 @@ describe('EntityHeader', () => {
     expect(fixture.nativeElement.textContent).toContain('The Whisperwood');
   });
 
-  /**
-   * A name is prose too, so it is spell-checked like the Content below it (#323, ADR-0070) — the Desktop App's
-   * spellchecker is session-wide, and an opt-out here would be the one field it could not reach.
-   */
+  /** A name is prose too, so it is spell-checked like the Content below it (#323, ADR-0070). */
   it('leaves the name field spell-checked', () => {
     open(aldermoor);
 
     const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
-    // The absence of the opt-out is the whole claim: `spellcheck` is inherited, and only an explicit `false`
-    // here could exempt the field. (jsdom implements the attribute but not the IDL property.)
+    // `spellcheck` is inherited; only an explicit `false` would exempt the field (jsdom implements the
+    // attribute, not the IDL property).
     const title = fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement;
     expect(title.getAttribute('spellcheck')).toBeNull();
   });

@@ -71,8 +71,8 @@ const SEARCH_DEBOUNCE_MS = 150;
  * Board image picker reuses; the type facet is pinned, so it is hidden from the rail. Upload mints (or
  * dedups to) an Asset through the ordinary path and refreshes page one.
  *
- * A tile whose Asset reports **Missing Bytes** (#325, ADR-0034) names that state instead of drawing a frame
- * whose `src` the server has already said it cannot serve.
+ * A tile whose Asset reports **Missing Bytes** (#325, ADR-0034) names that state instead of drawing a `src`
+ * the server has already said it cannot serve.
  */
 @Component({
   selector: 'app-asset-browser',
@@ -152,8 +152,8 @@ const SEARCH_DEBOUNCE_MS = 150;
                     [attr.aria-label]="asset.name"
                     [title]="asset.name"
                   >
-                    <!-- Missing Bytes take the tile, ahead of the thumbnail (#325). Emitting no src is the
-                         point: the state came from the server, so the request is known to 404. -->
+                    <!-- Missing Bytes take the tile ahead of the thumbnail (#325): the state came from the
+                         server, so the request is known to 404. -->
                     @if (asset.assetBytesMissing) {
                       <span
                         class="flex h-full flex-col items-center justify-center gap-1 border border-dashed border-gold text-gold"

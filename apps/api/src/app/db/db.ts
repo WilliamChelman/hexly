@@ -64,14 +64,12 @@ export function resolveDbPath(): string {
 }
 
 /**
- * The Asset bytes root (ADR-0034) — `<instanceDir>/assets` beside the database unless `hexly.yml`'s
- * `assets.dir` moves it (ADR-0070): absolute is taken as-is, relative resolves against the Instance
- * Directory. This seam is the one home for that rule; `ASSETS_DIR` feeds it the configured value, so no
- * consumer reads config (ADR-0036). A `:memory:` Instance has no real directory — and reads no
- * `hexly.yml` — so it falls back to a throwaway OS temp dir.
+ * The Asset bytes root (ADR-0034): `<instanceDir>/assets` unless `hexly.yml`'s `assets.dir` moves it —
+ * absolute as-is, relative against the Instance Directory. The one home for that rule, so no consumer reads
+ * config (ADR-0036). A `:memory:` Instance has no real directory, so it falls back to an OS temp dir.
  */
 export function resolveAssetsDir(instanceDir: string, configured?: string): string {
   if (instanceDir === ':memory:') return mkdtempSync(join(tmpdir(), 'hexly-assets-'));
-  // `resolve` *is* the absolute-vs-relative rule: a later absolute segment wins outright.
+  // `resolve` is the absolute-vs-relative rule: a later absolute segment wins.
   return resolve(instanceDir, configured ?? 'assets');
 }

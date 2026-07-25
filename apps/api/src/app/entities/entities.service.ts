@@ -139,11 +139,9 @@ export class EntitiesService {
   ) {}
 
   /**
-   * Attach the missing-bytes state to a freshly read detail (#325, ADR-0034): one PK lookup on the derived
-   * dedup index for the byte address, then one stat through the {@link AssetBytesRegistry} probe — so
-   * `entities` marks the state without learning where bytes live. Only an Entity that owns bytes has an
-   * index row, so everything else pays one indexed miss and carries no flag. Computed per read, which is
-   * what makes restoring the file clear the state with no Reindex.
+   * Attach the missing-bytes state to a detail (#325, ADR-0034): one indexed lookup for the byte address plus
+   * one stat through the {@link AssetBytesRegistry} probe, computed per read so restoring the file clears the
+   * state with no Reindex.
    */
   private withAssetBytesState(detail: EntityDetail): EntityDetail {
     const ref = this.db
@@ -234,9 +232,8 @@ export class EntitiesService {
         const assetRow = row as typeof row & ThumbnailRow;
         const thumbnailUrl = resolveThumbnailUrl(assetRow, row.worldId);
         if (thumbnailUrl) summary = { ...summary, thumbnailUrl };
-        // The missing-bytes state (#325) rides the same opt-in: a read that draws an Asset's imagery is
-        // exactly the read that must say so when the file is not there, and only its rows pay the stat.
-        // Own bytes only — a broken Thumbnail *designation* is the designated Asset's story, not this row's.
+        // The missing-bytes state (#325) rides the same opt-in, so only rows that draw imagery pay the stat.
+        // Own bytes only: a broken Thumbnail designation is the designated Asset's story, not this row's.
         if (this.assetBytes.missing(row.worldId, assetRow.ownAssetHash, assetRow.ownAssetExt))
           summary = { ...summary, assetBytesMissing: true };
       }
@@ -742,9 +739,7 @@ export class EntitiesService {
       case 'conflict':
         return { status: 'conflict', current: this.withAssetBytesState(toDetail(result.row)) };
       case 'ok':
-        // Every detail the client will hold as `current` carries the state (#325) — a save response replaces
-        // the open Entity wholesale, so omitting it here would silently unsay "your bytes are missing" the
-        // moment autosave fires on a stranded Asset's prose.
+        // A save response replaces the client's open Entity wholesale, so it must carry the state too (#325).
         return { status: 'saved', entity: this.withAssetBytesState(detailOf(result.row, req.document)) };
     }
   }
@@ -1242,8 +1237,7 @@ function thumbnailJoin() {
     fieldKind,
     columns: {
       ownAssetHash: ownAsset.hash,
-      // The own-bytes address is projected whole (#325): `hash` resolves the thumbnail URL, `hash + ext` is
-      // the file a read stats to mark a missing Asset — one join answering both.
+      // `hash + ext` is the file a read stats to mark a missing Asset (#325); one join answers both.
       ownAssetExt: ownAsset.ext,
       fieldAssetHash: fieldAsset.hash,
       fieldAssetWorldId: fieldAsset.worldId,

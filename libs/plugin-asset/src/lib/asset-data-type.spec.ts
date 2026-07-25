@@ -14,7 +14,7 @@ describe('core.datatype.asset', () => {
 
   it('harvests the whole byte address for the dedup index (ADR-0065, #325)', () => {
     // The one data-type that owns bytes: its hash keys the (worldId, hash) → entity index, and the pinned
-    // `ext` completes the on-disk address a read stats to tell a missing Asset from a healthy one (#325).
+    // `ext` completes the address a read stats for presence (#325).
     expect(ASSET_DATA_TYPE.harvestAssetRef?.(value)).toEqual({ hash: HASH, ext: '.png' });
     // No edges or text — an Asset's prose is the Content Field's, not the ref's.
     expect(ASSET_DATA_TYPE.harvestEdges).toBeUndefined();

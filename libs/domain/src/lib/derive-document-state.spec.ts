@@ -295,8 +295,7 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
     });
   });
 
-  // The dedup index keys on the hash, but the *file* is `<hash><ext>` — so the derivation carries both, and
-  // a presence check is one hash-addressed stat rather than a listing of the World's folder (#325).
+  // The dedup index keys on the hash, but the file is `<hash><ext>`, so the derivation carries both (#325).
   describe('assetRef: the whole byte address of the bytes a value wraps (ADR-0065, #325)', () => {
     it('harvests the hash and the stored extension together', () => {
       const state = derive({ bytes: { hash: 'f'.repeat(64), ext: '.png' } }, [bytesField]);

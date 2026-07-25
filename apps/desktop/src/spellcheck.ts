@@ -1,17 +1,11 @@
-/** The language to check in when the user's own has no dictionary — and the one the app's own UI is written in. */
+/** The language to check in when the user's own has no dictionary (ADR-0070). */
 export const FALLBACK_LANGUAGE = 'en-US';
 
 /**
  * Which languages the spellchecker runs with, given the user's locale and the dictionaries Chromium has.
- * Hexly is fundamentally a prose tool, so writing in it should be at least as well served as writing in the
- * browser was (ADR-0070).
- *
- * Exactly one language, not a union: a second enabled dictionary makes every word it knows correct, which for
- * an invented-name-heavy vocabulary quietly stops the checker being useful. The locale's own dialect first
- * (`en-GB` over `en-US`), then any dialect of the same language, then English.
- *
- * Empty when Chromium has none of them — `setSpellCheckerLanguages` throws on a language it cannot load, so
- * "no dictionary" has to be sayable.
+ * Exactly one, not a union: a second enabled dictionary makes every word it knows correct, which for an
+ * invented-name-heavy vocabulary stops the checker being useful. Empty when Chromium has none of them, since
+ * `setSpellCheckerLanguages` throws on a language it cannot load.
  */
 export function spellCheckerLanguages(locale: string, available: readonly string[]): readonly string[] {
   const language = bestMatch(locale, available) ?? bestMatch(FALLBACK_LANGUAGE, available);
@@ -34,12 +28,9 @@ export interface SpellCheckerSession {
 }
 
 /**
- * Turn the spellchecker on for `locale` and report the languages it ended up with. Session-wide, so it covers
- * every editable surface a window has — Content, a Board's Text Blocks, and the name fields — rather than
- * being wired per component.
- *
- * A no-op on macOS, where the OS spellchecker is used and picks its own language from what is being typed;
- * calling it anyway keeps one code path and is what every other platform needs.
+ * Turn the spellchecker on for `locale`. Session-wide, so it covers every editable surface a window has rather
+ * than being wired per component. Effectively a no-op on macOS, where the OS spellchecker picks its own
+ * language.
  */
 export function enableSpellChecker(session: SpellCheckerSession, locale: string): readonly string[] {
   const languages = spellCheckerLanguages(locale, session.availableSpellCheckerLanguages);

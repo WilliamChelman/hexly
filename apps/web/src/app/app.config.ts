@@ -44,8 +44,8 @@ export const appConfig: ApplicationConfig = {
     // Credentials first, so the retry the renewal issues inherits them (ADR-0004, ADR-0070).
     provideHttpClient(withInterceptors([withCredentialsInterceptor, sessionRenewalInterceptor])),
     // Fetch the client config (ADR-0052) before stabilisation, ahead of the plugin providers below, so
-    // the enabled-Plugin set is settled before any registry reads it — and, since ADR-0071 rides the
-    // same channel, so the Deployment Profile and Collaboration gates cannot flicker on first render.
+    // the enabled-Plugin set is settled before any registry reads it — and the ADR-0071 gates cannot
+    // flicker on first render.
     provideClientConfig(),
     // Runtime i18n (ADR-0014): one bundle ships every language; LocaleService
     // picks the active one on boot and the switcher flips it live. The loader
@@ -87,8 +87,7 @@ export const appConfig: ApplicationConfig = {
     // The Command Palette's built-in Providers (ADR-0032), registered for the
     // app's lifetime by the palette when it mounts.
     provideBuiltInCommands(),
-    // In the Desktop App, the native menu's clicks arrive as invocations of those same Commands (ADR-0070);
-    // in a browser there is no bridge and this is inert.
+    // The native menu's clicks arrive as invocations of those same Commands (ADR-0070); inert in a browser.
     provideDesktopMenuCommands(),
     // The read contract a lib injects to ask what Entity Types exist (ADR-0048).
     { provide: ENTITY_TYPES, useExisting: TypeRegistry },

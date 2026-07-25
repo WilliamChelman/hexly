@@ -1,14 +1,10 @@
 import { enterLibrary, expect, openEntityActions, test } from '../fixtures';
 
 /**
- * The `desktop` Deployment Profile end-to-end via its own server, whose profile the boot script pins
- * — there is no hexly.yml key for it (ADR-0071; server in `playwright.config.ts`). The run
- * authenticates by posting to the login endpoint (`desktop-auth.setup.ts`), since this profile has no
- * login page, and its config has Collaboration off as the Desktop App pins it, so both cut lists are
- * covered here rather than in Electron.
- *
- * The account is Sole-User-shaped — Superadmin holding every Instance Role — so no absence below can
- * be an Instance Role check's doing (ADR-0071).
+ * The `desktop` Deployment Profile end-to-end via its own server, whose profile the boot script pins —
+ * there is no hexly.yml key for it (ADR-0071; server in `playwright.config.ts`). Collaboration is off
+ * too, as the Desktop App pins it, so both cut lists are covered here rather than in Electron. The
+ * account is Sole-User-shaped, so no absence below can be an Instance Role check's doing.
  */
 
 test('the desktop profile has no login page and no route to one', async ({ page, request }) => {
@@ -19,12 +15,10 @@ test('the desktop profile has no login page and no route to one', async ({ page,
   expect(config.profile).toBe('desktop');
   expect(config.collaboration).toBe(false);
 
-  // The stored session was minted over the API, never typed: the World Index opens on it.
+  // The stored session was minted over the API, never typed.
   await page.goto('/worlds');
   await expect(page).toHaveTitle(/Worlds/);
 
-  // Typed in directly, /login is no destination: it bounces to the World Index and the form the
-  // Sole User could not fill in anyway never renders.
   await page.goto('/login');
   await expect(page).toHaveURL(/\/worlds$/);
   await expect(page.getByLabel('Email')).toHaveCount(0);
@@ -35,21 +29,19 @@ test('the desktop profile has no login page and no route to one', async ({ page,
 test('the user menu keeps theme and language and drops the session and the identity', async ({ page }) => {
   await page.goto('/worlds');
 
-  // Located by component, not by accessible name: the name is translated, and this spec flips the
-  // language below to prove that row still works.
+  // Located by component, not by accessible name: this spec flips the language below.
   const trigger = page.locator('app-user-menu button');
   await trigger.click();
   const menu = page.getByRole('menu');
 
-  // No session to manage: neither Sign out nor its signed-out counterpart.
   await expect(menu.getByRole('menuitem', { name: /sign out/i })).toHaveCount(0);
   await expect(menu.getByRole('menuitem', { name: /login/i })).toHaveCount(0);
-  // A non-identity trigger (ADR-0071): no initials, and no display name in the trigger or the panel.
+  // A non-identity trigger (ADR-0071).
   await expect(page.getByTestId('user-initials')).toHaveCount(0);
   await expect(trigger).not.toContainText('E2E Tester');
   await expect(menu).not.toContainText('E2E Tester');
 
-  // Theme and language are account-independent preferences and stay, working.
+  // Theme and language are account-independent preferences and stay.
   const theme = await page.locator('html').getAttribute('data-theme');
   await menu.getByRole('menuitem', { name: /switch to (solar|astral) theme/i }).click();
   await expect(page.locator('html')).not.toHaveAttribute('data-theme', String(theme));
@@ -87,8 +79,7 @@ test('Settings keeps its Preferences and offers no Profile section and no passwo
 });
 
 test('a session that cannot be recovered ends on an unrecoverable error, not the login page', async ({ page }) => {
-  // Only the policy half: re-minting is a capability question the preload bridge answers, and a
-  // browser has no bridge (ADR-0070, ADR-0071).
+  // Only the policy half: re-minting needs the preload bridge, which a browser has not got (ADR-0070).
   await page.context().clearCookies();
   await page.goto('/worlds');
 
@@ -96,7 +87,6 @@ test('a session that cannot be recovered ends on an unrecoverable error, not the
   await expect(page.getByTestId('session-error')).toBeVisible();
   await expect(page.getByLabel('Password')).toHaveCount(0);
 
-  // Every other guarded destination agrees, and none of them offers a returnUrl to come back with.
   for (const url of ['/settings', '/admin', '/w/nope']) {
     await page.goto(url);
     await expect(page).toHaveURL(/\/session-error$/);
@@ -130,9 +120,7 @@ test('the Collaboration cut list is hidden here too, as the Desktop App pins it 
   await expect(page.getByTestId('command-palette-option-go-admin')).toBeVisible();
   await expect(page.getByTestId('command-palette-option-go-users')).toHaveCount(0);
 
-  // And the one affordance this profile does *not* get by being this profile: moving the Asset storage needs a
-  // native picker and a `hexly.yml` to rewrite, so it checks for the preload bridge, which a browser has not
-  // got (#326, ADR-0071). Absent here, and absent for the right reason.
+  // The move checks for the preload bridge, not the profile, and a browser has none (#326, ADR-0071).
   await page.getByTestId('command-palette-input').fill('>asset');
   await expect(page.getByTestId('command-palette-option-move-asset-storage')).toHaveCount(0);
   await page.keyboard.press('Escape');

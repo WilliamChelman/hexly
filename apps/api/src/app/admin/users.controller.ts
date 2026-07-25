@@ -33,8 +33,8 @@ import { UsersService } from './users.service';
  * The public user *directory* (id + displayName, for pickers) is a separate
  * controller at `/users/directory`; this surface carries the email.
  *
- * {@link CollaborationGuard} is listed first so that where the layer is off the routes read as
- * absent rather than unauthorized (ADR-0071).
+ * {@link CollaborationGuard} is listed first, so where the layer is off the routes read as absent rather
+ * than unauthorized (ADR-0071).
  */
 @Controller('users')
 @UseGuards(CollaborationGuard, SessionAuthGuard, ManageUsersGuard)

@@ -11,29 +11,25 @@ const mainJs = join(workspaceRoot, 'dist', 'apps', 'desktop', 'main.js');
 const webIndex = join(workspaceRoot, 'dist', 'apps', 'web', 'browser', 'index.html');
 
 /**
- * The platform's Electron binary: `electron/index.js` exports its *path*, while the package's types
- * describe the in-process API — hence the cast. Passed explicitly because Playwright's own lookup resolves
- * `electron` from *its* package, which pnpm gives no such dependency.
+ * `electron/index.js` exports the binary's *path* while the package's types describe the in-process API — hence
+ * the cast. Passed explicitly because Playwright resolves `electron` from *its* package, which pnpm gives no
+ * such dependency.
  */
 const electronBinary = createRequire(__filename)('electron') as unknown as string;
 
 /**
- * Which Electron a launch runs, and what it runs it on: the repo's own `electron` against the unpackaged
- * bundle, or an artifact electron-builder produced that *is* both (#327). Everything past `_electron.launch`
- * is the same either way, which is the point — the packaged smoke check waits for the same boot this suite
- * already knows how to wait for, rather than reimplementing it beside a build step.
+ * Which Electron a launch runs and what it runs it on: the repo's own against the unpackaged bundle, or an
+ * artifact electron-builder produced that *is* both (#327), so a packaged run waits for the same boot.
  */
 export interface LaunchTarget {
   readonly executablePath: string;
   /** Arguments before `--user-data-dir`: the bundle to run, for an Electron that is not itself the app. */
   readonly entryArgs: readonly string[];
-  /** What must exist before a launch is worth attempting, as path → what a missing one is. */
   readonly requires: readonly (readonly [path: string, what: string])[];
-  /** What to try when a launch dies mid-boot — nearly always a native module built for the wrong ABI. */
+  /** Shown when a launch dies mid-boot — nearly always a native module built for the wrong ABI. */
   readonly fixHint: string;
 }
 
-/** The unpackaged bundle, run by the Electron in `node_modules` — what `nx e2e desktop-e2e` launches. */
 export const devTarget: LaunchTarget = {
   executablePath: electronBinary,
   entryArgs: [mainJs],
@@ -41,8 +37,7 @@ export const devTarget: LaunchTarget = {
     [mainJs, "the Desktop App's build"],
     [webIndex, "the web app's build"],
   ],
-  // One node_modules holds one ABI (ADR-0070), and a `better-sqlite3` built for Node's — or one left
-  // linker-signed on macOS — kills main mid-boot with no JS error to catch.
+  // One `node_modules` holds one ABI (ADR-0070), and the wrong one kills main mid-boot with no JS error to catch.
   fixHint:
     'If main died loading a native module, run `pnpm native:electron` — and `pnpm native:node` again before `nx test api` or `nx e2e web-e2e`.',
 };
@@ -53,17 +48,12 @@ const BOOT_TIMEOUT = 90_000;
 /** A launch the lock refuses exits at once; anything slower has booted something. */
 const SECOND_LAUNCH_TIMEOUT = 60_000;
 
-/** One launched Desktop App. */
 export interface DesktopRun {
   readonly app: ElectronApplication;
-  /** The window the shell opened, loaded at {@link origin}. */
   readonly window: Page;
   /** The loopback origin this run bound — an ephemeral port (ADR-0070), so never twice the same. */
   readonly origin: string;
-  /**
-   * Everything main has written since Playwright handed the process over, which is *after* `whenReady` — so an
-   * early `boot` line can be missing, and this is a diagnostic rather than something to assert against.
-   */
+  /** Main's output since Playwright handed the process over, which is *after* `whenReady` — a diagnostic. */
   output(): string;
   /** Quit as the user does: the ordered shutdown revokes the session and closes the SQLite handle. */
   close(): Promise<void>;
@@ -76,17 +66,15 @@ export interface SecondLaunch {
 }
 
 /**
- * The Electron suite's base test, over one {@link LaunchTarget}. `launch` opens the Desktop App against one
- * throwaway Instance Directory per test — call it twice for a relaunch — and quits every run it opened at
- * teardown.
+ * The suite's base test over one {@link LaunchTarget}: `launch` opens the app against one throwaway Instance
+ * Directory per test — call it twice for a relaunch — and quits every run it opened at teardown.
  */
 export function defineDesktopTest(target: LaunchTarget) {
   return base.extend<{ userDataDir: string; launch: () => Promise<DesktopRun> }>({
     // Playwright reads a fixture's dependencies off its destructuring pattern; this one has none.
     // eslint-disable-next-line no-empty-pattern
     userDataDir: async ({}, use, testInfo) => {
-      // Per test, so no two tests share an Instance Directory — nor the single-instance lock, which is what
-      // lets the relaunch and second-launch facts sit in one suite.
+      // Per test, so no two tests share an Instance Directory — nor the single-instance lock.
       const dir = join(workspaceRoot, 'tmp', 'desktop-e2e', testInfo.testId);
       // Cleared going in, not coming out: a failed run's database is the first thing worth looking at.
       rmSync(dir, { recursive: true, force: true });
@@ -100,22 +88,19 @@ export function defineDesktopTest(target: LaunchTarget) {
         runs.push(run);
         return run;
       });
-      // A run the test already quit is a no-op here; one left open would hold the database — and the lock —
-      // into the next test.
+      // One left open would hold the database — and the lock — into the next test.
       for (const run of runs) await run.close().catch(() => undefined);
     },
   });
 }
 
-/** The suite's own test: the unpackaged bundle. A packaged run defines its own from {@link defineDesktopTest}. */
 export const test = defineDesktopTest(devTarget);
 
 export { expect };
 
 /**
- * Choose an application-menu item the way a user does: `MenuItem.click` *is* the handler main gave it, so
- * calling it is the click. Read off the live `Menu`, so a spec exercises the menu Electron built rather than
- * the template it was built from.
+ * `MenuItem.click` *is* the handler main gave it, and it is read off the live `Menu` so a spec exercises the
+ * menu Electron built rather than the template.
  */
 export function clickMenuItem(app: ElectronApplication, id: string): Promise<void> {
   return app.evaluate(({ Menu }, itemId) => {
@@ -129,9 +114,8 @@ export function clickMenuItem(app: ElectronApplication, id: string): Promise<voi
 /**
  * Launch the Desktop App against `userDataDir`, resolving once its window is loaded at the API's origin.
  *
- * `--user-data-dir` is the whole isolation: the Instance Directory is pinned to `userData/hexly` and the
- * single-instance lock lives there too (ADR-0070), so that one switch gives the run its own database and
- * keeps a developer's real Hexly from answering for it.
+ * `--user-data-dir` is the whole isolation: the Instance Directory and the single-instance lock both live under
+ * `userData` (ADR-0070), so one switch keeps a developer's real Hexly from answering for the run.
  */
 async function launchDesktopApp(userDataDir: string, target: LaunchTarget): Promise<DesktopRun> {
   for (const [path, what] of target.requires) requireBuilt(path, what);
@@ -145,9 +129,8 @@ async function launchDesktopApp(userDataDir: string, target: LaunchTarget): Prom
       timeout: BOOT_TIMEOUT,
     });
   } catch (err) {
-    // A launch Playwright never gets a handle on, which is the shape a missing native module takes: main dies
-    // in `failToStart`, whose modal error box answers nothing. There is no process to read output off, so the
-    // fix-it hint is all this can offer — and it is the answer nearly every time.
+    // No process to read output off — a missing native module dies in `failToStart`, behind a modal error box —
+    // so the fix-it hint is all this can offer.
     throw new Error(bootFailureMessage(err, '', target));
   }
   const output = collectOutput(app.process());
@@ -165,8 +148,8 @@ async function launchDesktopApp(userDataDir: string, target: LaunchTarget): Prom
 }
 
 /**
- * Launch the app a second time the way double-clicking it would. Not driven through Playwright: the
- * behaviour under test is a process that takes the lock's refusal and leaves.
+ * A second launch as double-clicking would do it — not through Playwright, since the behaviour under test is a
+ * process that takes the lock's refusal and leaves.
  */
 export async function launchAgain(userDataDir: string): Promise<SecondLaunch> {
   const child = spawn(devTarget.executablePath, launchArgs(userDataDir, devTarget), { cwd: workspaceRoot });

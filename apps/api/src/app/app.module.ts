@@ -17,8 +17,7 @@ import { TestModule } from './test/test.module';
  * not `NODE_ENV !== 'production'`: an unset or unknown NODE_ENV (the default in a real deploy)
  * must fail closed, so the routes stay physically absent even if HEXLY_E2E=1 leaks in.
  *
- * Exported because `main.ts` gates the harness's Deployment Profile pin (ADR-0071) on the same
- * allowlist — one definition of "this process is an e2e run", not two that can drift.
+ * Exported so `main.ts` gates its e2e Deployment Profile pin on the same allowlist (ADR-0071).
  */
 export const e2eTestingEnabled =
   process.env.HEXLY_E2E === '1' && (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development');

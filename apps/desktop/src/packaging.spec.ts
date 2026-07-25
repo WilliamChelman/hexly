@@ -2,8 +2,8 @@ import config from '../electron-builder.config.js';
 import { APP_NAME } from './instance-dir';
 
 /**
- * The packaging facts that fail *silently* or *late* if they drift. Everything else about a package is
- * asserted by opening one — `apps/desktop-e2e/src/packaged/packaged-app.spec.ts` does that after every build.
+ * The packaging facts that fail *silently* or *late* if they drift; everything else is asserted by opening a
+ * package in `apps/desktop-e2e/src/packaged/packaged-app.spec.ts`.
  */
 describe('the electron-builder configuration', () => {
   const originalVersion = process.env.HEXLY_VERSION;
@@ -14,14 +14,13 @@ describe('the electron-builder configuration', () => {
   });
 
   it('names the artifact what main names the app', () => {
-    // The bundle's name and the app's own name are the same name, and every path derived from the bundle — the
-    // packaged smoke check's included — is spelled from the former.
+    // Every path derived from the bundle, the packaged smoke check's included, is spelled from `productName`.
     expect(config.productName).toBe(APP_NAME);
   });
 
   it('unpacks every native module from the archive', () => {
-    // Native code cannot be `dlopen`ed out of an asar. The image library is the one to watch: its binaries sit
-    // in sibling `@img/*` packages, and getting it wrong shows up during thumbnailing, not at build time.
+    // Native code cannot be `dlopen`ed out of an asar; sharp's binaries sit in sibling `@img/*` packages, and a
+    // miss shows up during thumbnailing rather than at build time.
     expect(config.asarUnpack).toEqual(
       expect.arrayContaining([
         '**/node_modules/better-sqlite3/**',
@@ -33,16 +32,15 @@ describe('the electron-builder configuration', () => {
   });
 
   it('configures no signing, no notarization and no updater', () => {
-    // One decision, not two: Squirrel.Mac will not update an unsigned bundle, so a publish provider here could
-    // only ever ship an updater that fails (ADR-0070). Adding signing later is what re-opens the updater.
+    // Squirrel.Mac will not update an unsigned bundle, so a publish provider could only ship an updater that
+    // fails (ADR-0070).
     expect(config.publish).toBeNull();
     expect(config.mac.identity).toBeNull();
     expect(config.mac.notarize).toBe(false);
   });
 
-  // Three runners upload three artifacts to one Releases page (#328), and the release workflow attaches each by
-  // globbing `*-$VERSION-*.<ext>` — so a dropped macro is not cosmetic: it attaches nothing, on a release that
-  // otherwise succeeded.
+  // The release workflow attaches each of the three runners' artifacts by globbing `*-$VERSION-*.<ext>` (#328),
+  // so a dropped macro attaches nothing.
   it.each([
     ['mac', 'macos'],
     ['win', 'windows'],
@@ -57,8 +55,8 @@ describe('the electron-builder configuration', () => {
   });
 
   it('labels the artifact with the release version when a release has one to give', async () => {
-    // `HEXLY_VERSION` is how the release workflow names what it just tagged; without it every artifact of every
-    // release is `0.0.0`, since semantic-release writes no version back into `package.json`.
+    // Semantic-release writes no version back into `package.json`, so `HEXLY_VERSION` is how a release names
+    // what it just tagged.
     process.env.HEXLY_VERSION = 'v9.8.7';
     vi.resetModules();
 

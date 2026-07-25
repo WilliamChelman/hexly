@@ -19,8 +19,7 @@ const KIND_ICONS: Record<string, IconName> = {
  * gracefully with zero new machinery. It backs both the **Asset detail page** and, through the Entity View
  * Outlet's transclusion (ADR-0062), a Board **Embed** of an Asset.
  *
- * **Missing Bytes** (#325, ADR-0034) renders a third thing, ahead of the mime dispatch. Stats and prose still
- * render: they are document facts, and the state exists to say they survived.
+ * Missing Bytes (#325) render ahead of the mime dispatch; Stats and prose still render, being document facts.
  *
  * It is the detail page's main content in one View: the rendered image/icon, the mechanical **Asset
  * Stats**, and the canonical **Content** prose (the very {@link ContentEditorComponent} an Entity's
@@ -42,10 +41,8 @@ const KIND_ICONS: Record<string, IconName> = {
       <div class="mx-auto flex max-w-[60rem] flex-col gap-6 px-6 py-6">
         <!-- The rendered Asset (ADR-0065): the image inline when the bytes are an image and load, else the
              icon card — the same fallback a broken/deleted URL degrades to, so one missing Asset never blanks
-             the page (mirrors the Board Image element).
-
-             Missing Bytes precede the mime dispatch and are their own state, never that fallback (#325). No
-             src is emitted: the server already told us it 404s. -->
+             the page (mirrors the Board Image element). Missing Bytes are their own state ahead of that
+             fallback, and emit no src (#325). -->
         @if (bytesMissing()) {
           <div
             class="mx-auto flex w-full max-w-sm flex-col items-center gap-2 rounded-md border border-dashed border-gold bg-surface px-6 py-10 text-center"
@@ -143,10 +140,7 @@ export class AssetViewComponent {
 
   protected readonly mime = computed(() => this.value()?.mime ?? '');
 
-  /**
-   * **Missing Bytes** as the server computed it on this read (#325) — distinct from the icon-card fallback,
-   * which also means "not an image". Recomputed per read, so a restored file clears it with no Reindex.
-   */
+  /** Distinct from the icon-card fallback, which also means "not an image" (#325). */
   protected readonly bytesMissing = computed(() => this.session.current()?.assetBytesMissing === true);
 
   /** Whether to draw the image inline: an image-kind ref whose URL resolved and has not failed to load. */

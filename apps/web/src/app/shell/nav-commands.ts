@@ -27,10 +27,8 @@ export class NavCommands implements CommandProvider {
   readonly prefix = '>';
   readonly label = 'commandPalette.commands';
 
-  /**
-   * Built once and held, because two surfaces share it: the Palette lists it and the Desktop App's native
-   * menu invokes it by id — one Command with one `run`, not a copy per surface (ADR-0070).
-   */
+  /** Built once and held: the Palette lists it and the native menu invokes it by id — one `run`, not a copy
+   * per surface (ADR-0070). */
   private readonly goToWorlds = this.nav(GO_TO_WORLDS, 'commandPalette.goToWorlds', ['/worlds']);
 
   constructor() {
@@ -55,8 +53,8 @@ export class NavCommands implements CommandProvider {
     const transloco = this.transloco;
     return {
       id,
-      // Resolved on read, not at build time: {@link goToWorlds} is held for the app's lifetime and would
-      // otherwise keep the language it was built in — and `search` filters on this text.
+      // Resolved on read: a held Command would otherwise keep the language it was built in, and `search`
+      // filters on this text.
       get label() {
         return transloco.translate(labelKey);
       },

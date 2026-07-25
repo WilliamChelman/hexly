@@ -65,8 +65,7 @@ describe('NavCommands', () => {
   });
 
   it('drops Go to Users once Collaboration is off, keeping the repair surface', async () => {
-    // The Sole User's shape (ADR-0071): Superadmin and every Instance Role, so both role checks read
-    // true. Only the flag can cut Users — and it must not cut the Reindex with it.
+    // The Sole User's shape (ADR-0071): both role checks read true, so only the flag can cut Users.
     signIn([...INSTANCE_ROLES], true);
     collaboration.set(false);
     const commands = await firstValueFrom(provider.search(''));
@@ -91,8 +90,8 @@ describe('NavCommands', () => {
   });
 
   it("re-resolves a held Command's label after a language switch", async () => {
-    // Worlds is built once and held for the Directory (ADR-0070), so a frozen label would both read in the
-    // old language and stop matching what the user types.
+    // Worlds is built once and held (ADR-0070), so a frozen label would read in the old language and stop
+    // matching what the user types.
     signIn([]);
     TestBed.inject(TranslocoService).setActiveLang('fr');
 

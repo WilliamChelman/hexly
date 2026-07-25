@@ -21,9 +21,8 @@ import { ASSET_TYPE_DEFINITIONS, CORE_VIEW_ASSET } from './asset-types';
 export function providePluginAsset(): EnvironmentProviders {
   return makeEnvironmentProviders([
     // The icon-card glyphs the Asset View falls back to per kind (ADR-0065): `asset` (image) is the type's
-    // own icon; the rest cover the non-image kinds that render as an icon card today. `asset-missing` is not
-    // a kind — it marks an Asset whose bytes are not under the Assets root (#325), so it must read as absence
-    // rather than as another file type.
+    // own icon; the rest cover the non-image kinds that render as an icon card today. `asset-missing` is no
+    // kind: it must read as absence rather than as another file type (#325).
     provideIcons([
       lucideGlyph('asset', LucideImage),
       lucideGlyph('asset-pdf', LucideFileText),

@@ -4,18 +4,15 @@ import { type AssetStorageMoveProgress, type AssetStorageMoveRefusal, DESKTOP_BR
 import { ButtonComponent, DialogComponent, DialogRef } from '@hexly/web-ui';
 
 /**
- * What the user is watching. `choosing` is the native folder picker, which main opens as this dialog mounts;
- * `moved` is terminal in the sense that matters — the app is already on its way to relaunching.
+ * `choosing` is the native folder picker main opens as this dialog mounts; `moved` is terminal in the sense
+ * that matters — the app is already on its way to relaunching.
  */
 type MoveState = 'choosing' | 'copying' | 'cancelling' | 'moved' | 'failed';
 
 /**
- * The Desktop App's Asset-storage move, as the user sees it (#326): the shell picks the folder, copies and
- * verifies every file by hash, then rewrites `hexly.yml` and relaunches. This dialog exists because that copy
- * can be gigabytes — it is the surface progress is reported on and the only place the move can be cancelled.
- *
- * The move *is* the dialog: opening it starts the picker, and closing it cancels a copy in flight rather than
- * leaving one running where nothing reports it.
+ * The Desktop App's Asset-storage move, as the user sees it (#326). It exists because the copy can be
+ * gigabytes: it is where progress is reported and the only place the move can be cancelled. The move *is* the
+ * dialog — opening it starts the picker, closing it cancels a copy in flight.
  */
 @Component({
   selector: 'app-move-asset-storage-dialog',
@@ -134,7 +131,7 @@ export class MoveAssetStorageDialogComponent {
         this.state.set('failed');
         return;
       default:
-        // Dismissed or cancelled: the user's own gesture, and the Assets are exactly where they were.
+        // Dismissed or cancelled: the user's own gesture, and the Assets are where they were.
         this.dialogRef.close();
     }
   }
@@ -150,9 +147,8 @@ export class MoveAssetStorageDialogComponent {
   }
 
   /**
-   * Escape or the backdrop. Unless the move has already settled, that is a cancel: leaving a gigabyte-scale copy
-   * running with no surface reporting it — and a relaunch waiting at the end of it — is the one outcome to rule
-   * out. Which is why it covers `choosing` too, where the copy has not started but is about to.
+   * Escape or the backdrop. Unless the move has already settled that is a cancel — `choosing` included, where
+   * the copy is about to start — so no unreported copy is left running with a relaunch at the end of it.
    */
   protected dismiss(): void {
     if (this.state() === 'choosing' || this.state() === 'copying') this.cancel();

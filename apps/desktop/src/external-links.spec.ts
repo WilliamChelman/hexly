@@ -3,11 +3,9 @@ import { linkDestination, type NavigatingContents, openExternally, routeLinks, t
 /** The loopback origin one launch bound; the port is ephemeral (ADR-0070), so nothing may key on this one. */
 const ORIGIN = 'http://127.0.0.1:52341';
 
-/** A `WebContents` stand-in whose two interception points a spec can fire. */
 function fakeContents(): NavigatingContents & {
-  /** Ask as `window.open` does, returning what Electron would be told to do. */
   requestWindow(url: string): { action: 'deny' };
-  /** Click a link in the page, returning whether the window was allowed to navigate. */
+  /** Returns whether the window was allowed to navigate. */
   clickLink(url: string): boolean;
 } {
   let openHandler: ((details: { url: string }) => { action: 'deny' }) | undefined;
@@ -91,7 +89,7 @@ describe('routeLinks', () => {
       const opened: string[] = [];
       routeLinks(contents, ORIGIN, shell, { openWindow: (url) => void opened.push(url) });
 
-      // Denied so Electron does not build a window of its own — ours is opened instead.
+      // Denied so Electron does not build a window of its own.
       expect(contents.requestWindow(`${ORIGIN}/w/w1/entities/e2`)).toEqual({ action: 'deny' });
 
       expect(opened).toEqual([`${ORIGIN}/w/w1/entities/e2`]);

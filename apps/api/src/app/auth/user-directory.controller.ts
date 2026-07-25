@@ -12,8 +12,8 @@ import { SessionAuthGuard } from './session-auth.guard';
  * Distinct from the role-gated `manage-users` account surface at `/users`
  * (ADR-0047).
  *
- * It exists only to populate the share dialogs' people pickers, so it is Collaboration entire
- * (ADR-0071): absent where the layer is off.
+ * Collaboration entire (ADR-0071) — it exists only for the share dialogs' people pickers — so it is absent
+ * where the layer is off.
  */
 @Controller('users/directory')
 @UseGuards(CollaborationGuard, SessionAuthGuard)

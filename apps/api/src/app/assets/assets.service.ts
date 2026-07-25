@@ -61,15 +61,12 @@ export class AssetsService implements OnModuleInit {
   ) {}
 
   /**
-   * Register the two hooks the `entities` module holds for a byte-owning subsystem, so it never learns what
-   * an Asset is.
+   * Register the Asset byte reaper on the Entity deletion hooks (ADR-0065): deleting an Asset Entity is the
+   * ordinary Entity delete, and this is what makes it take the bytes/thumbnail with it. `EntityWrites` fires
+   * it post-commit; dedup guarantees one Entity per hash, so the bytes are safely orphaned once it is gone.
    *
-   * The deletion reaper (ADR-0065): deleting an Asset Entity is the ordinary Entity delete, and this is what
-   * makes it take the bytes/thumbnail with it. `EntityWrites` fires it post-commit; dedup guarantees one
-   * Entity per hash, so the bytes are safely orphaned once it is gone.
-   *
-   * The byte-presence probe (#325): this service alone knows the resolved Assets root, so it answers "are
-   * these bytes here?" for the reads that mark a missing Asset.
+   * And the byte-presence probe (#325): this service alone knows the resolved Assets root, so `entities`
+   * never learns what an Asset is.
    */
   onModuleInit(): void {
     this.deletions.register((deleted) => this.reap(deleted));
@@ -77,13 +74,9 @@ export class AssetsService implements OnModuleInit {
   }
 
   /**
-   * Whether an Asset's bytes are on disk under the resolved Assets root (#325, ADR-0034). One stat at the
-   * hash-derived path — never a directory listing and never a rehash — which is what makes it affordable per
-   * read: the address comes off the derived dedup index, so nothing walks the tree looking for it.
-   *
-   * The thumbnail is deliberately not consulted: it is a regenerable cache that can outlive (or never exist
-   * beside) the original, so only the original answers the question the user is asking. Path-traversal-safe
-   * like {@link read} — an address that is not a single path segment is "not there".
+   * Whether an Asset's bytes are on disk (#325, ADR-0034): one stat at the hash-derived path, cheap enough to
+   * run per read. The regenerable thumbnail is deliberately not consulted, and an address that is not a
+   * single path segment reads as "not there", as in {@link read}.
    */
   bytesPresent(worldId: string, hash: string, ext: string): boolean {
     const file = hash + ext;

@@ -72,16 +72,14 @@ describe('Asset serving endpoint', () => {
 });
 
 /**
- * `assets.dir` end-to-end (ADR-0034 amendment, ADR-0070): `hexly.yml` → the `ASSETS_DIR` seam → where an
- * upload's bytes land and what the capability URL serves. Composed over a real throwaway Instance
- * Directory with `ASSETS_DIR` *not* overridden, because the wiring is the thing under test.
+ * `assets.dir` end-to-end (ADR-0034 amendment, ADR-0070). `ASSETS_DIR` is deliberately not overridden: the
+ * wiring from `hexly.yml` through the seam is what's under test.
  */
 describe('Asset bytes root from hexly.yml (ADR-0070)', () => {
   const originalDir = process.env.HEXLY_DIR;
   let app: INestApplication;
   let instanceDir: string;
 
-  /** Boot over a fresh Instance Directory carrying `yml` (none when absent), and seed a World to upload into. */
   async function boot(yml?: string): Promise<void> {
     instanceDir = mkdtempSync(join(tmpdir(), 'hexly-assets-instance-'));
     if (yml !== undefined) writeFileSync(join(instanceDir, 'hexly.yml'), yml);
@@ -96,7 +94,7 @@ describe('Asset bytes root from hexly.yml (ADR-0070)', () => {
     seedUserAndWorld(db);
   }
 
-  /** Mint an Asset from uploaded bytes — what the upload route does behind multer — and hand back its URL. */
+  /** What the upload route does behind multer. */
   async function mintUpload(filename: string): Promise<string> {
     const mint = app.get(AssetMintService);
     const { url } = mint.mint('u1', 'world-1', filename, PNG, await mint.extract(filename, PNG));
@@ -118,7 +116,6 @@ describe('Asset bytes root from hexly.yml (ADR-0070)', () => {
 
     const res = await request(app.getHttpServer()).get(url).expect(200);
     expect(new Uint8Array(res.body)).toEqual(PNG);
-    // The bytes are on the configured volume, and nothing was written beside the database.
     expect(existsSync(join(elsewhere, 'world-1', `${url.split('/').pop()}`))).toBe(true);
     expect(existsSync(join(instanceDir, 'assets'))).toBe(false);
     rmSync(elsewhere, { recursive: true, force: true });
@@ -135,10 +132,8 @@ describe('Asset bytes root from hexly.yml (ADR-0070)', () => {
 });
 
 /**
- * Missing Asset bytes (#325, ADR-0034 amendment). Changing `assets.dir` moves no existing bytes, and an
- * external volume can be unmounted — so bytes go absent while the Entity, its Stats and its prose stay
- * perfectly intact. The read model must be able to say which of the two happened, and say it live: the state
- * is one stat off the address the dedup index already holds, so restoring the file heals it with no Reindex.
+ * Missing Asset bytes (#325, ADR-0034 amendment): bytes can go absent — a moved `assets.dir`, an unmounted
+ * volume — while the Entity stays intact, so the read model reports it live off one stat.
  */
 describe('Missing Asset bytes (#325)', () => {
   let app: INestApplication;
@@ -164,7 +159,6 @@ describe('Missing Asset bytes (#325)', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  /** Mint an Asset the ordinary way and hand back its id plus the on-disk path of its bytes. */
   async function mintAsset(): Promise<{ id: string; bytesPath: string }> {
     const mint = app.get(AssetMintService);
     const { entity } = mint.mint('u1', 'world-1', 'Portrait.png', PNG, await mint.extract('Portrait.png', PNG));
@@ -176,13 +170,12 @@ describe('Missing Asset bytes (#325)', () => {
     const { id, bytesPath } = await mintAsset();
     const entities = app.get(EntitiesService);
 
-    // A healthy Asset carries no flag at all — visually unchanged from before this state existed.
     expect(entities.load('u1', id)?.assetBytesMissing).toBeUndefined();
 
     rmSync(bytesPath);
     expect(entities.load('u1', id)?.assetBytesMissing).toBe(true);
 
-    // Restoring the file clears it on the next read — no Reindex, because nothing derived went stale.
+    // No Reindex: nothing derived went stale.
     writeFileSync(bytesPath, PNG);
     expect(entities.load('u1', id)?.assetBytesMissing).toBeUndefined();
   });
@@ -190,8 +183,7 @@ describe('Missing Asset bytes (#325)', () => {
   it('marks it on the thumbnail-bearing list read too — the Asset Browser draws its grid off that', async () => {
     const { id, bytesPath } = await mintAsset();
     const entities = app.get(EntitiesService);
-    // Exactly the read the Asset Browser issues: the type facet pinned to the asset type (which is
-    // hidden-from-default-listing, ADR-0065) and thumbnails opted in.
+    // Exactly the read the Asset Browser issues; the asset type is hidden from default listing (ADR-0065).
     const tileFor = () =>
       entities
         .list('u1', {
@@ -208,7 +200,7 @@ describe('Missing Asset bytes (#325)', () => {
 
     rmSync(bytesPath);
     expect(tileFor()?.assetBytesMissing).toBe(true);
-    // The thumbnail URL still resolves off the index — the state is what tells the grid not to draw it.
+    // The thumbnail URL still resolves; the flag is what tells the grid not to draw it.
     expect(tileFor()?.thumbnailUrl).toBeDefined();
   });
 
@@ -220,8 +212,7 @@ describe('Missing Asset bytes (#325)', () => {
 
     rmSync(bytesPath);
 
-    // Autosave on the Asset's prose: the client holds this response as `current`, so a bare detail here
-    // would unsay the state while the file is still gone.
+    // The client holds a write response as `current`, so a bare detail here would unsay the flag.
     const saved = entities.save('u1', id, { document: open.document, version: open.version });
     expect(saved.status).toBe('saved');
     expect(saved.status === 'saved' && saved.entity.assetBytesMissing).toBe(true);
@@ -233,8 +224,8 @@ describe('Missing Asset bytes (#325)', () => {
     const { id } = await mintAsset();
     const entities = app.get(EntitiesService);
 
-    // A thumbnail is regenerable and may never have existed (a PDF, bytes sharp could not parse); losing it
-    // must not read as "your file is gone", because the serving route falls back to the original.
+    // Thumbnails are regenerable and may never have existed (e.g. a PDF), so their absence is not the
+    // original's; the serving route falls back.
     const hash = (entities.load('u1', id)?.document['core.field.asset'] as { hash: string }).hash;
     rmSync(join(dir, 'world-1', `${hash}.thumb.webp`), { force: true });
 

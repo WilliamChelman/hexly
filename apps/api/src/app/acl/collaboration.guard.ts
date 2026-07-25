@@ -2,11 +2,8 @@ import { CanActivate, Inject, Injectable, NotFoundException } from '@nestjs/comm
 import { HEXLY_CONFIG, type HexlyConfig } from '../config';
 
 /**
- * Makes the Collaboration layer's routes **absent** — 404, not 403 — where `features.collaboration`
- * is off (ADR-0071), enforced at the route as ADR-0068 enforces at the write choke point.
- *
- * Never applied to `/auth/login` (auth, not Collaboration), `/admin/reindex` (ADR-0037 repair),
- * `GET /config`, or the Asset bytes route.
+ * Makes the Collaboration layer's routes absent — 404, not 403 — where `features.collaboration` is off
+ * (ADR-0071). Never applied to `/auth/login`, `/admin/reindex`, `GET /config` or the Asset bytes route.
  */
 @Injectable()
 export class CollaborationGuard implements CanActivate {

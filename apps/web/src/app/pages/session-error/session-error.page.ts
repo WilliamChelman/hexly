@@ -4,10 +4,9 @@ import { AppShellStore } from '@hexly/web-core';
 import { EyebrowComponent } from '@hexly/web-ui';
 
 /**
- * Where a session that cannot be recovered lands in the desktop profile, which has no password for a
- * login page to ask for (ADR-0070, ADR-0071). CTA-free: re-minting is the preload bridge's job, and a
- * bridge that answers never lets a navigation reach this page. Standalone, like the login page —
- * every rail destination bounces without a session.
+ * Where a session that cannot be recovered lands in the desktop profile, which has no login page to send
+ * it to (ADR-0070, ADR-0071). CTA-free: re-minting is the preload bridge's job. Standalone, like the login
+ * page — every rail destination bounces without a session.
  */
 @Component({
   selector: 'app-session-error-page',

@@ -68,8 +68,7 @@ type ImporterStatusLine =
             }
           </div>
 
-          <!-- The per-run Visibility goes with every other Visibility affordance when Collaboration
-               is off (ADR-0071); the row itself is not sharing. -->
+          <!-- Visibility goes with every other Visibility affordance when Collaboration is off (ADR-0071). -->
           @if (collaboration()) {
             <select
               appSelect
@@ -177,8 +176,7 @@ export class WorldImportsPanelComponent implements OnInit {
   }
 
   protected visibilityFor(importerId: string): Visibility {
-    // No toggle means no intent to honour, so an import mints at the schema default like every other
-    // write path — Visibility left inert (ADR-0071).
+    // No toggle means no intent to honour: the import mints at the schema default (ADR-0071).
     return this.visibility()[importerId] ?? (this.collaboration() ? 'shared' : 'private');
   }
 

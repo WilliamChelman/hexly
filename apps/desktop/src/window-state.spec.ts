@@ -22,7 +22,6 @@ function state(bounds: WindowBounds, maximized = false): WindowState {
   return { bounds, maximized };
 }
 
-/** A `BrowserWindow` stand-in whose geometry and events a spec drives. */
 function fakeWindow(bounds: WindowBounds): GeometryWindow & {
   bounds: WindowBounds;
   maximized: boolean;
@@ -159,7 +158,6 @@ describe('rememberGeometry', () => {
     window.emit('close');
 
     expect(saved).toHaveLength(1);
-    // And the debounced write it pre-empted does not land a second time.
     vi.advanceTimersByTime(1000);
     expect(saved).toHaveLength(1);
   });
@@ -173,7 +171,6 @@ describe('rememberGeometry', () => {
     tracker.flush();
 
     expect(saved).toHaveLength(1);
-    // Nothing pending, so a second flush is a no-op rather than a duplicate.
     tracker.flush();
     expect(saved).toHaveLength(1);
   });

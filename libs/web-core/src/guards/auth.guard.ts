@@ -6,12 +6,9 @@ import { AuthClient } from '../services/auth.client';
 import { ClientConfigStore } from '../services/client-config.store';
 
 /**
- * Where a navigation without a session goes — the *policy* half of 401 recovery, so it reads the
- * profile (ADR-0071): the desktop profile has no password a login form could ask for (ADR-0070).
- * Reached only once the capability half has had its turn: `sessionRenewalInterceptor` already asked the
- * preload bridge for a fresh session, so a bridge that answers never lets a navigation get this far.
- * Dependencies are arguments because the guards call this from an operator, outside their injection
- * context.
+ * Where a navigation without a session goes: the desktop profile has no password a login form could ask for
+ * (ADR-0070, ADR-0071). Dependencies are arguments because the guards call this from an rxjs operator,
+ * outside their injection context.
  */
 function unauthenticatedDestination(router: Router, config: ClientConfigStore, url: string): UrlTree {
   return config.isDesktopProfile()

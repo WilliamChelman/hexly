@@ -19,7 +19,7 @@ export function provideBuiltInCommands(): Provider[] {
     { provide: COMMAND_PROVIDERS, useExisting: WorldQuickOpen, multi: true },
     { provide: COMMAND_PROVIDERS, useExisting: CreateCommands, multi: true },
     { provide: COMMAND_PROVIDERS, useExisting: NavCommands, multi: true },
-    // Empty in a browser: the Desktop App's shell affordances are capabilities, not entries to disable.
+    // Empty in a browser: a shell affordance is a capability, not an entry to disable.
     { provide: COMMAND_PROVIDERS, useExisting: AssetStorageCommands, multi: true },
     // Its own `/r ` prefix, so it never shares a section — listed last for tidiness (ADR-0032).
     { provide: COMMAND_PROVIDERS, useExisting: DiceCommands, multi: true },

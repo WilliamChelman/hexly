@@ -26,7 +26,6 @@ class FakeBridge {
 
   cancelAssetStorageMove = (): void => void this.cancelled++;
 
-  /** A file going past, as main reports it. */
   progress(progress: Partial<AssetStorageMoveProgress> = {}): void {
     this.report?.({
       file: 'world-1/aaa.png',
@@ -38,7 +37,6 @@ class FakeBridge {
     });
   }
 
-  /** How the move ended. */
   finish(outcome: AssetStorageMoveOutcome): void {
     this.settle?.(outcome);
   }
@@ -85,8 +83,7 @@ describe('MoveAssetStorageDialogComponent', () => {
 
     expect(text(fixture, 'asset-move-progress')).toContain('1');
     expect(text(fixture, 'asset-move-file')).toBe('world-1/aaa.png');
-    // Bytes, not files: 1 of 4 files but a quarter of the bytes — a file count would say the same by luck here,
-    // so the assertion is on the byte fraction the element carries.
+    // Bytes, not files: 25% is the byte fraction, not the 1-of-4 file count.
     expect(fixture.nativeElement.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('25');
   });
 
@@ -105,7 +102,7 @@ describe('MoveAssetStorageDialogComponent', () => {
     bridge.finish({ status: 'cancelled' });
     await fixture.whenStable();
 
-    // Nothing to report: the user asked, and the Assets are exactly where they were.
+    // No message: the user asked, and the Assets are where they were.
     expect(closes).toBe(1);
   });
 
@@ -144,7 +141,7 @@ describe('MoveAssetStorageDialogComponent', () => {
     expect(closes).toBe(0);
   });
 
-  /** Our own refusal has copy of its own, because unlike a filesystem message it is ours to translate. */
+  /** Our own refusal is ours to translate, unlike a filesystem message. */
   it('says a refusal in the app’s own words rather than passing a sentence through from the shell', async () => {
     const fixture = render();
 
@@ -163,7 +160,7 @@ describe('MoveAssetStorageDialogComponent', () => {
     fixture.detectChanges();
 
     expect(text(fixture, 'asset-move-reason')).toContain('ENOSPC');
-    // True of every unsuccessful outcome, the copied-but-unswitched one included: nothing switched.
+    // True of every unsuccessful outcome, the copied-but-unswitched one included.
     expect(text(fixture, 'asset-move-failed')).toContain('still using the Asset folder it was using before');
     // Dismissed by hand, not automatically: a message nobody read is the same as no message.
     fixture.nativeElement.querySelector('[data-testid="asset-move-close"]').click();

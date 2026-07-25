@@ -1,12 +1,6 @@
 /**
- * What an *embedding* entry point needs to host this API in its own process. The Desktop App's
- * Electron main boots the same `AppModule` and points a window at it (ADR-0070), so the wiring both
- * entry points share — the `/api` prefix, the cookie parser, the shutdown hooks, the SPA served over
- * HTTP — lives here instead of being restated (and drifting) in two mains. Listening is deliberately
- * *not* here: the port and interface are the one thing the two entry points genuinely disagree about.
- *
- * Kept to a single file so the one cross-project import the desktop needs is one waived path, rather
- * than a lib extracted for a single consumer.
+ * The wiring shared by both entry points that host this API — `main.ts` and the Desktop App's Electron
+ * main (ADR-0070). Listening stays with the caller: the port and interface are what the two disagree about.
  */
 import { existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
@@ -18,36 +12,27 @@ import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app/app.module';
 import { loopbackOnly } from './loopback-only';
 
-// The deployment pins an entry point states before the graph resolves (ADR-0071), and the credential
-// -free session primitives an embedder mints the Sole User's session with (ADR-0070).
+// Re-exported so an embedder can pin the deployment (ADR-0071) and mint the Sole User's session (ADR-0070).
 export { pinDeployment } from './app/config';
 export type { DeploymentPins } from './app/config';
 export { AuthService } from './app/auth/auth.service';
 export { SESSION_COOKIE } from './app/auth/auth.controller';
-// The resolved Assets root (ADR-0034), so an embedder that offers to *move* those bytes (#326) reads the same
-// truth every consumer does rather than re-deriving `assets.dir` against the Instance Directory.
+// So an embedder moving asset bytes (#326) reads the same resolved root as every other consumer (ADR-0034).
 export { ASSETS_DIR } from './app/assets/assets.service';
 
 /** What an entry point decides about the app itself, as opposed to where it listens. */
 export interface ApiAppOptions {
-  /**
-   * Turn on the DNS-rebinding wall (`loopback-only.ts`). The Desktop App does, being the only caller of
-   * its own socket; a server serves whatever hostname its operator points at it, so it must not.
-   */
+  /** DNS-rebinding wall; only for the Desktop App, the sole caller of its own socket (ADR-0070). */
   readonly loopbackOnly?: boolean;
 }
 
 /**
- * Create the Nest app with everything both entry points want, ready to `listen`. The caller pins its
- * {@link DeploymentPins} *before* calling this: the graph is composed at import time but resolved
- * here (ADR-0071).
- *
- * There is no `enableCors()` here, and **its absence is load-bearing** — it is the second of the two walls
- * that make the Desktop App's loopback socket acceptable (ADR-0008, ADR-0070).
+ * Creates the Nest app, ready to `listen`. Callers must pin their {@link DeploymentPins} first (ADR-0071).
+ * The absence of `enableCors()` is load-bearing (ADR-0008, ADR-0070).
  */
 export async function createApiApp(options: ApiAppOptions = {}): Promise<NestExpressApplication> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  // Before every other middleware, so a rebound request reaches neither a controller nor the SPA below.
+  // First of all middleware, so a rebound request reaches neither a controller nor the SPA below.
   if (options.loopbackOnly) app.use(loopbackOnly());
   // Serve every controller under `/api` so the API namespace never collides with the web app's
   // client-side routes (the SPA owns `/maps/:id`, the API owns `/api/maps/:id`). Asset serving is
@@ -57,8 +42,7 @@ export async function createApiApp(options: ApiAppOptions = {}): Promise<NestExp
   });
   // Parse the session cookie off incoming requests (read by AuthController).
   app.use(cookieParser());
-  // Run module shutdown hooks (DbModule closes the SQLite handle) on SIGTERM/SIGINT — and on the
-  // `app.close()` an embedder awaits before its own process exits.
+  // Run module shutdown hooks (DbModule closes the SQLite handle) on SIGTERM/SIGINT.
   app.enableShutdownHooks();
   // In a built deploy, this same process also serves the SPA — one origin, no
   // CORS, same-site cookies (ADR-0008).

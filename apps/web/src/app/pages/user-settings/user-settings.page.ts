@@ -27,8 +27,8 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
  * User Settings: Preferences (applied instantly through the same signals the user menu writes)
  * plus the self-service profile forms. Email is the login identity and stays read-only.
  *
- * In the desktop profile only the Preferences survive: the Sole User has no password to change and
- * no identity to edit (ADR-0071), so the page is the preferences page it always mostly was.
+ * In the desktop profile only the Preferences survive: no password to change, no identity to edit
+ * (ADR-0071).
  */
 @Component({
   selector: 'app-user-settings',
@@ -102,8 +102,7 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
         </label>
       </div>
 
-      <!-- Account management, cut whole in the desktop profile: no password exists anywhere, so
-      there is no email to show and nothing a display name distinguishes (ADR-0071). -->
+      <!-- Account management, cut whole in the desktop profile: no password exists anywhere (ADR-0071). -->
       @if (!desktop()) {
         <h2 class="settings-heading text-xl">
           {{ 'settings.profile.heading' | transloco }}

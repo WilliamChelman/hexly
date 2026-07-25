@@ -1,67 +1,50 @@
 /**
- * Packaging for the Desktop App (#327, ADR-0070). Run from the workspace root — the *project directory*
- * electron-builder resolves everything against is the cwd, not this file's folder:
+ * Packaging for the Desktop App (#327, ADR-0070). Must run from the workspace root: electron-builder resolves
+ * against the cwd, and the app directory being the root is what makes dependency pruning right by construction
+ * (ADR-0070) — hence also the root `package.json`'s `description` and `author`.
  *
  *     pnpm package:desktop        # nx run desktop:package — builds, packages, then smoke-tests the package
  *     pnpm exec electron-builder --config apps/desktop/electron-builder.config.js
- *
- * The **app directory is the workspace root**, which is what makes dependency pruning right by construction
- * rather than by a maintained list — ADR-0070 says why. It is also why the root `package.json` carries a
- * `description` and an `author`: they become this app's metadata.
  */
-/**
- * The version to label the artifact with, when a release has one to give (#328). Otherwise electron-builder
- * reads the root `package.json`, which is `0.0.0` and stays there — semantic-release cuts tags without an npm
- * plugin to write versions back (`release.config.js`) — so a developer's local package is honestly `0.0.0`.
- */
+/** The version a release has to give (#328); otherwise the root `package.json`'s `0.0.0` stands. */
 const releaseVersion = process.env.HEXLY_VERSION?.replace(/^v/, '');
 
 /**
- * The host architecture only. `sharp`'s prebuilds and its libvips are per-platform *and* per-arch optional
- * dependencies, and `better-sqlite3` is rebuilt against the local toolchain, so an install on this machine
- * holds binaries for this machine and nothing else. Each release runner builds its own platform (ADR-0070,
- * #328) rather than one machine cross-building three.
+ * The host architecture only: `sharp`'s prebuilds are per-platform *and* per-arch, and `better-sqlite3` is
+ * rebuilt against the local toolchain, so each release runner builds its own platform (ADR-0070, #328).
  */
 const arch = [process.arch === 'arm64' ? 'arm64' : 'x64'];
 
 /**
- * One name per download, on the one Releases page three runners upload to (#328). electron-builder's defaults
- * name for the *product* and leave the platform to the extension — and on Windows put a space in it — so each
- * target states its own: `Hexly-1.4.0-macos-arm64.dmg`. The arch is never elided; it decides whether a download
- * runs at all. Single-quoted on purpose: the `${...}` are electron-builder's macros, not this file's — and it
- * spells `${arch}` per extension, so an AppImage's is `x86_64` where the dmg's is `x64` (the README's download
- * table names them).
+ * One name per download on the one Releases page three runners upload to (#328); electron-builder's defaults
+ * would collide across platforms. Single-quoted: the `${...}` are electron-builder's macros, and it spells
+ * `${arch}` per extension, so an AppImage's is `x86_64` where the dmg's is `x64`.
  */
 const artifactName = (platform) => '${productName}-${version}-' + platform + '-${arch}.${ext}';
 
 module.exports = {
   appId: 'io.github.williamchelman.hexly',
   /**
-   * The artifact's name, which has to stay the name `main.ts` gives the app itself with `electron.setName` —
-   * `packaging.spec.ts` holds the two together. Main pins that name *before* anything reads `userData`, so a
-   * drift here is cosmetic rather than an Instance in a second folder (ADR-0070); what it does break is every
-   * path derived from the bundle's name, the smoke check's included.
+   * Has to stay the name `main.ts` gives the app with `electron.setName` (ADR-0070), since every path derived
+   * from the bundle's name depends on it; `packaging.spec.ts` holds the two together.
    */
   productName: 'Hexly',
   extraMetadata: {
     main: 'dist/apps/desktop/main.js',
-    // The root package is `@hexly/source`, a name for a repo rather than for an app — and it is what the Linux
-    // package name and the Windows installer would otherwise be derived from.
+    // The Linux package name and the Windows installer would otherwise derive from the root `@hexly/source`.
     name: 'hexly',
     ...(releaseVersion && { version: releaseVersion }),
   },
   directories: { output: 'dist/desktop' },
   /**
-   * Both bundles, and nothing else from the repo. The SPA is served over HTTP by the Nest app in main
-   * (ADR-0008), which finds it at `../web/browser` relative to its own directory — so the two have to keep
-   * their `dist/apps/*` layout inside the archive. `node_modules` is not listed because electron-builder
-   * collects production dependencies itself.
+   * The Nest app in main finds the SPA at `../web/browser` relative to its own directory (ADR-0008), so the two
+   * have to keep their `dist/apps/*` layout inside the archive. `node_modules` is unlisted because
+   * electron-builder collects production dependencies itself.
    */
   files: ['dist/apps/desktop/**', 'dist/apps/web/browser/**'],
   /**
-   * Native code cannot be `dlopen`ed out of an asar archive. Stated rather than left to electron-builder's own
-   * detection of modules containing a `.node`, because the image library's binaries live in *sibling* packages
-   * — and getting that wrong surfaces during thumbnailing, not at build time (ADR-0070).
+   * Native code cannot be `dlopen`ed out of an asar archive. Stated rather than left to electron-builder's `.node`
+   * detection, because the image library's binaries live in *sibling* packages (ADR-0070).
    */
   asarUnpack: [
     // The SQLite binding, rebuilt for Electron's ABI (ADR-0027, ADR-0070).
@@ -69,33 +52,25 @@ module.exports = {
     // The image library, its per-platform prebuilt binary, and the libvips dylib that binary links against.
     '**/node_modules/sharp/**',
     '**/node_modules/@img/**',
-    // napi-rs and ABI-stable, so it rides along — but it is still a native addon and still needs unpacking.
+    // ABI-stable napi-rs, but still a native addon.
     '**/node_modules/@node-rs/**',
   ],
   /**
-   * The `desktop:rebuild-native` target owns the Electron rebuild instead, and `desktop:package` runs it first.
-   * electron-builder's own rebuild is not forced, so `@electron/rebuild`'s `.forge-meta` marker makes it a
-   * no-op that packages Node's ABI against Electron's (ADR-0070); `rebuild-native` passes `--force`, and its
-   * ad-hoc re-signing matters more here than in dev because nothing below signs anything.
+   * `desktop:rebuild-native` owns the Electron rebuild and `desktop:package` runs it first: electron-builder's
+   * own rebuild is unforced, so `@electron/rebuild`'s `.forge-meta` marker makes it a no-op that packages Node's
+   * ABI against Electron's (ADR-0070).
    */
   npmRebuild: false,
   /**
-   * No publish provider, so no `app-update.yml` in the bundle and no electron-updater anywhere. **Unsigned and
-   * no-updater are one decision, not two**: Squirrel.Mac refuses to update a bundle that is not signed, so an
-   * updater here could only ever fail (ADR-0070). Signing later is this config plus secrets — `mac.identity`,
-   * `win.certificateFile`, a notarization step — and it re-opens the updater in the same change.
+   * No publish provider, so no `app-update.yml` and no electron-updater. Unsigned and no-updater are one
+   * decision: Squirrel.Mac refuses to update an unsigned bundle, so an updater here could only fail (ADR-0070).
    */
   publish: null,
   mac: {
     target: [{ target: 'dmg', arch }],
     artifactName: artifactName('macos'),
     category: 'public.app-category.productivity',
-    /**
-     * Explicitly unsigned: `null` means "do not go looking for an identity", so a developer who happens to
-     * hold an Apple certificate gets the same artifact CI does. Users are told to go through System
-     * Settings → Privacy & Security → "Open Anyway" (#328); the Finder right-click bypass is gone on
-     * recent macOS.
-     */
+    // Explicitly unsigned, so a developer holding an Apple certificate still gets the artifact CI does (#328).
     identity: null,
     /** Nothing to notarize without a signature, and asking would fail the build rather than warn. */
     notarize: false,

@@ -10,14 +10,11 @@ import { MoveAssetStorageDialogComponent } from './move-asset-storage-dialog.com
 export const MOVE_ASSET_STORAGE = 'move-asset-storage';
 
 /**
- * Moving the Asset bytes to another folder (#326), offered on the two surfaces every Command has: the File
- * menu and the Palette. The Command owns nothing but the open — {@link MoveAssetStorageDialogComponent} drives
- * the move through the preload bridge, and main does the picking, copying and relaunching.
+ * Moving the Asset bytes to another folder (#326), on both Command surfaces: the File menu and the Palette.
+ * The Command owns nothing but the open — {@link MoveAssetStorageDialogComponent} drives the move.
  *
- * Gated on the **bridge's presence**, not on the Deployment Profile: "is there a native folder picker and a
- * `hexly.yml` to rewrite?" is a capability question, and ADR-0071 says a capability question checks the
- * capability. A browser has no such affordance rather than a disabled one — including the desktop-profile
- * browser run the e2e suite uses, where there is genuinely nothing behind it.
+ * Gated on the bridge's presence, not on the Deployment Profile: a capability question checks the capability
+ * (ADR-0071), so a browser has no such affordance rather than a disabled one.
  */
 @Injectable({ providedIn: 'root' })
 export class AssetStorageCommands implements CommandProvider {
@@ -33,8 +30,7 @@ export class AssetStorageCommands implements CommandProvider {
   private readonly move = this.moveCommand();
 
   constructor() {
-    // Registered only where it can work. The menu is built at launch and names this id regardless, which the
-    // Directory answers as a warning rather than a throw (ADR-0070).
+    // Registered only where it can work; the menu names this id regardless and the Directory warns (ADR-0070).
     if (this.bridge) this.directory.register(this.move);
   }
 
@@ -45,7 +41,7 @@ export class AssetStorageCommands implements CommandProvider {
   }
 
   private moveCommand(): Command {
-    // Captured, because the getter's `this` is the literal: resolved on read so the label follows the language.
+    // Captured: the getter's `this` is the literal, and the label must follow the active language.
     const transloco = this.transloco;
     return {
       id: MOVE_ASSET_STORAGE,

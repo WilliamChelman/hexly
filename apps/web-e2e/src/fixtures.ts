@@ -31,9 +31,8 @@ export const test = base.extend<{ resetDb: void }>({
 export { expect };
 
 /**
- * The Instance Directory this run's server booted against, derived exactly as `e2e-server.mjs` does — the one
- * place a spec learns it, so the two never drift. A spec needs it to reach the same filesystem the API reads:
- * stranding Asset bytes (#325) is only testable by removing the file the server would have served.
+ * The Instance Directory this run's server booted against, derived exactly as `e2e-server.mjs` does so the
+ * two cannot drift. A spec needs it to reach the same filesystem the API reads (#325).
  */
 export const instanceDir = process.env.E2E_INSTANCE_DIR ?? join(__dirname, '..', '..', '..', 'tmp', 'web-e2e');
 

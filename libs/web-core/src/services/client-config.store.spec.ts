@@ -18,7 +18,7 @@ describe('ClientConfigStore', () => {
 
   afterEach(() => http.verify());
 
-  /** Drive init() to completion against a stubbed GET /api/config response; deployment flags default to a server Instance with Collaboration on. */
+  /** Drives init() against a stubbed GET /api/config; flags default to a server Instance, Collaboration on. */
   async function initWith(config: Partial<ClientConfig> & Pick<ClientConfig, 'plugins' | 'entities'>): Promise<void> {
     const done = store.init();
     const body: ClientConfig = { profile: 'server', collaboration: true, ...config };

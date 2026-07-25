@@ -139,8 +139,7 @@ describe('NavRail', () => {
   });
 
   it('drops user management once Collaboration is off, keeping the repair surface (ADR-0071)', () => {
-    // Same account: its Superadmin flag and full role set still read true, so only the flag can cut
-    // Users — and the Reindex is on neither cut list.
+    // Same account: every role check still reads true, so only the flag can cut Users.
     signInSoleUser();
     collaboration.set(false);
     const fixture = render();

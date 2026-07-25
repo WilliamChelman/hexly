@@ -260,10 +260,8 @@ export const entityLinks = sqliteTable(
  * mirroring the other derived indexes; the unique `(worldId, hash)` is the per-World dedup key the upload
  * mint-and-dedup resolves against (re-uploading identical bytes returns the existing Asset).
  *
- * `ext` completes the byte address (#325): `<worldId>/<hash><ext>` is the file, so recording the pinned
- * extension here is what lets a read answer "are the bytes there?" with one hash-addressed stat instead of
- * listing the World's folder. Nullable, not defaulted: a row written before the column existed has an
- * *unknown* address, and an unknown address is never reported missing — the next save or Reindex fills it.
+ * `ext` completes the byte address `<worldId>/<hash><ext>`, so a presence check is one stat (#325). Nullable:
+ * a row predating the column has an unknown address, which is never reported missing.
  */
 export const assetIndex = sqliteTable(
   'asset_index',

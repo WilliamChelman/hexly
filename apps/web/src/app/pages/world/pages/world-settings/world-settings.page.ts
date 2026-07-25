@@ -23,8 +23,7 @@ interface SectionItem {
  * Owner-only (ADR-0039): a non-Owner who reaches this page sees load errors, not controls. Resigning
  * can cost the user reach to this World, so it drops back to the World Index.
  *
- * With Collaboration off (ADR-0071) the rail carries only the schema and imports groups, so no
- * section can reach the owner set, the member set or the World Public Link.
+ * With Collaboration off (ADR-0071) the rail carries only the schema and imports groups.
  */
 @Component({
   selector: 'app-world-settings',

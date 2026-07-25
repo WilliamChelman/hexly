@@ -12,10 +12,8 @@ export function assetUrl(worldId: string, hash: string, ext: string): string {
 }
 
 /**
- * The complete on-disk address of a stored Asset's bytes within its World's folder: the content `hash`
- * plus the `ext` pinned at first store (ADR-0034). Both halves, because the hash alone names no file —
- * which is why the derived dedup index records the `ext` too, so a presence check is one hash-addressed
- * stat rather than a directory listing (#325).
+ * The complete on-disk address of a stored Asset's bytes: content `hash` plus the `ext` pinned at first store
+ * (ADR-0034), since the hash alone names no file (#325).
  */
 export interface AssetBytesRef {
   readonly hash: string;

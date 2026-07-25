@@ -30,10 +30,7 @@ describe('spellCheckerLanguages', () => {
     expect(spellCheckerLanguages('', AVAILABLE)).toEqual([FALLBACK_LANGUAGE]);
   });
 
-  /**
-   * One language, never a union: a second dictionary makes every word *it* knows correct too, which for a
-   * vocabulary full of invented names quietly stops the checker finding anything.
-   */
+  /** A second dictionary makes every word *it* knows correct too, quietly stopping the checker finding anything. */
   it('never enables more than one language', () => {
     for (const locale of ['en-GB', 'fr-CA', 'ja', 'pt_PT']) {
       expect(spellCheckerLanguages(locale, AVAILABLE)).toHaveLength(1);

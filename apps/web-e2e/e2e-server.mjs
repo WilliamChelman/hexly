@@ -89,8 +89,8 @@ const childEnv = {
 // before the users exist). The grantee is optional — the loop skips it if unset.
 // Only the login user gets a starter World: `enterLibrary` reaches its library by
 // clicking a World card on the Index, so the suite is dead without one.
-// E2E_SOLE_USER gives the login user the Sole User's shape (ADR-0071), so a run asserting a
-// Collaboration-off absence cannot be passing on a role check instead of the flag.
+// E2E_SOLE_USER gives the login user the Sole User's shape (ADR-0071), so a Collaboration-off
+// absence cannot be a role check's doing.
 const toSeed = [
   { ...user, withWorld: true, soleUser: !!process.env.E2E_SOLE_USER },
   ...(grantee.email ? [grantee] : []),
@@ -119,8 +119,7 @@ for (const u of toSeed) {
 }
 
 // Serve. HEXLY_E2E=1 mounts the test-reset endpoint (and only here — ADR-0009). The Deployment Profile
-// (ADR-0071) has no hexly.yml key, so a run that needs `desktop` pins it through the entry point via
-// E2E_PROFILE — the server honours it only under the same HEXLY_E2E allowlist.
+// has no hexly.yml key (ADR-0071), so E2E_PROFILE pins it, honoured under the same allowlist.
 const server = spawn(process.execPath, [mainJs], {
   env: {
     ...childEnv,

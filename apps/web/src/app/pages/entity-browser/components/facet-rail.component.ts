@@ -222,8 +222,8 @@ export class FacetRailComponent {
       { category: 'tag' as const, rows: counts.tag, label: (v: string) => v },
       {
         category: 'visibility' as const,
-        // Nothing reads Visibility with Collaboration off (ADR-0071), so the category has one value to
-        // offer: emptied, it falls to the drop-empties filter below like any other exhausted category.
+        // Nothing reads Visibility with Collaboration off (ADR-0071); emptied, the category falls to
+        // the drop-empties filter below.
         rows: this.clientConfig.isCollaborationEnabled() ? counts.visibility : [],
         label: (v: string) => this.transloco.translate(`entityBrowser.facets.${v}`),
       },

@@ -11,8 +11,8 @@ import { ASSETS_DIR, AssetsService } from './assets.service';
 /**
  * Asset subsystem (ADR-0034, ADR-0065): content-addressed per-World binary storage plus its
  * unauthenticated serving route, and the mint-and-dedup that wraps an upload in an **Asset Entity**.
- * `ASSETS_DIR` is resolved once at boot, its provider injecting `hexly.yml`'s `assets.dir` the way
- * `MulterModule`'s upload ceiling does, so nothing downstream reads config for it (ADR-0036).
+ * `ASSETS_DIR` is resolved once at boot from `hexly.yml`'s `assets.dir`, so nothing downstream reads config
+ * for it (ADR-0036).
  * `EntitiesModule` is imported so the mint routes through the one Entity write handle (ADR-0045).
  */
 @Module({

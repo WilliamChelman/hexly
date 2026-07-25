@@ -13,10 +13,7 @@ import {
   watchRequests,
 } from './loop-lag';
 
-/**
- * A probe whose clock and whose delay readings a spec drives, instead of blocking a real event loop. No
- * slack by default, so a spec's arithmetic is the probe's arithmetic; the slack has a spec of its own.
- */
+/** A probe whose clock and delay readings a spec drives; no slack, so a spec's arithmetic is the probe's. */
 function probeAt(thresholdMs = 100, slackMs = 0) {
   const slack = () => slackMs;
   let clock = 1_000;
@@ -32,7 +29,7 @@ function probeAt(thresholdMs = 100, slackMs = 0) {
   return {
     probe,
     reported,
-    /** Close a window that saw `peakMs` of delay. The clock is the spec's to advance. */
+    /** Close a window that saw `peakMs` of delay; the clock is the spec's to advance. */
     sample(peakMs: number) {
       peaks.push(peakMs);
       probe.sample();
@@ -40,7 +37,6 @@ function probeAt(thresholdMs = 100, slackMs = 0) {
     advance(ms: number) {
       clock += ms;
     },
-    /** Work that occupied main for `ms` and then finished. */
     ran(label: string, ms: number) {
       const done = this.probe.during(label);
       this.advance(ms);
@@ -132,8 +128,8 @@ describe('loopLagProbe', () => {
     let clock = 0;
     const probe = loopLagProbe({
       thresholdMs: 100,
-      // The numbers off the #329 baseline run: a peak no request can account for to the millisecond, because
-      // the delay carries the monitor's own sampling period (ADR-0070).
+      // The #329 baseline numbers: no request accounts for the peak to the millisecond, since the delay carries
+      // the monitor's own sampling period (ADR-0070).
       peakDelayMs: () => 1514,
       report: (reading) => reported.push(reading),
       now: () => clock,
@@ -344,8 +340,8 @@ describe('startLoopLagProbe', () => {
       const waiting = setInterval(() => reported.length && (clearInterval(waiting), resolve()), 50);
     });
 
-    // Blocked from a timer callback, not from here: libuv starts the histogram's own timer when the loop
-    // first runs, so a block in the synchronous pass before that is the one thing it cannot see.
+    // Blocked from a timer callback, not from here: libuv starts the histogram's timer when the loop first runs,
+    // so a block in the synchronous pass before that is the one thing it cannot see.
     setTimeout(() => {
       const done = probe.during('busy');
       const until = Date.now() + 300;

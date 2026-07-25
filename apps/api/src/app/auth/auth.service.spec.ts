@@ -6,11 +6,7 @@ import { sessions } from '../db/schema';
 import { AuthModule } from './auth.module';
 import { AuthService } from './auth.service';
 
-/**
- * The credential-free session primitives an embedding entry point needs: the Desktop App's main
- * process establishes the Sole User's identity by construction, not by a password (ADR-0070), so it
- * looks the row up, mints a session for it, and clears the ones a previous launch left behind.
- */
+/** The credential-free session primitives an embedder needs; the Desktop App has no password (ADR-0070). */
 describe('AuthService session primitives', () => {
   let app: INestApplication;
   let auth: AuthService;

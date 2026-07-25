@@ -23,8 +23,7 @@ describe('CommandDirectory', () => {
   });
 
   it('answers false for an id nothing holds, and runs nothing', () => {
-    // The menu is built at launch and outlives any one surface's Commands (ADR-0071), so this is a
-    // legitimate outcome the caller reads — not a throw.
+    // A native menu outlives any one surface's Commands (ADR-0071), so a miss is a legitimate outcome.
     expect(directory.invoke('go-nowhere')).toBe(false);
     expect(ran).toEqual([]);
   });

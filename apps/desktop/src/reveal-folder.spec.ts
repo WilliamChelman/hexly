@@ -1,6 +1,5 @@
 import { PathOpener, revealFolder } from './reveal-folder';
 
-/** Electron's `shell`, recording what it was asked to open and answering as configured. */
 function fakeShell(failure = ''): PathOpener & { readonly opened: string[] } {
   const opened: string[] = [];
   return {

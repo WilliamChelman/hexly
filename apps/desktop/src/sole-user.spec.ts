@@ -1,7 +1,6 @@
 import { INSTANCE_ROLES } from '@hexly/domain';
 import { closeSoleUserSession, NO_EXPIRY, openSoleUserSession, SoleUserAuth } from './sole-user';
 
-/** Records what main asks of the API's auth service, standing in for a real `users`/`sessions` table. */
 class FakeAuth implements SoleUserAuth {
   readonly seeded: { email: string; password: string; displayName: string; opts: unknown }[] = [];
   readonly minted: { userId: string; expiresAt?: number }[] = [];

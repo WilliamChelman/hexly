@@ -218,16 +218,14 @@ describe('loadConfig: profile (ADR-0071)', () => {
   });
 
   it('ignores a profile: key written into hexly.yml, rather than honouring it', () => {
-    // There is no config key for the Deployment Profile, so an operator cannot declare `desktop` on a
-    // multi-user Instance; the key is stripped like any unknown one, and the pin still decides.
+    // No config key for the profile, so the key is stripped like any unknown one (ADR-0071).
     expect(loadConfig(dataDir('profile: desktop\n'), PLUGINS).profile).toBe('server');
     expect(loadConfig(dataDir('profile: server\n'), PLUGINS, { profile: 'desktop' }).profile).toBe('desktop');
   });
 });
 
 describe('deployment pins (ADR-0071)', () => {
-  // The composition root reads the pins when the config resolves, so a spec that leaves one behind
-  // would hand its deployment to every later one.
+  // Module state: a spec that left a pin behind would hand its deployment to every later one.
   afterEach(() => pinDeployment({}));
 
   it('reads back what the entry point pinned, so ConfigModule can hand it to loadConfig', () => {

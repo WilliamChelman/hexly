@@ -21,10 +21,8 @@ import { AclSetResult } from './owner-set';
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 
 /**
- * Every route the Collaboration layer owns (ADR-0071), as `VERB /pattern`. One list, two jobs: the
- * supertest sweeps drive it, and {@link discoverGatedRoutes} must reproduce it exactly — which settles
- * the other direction for the whole API at once, since a route absent from this list provably carries
- * no {@link CollaborationGuard} and so cannot 404 because of one.
+ * Every route the Collaboration layer owns (ADR-0071), as `VERB /pattern`: the sweeps below drive it and
+ * {@link discoverGatedRoutes} must reproduce it exactly.
  */
 const COLLABORATION_ROUTES = [
   'GET /entities/:id/owners',
@@ -72,10 +70,8 @@ interface Fixtures {
 }
 
 /**
- * Substitute the fixture that makes the route *reachable*, so a 404 can only be the gate.
- * `:userId` is the caller on the ownership routes — they are the sole Owner there, so removal is
- * refused as `last-owner` (409), never a 404 the gate could hide behind — and the other account
- * everywhere else, where it is a real member, grantee and deletable account.
+ * Substitutes the fixture that makes the route reachable, so a 404 can only be the gate. `:userId` is the
+ * caller on the ownership routes, where removal is refused as `last-owner` (409) rather than 404.
  */
 function concretePath(pattern: string, f: Fixtures): string {
   const segments = pattern.split('/');
@@ -84,7 +80,7 @@ function concretePath(pattern: string, f: Fixtures): string {
       if (!segment.startsWith(':')) return segment;
       if (segment === ':userId') return segments[i - 1] === 'owners' ? f.operator : f.other;
       if (segment === ':token') return segments[i - 1] === 'entities' ? f.entityToken : f.worldToken;
-      // `:id` names whatever the route root is about; under the `/public` reader it is an Entity.
+      // Under the `/public` reader, `:id` is an Entity.
       switch (segments[1]) {
         case 'entities':
         case 'public':
@@ -99,11 +95,7 @@ function concretePath(pattern: string, f: Fixtures): string {
     .join('/');
 }
 
-/**
- * Fire a `VERB /pattern` at the app. The body is empty on purpose: every write route here validates
- * before it looks anything up, so with the gate open it answers 400 — a status only a reached
- * handler produces.
- */
+/** Empty body on purpose: with the gate open a write route answers 400, a status only a reached handler gives. */
 function call(f: Fixtures, route: string) {
   const [verb, pattern] = route.split(' ');
   const path = concretePath(pattern, f);
@@ -121,10 +113,7 @@ function call(f: Fixtures, route: string) {
   }
 }
 
-/**
- * Every route in the composed app that carries a {@link CollaborationGuard}, read off Nest's own
- * route metadata (a class-level guard covers all of that controller's handlers).
- */
+/** Every route carrying a {@link CollaborationGuard}; a class-level guard covers all of its handlers. */
 function discoverGatedRoutes(discovery: DiscoveryService): string[] {
   const gated: string[] = [];
   for (const wrapper of discovery.getControllers()) {
@@ -156,9 +145,8 @@ function unwrap<T>(result: AclSetResult<T>): T {
 }
 
 /**
- * The Collaboration gate (ADR-0071): where `features.collaboration` is off the sharing and
- * user-management routes are **absent**, not merely hidden — a stale tab cannot mint a Public Link
- * into an Instance whose port is network-reachable. Login and Reindex are never gated.
+ * The Collaboration gate (ADR-0071): with `features.collaboration` off the sharing and user-management
+ * routes are absent, not merely hidden.
  */
 describe('Collaboration gate', () => {
   let app: INestApplication;
@@ -168,11 +156,11 @@ describe('Collaboration gate', () => {
   async function boot(collaboration: boolean): Promise<void> {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
     assetsDir = mkdtempSync(join(tmpdir(), 'hexly-collab-assets-'));
-    // The entry-point pin (ADR-0071) rather than a fabricated HEXLY_CONFIG: this is the path the
-    // Desktop App takes, and it leaves ConfigModule composing the rest of the config for real.
+    // The entry-point pin (ADR-0071) rather than a fabricated HEXLY_CONFIG, so ConfigModule still
+    // composes the rest of the config for real.
     pinDeployment({ collaboration });
-    // AppModule, not a hand-picked set of feature modules: the coverage assertion below is only
-    // exhaustive if every controller the app registers is in the graph.
+    // Whole AppModule: the coverage assertion below is exhaustive only if every registered controller
+    // is in the graph.
     const moduleRef = await Test.createTestingModule({ imports: [AppModule, DiscoveryModule] })
       .overrideProvider(DB)
       .useValue(db)
@@ -192,12 +180,9 @@ describe('Collaboration gate', () => {
   });
 
   /**
-   * A Superadmin with a World, a `shared` Entity, a second account holding a real membership and a
-   * real grant, and both Public Links live — an Instance that had Collaboration and turned it off.
-   * Every route below is therefore genuinely reachable, so no 404 in the sweep is the fixture's.
-   *
-   * The links and the membership are minted through the services: their HTTP routes are the very
-   * ones under test, and with the gate closed they answer 404.
+   * An Instance that had Collaboration and turned it off, so every swept route is genuinely reachable and
+   * no 404 is the fixture's. Links and membership are minted through the services because their HTTP
+   * routes are the ones under test.
    */
   async function fixtures(): Promise<Fixtures> {
     const auth = app.get(AuthService);
@@ -217,8 +202,7 @@ describe('Collaboration gate', () => {
         .send({ name: 'Lady Mara', types: ['core.type.note'], worldId: world })
         .expect(201)
     ).body.id;
-    // `shared`, so the World link's reader can reach it (ADR-0037). Visibility is inert with
-    // Collaboration off but still writable — ADR-0071 changes no write path.
+    // `shared`, so the World link's reader can reach it (ADR-0037).
     await agent.patch(`/entities/${entity}`).send({ visibility: 'shared' }).expect(200);
 
     const worlds = app.get(WorldsService);
@@ -247,8 +231,8 @@ describe('Collaboration gate', () => {
     });
 
     it('answers the class-gated surfaces as absent before it answers them as unauthorized', async () => {
-      // No session at all: the guard is listed first on those controllers, so the routes read as
-      // missing rather than advertising that a session would help.
+      // The guard is listed first on those controllers, so an anonymous caller reads them as missing
+      // rather than unauthorized.
       const anonymous = request(app.getHttpServer());
       await anonymous.get('/users').expect(404);
       await anonymous.get('/users/directory').expect(404);
@@ -280,8 +264,7 @@ describe('Collaboration gate', () => {
     });
 
     it('leaves the live-follow bus alone — it stays for multi-window (ADR-0071)', async () => {
-      // A malformed interest set, so the 400 is the handler's own — a route that answered the gate
-      // would 404 before parsing.
+      // A malformed interest set: the 400 is the handler's own, so the route was reached.
       await f.agent.put('/events/no-such-connection/interest').send({}).expect(400);
     });
   });
@@ -294,8 +277,7 @@ describe('Collaboration gate', () => {
       f = await fixtures();
     });
 
-    // Each surface's own spec pins down *what* these routes answer; here it only matters that the
-    // gate is open, so none of them is the 404 the sweep above demands.
+    // Only the gate matters here; each surface's own spec pins down what these routes answer.
     it.each(COLLABORATION_ROUTES)('opens %s', async (route) => {
       const res = await call(f, route);
       expect(res.status).not.toBe(404);

@@ -159,7 +159,6 @@ describe('Settings page (ADR-0038)', () => {
     // No email address anywhere either, not merely no input for it.
     expect(html.textContent).not.toContain('ada@hexly.test');
 
-    // The account-independent preferences are all still here.
     for (const testid of ['theme-light', 'theme-dark', 'language', 'format-locale']) {
       expect(html.querySelector(`[data-testid="${testid}"]`)).not.toBeNull();
     }

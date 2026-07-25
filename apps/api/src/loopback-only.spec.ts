@@ -5,10 +5,7 @@ import { loopbackOnly } from './loopback-only';
 const BOUND = { localAddress: '127.0.0.1', localPort: 54321 };
 const ADDRESS = '127.0.0.1:54321';
 
-/**
- * Put a request through the wall, reporting what it did with it: `passed` for a caller handed on to the
- * rest of the stack, a status for one it answered itself.
- */
+/** `passed` when the wall handed the request on; a status when it answered the caller itself. */
 function through(headers: Record<string, string>, socket = BOUND): { passed: boolean; status?: number; type?: string } {
   const result: { passed: boolean; status?: number; type?: string } = { passed: false };
   const res = {
@@ -33,7 +30,6 @@ describe('loopbackOnly (#321)', () => {
   it('passes the app’s own window, whose Host is the address main bound', () => {
     // No Origin: navigations, Asset `src` and the live-follow stream all send none.
     expect(through({ host: ADDRESS })).toEqual({ passed: true });
-    // And a same-origin fetch, which names that same address.
     expect(through({ host: ADDRESS, origin: `http://${ADDRESS}` })).toEqual({ passed: true });
   });
 
@@ -42,7 +38,7 @@ describe('loopbackOnly (#321)', () => {
   });
 
   it('rejects a rebound name, which is the whole point (ADR-0070)', () => {
-    // 403, not 401: a 401 is the one status the client answers by re-minting a session.
+    // 403, not 401: the client answers a 401 by re-minting a session.
     expect(through({ host: 'hexly.evil.example' })).toEqual({ passed: false, status: 403, type: 'text/plain' });
     expect(through({ host: 'hexly.evil.example:54321' }).status).toBe(403);
   });

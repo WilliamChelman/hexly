@@ -2,9 +2,9 @@ import { inject, Injectable } from '@angular/core';
 import { DESKTOP_BRIDGE } from './desktop-bridge';
 
 /**
- * Re-minting the session, wherever something can. In the Desktop App a 401 is recoverable rather than
- * fatal, and must be: the login page a browser falls back to is a dead end with no password to type
- * (ADR-0070). Gated on the bridge, so in a browser {@link renew} answers `false` and the 401 stands.
+ * Re-minting the session where something can: in the Desktop App a 401 must be recoverable, since the login
+ * page a browser falls back to has no password to type (ADR-0070). Gated on the bridge, so in a browser
+ * {@link renew} answers `false` and the 401 stands.
  */
 @Injectable({ providedIn: 'root' })
 export class SessionRenewal {
@@ -19,13 +19,10 @@ export class SessionRenewal {
 
   /**
    * Re-mint, resolving `true` when a retry is worth making. `since` is the {@link generation} the failed
-   * request went out under: a 401 from before the current session only needs the retry, because someone
-   * else has already re-minted. Re-minting again would revoke the session their retries are carrying —
-   * `openSoleUserSession` clears the Sole User's sessions before it mints. Truly concurrent callers share
-   * one round trip for the same reason.
-   *
-   * A bridge that rejects resolves `false` rather than throwing: the caller's own 401 is the honest error
-   * to report, not the failure to paper over it.
+   * request went out under: a 401 from an older session only needs the retry, since re-minting again would
+   * revoke the session other retries carry — `openSoleUserSession` clears the Sole User's sessions before it
+   * mints, which is also why concurrent callers share one round trip. A rejecting bridge resolves `false`
+   * rather than throwing, leaving the caller's own 401 as the error.
    */
   renew(since: number): Promise<boolean> {
     if (!this.bridge) return Promise.resolve(false);

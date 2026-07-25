@@ -61,8 +61,8 @@ describe('EntityShareDialog', () => {
     expect(fixture.debugElement.query(By.directive(PublicLinkComponent))).not.toBeNull();
   });
 
-  // Collaboration off (ADR-0071, #316): the sharing surface guards itself, so no host can mount the
-  // owner set, the grant set or the Public Link — and none of them fetches an endpoint that now 404s.
+  // The surface guards itself, so no host can mount it and nothing fetches an endpoint that now 404s
+  // (ADR-0071, #316).
   it('renders nothing when Collaboration is off, even asked to open', () => {
     collaboration.set(false);
     const fixture = render();

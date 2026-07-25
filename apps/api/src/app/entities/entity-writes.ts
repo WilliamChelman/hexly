@@ -474,8 +474,7 @@ export class EntityWrites {
    * ADR-0065): an asset-ref-carrying document materialises one row keyed on the bytes' hash, clearing the
    * ref removes it, and the FK cascade drops it with the Entity. Derived, never authoritative — an index
    * over the document like the edge and provenance sets, so `worldId` is denormalised off the source. The
-   * `ext` rides along so a read can stat the exact file (#325); rewriting the row is what heals a pre-#325
-   * row's unknown extension, no separate backfill.
+   * `ext` rides along so a read can stat the exact file, and rewriting the row heals a pre-#325 row.
    */
   private replaceAssetIndex(id: string, worldId: string, ref: AssetBytesRef | null): void {
     this.db.delete(assetIndex).where(eq(assetIndex.entityId, id)).run();

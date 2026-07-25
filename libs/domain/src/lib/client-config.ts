@@ -1,7 +1,4 @@
-/**
- * Which shape of deployment an Instance is (ADR-0071) — pinned by the entry point, with no `hexly.yml`
- * key, so no operator can declare `desktop` on a multi-user Instance.
- */
+/** Pinned by the entry point, with no `hexly.yml` key of its own (ADR-0071). */
 export const DEPLOYMENT_PROFILES = ['desktop', 'server'] as const;
 export type DeploymentProfile = (typeof DEPLOYMENT_PROFILES)[number];
 
@@ -11,7 +8,7 @@ export type DeploymentProfile = (typeof DEPLOYMENT_PROFILES)[number];
  * client knobs, today Plugin enablement, the default create Type, and ADR-0071's two deployment knobs.
  */
 export interface ClientConfig {
-  /** This Instance's Deployment Profile (ADR-0071); the client gates profile-only affordances on it. */
+  /** This Instance's Deployment Profile (ADR-0071). */
   profile: DeploymentProfile;
   /** Whether the Collaboration layer is on (ADR-0071): sharing, World roles, Visibility, Public Links. */
   collaboration: boolean;

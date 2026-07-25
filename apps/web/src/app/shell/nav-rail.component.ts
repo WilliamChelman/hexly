@@ -180,8 +180,7 @@ export class NavRailComponent {
     if (this.activeWorldId()) return [];
     return [
       ...STATIC_ENTRIES,
-      // User management: on the Collaboration cut list (ADR-0071), then the manage-users role or
-      // Superadmin — the same pair `/users` enforces.
+      // User management: on the Collaboration cut list (ADR-0071), then the same role pair `/users` enforces.
       ...(this.clientConfig.isCollaborationEnabled() && this.auth.canManageUsers()
         ? [
             {

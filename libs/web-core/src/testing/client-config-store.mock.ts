@@ -11,12 +11,10 @@ export interface ClientConfigOverrides {
 }
 
 /**
- * A settled {@link ClientConfigStore} whose flags a spec drives through signals, so a gate can be
- * re-read after a flip. Every unstated flag reads the fall-open answer the real store gives before
- * `/api/config` resolves (ADR-0052, ADR-0071): all Plugins enabled, Collaboration on, `server`.
+ * A settled {@link ClientConfigStore} whose flags a spec drives through signals. Unstated flags read the
+ * fall-open answers of the real store before `/api/config` resolves (ADR-0052, ADR-0071).
  *
- * A cast object rather than a subclass: the store resolves `HttpClient` lazily in `init`, which this
- * stubs out, so a consumer's spec needs no HTTP wiring for a fetch it never triggers.
+ * A cast object rather than a subclass, so a consumer's spec needs no HTTP wiring for a fetch it never makes.
  */
 export function mockClientConfigStore(overrides: ClientConfigOverrides = {}): ClientConfigStore {
   const enabled = overrides.enabledPlugins ?? signal<ReadonlySet<string>>(new Set());
