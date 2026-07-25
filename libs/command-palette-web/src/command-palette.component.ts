@@ -15,10 +15,11 @@ import { ListKeyManager } from '@angular/cdk/a11y';
 import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { of, switchMap } from 'rxjs';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ShortcutService } from '@hexly/web-core';
 import { ButtonComponent, DialogComponent, InputComponent } from '@hexly/web-ui';
 import { Command, CommandProvider, parseCommandQuery } from './command';
+import { CommandDirectory } from './command-directory';
 import { CommandRegistry, CommandSection } from './command-registry';
 
 /**
@@ -26,6 +27,13 @@ import { CommandRegistry, CommandSection } from './command-registry';
  * with their domain, not here; the host binds them to this token — order is the palette's section order.
  */
 export const COMMAND_PROVIDERS = new InjectionToken<readonly CommandProvider[]>('COMMAND_PROVIDERS');
+
+/**
+ * Opening the Palette, as a Command reachable by id — so the Desktop App's native menu item opens it by
+ * invoking a Command like any other, rather than the shell reaching into the renderer (ADR-0070). The chord
+ * stays the dispatcher's: the menu only *displays* it.
+ */
+export const OPEN_COMMAND_PALETTE = 'open-command-palette';
 
 /**
  * The Command Palette: a Cmd/Ctrl+K overlay, mounted once in {@link App},
@@ -131,8 +139,10 @@ export const COMMAND_PROVIDERS = new InjectionToken<readonly CommandProvider[]>(
 })
 export class CommandPaletteComponent {
   private readonly registry = inject(CommandRegistry);
+  private readonly directory = inject(CommandDirectory);
   private readonly router = inject(Router);
   private readonly shortcuts = inject(ShortcutService);
+  private readonly transloco = inject(TranslocoService);
   private readonly builtIns = inject(COMMAND_PROVIDERS, { optional: true }) ?? [];
   // read: ElementRef — #search also hosts appInput, so a bare query would
   // resolve to the Input component instead of the native element.
@@ -190,6 +200,19 @@ export class CommandPaletteComponent {
   constructor() {
     // The Palette mounts once for the app's lifetime, so there's nothing to unregister.
     for (const provider of this.builtIns) this.registry.register(provider);
+
+    // Opening is itself a Command, so a second surface — the Desktop App's native menu — invokes it by id
+    // instead of owning the chord (ADR-0070). `set`, not the chord's toggle: choosing "Command Palette" from
+    // a menu means open it, and the item is reachable while the palette's own dialog holds the keyboard.
+    const transloco = this.transloco;
+    this.directory.register({
+      id: OPEN_COMMAND_PALETTE,
+      // Resolved on read: this Command is held for the app's lifetime, across language switches.
+      get label() {
+        return transloco.translate('commandPalette.openPalette');
+      },
+      run: () => this.open.set(true),
+    });
 
     // Both ⌘K and Ctrl+K, on every platform (not `mod`) — the palette's historic
     // contract. `inEditable` keeps it reachable mid-typing. Global layer, so any

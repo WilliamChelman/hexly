@@ -2,10 +2,12 @@
 // module reads that value at its own import time (ADR-0070).
 import './no-production-env';
 import { join } from 'node:path';
-import { app as electron, BrowserWindow, dialog, ipcMain, session } from 'electron';
+import { app as electron, BrowserWindow, dialog, ipcMain, Menu, session, shell } from 'electron';
 import { ApiHost, startApiHost } from './api-host';
 import { pinInstanceDir } from './instance-dir';
-import { RENEW_SESSION } from './ipc';
+import { MENU_COMMAND, RENEW_SESSION } from './ipc';
+import { buildAppMenuTemplate } from './menu';
+import { revealFolder } from './reveal-folder';
 import { writeSessionCookie } from './session-cookie';
 import { closeSoleUserSession, openSoleUserSession } from './sole-user';
 
@@ -17,6 +19,7 @@ import { closeSoleUserSession, openSoleUserSession } from './sole-user';
 let host: ApiHost | undefined;
 let sessionToken: string | undefined;
 let mainWindow: BrowserWindow | undefined;
+let instanceDir: string | undefined;
 let quitting = false;
 
 // Pinned before anything reads `userData`: both the Instance Directory and the single-instance lock hang
@@ -42,7 +45,8 @@ if (!electron.requestSingleInstanceLock()) {
  * and the login page is never rendered.
  */
 async function boot(): Promise<void> {
-  const instanceDir = pinInstanceDir(electron.getPath('userData'));
+  instanceDir = pinInstanceDir(electron.getPath('userData'));
+  installAppMenu();
   host = await startApiHost();
   await mintSessionCookie(host);
   mainWindow = openWindow();
@@ -56,6 +60,23 @@ async function boot(): Promise<void> {
 async function mintSessionCookie(api: ApiHost): Promise<void> {
   sessionToken = await openSoleUserSession(api.auth);
   await writeSessionCookie(session.defaultSession.cookies, api.origin, sessionToken);
+}
+
+/**
+ * The application menu, installed once and global to the app. A Command item sends its id to the renderer,
+ * which invokes the Command the Palette lists — a second surface, not a second dispatcher (ADR-0070).
+ */
+function installAppMenu(): void {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(
+      buildAppMenuTemplate(process.platform, {
+        // `mainWindow` while there is one window; multi-window (ADR-0070) makes this the focused one.
+        invokeCommand: (commandId) => mainWindow?.webContents.send(MENU_COMMAND, commandId),
+        // Nothing to reveal before the Instance Directory is pinned, which `boot` does first.
+        revealDataFolder: () => void (instanceDir && revealFolder(shell, instanceDir)),
+      }),
+    ),
+  );
 }
 
 function openWindow(): BrowserWindow {

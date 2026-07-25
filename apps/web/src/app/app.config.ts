@@ -35,6 +35,7 @@ import { providePluginDrawSteel } from '@hexly/plugin-draw-steel/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { TypeRegistry } from './entity-types/type-registry';
 import { provideBuiltInCommands } from './shell/built-in-commands';
+import { provideDesktopMenuCommands } from './shell/desktop-menu-commands';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -86,6 +87,9 @@ export const appConfig: ApplicationConfig = {
     // The Command Palette's built-in Providers (ADR-0032), registered for the
     // app's lifetime by the palette when it mounts.
     provideBuiltInCommands(),
+    // In the Desktop App, the native menu's clicks arrive as invocations of those same Commands (ADR-0070);
+    // in a browser there is no bridge and this is inert.
+    provideDesktopMenuCommands(),
     // The read contract a lib injects to ask what Entity Types exist (ADR-0048).
     { provide: ENTITY_TYPES, useExisting: TypeRegistry },
     // The Entity View Outlet host a plugin transcludes another Entity through, and the resolver naming a
