@@ -1,20 +1,29 @@
 import { provideTranslocoTesting } from '../../testing/transloco-testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { AuthClient, LocaleService, ThemeService } from '@hexly/web-core';
-import { MockAuthClient } from '@hexly/web-core/testing';
+import { DeploymentProfile } from '@hexly/domain';
+import { AuthClient, ClientConfigStore, LocaleService, ThemeService } from '@hexly/web-core';
+import { MockAuthClient, mockClientConfigStore } from '@hexly/web-core/testing';
 import { UserMenuComponent } from './user-menu.component';
 
 describe('UserMenu', () => {
   let auth: MockAuthClient;
+  /** Flipped by a spec before rendering; the menu re-reads it, so no re-configuration is needed. */
+  let profile: ReturnType<typeof signal<DeploymentProfile>>;
 
   beforeEach(async () => {
     localStorage.clear();
     auth = new MockAuthClient();
+    profile = signal<DeploymentProfile>('server');
     await TestBed.configureTestingModule({
       imports: [UserMenuComponent, provideTranslocoTesting()],
-      providers: [provideRouter([]), { provide: AuthClient, useValue: auth }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthClient, useValue: auth },
+        { provide: ClientConfigStore, useValue: mockClientConfigStore({ profile }) },
+      ],
     }).compileComponents();
   });
 
@@ -145,5 +154,53 @@ describe('UserMenu', () => {
 
     const login = item(menu, /login/i) as HTMLAnchorElement;
     expect(login.getAttribute('href')).toBe('/login');
+  });
+
+  describe('desktop profile (ADR-0071)', () => {
+    beforeEach(() => profile.set('desktop'));
+
+    it('offers neither Sign out nor Login — there is no session to manage', () => {
+      signIn();
+      const fixture = TestBed.createComponent(UserMenuComponent);
+      fixture.detectChanges();
+
+      const menu = openMenu(fixture);
+      expect(() => item(menu, /sign out/i)).toThrow();
+      expect(() => item(menu, /login/i)).toThrow();
+    });
+
+    it('keeps the account-independent preferences: theme and language', () => {
+      signIn();
+      const theme = TestBed.inject(ThemeService);
+      const locale = TestBed.inject(LocaleService);
+      const fixture = TestBed.createComponent(UserMenuComponent);
+      fixture.detectChanges();
+
+      const before = theme.theme();
+      item(openMenu(fixture), /theme/i).click();
+      expect(theme.theme()).not.toBe(before);
+
+      // Re-opened: triggering a menu item closes the panel, as it does in the server profile.
+      item(openMenu(fixture), /français/i).click();
+      expect(locale.lang()).toBe('fr');
+    });
+
+    it('keeps the Settings link — Preferences live there and survive the cut', () => {
+      signIn();
+      const fixture = TestBed.createComponent(UserMenuComponent);
+      fixture.detectChanges();
+
+      expect(item(openMenu(fixture), /settings|paramètres/i).getAttribute('href')).toBe('/settings');
+    });
+
+    it('renders a non-identity trigger: no initials, no name, in the trigger or the panel', () => {
+      signIn();
+      const fixture = TestBed.createComponent(UserMenuComponent);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="user-initials"]')).toBeNull();
+      expect(trigger(fixture).textContent).not.toContain('Ada');
+      expect(openMenu(fixture).textContent).not.toContain('Ada');
+    });
   });
 });

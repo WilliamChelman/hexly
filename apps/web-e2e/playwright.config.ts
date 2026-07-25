@@ -18,16 +18,27 @@ const DEFAULT_PORT = basePort;
 const PLUGIN_DISABLED_PORT = basePort + 1;
 const DEFAULT_TYPE_PORT = basePort + 2;
 const COLLAB_OFF_PORT = basePort + 3;
+const DESKTOP_PORT = basePort + 4;
 
 // dnd off: its Types degrade to the generic Field View, values intact (ADR-0052).
 const DISABLE_DND_YAML = ['features:', '  plugin:', '    dnd:', '      enabled: false', ''].join('\n');
 // The "New" button mints a Hex Map by default — an enabled non-note Type (ADR-0052).
 const DEFAULT_HEXMAP_YAML = ['entities:', '  defaultType: core.type.hex-map', ''].join('\n');
 // Collaboration off (ADR-0071): the solo self-hoster — still a server profile, so it keeps its login page.
+// Also the desktop run's yaml: that run's profile is pinned by the boot script, since the profile has no key.
 const COLLABORATION_OFF_YAML = ['features:', '  collaboration: false', ''].join('\n');
 
 /** One `e2e-server.mjs` invocation: its own port, throwaway Instance Directory, and optional hexly.yml. */
-function server(port: number, opts: { instanceSubdir?: string; configYaml?: string; soleUser?: boolean } = {}) {
+function server(
+  port: number,
+  opts: {
+    instanceSubdir?: string;
+    configYaml?: string;
+    soleUser?: boolean;
+    /** The Deployment Profile the entry point pins — there is no hexly.yml key for it (ADR-0071). */
+    profile?: 'desktop' | 'server';
+  } = {},
+) {
   return {
     command: 'node apps/web-e2e/e2e-server.mjs',
     url: urlFor(port),
@@ -51,6 +62,7 @@ function server(port: number, opts: { instanceSubdir?: string; configYaml?: stri
       ...(opts.configYaml ? { E2E_CONFIG_YAML: opts.configYaml } : {}),
       // The Sole User's shape: Superadmin holding every Instance Role (ADR-0071).
       ...(opts.soleUser ? { E2E_SOLE_USER: '1' } : {}),
+      ...(opts.profile ? { E2E_PROFILE: opts.profile } : {}),
     },
   };
 }
@@ -65,9 +77,13 @@ function authenticated(name: string, port: number, extra: { testMatch?: RegExp; 
   };
 }
 
-/** The setup project that logs into `port`'s server and persists its session (ADR-0009). */
-function setup(name: string, port: number) {
-  return { name: `setup-${name}`, testMatch: /.*\.setup\.ts/, use: { baseURL: urlFor(port) } };
+/**
+ * The setup project that logs into `port`'s server and persists its session (ADR-0009). `testMatch`
+ * because how a run authenticates depends on its config: the desktop profile has no login page to
+ * drive, so it posts to the login endpoint instead (ADR-0071).
+ */
+function setup(name: string, port: number, testMatch = /.*[/\\]auth\.setup\.ts/) {
+  return { name: `setup-${name}`, testMatch, use: { baseURL: urlFor(port) } };
 }
 
 /**
@@ -109,6 +125,13 @@ export default defineConfig({
     authenticated('collab-off', COLLAB_OFF_PORT, {
       testMatch: /.*[/\\]config[/\\]collab-off\.spec\.ts/,
     }),
+    // The desktop Deployment Profile (ADR-0071, #318), pinned by the boot script and paired with
+    // Collaboration off as the Desktop App pins both. Its setup posts to the login endpoint, since
+    // this profile renders no login page to drive.
+    setup('desktop', DESKTOP_PORT, /.*[/\\]desktop-auth\.setup\.ts/),
+    authenticated('desktop', DESKTOP_PORT, {
+      testMatch: /.*[/\\]config[/\\]desktop-profile\.spec\.ts/,
+    }),
   ],
   webServer: [
     server(DEFAULT_PORT),
@@ -118,6 +141,12 @@ export default defineConfig({
       instanceSubdir: 'web-e2e-collab-off',
       configYaml: COLLABORATION_OFF_YAML,
       soleUser: true,
+    }),
+    server(DESKTOP_PORT, {
+      instanceSubdir: 'web-e2e-desktop',
+      configYaml: COLLABORATION_OFF_YAML,
+      soleUser: true,
+      profile: 'desktop',
     }),
   ],
 });

@@ -1,25 +1,39 @@
 import { inject, Injector } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { CanActivateFn, Router, UrlTree } from '@angular/router';
 import { filter, first, map } from 'rxjs';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { AuthClient } from '../services/auth.client';
+import { ClientConfigStore } from '../services/client-config.store';
+
+/**
+ * Where a navigation without a session goes — the *policy* half of 401 recovery, so it reads the
+ * profile (ADR-0071): the desktop profile has no password a login form could ask for (ADR-0070).
+ * Dependencies are arguments because the guards call this from an operator, outside their injection
+ * context.
+ */
+function unauthenticatedDestination(router: Router, config: ClientConfigStore, url: string): UrlTree {
+  return config.isDesktopProfile()
+    ? router.parseUrl('/session-error')
+    : router.createUrlTree(['/login'], { queryParams: { returnUrl: url } });
+}
 
 /**
  * Blocks a route until the session boot-check settles, then redirects to
- * `/login` if there is no authenticated user (ADR-0004). No per-navigation
- * re-validation: the session resource fetches once at boot and stays valid
- * until an explicit login/logout.
+ * `/login` if there is no authenticated user (ADR-0004) — or, in the desktop profile, to the
+ * unrecoverable-session error. No per-navigation re-validation: the session resource fetches once at
+ * boot and stays valid until an explicit login/logout.
  */
 export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthClient);
   const router = inject(Router);
+  const config = inject(ClientConfigStore);
   const injector = inject(Injector);
-  const toLogin = () => router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+  const noSession = () => unauthenticatedDestination(router, config, state.url);
 
   return toObservable(auth.sessionLoading, { injector }).pipe(
     filter((loading) => !loading),
     first(),
-    map(() => (auth.isAuthenticated() ? true : toLogin())),
+    map(() => (auth.isAuthenticated() ? true : noSession())),
   );
 };
 
@@ -31,14 +45,15 @@ export const authGuard: CanActivateFn = (_route, state) => {
 export const manageUsersGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthClient);
   const router = inject(Router);
+  const config = inject(ClientConfigStore);
   const injector = inject(Injector);
-  const toLogin = () => router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+  const noSession = () => unauthenticatedDestination(router, config, state.url);
 
   return toObservable(auth.sessionLoading, { injector }).pipe(
     filter((loading) => !loading),
     first(),
     map(() => {
-      if (!auth.isAuthenticated()) return toLogin();
+      if (!auth.isAuthenticated()) return noSession();
       return auth.canManageUsers() ? true : router.parseUrl('/');
     }),
   );
@@ -51,14 +66,15 @@ export const manageUsersGuard: CanActivateFn = (_route, state) => {
 export const superadminGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthClient);
   const router = inject(Router);
+  const config = inject(ClientConfigStore);
   const injector = inject(Injector);
-  const toLogin = () => router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+  const noSession = () => unauthenticatedDestination(router, config, state.url);
 
   return toObservable(auth.sessionLoading, { injector }).pipe(
     filter((loading) => !loading),
     first(),
     map(() => {
-      if (!auth.isAuthenticated()) return toLogin();
+      if (!auth.isAuthenticated()) return noSession();
       return auth.isSuperadmin() ? true : router.parseUrl('/');
     }),
   );

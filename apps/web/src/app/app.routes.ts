@@ -5,6 +5,8 @@ import {
   superadminGuard,
   authGuard,
   loginGuard,
+  serverProfileGuard,
+  desktopProfileGuard,
   entityWorldRedirect,
   reconcileWorldSegment,
   activeWorldGuard,
@@ -14,10 +16,21 @@ import {
 // `title` values are transloco keys, resolved by TranslationTitleStrategy.
 export const appRoutes: Route[] = [
   {
+    // The desktop profile has no password to satisfy this with, so the page is no destination
+    // there and the profile guard bounces it before it can render (ADR-0071).
     path: 'login',
-    canActivate: [loginGuard],
+    canActivate: [serverProfileGuard, loginGuard],
     loadComponent: () => import('./pages/login/login.page').then((m) => m.LoginPage),
     title: 'auth.tabTitle',
+  },
+  {
+    // The other half of that decision: where the desktop profile's unrecoverable session lands,
+    // since /login cannot help it (ADR-0070). Desktop-only, or it would tell a server's reader
+    // there is no sign-in to fall back on when there is (ADR-0071).
+    path: 'session-error',
+    canActivate: [desktopProfileGuard],
+    loadComponent: () => import('./pages/session-error/session-error.page').then((m) => m.SessionErrorPage),
+    title: 'auth.sessionError.tabTitle',
   },
   {
     path: '',

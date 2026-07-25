@@ -25,7 +25,13 @@
     "password": "Mot de passe",
     "signIn": "Se connecter",
     "signingIn": "Connexion…",
-    "invalidCredentials": "E-mail ou mot de passe incorrect."
+    "invalidCredentials": "E-mail ou mot de passe incorrect.",
+    "sessionError": {
+      "tabTitle": "Hexly — Session indisponible",
+      "eyebrow": "Hexly",
+      "heading": "Cette session ne peut pas continuer.",
+      "hint": "Hexly n'a pas pu confirmer votre session, et cette application n'a pas de connexion de secours. Redémarrez Hexly pour en ouvrir une nouvelle."
+    }
   },
   "entityBrowser": {
     "tabTitle": "Hexly — Votre bibliothèque",

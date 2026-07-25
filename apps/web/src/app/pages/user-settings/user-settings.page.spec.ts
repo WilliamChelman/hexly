@@ -1,15 +1,17 @@
 import { provideTranslocoTesting } from '../../../testing/transloco-testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
-import { MockAuthClient } from '@hexly/web-core/testing';
-import { LocaleService, ThemeService, AuthClient } from '@hexly/web-core';
+import { DeploymentProfile } from '@hexly/domain';
+import { MockAuthClient, mockClientConfigStore } from '@hexly/web-core/testing';
+import { LocaleService, ThemeService, AuthClient, ClientConfigStore } from '@hexly/web-core';
 import { UserSettingsPage } from './user-settings.page';
 
 describe('Settings page (ADR-0038)', () => {
   let auth: MockAuthClient;
 
-  function render() {
+  function render(profile: DeploymentProfile = 'server') {
     auth = new MockAuthClient();
     auth.setUser({
       id: 'u1',
@@ -21,7 +23,10 @@ describe('Settings page (ADR-0038)', () => {
     });
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
-      providers: [{ provide: AuthClient, useValue: auth }],
+      providers: [
+        { provide: AuthClient, useValue: auth },
+        { provide: ClientConfigStore, useValue: mockClientConfigStore({ profile: signal(profile) }) },
+      ],
     });
     const fixture = TestBed.createComponent(UserSettingsPage);
     fixture.detectChanges();
@@ -135,5 +140,28 @@ describe('Settings page (ADR-0038)', () => {
     expect(fixture.nativeElement.textContent).toContain('at least 8 characters');
 
     expect(auth.changePassword).not.toHaveBeenCalled();
+  });
+
+  it('keeps only Preferences in the desktop profile — no Profile section, no password form (ADR-0071)', () => {
+    const fixture = render('desktop');
+    const html: HTMLElement = fixture.nativeElement;
+
+    for (const testid of [
+      'email',
+      'display-name',
+      'save-profile',
+      'current-password',
+      'new-password',
+      'change-password',
+    ]) {
+      expect(html.querySelector(`[data-testid="${testid}"]`)).toBeNull();
+    }
+    // No email address anywhere either, not merely no input for it.
+    expect(html.textContent).not.toContain('ada@hexly.test');
+
+    // The account-independent preferences are all still here.
+    for (const testid of ['theme-light', 'theme-dark', 'language', 'format-locale']) {
+      expect(html.querySelector(`[data-testid="${testid}"]`)).not.toBeNull();
+    }
   });
 });

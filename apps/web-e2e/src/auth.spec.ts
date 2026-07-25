@@ -30,4 +30,8 @@ test('guards the app, signs in, and signs out', async ({ page }) => {
 
   await page.goto('/');
   await expect(page).toHaveURL(/\/login/);
+
+  // The desktop profile's dead end is no destination here: a server has a login page (ADR-0071).
+  await page.goto('/session-error');
+  await expect(page).toHaveURL(/\/login/);
 });
