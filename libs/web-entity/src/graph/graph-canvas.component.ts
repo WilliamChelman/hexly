@@ -20,9 +20,22 @@ import { GENERIC_TYPE_DEFINITION, TypeDefinition } from '../models/type-definiti
 
 /**
  * The declutter: at most one Entity label per {@link LABEL_GRID.pointCell} of screen, and one Link
- * Descriptor per `linkCell`. `max` is a ceiling on the DOM one frame may touch, not the mechanism.
+ * Descriptor per `linkCell`. `max` caps each election — at most that many Entity names in the
+ * viewport, highest-degree first — and twice it is the ceiling on the DOM one frame may touch.
+ * `sparse` is the declutter's off-switch: at that few Entities in view (a Local Graph at depth 1,
+ * a deep zoom) every name has room, so every visible node is labelled.
  */
-const LABEL_GRID: LabelGrid = { pointCell: 90, linkCell: 120, max: 400 };
+const LABEL_GRID: LabelGrid = { pointCell: 90, linkCell: 120, max: 200, sparse: 30 };
+
+/**
+ * The crowd reading the label layer's opacity follows: at this many Entities in view (or fewer)
+ * the labels are fully opaque; past it they recede on a square-root curve — zooming in thins the
+ * crowd, so the labels surface gradually instead of popping at a threshold.
+ */
+const LABEL_CROWD = 80;
+
+/** The recession's floor: a dense overview keeps faint labels rather than losing them outright. */
+const LABEL_MIN_OPACITY = 0.25;
 
 /** cosmos.gl's fixed simulation space. Anything larger crashes iOS; it caps at 4096. */
 const SPACE = 4096;
@@ -101,11 +114,28 @@ const REHEAT_ALPHA = 0.3;
 const LABEL_CONTOUR = '-1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1px 0 #111, 0 1px 2px rgba(0,0,0,0.6)';
 
 /**
- * How long the pointer must settle before the focus grey-out commits. A sweep across the canvas
+ * How long the pointer must settle before the focus fade commits. A sweep across the canvas
  * fires a burst of over/out events — one per node brushed — and applying each would flash the whole
  * graph light and dark.
  */
 const HOVER_DEBOUNCE_MS = 50;
+
+/**
+ * How long the hover focus fades in and out — one render transition tweens the point and link
+ * buffers together, so both directions and both layers share this clock. Longer than the chrome's
+ * `--dur-base`: a canvas-wide crossfade needs more time than a button to read as motion at all.
+ */
+const HOVER_FADE_MS = 300;
+
+/**
+ * What is left of a node or link outside the hovered neighbourhood — an alpha multiplier, so a
+ * dimmed node recedes in its own hue rather than snapping to cosmos.gl's greyout blend (which is a
+ * status-texture flip and cannot animate).
+ */
+const HOVER_DIM = 0.15;
+
+/** The border ring's share of the ink colour's alpha — a hairline, not a second halo. */
+const NODE_RING_ALPHA = 0.5;
 
 /** Read a design token, so the canvas follows the theme (ADR-0007's palette, not hardcoded hex). */
 function token(style: CSSStyleDeclaration, name: string, fallback: string): string {
@@ -122,6 +152,10 @@ interface Palette {
   /** Fallback node colour for an unregistered type — the generic type's hue, as every other chrome resolves it. */
   readonly node: [number, number, number, number];
   readonly link: [number, number, number, number];
+  /** The hovered Entity's own edges — pulled forward in the accent while the rest of the graph dims. */
+  readonly linkHighlight: [number, number, number, number];
+  /** The border ring every node wears, so a pale node holds its shape against the field. */
+  readonly ring: [number, number, number, number];
 }
 
 function palette(defs: readonly TypeDefinition[]): Palette {
@@ -130,6 +164,7 @@ function palette(defs: readonly TypeDefinition[]): Palette {
   for (const def of defs) {
     byType.set(def.id, toRgba(token(style, def.graphColorToken, FALLBACK_NODE_COLOR)));
   }
+  const ink = toRgba(token(style, '--color-ink', '#2e2412'));
   return {
     background: token(style, '--color-surface-sunken', '#ece0c0'),
     byType,
@@ -137,6 +172,8 @@ function palette(defs: readonly TypeDefinition[]): Palette {
     // fallback `TypeRegistry.resolve` gives every other surface, so the graph needs no plugin of its own.
     node: toRgba(token(style, GENERIC_TYPE_DEFINITION.graphColorToken, FALLBACK_NODE_COLOR)),
     link: toRgba(token(style, '--color-line-strong', '#b89a62')),
+    linkHighlight: toRgba(token(style, '--color-gold', '#9a6a16')),
+    ring: [ink[0], ink[1], ink[2], ink[3] * NODE_RING_ALPHA],
   };
 }
 
@@ -181,6 +218,10 @@ interface Mounted {
   readonly positions: Float32Array;
   /** The pool entry this mount adopted, if any — single-use, handed back on destroy. */
   readonly adopted: WarmGraph | null;
+  /** Re-bake a theme flip's palette into the base buffers and re-apply the current hover state. */
+  readonly setPalette: (colors: Palette) => void;
+  /** The hovered Entity and its neighbours while a focus is applied — `null` when none is. */
+  readonly focused: () => ReadonlySet<number> | null;
 }
 
 /**
@@ -294,17 +335,12 @@ export class GraphCanvasComponent {
   }
 
   /**
-   * Re-bake the theme's colours into cosmos.gl's buffers. `render()` with no alpha leaves the
-   * simulation exactly where it stands, so the layout survives the flip and only the colour moves.
+   * Re-bake the theme's colours into cosmos.gl's buffers. The mount owns the base colour arrays
+   * (they are what the hover fade returns to), so the flip goes through it — the layout survives
+   * and only the colour moves.
    */
   private repaint(): void {
-    if (!this.mounted) return;
-    const { cosmos, payload } = this.mounted;
-    const colors = palette(this.types.all());
-    cosmos.setPointColors(pointColors(payload.nodes, colors));
-    cosmos.setLinkColors(linkColors(payload.links.length / 2, colors));
-    cosmos.setConfigPartial({ backgroundColor: colors.background });
-    cosmos.render();
+    this.mounted?.setPalette(palette(this.types.all()));
   }
 
   private async mount(graph: WorldGraph, center: string | null, host: HTMLDivElement): Promise<Mounted | null> {
@@ -317,7 +353,7 @@ export class GraphCanvasComponent {
     let settled = false;
     /** When the camera last followed the layout — the {@link REFRAME_MS} throttle's clock. */
     let reframedAt = 0;
-    const colors = palette(this.types.all());
+    let colors = palette(this.types.all());
     // `graphPayload` re-orders the nodes, so the centre's *point index* is only knowable from its output.
     const centerIndex = center === null ? -1 : nodes.findIndex((n) => n.id === center);
 
@@ -336,23 +372,61 @@ export class GraphCanvasComponent {
       sizes[i] = 8 + Math.min(9, Math.sqrt(degrees[i]) * 2.2) + (nodes[i].id === center ? CENTER_SIZE_BOOST : 0);
     }
 
-    // Commit the focus grey-out only once the pointer settles: each over/out reschedules the same
+    /** Point → its link indices — the adjacency the flat pair array can't answer on hover. */
+    const incident = incidentLinks(links, nodes.length);
+    const everyPoint = Array.from({ length: nodes.length }, (_, i) => i);
+    let basePointColors = pointColors(nodes, colors);
+    let baseLinkColors = linkColors(links.length / 2, colors);
+    /** The committed hover target, so a theme flip can re-bake colours without losing the focus. */
+    let focusIndex: number | undefined;
+    /** What {@link applyFocus} kept bright — the label pass forces these Entities' names on. */
+    let focusedSet: ReadonlySet<number> | null = null;
+
+    // The focus treatment, in place of cosmos.gl's built-in greyout: that one is a status-texture
+    // flip, which cannot animate. Recolouring the buffers instead lets `render`'s transition tween
+    // the fade — in and out on the same clock, links and nodes together. The neighbourhood keeps its
+    // hues, the hovered Entity's own edges take the accent, everything else recedes to {@link HOVER_DIM}.
+    const applyFocus = (index: number | undefined, fadeMs: number) => {
+      if (index === undefined) {
+        focusedSet = null;
+        cosmos.setPointColors(basePointColors);
+        cosmos.setLinkColors(baseLinkColors);
+        cosmos.setConfigPartial({ focusedPointIndex: undefined, outlinedPointIndices: everyPoint });
+      } else {
+        const kept = new Set([index, ...cosmos.getNeighboringPointIndices(index)]);
+        focusedSet = kept;
+        const points = basePointColors.slice();
+        for (let i = 0; i < nodes.length; i++) if (!kept.has(i)) points[i * 4 + 3] *= HOVER_DIM;
+        const linkRgba = baseLinkColors.slice();
+        for (let alpha = 3; alpha < linkRgba.length; alpha += 4) linkRgba[alpha] *= HOVER_DIM;
+        for (const link of incident[index]) linkRgba.set(colors.linkHighlight, link * 4);
+        cosmos.setPointColors(points);
+        cosmos.setLinkColors(linkRgba);
+        // The rings are one global colour, so a dimmed node's ring cannot fade with its body — it
+        // hands the ring back instead, under cover of the body's own fade.
+        cosmos.setConfigPartial({ focusedPointIndex: index, outlinedPointIndices: [...kept] });
+      }
+      cosmos.render(undefined, fadeMs);
+      // The label pass owes the neighbourhood its names now — one repaint even if the loop is parked.
+      this.wake();
+    };
+
+    const setPalette = (next: Palette) => {
+      colors = next;
+      basePointColors = pointColors(nodes, next);
+      baseLinkColors = linkColors(links.length / 2, next);
+      cosmos.setConfigPartial({ backgroundColor: next.background, outlinedPointRingColor: next.ring });
+      applyFocus(focusIndex, 0);
+    };
+
+    // Commit the focus fade only once the pointer settles: each over/out reschedules the same
     // timer, so a burst of them while sweeping the canvas collapses to a single apply on the target
     // the pointer finally rests on (or a clear, when that target is the background).
     const focus = (index: number | undefined) => {
       clearTimeout(this.hoverTimer);
       this.hoverTimer = window.setTimeout(() => {
-        cosmos.setConfigPartial(
-          index === undefined
-            ? {
-                highlightedPointIndices: undefined,
-                focusedPointIndex: undefined,
-              }
-            : {
-                highlightedPointIndices: [index, ...cosmos.getNeighboringPointIndices(index)],
-                focusedPointIndex: index,
-              },
-        );
+        focusIndex = index;
+        applyFocus(index, HOVER_FADE_MS);
       }, HOVER_DEBOUNCE_MS);
     };
 
@@ -362,6 +436,12 @@ export class GraphCanvasComponent {
 
     const config: GraphConfig = {
       backgroundColor: colors.background,
+      // Colour changes snap unless a render asks for a fade by itself — the hover fade passes its
+      // own duration; mount and theme flips must not inherit cosmos.gl's 800 ms default.
+      transitionDuration: 0,
+      // Every node wears a hairline ring, so a node the field's hue washes out keeps its shape.
+      outlinedPointIndices: everyPoint,
+      outlinedPointRingColor: colors.ring,
       enableDrag: true,
       // The seed ring is what this frames; the follow camera below takes over from the first tick, so the
       // default delay is right — a longer one would only stall the first frame.
@@ -381,8 +461,8 @@ export class GraphCanvasComponent {
           id: nodes[index].id,
           newTab: event.ctrlKey || event.metaKey || event.button === 1,
         }),
-      // Focus mode, built in: everything outside the hovered Entity's neighbourhood greys out.
-      // Debounced (see {@link focus}) so a sweep across the canvas doesn't strobe the grey-out.
+      // Focus mode: everything outside the hovered Entity's neighbourhood fades ({@link applyFocus}).
+      // Debounced (see {@link focus}) so a sweep across the canvas doesn't strobe the fade.
       onPointMouseOver: (index) => focus(index),
       onPointMouseOut: () => focus(undefined),
       // A pan/zoom shifts the projection and a drag moves the point; both need the label loop awake
@@ -431,10 +511,10 @@ export class GraphCanvasComponent {
     }
 
     cosmos.setPointPositions(positions);
-    cosmos.setPointColors(pointColors(nodes, colors));
+    cosmos.setPointColors(basePointColors);
     cosmos.setPointSizes(sizes);
     cosmos.setLinks(links);
-    cosmos.setLinkColors(linkColors(links.length / 2, colors));
+    cosmos.setLinkColors(baseLinkColors);
     // Pin the centre where it was seeded, at the middle of the space: it takes no force, so the layout
     // arranges *around* it and can never drift away as a whole, and the Entity the drawing is about stays
     // where the reader looked for it. It still pulls its neighbours (a pinned point keeps acting on the
@@ -453,7 +533,7 @@ export class GraphCanvasComponent {
       cosmos.render();
     }
 
-    return { cosmos, payload, positions, adopted };
+    return { cosmos, payload, positions, adopted, setPalette, focused: () => focusedSet };
   }
 
   /** Destroy a mount's graph; an adopted one goes back to the pool, which owns its teardown. */
@@ -474,7 +554,11 @@ export class GraphCanvasComponent {
    * Only ever called on a live mount, past the effect's stale check — the loop it starts owns
    * {@link frame} until {@link teardown} cancels it.
    */
-  private paintLabels({ cosmos, payload, positions }: Mounted, host: HTMLDivElement, overlay: HTMLDivElement): void {
+  private paintLabels(
+    { cosmos, payload, positions, focused }: Mounted,
+    host: HTMLDivElement,
+    overlay: HTMLDivElement,
+  ): void {
     const { nodes, links, descriptors } = payload;
 
     /** The camera, in the space units `selectLabels` elects on. */
@@ -497,8 +581,9 @@ export class GraphCanvasComponent {
     const tick = () => {
       let used = 0;
 
-      const place = (text: string, x: number, y: number, angle: number | null) => {
-        if (!text || used >= LABEL_GRID.max) return;
+      const place = (text: string, x: number, y: number, angle: number | null, opacity: string) => {
+        // `max` bounds each election; the DOM ceiling is both of them together.
+        if (!text || used >= LABEL_GRID.max * 2) return;
         let label = this.labels[used];
         if (!label) {
           label = document.createElement('span');
@@ -509,6 +594,7 @@ export class GraphCanvasComponent {
           this.labels[used] = label;
         }
         label.style.display = '';
+        label.style.opacity = opacity;
         label.style.left = `${x}px`;
         label.style.top = `${y}px`;
         label.style.transform = angle === null ? 'translate(-50%, 0)' : `translate(-50%, -100%) rotate(${angle}rad)`;
@@ -535,9 +621,27 @@ export class GraphCanvasComponent {
 
       const selection = selectLabels(payload, positions, currentView(), LABEL_GRID);
 
-      for (const index of selection.points) {
+      // The labels' opacity follows the crowd: past {@link LABEL_CROWD} Entities in view the text
+      // recedes on a square-root curve, so zooming in (thinning the crowd) surfaces it gradually.
+      // Per span, not on the overlay — a hover-focused name must be able to sit at full strength
+      // over a receded crowd, and no child can out-opaque its parent.
+      const crowd = (
+        selection.visiblePoints <= LABEL_CROWD
+          ? 1
+          : Math.max(LABEL_MIN_OPACITY, Math.sqrt(LABEL_CROWD / selection.visiblePoints))
+      ).toFixed(2);
+
+      const placeNode = (index: number, opacity: string) => {
         const [x, y] = cosmos.spaceToScreenPosition([positions[index * 2], positions[index * 2 + 1]]);
-        place(nodes[index].name, x, y + 6, null);
+        place(nodes[index].name, x, y + 6, null, opacity);
+      };
+
+      // The hovered neighbourhood reads on demand: its names are forced past the election, first —
+      // so the DOM ceiling can never squeeze them out — and at full strength.
+      const focusedPoints = focused();
+      if (focusedPoints) for (const index of focusedPoints) placeNode(index, '1');
+      for (const index of selection.points) {
+        if (!focusedPoints?.has(index)) placeNode(index, crowd);
       }
       for (const index of selection.links) {
         const source = links[index * 2];
@@ -545,7 +649,7 @@ export class GraphCanvasComponent {
         const [sx, sy] = cosmos.spaceToScreenPosition([positions[source * 2], positions[source * 2 + 1]]);
         const [tx, ty] = cosmos.spaceToScreenPosition([positions[target * 2], positions[target * 2 + 1]]);
         // Angle in screen space, so the label lies along the edge as drawn, at any zoom.
-        place(descriptors[index], (sx + tx) / 2, (sy + ty) / 2, upright(Math.atan2(ty - sy, tx - sx)));
+        place(descriptors[index], (sx + tx) / 2, (sy + ty) / 2, upright(Math.atan2(ty - sy, tx - sx)), crowd);
       }
 
       for (let i = used; i < this.labels.length; i++) this.labels[i].style.display = 'none';
@@ -682,6 +786,19 @@ function misframed(cosmos: Graph, host: HTMLDivElement): boolean {
   // above and below it that no framing can remove.
   const coverage = Math.max((maxX - minX) / (viewMaxX - viewMinX), (maxY - minY) / (viewMaxY - viewMinY));
   return coverage < REFRAME_MIN_COVERAGE;
+}
+
+/**
+ * Link indices by point: `GraphPayload.links` is a flat pair array, so finding the hovered Entity's
+ * own edges needs this adjacency built once per mount.
+ */
+function incidentLinks(links: Float32Array, pointCount: number): number[][] {
+  const incident: number[][] = Array.from({ length: pointCount }, () => []);
+  for (let link = 0; link < links.length / 2; link++) {
+    incident[links[link * 2]].push(link);
+    incident[links[link * 2 + 1]].push(link);
+  }
+  return incident;
 }
 
 /** Flip an edge label that would otherwise read upside-down. */
