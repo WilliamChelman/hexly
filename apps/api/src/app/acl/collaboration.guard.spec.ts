@@ -170,7 +170,9 @@ describe('Collaboration gate', () => {
 
     app = moduleRef.createNestApplication();
     app.use(cookieParser());
-    await app.init();
+    // Listen for real: supertest otherwise churns an ephemeral port per request, and a reused loopback
+    // 4-tuple still in TIME_WAIT is RST as `socket hang up`.
+    await app.listen(0);
   }
 
   afterEach(async () => {
