@@ -295,6 +295,8 @@
     "subhead": "Reprenez où vous en étiez, ou tracez un nouveau monde.",
     "continue": "Reprendre",
     "creating": "Création…",
+    "createHeading": "Nommez votre monde",
+    "createNameLabel": "Nom du monde",
     "owned": "Propriétaire",
     "member": "Membre",
     "loadErrorTitle": "Impossible de charger vos mondes.",

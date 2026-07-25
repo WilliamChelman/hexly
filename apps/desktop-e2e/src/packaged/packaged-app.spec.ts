@@ -49,6 +49,7 @@ test('the packaged app opens on its Worlds, creates one, thumbnails an image and
   // rebuilt for Electron's ABI opened a database and ran migrations (ADR-0027).
   const created = window.waitForResponse((r) => r.url().endsWith('/api/worlds') && r.request().method() === 'POST');
   await window.getByTestId('create-world').click();
+  await window.getByTestId('confirm-create-world').click();
   const response = await created;
   expect(response.ok(), `${response.status()} ${await response.text()}`).toBe(true);
   const world = (await response.json()) as { id: string };

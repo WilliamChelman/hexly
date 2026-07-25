@@ -132,8 +132,51 @@ describe('WorldIndex', () => {
     expect($(empty, '[data-testid=create-world]')).toBeNull();
   });
 
-  it('creating a World lands on its Dashboard (ADR-0043)', () => {
-    const el = render([]).nativeElement as HTMLElement;
+  /** Click Create and resolve the name prompt it opens; returns the fixture. */
+  function openCreatePrompt(worlds: WorldSummary[] = []) {
+    const fixture = render(worlds);
+    const el = fixture.nativeElement as HTMLElement;
+    ($(el, '[data-testid=create-world]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('prompts for a name before writing the World', () => {
+    const fixture = openCreatePrompt();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect($(el, '[data-testid=create-world-modal]')).not.toBeNull();
+    expect(worldsClient.create).not.toHaveBeenCalled();
+  });
+
+  it('creates the World under the typed name and lands on its Dashboard (ADR-0043)', () => {
+    const fixture = openCreatePrompt();
+    const el = fixture.nativeElement as HTMLElement;
+
+    worldsClient.create.mockReturnValue(
+      of({
+        ...world('w9', 'Aldermoor'),
+        entityCount: 0,
+        pinnedEntityIds: [],
+        seq: 1,
+      }),
+    );
+    const input = $(el, '[data-testid=create-world-name]') as HTMLInputElement;
+    input.value = '  Aldermoor  ';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    ($(el, '[data-testid=confirm-create-world]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    // Trimmed, and the prompt closes behind the navigation.
+    expect(worldsClient.create).toHaveBeenCalledWith('Aldermoor');
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w9']);
+    expect($(el, '[data-testid=create-world-modal]')).toBeNull();
+  });
+
+  it('falls back to the untitled default when the name is left blank', () => {
+    const fixture = openCreatePrompt();
+    const el = fixture.nativeElement as HTMLElement;
 
     worldsClient.create.mockReturnValue(
       of({
@@ -143,9 +186,21 @@ describe('WorldIndex', () => {
         seq: 1,
       }),
     );
-    ($(el, '[data-testid=create-world]') as HTMLButtonElement).click();
+    ($(el, '[data-testid=confirm-create-world]') as HTMLButtonElement).click();
 
+    expect(worldsClient.create).toHaveBeenCalledWith('Untitled world');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w9']);
+  });
+
+  it('writes nothing when the name prompt is cancelled', () => {
+    const fixture = openCreatePrompt();
+    const el = fixture.nativeElement as HTMLElement;
+
+    ($(el, '[data-testid=cancel-create-world]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect($(el, '[data-testid=create-world-modal]')).toBeNull();
+    expect(worldsClient.create).not.toHaveBeenCalled();
   });
 
   const importSummary = (over: Partial<ImportSummary> = {}): ImportSummary => ({
@@ -407,17 +462,25 @@ describe('WorldIndex', () => {
     expect($(el, '[data-testid=worlds-empty]')).toBeNull();
   });
 
-  it('surfaces an error toast when creating a World fails', () => {
-    const el = render([]).nativeElement as HTMLElement;
+  it('surfaces an error toast when creating a World fails, keeping the typed name', () => {
+    const fixture = openCreatePrompt();
+    const el = fixture.nativeElement as HTMLElement;
 
     worldsClient.create.mockReturnValue(throwError(() => new Error('server error')));
-    ($(el, '[data-testid=create-world]') as HTMLButtonElement).click();
+    const input = $(el, '[data-testid=create-world-name]') as HTMLInputElement;
+    input.value = 'Aldermoor';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    ($(el, '[data-testid=confirm-create-world]') as HTMLButtonElement).click();
+    fixture.detectChanges();
 
     expect(
       TestBed.inject(ToasterService)
         .toasts()
         .map((t) => t.tone),
     ).toEqual(['error']);
+    // The prompt survives the failure, so the retry doesn't retype the name.
+    expect(($(el, '[data-testid=create-world-name]') as HTMLInputElement).value).toBe('Aldermoor');
   });
 
   /**
