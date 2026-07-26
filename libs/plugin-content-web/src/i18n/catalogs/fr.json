@@ -61,6 +61,10 @@
   },
   "entityLink": {
     "dangling": "Cette entité est indisponible",
+    "relink": "Lier à une entité existante…",
+    "relinkEmpty": "Aucune entité correspondante",
+    "relinkSearch": "Rechercher des entités",
+    "repairLabel": "Réparer ce lien",
     "unresolved": "Aucune entité ne porte encore ce nom"
   },
   "note": {

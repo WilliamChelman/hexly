@@ -2,18 +2,39 @@ import {
   ApplicationRef,
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   EnvironmentInjector,
   Injector,
+  Signal,
+  afterRenderEffect,
   computed,
   createComponent,
+  effect,
   inject,
   input,
+  signal,
+  viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { Editor } from '@tiptap/core';
 import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { NodeView } from '@tiptap/pm/view';
+import { EntitySummary } from '@hexly/domain';
+import { EntitySearchPickerComponent } from '@hexly/web-entity';
+import { BodyPortalDirective, ButtonComponent } from '@hexly/web-ui';
 import { EntityNameResolver, EntityResolution } from '../services/entity-name-resolver';
+
+/** The repair a broken link affords, supplied by the node view that owns the document position. */
+export interface EntityLinkRepair {
+  /**
+   * Whether the surface accepts writes. A read-only viewer keeps the inert label and is never
+   * offered a write they cannot perform (ADR-0073).
+   */
+  readonly writable: Signal<boolean>;
+  /** Rewrite this link's target in place: the prose, the `display` and the `heading` are untouched. */
+  readonly retarget: (entity: EntitySummary) => void;
+}
 
 /**
  * Renders a Content Entity Link inline (ADR-0023). Resolves `entityId` to the target's
@@ -23,11 +44,15 @@ import { EntityNameResolver, EntityResolution } from '../services/entity-name-re
  *
  * Three renderings, not two: a link with no id is an *Unresolved Link* — a name never
  * written — and must not read as a *dangling* one, whose target went away (ADR-0073).
+ *
+ * Either broken rendering is clickable for a writer, opening the repair popover: an import
+ * resolves wikilinks by basename, so `[[Zorblax]]` routinely misses an Entity named "Zorblax
+ * the Devourer" and retargeting is the fix that does not mint a duplicate (ADR-0073).
  */
 @Component({
   selector: 'app-entity-link-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslocoPipe],
+  imports: [RouterLink, TranslocoPipe, BodyPortalDirective, ButtonComponent, EntitySearchPickerComponent],
   // `relative inline-block` makes each link its own positioning context so the
   // descriptor badge can anchor to the pill's top-right corner (see below).
   host: { class: 'relative inline-block align-baseline' },
@@ -42,6 +67,14 @@ import { EntityNameResolver, EntityResolution } from '../services/entity-name-re
           data-unresolved=""
           [attr.title]="'editor.entityLink.unresolved' | transloco"
           class="inline-block rounded bg-astra-soft px-1.5 py-0.5 leading-tight text-astra underline decoration-dashed underline-offset-2"
+          [class.cursor-pointer]="repairable()"
+          [attr.role]="repairable() ? 'button' : null"
+          [attr.tabindex]="repairable() ? 0 : null"
+          [attr.aria-haspopup]="repairable() ? 'dialog' : null"
+          [attr.aria-expanded]="repairable() ? repairOpen() : null"
+          (click)="toggleRepair()"
+          (keydown.enter)="toggleRepair()"
+          (keydown.space)="toggleRepair(); $event.preventDefault()"
           >{{ text() }}</span
         >
       }
@@ -53,6 +86,14 @@ import { EntityNameResolver, EntityResolution } from '../services/entity-name-re
           [attr.data-entity-id]="entityId()"
           [attr.title]="'editor.entityLink.dangling' | transloco"
           class="inline-block rounded bg-ink-faint/15 px-1.5 py-0.5 italic leading-tight text-ink-muted"
+          [class.cursor-pointer]="repairable()"
+          [attr.role]="repairable() ? 'button' : null"
+          [attr.tabindex]="repairable() ? 0 : null"
+          [attr.aria-haspopup]="repairable() ? 'dialog' : null"
+          [attr.aria-expanded]="repairable() ? repairOpen() : null"
+          (click)="toggleRepair()"
+          (keydown.enter)="toggleRepair()"
+          (keydown.space)="toggleRepair(); $event.preventDefault()"
           >{{ text() }}</span
         >
       }
@@ -85,6 +126,48 @@ import { EntityNameResolver, EntityResolution } from '../services/entity-name-re
         >{{ descriptor() }}</span
       >
     }
+    @if (repairOpen()) {
+      <!-- Portaled to <body>: the pill sits inside the editor's contenteditable, and on a Board
+           under a scaled ancestor that would capture a fixed-position descendant. -->
+      <div
+        #repairMenu
+        appBodyPortal
+        role="dialog"
+        data-testid="entity-link-repair"
+        class="fixed z-50 w-64"
+        [attr.aria-label]="'editor.entityLink.repairLabel' | transloco"
+        [style.left.px]="repairAt().x"
+        [style.top.px]="repairAt().y"
+      >
+        @if (picking()) {
+          <app-entity-search-picker
+            testid="entity-link-repair-picker"
+            placeholderKey="editor.entityLink.relinkSearch"
+            emptyKey="editor.entityLink.relinkEmpty"
+            [query]="query()"
+            (queryChange)="query.set($event)"
+            (pick)="choose($event)"
+          />
+        } @else {
+          <div class="rounded-md border border-line bg-surface p-1 shadow-2">
+            <!-- An Unresolved Link also gets *Create* here (#350); a dangling one must not, because
+                 a failed resolver batch reads every id as missing, and a bad connection would mint a
+                 duplicate of an Entity that exists and is fine (ADR-0073). -->
+            <button
+              type="button"
+              appButton
+              variant="ghost"
+              size="sm"
+              class="w-full justify-start!"
+              data-testid="entity-link-relink"
+              (click)="picking.set(true)"
+            >
+              {{ 'editor.entityLink.relink' | transloco }}
+            </button>
+          </div>
+        }
+      </div>
+    }
   `,
 })
 export class EntityLinkViewComponent {
@@ -95,8 +178,12 @@ export class EntityLinkViewComponent {
   readonly display = input<string | null>(null);
   /** `[[Target#Heading]]` anchor (ADR-0033); rendered as the routerLink fragment so navigation scrolls to it. */
   readonly heading = input<string | null>(null);
+  /** Absent wherever no document position backs the link (a spec, a static render): no popover. */
+  readonly repair = input<EntityLinkRepair | null>(null);
 
   private readonly resolver = inject(EntityNameResolver);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly repairMenu = viewChild<ElementRef<HTMLElement>>('repairMenu');
 
   /** `null` when no id was ever stored — an Unresolved Link resolves nothing, so it joins no batch. */
   private readonly resolution = computed<EntityResolution | null>(() =>
@@ -124,7 +211,102 @@ export class EntityLinkViewComponent {
     const r = this.resolution();
     return r?.status === 'found' ? r.entity.name : this.label();
   });
+
+  /** Only a broken link is repairable, and only where the surface accepts writes (ADR-0073). */
+  protected readonly repairable = computed(() => this.tone() !== 'live' && !!this.repair()?.writable());
+
+  protected readonly repairOpen = signal(false);
+  /** Viewport coordinates of the open popover — held apart from {@link repairOpen} so re-anchoring is not a re-open. */
+  protected readonly repairAt = signal({ x: 0, y: 0 });
+  /** False on the action list, true once *Link to an existing Entity…* swapped it for the picker. */
+  protected readonly picking = signal(false);
+  protected readonly query = signal('');
+
+  constructor() {
+    // Bound only while open: a note carries dozens of links, and a permanent listener per link
+    // would run — and schedule a change detection — on every press anywhere in the app.
+    effect((onCleanup) => {
+      if (!this.repairOpen()) return;
+      // mousedown, not click: a click inside the popover has already re-rendered it by the time it
+      // arrives, so a containment test would read a detached node and dismiss on its own action.
+      const onDown = (event: MouseEvent) => this.onOutsideDown(event);
+      const onKey = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') this.closeRepair(true);
+      };
+      // Capture: `scroll` does not bubble, and the pill scrolls inside the editor's own box, not the page.
+      const reanchor = () => this.repairAt.set(this.anchor());
+      document.addEventListener('mousedown', onDown);
+      document.addEventListener('keydown', onKey);
+      window.addEventListener('scroll', reanchor, true);
+      window.addEventListener('resize', reanchor);
+      onCleanup(() => {
+        document.removeEventListener('mousedown', onDown);
+        document.removeEventListener('keydown', onKey);
+        window.removeEventListener('scroll', reanchor, true);
+        window.removeEventListener('resize', reanchor);
+      });
+    });
+
+    // The popover is portaled to the end of <body>, so Tab from the pill would skip straight past it:
+    // move the keyboard in explicitly, and again when the action list becomes the picker.
+    afterRenderEffect(() => {
+      if (!this.repairOpen()) return;
+      this.picking();
+      this.repairMenu()?.nativeElement.querySelector<HTMLElement>('input, button')?.focus();
+    });
+  }
+
+  protected toggleRepair(): void {
+    if (this.repairOpen()) {
+      this.closeRepair();
+      return;
+    }
+    if (!this.repairable()) return;
+    this.picking.set(false);
+    this.query.set('');
+    this.repairAt.set(this.anchor());
+    this.repairOpen.set(true);
+  }
+
+  protected choose(entity: EntitySummary): void {
+    this.repair()?.retarget(entity);
+    this.closeRepair();
+  }
+
+  /**
+   * Clamped rather than flipped: the popover is not measured at this point, so a pill near an edge
+   * gets an opening that is wholly on screen instead of one sized against a guess.
+   */
+  private anchor(): { x: number; y: number } {
+    const pill = this.host.nativeElement.getBoundingClientRect();
+    return {
+      x: clamp(pill.left, GUTTER, window.innerWidth - REPAIR_WIDTH - GUTTER),
+      y: clamp(pill.bottom + GAP, GUTTER, window.innerHeight - REPAIR_MAX_HEIGHT - GUTTER),
+    };
+  }
+
+  private closeRepair(restoreFocus = false): void {
+    this.repairOpen.set(false);
+    this.picking.set(false);
+    // Only on Esc: a dismissing click has already put the focus where the reader pointed it.
+    if (restoreFocus) this.host.nativeElement.querySelector<HTMLElement>('[data-testid=entity-link]')?.focus();
+  }
+
+  /** Dismiss on a press landing neither on the pill nor in the popover — which is portaled away from both. */
+  private onOutsideDown(event: MouseEvent): void {
+    const target = event.target as Node;
+    if (this.host.nativeElement.contains(target) || this.repairMenu()?.nativeElement.contains(target)) return;
+    this.closeRepair();
+  }
 }
+
+/** The popover's `w-64`, the gap under the pill, the viewport gutter, and the tallest the picker gets. */
+const REPAIR_WIDTH = 256;
+const REPAIR_MAX_HEIGHT = 272;
+const GUTTER = 8;
+const GAP = 4;
+
+const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(value, Math.max(min, max)));
 
 /**
  * Bridge a ProseMirror node to an {@link EntityLinkViewComponent}.
@@ -133,9 +315,15 @@ export class EntityLinkViewComponent {
  * is provided. `elementInjector` must be ContentEditor's node injector, which lives inside
  * the router outlet: the environment injector alone cannot resolve the `ActivatedRoute` the
  * component's `routerLink` needs.
+ *
+ * `writable` is the surface's write standing, passed as a signal so a Board Text Block that
+ * arms mid-session gains the repair popover without a re-render (ADR-0073).
  */
 export function createEntityLinkNodeView(
   node: ProseMirrorNode,
+  editor: Editor,
+  getPos: () => number | undefined,
+  writable: Signal<boolean>,
   environmentInjector: EnvironmentInjector,
   elementInjector: Injector,
   appRef: ApplicationRef,
@@ -152,6 +340,21 @@ export function createEntityLinkNodeView(
     ref.setInput('heading', n.attrs['heading'] ?? null);
   };
   apply(node);
+  ref.setInput('repair', {
+    writable,
+    // setNodeMarkup on the node's own position, so only the target changes: the prose either side
+    // is never touched, and `display`, `heading` and the descriptor ride through (ADR-0073).
+    retarget: (entity) => {
+      const pos = getPos();
+      if (pos === undefined) return;
+      editor.commands.command(({ tr }) => {
+        const current = tr.doc.nodeAt(pos);
+        if (current?.type.name !== node.type.name) return false;
+        tr.setNodeMarkup(pos, undefined, { ...current.attrs, entityId: entity.id, label: entity.name });
+        return true;
+      });
+    },
+  } satisfies EntityLinkRepair);
   appRef.attachView(ref.hostView);
 
   return {

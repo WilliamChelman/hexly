@@ -361,3 +361,31 @@ export async function addType(page: Page, typeId: string): Promise<void> {
   await page.getByTestId('type-add').selectOption(typeId);
   await page.getByTestId('types-close').click();
 }
+
+/** The summary a vault import returns off the wire (ADR-0033, ADR-0073). */
+export interface ImportSummary {
+  worldId: string;
+  notesImported: number;
+  linksResolved: number;
+  linksCreated: number;
+  linksDangling: number;
+}
+
+/**
+ * Pick a vault on the World Index's hidden file input; `setInputFiles` bypasses the click. The options
+ * dialog opens and nothing uploads until {@link confirmImport} (ADR-0073), so every spec picking a vault
+ * pairs the two.
+ */
+export async function pickVault(page: Page, zip: Buffer, name = 'Aldermoor.zip'): Promise<void> {
+  await page.getByTestId('import-vault-input').setInputFiles({ name, mimeType: 'application/zip', buffer: zip });
+  await expect(page.getByTestId('import-options')).toBeVisible();
+}
+
+/** Confirm the options dialog and read the import summary off the wire. */
+export async function confirmImport(page: Page): Promise<ImportSummary> {
+  const imported = page.waitForResponse(
+    (r) => r.url().endsWith('/api/worlds/import') && r.request().method() === 'POST' && r.ok(),
+  );
+  await page.getByTestId('confirm-import').click();
+  return (await (await imported).json()) as ImportSummary;
+}

@@ -61,6 +61,10 @@
   },
   "entityLink": {
     "dangling": "This entity is unavailable",
+    "relink": "Link to an existing Entity…",
+    "relinkEmpty": "No matching entities",
+    "relinkSearch": "Search entities",
+    "repairLabel": "Repair this link",
     "unresolved": "No entity by this name yet"
   },
   "note": {

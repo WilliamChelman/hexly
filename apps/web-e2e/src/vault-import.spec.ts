@@ -1,6 +1,6 @@
 import type { APIRequestContext, Page } from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
-import { entityIdFromUrl, expect, openDetails, segRe, test } from './fixtures';
+import { confirmImport, entityIdFromUrl, expect, openDetails, pickVault, segRe, test } from './fixtures';
 
 /**
  * Vault-import smoke (ADR-0033) and the import dialog's per-run options (ADR-0073). The vault is built
@@ -26,31 +26,6 @@ function vaultZip(): Buffer {
   );
 }
 
-/** Pick the vault on the hidden input; `setInputFiles` bypasses the click. The dialog opens, nothing uploads. */
-async function pickVault(page: Page): Promise<void> {
-  await page.getByTestId('import-vault-input').setInputFiles({
-    name: 'Aldermoor.zip',
-    mimeType: 'application/zip',
-    buffer: vaultZip(),
-  });
-  await expect(page.getByTestId('import-options')).toBeVisible();
-}
-
-/** Confirm the options dialog and read the import summary off the wire. */
-async function confirmImport(page: Page) {
-  const imported = page.waitForResponse(
-    (r) => r.url().endsWith('/api/worlds/import') && r.request().method() === 'POST' && r.ok(),
-  );
-  await page.getByTestId('confirm-import').click();
-  return (await (await imported).json()) as {
-    worldId: string;
-    notesImported: number;
-    linksResolved: number;
-    linksCreated: number;
-    linksDangling: number;
-  };
-}
-
 /**
  * The rendered ink of the open note's one Entity Link. Live, Unresolved and dangling must not
  * share a colour (ADR-0073); the computed value says so without pinning a class name. The
@@ -70,7 +45,7 @@ async function mintedZorblax(request: APIRequestContext, worldId: string) {
 test('imports a vault from the World Index, landing in the new World with a resolved link', async ({ page }) => {
   await page.goto('/');
 
-  await pickVault(page);
+  await pickVault(page, vaultZip());
   // Prefilled from the Instance defaults, so the common case needs no decision.
   await expect(page.getByTestId('import-create-unresolved')).toBeChecked();
   await expect(page.getByTestId('import-inline-type')).toHaveValue('core.type.note');
@@ -120,7 +95,7 @@ test('cancelling the options dialog uploads nothing', async ({ page }) => {
     if (r.url().endsWith('/api/worlds/import')) posted = true;
   });
 
-  await pickVault(page);
+  await pickVault(page, vaultZip());
   await page.getByTestId('cancel-import').click();
   await expect(page.getByTestId('import-options')).toBeHidden();
 
@@ -135,7 +110,7 @@ test('the switch off creates nothing, and its Unresolved Link reads apart from a
 }) => {
   await page.goto('/');
 
-  await pickVault(page);
+  await pickVault(page, vaultZip());
   await page.getByTestId('import-create-unresolved').uncheck();
   const summary = await confirmImport(page);
   expect(summary.linksCreated).toBe(0);
@@ -186,7 +161,7 @@ test('the per-run Type and Tag land on what the import creates, and never reach 
 }) => {
   await page.goto('/');
 
-  await pickVault(page);
+  await pickVault(page, vaultZip());
   await page.getByTestId('import-inline-type').selectOption('core.type.hex-map');
   // A Tag this World does not have — it is minted by this very import, so it has none.
   await page.getByTestId('import-inline-tag').fill('from-the-vault');
@@ -200,7 +175,7 @@ test('the per-run Type and Tag land on what the import creates, and never reach 
   // Neither override survives: the next pick reads the Instance defaults again.
   await page.getByTestId('open-imported').click();
   await page.goto('/');
-  await pickVault(page);
+  await pickVault(page, vaultZip());
   await expect(page.getByTestId('import-create-unresolved')).toBeChecked();
   await expect(page.getByTestId('import-inline-type')).toHaveValue('core.type.note');
   await expect(page.getByTestId('import-inline-tag')).toHaveValue('');

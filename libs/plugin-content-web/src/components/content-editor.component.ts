@@ -6,6 +6,7 @@ import {
   EnvironmentInjector,
   Injector,
   afterRenderEffect,
+  computed,
   effect,
   inject,
   input,
@@ -293,6 +294,12 @@ export class ContentEditorComponent {
    */
   readonly editable = input(true);
 
+  /**
+   * Whether a broken Entity Link may be retargeted in place — the same standing that makes the prose
+   * editable, because retargeting *is* a write. A read-only viewer keeps the inert label (ADR-0073).
+   */
+  private readonly canRepairLinks = computed(() => this.editable() && this.session.writable());
+
   private readonly slashMenu = viewChild(SlashMenuComponent);
   private readonly entityPicker = viewChild(EntityPickerComponent);
   private readonly descriptorPicker = viewChild(DescriptorPickerComponent);
@@ -521,9 +528,11 @@ export class ContentEditorComponent {
     const environmentInjector = this.environmentInjector;
     const elementInjector = this.injector;
     const appRef = this.appRef;
+    const writable = this.canRepairLinks;
     const entityLinkWithView = entityLinkNode.extend({
       addNodeView() {
-        return ({ node }) => createEntityLinkNodeView(node, environmentInjector, elementInjector, appRef);
+        return ({ node, editor, getPos }) =>
+          createEntityLinkNodeView(node, editor, getPos, writable, environmentInjector, elementInjector, appRef);
       },
     });
 
