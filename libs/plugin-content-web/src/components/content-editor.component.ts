@@ -20,7 +20,7 @@ import { Observable, catchError, firstValueFrom, of } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { RichContent, CONTENT_FIELD, tiptapContent } from '@hexly/plugin-content';
-import { EntitiesClient, ToasterService } from '@hexly/web-core';
+import { ActiveWorld, EntitiesClient, ToasterService } from '@hexly/web-core';
 import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { TiptapDirective } from '../directives/tiptap.directive';
 import { EntityNameResolver } from '../services/entity-name-resolver';
@@ -267,6 +267,9 @@ export class ContentEditorComponent {
   private readonly entities = inject(EntitiesClient);
   // The `@` picker's Create rows write through this (ADR-0073); it owns the Inline Creation knobs.
   private readonly inlineCreator = inject(InlineEntityCreator);
+  // The host Entity's World, pinned by the route guard — the source of the create standing those rows
+  // hang on (ADR-0039).
+  private readonly activeWorld = inject(ActiveWorld);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly environmentInjector = inject(EnvironmentInjector);
@@ -427,6 +430,16 @@ export class ContentEditorComponent {
   }
 
   /**
+   * The `create-entity` Right on the World a mint would land in (ADR-0039) — matched against the World
+   * {@link mintThrough} writes to, so an unloaded or mismatched World gates rather than offering
+   * exactly what the server would refuse.
+   */
+  private canCreate(): boolean {
+    const world = this.activeWorld.world();
+    return !!world && world.id === this.session.current()?.worldId && world.rights.includes('create-entity');
+  }
+
+  /**
    * Mint the Entity an `@` mention names, into the open Entity's World — typing must never author a
    * cross-World link (ADR-0073). A failed write is reported here and rethrown, so the extension can
    * put the typed text back where it was.
@@ -531,6 +544,7 @@ export class ContentEditorComponent {
     const mention = entityMention({
       getPicker: () => this.entityPicker(),
       search: (name) => this.resolver.search(name),
+      canCreate: () => this.canCreate(),
       mint: (name) => this.mint(name),
       mintWithDetails: (name) => this.mintWithDetails(name),
     });

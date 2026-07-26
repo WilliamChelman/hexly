@@ -13,6 +13,11 @@ export interface EntityMentionPorts {
   /** The owner's Entities matching the typed name, server-side (ADR-0025 `q`). */
   search: (name: string) => Promise<EntitySummary[]>;
   /**
+   * Whether the caller may create Entities in the host Entity's World — the `create-entity` Right
+   * (ADR-0039). False withholds both Create rows entirely (ADR-0073); picking is untouched.
+   */
+  canCreate: () => boolean;
+  /**
    * Mint the Entity the `Create "…"` row names, under the Instance's Inline Creation knobs and in
    * the host Entity's World (ADR-0073). Rejects when the write fails; the typed text is restored.
    */
@@ -34,7 +39,8 @@ export interface EntityMentionPorts {
  * The picker's last two rows mint the typed name and link it (ADR-0073): `Create "…"` in one gesture,
  * unconditionally — no Type filter and no modal, because an unfilled `required` Field no longer refuses
  * a write (ADR-0074) — and `Create "…" with details…` through the create dialog, for an author who asks
- * for it.
+ * for it. Both are withheld from a caller without create rights in the host World: Inline Creation is a
+ * write, so it inherits the Contributor gate.
  *
  * `setProgrammatic` flags an `@` inserted by code (the `/link` slash item) rather than typed;
  * `onExit` then removes the stray `@` if the user escaped instead of picking.
@@ -64,7 +70,7 @@ export function entityMention(ports: EntityMentionPorts): { extension: Extension
             },
             items: async ({ query }) => {
               const parsed = parseMentionQuery(query);
-              return mentionItems(parsed, await ports.search(parsed.name));
+              return mentionItems(parsed, await ports.search(parsed.name), ports.canCreate());
             },
             command: ({ editor, range, props }) => {
               if (programmatic) picked = true;

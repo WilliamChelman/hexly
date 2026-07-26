@@ -1,5 +1,6 @@
 import { join } from 'node:path';
-import { test as base, expect, type APIRequestContext, type Page, type Response } from '@playwright/test';
+import { test as base, expect, type APIRequestContext, type Browser, type Page, type Response } from '@playwright/test';
+import { TEST_GRANTEE } from './test-user';
 // The app's own pretty-URL codec (ADR-0042). Imported by file path, not via the @hexly/web-core
 // barrel: the barrel re-exports the Angular services layer, which must stay out of the Playwright
 // process. The nx module-boundary rule is waived for these pure utils via eslint.config.mjs `allow`.
@@ -135,6 +136,49 @@ export async function flushSave(page: Page): Promise<Response> {
 /** Open the entity header's actions overflow menu (Visibility, Pin, Share). */
 export async function openEntityActions(page: Page): Promise<void> {
   await page.getByTestId('entity-actions').click();
+}
+
+/** Grant the second seeded user a role on the open Entity, through the header's Share dialog (ADR-0037). */
+export async function shareOpenEntity(page: Page, role: 'editor' | 'viewer'): Promise<void> {
+  await openEntityActions(page);
+  await page.getByTestId('manage-owners').click();
+  await page.getByTestId('grant-add-select').selectOption({ label: TEST_GRANTEE.displayName });
+  await page.getByTestId('grant-add-role').selectOption(role);
+  const granted = page.waitForResponse(
+    (r) => /\/api\/entities\/[\w-]+\/grants$/.test(r.url()) && r.request().method() === 'POST' && r.ok(),
+  );
+  await page.getByTestId('grant-add').click();
+  await granted;
+  await page.getByTestId('owners-close').click();
+}
+
+/** Add the second seeded user to a World with `role`, from the World's Settings Access pane. */
+export async function addWorldMember(page: Page, worldSeg: string, role: 'contributor' | 'viewer'): Promise<void> {
+  await page.goto(`/w/${worldSeg}/settings`);
+  // Owner-set and member-set share `add-select`/`add` testids, so scope to the member controls.
+  const memberAdd = page.locator('app-member-set');
+  await memberAdd.getByTestId('add-select').selectOption({ label: TEST_GRANTEE.displayName });
+  await memberAdd.getByTestId('add-role').selectOption(role);
+  const added = page.waitForResponse(
+    (r) => /\/api\/worlds\/[\w-]+\/members$/.test(r.url()) && r.request().method() === 'POST' && r.ok(),
+  );
+  await memberAdd.getByTestId('add').click();
+  await added;
+}
+
+/**
+ * Log the second seeded user in through the real UI, in their own cookie-less context — the project's
+ * authenticated storage state is the *first* user's, so a second standing needs its own context.
+ */
+export async function signInGrantee(browser: Browser): Promise<Page> {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(TEST_GRANTEE.email);
+  await page.getByLabel('Password').fill(TEST_GRANTEE.password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveTitle(/Worlds/);
+  return page;
 }
 
 /**

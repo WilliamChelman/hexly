@@ -42,16 +42,18 @@ describe('worldAccess', () => {
   function verbs(userId: string, id: string): WorldVerb[] {
     const access = worldAccess(db, userId);
     const world = access.decide(id);
-    return world ? access.rightsOf({ isOwner: access.managedBy(ownersOf(id)) }) : [];
+    return world
+      ? access.rightsOf({ isOwner: access.managedBy(ownersOf(id)), canContribute: access.contributingIn([id]).has(id) })
+      : [];
   }
 
   describe('rightsOf ∘ decide', () => {
-    it('gives an Owner read + manage', () => {
-      expect(verbs(owner, worldId)).toEqual(['read', 'manage']);
+    it('gives an Owner read + create-entity + manage', () => {
+      expect(verbs(owner, worldId)).toEqual(['read', 'create-entity', 'manage']);
     });
 
-    it('gives a Contributor read only', () => {
-      expect(verbs(contributor, worldId)).toEqual(['read']);
+    it('gives a Contributor read + create-entity, but no manage', () => {
+      expect(verbs(contributor, worldId)).toEqual(['read', 'create-entity']);
     });
 
     it('gives a Viewer read only', () => {
@@ -62,8 +64,8 @@ describe('worldAccess', () => {
       expect(verbs(stranger, worldId)).toEqual([]);
     });
 
-    it('gives a Superadmin read + manage (repair bypass, outside the model)', () => {
-      expect(verbs(superadmin, worldId)).toEqual(['read', 'manage']);
+    it('gives a Superadmin read + create-entity + manage (repair bypass, outside the model)', () => {
+      expect(verbs(superadmin, worldId)).toEqual(['read', 'create-entity', 'manage']);
     });
   });
 
@@ -146,6 +148,53 @@ describe('worldAccess', () => {
       // Superadmin manages regardless of set membership.
       expect(worldAccess(db, superadmin).managedBy(owners)).toBe(true);
       expect(worldAccess(db, superadmin).managedBy([])).toBe(true);
+    });
+  });
+
+  describe('contributingIn (the `create-entity` Right, resolved for a page in one read)', () => {
+    const contributes = (userId: string, ids: string[] = [worldId]) => [...worldAccess(db, userId).contributingIn(ids)];
+
+    it('agrees with the owner ∨ contributor rule for every standing', () => {
+      expect(contributes(owner)).toEqual([worldId]);
+      expect(contributes(contributor)).toEqual([worldId]);
+      expect(contributes(viewer)).toEqual([]);
+      expect(contributes(stranger)).toEqual([]);
+      expect(contributes(superadmin)).toEqual([worldId]);
+    });
+
+    // An Editor granted rights on one Entity reaches its World but is no Contributor in it — the
+    // standing the Create rows hang on (ADR-0073).
+    it('excludes a reachable-by-entity-grant caller with no member row', () => {
+      const editor = seedUser();
+      const entityId = randomUUID();
+      db.insert(entities)
+        .values({
+          id: entityId,
+          worldId,
+          name: 'Relic',
+          types: ['core.type.note'],
+          tags: [],
+          visibility: 'private',
+          version: 1,
+          document: '{}',
+          createdAt: 1,
+          updatedAt: 1,
+        })
+        .run();
+      db.insert(entityGrants).values({ entityId, userId: editor, role: 'editor' }).run();
+
+      expect(worldAccess(db, editor).decide(worldId)).toBeDefined();
+      expect(contributes(editor)).toEqual([]);
+    });
+
+    it('answers a whole page in one read, and an empty page without one', () => {
+      const second = seedWorld();
+      db.insert(worldMembers).values({ worldId: second, userId: viewer, role: 'contributor' }).run();
+
+      expect(contributes(viewer, [worldId, second])).toEqual([second]);
+      expect(contributes(owner, [])).toEqual([]);
+      // The Superadmin bypass answers without touching the membership table at all.
+      expect(contributes(superadmin, [worldId, second]).sort()).toEqual([worldId, second].sort());
     });
   });
 

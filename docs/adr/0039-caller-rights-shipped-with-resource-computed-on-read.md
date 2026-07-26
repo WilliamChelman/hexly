@@ -10,7 +10,7 @@ The ACL predicates (ADR-0037) are the single source of truth for what a caller m
 
 - **Per-resource verb enums** (code-known, closed — like `EntityType`), in `libs/domain`:
   - `EntityVerb`: `read` (`canReadEntity`), `edit` (`canEditSubstanceEntity`), `delete` (`canWriteEntity`), `set-visibility` (`canWriteEntity`), `manage` (`ownsEntity`).
-  - `WorldVerb`: `read` (`reachableWorld`), `manage` (`isOwner`).
+  - `WorldVerb`: `read` (`reachableWorld`), `create-entity` (`canCreateEntity`, i.e. `owner ∨ contributor`), `manage` (`isOwner`). `create-entity` arrived later, under the forward leeway below, so Inline Creation could hide the Create rows the server would refuse (ADR-0073).
   - The verb→predicate map is many-to-one (`delete` and `set-visibility` share `canWriteEntity`) — two UI affordances, one rule today; if the rules diverge, only the map changes. Adding a finer verb later (`rename`, `move`, …) is one more string, no contract break — that forward leeway is the whole point of the array shape.
 - **Computed on read from the existing predicates, not stored.** Entities: `access()` already selects the four predicate columns in one query; a pure `entityRightsOf()` serializes them to the array — this function _is_ the one documented place the verb↔predicate correspondence lives. Worlds: plain JS from `reachableWorld`/`isOwner`. Superadmin needs no special case — the predicates already short-circuit to match-all, yielding the full verb set.
 - **`rights` replaces `canWrite`/`canManage`.** Present and non-empty on `EntityDetail`, `WorldDetail`, `WorldSummary` (kills `world-index`'s `owners.includes(me)`). Anonymous public-link reads ship `rights: ['read']` — the field is always present, so the client never branches on its absence.

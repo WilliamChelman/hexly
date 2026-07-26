@@ -68,15 +68,22 @@ export function parseMentionQuery(query: string): MentionQuery {
  *
  * Order is the fast path first: plain Create is what Enter reaches on a miss, and the details row sits
  * below it as the one you go looking for.
+ *
+ * Without `canCreate` — the caller's Entity-creation standing in the host World — both rows are
+ * *absent* rather than present-and-failing (ADR-0073).
  */
-export function mentionItems(query: MentionQuery, matches: readonly EntitySummary[]): MentionItem[] {
+export function mentionItems(
+  query: MentionQuery,
+  matches: readonly EntitySummary[],
+  canCreate: boolean,
+): MentionItem[] {
   const items: MentionItem[] = matches.map((entity) => ({
     kind: 'entity',
     id: entity.id,
     entity,
     descriptor: query.descriptor,
   }));
-  if (query.name) {
+  if (query.name && canCreate) {
     items.push({ kind: 'create', id: MENTION_CREATE_ID, name: query.name, descriptor: query.descriptor });
     items.push({
       kind: 'create-details',

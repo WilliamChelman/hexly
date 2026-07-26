@@ -29,10 +29,14 @@ export type WorldRole = z.infer<typeof worldRoleSchema>;
 
 /**
  * The closed set of actions a caller may exercise on a World (CONTEXT.md →
- * Rights): `read` (reachable) and `manage` (World Owner). A World has no
- * substance to `edit`.
+ * Rights): `read` (reachable), `create-entity` (World Owner or Contributor) and
+ * `manage` (World Owner). A World has no substance to `edit`.
+ *
+ * `create-entity` is narrower than `manage` and wider than `read` — authoring an
+ * Entity is not a World management power (ADR-0024) — so an Editor holding rights
+ * on one Entity reaches its World without being able to create in it (ADR-0073).
  */
-export const worldVerbSchema = z.enum(['read', 'manage']);
+export const worldVerbSchema = z.enum(['read', 'create-entity', 'manage']);
 
 /** CONTEXT.md → Rights (World). */
 export type WorldVerb = z.infer<typeof worldVerbSchema>;

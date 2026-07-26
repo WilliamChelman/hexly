@@ -100,13 +100,16 @@ export class WorldsService {
       if (list) list.push(userId);
       else ownersByWorld.set(worldId, [userId]);
     }
+    // The caller's own contributing standing across the whole page, in one read — the Entity-creation
+    // rule is not derivable from the owner set (a Contributor holds no owner row).
+    const contributing = access.contributingIn(rows.map((w) => w.id));
     return rows.map((w) => {
       const owners = ownersByWorld.get(w.id) ?? [];
       // Rights fall out of the owner set already fetched; `managedBy` folds the Superadmin bypass.
       return {
         ...w,
         owners,
-        rights: access.rightsOf({ isOwner: access.managedBy(owners) }),
+        rights: access.rightsOf({ isOwner: access.managedBy(owners), canContribute: contributing.has(w.id) }),
       };
     });
   }
@@ -128,7 +131,7 @@ export class WorldsService {
       name: req.name,
       // The creator is the sole initial Owner, so full Rights.
       owners: [ownerId],
-      rights: worldRightsOf({ isOwner: true }),
+      rights: worldRightsOf({ isOwner: true, canContribute: true }),
       entityCount: 0,
       pinnedEntityIds: [],
       seq: INITIAL_SEQ,
@@ -433,13 +436,14 @@ export class WorldsService {
       .where(eq(entities.worldId, world.id))
       .all();
     const owners = this.worldOwners(world.id);
-    const access = worldAccess(this.db, callerId);
+    // Both standings come off the one meta read: the owner set can't answer `create-entity`, since a
+    // Contributor holds no owner row (ADR-0073). Only reachable Worlds get here, so a miss reads empty.
+    const meta = worldAccess(this.db, callerId).decideMeta(world.id);
     return {
       id: world.id,
       name: world.name,
       owners,
-      // Rights fall out of the owner set already fetched; `managedBy` folds the Superadmin bypass.
-      rights: access.rightsOf({ isOwner: access.managedBy(owners) }),
+      rights: worldRightsOf({ isOwner: !!meta?.isOwner, canContribute: !!meta?.canContribute }),
       entityCount,
       pinnedEntityIds: world.pinnedEntityIds ?? [],
       // The freshness key a live-follower holds and compares each nudge against (ADR-0045).
