@@ -1,11 +1,12 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { coordKey, Label, TerrainId } from '@hexly/plugin-hexmap';
+import { coordKey, Label } from '@hexly/plugin-hexmap';
 import { EntityLinkPickerComponent } from '@hexly/web-entity';
+import { DesignToken } from '@hexly/web-styles';
 import { ButtonComponent, CoordComponent, EyebrowComponent, FieldComponent, InputComponent } from '@hexly/web-ui';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HexMapStore, Selection } from '../services/hexmap-store';
-import { featureKey, terrainKey } from '../utils/catalog-keys';
+import { featureKey, terrainFill, terrainKey } from '../utils/catalog-keys';
 import { inputValue } from '../utils/input-value';
 import { RegionFieldsComponent } from './region-fields.component';
 
@@ -43,8 +44,8 @@ interface SelectedEntity {
   readonly kind: 'hex' | 'feature';
   readonly q: number;
   readonly r: number;
-  /** The hex's terrain id, for the identity swatch colour. */
-  readonly terrain: TerrainId;
+  /** The identity swatch's fill token, resolved from the hex's terrain rather than spliced in the template. */
+  readonly swatch: DesignToken;
   /**
    * The translation key for the entity's built-in catalog label, keyed by its stable
    * id (`map.terrain.<id>` / `map.feature.<id>`, ADR-0014): the Feature's key for a
@@ -222,7 +223,7 @@ interface SelectedEntity {
 
       <div class="leaf">
         <div class="ident">
-          <span class="ident-swatch" [style.background]="'var(--color-terrain-' + entity.terrain + ')'"></span>
+          <span class="ident-swatch" [style.background]="'var(' + entity.swatch + ')'"></span>
           <div class="min-w-0">
             <div class="ident-name">
               {{ entity.name || (entity.detailKey | transloco) }}
@@ -383,7 +384,7 @@ export class InspectorComponent {
       kind: sel.kind,
       q: sel.coord.q,
       r: sel.coord.r,
-      terrain: hex.terrain,
+      swatch: terrainFill(hex.terrain),
       detailKey,
       name: hex.name ?? '',
     };

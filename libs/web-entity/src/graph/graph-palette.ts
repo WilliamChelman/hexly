@@ -1,16 +1,9 @@
 import { LinkedEntity } from '@hexly/domain';
+import { readDesignToken } from '@hexly/web-styles';
 import { GENERIC_TYPE_DEFINITION, TypeDefinition } from '../models/type-definition';
 
 /** The border ring's share of the ink colour's alpha — a hairline, not a second halo. */
 const NODE_RING_ALPHA = 0.5;
-
-/** The muted fallback hue if a colour token fails to resolve (jsdom, missing var). */
-const FALLBACK_NODE_COLOR = '#6f5a36';
-
-/** Read a design token, so the canvas follows the theme (ADR-0007's palette, not hardcoded hex). */
-function token(style: CSSStyleDeclaration, name: string, fallback: string): string {
-  return style.getPropertyValue(name).trim() || fallback;
-}
 
 /** The graph's colours, resolved from the live theme's tokens — cosmos.gl wants 0..1 RGBA floats. */
 export interface Palette {
@@ -30,17 +23,17 @@ export function palette(defs: readonly TypeDefinition[]): Palette {
   const style = getComputedStyle(document.documentElement);
   const byType = new Map<string, [number, number, number, number]>();
   for (const def of defs) {
-    byType.set(def.id, toRgba(token(style, def.graphColorToken, FALLBACK_NODE_COLOR)));
+    byType.set(def.id, toRgba(readDesignToken(style, def.graphColorToken)));
   }
-  const ink = toRgba(token(style, '--color-ink', '#2e2412'));
+  const ink = toRgba(readDesignToken(style, '--color-ink'));
   return {
-    background: token(style, '--color-surface-sunken', '#ece0c0'),
+    background: readDesignToken(style, '--color-surface-sunken'),
     byType,
     // An unregistered, absent, or disabled type paints with the generic definition's hue — the same
     // fallback `TypeRegistry.resolve` gives every other surface, so the graph needs no plugin of its own.
-    node: toRgba(token(style, GENERIC_TYPE_DEFINITION.graphColorToken, FALLBACK_NODE_COLOR)),
-    link: toRgba(token(style, '--color-line-strong', '#b89a62')),
-    linkHighlight: toRgba(token(style, '--color-accent', '#9a6a16')),
+    node: toRgba(readDesignToken(style, GENERIC_TYPE_DEFINITION.graphColorToken)),
+    link: toRgba(readDesignToken(style, '--color-line-strong')),
+    linkHighlight: toRgba(readDesignToken(style, '--color-accent')),
     ring: [ink[0], ink[1], ink[2], ink[3] * NODE_RING_ALPHA],
   };
 }

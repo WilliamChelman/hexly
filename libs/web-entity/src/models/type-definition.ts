@@ -1,4 +1,5 @@
 import { EntityType } from '@hexly/domain';
+import { DesignToken } from '@hexly/web-styles';
 import { IconName } from '@hexly/web-ui';
 import { CORE_VIEW_DETAILS, ViewPlacement } from './view-definition';
 
@@ -67,10 +68,11 @@ export interface TypeDefinition {
    */
   readonly fieldRefs?: readonly string[];
   /**
-   * The CSS custom property the World Graph paints this type's nodes with
-   * (resolved to RGBA per theme, ADR-0007).
+   * The CSS custom property the World Graph paints this type's nodes with (resolved to RGBA per
+   * ColorScheme, ADR-0007). Manifest-typed, so a rename that misses one plugin is a compile
+   * error (ADR-0075).
    */
-  readonly graphColorToken: string;
+  readonly graphColorToken: DesignToken;
   /**
    * **System-managed** (CONTEXT.md → System-managed, ADR-0068): the marker projected across the web seam
    * from the type's declaration (`AvailableType.systemManaged`). Surfaces derive behavior from it — the
