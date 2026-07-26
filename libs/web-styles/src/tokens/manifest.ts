@@ -111,11 +111,26 @@ const DECLARATIONS = [
   { name: '--color-on-accent-sheen', tier: 'role', type: 'color', public: true, initial: '#221e13' },
   { name: '--color-accent-glow', tier: 'role', type: 'color', public: true, initial: 'rgba(211, 149, 39, 0.5)' },
 
-  // The categorical pair, pending the `--color-tone-*` rotation that replaces them.
-  { name: '--color-sea', tier: 'role', type: 'color', public: true, initial: '#2f6f7a' },
-  { name: '--color-sea-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(47, 111, 122, 0.14)' },
-  { name: '--color-astra', tier: 'role', type: 'color', public: true, initial: '#5a4aa6' },
-  { name: '--color-astra-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(90, 74, 166, 0.14)' },
+  // The categorical set — eight tones rotated off the accent (ADR-0075, spike-tone-rotation.md §7).
+  // Eight and not twelve because the accent sits *between* danger and success, so their exclusions
+  // merge into one forbidden zone leaving a single ~161° arc. The `-soft` fills are emphasis, not
+  // identity: they land within ΔE00 1.4 of each other, so a chip's category rides its text and border.
+  { name: '--color-tone-1', tier: 'role', type: 'color', public: true, initial: '#006761' },
+  { name: '--color-tone-1-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(0, 99, 99, 0.14)' },
+  { name: '--color-tone-2', tier: 'role', type: 'color', public: true, initial: '#006478' },
+  { name: '--color-tone-2-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(0, 99, 120, 0.14)' },
+  { name: '--color-tone-3', tier: 'role', type: 'color', public: true, initial: '#005c8a' },
+  { name: '--color-tone-3-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(0, 92, 135, 0.14)' },
+  { name: '--color-tone-4', tier: 'role', type: 'color', public: true, initial: '#5169ad' },
+  { name: '--color-tone-4-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(78, 106, 170, 0.14)' },
+  { name: '--color-tone-5', tier: 'role', type: 'color', public: true, initial: '#4d4b90' },
+  { name: '--color-tone-5-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(78, 78, 142, 0.14)' },
+  { name: '--color-tone-6', tier: 'role', type: 'color', public: true, initial: '#7c5aa0' },
+  { name: '--color-tone-6-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(128, 92, 163, 0.14)' },
+  { name: '--color-tone-7', tier: 'role', type: 'color', public: true, initial: '#733c76' },
+  { name: '--color-tone-7-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(113, 57, 120, 0.14)' },
+  { name: '--color-tone-8', tier: 'role', type: 'color', public: true, initial: '#99507b' },
+  { name: '--color-tone-8-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(156, 78, 120, 0.14)' },
 
   { name: '--color-danger', tier: 'role', type: 'color', public: true, initial: '#a4402e' },
   { name: '--color-danger-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(164, 64, 46, 0.15)' },

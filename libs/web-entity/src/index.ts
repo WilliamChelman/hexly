@@ -10,6 +10,7 @@ export * from './models/entity-types';
 export * from './models/panel-definition';
 export * from './models/plugin';
 export * from './models/type-definition';
+export * from './models/type-tone';
 export * from './panels/universal-panels';
 export * from './services/entity-dock';
 // `services/local-graph-store` stays off the barrel with the Panel that provides it — both are

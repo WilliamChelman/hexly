@@ -160,11 +160,31 @@
     from var(--palette-accent) max(l, 0.713) calc(c + (0.713 - min(l, 0.713)) * 0.18) calc(h + 1) / 0.5
   );
 
-  --color-sea: #2f6f7a; /* lapis water — secondary accent                   */
-  --color-sea-soft: rgba(47, 111, 122, 0.14);
-
-  --color-astra: #5a4aa6; /* dusk violet — tertiary                         */
-  --color-astra-soft: rgba(90, 74, 166, 0.14);
+  /* The categorical tones — hue rotations off the accent, whose only job is mutual
+     distinguishability (ADR-0075). The accent sits *between* danger and success on
+     the hue circle, so excluding both leaves one continuous ~161° arc rather than
+     two pockets: every tone is a cool colour, and eight is what fits there at a
+     min pairwise ΔE00 of 10.8 (spike-tone-rotation.md §7). The two lightness rows
+     are load-bearing — at the accent's own `l`, most of the arc misses 4.5:1 in
+     Solar, where `--color-accent` itself ships at 4.37:1. */
+  --color-tone-1: oklch(from var(--color-accent) calc(l * 0.8) c calc(h + 113));
+  --color-tone-2: oklch(from var(--color-accent) calc(l * 0.8) c calc(h + 136));
+  --color-tone-3: oklch(from var(--color-accent) calc(l * 0.8) c calc(h + 161));
+  --color-tone-4: oklch(from var(--color-accent) calc(l * 0.95) c calc(h + 193));
+  --color-tone-5: oklch(from var(--color-accent) calc(l * 0.8) c calc(h + 207));
+  --color-tone-6: oklch(from var(--color-accent) calc(l * 0.95) c calc(h + 230));
+  --color-tone-7: oklch(from var(--color-accent) calc(l * 0.8) c calc(h + 250));
+  --color-tone-8: oklch(from var(--color-accent) calc(l * 0.95) c calc(h + 270));
+  /* Emphasis, not identity: at α 0.14 the eight fills land within ΔE00 1.4 of each
+     other — under a JND — so a chip's category is its text and border (ADR-0075). */
+  --color-tone-1-soft: oklch(from var(--color-tone-1) l c h / 0.14);
+  --color-tone-2-soft: oklch(from var(--color-tone-2) l c h / 0.14);
+  --color-tone-3-soft: oklch(from var(--color-tone-3) l c h / 0.14);
+  --color-tone-4-soft: oklch(from var(--color-tone-4) l c h / 0.14);
+  --color-tone-5-soft: oklch(from var(--color-tone-5) l c h / 0.14);
+  --color-tone-6-soft: oklch(from var(--color-tone-6) l c h / 0.14);
+  --color-tone-7-soft: oklch(from var(--color-tone-7) l c h / 0.14);
+  --color-tone-8-soft: oklch(from var(--color-tone-8) l c h / 0.14);
 
   /* The `-soft` alphas are per-role, not a ramp: each is the one the two
      ColorSchemes already agreed on, to within 0.01 (spike §2). */

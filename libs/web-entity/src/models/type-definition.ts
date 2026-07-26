@@ -1,6 +1,6 @@
 import { EntityType } from '@hexly/domain';
 import { DesignToken } from '@hexly/web-styles';
-import { IconName } from '@hexly/web-ui';
+import { ChipTone, IconName } from '@hexly/web-ui';
 import { CORE_VIEW_DETAILS, ViewPlacement } from './view-definition';
 
 /**
@@ -73,6 +73,13 @@ export interface TypeDefinition {
    * error (ADR-0075).
    */
   readonly graphColorToken: DesignToken;
+  /**
+   * This type's categorical {@link ChipTone}, pinned. Omit it and {@link typeTone} derives one from the
+   * id — stable across runs and across plugins — so declaring one is how a plugin refuses a tone
+   * another plugin's type already took (ADR-0075). It is the chip's colour, not the graph's: the graph
+   * paints nodes with {@link graphColorToken}, which may name a non-categorical role.
+   */
+  readonly tone?: ChipTone;
   /**
    * **System-managed** (CONTEXT.md → System-managed, ADR-0068): the marker projected across the web seam
    * from the type's declaration (`AvailableType.systemManaged`). Surfaces derive behavior from it — the

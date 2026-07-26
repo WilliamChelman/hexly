@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Field, EntityDocument, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
-import { ButtonComponent, ChipComponent } from '@hexly/web-ui';
+import { ButtonComponent, ChipComponent, ChipTone, IconComponent, IconName } from '@hexly/web-ui';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { FieldControlComponent } from '@hexly/web-entity';
+import { FieldControlComponent, GENERIC_TYPE_DEFINITION, typeTone } from '@hexly/web-entity';
 
 /**
  * Pick, add, remove, and reorder an Entity's ordered Entity Type set, `types[0]` primary (ADR-0048).
@@ -15,12 +15,16 @@ import { FieldControlComponent } from '@hexly/web-entity';
 @Component({
   selector: 'app-entity-types-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, ChipComponent, ButtonComponent, FieldControlComponent],
+  imports: [TranslocoPipe, ChipComponent, IconComponent, ButtonComponent, FieldControlComponent],
   template: `
     <div class="flex flex-col gap-3" data-testid="entity-types-editor">
       <div class="flex flex-wrap items-center gap-2">
         @for (type of types(); track type; let i = $index) {
-          <app-chip [tone]="i === 0 ? 'accent' : undefined" [attr.data-testid]="'type-chip-' + type">
+          <!-- The chip carries the type's categorical tone, and its icon beside the label: the tone arc
+               is the deuteranope confusion line, so colour is decoration and the glyph is what makes a
+               category legible without it (ADR-0075). Primacy is the "· Primary" marker, not a colour. -->
+          <app-chip [tone]="toneFor(type)" [attr.data-testid]="'type-chip-' + type">
+            <app-icon [name]="iconFor(type)" [size]="12" />
             {{ typeLabel(type) }}
             @if (i === 0) {
               <span class="text-2xs opacity-70" data-testid="type-primary"
@@ -190,6 +194,16 @@ export class EntityTypesEditorComponent {
   /** A friendly label: a registered type's name (authored, for a user-defined one), else the raw id. */
   protected typeLabel(type: string): string {
     return this.registry.get(type) ? this.registry.chromeLabel(type, 'eyebrow') : type;
+  }
+
+  /** The type's tone — its own if it pinned one, else the one its id derives (ADR-0075). */
+  protected toneFor(type: string): ChipTone {
+    return typeTone(this.registry.get(type) ?? { id: type });
+  }
+
+  /** The type's glyph; an unregistered type borrows the generic one rather than showing a gap. */
+  protected iconFor(type: string): IconName {
+    return this.registry.get(type)?.icon ?? GENERIC_TYPE_DEFINITION.icon;
   }
 
   /** Whether the type is System-managed (ADR-0068) — the system alone assigns/removes it, so no remove renders. */

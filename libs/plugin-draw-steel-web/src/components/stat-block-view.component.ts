@@ -176,7 +176,9 @@ import { dsIcon } from '../ds-glyphs';
           <dl class="m-0 divide-y divide-line border-y border-line text-sm">
             @for (row of railRows(); track row.key) {
               <div class="flex items-center justify-between gap-3 py-1.5" [attr.data-testid]="'stat-' + row.key">
-                <dt class="flex shrink-0 items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-sea">
+                <dt
+                  class="flex shrink-0 items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-tone-1"
+                >
                   <app-icon [name]="row.icon" [size]="14" class="text-ink-muted" />
                   {{ row.labelKey | transloco }}
                 </dt>
@@ -207,7 +209,7 @@ import { dsIcon } from '../ds-glyphs';
           <div class="grid grid-cols-5 gap-1 rounded-md border border-line bg-surface-sunken p-2 text-center">
             @for (key of characteristicKeys; track key) {
               <div class="flex flex-col items-center gap-0.5" [attr.data-testid]="'stat-' + key">
-                <app-icon [name]="charIcon(key)" class="text-2xl text-sea" [label]="abbreviation(key)" />
+                <app-icon [name]="charIcon(key)" class="text-2xl text-tone-1" [label]="abbreviation(key)" />
                 @if (edit()) {
                   <ds-stat-slot
                     [field]="field(key)"
@@ -230,7 +232,7 @@ import { dsIcon } from '../ds-glyphs';
             <dl class="m-0 space-y-2 text-sm">
               @for (mapKey of damageSectionKeys; track mapKey) {
                 <div [attr.data-testid]="'section-' + mapKey">
-                  <dt class="font-semibold text-sea">{{ 'drawSteel.statBlock.section.' + mapKey | transloco }}</dt>
+                  <dt class="font-semibold text-tone-1">{{ 'drawSteel.statBlock.section.' + mapKey | transloco }}</dt>
                   <dd class="m-0 mt-1 text-ink">
                     <ds-damage-map
                       [mapKey]="mapKey"

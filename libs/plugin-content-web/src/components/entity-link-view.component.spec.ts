@@ -202,7 +202,7 @@ describe('EntityLinkView', () => {
       const badge = fixture.nativeElement.querySelector('[data-testid=link-descriptor]');
       expect(badge.textContent).toContain('hunts');
       // The badge follows the pill, so all three states stay tellable apart (ADR-0021 utilities).
-      expect(badge.classList.contains('bg-astra')).toBe(true);
+      expect(badge.classList.contains('bg-tone-5')).toBe(true);
       expect(badge.classList.contains('bg-accent')).toBe(false);
       expect(badge.classList.contains('bg-ink-muted')).toBe(false);
     });

@@ -3,7 +3,7 @@
  * tiles vary visually without storing a colour or glyph. The accent classes are
  * full literal strings because Tailwind only generates classes it can see whole.
  */
-const ACCENTS = ['accent', 'sea', 'astra', 'danger', 'success'] as const;
+const ACCENTS = ['accent', 'tone-2', 'tone-5', 'danger', 'success'] as const;
 export type Accent = (typeof ACCENTS)[number];
 
 /** Stable accent for an id (hash → palette index). */
@@ -16,8 +16,8 @@ export function accentFor(id: string): Accent {
 /** Sigil chip colours (text + soft fill) per accent. */
 export const ACCENT_SIGIL: Record<Accent, string> = {
   accent: 'text-accent bg-accent-soft',
-  sea: 'text-sea bg-sea-soft',
-  astra: 'text-astra bg-astra-soft',
+  'tone-2': 'text-tone-2 bg-tone-2-soft',
+  'tone-5': 'text-tone-5 bg-tone-5-soft',
   danger: 'text-danger bg-danger-soft',
   success: 'text-success bg-success-soft',
 };
@@ -25,8 +25,8 @@ export const ACCENT_SIGIL: Record<Accent, string> = {
 /** Solid accent bar per accent (the tile's left edge). */
 export const ACCENT_BAR: Record<Accent, string> = {
   accent: 'bg-accent',
-  sea: 'bg-sea',
-  astra: 'bg-astra',
+  'tone-2': 'bg-tone-2',
+  'tone-5': 'bg-tone-5',
   danger: 'bg-danger',
   success: 'bg-success',
 };

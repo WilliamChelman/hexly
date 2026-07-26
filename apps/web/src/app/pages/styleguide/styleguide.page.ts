@@ -13,6 +13,7 @@ import {
   FieldComponent,
   IconButtonComponent,
   IconComponent,
+  IconName,
   InputComponent,
   KbdComponent,
   ListboxOptionComponent,
@@ -24,6 +25,7 @@ import {
   TextareaComponent,
 } from '@hexly/web-ui';
 import { DesignToken } from '@hexly/web-styles';
+import { CATEGORICAL_TONES } from '@hexly/web-entity';
 
 // Each `token` reaches the template spliced into `var(…)`, which the lint rule cannot see (ADR-0075).
 interface SwatchRow {
@@ -77,8 +79,8 @@ interface TypeRow {
         <p class="hero-lede" [innerHTML]="'styleguide.heroLede' | transloco"></p>
         <div class="flex flex-wrap gap-2 mt-2">
           <app-chip tone="accent">{{ 'styleguide.fontDisplay' | transloco }}</app-chip>
-          <app-chip tone="sea">{{ 'styleguide.fontBody' | transloco }}</app-chip>
-          <app-chip tone="astra">{{ 'styleguide.fontCoord' | transloco }}</app-chip>
+          <app-chip tone="tone-3">{{ 'styleguide.fontBody' | transloco }}</app-chip>
+          <app-chip tone="tone-7">{{ 'styleguide.fontCoord' | transloco }}</app-chip>
         </div>
       </section>
 
@@ -250,10 +252,19 @@ interface TypeRow {
             <div class="specimen-row">
               <app-chip>{{ 'styleguide.chipDefault' | transloco }}</app-chip>
               <app-chip tone="accent">{{ 'styleguide.chipSettlement' | transloco }}</app-chip>
-              <app-chip tone="sea">{{ 'styleguide.chipEditing' | transloco }}</app-chip>
-              <app-chip tone="astra">{{ 'styleguide.chipRegion' | transloco }}</app-chip>
               <app-coord>q 12 · r −4</app-coord>
               <kbd appKbd>⌘ Z</kbd>
+            </div>
+            <!-- The eight categoricals side by side, each with a glyph, because that is the comparison
+                 the set has to survive — and the glyph is what carries the category where the hue
+                 cannot (ADR-0075). -->
+            <div class="specimen-row" data-testid="tone-chips">
+              @for (tone of tones; track tone) {
+                <app-chip [tone]="tone" [attr.data-testid]="'tone-chip-' + tone">
+                  <app-icon [name]="toneIcons[$index]" [size]="12" />
+                  {{ tone }}
+                </app-chip>
+              }
             </div>
           </figure>
 
@@ -598,11 +609,27 @@ export class StyleguidePage {
     { token: '--color-ink', nameKey: 'styleguide.swatch.ink' },
     { token: '--color-ink-muted', nameKey: 'styleguide.swatch.inkMuted' },
     { token: '--color-accent', nameKey: 'styleguide.swatch.compassGold' },
-    { token: '--color-sea', nameKey: 'styleguide.swatch.seaAurora' },
-    { token: '--color-astra', nameKey: 'styleguide.swatch.nebula' },
     { token: '--color-danger', nameKey: 'styleguide.swatch.marginalia' },
     { token: '--color-success', nameKey: 'styleguide.swatch.moss' },
     { token: '--color-line-strong', nameKey: 'styleguide.swatch.drawnRule' },
+  ];
+
+  /**
+   * The categorical set (ADR-0075). Rendered as its own row rather than mixed in with the semantic
+   * roles because it is one vocabulary, and the eight only mean anything read against each other.
+   */
+  protected readonly tones = CATEGORICAL_TONES;
+
+  /** One glyph per tone in the chip specimen — the channel that survives where the hue does not. */
+  protected readonly toneIcons: readonly IconName[] = [
+    'region',
+    'label',
+    'library',
+    'graph',
+    'terrain',
+    'user',
+    'globe',
+    'link',
   ];
 
   protected readonly terrain: SwatchRow[] = [

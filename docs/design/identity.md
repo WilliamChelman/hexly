@@ -81,11 +81,18 @@ block (emitted to `:root`); `:root[data-color-scheme='astral']` reassigns the ge
 | `--color-ink`         | Primary text                             | `#2f2416` | `#e9e2cf` |
 | `--color-ink-muted`   | Secondary text                           | `#6f5d40` | `#aeb2cc` |
 | `--color-accent`      | Primary accent (compass / constellation) | `#9a6a16` | `#e6b652` |
-| `--color-sea`         | Secondary (seas / aurora)                | `#2f6f6a` | `#54c8bb` |
-| `--color-astra`       | Tertiary (dusk / nebula)                 | `#5a4aa6` | `#a18cf0` |
+| `--color-tone-1…8`    | The categorical set (below)              | derived   | derived   |
 | `--color-danger`      | Danger (marginalia)                      | `#a4402e` | `#e88a6f` |
 | `--color-success`     | Confirm / "online"                       | `#4a6f2f` | `#86c46a` |
 | `--color-line-strong` | Drawn rules / borders                    | `#a8946a` | `#3d4878` |
+
+**The categorical set** (`--color-tone-1…8`, plus `-soft`) is not a secondary and
+tertiary accent — it is eight hue rotations off `--color-accent`, whose only job is
+mutual distinguishability (ADR-0075). It is eight rather than twelve because the
+accent sits _between_ danger and success on the hue circle, leaving one continuous
+~161° arc: cyan → blue → violet → magenta. That arc is the deuteranope confusion
+line, so **colour here is decoration** — a chip carries its category in its text,
+its border, and the Entity Type's icon, never in the `-soft` fill.
 
 **Terrain fills** (`--color-terrain-grass|forest|ocean|mountain|desert|marsh|sky`)
 are the base type of a hex, tuned to read as hand-tinted washes on each theme's

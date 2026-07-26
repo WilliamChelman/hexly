@@ -116,6 +116,11 @@ Consequences that are part of this spec, not optional polish:
 - **Chips render the Entity Type's `icon`** alongside the label. `TypeDefinition.icon` already exists. This is the non-colour channel that makes categories legible under deuteranopia, where no rotation set above ~4 tones separates.
 - **Tone assignment is a deterministic hash of the type id**, with an explicit per-type override, so plugins cannot collide.
 
+**Amended in implementation (#368).** The set shipped exactly as written, and the engine's resolved values were measured rather than assumed: min pairwise ΔE00 **10.6 Solar / 11.0 Astral** on the text colour (predicted 10.9 / 10.8), **3.7 / 5.3** on the border at 36% (predicted 3.7 / 5.3), **1.3 / 2.1** on the `-soft` fills composited over `surface` (predicted 1.2 / 1.9); every tone clears 4.5:1 as text on `--color-surface` in both schemes (4.83–7.29 / 4.70–7.67). Under a deuteranope simulation the eight collapse to **0.2–1.3**, which is the finding the icon channel exists for and not a defect in the placement. Two details this section left open:
+
+- **`typeTone(def)`** (`libs/web-entity/src/models/type-tone.ts`) is the assignment. Its digest is FNV-1a plus murmur3's finaliser: eight tones means a `% 8` bucket that reads only the low three bits, and unmixed those bits follow the id's last characters — which is exactly where two plugins' type ids agree (`dnd.type.monster` / `draw-steel.type.monster`). A plugin pins its tone with `tone: 'tone-5'` on its `TypeDefinition`; `dnd` does, to keep the violet it shipped as and to clear the tone its id would otherwise share with the core asset type.
+- **`accent` is declarable but never derived.** A type that hashed onto the through-line accent would read as the primary one.
+
 ### 2.4 Two deliberate behavioural changes
 
 - **Solar `line` and `line-strong` go opaque → translucent.** The ramp becomes one rule in both schemes (`--palette-accent` at `--palette-line-alpha × {1, 1.85, 0.44}`). Solar's rules become backdrop-sensitive: they match today's values over `surface` (ΔE00 0.81) and diverge over other backdrops (up to ΔE00 11.5 over `bg`). Accepted as the better rule.

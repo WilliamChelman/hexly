@@ -84,8 +84,7 @@
  * This block is the Astral **Palette**, and almost nothing else: the semantic roles
  * are derived once in index.css and re-resolve here off these anchors (ADR-0075).
  * What remains beside it is what the derivation does not reach — the one named
- * literal, the categorical pair awaiting the `--color-tone-*` rotation, and the
- * hexmap plugin's tier-3 vocabulary awaiting its move out of core.
+ * literal and the hexmap plugin's tier-3 vocabulary awaiting its move out of core.
  * ======================================================================= */
 :root[data-color-scheme='astral'] {
   /* ---- Tier 1 — the Astral Palette. */
@@ -104,12 +103,6 @@
   /* The named literal (ADR-0075): indigo starlight over indigo paper is a
      different design idea from Solar's warm highlight of its own paper. */
   --color-canvas-glow: rgba(58, 70, 140, 0.26);
-
-  --color-sea: #54c8bb; /* aurora-teal                                      */
-  --color-sea-soft: rgba(84, 200, 187, 0.14);
-
-  --color-astra: #a18cf0; /* nebula violet                                  */
-  --color-astra-soft: rgba(161, 140, 240, 0.16);
 
   --color-hex-line: rgba(160, 170, 235, 0.15);
   --color-feature-ink: #ecd49a; /* a placed Feature's marker — gilded       */
