@@ -39,7 +39,7 @@ import { DescriptorPickerComponent } from './descriptor-picker.component';
 import { descriptorSuggestion } from '../extensions/descriptor-suggestion';
 import { LinkTextPickerComponent } from './link-text-picker.component';
 import { linkTextSuggestion } from '../extensions/link-text-suggestion';
-import { createEntityLinkNodeView } from './entity-link-view.component';
+import { EntityLinkRepairHost, createEntityLinkNodeView } from './entity-link-view.component';
 import { FormattingMenuComponent } from './formatting-menu.component';
 import { BubbleMenuDirective } from '../directives/bubble-menu.directive';
 
@@ -300,6 +300,17 @@ export class ContentEditorComponent {
    */
   private readonly canRepairLinks = computed(() => this.editable() && this.session.writable());
 
+  /**
+   * The `create-entity` Right on the World a mint would land in (ADR-0039) — matched against the World
+   * {@link mintThrough} writes to, so an unloaded or mismatched World gates rather than offering
+   * exactly what the server would refuse. Backs both the `@` picker's Create rows and an Unresolved
+   * Link's *Create*, which are the same write (ADR-0073).
+   */
+  private readonly canCreate = computed(() => {
+    const world = this.activeWorld.world();
+    return !!world && world.id === this.session.current()?.worldId && world.rights.includes('create-entity');
+  });
+
   private readonly slashMenu = viewChild(SlashMenuComponent);
   private readonly entityPicker = viewChild(EntityPickerComponent);
   private readonly descriptorPicker = viewChild(DescriptorPickerComponent);
@@ -437,16 +448,6 @@ export class ContentEditorComponent {
   }
 
   /**
-   * The `create-entity` Right on the World a mint would land in (ADR-0039) — matched against the World
-   * {@link mintThrough} writes to, so an unloaded or mismatched World gates rather than offering
-   * exactly what the server would refuse.
-   */
-  private canCreate(): boolean {
-    const world = this.activeWorld.world();
-    return !!world && world.id === this.session.current()?.worldId && world.rights.includes('create-entity');
-  }
-
-  /**
    * Mint the Entity an `@` mention names, into the open Entity's World — typing must never author a
    * cross-World link (ADR-0073). A failed write is reported here and rethrown, so the extension can
    * put the typed text back where it was.
@@ -528,11 +529,17 @@ export class ContentEditorComponent {
     const environmentInjector = this.environmentInjector;
     const elementInjector = this.injector;
     const appRef = this.appRef;
-    const writable = this.canRepairLinks;
+    // A broken link's popover writes through the same two standings and the same mint the `@` picker
+    // does — Create there and Create here are one write (ADR-0073).
+    const repairHost: EntityLinkRepairHost = {
+      writable: this.canRepairLinks,
+      creatable: this.canCreate,
+      mint: (name) => this.mint(name),
+    };
     const entityLinkWithView = entityLinkNode.extend({
       addNodeView() {
         return ({ node, editor, getPos }) =>
-          createEntityLinkNodeView(node, editor, getPos, writable, environmentInjector, elementInjector, appRef);
+          createEntityLinkNodeView(node, editor, getPos, repairHost, environmentInjector, elementInjector, appRef);
       },
     });
 
@@ -553,7 +560,7 @@ export class ContentEditorComponent {
     const mention = entityMention({
       getPicker: () => this.entityPicker(),
       search: (name) => this.resolver.search(name),
-      canCreate: () => this.canCreate(),
+      canCreate: this.canCreate,
       mint: (name) => this.mint(name),
       mintWithDetails: (name) => this.mintWithDetails(name),
     });

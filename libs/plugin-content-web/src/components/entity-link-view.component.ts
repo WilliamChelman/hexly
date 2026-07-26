@@ -24,6 +24,7 @@ import { EntitySummary } from '@hexly/domain';
 import { EntitySearchPickerComponent } from '@hexly/web-entity';
 import { BodyPortalDirective, ButtonComponent } from '@hexly/web-ui';
 import { EntityNameResolver, EntityResolution } from '../services/entity-name-resolver';
+import { promotedName } from '../utils/promoted-name';
 
 /** The repair a broken link affords, supplied by the node view that owns the document position. */
 export interface EntityLinkRepair {
@@ -32,8 +33,21 @@ export interface EntityLinkRepair {
    * offered a write they cannot perform (ADR-0073).
    */
   readonly writable: Signal<boolean>;
+  /**
+   * Whether the caller may create Entities in the host Entity's World. Create is a write, so it
+   * inherits the Contributor gate: without it the row is absent, not present-and-failing (ADR-0073).
+   */
+  readonly creatable: Signal<boolean>;
   /** Rewrite this link's target in place: the prose, the `display` and the `heading` are untouched. */
   readonly retarget: (entity: EntitySummary) => void;
+  /** Mint an Entity named `name` and point this link at it, in place, on the same terms. */
+  readonly promote: (name: string) => void;
+}
+
+/** The half of a repair the editing surface owns; the node view supplies the document position. */
+export interface EntityLinkRepairHost extends Pick<EntityLinkRepair, 'writable' | 'creatable'> {
+  /** Mint `name` in the host Entity's World; rejects once the failure has been reported to the author. */
+  readonly mint: (name: string) => Promise<EntitySummary>;
 }
 
 /**
@@ -150,9 +164,23 @@ export interface EntityLinkRepair {
           />
         } @else {
           <div class="rounded-md border border-line bg-surface p-1 shadow-2">
-            <!-- An Unresolved Link also gets *Create* here (#350); a dangling one must not, because
+            <!-- *Create* is an Unresolved Link's alone (#350); a dangling one must not get it, because
                  a failed resolver batch reads every id as missing, and a bad connection would mint a
                  duplicate of an Entity that exists and is fine (ADR-0073). -->
+            @if (promotable()) {
+              <!-- Naming what it mints rather than the display text it renders as (ADR-0073). -->
+              <button
+                type="button"
+                appButton
+                variant="ghost"
+                size="sm"
+                class="w-full justify-start!"
+                data-testid="entity-link-repair-create"
+                (click)="promote()"
+              >
+                {{ 'editor.entityLink.create' | transloco: { name: promotedName() } }}
+              </button>
+            }
             <button
               type="button"
               appButton
@@ -215,6 +243,17 @@ export class EntityLinkViewComponent {
   /** Only a broken link is repairable, and only where the surface accepts writes (ADR-0073). */
   protected readonly repairable = computed(() => this.tone() !== 'live' && !!this.repair()?.writable());
 
+  /** What promoting mints: the `label`, never the `display`, and its basename at that (ADR-0073). */
+  protected readonly promotedName = computed(() => promotedName(this.label()));
+
+  /**
+   * Repairable, unresolved rather than dangling, and holding create rights in the World (ADR-0073).
+   * A label that is no name at all offers nothing rather than a blank Entity the server would refuse.
+   */
+  protected readonly promotable = computed(
+    () => this.repairable() && this.tone() === 'unresolved' && !!this.repair()?.creatable() && !!this.promotedName(),
+  );
+
   protected readonly repairOpen = signal(false);
   /** Viewport coordinates of the open popover — held apart from {@link repairOpen} so re-anchoring is not a re-open. */
   protected readonly repairAt = signal({ x: 0, y: 0 });
@@ -273,6 +312,12 @@ export class EntityLinkViewComponent {
     this.closeRepair();
   }
 
+  /** Closed on the gesture rather than on the mint landing: the write reports its own failure. */
+  protected promote(): void {
+    this.repair()?.promote(this.promotedName());
+    this.closeRepair();
+  }
+
   /**
    * Clamped rather than flipped: the popover is not measured at this point, so a pill near an edge
    * gets an opening that is wholly on screen instead of one sized against a guess.
@@ -316,14 +361,14 @@ const clamp = (value: number, min: number, max: number): number => Math.max(min,
  * the router outlet: the environment injector alone cannot resolve the `ActivatedRoute` the
  * component's `routerLink` needs.
  *
- * `writable` is the surface's write standing, passed as a signal so a Board Text Block that
- * arms mid-session gains the repair popover without a re-render (ADR-0073).
+ * `host` carries the two standings as signals, so a Board Text Block that arms mid-session — or a
+ * World whose rights land after mount — gains its actions without a re-render (ADR-0073).
  */
 export function createEntityLinkNodeView(
   node: ProseMirrorNode,
   editor: Editor,
   getPos: () => number | undefined,
-  writable: Signal<boolean>,
+  host: EntityLinkRepairHost,
   environmentInjector: EnvironmentInjector,
   elementInjector: Injector,
   appRef: ApplicationRef,
@@ -340,19 +385,34 @@ export function createEntityLinkNodeView(
     ref.setInput('heading', n.attrs['heading'] ?? null);
   };
   apply(node);
+  // setNodeMarkup on the node's own position, so only the target changes: the prose either side
+  // is never touched, and `display`, `heading` and the descriptor ride through (ADR-0073).
+  const pointAt = (entity: EntitySummary) => {
+    const pos = getPos();
+    if (pos === undefined) return;
+    editor.commands.command(({ tr }) => {
+      const current = tr.doc.nodeAt(pos);
+      if (current?.type.name !== node.type.name) return false;
+      tr.setNodeMarkup(pos, undefined, { ...current.attrs, entityId: entity.id, label: entity.name });
+      return true;
+    });
+  };
+  // The link stays unresolved until the mint lands, so it can be clicked again meanwhile — and a second
+  // mint is exactly the duplicate ADR-0073 keeps Create away from a dangling link to avoid.
+  let minting = false;
   ref.setInput('repair', {
-    writable,
-    // setNodeMarkup on the node's own position, so only the target changes: the prose either side
-    // is never touched, and `display`, `heading` and the descriptor ride through (ADR-0073).
-    retarget: (entity) => {
-      const pos = getPos();
-      if (pos === undefined) return;
-      editor.commands.command(({ tr }) => {
-        const current = tr.doc.nodeAt(pos);
-        if (current?.type.name !== node.type.name) return false;
-        tr.setNodeMarkup(pos, undefined, { ...current.attrs, entityId: entity.id, label: entity.name });
-        return true;
-      });
+    writable: host.writable,
+    creatable: host.creatable,
+    retarget: pointAt,
+    // The same rewrite behind a mint, so promoting keeps what retargeting keeps. The mint reports its
+    // own failure, so a rejection leaves the link as it was.
+    promote: (name) => {
+      if (minting) return;
+      minting = true;
+      void host
+        .mint(name)
+        .then(pointAt, () => undefined)
+        .finally(() => (minting = false));
     },
   } satisfies EntityLinkRepair);
   appRef.attachView(ref.hostView);

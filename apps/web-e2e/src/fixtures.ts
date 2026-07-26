@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { test as base, expect, type APIRequestContext, type Browser, type Page, type Response } from '@playwright/test';
+import { strToU8, zipSync } from 'fflate';
 import { TEST_GRANTEE } from './test-user';
 // The app's own pretty-URL codec (ADR-0042). Imported by file path, not via the @hexly/web-core
 // barrel: the barrel re-exports the Angular services layer, which must stay out of the Playwright
@@ -388,4 +389,26 @@ export async function confirmImport(page: Page): Promise<ImportSummary> {
   );
   await page.getByTestId('confirm-import').click();
   return (await (await imported).json()) as ImportSummary;
+}
+
+/**
+ * Land a one-note vault with auto-creation switched off and open its note, whose sole wikilink — which
+ * carries both a heading anchor and a display override — stayed an Unresolved Link. Import is the only
+ * producer of one (ADR-0073), so this is the seed every broken-link spec starts from.
+ */
+export async function importUnresolvedVault(page: Page): Promise<{ worldId: string }> {
+  await page.goto('/');
+  // A folder-qualified target, which Obsidian writes whenever two notes share a basename: the name a
+  // promotion mints is the basename of it, never the path (ADR-0073).
+  const keep = 'The northern keep guards the pass against [[bestiary/Zorblax#Lair|the old wyrm]], and holds.';
+  await pickVault(page, Buffer.from(zipSync({ 'Keep.md': strToU8(keep) })));
+  await page.getByTestId('import-create-unresolved').uncheck();
+  const summary = await confirmImport(page);
+  expect(summary.linksCreated).toBe(0);
+  expect(summary.linksDangling).toBe(1);
+
+  await page.getByTestId('open-imported').click();
+  await page.getByRole('link', { name: 'Keep' }).click();
+  await expect(page.getByTestId('title')).toHaveText('Keep');
+  return { worldId: summary.worldId };
 }

@@ -5,6 +5,7 @@ import {
   entityIdFromUrl,
   expect,
   flushSave,
+  importUnresolvedVault,
   openEntity,
   pickVault,
   shareOpenEntity,
@@ -21,15 +22,6 @@ import {
  * Seeded by a vault import, which is the only producer of an Unresolved Link (ADR-0073).
  */
 
-/** One note whose sole wikilink carries both a heading anchor and a display override. */
-function unresolvedVault(): Buffer {
-  return Buffer.from(
-    zipSync({
-      'Keep.md': strToU8('The northern keep guards the pass against [[Zorblax#Lair|the old wyrm]], and holds.'),
-    }),
-  );
-}
-
 /** Two notes whose wikilink resolves, so deleting the target leaves a dangling link behind. */
 function resolvedVault(): Buffer {
   return Buffer.from(
@@ -40,22 +32,7 @@ function resolvedVault(): Buffer {
   );
 }
 
-/** Land a switch-off vault and open its Keep note, whose `[[Zorblax]]` stayed an Unresolved Link. */
-async function importUnresolved(page: Page): Promise<{ worldId: string }> {
-  await page.goto('/');
-  await pickVault(page, unresolvedVault());
-  await page.getByTestId('import-create-unresolved').uncheck();
-  const summary = await confirmImport(page);
-  expect(summary.linksCreated).toBe(0);
-  expect(summary.linksDangling).toBe(1);
-
-  await page.getByTestId('open-imported').click();
-  await page.getByRole('link', { name: 'Keep' }).click();
-  await expect(page.getByTestId('title')).toHaveText('Keep');
-  return { worldId: summary.worldId };
-}
-
-/** Walk the popover: open it on the pill, take the one action it offers, then pick `targetId`. */
+/** Walk the popover: open it on the pill, take the relink action, then pick `targetId`. */
 async function relink(page: Page, query: string, targetId: string): Promise<void> {
   await page.getByTestId('entity-link').click();
   await expect(page.getByTestId('entity-link-repair')).toBeVisible();
@@ -68,7 +45,7 @@ async function relink(page: Page, query: string, targetId: string): Promise<void
 test('an Unresolved Link retargets in place, keeping its display text, its heading and the prose around it', async ({
   page,
 }) => {
-  const { worldId } = await importUnresolved(page);
+  const { worldId } = await importUnresolvedVault(page);
 
   // The Entity the import could not match: the basename is only a prefix of its name.
   const created = await page.request.post('/api/entities', {
@@ -147,7 +124,7 @@ test('a dangling link offers the same repair, and retargeting revives it', async
 });
 
 test('a read-only viewer sees an inert link and is offered no repair', async ({ page, browser }) => {
-  await importUnresolved(page);
+  await importUnresolvedVault(page);
   const keepId = entityIdFromUrl(page);
   await shareOpenEntity(page, 'viewer');
 
@@ -161,6 +138,8 @@ test('a read-only viewer sees an inert link and is offered no repair', async ({ 
 
   await link.click();
   await expect(viewer.getByTestId('entity-link-repair')).toHaveCount(0);
+  // Nor the Create the same link offers a writer (#350): no popover means no action in it.
+  await expect(viewer.getByTestId('entity-link-repair-create')).toHaveCount(0);
 
   await viewer.context().close();
 });

@@ -60,6 +60,7 @@
     "linkPlaceholder": "Collez ou saisissez une URL"
   },
   "entityLink": {
+    "create": "Créer « {{name}} »",
     "dangling": "Cette entité est indisponible",
     "relink": "Lier à une entité existante…",
     "relinkEmpty": "Aucune entité correspondante",

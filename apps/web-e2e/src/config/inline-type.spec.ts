@@ -1,5 +1,5 @@
 import { strToU8, zipSync } from 'fflate';
-import { enterLibrary, expect, test } from '../fixtures';
+import { enterLibrary, expect, importUnresolvedVault, test } from '../fixtures';
 
 /**
  * `entities.inlineType: core.type.hex-map` + `entities.inlineTag: untriaged`, with `defaultType` left on
@@ -70,6 +70,23 @@ test('the details dialog opens prefilled with the same inline Type and Tag (#344
   const link = page.getByTestId('entity-link');
   await expect(link).toHaveText('Zorblax');
   const minted = await (await request.get(`/api/entities/${await link.getAttribute('data-entity-id')}`)).json();
+  expect(minted.types).toEqual(['core.type.hex-map']);
+  expect(minted.tags).toEqual(['untriaged']);
+});
+
+test('promoting an Unresolved Link mints under the same inline Type and Tag (#350)', async ({ page, request }) => {
+  // Landed with auto-creation off, so the wikilink stays the Unresolved Link this promotes.
+  await importUnresolvedVault(page);
+
+  const link = page.getByTestId('entity-link');
+  await expect(link).toHaveAttribute('data-unresolved', '');
+  await link.click();
+  await page.getByTestId('entity-link-repair-create').click();
+
+  // Promotion is Inline Creation, so it follows the same two knobs a mention does, not `defaultType`.
+  await expect(link).toHaveAttribute('data-entity-id', /.+/);
+  const minted = await (await request.get(`/api/entities/${await link.getAttribute('data-entity-id')}`)).json();
+  expect(minted.name).toBe('Zorblax');
   expect(minted.types).toEqual(['core.type.hex-map']);
   expect(minted.tags).toEqual(['untriaged']);
 });

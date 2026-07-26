@@ -60,6 +60,7 @@
     "linkPlaceholder": "Paste or type a URL"
   },
   "entityLink": {
+    "create": "Create \"{{name}}\"",
     "dangling": "This entity is unavailable",
     "relink": "Link to an existing Entity…",
     "relinkEmpty": "No matching entities",
