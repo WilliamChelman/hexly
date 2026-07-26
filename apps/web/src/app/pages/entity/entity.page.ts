@@ -27,22 +27,35 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
   host: { class: 'block h-full overflow-hidden' },
   styles: `
     /* Dock-clearance inset for a reading-column View (ADR-0067): the reading surface right-pads its column
-       by this var so the full-bleed scrollbar stays at the true edge. 0 while there is whitespace to float
-       into; a narrow viewport reserves the strip (closed) or the whole Dock (open). Reserves include the
-       Dock's 1.5rem inset. Set on \`main\`, never \`.reading\` — a container query can't style the element
-       that establishes its own container; the surface inside \`main\` inherits it. */
+       by this var so the full-bleed scrollbar stays at the true edge. Set on \`main\`, never \`.reading\` —
+       a container query can't style the element that establishes its own container; the surface inside
+       \`main\` inherits it.
+
+       The reserve is derived, not stepped, because the Panel is resizeable: the column is centred in what
+       the padding leaves, so padding \`i\` buys only \`i / 2\` of clearance on the right. Clearing a
+       footprint \`f\` beside a 60rem column therefore needs \`i = 2f + 60rem - 100cqi\` — 0 once the
+       container is wide enough to float the Dock in the whitespace, capped at \`f\` once the column has
+       stopped being 60rem wide and is simply pushed. */
     .reading main {
-      --reading-dock-inset: 0rem;
+      /* The Dock's chrome right of the Panel: the toggle strip plus the page's 1.5rem inset. */
+      --_dock-chrome: 5rem;
+      --_dock-footprint: var(--_dock-chrome);
+      --reading-dock-inset: min(var(--_dock-footprint), max(0rem, calc(2 * var(--_dock-footprint) + 60rem - 100cqi)));
     }
-    @container entity-body (max-width: 68rem) {
-      .reading main {
-        --reading-dock-inset: 5rem;
-      }
+    .reading.dock-open main {
+      /* --_dock-panel-width is the live Panel width, bound by the page from the Dock. */
+      --_dock-footprint: calc(var(--_dock-panel-width, 20rem) + 0.5rem + var(--_dock-chrome));
     }
-    @container entity-body (min-width: 48rem) and (max-width: 109rem) {
+    /* Too narrow to seat both: reserving the Panel's width would leave no column worth reading, so it
+       overlays and only the strip is cleared. */
+    @container entity-body (max-width: 48rem) {
       .reading.dock-open main {
-        --reading-dock-inset: 26rem;
+        --_dock-footprint: var(--_dock-chrome);
       }
+    }
+    /* Under the grip the column must track the pointer, not settle behind it. */
+    .reading.dock-resizing main {
+      --reading-dock-transition: 0ms;
     }
   `,
   // EntityViewStore is page-scoped: it reads the open Entity's types off the session, provided above
@@ -64,6 +77,8 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
           class="relative min-h-0 overflow-hidden bg-surface-sunken"
           [class.reading]="reading()"
           [class.dock-open]="dock.isOpen()"
+          [class.dock-resizing]="dock.resizing()"
+          [style.--_dock-panel-width]="panelWidth()"
           style="container: entity-body / inline-size"
         >
           <main class="absolute inset-0 overflow-hidden">
@@ -108,6 +123,9 @@ export class EntityPage {
   protected readonly reading = computed(
     () => this.views.resolve(this.viewStore.activeView().viewId).layout === 'reading',
   );
+
+  /** The resizeable Panel's width, published to the body's subtree so the reading inset can derive from it. */
+  protected readonly panelWidth = computed(() => `${this.dock.panelWidth()}px`);
 
   constructor() {
     // Register the core Views from the lazy entity chunk, dropping them when the page is torn down.

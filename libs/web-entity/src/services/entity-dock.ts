@@ -5,6 +5,12 @@ import { PanelDefinition, PanelId } from '../models/panel-definition';
 /** Per-user preference key (auth-scoped), so one user's Dock choice never leaks to the next. */
 export const DOCK_STORAGE_KEY = 'entity.dockPanel';
 
+/** Per-user Panel width (auth-scoped), remembered alongside the open-Panel choice. */
+export const DOCK_WIDTH_STORAGE_KEY = 'entity.dockPanelWidth';
+
+/** The Panel card's width, in px: the default the Dock shipped with, and the bounds a resize is held to. */
+export const DOCK_PANEL_WIDTH = { default: 320, min: 240, max: 640 } as const;
+
 /**
  * The Entity page's one **Dock** (ADR-0067). Page-scoped: provided above the View outlet so both the
  * Dock chrome *and* the running View share the instance — a View reaches it to {@link claim} the open
@@ -20,6 +26,10 @@ export const DOCK_STORAGE_KEY = 'entity.dockPanel';
  * Both are resolved against the {@link available} Panels the current View offers: a remembered or
  * claimed Panel the View does not offer **closes** the Dock rather than substituting another
  * ({@link openPanel} returns `null`), and reopens unchanged when a View that offers it comes back.
+ *
+ * How *wide* the one Panel is ({@link panelWidth}) is a third remembered preference — one width for
+ * every Panel, since only one is ever open. Clamping to {@link DOCK_PANEL_WIDTH} lives here, so no
+ * drag can leave the Dock at a width the strip could not seat.
  */
 @Injectable()
 export class EntityDock {
@@ -43,6 +53,14 @@ export class EntityDock {
    */
   private readonly _viewInjector = signal<Injector | null>(null);
   readonly viewInjector = this._viewInjector.asReadonly();
+
+  /** The open Panel's width in px — the user's remembered choice, clamped to {@link DOCK_PANEL_WIDTH}. */
+  private readonly _panelWidth = signal(this.restoreWidth());
+  readonly panelWidth = this._panelWidth.asReadonly();
+
+  /** Whether a resize drag is in flight, so surfaces that follow the width can drop their settle transition. */
+  private readonly _resizing = signal(false);
+  readonly resizing = this._resizing.asReadonly();
 
   /** What the Dock is asked to show — a live claim wins, else the remembered choice. */
   private readonly requested = computed(() => this._claim() ?? this._remembered());
@@ -87,6 +105,27 @@ export class EntityDock {
     this._claim.set(null);
   }
 
+  /**
+   * A resize gesture, in three beats: {@link beginResize} on the press, {@link resizePanel} on every
+   * move (live, so the Panel tracks the pointer), {@link endResize} on release — which is the only beat
+   * that writes to storage, so a drag doesn't hammer it a frame at a time. A keyboard nudge is a whole
+   * gesture in two calls: `resizePanel` then `endResize`.
+   */
+  beginResize(): void {
+    this._resizing.set(true);
+  }
+
+  /** Set the open Panel's width, clamped to {@link DOCK_PANEL_WIDTH} — not yet remembered. */
+  resizePanel(width: number): void {
+    this._panelWidth.set(Math.min(DOCK_PANEL_WIDTH.max, Math.max(DOCK_PANEL_WIDTH.min, Math.round(width))));
+  }
+
+  /** End the gesture and remember the width it settled on. */
+  endResize(): void {
+    this._resizing.set(false);
+    this.storage.setItem(DOCK_WIDTH_STORAGE_KEY, String(this._panelWidth()));
+  }
+
   private persist(): void {
     this.storage.setItem(DOCK_STORAGE_KEY, this._remembered() ?? '');
   }
@@ -96,5 +135,12 @@ export class EntityDock {
   private restore(): PanelId | null {
     const stored = this.storage.getItem(DOCK_STORAGE_KEY);
     return stored ? (stored as PanelId) : null;
+  }
+
+  /** A stored width outside the bounds — or not a number at all — falls back to the default. */
+  private restoreWidth(): number {
+    const stored = Number(this.storage.getItem(DOCK_WIDTH_STORAGE_KEY));
+    const inBounds = stored >= DOCK_PANEL_WIDTH.min && stored <= DOCK_PANEL_WIDTH.max;
+    return inBounds ? stored : DOCK_PANEL_WIDTH.default;
   }
 }

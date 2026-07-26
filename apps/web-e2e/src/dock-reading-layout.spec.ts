@@ -23,6 +23,23 @@ async function edges(page: Page) {
   return { contentRight: content.x + content.width, panelLeft: panel.x };
 }
 
+async function panelWidth(page: Page) {
+  const panel = await page.getByTestId('dock-panel').boundingBox();
+  if (!panel) throw new Error('panel not laid out');
+  return panel.width;
+}
+
+/** Drag the Panel's grip `by` px to the left — the direction that widens it. */
+async function widenBy(page: Page, by: number) {
+  const grip = await page.getByTestId('dock-resize').boundingBox();
+  if (!grip) throw new Error('resize grip not laid out');
+  const y = grip.y + grip.height / 2;
+  await page.mouse.move(grip.x + grip.width / 2, y);
+  await page.mouse.down();
+  await page.mouse.move(grip.x - by, y, { steps: 8 });
+  await page.mouse.up();
+}
+
 test('a narrow viewport pushes the reading column clear of an open Panel', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 800 }); // within the 48–109rem push range
   await newNote(page);
@@ -48,4 +65,34 @@ test('a wide viewport floats the Panel over the whitespace without shifting the 
   expect(contentRight).toBeLessThanOrEqual(panelLeft);
   const after = await page.getByTestId('note-content').boundingBox();
   expect(after?.x).toBeCloseTo(before?.x ?? -1, 0);
+});
+
+test('the grip resizes the Panel, and the width is remembered across a reload', async ({ page }) => {
+  await page.setViewportSize({ width: 1900, height: 900 });
+  await newNote(page);
+
+  await page.getByTestId('references-toggle').click();
+  await expect(page.getByTestId('dock-panel')).toBeVisible();
+  const before = await panelWidth(page);
+
+  await widenBy(page, 120);
+  const widened = await panelWidth(page);
+  expect(widened).toBeGreaterThan(before + 100);
+
+  await page.reload();
+  await expect(page.getByTestId('dock-panel')).toBeVisible();
+  expect(await panelWidth(page)).toBeCloseTo(widened, 0);
+});
+
+test('a widened Panel pushes the reading column further clear', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 800 }); // narrow enough that the Dock pushes
+  await newNote(page);
+
+  await page.getByTestId('references-toggle').click();
+  await expect(page.getByTestId('dock-panel')).toBeVisible();
+
+  await widenBy(page, 120);
+
+  // The reserved inset follows the width, so the column clears the wider Panel too.
+  await expect.poll(async () => (await edges(page)).contentRight <= (await edges(page)).panelLeft).toBe(true);
 });

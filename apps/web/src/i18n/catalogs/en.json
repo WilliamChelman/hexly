@@ -108,6 +108,9 @@
       "note": "Note",
       "details": "Details"
     },
+    "dock": {
+      "resize": "Resize panel"
+    },
     "save": {
       "conflict": "Newer version on server",
       "saved": "Saved",

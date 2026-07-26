@@ -61,6 +61,40 @@ test('the Local Graph panel opens one hop out and deepens on request', async ({ 
   await expect(counts).toContainText('3 entities');
 });
 
+/**
+ * The drawing is square, so it follows the resizeable Panel's width (ADR-0067) instead of letterboxing:
+ * a fixed height would leave a widened Panel drawing the same short strip.
+ */
+test('the Local Graph drawing grows with the Panel it is drawn in', async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 1000 }); // tall enough that the 50vh cap can't bite
+  await enterLibrary(page);
+
+  const created = await page.request.post('/api/entities', {
+    data: { name: 'Emberhold', types: ['core.type.note'] },
+  });
+  expect(created.ok(), `${created.status()} ${await created.text()}`).toBeTruthy();
+  await openEntity(page, (await created.json()).id as string);
+
+  await page.getByTestId('local-graph-toggle').click();
+  const drawing = page.getByTestId('local-graph-box');
+  const before = await drawing.boundingBox();
+  if (!before) throw new Error('drawing not laid out');
+  expect(before.height).toBeCloseTo(before.width, 0);
+
+  const grip = await page.getByTestId('dock-resize').boundingBox();
+  if (!grip) throw new Error('resize grip not laid out');
+  const y = grip.y + grip.height / 2;
+  await page.mouse.move(grip.x + grip.width / 2, y);
+  await page.mouse.down();
+  await page.mouse.move(grip.x - 150, y, { steps: 8 });
+  await page.mouse.up();
+
+  const after = await drawing.boundingBox();
+  if (!after) throw new Error('drawing not laid out');
+  expect(after.width).toBeGreaterThan(before.width + 100);
+  expect(after.height).toBeCloseTo(after.width, 0);
+});
+
 /** An Entity nothing links to and that links to nothing is a graph of one — a claim, not an empty canvas. */
 test('the Local Graph panel says so when the open Entity links to nothing', async ({ page }) => {
   await enterLibrary(page);

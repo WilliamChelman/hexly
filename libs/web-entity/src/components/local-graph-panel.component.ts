@@ -40,8 +40,10 @@ import { LocalGraphStore } from '../services/local-graph-store';
     TranslocoPipe,
   ],
   // Scrolls like the References panel: on a short viewport the Dock card is shorter than the drawing plus
-  // its controls, and the controls must stay reachable.
-  host: { class: 'flex flex-col gap-2 p-3 overflow-y-auto bg-surface min-h-0 flex-1' },
+  // its controls, and the controls must stay reachable. The gutter is held whether it scrolls or not —
+  // the drawing's height follows its width, so a scrollbar appearing and disappearing could otherwise
+  // chase itself.
+  host: { class: 'flex flex-col gap-2 p-3 overflow-y-auto [scrollbar-gutter:stable] bg-surface min-h-0 flex-1' },
   template: `
     <div class="flex items-center justify-between gap-2">
       <span appEyebrow mark>{{ 'fields.localGraph.title' | transloco }}</span>
@@ -65,8 +67,13 @@ import { LocalGraphStore } from '../services/local-graph-store';
       }
     </div>
 
-    <!-- A square-ish box: the drawing needs height of its own inside a Dock card that has none to give. -->
-    <div class="relative h-64 shrink-0 overflow-hidden rounded-md border border-line bg-surface-sunken">
+    <!-- A square box: the drawing needs height of its own inside a Dock card that has none to give, and
+         the Panel is resizeable (ADR-0067) — a fixed height would letterbox the graph as it widens. Capped
+         against the viewport so a wide Panel on a short screen can't push the depth control out of sight. -->
+    <div
+      data-testid="local-graph-box"
+      class="relative aspect-square max-h-[50vh] shrink-0 overflow-hidden rounded-md border border-line bg-surface-sunken"
+    >
       <!-- Nothing renders before the first read lands: "links to nothing" is a claim about the edge index,
            not about the fetch, and a lone dot is no drawing — so an isolated Entity gets the words instead. -->
       @if (store.graph(); as graph) {

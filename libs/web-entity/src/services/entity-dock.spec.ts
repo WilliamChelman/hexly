@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Injector, Type } from '@angular/core';
 import { AuthClient } from '@hexly/web-core';
 import { MockAuthClient } from '@hexly/web-core/testing';
-import { EntityDock, DOCK_STORAGE_KEY } from './entity-dock';
+import { EntityDock, DOCK_PANEL_WIDTH, DOCK_STORAGE_KEY, DOCK_WIDTH_STORAGE_KEY } from './entity-dock';
 import { PanelDefinition } from '../models/panel-definition';
 
 /** A stub component class — the Dock never instantiates it here, so a bare class suffices. */
@@ -24,15 +24,26 @@ const OUTLINE = panel('core.panel.outline');
  * substituting — when the remembered Panel is unavailable.
  */
 describe('EntityDock', () => {
+  function configure(): void {
+    TestBed.configureTestingModule({
+      providers: [EntityDock, { provide: AuthClient, useValue: new MockAuthClient() }],
+    });
+  }
+
   function make(): EntityDock {
+    return TestBed.inject(EntityDock);
+  }
+
+  /** A genuinely new instance over the same storage — what a page reload gives the next session. */
+  function reload(): EntityDock {
+    TestBed.resetTestingModule();
+    configure();
     return TestBed.inject(EntityDock);
   }
 
   beforeEach(() => {
     localStorage.clear();
-    TestBed.configureTestingModule({
-      providers: [EntityDock, { provide: AuthClient, useValue: new MockAuthClient() }],
-    });
+    configure();
   });
 
   afterEach(() => localStorage.clear());
@@ -85,7 +96,7 @@ describe('EntityDock', () => {
     expect(localStorage.getItem(`hexly-u:${DOCK_STORAGE_KEY}`)).toBe(REFERENCES.id);
 
     // A fresh service (a reload) restores the same open Panel.
-    const reloaded = TestBed.inject(EntityDock);
+    const reloaded = reload();
     reloaded.setAvailable([REFERENCES]);
     expect(reloaded.openPanel()?.id).toBe(REFERENCES.id);
   });
@@ -137,6 +148,51 @@ describe('EntityDock', () => {
 
     dock.toggle(REFERENCES.id);
     expect(dock.openPanel()?.id).toBe(REFERENCES.id);
+  });
+
+  describe('Panel width', () => {
+    const key = `hexly-u:${DOCK_WIDTH_STORAGE_KEY}`;
+
+    it('starts at the default width', () => {
+      expect(make().panelWidth()).toBe(DOCK_PANEL_WIDTH.default);
+    });
+
+    it('holds a resize to the bounds, so no drag can leave the Dock unseatable', () => {
+      const dock = make();
+
+      dock.resizePanel(DOCK_PANEL_WIDTH.min - 200);
+      expect(dock.panelWidth()).toBe(DOCK_PANEL_WIDTH.min);
+
+      dock.resizePanel(DOCK_PANEL_WIDTH.max + 200);
+      expect(dock.panelWidth()).toBe(DOCK_PANEL_WIDTH.max);
+    });
+
+    it('remembers the width the gesture ends on — not every frame of it', () => {
+      const dock = make();
+
+      dock.beginResize();
+      expect(dock.resizing()).toBe(true);
+      dock.resizePanel(400);
+      dock.resizePanel(420);
+      // Mid-drag the Panel has moved, but nothing is remembered yet.
+      expect(dock.panelWidth()).toBe(420);
+      expect(localStorage.getItem(key)).toBeNull();
+
+      dock.endResize();
+      expect(dock.resizing()).toBe(false);
+      expect(localStorage.getItem(key)).toBe('420');
+
+      // A fresh service (a reload) restores it.
+      expect(reload().panelWidth()).toBe(420);
+    });
+
+    it('falls back to the default when the stored width is unusable', () => {
+      localStorage.setItem(key, 'wide');
+      expect(make().panelWidth()).toBe(DOCK_PANEL_WIDTH.default);
+
+      localStorage.setItem(key, String(DOCK_PANEL_WIDTH.max + 1000));
+      expect(reload().panelWidth()).toBe(DOCK_PANEL_WIDTH.default);
+    });
   });
 
   it('carries the running View’s injector for hosting View-contributed Panels (ADR-0067, #294)', () => {
