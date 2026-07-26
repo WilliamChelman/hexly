@@ -6,7 +6,10 @@
  * Order is load-bearing: tokens.css [data-color-scheme] must cascade after the
  * `tailwindcss` import and the @theme :root it emits.
  */
-@import 'tailwindcss';
+/* `source(none)`: automatic detection walks the whole workspace, which is the only reason the plugin
+   libraries that no `@source` names got their classes generated (#359). apps/web/src/styles.css
+   declares the scan set instead — the condition ADR-0075's tier-3 move rests on. */
+@import 'tailwindcss' source(none);
 @import './tokens.css';
 @import './base.css' layer(base);
 

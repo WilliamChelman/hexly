@@ -46,8 +46,12 @@
 /* Menu chrome utilities, co-located with the ui/menu primitives that apply them. */
 @import '../../../libs/web-ui/src/directives/menu.css';
 
-/* Tell Tailwind where to scan for class names (Nx monorepo: be explicit). */
+/*
+ * The whole scan set, automatic detection being off (index.css): a class is generated only if the
+ * library its template lives in is named here. Two globs are exhaustive because every browser
+ * library is `web-*` or `*-web` — libs/web-styles/tests/stylesheet.spec.ts checks that off the
+ * `scope:web` tag rather than off these globs.
+ */
 @source './**/*.{html,ts}';
-@source '../../../libs/web-ui/src/**/*.{html,ts}';
-@source '../../../libs/web-core/src/**/*.{html,ts}';
-@source '../../../libs/web-entity/src/**/*.{html,ts}';
+@source '../../../libs/web-*/src/**/*.{html,ts}';
+@source '../../../libs/*-web/src/**/*.{html,ts}';
