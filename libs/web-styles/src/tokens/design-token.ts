@@ -24,7 +24,10 @@ export interface TokenDecl {
   readonly initial: string;
   /**
    * Opt out of `@property` registration: a registered property computes at the element that *declares*
-   * it, so a font-relative length would stop scaling with the element that uses it.
+   * it, so a font-relative length would stop scaling with the element that uses it. For a relative
+   * length the opt-out is forced rather than chosen — an `initial-value` must be computationally
+   * independent, and a rule carrying one that isn't is dropped whole, leaving the token unregistered
+   * anyway but claiming otherwise.
    */
   readonly unregistered?: true;
 }
