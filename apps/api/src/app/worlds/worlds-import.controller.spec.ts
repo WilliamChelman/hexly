@@ -112,9 +112,13 @@ describe('Vault import endpoint', () => {
   /**
    * Boot an Instance over its own throwaway DB, seeded with Ada. `entities` re-states the Instance
    * Configuration's `entities` block, for the specs that need Inline Creation's knobs pointed somewhere
-   * visible (ADR-0073); absent, the loader's own defaults stand.
+   * visible (ADR-0073); `importConfig` does the same for the `import` block, so a spec can meet a
+   * ceiling without writing the thousands of links the shipped one takes. Absent, the loader's defaults stand.
    */
-  async function boot(entities?: Partial<HexlyConfig['entities']>): Promise<void> {
+  async function boot(
+    entities?: Partial<HexlyConfig['entities']>,
+    importConfig?: Partial<HexlyConfig['import']>,
+  ): Promise<void> {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
     const builder = Test.createTestingModule({
       imports: [ConfigModule, AuthModule, WorldsModule, EntitiesModule],
@@ -123,9 +127,13 @@ describe('Vault import endpoint', () => {
       .useValue(db)
       .overrideProvider(ASSETS_DIR)
       .useValue(assetsDir);
-    if (entities) {
+    if (entities || importConfig) {
       const base = loadConfig(':memory:', BUNDLED_PLUGIN_CONFIGS);
-      builder.overrideProvider(HEXLY_CONFIG).useValue({ ...base, entities: { ...base.entities, ...entities } });
+      builder.overrideProvider(HEXLY_CONFIG).useValue({
+        ...base,
+        entities: { ...base.entities, ...entities },
+        import: { ...base.import, ...importConfig },
+      });
     }
     const moduleRef = await builder.compile();
 
@@ -459,6 +467,61 @@ describe('Vault import endpoint', () => {
     expect(keep.links[1].attrs.entityId).toBe(byPath['North/Guard.md']);
   });
 
+  /**
+   * Obsidian's link format is a per-vault setting, so the same note may be named three ways. A form the
+   * index cannot answer is no longer inert now that a miss mints (ADR-0073) — it would silently double
+   * its target — so each shape has to land on the note that is already in the import.
+   */
+  describe('link forms other than the exact vault path', () => {
+    it('resolves a note-relative [[../folder/Note]] to the note it names, minting nothing', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // Obsidian's stock "Relative path to file" setting writes every cross-folder link this way.
+      const zip = vaultZip({
+        'people/Alice.md': 'Rode to [[../places/Rivendell]] and stayed.',
+        'places/Rivendell.md': '# Rivendell',
+      });
+
+      const res = await importVault(ada, zip);
+
+      expect(res.body).toMatchObject({ linksResolved: 1, linksCreated: 0, linksDangling: 0 });
+      const byPath = await pathsToIds(ada, res.body.worldId);
+      const alice = await linksOf(ada, res.body.worldId, 'Alice');
+      expect(alice.links[0].attrs.entityId).toBe(byPath['places/Rivendell.md']);
+    });
+
+    it('resolves a same-folder [[./Note]] to its sibling', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({
+        'people/Alice.md': 'Travels with [[./Bob]].',
+        'people/Bob.md': '# Bob',
+      });
+
+      const res = await importVault(ada, zip);
+
+      expect(res.body).toMatchObject({ linksResolved: 1, linksCreated: 0, linksDangling: 0 });
+      const byPath = await pathsToIds(ada, res.body.worldId);
+      const alice = await linksOf(ada, res.body.worldId, 'Alice');
+      expect(alice.links[0].attrs.entityId).toBe(byPath['people/Bob.md']);
+    });
+
+    it('resolves a vault-absolute link inside a wrapper directory no .obsidian marked for stripping', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // Zipped without its config folder, so `reroot` finds no marker and every path keeps `Aldermoor/`
+      // while the links stay vault-relative — the basename fallback is what still finds the note.
+      const zip = vaultZip({
+        'Aldermoor/Keep.md': 'Rode to [[places/Rivendell]] and stayed.',
+        'Aldermoor/places/Rivendell.md': '# Rivendell',
+      });
+
+      const res = await importVault(ada, zip);
+
+      expect(res.body).toMatchObject({ linksResolved: 1, linksCreated: 0, linksDangling: 0 });
+      const byPath = await pathsToIds(ada, res.body.worldId);
+      const keep = await linksOf(ada, res.body.worldId, 'Keep');
+      expect(keep.links[0].attrs.entityId).toBe(byPath['Aldermoor/places/Rivendell.md']);
+    });
+  });
+
   it('leaves a wikilink to a nonexistent note unresolved with the switch off, resolving only the ones that exist', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const zip = vaultZip({
@@ -592,6 +655,50 @@ describe('Vault import endpoint', () => {
       await ada.post('/worlds/import').field('inlineType', 'nonsense').attach('file', zip, 'Aldermoor.zip').expect(400);
     });
 
+    it('rejects a System-managed Type override, and mints no World for the refused run', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      // The asset type is the system's to assign (ADR-0068); the importer's exemption from the write
+      // gate covers frontmatter round-tripping an export, not a Type this request picked.
+      await ada
+        .post('/worlds/import')
+        .field('inlineType', 'core.type.asset')
+        .attach('file', zip, 'Aldermoor.zip')
+        .expect(400);
+      expect((await ada.get('/worlds').expect(200)).body).toEqual([]);
+    });
+
+    it('rejects an overlong Tag override rather than stamping it onto every Entity the run mints', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      await ada
+        .post('/worlds/import')
+        .field('inlineTag', 'x'.repeat(256))
+        .attach('file', zip, 'Aldermoor.zip')
+        .expect(400);
+    });
+
+    it('stops minting at the run’s ceiling, tallying the rest as dangling rather than failing the import', async () => {
+      // One note's links all mint inside its own transaction, so the ceiling is what keeps a crafted
+      // archive of nothing but distinct wikilinks from pinning the process (ADR-0073).
+      await app.close();
+      await boot(undefined, { maxCreatedEntities: 2 });
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]], [[Morblax]] and [[Norblax]].' });
+
+      const res = await importVault(ada, zip);
+
+      // The import lands, and the summary says exactly what it did rather than reading as a success.
+      expect(res.body).toMatchObject({ linksResolved: 0, linksCreated: 2, linksDangling: 1 });
+      const list = await ada.get(`/entities?worldId=${res.body.worldId}`).expect(200);
+      expect(list.body.items.map((e: { name: string }) => e.name).sort()).toEqual(['Keep', 'Morblax', 'Zorblax']);
+      // The one past the ceiling keeps its intent — an id-less entityLink, as with the switch off.
+      const keep = await linksOf(ada, res.body.worldId, 'Keep');
+      expect(keep.links[2].attrs).toMatchObject({ entityId: null, label: 'Norblax' });
+    });
+
     it('applies the per-run Type and Tag overrides over the configured defaults, persisting neither', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
@@ -626,11 +733,12 @@ describe('Vault import endpoint', () => {
       expect((await entityNamed(ada, res.body.worldId, 'Zorblax')).summary?.types).toEqual(['core.type.hex-map']);
     });
 
-    it('treats a blank override as an absent one, falling back to the Instance defaults', async () => {
+    it('treats a blank Type override as an absent one, falling back to the Instance defaults', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
 
-      // An untouched free-text Tag control (#347) sends an empty string; that must fall back, not 400.
+      // A control the author never touched (#347) sends an empty string; that must land, not 400. Blank
+      // reads as absent for the Type and as *no tag* for the Tag — here the Instance configures neither.
       const res = await importVault(ada, zip, { inlineType: '', inlineTag: '  ' });
 
       expect((await entityNamed(ada, res.body.worldId, 'Zorblax')).summary).toMatchObject({
@@ -693,6 +801,20 @@ describe('Vault import endpoint', () => {
         expect((await entityNamed(ada, res.body.worldId, 'Zorblax')).summary).toMatchObject({
           types: ['core.type.note'],
           tags: ['this-run'],
+        });
+      });
+
+      it('lets a cleared Tag mint untagged — the one override a blank-is-absent reading could not express', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+        // Sent, and empty: emptying the prefilled control is the instruction *no tag* (ADR-0073), not
+        // "no override" — which would hand the run the Instance's `untriaged` right back.
+        const res = await importVault(ada, zip, { inlineTag: '' });
+
+        expect((await entityNamed(ada, res.body.worldId, 'Zorblax')).summary).toMatchObject({
+          types: ['core.type.hex-map'],
+          tags: [],
         });
       });
     });

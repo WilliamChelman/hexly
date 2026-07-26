@@ -55,6 +55,7 @@ describe('loadConfig', () => {
       maxUpload: 500 * MB,
       maxDecompressed: 5 * 1024 * MB,
       strictZipGuard: false,
+      maxCreatedEntities: 5_000,
     },
     search: { weights: { name: 10, tags: 5, content: 1 } },
     liveFollow: { heartbeatSeconds: 30 },
@@ -71,6 +72,14 @@ describe('loadConfig', () => {
   it('defaults strictZipGuard off (fast) and lets a file turn it on (airtight)', () => {
     expect(loadConfig(dataDir()).import.strictZipGuard).toBe(false);
     expect(loadConfig(dataDir('import:\n  strictZipGuard: true\n')).import.strictZipGuard).toBe(true);
+  });
+
+  it('takes a maxCreatedEntities ceiling from the file, and refuses a nonsensical one', () => {
+    // The bound on what one import may mint for unresolved wikilinks (ADR-0073) — an operator raises
+    // it for a genuinely huge vault; zero or a fraction would only ever be a mistake.
+    expect(loadConfig(dataDir('import:\n  maxCreatedEntities: 25\n')).import.maxCreatedEntities).toBe(25);
+    expect(() => loadConfig(dataDir('import:\n  maxCreatedEntities: 0\n'))).toThrow(/maxCreatedEntities/);
+    expect(() => loadConfig(dataDir('import:\n  maxCreatedEntities: 1.5\n'))).toThrow(/maxCreatedEntities/);
   });
 
   it('merges a partial file over defaults, resolving sizes to bytes', () => {

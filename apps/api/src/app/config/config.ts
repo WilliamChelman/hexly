@@ -113,6 +113,10 @@ function buildConfigSchema(plugins: readonly PluginConfigContribution[]) {
         // archive can spoof it). true: stream and meter *actual* output, aborting a zip bomb
         // mid-inflate at the cost of a slower import.
         strictZipGuard: z.boolean().default(false),
+        // The run's ceiling on Entities minted for unresolved wikilinks (ADR-0073). A real vault's
+        // to-write list is orders of magnitude shorter; a crafted one is unbounded, and `maxDecompressed`
+        // is no cover for it — 12 bytes of `[[a000001]]` buy a row plus its edge/facet/FTS rows.
+        maxCreatedEntities: z.number().int().positive().default(5_000),
       })
       .prefault({}),
     // Where Asset bytes live (ADR-0034 amendment); neither defaulted nor resolved here, `resolveAssetsDir`
@@ -182,6 +186,8 @@ export interface HexlyConfig {
     maxDecompressed: number;
     /** Meter actual decompressed output (airtight, slower) vs. trust the zip's declared sizes (fast). */
     strictZipGuard: boolean;
+    /** Max Entities one import may mint for unresolved wikilinks; past it they stay dangling (ADR-0073). */
+    maxCreatedEntities: number;
   };
   assets: {
     /** Verbatim as the file states it; `resolveAssetsDir` turns it into `ASSETS_DIR` (ADR-0034 amendment). */
@@ -223,6 +229,7 @@ function processConfig(raw: HexlyConfigRaw, pins: DeploymentPins): HexlyConfig {
       maxUpload: parseSize(raw.import.maxUpload),
       maxDecompressed: parseSize(raw.import.maxDecompressed),
       strictZipGuard: raw.import.strictZipGuard,
+      maxCreatedEntities: raw.import.maxCreatedEntities,
     },
     assets: { dir: raw.assets.dir },
     search: { weights: { ...raw.search.weights } },

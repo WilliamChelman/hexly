@@ -274,6 +274,9 @@ import:
     false # false: fast import, guard on the zip's *declared* size.
     # true: slower, streams and meters *actual* output to abort a
     #       bomb mid-inflate — set on an untrusted/public instance.
+  maxCreatedEntities: 5000 # ceiling on the Entities one import mints for unresolved
+  #     wikilinks (ADR-0073); past it they land as Unresolved Links and the
+  #     summary counts them dangling, rather than the import failing.
 assets:
   dir: /Volumes/big-disk/hexly-assets # where Asset bytes are stored (ADR-0034);
   #     absolute, or relative to the Instance Directory. Omit the key — the default —
