@@ -20,7 +20,8 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       scrollbar-gutter: stable;
       scrollbar-color: transparent transparent;
       padding-right: var(--reading-dock-inset, 0rem);
-      transition: padding-right 200ms;
+      /* The page zeroes the duration while the Panel is being dragged, so the column tracks the grip. */
+      transition: padding-right var(--reading-dock-transition, 200ms);
     }
     .reading-scroll:hover {
       scrollbar-color: var(--color-line-strong) transparent;

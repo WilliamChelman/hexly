@@ -226,6 +226,19 @@ export class GraphCanvasComponent {
       this.mounted?.drawing.focus.usePalette(palette(this.types.all()));
     });
 
+    // The labels follow their box — a Dock Panel dragged wider (ADR-0067), a window resize. cosmos.gl
+    // re-reads the canvas size on its own render loop, so the drawing keeps up by itself; the label layer
+    // is DOM we own and parks itself once the layout cools, so a resize landing after that would strand
+    // every label at the old projection. A repaint is all this is: the framing is the camera's, on the
+    // clock it already keeps.
+    effect((onCleanup) => {
+      const host = this.hostEl().nativeElement;
+      if (typeof ResizeObserver === 'undefined') return;
+      const observer = new ResizeObserver(() => this.wake());
+      observer.observe(host);
+      onCleanup(() => observer.disconnect());
+    });
+
     inject(DestroyRef).onDestroy(() => this.teardown());
   }
 

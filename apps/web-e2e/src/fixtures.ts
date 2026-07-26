@@ -261,6 +261,21 @@ export async function openDetails(page: Page): Promise<void> {
 }
 
 /**
+ * Drag the open Dock Panel's grip `by` px to the left — the direction that widens it (ADR-0067). The
+ * Panel must already be open, and the width is held to the Dock's own bounds, so a drag past them stops
+ * there rather than reporting what it asked for.
+ */
+export async function widenDockPanel(page: Page, by: number): Promise<void> {
+  const grip = await page.getByTestId('dock-resize').boundingBox();
+  if (!grip) throw new Error('the Dock resize grip is not laid out');
+  const y = grip.y + grip.height / 2;
+  await page.mouse.move(grip.x + grip.width / 2, y);
+  await page.mouse.down();
+  await page.mouse.move(grip.x - by, y, { steps: 8 });
+  await page.mouse.up();
+}
+
+/**
  * Attach the registered Field `fieldId` to the open Entity through the Details View/Panel's inline
  * management (ADR-0067 — the Edit-fields dialog is retired). The Field must be attachable — not already
  * on the Entity's effective set.

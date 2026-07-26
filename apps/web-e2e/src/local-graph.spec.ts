@@ -1,4 +1,4 @@
-import { enterLibrary, expect, openEntity, test } from './fixtures';
+import { enterLibrary, expect, openEntity, test, widenDockPanel } from './fixtures';
 
 /** A tiptap doc whose one paragraph carries a prose Entity Link to `entityId` — a semantic edge. */
 function proseLinking(entityId: string, label: string) {
@@ -59,6 +59,42 @@ test('the Local Graph panel opens one hop out and deepens on request', async ({ 
   await expect(page.getByTestId('local-graph-depth-2')).toHaveAttribute('aria-pressed', 'true');
   // Thornwood's own neighbourhood, two hops out: Riverbend that links it, and Ealdred behind it.
   await expect(counts).toContainText('3 entities');
+});
+
+/**
+ * The drawing is square, so it follows the resizeable Panel's width (ADR-0067) instead of letterboxing:
+ * a fixed height would leave a widened Panel drawing the same short strip.
+ */
+test('the Local Graph drawing grows with the Panel it is drawn in', async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 1000 }); // tall enough that the 50vh cap can't bite
+  await enterLibrary(page);
+
+  const created = await page.request.post('/api/entities', {
+    data: { name: 'Emberhold', types: ['core.type.note'] },
+  });
+  expect(created.ok(), `${created.status()} ${await created.text()}`).toBeTruthy();
+  await openEntity(page, (await created.json()).id as string);
+
+  await page.getByTestId('local-graph-toggle').click();
+  const drawing = page.getByTestId('local-graph-box');
+  const before = await drawing.boundingBox();
+  if (!before) throw new Error('drawing not laid out');
+  expect(before.height).toBeCloseTo(before.width, 0);
+
+  await widenDockPanel(page, 150);
+
+  const after = await drawing.boundingBox();
+  if (!after) throw new Error('drawing not laid out');
+  expect(after.width).toBeGreaterThan(before.width + 100);
+  expect(after.height).toBeCloseTo(after.width, 0);
+
+  // The one place the height stops following the width: a short viewport caps it at half, so the depth
+  // control below stays in sight rather than being pushed out of the card.
+  await page.setViewportSize({ width: 1500, height: 600 });
+  const capped = await drawing.boundingBox();
+  if (!capped) throw new Error('drawing not laid out');
+  expect(capped.height).toBeLessThanOrEqual(301);
+  await expect(page.getByTestId('local-graph-depth-1')).toBeInViewport();
 });
 
 /** An Entity nothing links to and that links to nothing is a graph of one — a claim, not an empty canvas. */

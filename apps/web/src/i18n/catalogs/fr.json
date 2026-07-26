@@ -108,6 +108,10 @@
       "note": "Note",
       "details": "Détails"
     },
+    "dock": {
+      "resize": "Redimensionner le panneau",
+      "resizeValue": "{{width}} pixels de large"
+    },
     "save": {
       "conflict": "Version plus récente sur le serveur",
       "saved": "Enregistré",
