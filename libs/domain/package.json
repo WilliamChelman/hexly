@@ -6,6 +6,8 @@
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
   "dependencies": {
+    "@hexly/web-styles": "0.0.1",
+    "culori": "^4.0.2",
     "tslib": "^2.3.0",
     "zod": "^4.4.3"
   }

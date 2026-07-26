@@ -225,8 +225,9 @@ export class WorldsController {
     return result;
   }
 
-  // A partial update of the Owner-curated fields: `name` (rename) and/or `pinnedEntityIds`
-  // (Dashboard pins, #168). Owner-gated in the service; reachable-but-not-Owner is a 403.
+  // A partial update of the Owner-curated fields: `name` (rename), `pinnedEntityIds` (Dashboard pins,
+  // #168) and/or the World Theme (ADR-0076). Owner-gated in the service; reachable-but-not-Owner is a
+  // 403. The schema is the Theme's write choke point, so a value that is not one is a 400 here.
   @Patch(':id')
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): WorldDetail {
     const parsed = updateWorldRequestSchema.safeParse(body);

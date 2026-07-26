@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { FieldSchema, MemberRole, UserDefinedType } from '@hexly/domain';
+import { FieldSchema, MemberRole, UserDefinedType, WorldTheme } from '@hexly/domain';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { INITIAL_SEQ, worldFields, worldMembers, worlds, worldTypes } from '../db/schema';
@@ -71,20 +71,21 @@ export class WorldWrites {
   }
 
   /**
-   * Write a World's Owner-curated fields — `name` and/or the ordered `pinnedEntityIds`. Both
-   * timestamps move, unlike {@link membership} which moves `seq` alone. An absent field is left
-   * untouched.
+   * Write a World's Owner-curated fields — `name`, the ordered `pinnedEntityIds`, and/or the World
+   * Theme. Both timestamps move, unlike {@link membership} which moves `seq` alone. An absent field
+   * is left untouched; a `null` Theme clears it.
    *
    * The post-write `seq` is computed in JS and used for both the SET and the returned row, so the
    * caller's write-through holds exactly what the row holds and the server's echo nudge for this
    * write dedups to nothing. Safe because `better-sqlite3` is synchronous and the read rode the
    * same transaction.
    */
-  update(row: WorldRow, patch: { name?: string; pinnedEntityIds?: string[] }): WorldRow {
+  update(row: WorldRow, patch: { name?: string; pinnedEntityIds?: string[]; theme?: WorldTheme | null }): WorldRow {
     const next: WorldRow = {
       ...row,
       ...(patch.name !== undefined ? { name: patch.name } : {}),
       ...(patch.pinnedEntityIds !== undefined ? { pinnedEntityIds: patch.pinnedEntityIds } : {}),
+      ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
       updatedAt: Date.now(),
       seq: row.seq + 1,
     };
@@ -94,13 +95,15 @@ export class WorldWrites {
         .set({
           name: next.name,
           pinnedEntityIds: next.pinnedEntityIds,
+          theme: next.theme,
           updatedAt: next.updatedAt,
           seq: next.seq,
         })
         .where(eq(worlds.id, row.id))
         .run();
-      // Rename and pin reorder both ride this one world-detail nudge. Curation touches no Entity's
-      // Rights, so the shared Entities are deliberately not fanned out.
+      // Rename, pin reorder and a Theme edit all ride this one world-detail nudge — a theme edit bumps
+      // `seq` so a live-following reader re-applies without a refresh (ADR-0076). Curation touches no
+      // Entity's Rights, so the shared Entities are deliberately not fanned out.
       this.outbox.world(row.id);
       return next;
     });

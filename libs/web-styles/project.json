@@ -5,6 +5,16 @@
   "projectType": "library",
   "tags": ["scope:web", "type:styles"],
   "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/web-styles",
+        "main": "libs/web-styles/src/index.ts",
+        "tsConfig": "libs/web-styles/tsconfig.lib.json",
+        "assets": [{ "input": "libs/web-styles/src", "glob": "**/*.css", "output": "src" }]
+      }
+    },
     "test": {
       "inputs": [
         "default",

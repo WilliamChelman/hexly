@@ -15,6 +15,7 @@ export * from './lib/derive-document-state';
 export * from './lib/join-search-text';
 export * from './lib/asset';
 export * from './lib/world';
+export * from './lib/world-theme';
 export * from './lib/world-field';
 export * from './lib/world-type';
 export * from './lib/plugin-type';
