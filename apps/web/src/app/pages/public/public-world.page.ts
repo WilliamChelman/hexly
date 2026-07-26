@@ -67,7 +67,7 @@ import { EyebrowComponent } from '@hexly/web-ui';
       @apply flex flex-col gap-1;
     }
     .public-link {
-      @apply text-gold-strong underline;
+      @apply text-accent-strong underline;
     }
   `,
 })

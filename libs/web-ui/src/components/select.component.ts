@@ -38,10 +38,10 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       transition: border-color var(--dur-fast) var(--ease-out);
     }
     :host(:hover) {
-      @apply border-gold;
+      @apply border-accent;
     }
     :host(:focus-visible) {
-      @apply outline-none border-gold;
+      @apply outline-none border-accent;
     }
     :host(:disabled) {
       @apply opacity-50 cursor-not-allowed;
@@ -61,7 +61,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
         appearance: base-select;
       }
       :host(:open) {
-        @apply border-gold;
+        @apply border-accent;
       }
       /* In base-select the chevron is a real in-flow element (the native picker-icon), so it follows the
          value rather than floating over it the way a background image does — long text can never slide
@@ -96,14 +96,14 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       }
       :host ::ng-deep option:hover,
       :host ::ng-deep option:focus-visible {
-        @apply bg-gold-soft outline-none;
+        @apply bg-accent-soft outline-none;
       }
       :host ::ng-deep option:checked {
         @apply text-ink-strong;
       }
       /* The check rides at the row's end, like the CDK menus (user-menu). */
       :host ::ng-deep option::checkmark {
-        @apply order-1 ml-auto text-gold;
+        @apply order-1 ml-auto text-accent;
       }
     }
   `,

@@ -36,7 +36,7 @@ import { ButtonComponent, FieldComponent, InputComponent, PanelComponent } from 
           </label>
 
           @if (error(); as e) {
-            <p class="m-0 text-sm text-ember" role="alert">
+            <p class="m-0 text-sm text-danger" role="alert">
               {{ e | transloco }}
             </p>
           }

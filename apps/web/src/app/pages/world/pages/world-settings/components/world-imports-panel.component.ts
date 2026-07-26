@@ -129,7 +129,7 @@ type ImporterStatusLine =
     }
     /* A failed run reads as failed, not as an empty success line (#262 review). */
     .importer-status.is-failed {
-      @apply text-ember;
+      @apply text-danger;
     }
     .importer-empty {
       @apply py-1 text-sm text-ink-muted;

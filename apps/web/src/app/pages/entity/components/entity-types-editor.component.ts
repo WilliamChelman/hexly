@@ -20,7 +20,7 @@ import { FieldControlComponent } from '@hexly/web-entity';
     <div class="flex flex-col gap-3" data-testid="entity-types-editor">
       <div class="flex flex-wrap items-center gap-2">
         @for (type of types(); track type; let i = $index) {
-          <app-chip [tone]="i === 0 ? 'gold' : undefined" [attr.data-testid]="'type-chip-' + type">
+          <app-chip [tone]="i === 0 ? 'accent' : undefined" [attr.data-testid]="'type-chip-' + type">
             {{ typeLabel(type) }}
             @if (i === 0) {
               <span class="text-2xs opacity-70" data-testid="type-primary"

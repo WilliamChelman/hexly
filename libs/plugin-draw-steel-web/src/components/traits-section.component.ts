@@ -18,7 +18,7 @@ import { Trait } from '@hexly/plugin-draw-steel';
   imports: [TranslocoPipe, ButtonComponent, InputComponent, TextareaComponent, IconComponent],
   template: `
     <section class="border-b border-line py-3 last:border-b-0" data-testid="section-traits">
-      <h3 class="m-0 mb-2 flex items-center gap-1.5 font-serif text-lg font-bold italic text-gold-deep">
+      <h3 class="m-0 mb-2 flex items-center gap-1.5 font-serif text-lg font-bold italic text-accent-strong">
         <app-icon name="ds-trait" class="text-base not-italic" />{{ 'drawSteel.statBlock.section.traits' | transloco }}
       </h3>
 

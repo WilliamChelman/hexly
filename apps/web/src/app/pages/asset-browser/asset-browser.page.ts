@@ -92,7 +92,7 @@ const SEARCH_DEBOUNCE_MS = 150;
   template: `
     <app-page-header sticky>
       <div pageHeaderTitle class="flex flex-col">
-        <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'assetBrowser.eyebrow' | transloco }}</span>
+        <span appEyebrow class="text-accent! tracking-[0.28em]">{{ 'assetBrowser.eyebrow' | transloco }}</span>
         <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
           {{ 'assetBrowser.heading' | transloco }}
         </h1>
@@ -126,7 +126,7 @@ const SEARCH_DEBOUNCE_MS = 150;
       />
       <app-entity-search [value]="query()" (queryChange)="onSearch($event)" />
       @if (uploadError()) {
-        <p class="text-sm text-ember mb-4" data-testid="asset-upload-error">
+        <p class="text-sm text-danger mb-4" data-testid="asset-upload-error">
           {{ 'assetBrowser.uploadError' | transloco }}
         </p>
       }
@@ -156,7 +156,7 @@ const SEARCH_DEBOUNCE_MS = 150;
                          server, so the request is known to 404. -->
                     @if (asset.assetBytesMissing) {
                       <span
-                        class="flex h-full flex-col items-center justify-center gap-1 border border-dashed border-gold text-gold"
+                        class="flex h-full flex-col items-center justify-center gap-1 border border-dashed border-accent text-accent"
                         [attr.data-testid]="'asset-missing-' + asset.id"
                       >
                         <app-icon name="asset-missing" [size]="28" />
@@ -245,7 +245,7 @@ const SEARCH_DEBOUNCE_MS = 150;
 
     .asset-tile {
       @apply block aspect-square w-full overflow-hidden rounded-md border border-line bg-surface no-underline;
-      @apply transition-shadow hover:shadow-3 focus-visible:[outline:2px_solid_var(--color-gold)] focus-visible:outline-offset-2 outline-none;
+      @apply transition-shadow hover:shadow-3 focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:outline-offset-2 outline-none;
     }
   `,
 })

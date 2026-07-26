@@ -97,7 +97,7 @@ const IMAGE_KIND_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILT
                   <button
                     type="button"
                     role="listitem"
-                    class="aspect-square overflow-hidden rounded border border-line bg-surface-sunken hover:border-gold focus-visible:border-gold outline-none"
+                    class="aspect-square overflow-hidden rounded border border-line bg-surface-sunken hover:border-accent focus-visible:border-accent outline-none"
                     [title]="asset.name"
                     [attr.aria-label]="asset.name"
                     [attr.data-testid]="'asset-link-option-' + asset.id"

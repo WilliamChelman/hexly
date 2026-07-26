@@ -45,18 +45,18 @@ import { ChangeDetectionStrategy, Component, booleanAttribute, input } from '@an
     :host(.is-sm) {
       @apply w-8 h-8 rounded-md;
     }
-    /* Hover (only when not armed): gold glyph + gilded border, fill unchanged. */
+    /* Hover (only when not armed): accent glyph + drawn border, fill unchanged. */
     :host(:hover:not(:disabled):not(.is-active)) {
-      @apply text-gold border-line-strong;
+      @apply text-accent border-line-strong;
     }
-    /* Armed/selected — a gilded gem: radial gold gradient + glow halo (raw). */
+    /* Armed/selected — a gilded gem: the radial accent sheen + its glow halo (raw). */
     :host(.is-active) {
-      @apply text-on-gilded;
-      background: var(--gradient-gold-radial);
-      border-color: color-mix(in srgb, var(--color-gold-bright) 60%, #fff);
+      @apply text-on-accent-sheen;
+      background: var(--gradient-accent-sheen-radial);
+      border-color: color-mix(in srgb, var(--color-accent-sheen-bright) 60%, #fff);
       box-shadow:
-        0 0 0 1px var(--color-glow),
-        0 0 16px -1px var(--color-glow);
+        0 0 0 1px var(--color-accent-glow),
+        0 0 16px -1px var(--color-accent-glow);
     }
     :host(:disabled) {
       @apply opacity-40 cursor-not-allowed;

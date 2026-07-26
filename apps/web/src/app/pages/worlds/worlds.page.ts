@@ -94,7 +94,7 @@ import {
       <header class="bg-linear-[180deg] from-surface to-bg-deep border-b border-line">
         <div class="max-w-[64rem] mx-auto px-8 py-16 flex items-end justify-between gap-8">
           <div>
-            <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'worldIndex.eyebrow' | transloco }}</span>
+            <span appEyebrow class="text-accent! tracking-[0.28em]">{{ 'worldIndex.eyebrow' | transloco }}</span>
             <h1 class="font-display text-3xl text-ink-strong m-0 leading-tight">
               {{ 'worldIndex.greeting' | transloco: { name: who() } }}
             </h1>
@@ -119,7 +119,7 @@ import {
           @for (card of sorted(); track card.id) {
             <li class="snap-start shrink-0 w-56">
               <div
-                class="group relative h-44 rounded-lg border border-line bg-surface shadow-1 overflow-hidden flex flex-col transition-shadow hover:shadow-2 has-[a:focus-visible]:[outline:2px_solid_var(--color-gold)] has-[a:focus-visible]:[outline-offset:-2px]"
+                class="group relative h-44 rounded-lg border border-line bg-surface shadow-1 overflow-hidden flex flex-col transition-shadow hover:shadow-2 has-[a:focus-visible]:[outline:2px_solid_var(--color-accent)] has-[a:focus-visible]:[outline-offset:-2px]"
               >
                 <div class="h-20 flex items-center justify-center {{ sigil(card.id) }}">
                   <span class="font-cartouche text-2xl">{{ mono(card.name) }}</span>
@@ -128,7 +128,7 @@ import {
                   <input
                     type="text"
                     appAutofocus
-                    class="m-3 font-display text-md text-ink-strong bg-surface-sunken border border-gold rounded-sm py-1 px-2 outline-none"
+                    class="m-3 font-display text-md text-ink-strong bg-surface-sunken border border-accent rounded-sm py-1 px-2 outline-none"
                     [value]="card.name"
                     [attr.data-testid]="'rename-world-input-' + card.id"
                     [attr.aria-label]="'worldIndex.renameLabel' | transloco"
@@ -151,7 +151,7 @@ import {
                 <div class="flex items-center gap-1 px-3 pb-2">
                   <span
                     class="text-2xs uppercase tracking-wider"
-                    [class.text-gold]="card.owned"
+                    [class.text-accent]="card.owned"
                     [class.text-ink-faint]="!card.owned"
                     [attr.data-testid]="(card.owned ? 'owned-' : 'member-') + card.id"
                     >{{ (card.owned ? 'worldIndex.owned' : 'worldIndex.member') | transloco }}</span
@@ -240,7 +240,7 @@ import {
             <li class="snap-start shrink-0 w-56">
               <button
                 type="button"
-                class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-gold hover:border-gold bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-gold)] focus-visible:[outline-offset:-2px]"
+                class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-accent hover:border-accent bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:[outline-offset:-2px]"
                 [disabled]="creating()"
                 (click)="promptCreate()"
               >
@@ -388,7 +388,7 @@ import {
         <label class="flex items-start gap-2 text-sm text-ink">
           <input
             type="checkbox"
-            class="mt-0.5 accent-gold"
+            class="mt-0.5 accent-accent"
             data-testid="import-create-unresolved"
             [checked]="createUnresolved()"
             (change)="createUnresolved.set($any($event.target).checked)"

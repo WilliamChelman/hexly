@@ -19,7 +19,7 @@ import { booleanAttribute, ChangeDetectionStrategy, Component, input } from '@an
     :host(.is-marked)::before {
       content: '✦';
       margin-right: 0.5em;
-      color: var(--color-gold);
+      color: var(--color-accent);
       font-size: 0.85em;
       opacity: 0.7;
     }

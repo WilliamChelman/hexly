@@ -29,7 +29,7 @@ const QUIET: Record<QuietState, { icon: IconName; key: string }> = {
   template: `
     <span aria-live="polite" class="inline-flex items-center">
       @if (conflict()) {
-        <app-chip tone="gold" data-testid="conflict">
+        <app-chip tone="accent" data-testid="conflict">
           {{ 'editorShell.save.conflict' | transloco }}
           <button
             type="button"
@@ -46,7 +46,7 @@ const QUIET: Record<QuietState, { icon: IconName; key: string }> = {
       } @else if (error() === 'readonly') {
         <app-chip data-testid="readonly">{{ 'editorShell.save.readonly' | transloco }}</app-chip>
       } @else if (error() === 'save') {
-        <app-chip tone="gold" data-testid="save-error">
+        <app-chip tone="accent" data-testid="save-error">
           {{ 'editorShell.save.failed' | transloco }}
           <button
             type="button"
@@ -61,7 +61,7 @@ const QUIET: Record<QuietState, { icon: IconName; key: string }> = {
         <span
           class="inline-flex items-center justify-center w-6 h-6 rounded-full border border-line-strong bg-surface-sunken"
           [class.text-ink-faint]="quiet() === 'saved'"
-          [class.text-gold]="quiet() !== 'saved'"
+          [class.text-accent]="quiet() !== 'saved'"
           [attr.data-state]="quiet()"
           [title]="QUIET[quiet()].key | transloco"
           data-testid="save-status"

@@ -40,7 +40,7 @@ export function palette(defs: readonly TypeDefinition[]): Palette {
     // fallback `TypeRegistry.resolve` gives every other surface, so the graph needs no plugin of its own.
     node: toRgba(token(style, GENERIC_TYPE_DEFINITION.graphColorToken, FALLBACK_NODE_COLOR)),
     link: toRgba(token(style, '--color-line-strong', '#b89a62')),
-    linkHighlight: toRgba(token(style, '--color-gold', '#9a6a16')),
+    linkHighlight: toRgba(token(style, '--color-accent', '#9a6a16')),
     ring: [ink[0], ink[1], ink[2], ink[3] * NODE_RING_ALPHA],
   };
 }

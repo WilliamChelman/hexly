@@ -152,8 +152,8 @@ function stubTheme(): () => void {
     '--color-feature-ink': FEATURE_INK,
     '--color-label-ink': LABEL_INK,
     '--color-name-ink': NAME_INK,
-    '--color-gold-strong': SELECT_INK,
-    '--color-ember': BLOCKED_INK,
+    '--color-accent-strong': SELECT_INK,
+    '--color-danger': BLOCKED_INK,
   };
   window.getComputedStyle = (() => ({
     getPropertyValue: (name: string) => colours[name] ?? '',

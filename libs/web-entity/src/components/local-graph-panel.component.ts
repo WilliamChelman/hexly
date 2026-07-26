@@ -112,7 +112,7 @@ import { LocalGraphStore } from '../services/local-graph-store';
         @for (depth of store.depths; track depth) {
           <button
             type="button"
-            class="min-w-6 rounded-sm px-1.5 py-0.5 font-sans text-xs text-ink-muted hover:bg-surface-sunken aria-pressed:bg-gold/15 aria-pressed:text-gold aria-pressed:font-semibold"
+            class="min-w-6 rounded-sm px-1.5 py-0.5 font-sans text-xs text-ink-muted hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent aria-pressed:font-semibold"
             [attr.aria-pressed]="store.depth() === depth"
             [attr.aria-label]="'fields.localGraph.depthOption' | transloco: { depth }"
             [attr.data-testid]="'local-graph-depth-' + depth"

@@ -20,7 +20,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       transition: border-color var(--dur-fast) var(--ease-out);
     }
     :host(:focus-visible) {
-      @apply border-gold;
+      @apply border-accent;
     }
   `,
 })

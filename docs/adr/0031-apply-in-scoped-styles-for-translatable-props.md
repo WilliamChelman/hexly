@@ -13,8 +13,8 @@ The "tax" ADR-0020 feared was re-examined and mostly didn't survive: under Angul
 
 - **`@apply` (utilities)** — every property that maps 1:1, **including private-var consumption** via functional shorthand: layout, sizing, spacing, type, radii, the project's `shadow-1/2/3/inset` utilities, `text-(--_fg)`, `bg-(--_bg)`, `border border-(--_bd)`.
 - **Raw CSS** — the irreducible custom core, which has no utility form and stays in plain declarations:
-  - private-var **assignment** (`--_fg: var(--color-on-gilded)`) — no utility assigns to a `--_…`;
-  - `color-mix()`, gradients (`var(--gradient-gold-radial)`);
+  - private-var **assignment** (`--_fg: var(--color-on-accent-sheen)`) — no utility assigns to a `--_…`;
+  - `color-mix()`, gradients (`var(--gradient-accent-sheen-radial)`);
   - bespoke multi-property `transition`s on the `--dur-…`/`--ease-…` motion tokens;
   - composite or literal-geometry `box-shadow`s (`0 0 0 3px …`).
 - **Don't convert at all** when `@apply` is a _net loss_: a single-declaration rule (the `@reference` line costs more than it saves — `dialog`), a rule that's all arbitrary `em`/glyph values (`eyebrow`), or one that would hit `@apply`'s source-order gotcha (`border: 0` + `border-top` resolve by utility source order, not `@apply` argument order — `rule`).

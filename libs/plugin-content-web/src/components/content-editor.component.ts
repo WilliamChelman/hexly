@@ -67,7 +67,7 @@ const COMMIT_DEBOUNCE_MS = 250;
   ],
   host: {
     class:
-      'flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-6 py-3 text-ink cursor-text focus-within:border-gold',
+      'flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-6 py-3 text-ink cursor-text focus-within:border-accent',
   },
   template: `
     <!-- ProseMirror fills the flex column (scoped CSS below) so a click anywhere
@@ -89,7 +89,7 @@ const COMMIT_DEBOUNCE_MS = 250;
     @reference '#app-styles.css';
 
     /* .ProseMirror lives outside Angular's template — pierce with ::ng-deep.
-       Suppress its focus ring; host's focus-within:border-gold already signals focus. */
+       Suppress its focus ring; host's focus-within:border-accent already signals focus. */
     :host ::ng-deep .ProseMirror {
       flex: 1;
     }
@@ -185,7 +185,7 @@ const COMMIT_DEBOUNCE_MS = 250;
       font-size: 0.85em;
     }
     :host ::ng-deep .ProseMirror a {
-      @apply text-gold underline;
+      @apply text-accent underline;
     }
     /* Callout (ADR-0033): a bordered box; the header carries its type + title, the
        body holds live block content (contentDOM). Colour-by-type is deferred. */
@@ -243,7 +243,7 @@ const COMMIT_DEBOUNCE_MS = 250;
     }
     /* Highlight mark (==text==): a warm wash that reads on the app's surface. */
     :host ::ng-deep .ProseMirror mark {
-      background: color-mix(in srgb, var(--color-gold) 30%, transparent);
+      background: color-mix(in srgb, var(--color-accent) 30%, transparent);
       border-radius: 0.15em;
       padding: 0 0.1em;
       color: inherit;

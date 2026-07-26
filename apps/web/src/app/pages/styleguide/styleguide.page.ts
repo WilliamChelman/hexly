@@ -74,7 +74,7 @@ interface TypeRow {
         <h1 class="text-3xl leading-[1.06]" [innerHTML]="'styleguide.heroTitle' | transloco"></h1>
         <p class="hero-lede" [innerHTML]="'styleguide.heroLede' | transloco"></p>
         <div class="flex flex-wrap gap-2 mt-2">
-          <app-chip tone="gold">{{ 'styleguide.fontDisplay' | transloco }}</app-chip>
+          <app-chip tone="accent">{{ 'styleguide.fontDisplay' | transloco }}</app-chip>
           <app-chip tone="sea">{{ 'styleguide.fontBody' | transloco }}</app-chip>
           <app-chip tone="astra">{{ 'styleguide.fontCoord' | transloco }}</app-chip>
         </div>
@@ -247,7 +247,7 @@ interface TypeRow {
             </figcaption>
             <div class="specimen-row">
               <app-chip>{{ 'styleguide.chipDefault' | transloco }}</app-chip>
-              <app-chip tone="gold">{{ 'styleguide.chipSettlement' | transloco }}</app-chip>
+              <app-chip tone="accent">{{ 'styleguide.chipSettlement' | transloco }}</app-chip>
               <app-chip tone="sea">{{ 'styleguide.chipEditing' | transloco }}</app-chip>
               <app-chip tone="astra">{{ 'styleguide.chipRegion' | transloco }}</app-chip>
               <app-coord>q 12 · r −4</app-coord>
@@ -311,7 +311,7 @@ interface TypeRow {
               {{ 'styleguide.cartouche' | transloco }}
             </figcaption>
             <div class="specimen-row">
-              <span class="text-2xl text-gold" appCartouche>Hexly</span>
+              <span class="text-2xl text-accent" appCartouche>Hexly</span>
             </div>
           </figure>
 
@@ -335,7 +335,7 @@ interface TypeRow {
                 <span appDot></span>{{ 'styleguide.dotIdle' | transloco }}
               </span>
               <span class="inline-flex items-center gap-2 text-sm text-ink-muted">
-                <span appDot positive></span>{{ 'styleguide.dotHealthy' | transloco }}
+                <span appDot success></span>{{ 'styleguide.dotHealthy' | transloco }}
               </span>
             </div>
           </figure>
@@ -460,7 +460,7 @@ interface TypeRow {
     .hero-lede code,
     .section-note code,
     figcaption code {
-      @apply font-mono text-gold-strong;
+      @apply font-mono text-accent-strong;
       font-size: 0.86em;
     }
 
@@ -522,7 +522,7 @@ interface TypeRow {
     }
     .ramp-bar {
       @apply h-3.5 rounded-sm;
-      background: linear-gradient(90deg, var(--color-gold), var(--color-gold-strong));
+      background: linear-gradient(90deg, var(--color-accent), var(--color-accent-strong));
     }
     .radii {
       @apply flex flex-wrap gap-4;
@@ -531,7 +531,7 @@ interface TypeRow {
       @apply flex flex-col items-center gap-2 m-0 font-mono text-2xs text-ink-muted;
     }
     .radiicard-box {
-      @apply w-16 h-16 bg-surface-sunken border border-gold;
+      @apply w-16 h-16 bg-surface-sunken border border-accent;
     }
 
     .specimens {
@@ -571,7 +571,7 @@ interface TypeRow {
       @apply flex justify-between items-center pt-6 border-t border-line text-sm text-ink-muted;
     }
     .guide-foot .brand {
-      @apply text-md text-gold;
+      @apply text-md text-accent;
     }
     .guide-foot code {
       @apply font-mono text-2xs;
@@ -595,11 +595,11 @@ export class StyleguidePage {
     { token: '--color-surface-sunken', nameKey: 'styleguide.swatch.well' },
     { token: '--color-ink', nameKey: 'styleguide.swatch.ink' },
     { token: '--color-ink-muted', nameKey: 'styleguide.swatch.inkMuted' },
-    { token: '--color-gold', nameKey: 'styleguide.swatch.compassGold' },
+    { token: '--color-accent', nameKey: 'styleguide.swatch.compassGold' },
     { token: '--color-sea', nameKey: 'styleguide.swatch.seaAurora' },
     { token: '--color-astra', nameKey: 'styleguide.swatch.nebula' },
-    { token: '--color-ember', nameKey: 'styleguide.swatch.marginalia' },
-    { token: '--color-positive', nameKey: 'styleguide.swatch.moss' },
+    { token: '--color-danger', nameKey: 'styleguide.swatch.marginalia' },
+    { token: '--color-success', nameKey: 'styleguide.swatch.moss' },
     { token: '--color-line-strong', nameKey: 'styleguide.swatch.drawnRule' },
   ];
 

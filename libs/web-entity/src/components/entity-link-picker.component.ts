@@ -43,7 +43,7 @@ import { ENTITY_TYPES } from '../models/entity-types';
         <div class="flex items-center gap-2">
           @if (linked(); as e) {
             <a
-              class="block flex-1 min-w-0 truncate cursor-pointer font-display text-base text-gold no-underline hover:underline"
+              class="block flex-1 min-w-0 truncate cursor-pointer font-display text-base text-accent no-underline hover:underline"
               data-testid="entity-link-name"
               [routerLink]="['/entities', id]"
             >

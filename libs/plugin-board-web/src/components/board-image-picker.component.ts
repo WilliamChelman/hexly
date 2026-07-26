@@ -52,7 +52,7 @@ const NO_FACETS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] 
             <p class="text-xs text-ink-muted">{{ 'board.imagePicker.uploading' | transloco }}</p>
           }
           @if (error()) {
-            <p class="text-xs text-ember" data-testid="image-upload-error">
+            <p class="text-xs text-danger" data-testid="image-upload-error">
               {{ 'board.imagePicker.uploadError' | transloco }}
             </p>
           }
@@ -131,11 +131,11 @@ const NO_FACETS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] 
 
     .asset-tile {
       @apply block aspect-square w-full overflow-hidden rounded-md border border-line bg-surface-sunken;
-      @apply cursor-pointer transition-colors hover:border-gold focus-visible:border-gold outline-none;
+      @apply cursor-pointer transition-colors hover:border-accent focus-visible:border-accent outline-none;
     }
     .facet-chip {
       @apply flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs text-ink-strong;
-      @apply cursor-pointer transition-colors hover:border-gold aria-pressed:border-gold aria-pressed:bg-gold/15 aria-pressed:text-gold;
+      @apply cursor-pointer transition-colors hover:border-accent aria-pressed:border-accent aria-pressed:bg-accent/15 aria-pressed:text-accent;
     }
   `,
 })

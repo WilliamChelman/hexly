@@ -94,13 +94,15 @@
   --color-line-strong: #b89a62; /* emphasised borders, panel edges          */
   --color-line-faint: rgba(120, 86, 30, 0.16);
 
-  --color-gold: #9a6a16; /* heliograph gold — primary accent                */
-  --color-gold-strong: #7e560f;
-  --color-gold-soft: rgba(154, 106, 22, 0.14);
-  --color-gold-bright: #efd078; /* metallic highlight — top stop of the gilded gradient */
-  --color-gold-deep: #b98323; /*   deep stop of the gilded gradient                    */
-  --color-on-gold: #fbf5e6; /* cream text/icon on the DARK flat gold (e.g. danger fill) */
-  --color-on-gilded: #2a1f08; /* dark ink on the BRIGHT gilded gradient — both themes  */
+  --color-accent: #9a6a16; /* heliograph gold — primary accent                */
+  --color-accent-strong: #7e560f;
+  --color-accent-soft: rgba(154, 106, 22, 0.14);
+  --color-accent-sheen-bright: #efd078; /* metallic highlight — top stop of the accent sheen  */
+  --color-accent-sheen-deep: #b98323; /*   deep stop of the accent sheen                     */
+  /* Foreground on any saturated flat fill, not just the accent's — its one consumer
+     is the danger button's hover (ADR-0075). */
+  --color-on-fill: #fbf5e6;
+  --color-on-accent-sheen: #2a1f08; /* dark ink on the BRIGHT accent sheen — both themes    */
 
   --color-sea: #2f6f7a; /* lapis water — secondary accent                   */
   --color-sea-soft: rgba(47, 111, 122, 0.14);
@@ -108,11 +110,11 @@
   --color-astra: #5a4aa6; /* dusk violet — tertiary                         */
   --color-astra-soft: rgba(90, 74, 166, 0.14);
 
-  --color-ember: #a4402e; /* burnt-sienna marginalia — danger              */
-  --color-ember-soft: rgba(164, 64, 46, 0.14);
+  --color-danger: #a4402e; /* burnt-sienna marginalia — danger              */
+  --color-danger-soft: rgba(164, 64, 46, 0.14);
 
-  --color-positive: #4a6f2f; /* moss — confirmations / "online"             */
-  --color-positive-soft: rgba(74, 111, 47, 0.16);
+  --color-success: #4a6f2f; /* moss — confirmations / "online"             */
+  --color-success-soft: rgba(74, 111, 47, 0.16);
 
   /* Canvas — the Vellum field: a calm warm paper plane. -bg/-mat are the
      directional gradient's light/deep stops; -glow pools soft light at the top

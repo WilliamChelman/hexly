@@ -41,9 +41,9 @@ import { ToasterService } from '@hexly/web-core';
       <div
         class="toast pointer-events-auto flex items-center gap-3 max-w-[min(90vw,32rem)] py-2 px-3 bg-surface-raised text-ink border border-l-[3px] border-t-line border-r-line border-b-line rounded-md shadow-2 text-[0.9rem]"
         [ngClass]="{
-          'border-l-ember': toast.tone === 'error',
+          'border-l-danger': toast.tone === 'error',
           'border-l-terrain-forest': toast.tone === 'success',
-          'border-l-gold-strong': toast.tone === 'info',
+          'border-l-accent-strong': toast.tone === 'info',
         }"
       >
         <span class="flex min-w-0 flex-1 flex-col">

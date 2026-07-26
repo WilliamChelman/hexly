@@ -1,16 +1,16 @@
 import { ChangeDetectionStrategy, Component, booleanAttribute, input } from '@angular/core';
 
 /**
- * A small status dot. `positive` turns it into a healthy/lit dot with a soft
+ * A small status dot. `success` turns it into a healthy/lit dot with a soft
  * halo. See ADR-0007.
  *
- *   <span appDot [positive]="healthy()"></span>
+ *   <span appDot [success]="healthy()"></span>
  */
 @Component({
   selector: '[appDot]',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    '[class.is-positive]': 'positive()',
+    '[class.is-success]': 'success()',
   },
   template: '',
   styles: `
@@ -19,14 +19,14 @@ import { ChangeDetectionStrategy, Component, booleanAttribute, input } from '@an
     :host {
       @apply w-2 h-2 rounded-full bg-ink-faint flex-none;
     }
-    :host(.is-positive) {
-      @apply bg-positive;
+    :host(.is-success) {
+      @apply bg-success;
       /* literal-geometry halo (not a token shadow) — stays raw. */
-      box-shadow: 0 0 0 3px var(--color-positive-soft);
+      box-shadow: 0 0 0 3px var(--color-success-soft);
     }
   `,
 })
 export class DotComponent {
   /** A healthy/lit dot — green with a soft halo. */
-  readonly positive = input(false, { transform: booleanAttribute });
+  readonly success = input(false, { transform: booleanAttribute });
 }

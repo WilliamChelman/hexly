@@ -39,7 +39,7 @@ const FULL_CURTAIN_DELAY_MS = 150;
         role="status"
         aria-busy="true"
       >
-        <span class="text-gold animate-pulse [filter:drop-shadow(0_0_12px_var(--color-glow))]">
+        <span class="text-accent animate-pulse [filter:drop-shadow(0_0_12px_var(--color-accent-glow))]">
           <app-icon name="logo" [size]="64" />
         </span>
       </div>
@@ -52,7 +52,7 @@ const FULL_CURTAIN_DELAY_MS = 150;
     -->
     @if (showSubtleFallback()) {
       <div
-        class="fixed bottom-4 right-4 z-40 text-gold animate-pulse [filter:drop-shadow(0_0_6px_var(--color-glow))]"
+        class="fixed bottom-4 right-4 z-40 text-accent animate-pulse [filter:drop-shadow(0_0_6px_var(--color-accent-glow))]"
         data-testid="app-loading-subtle"
         role="status"
         aria-busy="true"

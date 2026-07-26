@@ -81,7 +81,7 @@ export interface EntityLinkRepairHost extends Pick<EntityLinkRepair, 'writable' 
         [attr.data-entity-id]="entityId()"
         [routerLink]="['/entities', entityId()]"
         [fragment]="heading() || undefined"
-        class="cursor-pointer inline-block rounded bg-gold-soft px-1.5 py-0.5 leading-tight text-gold-strong no-underline transition-colors hover:bg-gold/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold"
+        class="cursor-pointer inline-block rounded bg-accent-soft px-1.5 py-0.5 leading-tight text-accent-strong no-underline transition-colors hover:bg-accent/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >{{ text() }}</a
       >
     } @else {
@@ -113,7 +113,7 @@ export interface EntityLinkRepairHost extends Pick<EntityLinkRepair, 'writable' 
       <span
         data-testid="link-descriptor"
         class="pointer-events-none absolute -top-1.5 right-0 whitespace-nowrap rounded-full px-0.5 text-[0.6em] font-semibold leading-none text-ink-stroke shadow-1"
-        [class.bg-gold]="tone() === 'live'"
+        [class.bg-accent]="tone() === 'live'"
         [class.bg-astra]="tone() === 'unresolved'"
         [class.bg-ink-muted]="tone() === 'dangling'"
         >{{ descriptor() }}</span

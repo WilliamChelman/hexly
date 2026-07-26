@@ -97,7 +97,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
   template: `
     <app-page-header sticky>
       <div pageHeaderTitle class="flex flex-col">
-        <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'entityBrowser.eyebrow' | transloco }}</span>
+        <span appEyebrow class="text-accent! tracking-[0.28em]">{{ 'entityBrowser.eyebrow' | transloco }}</span>
         <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
           {{ 'entityBrowser.heading' | transloco }}
         </h1>

@@ -18,7 +18,7 @@ import { EyebrowComponent } from '@hexly/web-ui';
       class="mx-auto flex max-w-[40rem] flex-col items-center gap-3 px-6 py-[6rem] text-center"
       data-testid="session-error"
     >
-      <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'auth.sessionError.eyebrow' | transloco }}</span>
+      <span appEyebrow class="text-accent! tracking-[0.28em]">{{ 'auth.sessionError.eyebrow' | transloco }}</span>
       <h1 class="m-0 font-display text-[28px] leading-tight text-ink-strong">
         {{ 'auth.sessionError.heading' | transloco }}
       </h1>

@@ -26,8 +26,7 @@ export const DND_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     // The stat block placed by its `{ field }` — the `dnd.datatype.stat-block` data-type's View, labelled by the
     // Field (ADR-0055) — then the content View by id, so a monster opens on its stats with a Note toggle.
     views: [{ field: DND_STAT_BLOCK_KEY }, CORE_VIEW_RICH_CONTENT],
-    // The tertiary role from the palette (docs/design/identity.md). Not `--color-ember`, which is
-    // Danger.
+    // A categorical hue, not a semantic role (ADR-0075) — deliberately not the Danger red.
     graphColorToken: '--color-astra',
     // A plugin ships translated copy, so its chrome is transloco keys — unlike a user-defined type,
     // whose every label is its one authored name (#191).

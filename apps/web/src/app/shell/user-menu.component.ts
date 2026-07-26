@@ -50,7 +50,7 @@ import {
     >
       @if (identity(); as u) {
         <span
-          class="grid place-items-center shrink-0 size-6 font-mono text-2xs text-on-gilded bg-linear-[140deg] from-gold-bright to-gold-deep rounded-full shadow-[0_0_14px_-2px_var(--color-glow)]"
+          class="grid place-items-center shrink-0 size-6 font-mono text-2xs text-on-accent-sheen bg-linear-[140deg] from-accent-sheen-bright to-accent-sheen-deep rounded-full shadow-[0_0_14px_-2px_var(--color-accent-glow)]"
           data-testid="user-initials"
           [title]="u.displayName"
           >{{ initials() }}</span
