@@ -165,14 +165,11 @@ export class EntityTypesEditorComponent {
   protected readonly pendingFields = signal<readonly Field[]>([]);
   protected readonly pendingMetadata = signal<EntityDocument>({});
 
-  /**
-   * The registered types not already carried — the add picker's options. A System-managed type is never
-   * offered: the system alone assigns it (ADR-0068).
-   */
+  /** The types the registry calls creatable (ADR-0068) minus those already carried — the add options. */
   protected readonly addable = computed(() =>
     this.registry
-      .all()
-      .filter((d) => !d.systemManaged && !this.types().includes(d.id))
+      .creatable()
+      .filter((d) => !this.types().includes(d.id))
       .map((d) => d.id),
   );
 

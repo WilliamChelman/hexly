@@ -184,16 +184,13 @@ export class DetailsPanelComponent {
       .map((type) => ({ id: type, label: this.typeLabel(type), systemManaged: !!this.types.get(type)?.systemManaged }));
   });
 
-  /**
-   * The registered types not already carried — the add picker's offer. A System-managed type is never
-   * offered: the system alone assigns it (ADR-0068).
-   */
+  /** The types the registry calls creatable (ADR-0068) minus those already carried — the add picker's offer. */
   protected readonly addableTypes = computed(() => {
     this.transloco.activeLang();
     const present = new Set(this.session.types());
     return this.types
-      .all()
-      .filter((def) => !present.has(def.id) && !def.systemManaged)
+      .creatable()
+      .filter((def) => !present.has(def.id))
       .map((def) => ({ id: def.id, label: this.typeLabel(def.id) }));
   });
 
