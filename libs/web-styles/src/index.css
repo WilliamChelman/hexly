@@ -10,6 +10,8 @@
    libraries that no `@source` names got their classes generated (#359). apps/web/src/styles.css
    declares the scan set instead — the condition ADR-0075's tier-3 move rests on. */
 @import 'tailwindcss' source(none);
+/* The `@property` registrations, generated from the token manifest (ADR-0075) — `pnpm tokens:generate`. */
+@import './tokens/design-token-properties.css';
 @import './tokens.css';
 @import './base.css' layer(base);
 
