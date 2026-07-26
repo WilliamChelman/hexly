@@ -59,4 +59,6 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   const dangling = page.getByTestId('entity-link');
   await expect(dangling).toHaveAttribute('data-dangling', '');
   await expect(dangling).toHaveText('Untitled note');
+  // A target that went away, never a name that was never written (ADR-0073).
+  await expect(dangling).not.toHaveAttribute('data-unresolved', '');
 });

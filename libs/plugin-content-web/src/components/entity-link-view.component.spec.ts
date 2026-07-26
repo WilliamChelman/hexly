@@ -21,13 +21,20 @@ const found = (name: string): EntityResolution => ({
 });
 
 describe('EntityLinkView', () => {
-  function mount(inputs: { entityId: string; label: string; display?: string | null; heading?: string | null }) {
+  function mount(inputs: {
+    entityId: string;
+    label: string;
+    display?: string | null;
+    heading?: string | null;
+    descriptor?: string | null;
+  }) {
     const fixture = TestBed.createComponent(EntityLinkViewComponent);
     const ref = fixture.componentRef as ComponentRef<EntityLinkViewComponent>;
     ref.setInput('entityId', inputs.entityId);
     ref.setInput('label', inputs.label);
     if ('display' in inputs) ref.setInput('display', inputs.display ?? null);
     if ('heading' in inputs) ref.setInput('heading', inputs.heading ?? null);
+    if ('descriptor' in inputs) ref.setInput('descriptor', inputs.descriptor ?? null);
     fixture.detectChanges();
     return fixture;
   }
@@ -73,5 +80,51 @@ describe('EntityLinkView', () => {
     const anchor = fixture.nativeElement.querySelector('[data-testid=entity-link]');
     // routerLink renders the fragment into the href as `#History`.
     expect(anchor.getAttribute('href')).toContain('#History');
+  });
+
+  describe('a link with no id — an Unresolved Link (ADR-0073)', () => {
+    it('reads as unresolved rather than dangling, without consulting the resolver', () => {
+      // The stub would answer *any* id with a live name; an Unresolved Link must never ask.
+      configure(found('Avalon'));
+      const fixture = mount({ entityId: '', label: 'Zorblax' });
+
+      const link = fixture.nativeElement.querySelector('[data-testid=entity-link]');
+      expect(link.hasAttribute('data-unresolved')).toBe(true);
+      expect(link.hasAttribute('data-dangling')).toBe(false);
+      expect(link.textContent).toContain('Zorblax');
+      // Non-navigable, exactly as a dangling link is.
+      expect(link.tagName).toBe('SPAN');
+    });
+
+    it('stays distinct from a dangling link, whose target went away', () => {
+      configure({ status: 'missing' });
+      const fixture = mount({ entityId: 'e1', label: 'Avalon' });
+
+      const link = fixture.nativeElement.querySelector('[data-testid=entity-link]');
+      expect(link.hasAttribute('data-dangling')).toBe(true);
+      expect(link.hasAttribute('data-unresolved')).toBe(false);
+      expect(link.tagName).toBe('SPAN');
+    });
+
+    it('keeps the `[[Target|display]]` override', () => {
+      configure(found('Avalon'));
+      const fixture = mount({ entityId: '', label: 'Zorblax', display: 'the old wyrm' });
+
+      const link = fixture.nativeElement.querySelector('[data-testid=entity-link]');
+      expect(link.textContent).toContain('the old wyrm');
+      expect(link.textContent).not.toContain('Zorblax');
+    });
+
+    it('still carries a Link Descriptor badge, in its own hue', () => {
+      configure(found('Avalon'));
+      const fixture = mount({ entityId: '', label: 'Zorblax', descriptor: 'hunts' });
+
+      const badge = fixture.nativeElement.querySelector('[data-testid=link-descriptor]');
+      expect(badge.textContent).toContain('hunts');
+      // The badge follows the pill, so all three states stay tellable apart (ADR-0021 utilities).
+      expect(badge.classList.contains('bg-astra')).toBe(true);
+      expect(badge.classList.contains('bg-gold')).toBe(false);
+      expect(badge.classList.contains('bg-ink-muted')).toBe(false);
+    });
   });
 });

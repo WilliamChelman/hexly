@@ -60,7 +60,8 @@
     "linkPlaceholder": "Paste or type a URL"
   },
   "entityLink": {
-    "dangling": "This entity is unavailable"
+    "dangling": "This entity is unavailable",
+    "unresolved": "No entity by this name yet"
   },
   "note": {
     "name": "Note",

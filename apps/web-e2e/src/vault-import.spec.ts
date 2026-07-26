@@ -1,6 +1,6 @@
 import type { APIRequestContext, Page } from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
-import { expect, openDetails, segRe, test } from './fixtures';
+import { entityIdFromUrl, expect, openDetails, segRe, test } from './fixtures';
 
 /**
  * Vault-import smoke (ADR-0033) and the import dialog's per-run options (ADR-0073). The vault is built
@@ -49,6 +49,15 @@ async function confirmImport(page: Page) {
     linksCreated: number;
     linksDangling: number;
   };
+}
+
+/**
+ * The rendered ink of the open note's one Entity Link. Live, Unresolved and dangling must not
+ * share a colour (ADR-0073); the computed value says so without pinning a class name. The
+ * non-colour cues — the dash and the italic — are asserted beside it.
+ */
+async function colourOf(page: Page): Promise<string> {
+  return page.getByTestId('entity-link').evaluate((el) => getComputedStyle(el).color);
 }
 
 /** The Entity a run minted for `[[Zorblax]]`, read back off the API — the Types and Tags it carries. */
@@ -120,7 +129,10 @@ test('cancelling the options dialog uploads nothing', async ({ page }) => {
   await expect(page.getByTestId('import-summary')).toHaveCount(0);
 });
 
-test('the switch off leaves an Unresolved Link and creates nothing', async ({ page }) => {
+test('the switch off creates nothing, and its Unresolved Link reads apart from a live and a dangling one', async ({
+  page,
+  request,
+}) => {
   await page.goto('/');
 
   await pickVault(page);
@@ -132,6 +144,40 @@ test('the switch off leaves an Unresolved Link and creates nothing', async ({ pa
   await page.getByTestId('open-imported').click();
   await expect(page.getByRole('link', { name: 'Keep' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Zorblax' })).toHaveCount(0);
+  const browserPath = new URL(page.url()).pathname;
+
+  // A live link, for the other two to be told apart from (ADR-0073).
+  await page.getByRole('link', { name: 'Mara' }).click();
+  await expect(page.getByTestId('entity-link')).toHaveAttribute('href', /\/entities\/[\w-]+$/);
+  const live = await colourOf(page);
+
+  // [[Zorblax]] matched no note, so it stayed an Unresolved Link — a name never written.
+  await page.goto(browserPath);
+  await page.getByRole('link', { name: 'Keep' }).click();
+  await expect(page.getByTestId('title')).toHaveText('Keep');
+  const unresolvedLink = page.getByTestId('entity-link');
+  await expect(unresolvedLink).toHaveText('Zorblax');
+  await expect(unresolvedLink).toHaveAttribute('data-unresolved', '');
+  await expect(unresolvedLink).not.toHaveAttribute('data-dangling', '');
+  // Non-navigable, like a dangling link: there is no id to go to.
+  await expect(page.getByTestId('note-content').getByRole('link', { name: 'Zorblax' })).toHaveCount(0);
+  // The dash carries the state without hue, for a reader who cannot tell the two tints apart.
+  await expect(unresolvedLink).toHaveCSS('text-decoration-style', 'dashed');
+  const unresolved = await colourOf(page);
+  const keepId = entityIdFromUrl(page);
+
+  // Delete Keep and Mara's resolved link dangles — the same World now carries one of each,
+  // and the author must tell "never written" from "no longer there" at a glance.
+  expect((await request.delete(`/api/entities/${keepId}`)).ok()).toBeTruthy();
+  await page.goto(browserPath);
+  await page.getByRole('link', { name: 'Mara' }).click();
+  const danglingLink = page.getByTestId('entity-link');
+  await expect(danglingLink).toHaveAttribute('data-dangling', '');
+  await expect(danglingLink).not.toHaveAttribute('data-unresolved', '');
+  await expect(danglingLink).toHaveCSS('font-style', 'italic');
+  const dangling = await colourOf(page);
+
+  expect(new Set([live, unresolved, dangling]).size).toBe(3);
 });
 
 test('the per-run Type and Tag land on what the import creates, and never reach the next run', async ({

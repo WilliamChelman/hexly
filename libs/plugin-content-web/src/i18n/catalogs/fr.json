@@ -60,7 +60,8 @@
     "linkPlaceholder": "Collez ou saisissez une URL"
   },
   "entityLink": {
-    "dangling": "Cette entité est indisponible"
+    "dangling": "Cette entité est indisponible",
+    "unresolved": "Aucune entité ne porte encore ce nom"
   },
   "note": {
     "name": "Note",
