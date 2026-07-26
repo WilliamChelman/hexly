@@ -30,7 +30,7 @@ export class PublicLinksService {
    */
   readWorld(token: string): PublicWorldView | null {
     const world = this.db
-      .select({ id: worlds.id, name: worlds.name })
+      .select({ id: worlds.id, name: worlds.name, theme: worlds.theme })
       .from(worldLinks)
       .innerJoin(worlds, eq(worlds.id, worldLinks.worldId))
       .where(eq(worldLinks.id, token))
@@ -39,6 +39,8 @@ export class PublicLinksService {
     return {
       worldId: world.id,
       worldName: world.name,
+      // The anonymous visitor has no account to resolve a Theme through, so it rides the view (ADR-0076).
+      ...(world.theme ? { theme: world.theme } : {}),
       entities: this.entities.listSharedByWorld(world.id),
     };
   }

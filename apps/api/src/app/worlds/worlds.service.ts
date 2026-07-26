@@ -9,6 +9,7 @@ import {
   FieldFilter,
   MemberRole,
   PublicLink,
+  UpdateWorldRequest,
   WorldDetail,
   WorldMember,
   WorldSummary,
@@ -149,16 +150,14 @@ export class WorldsService {
   }
 
   /**
-   * Update a World's Owner-curated fields (Owner only): `name` and/or the ordered
-   * `pinnedEntityIds`. Forbidden if not an Owner, null if not found; an absent
-   * field is left untouched. Pins are stored verbatim (references, not FKs).
+   * Update a World's Owner-curated fields (Owner only): `name`, the ordered
+   * `pinnedEntityIds`, and/or the World Theme. Forbidden if not an Owner, null if
+   * not found; an absent field is left untouched, and a `null` Theme clears it.
+   * Pins are stored verbatim (references, not FKs); the Theme arrives already
+   * canonicalised by its schema, the write choke point (ADR-0076).
    * ponytail: stale pin ids filtered on read, not pruned on delete.
    */
-  update(
-    userId: string,
-    id: string,
-    patch: { name?: string; pinnedEntityIds?: string[] },
-  ): WorldDetail | 'forbidden' | null {
+  update(userId: string, id: string, patch: UpdateWorldRequest): WorldDetail | 'forbidden' | null {
     const world = this.db.select().from(worlds).where(eq(worlds.id, id)).get();
     if (!world) return null;
     if (!worldAccess(this.db, userId).decideMeta(id)?.isOwner) return 'forbidden';
@@ -446,6 +445,8 @@ export class WorldsService {
       rights: worldRightsOf({ isOwner: !!meta?.isOwner, canContribute: !!meta?.canContribute }),
       entityCount,
       pinnedEntityIds: world.pinnedEntityIds ?? [],
+      // Omitted rather than null when the World carries none, so "no Theme" is one shape everywhere.
+      ...(world.theme ? { theme: world.theme } : {}),
       // The freshness key a live-follower holds and compares each nudge against (ADR-0045).
       seq: world.seq,
       createdAt: world.createdAt,
