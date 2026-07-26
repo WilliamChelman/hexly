@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, finalize, shareReplay } from 'rxjs';
 import { EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
 import { CORE_NOTE_TYPE } from '@hexly/plugin-content';
 import { ClientConfigStore, EntitiesClient } from '@hexly/web-core';
@@ -24,12 +24,33 @@ export class InlineEntityCreator {
   private readonly openDetails = inject(DETAILED_ENTITY_CREATOR);
 
   /**
+   * The mints still out, keyed by World and folded name. The picker's search cache is only forgotten
+   * once the first mint *lands* (ADR-0073), so a second `@Zorblax` typed inside that round trip is
+   * answered from the same miss and offers Create again — with no way to see the first is on its way.
+   * Joining it is what makes the two mentions converge on one Entity rather than two.
+   */
+  private readonly inFlight = new Map<string, Observable<EntityDetail>>();
+
+  /**
    * Mint `name` in `worldId` — the host Entity's World, never a picked one: typing must not author a
-   * cross-World link as a side effect (ADR-0073).
+   * cross-World link as a side effect (ADR-0073). A mint of the same name already in flight is joined
+   * rather than repeated; once it has landed the name is an ordinary match, and asking to create again
+   * mints a second, distinct Entity, which is the point of the Create row surviving beside the matches.
    */
   create(name: string, worldId: string): Observable<EntityDetail> {
+    const key = `${worldId}|${name.trim().toLowerCase()}`;
+    const joined = this.inFlight.get(key);
+    if (joined) return joined;
+
     const tags = this.tags();
-    return this.entities.create(name, [this.type()], worldId, undefined, tags.length ? tags : undefined);
+    const mint = this.entities.create(name, [this.type()], worldId, undefined, tags.length ? tags : undefined).pipe(
+      finalize(() => this.inFlight.delete(key)),
+      // refCount false: the write is already out, so a second mention arriving mid-flight replays its
+      // result rather than firing a duplicate POST.
+      shareReplay({ bufferSize: 1, refCount: false }),
+    );
+    this.inFlight.set(key, mint);
+    return mint;
   }
 
   /**

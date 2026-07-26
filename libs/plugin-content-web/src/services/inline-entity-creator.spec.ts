@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom, of } from 'rxjs';
+import { Subject, firstValueFrom, of } from 'rxjs';
 import { EntityDetail } from '@hexly/domain';
 import { ClientConfigStore, EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, mockClientConfigStore } from '@hexly/web-core/testing';
@@ -60,6 +60,56 @@ describe('InlineEntityCreator', () => {
     creator.create('Zorblax', 'w9').subscribe();
 
     expect(client.create).toHaveBeenCalledWith('Zorblax', ['core.type.note'], 'w9', undefined, undefined);
+  });
+
+  it('joins a mint of the same name still in flight, so two mentions converge on one Entity (ADR-0073)', () => {
+    const { creator, client } = createCreator(mockClientConfigStore());
+    const write = new Subject<EntityDetail>();
+    client.create.mockReturnValue(write);
+
+    const first: EntityDetail[] = [];
+    const second: EntityDetail[] = [];
+    creator.create('Zorblax', 'w9').subscribe((entity) => first.push(entity));
+    // Typed again before the first write came back — the picker still offers Create, because the
+    // search cache only forgets its miss once the mint lands.
+    creator.create('zorblax ', 'w9').subscribe((entity) => second.push(entity));
+    write.next(minted);
+    write.complete();
+
+    expect(client.create).toHaveBeenCalledTimes(1);
+    expect(first).toEqual([minted]);
+    expect(second).toEqual([minted]);
+  });
+
+  it('mints a second, distinct Entity once the first has landed — Create beside the matches still creates', () => {
+    const { creator, client } = createCreator(mockClientConfigStore());
+
+    creator.create('Zorblax', 'w9').subscribe();
+    creator.create('Zorblax', 'w9').subscribe();
+
+    expect(client.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a mint per World: the same name in two Worlds is two Entities', () => {
+    const { creator, client } = createCreator(mockClientConfigStore());
+    client.create.mockReturnValue(new Subject<EntityDetail>());
+
+    creator.create('Zorblax', 'w9').subscribe();
+    creator.create('Zorblax', 'w8').subscribe();
+
+    expect(client.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets the next mention retry after a failed write rather than replaying the failure', () => {
+    const { creator, client } = createCreator(mockClientConfigStore());
+    const write = new Subject<EntityDetail>();
+    client.create.mockReturnValueOnce(write).mockReturnValueOnce(of(minted));
+
+    creator.create('Zorblax', 'w9').subscribe({ error: () => undefined });
+    write.error(new Error('500'));
+    creator.create('Zorblax', 'w9').subscribe();
+
+    expect(client.create).toHaveBeenCalledTimes(2);
   });
 
   it('seeds the details dialog with the same name, Type, Tag and World the fast path would mint under', () => {
