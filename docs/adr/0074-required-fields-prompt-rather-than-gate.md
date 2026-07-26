@@ -2,7 +2,7 @@
 
 `validateFields` treats an absent value for a `required` Field as an error, and `assertTypedFieldsValid` turns that into a `400`. We are demoting it: **absence never refuses a write.** A `required` Field is a prompt to the author and a flag on a surface, and an Entity missing one is **Incomplete** (CONTEXT.md) — a state you can read, not a save you can't make. A _present_ value that does not match its Data Type stays a hard rejection, as does an Entity-Link Field whose resolvable target misses its target-type constraint. The rule is **shape violations are errors; absence is a hint.**
 
-The name `required` stays. It is persisted on every user-defined Field row and declared across the bundled plugins, so renaming it to something honest (`expected`) would cost a migration and a sweep to buy a word — and the word is only misleading to a reader who has not met this ADR, which is what this ADR is for. The glossary carries the correction instead.
+The name `required` stays. It is persisted inside every user-defined Field's stored definition (`world_fields.definition`, a JSON bag), so renaming it to something honest (`expected`) would cost a data migration to buy a word — and the word is only misleading to a reader who has not met this ADR, which is what this ADR is for. The glossary carries the correction instead. The cost is the stored rows and nothing else: no bundled plugin declares the flag at all, so there is no plugin sweep to pay for.
 
 ## What forced it
 
@@ -18,7 +18,7 @@ The gate was also never coherent. `validateFields`' own contract already says th
 
 ## Considered Options
 
-- **Rename `required` to `expected`** — rejected on cost, not on merit. It is the honest name, and the moment before user-defined Fields multiply is the cheapest it will ever be; but the flag is persisted (a drizzle-kit migration, ADR-0027) and declared across plugin types, and the glossary buys the same clarity for nothing. Reconsider if the misreading actually shows up in plugin code.
+- **Rename `required` to `expected`** — rejected on cost, not on merit. It is the honest name, and the moment before user-defined Fields multiply is the cheapest it will ever be; but the flag is persisted inside a stored JSON Field definition (a data migration, ADR-0027), and the glossary buys the same clarity for nothing. No bundled plugin declares it today, so the day one does — when the sweep stops being free — is the day to weigh this again.
 - **Keep the hard gate, exempt the paths that hurt** — rejected. That is the status quo plus a third exemption, and it is what produced `new-entity-button`'s special case. Every future creation path would have to remember which surfaces enforce and which don't.
 - **Enforce on save but not on create** — rejected as the worst of both: it makes an Entity creatable and then unsavable, so the enforcement lands on an author mid-edit, furthest from where the Fields were chosen.
 
