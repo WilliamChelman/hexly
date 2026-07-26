@@ -1,4 +1,4 @@
-import { enterLibrary, expect, openEntity, test } from './fixtures';
+import { enterLibrary, expect, openEntity, test, widenDockPanel } from './fixtures';
 
 /** A tiptap doc whose one paragraph carries a prose Entity Link to `entityId` — a semantic edge. */
 function proseLinking(entityId: string, label: string) {
@@ -81,18 +81,20 @@ test('the Local Graph drawing grows with the Panel it is drawn in', async ({ pag
   if (!before) throw new Error('drawing not laid out');
   expect(before.height).toBeCloseTo(before.width, 0);
 
-  const grip = await page.getByTestId('dock-resize').boundingBox();
-  if (!grip) throw new Error('resize grip not laid out');
-  const y = grip.y + grip.height / 2;
-  await page.mouse.move(grip.x + grip.width / 2, y);
-  await page.mouse.down();
-  await page.mouse.move(grip.x - 150, y, { steps: 8 });
-  await page.mouse.up();
+  await widenDockPanel(page, 150);
 
   const after = await drawing.boundingBox();
   if (!after) throw new Error('drawing not laid out');
   expect(after.width).toBeGreaterThan(before.width + 100);
   expect(after.height).toBeCloseTo(after.width, 0);
+
+  // The one place the height stops following the width: a short viewport caps it at half, so the depth
+  // control below stays in sight rather than being pushed out of the card.
+  await page.setViewportSize({ width: 1500, height: 600 });
+  const capped = await drawing.boundingBox();
+  if (!capped) throw new Error('drawing not laid out');
+  expect(capped.height).toBeLessThanOrEqual(301);
+  await expect(page.getByTestId('local-graph-depth-1')).toBeInViewport();
 });
 
 /** An Entity nothing links to and that links to nothing is a graph of one — a claim, not an empty canvas. */

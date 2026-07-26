@@ -139,7 +139,7 @@ export class EntityDock {
 
   /** A stored width outside the bounds — or not a number at all — falls back to the default. */
   private restoreWidth(): number {
-    const stored = Number(this.storage.getItem(DOCK_WIDTH_STORAGE_KEY));
+    const stored = Math.round(Number(this.storage.getItem(DOCK_WIDTH_STORAGE_KEY)));
     const inBounds = stored >= DOCK_PANEL_WIDTH.min && stored <= DOCK_PANEL_WIDTH.max;
     return inBounds ? stored : DOCK_PANEL_WIDTH.default;
   }
