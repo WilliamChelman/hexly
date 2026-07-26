@@ -16,7 +16,7 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { Editor, JSONContent } from '@tiptap/core';
-import { catchError, firstValueFrom, of } from 'rxjs';
+import { Observable, catchError, firstValueFrom, of } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { RichContent, CONTENT_FIELD, tiptapContent } from '@hexly/plugin-content';
@@ -265,7 +265,7 @@ export class ContentEditorComponent {
   private readonly resolver = inject(EntityNameResolver);
   // The `::` picker's vocabulary source (#96): the owner's last-saved DISTINCT descriptors.
   private readonly entities = inject(EntitiesClient);
-  // The `@` picker's Create row writes through this (ADR-0073); it owns the Inline Creation knobs.
+  // The `@` picker's Create rows write through this (ADR-0073); it owns the Inline Creation knobs.
   private readonly inlineCreator = inject(InlineEntityCreator);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
@@ -432,12 +432,25 @@ export class ContentEditorComponent {
    * put the typed text back where it was.
    */
   private async mint(name: string): Promise<EntitySummary> {
+    return this.mintThrough((worldId) => this.inlineCreator.create(name, worldId));
+  }
+
+  /**
+   * The details path (ADR-0073): the same mint through the create dialog, World locked to the open
+   * Entity's. `null` is the author cancelling — no link, and the extension leaves the typed text.
+   */
+  private async mintWithDetails(name: string): Promise<EntitySummary | null> {
+    return this.mintThrough((worldId) => this.inlineCreator.createWithDetails(name, worldId));
+  }
+
+  /** Both Create rows share one shape: the World guard, the failure toast, and the resolver's refresh. */
+  private async mintThrough<T extends EntitySummary | null>(write: (worldId: string) => Observable<T>): Promise<T> {
     try {
       const worldId = this.session.current()?.worldId;
       if (!worldId) throw new Error('Inline Creation needs an open Entity to take its World from');
-      const entity = await firstValueFrom(this.inlineCreator.create(name, worldId));
+      const entity = await firstValueFrom(write(worldId));
       // The very next `@Zorblax` must offer this Entity, not repeat the miss that minted it (ADR-0073).
-      this.resolver.forgetSearches();
+      if (entity) this.resolver.forgetSearches();
       return entity;
     } catch (error) {
       this.toaster.show(this.transloco.translate('editor.entityPicker.createError'), 'error');
@@ -519,6 +532,7 @@ export class ContentEditorComponent {
       getPicker: () => this.entityPicker(),
       search: (name) => this.resolver.search(name),
       mint: (name) => this.mint(name),
+      mintWithDetails: (name) => this.mintWithDetails(name),
     });
 
     // The owner's descriptor vocabulary, fetched lazily on the first `::` and cached for

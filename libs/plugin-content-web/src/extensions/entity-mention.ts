@@ -5,7 +5,7 @@ import { EntitySummary } from '@hexly/domain';
 import { EntityLinkAttrs } from '@hexly/plugin-content';
 import { EntityPickerComponent } from '../components/entity-picker.component';
 import { entityLinkNode } from './entity-link-node';
-import { MentionCreate, MentionItem, mentionItems, parseMentionQuery } from './mention-items';
+import { MentionCreate, MentionCreateDetails, MentionItem, mentionItems, parseMentionQuery } from './mention-items';
 
 /** What the editor supplies the `@` trigger; each callback is deferred so the editor builds first. */
 export interface EntityMentionPorts {
@@ -17,6 +17,11 @@ export interface EntityMentionPorts {
    * the host Entity's World (ADR-0073). Rejects when the write fails; the typed text is restored.
    */
   mint: (name: string) => Promise<EntitySummary>;
+  /**
+   * The `Create "…" with details…` row: the same mint through the create dialog, resolving `null` when
+   * the author cancels (ADR-0073) — cancelling then leaves the typed text exactly as `Esc` would.
+   */
+  mintWithDetails: (name: string) => Promise<EntitySummary | null>;
 }
 
 /**
@@ -26,9 +31,10 @@ export interface EntityMentionPorts {
  * or self (ADR-0025 `q`) — and a pick inserts the `entityLink` atom, snapshotting the name
  * as `label`.
  *
- * The picker's last row mints the typed name and links it in one gesture (ADR-0073), unconditionally:
- * no Type filter and no modal, because an unfilled `required` Field no longer refuses a write
- * (ADR-0074).
+ * The picker's last two rows mint the typed name and link it (ADR-0073): `Create "…"` in one gesture,
+ * unconditionally — no Type filter and no modal, because an unfilled `required` Field no longer refuses
+ * a write (ADR-0074) — and `Create "…" with details…` through the create dialog, for an author who asks
+ * for it.
  *
  * `setProgrammatic` flags an `@` inserted by code (the `/link` slash item) rather than typed;
  * `onExit` then removes the stray `@` if the user escaped instead of picking.
@@ -71,7 +77,15 @@ export function entityMention(ports: EntityMentionPorts): { extension: Extension
                   .run();
                 return;
               }
-              mintAndLink(editor, range, props, ports.mint);
+              // `programmatic` is sampled here, not read at resolution: `onExit` clears it the moment
+              // the popup closes, long before a dialog comes back.
+              mintAndLink(
+                editor,
+                range,
+                props,
+                props.kind === 'create' ? ports.mint : ports.mintWithDetails,
+                !programmatic,
+              );
             },
             render: () => ({
               onStart: (props: SuggestionProps<MentionItem, MentionItem>) => ports.getPicker()?.open(props),
@@ -104,16 +118,21 @@ function linkTo(entity: EntitySummary, descriptor: string | null): EntityLinkAtt
  * Mint the named Entity and drop its link where the mention was typed.
  *
  * The typed text goes *before* the await: `@tiptap/suggestion` fires `onExit` the instant the popup
- * closes, so the suggestion range is dead by the time the write lands (ADR-0073). The insertion point
- * is the captured one, mapped through every transaction since — the author keeps writing across the
- * round trip, and the link belongs in the sentence they left it in, not under the caret they have
- * since moved. A failed write puts the typed text back the same way.
+ * closes, so the suggestion range is dead by the time the write lands (ADR-0073) — which is also what
+ * lets the details row's dialog outlive the popup. The insertion point is the captured one, mapped
+ * through every transaction since — the author keeps writing across the round trip, and the link belongs
+ * in the sentence they left it in, not under the caret they have since moved.
+ *
+ * A failed write puts the typed text back the same way. So does declining the dialog (`null`) — unless
+ * the `@` came from `/link`, which is ours to remove, so cancelling then reads exactly like `Esc` at the
+ * picker: we clean up what we inserted, never what you typed.
  */
 function mintAndLink(
   editor: Editor,
   range: { from: number; to: number },
-  row: MentionCreate,
-  mint: (name: string) => Promise<EntitySummary>,
+  row: MentionCreate | MentionCreateDetails,
+  mint: (name: string) => Promise<EntitySummary | null>,
+  restoreOnDecline: boolean,
 ): void {
   const typed = editor.state.doc.textBetween(range.from, range.to);
   editor.chain().focus().deleteRange(range).run();
@@ -126,7 +145,10 @@ function mintAndLink(
 
   void mint(row.name).then(
     (entity) =>
-      finish(() => insertAt(editor, at, { type: entityLinkNode.name, attrs: linkTo(entity, row.descriptor) })),
+      finish(() => {
+        if (entity) insertAt(editor, at, { type: entityLinkNode.name, attrs: linkTo(entity, row.descriptor) });
+        else if (restoreOnDecline) insertAt(editor, at, typed);
+      }),
     () => finish(() => insertAt(editor, at, typed)),
   );
 

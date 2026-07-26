@@ -30,6 +30,7 @@
     "label": "Lier une entité",
     "empty": "Aucune entité correspondante",
     "create": "Créer « {{name}} »",
+    "createDetails": "Créer « {{name}} » avec des détails…",
     "createError": "Impossible de créer l'entité"
   },
   "descriptorPicker": {

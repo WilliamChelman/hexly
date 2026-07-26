@@ -30,6 +30,7 @@
     "label": "Link an entity",
     "empty": "No matching entities",
     "create": "Create \"{{name}}\"",
+    "createDetails": "Create \"{{name}}\" with details…",
     "createError": "Could not create the entity"
   },
   "descriptorPicker": {

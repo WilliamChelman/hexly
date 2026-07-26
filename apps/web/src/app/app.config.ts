@@ -27,6 +27,7 @@ import { DICE_TRANSLATIONS } from '@hexly/dice-web/i18n';
 import { ENTITY_TYPES, ENTITY_VIEW_OUTLET } from '@hexly/web-entity';
 import { EntityEmbedHostComponent } from './pages/entity/components/entity-embed-host.component';
 import { provideEntityViewChoices } from './entity-types/entity-view-choices.provider';
+import { provideDetailedEntityCreator } from './entity-types/detailed-entity-creator.provider';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginBoard } from '@hexly/plugin-board/web';
 import { providePluginAsset } from '@hexly/plugin-asset/web';
@@ -95,6 +96,9 @@ export const appConfig: ApplicationConfig = {
     // target's afforded Views — the seams the Board's Embed consumes without importing the app (ADR-0062, #270).
     { provide: ENTITY_VIEW_OUTLET, useValue: EntityEmbedHostComponent },
     provideEntityViewChoices(),
+    // The create dialog behind Inline Creation's details row — the `@` picker asks for it through this
+    // seam rather than importing the app (ADR-0073).
+    provideDetailedEntityCreator(),
     // Which plugins this build bundles, web side (ADR-0048, ADR-0050) — the twin of the API's list
     // in `bundled-plugins.ts`. Bundled means compiled-in: a plugin joins by shipping a lib and being
     // named here. Each provider carries that plugin's types, views, structured data-types, and copy.

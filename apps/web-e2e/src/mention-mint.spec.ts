@@ -113,8 +113,9 @@ test('offers Create beside the matches, and a second mention offers the Entity t
   // …and Create is still offered, so a second, different Zorblax is authorable.
   await expect(page.getByTestId('entity-picker-create')).toBeVisible();
 
-  // Reached by the same arrow keys as any row: ArrowUp wraps onto Create, which is always last.
-  await page.keyboard.press('ArrowUp');
+  // Reached by the same arrow keys as any row: Create sits directly below the matches (#344 added the
+  // details row below it, so it is no longer last).
+  await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
 
   await expect(page.getByTestId('entity-link')).toHaveCount(2);

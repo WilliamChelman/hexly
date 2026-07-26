@@ -1,5 +1,5 @@
 import { EntitySummary } from '@hexly/domain';
-import { MENTION_CREATE_ID, mentionItems, parseMentionQuery } from './mention-items';
+import { MENTION_CREATE_DETAILS_ID, MENTION_CREATE_ID, mentionItems, parseMentionQuery } from './mention-items';
 
 const summary = (id: string, name: string): EntitySummary =>
   ({ id, name, types: ['core.type.note'], tags: [] }) as unknown as EntitySummary;
@@ -26,15 +26,19 @@ describe('mentionItems — the picker rows', () => {
   it('offers Create below the matches, so an existing name never blocks authoring another', () => {
     const items = mentionItems({ name: 'Jane Doe', descriptor: null }, [summary('e1', 'Jane Doe')]);
 
-    expect(items.map((i) => i.kind)).toEqual(['entity', 'create']);
+    expect(items.map((i) => i.kind)).toEqual(['entity', 'create', 'create-details']);
     expect(items[1]).toMatchObject({ id: MENTION_CREATE_ID, name: 'Jane Doe' });
   });
 
-  it('makes Create the only — hence the active — row when nothing matches', () => {
+  it('sits the details row below the plain Create row, so Enter still reaches the fast path first', () => {
     const items = mentionItems({ name: 'Zorblax', descriptor: null }, []);
 
-    expect(items).toHaveLength(1);
-    expect(items[0].kind).toBe('create');
+    expect(items.map((i) => i.kind)).toEqual(['create', 'create-details']);
+    expect(items[1]).toMatchObject({ id: MENTION_CREATE_DETAILS_ID, name: 'Zorblax' });
+  });
+
+  it('makes Create the first — hence the active — row when nothing matches', () => {
+    expect(mentionItems({ name: 'Zorblax', descriptor: null }, [])[0].kind).toBe('create');
   });
 
   it('offers no Create row for an empty name — there is nothing to mint', () => {
@@ -45,6 +49,6 @@ describe('mentionItems — the picker rows', () => {
   it('carries the typed descriptor onto every row, matched or minted', () => {
     const items = mentionItems({ name: 'Zorblax', descriptor: 'rival' }, [summary('e1', 'Zorblax the Devourer')]);
 
-    expect(items.map((i) => i.descriptor)).toEqual(['rival', 'rival']);
+    expect(items.map((i) => i.descriptor)).toEqual(['rival', 'rival', 'rival']);
   });
 });

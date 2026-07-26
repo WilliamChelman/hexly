@@ -66,13 +66,11 @@ describe('CreateEntityDialog', () => {
     activeWorldId: string | null,
     seedType = 'core.type.note',
     setup?: () => void,
-    pinnedWorldId?: string,
+    /** The rest of the seed a caller may pin: the World, the name, the Tags (ADR-0073). */
+    seed: Omit<CreateEntityDialogData, 'type'> = {},
   ) {
     entitiesClient = new MockEntitiesClient();
-    dialogRef = new DialogRef<CreateEntityDialogData, CreateEntityDialogResult>({
-      type: seedType,
-      ...(pinnedWorldId ? { worldId: pinnedWorldId } : {}),
-    });
+    dialogRef = new DialogRef<CreateEntityDialogData, CreateEntityDialogResult>({ type: seedType, ...seed });
     closedWith = [];
     dialogRef.closed.subscribe((entity) => closedWith.push(entity));
     vi.spyOn(dialogRef, 'close');
@@ -117,11 +115,49 @@ describe('CreateEntityDialog', () => {
   it('locks the World select to a caller-pinned World, over the active one (ADR-0073)', () => {
     // A caller creating from inside an Entity pins that Entity's World: minting elsewhere would
     // author a cross-World link as a side effect.
-    const fixture = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')], 'w2', undefined, undefined, 'w1');
+    const fixture = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')], 'w2', undefined, undefined, {
+      worldId: 'w1',
+    });
 
     const select: HTMLSelectElement = q(fixture, 'create-entity-world');
     expect(select.value).toBe('w1');
     expect(select.disabled).toBe(true);
+  });
+
+  it('opens prefilled with a caller-seeded name and Tags — what a mention already typed (ADR-0073)', () => {
+    const fixture = render([world('w1', 'Aldermoor')], 'w1', undefined, undefined, {
+      worldId: 'w1',
+      name: 'Zorblax',
+      tags: ['untriaged'],
+    });
+
+    expect((q(fixture, 'create-entity-name') as HTMLInputElement).value).toBe('Zorblax');
+    expect((q(fixture, 'create-entity-tags') as HTMLElement).textContent).toContain('untriaged');
+  });
+
+  it('mints with the Tags the author leaves on the form, seeded ones dropped and typed ones added', () => {
+    const fixture = render([world('w1', 'Aldermoor')], 'w1', undefined, undefined, {
+      name: 'Zorblax',
+      tags: ['untriaged'],
+    });
+    entitiesClient.create.mockReturnValue(of({ id: 'e1' } as EntityDetail));
+
+    (q(fixture, 'create-tag-remove-untriaged') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    // Comma-split, trimmed and lower-cased on the way in, matching the server's own normalization.
+    const tagInput: HTMLInputElement = q(fixture, 'create-entity-tag-input');
+    tagInput.value = 'Rival, folklore';
+    tagInput.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    (q(fixture, 'create-entity-submit') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(entitiesClient.create).toHaveBeenCalledWith('Zorblax', ['core.type.note'], 'w1', undefined, [
+      'rival',
+      'folklore',
+    ]);
   });
 
   it('creates the Entity in the selected World and closes with it as the result', () => {
@@ -150,7 +186,7 @@ describe('CreateEntityDialog', () => {
     fixture.detectChanges();
 
     // The seeded type rides as a one-element ordered set; no EntityDocument (core types declare no Fields).
-    expect(entitiesClient.create).toHaveBeenCalledWith('The Reach', ['core.type.note'], 'w1', undefined);
+    expect(entitiesClient.create).toHaveBeenCalledWith('The Reach', ['core.type.note'], 'w1', undefined, undefined);
     // The created Entity is the result; where to go next is the caller's call (ADR-0073).
     expect(dialogRef.close).toHaveBeenCalledWith(created);
     expect(closedWith).toEqual([created]);
@@ -187,6 +223,7 @@ describe('CreateEntityDialog', () => {
       'Untitled note',
       ['core.type.note', 'core.type.hex-map'],
       'w1',
+      undefined,
       undefined,
     );
   });
@@ -232,9 +269,13 @@ describe('CreateEntityDialog', () => {
     submit.click();
     fixture.detectChanges();
     // The collected value rides the create as initial EntityDocument.
-    expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['test.type.monster'], 'w1', {
-      'test.field.lair': 'Sunken keep',
-    });
+    expect(entitiesClient.create).toHaveBeenCalledWith(
+      'Balthazar',
+      ['test.type.monster'],
+      'w1',
+      { 'test.field.lair': 'Sunken keep' },
+      undefined,
+    );
   });
 
   it('creates with a required Field left empty — the Entity is Incomplete, not refused (ADR-0074)', () => {
@@ -272,7 +313,7 @@ describe('CreateEntityDialog', () => {
     (q(fixture, 'create-entity-submit') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['test.type.monster'], 'w1', undefined);
+    expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['test.type.monster'], 'w1', undefined, undefined);
   });
 
   it('closes with no result and creates nothing on cancel', () => {
