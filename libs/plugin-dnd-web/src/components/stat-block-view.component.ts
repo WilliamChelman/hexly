@@ -64,7 +64,7 @@ interface Slot {
               [field]="slot.field"
               [value]="slot.value"
               [writable]="writable()"
-              [invalid]="isInvalid(slot.field)"
+              [invalid]="isFlagged(slot.field)"
               (valueChange)="set(slot.field, $event)"
             />
           </dd>
@@ -81,7 +81,7 @@ interface Slot {
                 [field]="slot.field"
                 [value]="slot.value"
                 [writable]="writable()"
-                [invalid]="isInvalid(slot.field)"
+                [invalid]="isFlagged(slot.field)"
                 (valueChange)="set(slot.field, $event)"
               />
             </span>
@@ -101,7 +101,7 @@ interface Slot {
               [field]="cr.field"
               [value]="cr.value"
               [writable]="writable()"
-              [invalid]="isInvalid(cr.field)"
+              [invalid]="isFlagged(cr.field)"
               (valueChange)="set(cr.field, $event)"
             />
           </dd>
@@ -132,7 +132,7 @@ export class StatBlockViewComponent {
    * The inner stats the forward-only gate reads as unfilled or mistyped — both channels, permanently: an
    * empty slot inside a structured View flags the block, it never gates the save (ADR-0074).
    */
-  private readonly invalidKeys = computed(() => {
+  private readonly flaggedKeys = computed(() => {
     const reading = validateFields(DND_STAT_FIELDS, this.block(), NO_STRUCTURED_DATA_TYPES);
     return new Set([...reading.errors, ...reading.incomplete].map((e) => e.key));
   });
@@ -156,8 +156,8 @@ export class StatBlockViewComponent {
     return modifier === null ? '—' : formatModifier(modifier);
   }
 
-  protected isInvalid(field: Field): boolean {
-    return this.invalidKeys().has(field.id);
+  protected isFlagged(field: Field): boolean {
+    return this.flaggedKeys().has(field.id);
   }
 
   /**
