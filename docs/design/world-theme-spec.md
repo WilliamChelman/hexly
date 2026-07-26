@@ -151,6 +151,10 @@ interface TokenDecl {
 
 Lint changes: the rule reads the manifest instead of grepping CSS, and gains tier awareness — a component referencing `--palette-*`, or another plugin's tier-3 token, is an error.
 
+The **styleguide is the one exemption from the tier gates**, named in the rule itself: rendering every token in the system, anchors and plugin vocabulary included, is what that page is _for_. It still answers to the manifest, so a token it renders has to exist. The exemption is what lets the terrain swatches sit in `apps/web` while their CSS is still in core; §3's move takes them out of the app for the reason §3 gives, not to satisfy the linter.
+
+Reading the manifest makes it a lint input for every project, and the plugin libs do not otherwise depend on `web-styles` — so it joins `eslint-rules/*.mjs` in Nx's `sharedGlobals`. Renaming a token has to turn a cached lint red; a fence a contributor clears by not touching the file is not one.
+
 ---
 
 ## 5. The World Theme
