@@ -7,6 +7,8 @@
  * `tailwindcss` import and the @theme :root it emits.
  */
 @import 'tailwindcss';
+/* The `@property` registrations, generated from the token manifest (ADR-0075) — `pnpm tokens:generate`. */
+@import './tokens/design-token-properties.css';
 @import './tokens.css';
 @import './base.css' layer(base);
 
