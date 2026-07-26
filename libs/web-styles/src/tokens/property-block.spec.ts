@@ -36,6 +36,7 @@ describe('the @property registration block', () => {
     const names = registeredTokens().map((decl) => decl.name);
     expect(names).not.toContain('--tracking-wider');
     expect(names).not.toContain('--container-reading');
+    expect(names).not.toContain('--text-base');
   });
 
   it('leaves out the types CSS has no @property syntax for', () => {
@@ -43,11 +44,14 @@ describe('the @property registration block', () => {
     expect([...types].sort()).toEqual(['color', 'length', 'number', 'time']);
   });
 
-  it('never registers an initial value that depends on another token', () => {
-    // `initial-value` must be computationally independent: a `var()` in one is a parse error that
-    // takes the whole registration — and every reader of that token — down with it.
+  it('never registers an initial value the engine would refuse', () => {
+    // `initial-value` must be computationally independent, and a rule whose one is not is dropped
+    // whole — the token reads back raw while the manifest still claims it is registered. A `var()` is
+    // the loud form of that; a relative unit is the quiet one, which is how the `rem` type scale got in.
+    const RELATIVE_UNIT = /\d(em|rem|ex|ch|cap|ic|lh|rlh|vw|vh|vi|vb|vmin|vmax)\b|%/;
     for (const decl of registeredTokens()) {
-      expect(decl.initial).not.toContain('var(');
+      expect(decl.initial, decl.name).not.toContain('var(');
+      expect(decl.initial, decl.name).not.toMatch(RELATIVE_UNIT);
     }
   });
 });

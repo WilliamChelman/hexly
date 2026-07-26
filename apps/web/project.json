@@ -5,6 +5,7 @@
   "prefix": "app",
   "sourceRoot": "apps/web/src",
   "tags": [],
+  "implicitDependencies": ["web-styles"],
   "cli": {
     "cache": {
       "environment": "all"

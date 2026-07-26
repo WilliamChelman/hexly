@@ -234,6 +234,10 @@ Type scale, layout rails (`--rail-*`, `--container-reading`), and motion (`--dur
 
 **Token snapshot test.** Read `getComputedStyle(document.documentElement)` for every registered token in both ColorSchemes and assert against a committed table. This is the only net for the "Solar and Astral go through the derivation path" condition — `apps/web-e2e` has 57 specs and zero visual or snapshot assertions today. It also exercises the exact resolved-value path the contrast reporter depends on, so the test and the mechanism are the same thing.
 
+It ships as `apps/web-e2e/src/design-tokens.spec.ts`, and the table it asserts is `apps/web-e2e/src/design-tokens.table.json` — every _declared_ token (not only the registered ones), keyed by name, each carrying its `solar` and `astral` resolved value. The derivation work's diff to that file is the list of colours it moved. Regenerate it with `UPDATE_TOKEN_TABLE=1`, and read the diff rather than waving it through: a token that starts reading back as its raw declaration would land in the table as one, and the spec's own resolution check is what stops that being committed quietly.
+
+**Nine public tokens sit outside that check, and the derivation work has to read their rows by eye.** `--shadow-1/2/3/inset/focus` and the four `--font-*` cannot be `@property`-registered — Properties & Values has no shadow or font-stack syntax component — so they read back as the token stream the stylesheet wrote, and the spec records them without asserting a shape. It asserts the one thing it can, that nothing reads back still carrying a `var()`. §2.2's re-parenting of `shadow-2/3/inset` onto an ink anchor therefore lands in the table as whatever expression survives substitution, which is legitimate for a `box-shadow` (the engine evaluates it at use) and would not be for anything a Canvas renderer reads. None of the nine is.
+
 Acceptance for the derivation work: a third theme authored as 12 values per ColorScheme looks right across the app.
 
 ---
