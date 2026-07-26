@@ -8,9 +8,13 @@
     "test": {
       "inputs": [
         "default",
+        "^production",
         "{workspaceRoot}/apps/web/src/**/*",
         "{workspaceRoot}/libs/*/src/**/*",
-        "{workspaceRoot}/libs/*/project.json"
+        "{workspaceRoot}/libs/*/project.json",
+        {
+          "externalDependencies": ["vitest", "postcss", "tailwindcss", "@tailwindcss/postcss"]
+        }
       ]
     }
   }

@@ -119,7 +119,7 @@ Consequences that are part of this spec, not optional polish:
 
 ## 3. Tier 3 — the plugin move
 
-**Prerequisite, and a live latent bug:** `@source` in `apps/web/src/styles.css` globs only `apps/web`, `web-ui`, `web-core`, `web-entity`. No plugin lib is scanned; plugin templates use theme utilities and survive by coincidence. Fix before moving anything.
+**Prerequisite, done in #359:** no plugin lib was named by an `@source` glob; Tailwind's automatic detection covered them by walking the whole workspace. `source(none)` plus globs for every browser library make the scan set declared, which is what the move needs.
 
 Moving to `plugin-hexmap-web`: `hex-line`, `feature-ink`, `label-ink`, `name-ink`, and `terrain-{grass,forest,ocean,mountain,desert,sky}`. Deleted: `--color-terrain-marsh` and its `styleguide.page.ts:615` entry. Staying in core tier 2: `canvas-*` (a design-system concept with two plugin consumers) and `ink-stroke` (also used by `plugin-content-web`).
 
