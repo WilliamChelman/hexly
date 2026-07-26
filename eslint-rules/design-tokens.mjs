@@ -1,77 +1,130 @@
 /**
- * Hexly design-token ESLint rules (ADR-0020).
+ * Hexly design-token ESLint rules (ADR-0020, amended by ADR-0075).
  *
- * no-unknown-design-token — every `var(--…)` must resolve to a token defined in
- * web-styles/index.css or tokens.css (or a private `--_…` component-local variable).
- * A token typo fails silently in CSS (`var(--danger)` resolves to nothing), and
- * stylelint can't see it: component styles are CSS-in-TS template strings, so the
- * check runs in ESLint over string/template literals.
+ * no-unknown-design-token — every `var(--…)` must resolve to a token the manifest declares
+ * (or a private `--_…` component-local variable), and must sit on the right side of the tier
+ * boundary. A token typo fails silently in CSS (`var(--danger)` resolves to nothing), and
+ * stylelint can't see it: component styles are CSS-in-TS template strings, so the check runs
+ * in ESLint over string/template literals.
  *
- * The allowlist is read from the CSS files at lint time.
+ * The allowlist is the manifest, not a grep of the stylesheets: a token exists for the linter
+ * exactly when it is declared, and the declaration also says which tier it belongs to (ADR-0075).
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { createJiti } from 'jiti';
 
-const TOKEN_FILES = ['libs/web-styles/src/index.css', 'libs/web-styles/src/tokens.css'];
+const REPO_ROOT = path.resolve(import.meta.dirname, '..');
+const MANIFEST = path.join(REPO_ROOT, 'libs/web-styles/src/tokens/manifest.ts');
+/**
+ * Where `no-builtin-shadow`'s allowlist lives — the `@utility shadow-*` declarations. Moving or
+ * renaming either file is a change here too: the read is unguarded, so it fails the lint by name
+ * rather than quietly waving every built-in shadow through.
+ */
+const UTILITY_FILES = ['libs/web-styles/src/index.css', 'libs/web-styles/src/tokens.css'].map((rel) =>
+  path.join(REPO_ROOT, rel),
+);
 
 /**
- * Tailwind built-ins a component may reference by name. `--spacing` is the base unit
- * of Tailwind's default scale — scoped styles spell a spacing value `calc(var(--spacing) * N)`
- * (ADR-0030) — and is the only spacing var, so it can't be a typo for anything. `--radius`
- * stays off the list: @theme declares explicit `--radius-*` keys, so a bare `var(--radius)`
- * resolves to nothing and must still be flagged.
+ * Tailwind built-ins a component may reference by name. Tailwind's own `@theme` declares them, not
+ * the manifest — which carries only Hexly's contract, so `--font-mono` is on it and its `--font-sans`
+ * / `--font-serif` siblings are not. `--spacing` is the base unit of Tailwind's default scale —
+ * scoped styles spell a spacing value `calc(var(--spacing) * N)` (ADR-0030) — and is the only spacing
+ * var, so it can't be a typo for anything. `--radius` stays off the list: @theme declares explicit
+ * `--radius-*` keys, so a bare `var(--radius)` resolves to nothing and must still be flagged.
  */
-const BUILTIN_TOKENS = ['font-sans', 'font-serif', 'font-mono', 'spacing'];
+const BUILTIN_TOKENS = new Set(['--font-sans', '--font-serif', '--spacing']);
 
-let cache = null;
-/**
- * Read the token set + shadow utilities from the CSS files.
- *
- * The cache is keyed by file mtimes, so a long-lived ESLint server / Nx daemon picks up
- * a new or renamed token without a restart. A load that read *no* file is never cached:
- * one early call from a cwd whose walk-up misses the repo would otherwise poison every
- * later file with a builtins-only set and fail the lint on false positives.
- */
-function loadCss(cwd) {
-  // Find the repo root by walking up from cwd until the token files resolve.
-  let base = cwd;
-  for (let i = 0; i < 6; i++) {
-    if (fs.existsSync(path.join(base, TOKEN_FILES[0]))) break;
-    const parent = path.dirname(base);
-    if (parent === base) break;
-    base = parent;
+/** A file's mtime, or `null` when it isn't there. */
+function mtime(file) {
+  try {
+    return fs.statSync(file).mtimeMs;
+  } catch {
+    return null;
   }
-  const sig =
-    base +
-    '|' +
-    TOKEN_FILES.map((rel) => {
-      try {
-        return `${rel}:${fs.statSync(path.join(base, rel)).mtimeMs}`;
-      } catch {
-        return `${rel}:none`;
-      }
-    }).join('|');
-  if (cache && cache.sig === sig) return cache;
+}
 
-  const tokens = new Set(BUILTIN_TOKENS);
-  const shadowUtilities = new Set();
-  let readAny = false;
-  for (const rel of TOKEN_FILES) {
-    try {
-      const txt = fs.readFileSync(path.join(base, rel), 'utf8');
-      readAny = true;
-      for (const m of txt.matchAll(/--([a-z0-9][a-z0-9-]*)\s*:/g)) tokens.add(m[1]);
-      // Shadow utilities are the `@utility shadow-*` declarations; only these
-      // respect the [data-color-scheme] reassignment — Tailwind's built-ins bake a
-      // Solar value (ADR-0021).
-      for (const m of txt.matchAll(/@utility\s+(shadow-[a-z0-9-]+)/g)) shadowUtilities.add(m[1]);
-    } catch {
-      /* token file not found from this cwd */
+/**
+ * Memoise `read()` until `stamp()` changes, so a long-lived ESLint server / Nx daemon picks up an
+ * edited source without a restart. A read that throws is left to throw: every source below sits at a
+ * path fixed relative to this file, so a failure means a broken checkout, and a silently empty
+ * allowlist would fail every lint on false positives instead of saying why.
+ */
+function rereadOnChange(stamp, read) {
+  let cache = null;
+  return () => {
+    const now = stamp();
+    if (!cache || cache.stamp !== now) cache = { stamp: now, value: read() };
+    return cache.value;
+  };
+}
+
+/**
+ * The token contract, by name. jiti loads the TS manifest with no build step — the route
+ * `scripts/generate-token-properties.mjs` also takes — and a fresh instance each time is what makes
+ * the reread a reread rather than a cache hit inside jiti.
+ */
+const loadManifest = rereadOnChange(
+  () => mtime(MANIFEST),
+  () => {
+    const { DESIGN_TOKENS } = createJiti(import.meta.url, { moduleCache: false })(MANIFEST);
+    return new Map(DESIGN_TOKENS.map((decl) => [decl.name, decl]));
+  },
+);
+
+/**
+ * The `@utility shadow-*` declarations; only these respect the [data-color-scheme] reassignment —
+ * Tailwind's built-ins bake a Solar value (ADR-0021).
+ */
+const loadShadowUtilities = rereadOnChange(
+  () => UTILITY_FILES.map(mtime).join('|'),
+  () => {
+    const utilities = new Set();
+    for (const file of UTILITY_FILES) {
+      for (const m of fs.readFileSync(file, 'utf8').matchAll(/@utility\s+(shadow-[a-z0-9-]+)/g)) utilities.add(m[1]);
     }
-  }
-  const result = { sig, tokens, shadowUtilities };
-  if (readAny) cache = result; // never cache a total-failure load (avoids poisoning)
-  return result;
+    return utilities;
+  },
+);
+
+/** Paths compare by `/`, whatever the platform wrote them with. */
+function posix(filename) {
+  return filename.replaceAll('\\', '/');
+}
+
+/**
+ * The plugin whose tier-3 vocabulary this file may use — `libs/plugin-hexmap-web/…` is `hexmap`'s —
+ * or `null` for core libs and the app, which own none. The id matches the manifest's `owner`.
+ */
+function owningPlugin(filename) {
+  const match = /(?:^|\/)libs\/plugin-([a-z0-9-]+?)(?:-server|-web)?\//.exec(posix(filename));
+  return match ? match[1] : null;
+}
+
+/**
+ * The one file exempt from the tier gates: rendering every token in the system, anchors and plugin
+ * vocabulary included, is what the styleguide is _for_. ADR-0075 draws the boundary and grants no
+ * exemption; `docs/design/world-theme-spec.md` §4 names this one. Spelled as a path rather than as
+ * suppression comments over the swatches, so the grant stays reviewable in one place and no lint
+ * config can hand it to anyone else.
+ */
+const STYLEGUIDE = 'apps/web/src/app/pages/styleguide/';
+
+/**
+ * Why a `var(--…)` reference is not allowed from this file, or `null` when it is fine.
+ *
+ * An undeclared name is a typo first and a tier breach second — including in the styleguide, which
+ * is exempt from the boundary but not from the manifest: a token it renders still has to exist.
+ * Past that, `--palette-*` is tier 1 by convention as well as by manifest (ADR-0075), so an anchor
+ * reference is named as the layering mistake it is from the first one written.
+ */
+function disallowedReason(name, decl, filename) {
+  const everyTier = posix(filename).includes(STYLEGUIDE);
+  if (!decl) return !everyTier && name.startsWith('--palette-') ? 'palette' : 'unknown';
+  if (everyTier) return null;
+  if (decl.tier === 'palette') return 'palette';
+  if (decl.tier === 'plugin' && decl.owner !== owningPlugin(filename)) return 'foreign';
+  return null;
 }
 
 /**
@@ -90,28 +143,34 @@ const noUnknownDesignToken = {
   meta: {
     type: 'problem',
     docs: {
-      description: 'Disallow var(--…) references to undefined design tokens (ADR-0020).',
+      description:
+        "Disallow var(--…) references to undeclared design tokens, to Palette anchors, and to another plugin's tier-3 tokens (ADR-0075).",
     },
     schema: [],
     messages: {
       unknown:
-        'Unknown design token `var(--{{name}})`. Reference a token defined in the @theme block (styles.css) or tokens.css, or a private `--_…` variable (ADR-0020).',
+        'Unknown design token `var({{name}})`. Reference a token declared in libs/web-styles/src/tokens/manifest.ts, or a private `--_…` variable (ADR-0075).',
+      palette:
+        'Private Palette anchor `var({{name}})`. Tier 1 belongs to the derivation: style from the semantic role derived from the anchor, so re-theming stays a change to the anchors alone (ADR-0075).',
+      foreign:
+        "Tier-3 token `var({{name}})` is the `{{owner}}` plugin's own vocabulary. Use a semantic role, or move the concept into tier 2 if it is one the design system names (ADR-0075).",
     },
   },
   create(context) {
-    const { tokens } = loadCss(context.cwd ?? process.cwd());
+    const byName = loadManifest();
     function check(node) {
       const text = textOf(node);
       if (!text || !text.includes('var(--')) return;
       // Capture uppercase letters too: CSS custom properties are case-sensitive,
       // so a typo'd `var(--Accent)` does not resolve to `--color-accent` and must
       // still be flagged rather than silently skipped by a lowercase-only match.
-      for (const m of text.matchAll(/var\(\s*--([A-Za-z0-9_-]+)\s*[,)]/g)) {
+      for (const m of text.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)\s*[,)]/g)) {
         const name = m[1];
-        if (name.startsWith('_')) continue; // component-local indirection var
-        if (!tokens.has(name)) {
-          context.report({ node, messageId: 'unknown', data: { name } });
-        }
+        if (name.startsWith('--_')) continue; // component-local indirection var
+        if (BUILTIN_TOKENS.has(name)) continue;
+        const decl = byName.get(name);
+        const messageId = disallowedReason(name, decl, context.filename);
+        if (messageId) context.report({ node, messageId, data: { name, owner: decl?.owner } });
       }
     }
     return { Literal: check, TemplateLiteral: check };
@@ -132,7 +191,7 @@ const noBuiltinShadow = {
     },
   },
   create(context) {
-    const { shadowUtilities } = loadCss(context.cwd ?? process.cwd());
+    const shadowUtilities = loadShadowUtilities();
     function scan(node, text) {
       for (const tok of text.split(/[\s"'`=<>(){},;:]+/)) {
         if (!tok.startsWith('shadow-') && tok !== 'shadow') continue;
