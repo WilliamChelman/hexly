@@ -54,6 +54,27 @@ function resolve(page: Page, names: readonly DesignToken[]): Promise<Record<stri
   }, names as string[]);
 }
 
+/**
+ * Each CSS colour as a 2D drawing context rasterises it — 8-bit RGBA, whatever syntax it was written
+ * in. That is both the comparison a hex and an `oklch()` can share and the exact parse the Canvas
+ * renderers make (`graph-palette.ts`), so a colour neither form parses fails here rather than there.
+ */
+function rasterise(page: Page, values: readonly string[]): Promise<number[][]> {
+  return page.evaluate((colors) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) throw new Error('no 2d context');
+    return colors.map((value) => {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = '#000000';
+      ctx.fillStyle = value;
+      ctx.fillRect(0, 0, 1, 1);
+      return [...ctx.getImageData(0, 0, 1, 1).data];
+    });
+  }, values as string[]);
+}
+
 /** Paint the app in `scheme` through the real preference control, and wait for the root to carry it. */
 async function chooseColorScheme(page: Page, scheme: ColorScheme): Promise<void> {
   await page.getByTestId(`color-scheme-${scheme}`).click();
@@ -127,6 +148,30 @@ test('every token reads back resolved and matches the committed table, in both C
   expect(
     unsubstituted.map(([name]) => name),
     'no token reads back still carrying a var()',
+  ).toEqual([]);
+
+  // The manifest carries each colour token's Solar value as its `@property` initial-value, and for a
+  // derived one that is the value its expression *resolves to* — which no static reader can compute,
+  // so `manifest.spec.ts` can only check it is a literal. This is where it is held to the engine: the
+  // initial is the fallback three Canvas renderers take when a property fails to resolve (ADR-0075),
+  // and a stale one is a second, silently wrong copy of the palette.
+  const colors = registeredTokens().filter((decl) => decl.type === 'color');
+  const [resolved, initials] = await Promise.all([
+    rasterise(
+      page,
+      colors.map((decl) => table[decl.name].solar),
+    ),
+    rasterise(
+      page,
+      colors.map((decl) => decl.initial),
+    ),
+  ]);
+  // One 8-bit step of slack: an `oklch()` rounds to the same channel a hand-written hex names, but
+  // only to within the rounding itself.
+  const drifted = colors.filter((_, i) => resolved[i].some((channel, c) => Math.abs(channel - initials[i][c]) > 1));
+  expect(
+    drifted.map((decl) => decl.name),
+    "every colour token's manifest initial is the value it resolves to in Solar",
   ).toEqual([]);
 
   // Rewritten only once the values above are known to be resolved, so a reflexive regenerate cannot

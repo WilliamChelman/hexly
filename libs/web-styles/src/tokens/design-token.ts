@@ -2,7 +2,7 @@
 
 /**
  * Which of ADR-0075's three tiers a token belongs to. The boundary is *what a token means*, not who
- * uses it. Nothing declares a `palette` anchor yet.
+ * uses it.
  */
 export type Tier = 'palette' | 'role' | 'plugin';
 
@@ -20,7 +20,11 @@ export interface TokenDecl {
   readonly public: boolean;
   /** The owning plugin's id, for tier 3. */
   readonly owner?: string;
-  /** The value CSS declares in the Solar ColorScheme; the `@property` `initial-value` when registered. */
+  /**
+   * The token's value in the Solar ColorScheme, and the `@property` `initial-value` when registered —
+   * so for a tier-2 role it is what the derivation *resolves to*, never the expression itself: an
+   * `initial-value` must be computationally independent, which a `var(--palette-…)` is not.
+   */
   readonly initial: string;
   /**
    * Opt out of `@property` registration: a registered property computes at the element that *declares*

@@ -85,6 +85,12 @@ Policy, from ADR-0075:
 - Re-parenting targets: `overlay` → `--palette-page`; `on-accent-sheen` → `contrast-color()`; `shadow-2/3/inset` → one ink anchor, once geometry is unified (§2.4).
 - **Named literals**: `canvas-glow` (two different design ideas — a warm highlight of the same paper in Solar, a different-hue light source in Astral; 5× lift mismatch), plus anything above that resists re-parenting.
 
+**Amended in implementation (#366).** The re-parenting landed, and two of the three targets moved somewhere other than where this section pointed. Both are measured rather than preferred:
+
+- **`overlay` stays on `--palette-soot`.** The affine knob was its _alpha_, and moving the colour does not remove that. A scrim is dark in **both** ColorSchemes, so it is the one paper role the polarity knob cannot carry: parented to `--palette-page` it costs ΔE00 2.28/4.57 against the values it ships as today, where the soot anchor costs 1.83/2.34. What escapes the affine form is the alpha, `calc(pow(var(--palette-veil), 0.44))`.
+- **The veil ladder is a power of the knob, not a multiple of it.** `shadow-1/2/3` take exponents 1, 0.75 and 0.5, which the two ColorSchemes agree on to within 3% — a mirror symmetry of the same species as the polarity finding, and the reason the ladder needs no offset. A multiple cannot do it: it would have to be 1.67 in Solar and 1.2 in Astral, and Astral's `shadow-3` would land at α 0.98. `shadow-inset` is not on the ladder and takes `shadow-1`'s own alpha. This adds `pow()` to the three colour primitives named above; it is Baseline widely available (Chrome 111, Safari 15.4, Firefox 118).
+- **`on-accent-sheen` resists.** Its two shipped values are ~ΔE00 10 apart and no shared expression reaches within 3 of both — the best balance is 5.71/5.00. It is derived anyway rather than made a named literal, because the sheen it sits on follows the accent and a frozen ink would not.
+
 ### 2.3 The categorical tones
 
 Eight tones, derived by hue rotation off `--color-accent`, in the ~161° arc left by excluding the danger and success hues.

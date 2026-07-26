@@ -66,31 +66,50 @@ const DECLARATIONS = [
   { name: '--radius-xl', tier: 'role', type: 'length', public: true, initial: '16px' },
   { name: '--radius-full', tier: 'role', type: 'length', public: true, initial: '999px' },
 
+  // ---- Tier 1 — the Palette. Eight anchors and three knobs per ColorScheme, and the only thing
+  //      `[data-color-scheme]` reassigns: every tier-2 role is one expression over these (ADR-0075).
+  //      Private — not `public`, and `no-unknown-design-token` bars a component from reaching one.
+  //      The knobs are registered as `<number>` so the `calc()`s that read them type-check; an
+  //      unregistered knob substitutes untyped and invalidates the whole expression.
+  { name: '--palette-page', tier: 'palette', type: 'color', public: false, initial: '#f1e5c7' },
+  { name: '--palette-ink', tier: 'palette', type: 'color', public: false, initial: '#2e2412' },
+  { name: '--palette-ink-quiet', tier: 'palette', type: 'color', public: false, initial: '#6f5a36' },
+  { name: '--palette-accent', tier: 'palette', type: 'color', public: false, initial: '#9a6a16' },
+  { name: '--palette-danger', tier: 'palette', type: 'color', public: false, initial: '#a4402e' },
+  { name: '--palette-success', tier: 'palette', type: 'color', public: false, initial: '#4a6f2f' },
+  { name: '--palette-canvas', tier: 'palette', type: 'color', public: false, initial: '#efe2bf' },
+  { name: '--palette-soot', tier: 'palette', type: 'color', public: false, initial: '#3c2c16' },
+  { name: '--palette-polarity', tier: 'palette', type: 'number', public: false, initial: '1' },
+  { name: '--palette-line-alpha', tier: 'palette', type: 'number', public: false, initial: '0.371' },
+  { name: '--palette-veil', tier: 'palette', type: 'number', public: false, initial: '0.12' },
+
   // ---- Tier 2 — the semantic roles the UI styles itself from. The public contract.
+  //      Each `initial` is the Solar value its derivation resolves to, not the expression:
+  //      an `@property` `initial-value` must be computationally independent, and a `var()` is not.
   { name: '--color-bg', tier: 'role', type: 'color', public: true, initial: '#f1e5c7' },
-  { name: '--color-bg-deep', tier: 'role', type: 'color', public: true, initial: '#e7d8b2' },
-  { name: '--color-surface', tier: 'role', type: 'color', public: true, initial: '#fbf6e7' },
-  { name: '--color-surface-raised', tier: 'role', type: 'color', public: true, initial: '#fffaf0' },
-  { name: '--color-surface-sunken', tier: 'role', type: 'color', public: true, initial: '#ece0c0' },
-  { name: '--color-overlay', tier: 'role', type: 'color', public: true, initial: 'rgba(58, 44, 28, 0.42)' },
+  { name: '--color-bg-deep', tier: 'role', type: 'color', public: true, initial: '#ebdcb6' },
+  { name: '--color-surface', tier: 'role', type: 'color', public: true, initial: '#fcf4e4' },
+  { name: '--color-surface-raised', tier: 'role', type: 'color', public: true, initial: '#fffbf2' },
+  { name: '--color-surface-sunken', tier: 'role', type: 'color', public: true, initial: '#eddfbc' },
+  { name: '--color-overlay', tier: 'role', type: 'color', public: true, initial: 'rgba(60, 44, 22, 0.393)' },
 
   { name: '--color-ink', tier: 'role', type: 'color', public: true, initial: '#2e2412' },
-  { name: '--color-ink-strong', tier: 'role', type: 'color', public: true, initial: '#211a0b' },
+  { name: '--color-ink-strong', tier: 'role', type: 'color', public: true, initial: '#20190b' },
   { name: '--color-ink-muted', tier: 'role', type: 'color', public: true, initial: '#6f5a36' },
-  { name: '--color-ink-faint', tier: 'role', type: 'color', public: true, initial: '#9c8a5e' },
+  { name: '--color-ink-faint', tier: 'role', type: 'color', public: true, initial: '#a08b60' },
 
-  { name: '--color-line', tier: 'role', type: 'color', public: true, initial: '#d6c39a' },
-  { name: '--color-line-strong', tier: 'role', type: 'color', public: true, initial: '#b89a62' },
-  { name: '--color-line-faint', tier: 'role', type: 'color', public: true, initial: 'rgba(120, 86, 30, 0.16)' },
+  { name: '--color-line', tier: 'role', type: 'color', public: true, initial: 'rgba(154, 106, 22, 0.371)' },
+  { name: '--color-line-strong', tier: 'role', type: 'color', public: true, initial: 'rgba(154, 106, 22, 0.686)' },
+  { name: '--color-line-faint', tier: 'role', type: 'color', public: true, initial: 'rgba(154, 106, 22, 0.163)' },
 
   { name: '--color-accent', tier: 'role', type: 'color', public: true, initial: '#9a6a16' },
-  { name: '--color-accent-strong', tier: 'role', type: 'color', public: true, initial: '#7e560f' },
+  { name: '--color-accent-strong', tier: 'role', type: 'color', public: true, initial: '#79550b' },
   { name: '--color-accent-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(154, 106, 22, 0.14)' },
-  { name: '--color-accent-sheen-bright', tier: 'role', type: 'color', public: true, initial: '#efd078' },
-  { name: '--color-accent-sheen-deep', tier: 'role', type: 'color', public: true, initial: '#b98323' },
-  { name: '--color-on-fill', tier: 'role', type: 'color', public: true, initial: '#fbf5e6' },
-  { name: '--color-on-accent-sheen', tier: 'role', type: 'color', public: true, initial: '#2a1f08' },
-  { name: '--color-accent-glow', tier: 'role', type: 'color', public: true, initial: 'rgba(210, 150, 40, 0.5)' },
+  { name: '--color-accent-sheen-bright', tier: 'role', type: 'color', public: true, initial: '#f0d488' },
+  { name: '--color-accent-sheen-deep', tier: 'role', type: 'color', public: true, initial: '#bb812b' },
+  { name: '--color-on-fill', tier: 'role', type: 'color', public: true, initial: '#f5f0e8' },
+  { name: '--color-on-accent-sheen', tier: 'role', type: 'color', public: true, initial: '#221e13' },
+  { name: '--color-accent-glow', tier: 'role', type: 'color', public: true, initial: 'rgba(211, 149, 39, 0.5)' },
 
   // The categorical pair, pending the `--color-tone-*` rotation that replaces them.
   { name: '--color-sea', tier: 'role', type: 'color', public: true, initial: '#2f6f7a' },
@@ -99,17 +118,18 @@ const DECLARATIONS = [
   { name: '--color-astra-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(90, 74, 166, 0.14)' },
 
   { name: '--color-danger', tier: 'role', type: 'color', public: true, initial: '#a4402e' },
-  { name: '--color-danger-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(164, 64, 46, 0.14)' },
+  { name: '--color-danger-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(164, 64, 46, 0.15)' },
   { name: '--color-success', tier: 'role', type: 'color', public: true, initial: '#4a6f2f' },
   { name: '--color-success-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(74, 111, 47, 0.16)' },
 
   // An infinite pan/zoom field and a legibility halo are design-system concepts, so they stay tier 2
   // even though only plugins consume them (ADR-0075).
   { name: '--color-canvas-bg', tier: 'role', type: 'color', public: true, initial: '#efe2bf' },
-  { name: '--color-canvas-mat', tier: 'role', type: 'color', public: true, initial: '#e5d4a9' },
+  { name: '--color-canvas-mat', tier: 'role', type: 'color', public: true, initial: '#e7d6a8' },
+  // A named literal rather than a derivation — the two ColorSchemes' field glows are two design ideas.
   { name: '--color-canvas-glow', tier: 'role', type: 'color', public: true, initial: 'rgba(255, 240, 202, 0.55)' },
-  { name: '--color-canvas-edge', tier: 'role', type: 'color', public: true, initial: 'rgba(120, 86, 30, 0.14)' },
-  { name: '--color-ink-stroke', tier: 'role', type: 'color', public: true, initial: '#fbf6e7' },
+  { name: '--color-canvas-edge', tier: 'role', type: 'color', public: true, initial: 'rgba(60, 44, 22, 0.12)' },
+  { name: '--color-ink-stroke', tier: 'role', type: 'color', public: true, initial: '#f7f0da' },
 
   // ---- Tier 3 — the hexmap plugin's own vocabulary. Out of the public contract: a per-World terrain
   //      set is a change to `terrainIdSchema` and a separate feature (ADR-0075). Still registered —
@@ -157,15 +177,22 @@ const DECLARATIONS = [
   // `ch` is measured against the reading column's own font, not the root's — see `unregistered`.
   { name: '--container-reading', tier: 'role', type: 'length', public: false, unregistered: true, initial: '68ch' },
 
-  // ---- Elevation (ADR-0021). Public — only shadow colour and alpha re-theme.
+  // ---- Elevation (ADR-0021). Public — the geometry is one set for both ColorSchemes, and only the
+  //      shadow's colour and alpha re-theme (ADR-0075).
   { name: '--shadow-1', tier: 'role', type: 'shadow', public: true, initial: '0 1px 2px rgba(60, 44, 22, 0.12)' },
-  { name: '--shadow-2', tier: 'role', type: 'shadow', public: true, initial: '0 4px 12px -2px rgba(60, 44, 22, 0.2)' },
+  {
+    name: '--shadow-2',
+    tier: 'role',
+    type: 'shadow',
+    public: true,
+    initial: '0 4px 12px -2px rgba(60, 44, 22, 0.204)',
+  },
   {
     name: '--shadow-3',
     tier: 'role',
     type: 'shadow',
     public: true,
-    initial: '0 16px 36px -8px rgba(50, 36, 18, 0.32)',
+    initial: '0 16px 36px -8px rgba(60, 44, 22, 0.346)',
   },
   {
     name: '--shadow-inset',
@@ -174,7 +201,13 @@ const DECLARATIONS = [
     public: true,
     initial: 'inset 0 1px 2px rgba(60, 44, 22, 0.12)',
   },
-  { name: '--shadow-focus', tier: 'role', type: 'shadow', public: true, initial: '0 0 0 3px rgba(154, 106, 22, 0.32)' },
+  {
+    name: '--shadow-focus',
+    tier: 'role',
+    type: 'shadow',
+    public: true,
+    initial: '0 0 0 3px rgba(154, 106, 22, 0.345)',
+  },
 
   // ---- The accent sheen's gradients. Not public: the material is composed from its stops, which are,
   //      and a settable gradient is the one place a `url()` could reach the page (spec §5.1).

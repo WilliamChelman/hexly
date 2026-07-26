@@ -47,9 +47,33 @@ describe('the design-token manifest', () => {
     expect(new Set(DESIGN_TOKENS.map((decl) => decl.name))).toEqual(new Set(declared.keys()));
   });
 
-  it("carries each token's Solar value as its initial", () => {
-    const drifted = DESIGN_TOKENS.filter((decl) => canonical(decl.initial) !== declared.get(decl.name));
+  /**
+   * A token the stylesheets *compute* from another one, rather than state: an alias of an anchor, or a
+   * colour function over one. A gradient naming its two stops is not one — it is exactly what it says.
+   */
+  function isDerived(name: string): boolean {
+    const value = declared.get(name) ?? '';
+    return /^var\(--palette-|oklch\(from|color-mix\(|contrast-color\(/.test(value);
+  }
+
+  it("carries each literal token's Solar value as its initial", () => {
+    const drifted = DESIGN_TOKENS.filter(
+      (decl) => !isDerived(decl.name) && canonical(decl.initial) !== declared.get(decl.name),
+    );
     expect(drifted.map((decl) => decl.name)).toEqual([]);
+  });
+
+  /**
+   * A derived token's initial is what its expression *resolves to* in Solar, which nothing outside an
+   * engine can compute — `design-tokens.spec.ts` reads those values back from a real one. What is
+   * checkable here is the constraint `@property` imposes: an `initial-value` carrying a `var()` is not
+   * computationally independent, so the rule declaring it is dropped whole and the token silently
+   * stops being registered (ADR-0075).
+   */
+  it('gives every derived token a computationally independent initial', () => {
+    const derived = DESIGN_TOKENS.filter((decl) => isDerived(decl.name));
+    expect(derived.length).toBeGreaterThan(0);
+    expect(derived.filter((decl) => decl.initial.includes('var(')).map((decl) => decl.name)).toEqual([]);
   });
 
   it('keeps the type scale, the layout rails, and motion out of the public contract', () => {
