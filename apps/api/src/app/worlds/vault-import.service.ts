@@ -14,6 +14,7 @@ import {
   typesSchema,
   VaultImportContext,
   VaultImportOptions,
+  wikilinkName,
 } from '@hexly/domain';
 import { bodyToFields, splitFrontmatter } from '@hexly/obsidian';
 import { AssetMintService } from '../assets/asset-mint.service';
@@ -200,9 +201,10 @@ export class VaultImportService {
                 linksDangling++;
                 return null;
               }
-              // The basename, never the explicit path: `[[folder/Zorblax]]` names *Zorblax* (ADR-0073).
-              // A label that is no name at all stays an Unresolved Link rather than minting a blank.
-              const name = nameSchema.safeParse(posix.basename(label).replace(/\.md$/i, ''));
+              // The basename, never the explicit path: `[[folder/Zorblax]]` names *Zorblax* (ADR-0073) —
+              // shared with the editor's promotion, so one link never names two Entities. A label that
+              // is no name at all stays an Unresolved Link rather than minting a blank.
+              const name = nameSchema.safeParse(wikilinkName(label));
               if (!name.success) {
                 linksDangling++;
                 return null;

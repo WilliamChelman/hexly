@@ -20,11 +20,10 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Editor } from '@tiptap/core';
 import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { NodeView } from '@tiptap/pm/view';
-import { EntitySummary } from '@hexly/domain';
+import { EntitySummary, wikilinkName } from '@hexly/domain';
 import { EntitySearchPickerComponent } from '@hexly/web-entity';
 import { BodyPortalDirective, ButtonComponent } from '@hexly/web-ui';
 import { EntityNameResolver, EntityResolution } from '../services/entity-name-resolver';
-import { promotedName } from '../utils/promoted-name';
 
 /** The repair a broken link affords, supplied by the node view that owns the document position. */
 export interface EntityLinkRepair {
@@ -243,8 +242,11 @@ export class EntityLinkViewComponent {
   /** Only a broken link is repairable, and only where the surface accepts writes (ADR-0073). */
   protected readonly repairable = computed(() => this.tone() !== 'live' && !!this.repair()?.writable());
 
-  /** What promoting mints: the `label`, never the `display`, and its basename at that (ADR-0073). */
-  protected readonly promotedName = computed(() => promotedName(this.label()));
+  /**
+   * What promoting mints: the `label`, never the `display`, read by the one rule the import mints under
+   * too ({@link wikilinkName}) — the same link must not name two different Entities (ADR-0073).
+   */
+  protected readonly promotedName = computed(() => wikilinkName(this.label()));
 
   /**
    * Repairable, unresolved rather than dangling, and holding create rights in the World (ADR-0073).
