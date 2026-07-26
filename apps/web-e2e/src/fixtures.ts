@@ -167,8 +167,7 @@ export async function enterLibrary(page: Page): Promise<string> {
 /**
  * Create an Entity of `typeId` through the "New" split button's type menu, open it, and return its
  * canonical id. The caller must already be on a surface carrying the button — `enterLibrary`, or an
- * empty World Dashboard. A Type declaring a *required* Field opens the create dialog instead, and is
- * not creatable through this helper (see `dnd-monster.spec.ts`).
+ * empty World Dashboard. Every Type mints this way, `required` Fields and all (ADR-0074).
  */
 export async function createEntity(page: Page, typeId: string): Promise<string> {
   await page.getByTestId('new-entity-menu').click();
@@ -188,12 +187,14 @@ export interface AuthoredField {
 
 /**
  * Author a user-defined type in a World's settings, and land back on the types list with it saved.
- * `id` is the bare id the form takes; the World's namespace makes it `world.type.<id>`.
+ * `id` is the bare id the form takes; the World's namespace makes it `world.type.<id>`. `fields` are
+ * minted inline; `refs` name already-authored Fields to reference by id (ADR-0054) — the way to give a
+ * type a Field whose own flags (`required`, say) the Fields editor set.
  */
 export async function authorWorldType(
   page: Page,
   worldId: string,
-  type: { id: string; name: string; fields: readonly AuthoredField[] },
+  type: { id: string; name: string; fields: readonly AuthoredField[]; refs?: readonly string[] },
 ): Promise<void> {
   await page.goto(`/w/${worldId}/settings`);
   // Settings is a master/detail layout; the type/field editors live under the Schema section.
@@ -214,6 +215,11 @@ export async function authorWorldType(
     await expect(page.getByTestId(`field-ref-checkbox-world.field.${field.segment}`)).toBeChecked();
   }
 
+  for (const id of type.refs ?? []) {
+    await page.getByTestId(`field-ref-checkbox-${id}`).click();
+    await expect(page.getByTestId(`field-ref-checkbox-${id}`)).toBeChecked();
+  }
+
   await page.getByTestId('type-save').click();
   await expect(page.getByTestId(`type-world.type.${type.id}`)).toBeVisible();
 }
@@ -223,12 +229,20 @@ export async function authorWorldType(
  * on the Fields list with it saved. `segment` is the `world.`-less key the form slugs into `world.field.<segment>`
  * (its id *and* document key); the label drives it but the fixture sets it explicitly. `kind` defaults to
  * the form's `string`; `options` fills an enum's comma-separated list. `decor` (ADR-0069) checks the
- * "presentation only" box, offered only on an `entityLink` kind.
+ * "presentation only" box, offered only on an `entityLink` kind. `required` (ADR-0074) checks the box that
+ * makes the Field a prompt on the surfaces that render it — never a gate on a write.
  */
 export async function authorWorldField(
   page: Page,
   worldId: string,
-  field: { segment: string; label: string; kind?: string; options?: string; decor?: boolean },
+  field: {
+    segment: string;
+    label: string;
+    kind?: string;
+    options?: string;
+    decor?: boolean;
+    required?: boolean;
+  },
 ): Promise<void> {
   await page.goto(`/w/${worldId}/settings`);
   // Settings is a master/detail layout; the type/field editors live under the Schema section.
@@ -239,6 +253,7 @@ export async function authorWorldField(
   if (field.kind) await page.getByTestId(`field-kind-option-${field.kind}`).click();
   if (field.options !== undefined) await page.getByTestId('field-options').fill(field.options);
   if (field.decor) await page.getByTestId('field-decor').check();
+  if (field.required) await page.getByTestId('field-required').check();
   await page.getByTestId('field-save').click();
   await expect(page.getByTestId(`field-world.field.${field.segment}`)).toBeVisible();
 }

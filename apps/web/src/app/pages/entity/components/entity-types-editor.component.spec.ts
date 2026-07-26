@@ -104,30 +104,47 @@ describe('EntityTypesEditor', () => {
     expect(q('type-add-prompt')).toBeNull();
   });
 
-  it('prompts for a newly-added type’s required Fields before it is added (#189)', () => {
+  it('prompts for a newly-added type’s required Fields and collects them on confirm (#189)', () => {
     const fixture = render(['core.type.note']);
 
-    // Adding a type with an unmet required Field opens the prompt instead of adding straight away.
+    // Adding a type with an unfilled required Field opens the prompt first, so the author is told
+    // what the type expects.
     const add = q('type-add') as HTMLSelectElement;
     add.value = 'test.type.monster';
     add.dispatchEvent(new Event('change'));
     fixture.detectChanges();
     expect(q('type-add-prompt')).not.toBeNull();
-    expect(emittedTypes).toEqual([]); // not added yet
-
-    // Confirm is inert while the required Field is empty.
-    expect((q('type-add-confirm') as HTMLElement).getAttribute('aria-disabled')).toBe('true');
 
     // Fill the required Field, then confirm: the EntityDocument rides metadataChange and the type is added.
     const input = q('pending-field-test.field.lair').querySelector('input') as HTMLInputElement;
     input.value = 'Sunken keep';
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
-    expect((q('type-add-confirm') as HTMLElement).getAttribute('aria-disabled')).toBeNull();
 
     q('type-add-confirm').click();
     expect(emittedMetadata.at(-1)).toEqual({ 'test.field.lair': 'Sunken keep' });
     expect(emittedTypes.at(-1)).toEqual(['core.type.note', 'test.type.monster']);
+  });
+
+  it('adds the type with its required Fields left empty, straight from the prompt (ADR-0074)', () => {
+    const fixture = render(['core.type.note']);
+
+    const add = q('type-add') as HTMLSelectElement;
+    add.value = 'test.type.monster';
+    add.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    // Confirm never goes inert on an empty required Field — classifying is not gated on describing.
+    expect((q('type-add-confirm') as HTMLElement).getAttribute('aria-disabled')).toBeNull();
+    // Nor is the empty control flagged invalid: absence is a hint, not a shape violation.
+    expect(q('pending-field-test.field.lair').querySelector('[aria-invalid]')).toBeNull();
+
+    // Adding without them lands the type anyway, leaving it Incomplete and writing no EntityDocument.
+    q('type-add-bare').click();
+    fixture.detectChanges();
+    expect(emittedTypes.at(-1)).toEqual(['core.type.note', 'test.type.monster']);
+    expect(emittedMetadata).toEqual([]);
+    expect(q('type-add-prompt')).toBeNull();
   });
 
   it('skips the prompt when the required Field is already satisfied by existing EntityDocument (#189)', () => {

@@ -7,7 +7,6 @@ import { ActiveWorld, ClientConfigStore, EntitiesClient, ToasterService, entityR
 import {
   ButtonComponent,
   ButtonGroupComponent,
-  DialogService,
   IconComponent,
   MenuItemDirective,
   MenuPanelDirective,
@@ -15,16 +14,14 @@ import {
 } from '@hexly/web-ui';
 import { TypeRegistry } from './type-registry';
 import { TypeNamePipe } from './type-name.pipe';
-import { CreateEntityDialogComponent } from './create-entity-dialog.component';
 
 /**
  * A split button: the primary action creates the Instance's default Type (`entities.defaultType`),
  * the arrowhead lists every *creatable* Type the {@link TypeRegistry} knows — a System-managed one
  * (ADR-0068) is never offered, the system alone mints it.
  *
- * A type declaring a **required** Field can't be minted blind, so it opens the create dialog,
- * which collects those Fields first. That is a rule about a type's *schema*: nothing here branches
- * on an id.
+ * Every Type mints directly, whatever Fields it declares `required` — absence never refuses a write
+ * (ADR-0074), so nothing here branches on a Type's schema any more than on its id.
  */
 @Component({
   selector: 'app-new-entity-button',
@@ -92,7 +89,6 @@ export class NewEntityButtonComponent {
   private readonly transloco = inject(TranslocoService);
   private readonly registry = inject(TypeRegistry);
   private readonly clientConfig = inject(ClientConfigStore);
-  private readonly dialogs = inject(DialogService);
 
   /**
    * The primary action's Type, resolved softly against the enabled registry (ADR-0052): the
@@ -119,12 +115,6 @@ export class NewEntityButtonComponent {
 
   protected create(type: EntityType): void {
     if (this.creating()) return;
-    // A required Field must be collected *before* the Entity exists, or the author lands on one
-    // that cannot be saved (the write gate, #187). The create dialog is that collection surface.
-    if (this.registry.resolveFields([type]).some((field) => field.required)) {
-      this.dialogs.open(CreateEntityDialogComponent, { type });
-      return;
-    }
     this.creating.set(true);
     this.entitiesClient
       .create(this.registry.chromeLabel(type, 'untitled'), [type], this.activeWorld.worldId() ?? undefined)

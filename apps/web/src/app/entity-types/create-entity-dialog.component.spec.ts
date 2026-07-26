@@ -170,7 +170,7 @@ describe('CreateEntityDialog', () => {
     );
   });
 
-  it('collects a seeded required-Field type’s Fields, gating Create until supplied (#189)', () => {
+  it('collects a seeded required-Field type’s Fields without ever gating Create (ADR-0074)', () => {
     // Seeded with the required-Field type (as a "Create Monster" command would), registered before build.
     const fixture = render([world('w1', 'Aldermoor')], 'w1', 'test.type.monster', () => {
       const registry = TestBed.inject(TypeRegistry);
@@ -198,19 +198,15 @@ describe('CreateEntityDialog', () => {
     nameInput.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    // Create is inert until the seeded type's required Field is filled — no dead-end (#189).
+    // The seeded type's required Field is prompted for, not demanded: Create stays live while it is empty.
     const submit = q(fixture, 'create-entity-submit') as HTMLButtonElement;
-    expect(submit.getAttribute('aria-disabled')).toBe('true');
-    submit.click();
-    fixture.detectChanges();
-    expect(entitiesClient.create).not.toHaveBeenCalled();
+    expect(submit.getAttribute('aria-disabled')).toBeNull();
 
     // Fill the required Field, rendered inline in the dialog.
     const lair = (q(fixture, 'create-field-test.field.lair') as HTMLElement).querySelector('input') as HTMLInputElement;
     lair.value = 'Sunken keep';
     lair.dispatchEvent(new Event('input'));
     fixture.detectChanges();
-    expect(submit.getAttribute('aria-disabled')).toBeNull();
 
     submit.click();
     fixture.detectChanges();
@@ -218,6 +214,44 @@ describe('CreateEntityDialog', () => {
     expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['test.type.monster'], 'w1', {
       'test.field.lair': 'Sunken keep',
     });
+  });
+
+  it('creates with a required Field left empty — the Entity is Incomplete, not refused (ADR-0074)', () => {
+    const fixture = render([world('w1', 'Aldermoor')], 'w1', 'test.type.monster', () => {
+      const registry = TestBed.inject(TypeRegistry);
+      registry.setWorldFields([lairField]);
+      registry.register(monster);
+    });
+    entitiesClient.create.mockReturnValue(
+      of({
+        id: 'e1',
+        name: 'Balthazar',
+        worldId: 'w1',
+        types: ['test.type.monster'],
+        tags: [],
+        visibility: 'private',
+        version: 1,
+        seq: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        document: { 'core.field.content': emptyRichContent() },
+      } as EntityDetail),
+    );
+
+    const nameInput: HTMLInputElement = q(fixture, 'create-entity-name');
+    nameInput.value = 'Balthazar';
+    nameInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    // The Field is still prompted for — the author knows what a monster is expected to carry…
+    expect(q(fixture, 'create-field-test.field.lair')).not.toBeNull();
+    // …and the control is not flagged invalid: absence is a hint, only a present ill-typed value is an error.
+    expect((q(fixture, 'create-field-test.field.lair') as HTMLElement).querySelector('[aria-invalid]')).toBeNull();
+
+    (q(fixture, 'create-entity-submit') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['test.type.monster'], 'w1', undefined);
   });
 
   it('closes without creating anything on cancel', () => {

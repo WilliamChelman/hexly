@@ -7,10 +7,10 @@ import { FieldControlComponent } from '@hexly/web-entity';
 
 /**
  * Pick, add, remove, and reorder an Entity's ordered Entity Type set, `types[0]` primary (ADR-0048).
- * Presentational: reads `types`/`metadata`, emits the authored set. Adding a type with unmet required
- * Fields opens an inline prompt ({@link FieldControlComponent} + {@link validateFields}) and holds the type
- * back until they are supplied; removing only drops the lens, leaving its EntityDocument behind
- * (CONTEXT.md → Field).
+ * Presentational: reads `types`/`metadata`, emits the authored set. Adding a type with unfilled required
+ * Fields opens an inline prompt ({@link FieldControlComponent} + {@link validateFields}) offering to collect
+ * them — the type is added either way, since classifying a thing is never gated on describing it
+ * (ADR-0074). Removing only drops the lens, leaving its EntityDocument behind (CONTEXT.md → Field).
  */
 @Component({
   selector: 'app-entity-types-editor',
@@ -84,7 +84,8 @@ import { FieldControlComponent } from '@hexly/web-entity';
         }
       </div>
 
-      <!-- Add-type prompt: the picked type's unmet required Fields, collected before the add commits. -->
+      <!-- Add-type prompt: the picked type's unfilled required Fields, offered before the add commits.
+           Both buttons commit it — the prompt informs, it never gates (ADR-0074). -->
       @if (pendingType(); as pending) {
         <div
           class="rounded-md border border-line bg-surface-sunken p-3 flex flex-col gap-3"
@@ -109,8 +110,8 @@ import { FieldControlComponent } from '@hexly/web-entity';
             }
           </dl>
           <div class="flex justify-end gap-2">
-            <button type="button" appButton size="sm" data-testid="type-add-cancel" (click)="cancelAdd()">
-              {{ 'common.cancel' | transloco }}
+            <button type="button" appButton size="sm" data-testid="type-add-bare" (click)="addWithoutFields()">
+              {{ 'entityTypes.addWithoutFields' | transloco }}
             </button>
             <button
               type="button"
@@ -139,16 +140,16 @@ export class EntityTypesEditorComponent {
   readonly metadata = input<EntityDocument>({});
   readonly writable = input(true);
   /**
-   * Whether adding a type with unmet required Fields opens the inline prompt. The header binds `true`
-   * so a live autosave never fires an unmet type; the create dialog binds `false` and collects the
-   * Fields in its own gated form.
+   * Whether adding a type with unfilled required Fields opens the inline prompt. The header binds `true`
+   * so the author is told what the new type expects; the create dialog binds `false` and collects the
+   * Fields in its own form instead.
    */
   readonly promptOnAdd = input(true);
 
   readonly typesChange = output<readonly string[]>();
   readonly metadataChange = output<EntityDocument>();
 
-  /** The type awaiting its required Fields before it is added, or `null` when none is pending. */
+  /** The type the prompt is collecting Fields for, or `null` when no prompt is open. */
   protected readonly pendingType = signal<string | null>(null);
   protected readonly pendingFields = signal<readonly Field[]>([]);
   protected readonly pendingMetadata = signal<EntityDocument>({});
@@ -164,20 +165,19 @@ export class EntityTypesEditorComponent {
       .map((d) => d.id),
   );
 
-  /** The forward-only reading of the pending prompt, both channels (ADR-0074). */
+  /** The forward-only reading of the prompt's collected values. */
   private readonly pendingValidation = computed(() =>
     validateFields(this.pendingFields(), this.pendingMetadata(), NO_STRUCTURED_DATA_TYPES),
   );
 
-  /** Absence still holds the add, recombined (ADR-0074). */
-  protected readonly pendingValid = computed(
-    () => this.pendingValidation().ok && this.pendingValidation().incomplete.length === 0,
-  );
+  /**
+   * Whether the prompt's values may be written. Shape violations only (ADR-0074) — an empty `required`
+   * Field is a reading, not a refusal, so it never holds the confirm back.
+   */
+  protected readonly pendingValid = computed(() => this.pendingValidation().ok);
 
-  /** Keys still failing the forward-only gate, so a control can flag itself invalid. */
-  protected readonly invalidPendingKeys = computed(
-    () => new Set([...this.pendingValidation().errors, ...this.pendingValidation().incomplete].map((e) => e.key)),
-  );
+  /** Keys carrying an ill-typed value, so their control can flag itself invalid — an empty one is not. */
+  protected readonly invalidPendingKeys = computed(() => new Set(this.pendingValidation().errors.map((e) => e.key)));
 
   /** A friendly label: a registered type's name (authored, for a user-defined one), else the raw id. */
   protected typeLabel(type: string): string {
@@ -212,24 +212,25 @@ export class EntityTypesEditorComponent {
     this.typesChange.emit(this.types().filter((t) => t !== type));
   }
 
-  /** Add the picked type; unmet required Fields (when prompting) defer it to the inline prompt. */
+  /** Add the picked type; required Fields the document does not satisfy (when prompting) open the prompt first. */
   protected onAdd(event: Event): void {
     const select = event.target as HTMLSelectElement;
     const type = select.value;
     select.value = '';
     if (!type || this.types().includes(type)) return;
     const required = this.registry.resolveFields([type]).filter((f) => f.required);
-    const unmet = required.filter((f) => {
+    const unsatisfied = required.filter((f) => {
       const reading = validateFields([f], this.metadata(), NO_STRUCTURED_DATA_TYPES);
-      // Recombined (ADR-0074): an absent required Field still counts as unmet here.
+      // What the prompt has to offer — a Field the document leaves empty or ill-shaped. Nothing here
+      // decides whether the type is added; both prompt buttons add it (ADR-0074).
       return !reading.ok || reading.incomplete.length > 0;
     });
-    if (unmet.length === 0 || !this.promptOnAdd()) {
+    if (unsatisfied.length === 0 || !this.promptOnAdd()) {
       this.typesChange.emit([...this.types(), type]);
       return;
     }
     this.pendingType.set(type);
-    this.pendingFields.set(unmet);
+    this.pendingFields.set(unsatisfied);
     this.pendingMetadata.set({ ...this.metadata() });
   }
 
@@ -237,7 +238,7 @@ export class EntityTypesEditorComponent {
     this.pendingMetadata.update((meta) => writeField(meta, field, value));
   }
 
-  /** Commit the pending add once its Fields validate: emit the EntityDocument, then the new set. */
+  /** Commit the add carrying the prompt's collected values: emit the EntityDocument, then the new set. */
   protected confirmAdd(): void {
     const type = this.pendingType();
     if (!type || !this.pendingValid()) return;
@@ -246,7 +247,11 @@ export class EntityTypesEditorComponent {
     this.clearPending();
   }
 
-  protected cancelAdd(): void {
+  /** Add the type carrying none of the prompt's Fields — it lands **Incomplete**, never refused (ADR-0074). */
+  protected addWithoutFields(): void {
+    const type = this.pendingType();
+    if (!type) return;
+    this.typesChange.emit([...this.types(), type]);
     this.clearPending();
   }
 

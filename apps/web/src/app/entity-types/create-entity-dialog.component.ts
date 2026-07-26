@@ -29,7 +29,9 @@ export interface CreateEntityDialogData {
  * no reference to this component and no shared open-state signal to bridge them.
  *
  * The Command seeds one primary type; the embedded {@link EntityTypesEditorComponent} lets the author pick
- * more (ADR-0048), and required Fields are collected below, gating Create until they validate.
+ * more (ADR-0048), and the picked types' `required` Fields are collected below — as a prompt, not a gate:
+ * they are marked with a `*` and Create stays live while they are empty (ADR-0074). Only a *present*
+ * ill-typed value holds the create back.
  */
 @Component({
   selector: 'app-create-entity-dialog',
@@ -84,12 +86,14 @@ export interface CreateEntityDialogData {
         />
       </div>
 
-      <!-- Required Fields for every picked type, gating Create until supplied (forward-only, #189). -->
+      <!-- Required Fields for every picked type: the asterisk tells the author what this kind of thing
+           expects; leaving one empty never holds Create back (ADR-0074). -->
       @if (requiredFields().length > 0) {
         <div class="flex flex-col gap-1.5">
           <span class="text-2xs uppercase tracking-wider text-ink-muted">{{
             'entityTypes.requiredFieldsHeading' | transloco
           }}</span>
+          <p class="m-0 text-xs text-ink-muted">{{ 'entityTypes.requiredFieldsHint' | transloco }}</p>
           <dl class="grid grid-cols-[minmax(6rem,10rem)_1fr] items-center gap-x-4 gap-y-2 m-0">
             @for (field of requiredFields(); track field.id) {
               <dt class="text-sm text-ink-muted">
@@ -150,7 +154,8 @@ export class CreateEntityDialogComponent {
   private readonly fields = computed(() => this.typeRegistry.resolveFields(this.types()));
 
   /**
-   * The required Fields the author must supply before creating.
+   * The `required` Fields the dialog prompts for — what this kind of thing is expected to carry, not a
+   * precondition of creating it (ADR-0074).
    *
    * A **Field of a Structured Data Type** is never among them, whatever it was flagged: it is edited on its own
    * View, not typed into a form row (ADR-0050). Its value is minted empty at create instead.
@@ -159,21 +164,20 @@ export class CreateEntityDialogComponent {
     this.fields().filter((field) => field.required && !isStructuredDataType(field.dataType)),
   );
 
-  /** The forward-only reading of the collected EntityDocument, both channels (ADR-0074). */
+  /** The forward-only reading of the collected EntityDocument. */
   private readonly validation = computed(() =>
     validateFields(this.fields(), this.metadata(), NO_STRUCTURED_DATA_TYPES),
   );
 
   /**
-   * Every picked type's required Fields must validate before the create is allowed (#189) — absence still
-   * gates here, recombined (ADR-0074).
+   * Whether the collected EntityDocument may be created. Shape violations only (ADR-0074): a typed value
+   * that doesn't inhabit its data-type breaks every reader of that key, while an empty `required` Field is
+   * an **Incomplete** reading the author may leave for later.
    */
-  protected readonly valid = computed(() => this.validation().ok && this.validation().incomplete.length === 0);
+  protected readonly valid = computed(() => this.validation().ok);
 
-  /** Keys still failing the forward-only gate, so a required control can flag itself invalid. */
-  protected readonly invalidKeys = computed(
-    () => new Set([...this.validation().errors, ...this.validation().incomplete].map((error) => error.key)),
-  );
+  /** Keys carrying an ill-typed value, so their control can flag itself invalid — an empty one is not. */
+  protected readonly invalidKeys = computed(() => new Set(this.validation().errors.map((error) => error.key)));
 
   /**
    * The create-dialog heading for the primary (first) type — already resolved, not a transloco key:

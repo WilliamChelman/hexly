@@ -88,9 +88,11 @@
     "editTypes": "Modifier les types",
     "heading": "Types de l’entité",
     "hint": "Le premier type est le principal — il détermine l’icône, la vue par défaut et l’en-tête.",
-    "requiredHeading": "{{type}} nécessite ces champs avant de pouvoir être ajouté :",
+    "requiredHeading": "{{type}} attend ces champs — vous pourrez les remplir plus tard :",
     "confirmAdd": "Ajouter le type",
-    "requiredFieldsHeading": "Champs requis"
+    "addWithoutFields": "Ajouter sans les remplir",
+    "requiredFieldsHeading": "Champs requis",
+    "requiredFieldsHint": "Vous pourrez les remplir plus tard."
   },
   "editorShell": {
     "tabTitle": "Hexly",
