@@ -21,10 +21,11 @@
  * and is emitted as a CSS var on `:root` for scoped component styles to consume
  * (`var(--color-surface)`). One vocabulary, no parallel `--space-*` layer.
  *
- * Colours are declared *non-`inline`* so the override point is the generated
- * `--color-*`: the Solar value lives here, `[data-color-scheme='astral']`
- * (tokens.css, imported after `tailwindcss`) reassigns it. Spacing/type/radii/fonts
- * are ColorScheme-invariant. Elevation can't live here — see the @utility block below.
+ * Colours are declared *non-`inline`* so the emitted `--color-*` carries the
+ * derivation itself: each role is one expression over the tier-1 Palette in
+ * tokens.css, and `[data-color-scheme='astral']` reassigns the *anchors*, not the
+ * roles (ADR-0075). Spacing/type/radii/fonts are ColorScheme-invariant. Elevation
+ * can't live here — see the @utility block below.
  *
  * Spacing uses Tailwind's default linear scale (`calc(var(--spacing) * N)`, base
  * 0.25rem) — no curated keys, every step open (ADR-0030, reverting ADR-0020's
@@ -78,36 +79,82 @@
   --radius-full: 999px;
 
   /* =======================================================================
-   * Colours — the "Solar" ColorScheme (the day half of the Celestial Codex:
-   * an illuminated solar almanac — warm ivory paper, sun-gold ink). The
-   * "Astral" ColorScheme reassigns these generated --color-* in tokens.css
-   * under [data-color-scheme].
+   * Colours — tier 2, the semantic roles, each *derived* from the tier-1
+   * Palette in tokens.css (ADR-0075). One expression per role, byte-identical
+   * in both ColorSchemes: only the eight anchors and three knobs differ, so
+   * re-theming is a 12-value job rather than a 35-value one. Relative colour
+   * syntax resolves at computed-value time, so swapping [data-color-scheme]
+   * re-resolves every role off the new Palette with no rule per scheme.
+   *
+   * The coefficients were fitted numerically against the values these roles
+   * shipped as; the authority is docs/design/spike-token-derivation.md §2 and
+   * they are copied from it, not re-derived here. An expression that used a
+   * knob with both a scale and an offset would hit any two schemes exactly and
+   * so prove nothing — every knob below carries a single coefficient.
    * ===================================================================== */
-  --color-bg: #f1e5c7; /* the table / outer ivory paper                     */
-  --color-bg-deep: #e7d8b2; /* shadowed paper behind panels                 */
-  --color-surface: #fbf6e7; /* primary paper stock for panels & cards       */
-  --color-surface-raised: #fffaf0; /* a leaf lifted above the page          */
-  --color-surface-sunken: #ece0c0; /* wells, inputs                         */
-  --color-overlay: rgba(58, 44, 28, 0.42); /* scrim behind modals           */
 
-  --color-ink: #2e2412; /* primary sepia-ink text                           */
-  --color-ink-strong: #211a0b; /* headings                                  */
-  --color-ink-muted: #6f5a36; /* secondary text, labels                     */
-  --color-ink-faint: #9c8a5e; /* tertiary, placeholders, disabled          */
+  /* Paper. `bg-deep` and the surfaces ride the paper ramp: lightness steps away
+     from the page, chroma sloped against it at ±0.42 per unit of lightness —
+     the mirror symmetry the polarity knob carries. */
+  --color-bg: var(--palette-page); /* the table / outer paper */
+  --color-bg-deep: oklch(from var(--palette-page) calc(l - 0.027) calc(c + 0.0113 * var(--palette-polarity)) h);
+  --color-surface: oklch(
+    from var(--palette-page) calc(l + 0.046) calc(c - 0.0193 * var(--palette-polarity)) calc(h - 2)
+  );
+  --color-surface-raised: oklch(
+    from var(--palette-page) calc(l + 0.067) calc(c - 0.0281 * var(--palette-polarity)) calc(h - 4.5)
+  );
+  /* The well sits below the page in Solar and above it in Astral — the swap the
+     polarity knob exists for. Parented to the page, not to `surface`, because
+     against `surface` the two schemes' offsets differ by 2.6× (spike §5). */
+  --color-surface-sunken: oklch(
+    from var(--palette-page) calc(l - 0.017 * var(--palette-polarity)) calc(c + 0.0071) calc(h + 1)
+  );
+  /* Scrim behind modals: the soot anchor at a power of the veil. `veil^0.44`
+     rather than a scale-and-offset, which would be the two alphas in disguise. */
+  --color-overlay: oklch(from var(--palette-soot) l c h / calc(pow(var(--palette-veil), 0.44)));
 
-  --color-line: #d6c39a; /* hairline drawn rules                            */
-  --color-line-strong: #b89a62; /* emphasised borders, panel edges          */
-  --color-line-faint: rgba(120, 86, 30, 0.16);
+  /* Ink. The ramp spans ±0.373 OKLab-L about the primary ink; quiet ink is its
+     own anchor because its hue *rotates* between schemes, which no fixed offset
+     off `--palette-ink` reaches (it collapses to grey, ΔE00 15.8). */
+  --color-ink: var(--palette-ink); /* primary text */
+  --color-ink-strong: oklch(
+    from var(--palette-ink) calc(l - 0.0485 * var(--palette-polarity)) calc(c - 0.007) calc(h + 4)
+  ); /* headings */
+  --color-ink-muted: var(--palette-ink-quiet); /* secondary text, labels */
+  --color-ink-faint: oklch(
+    from var(--palette-ink-quiet) calc(l + 0.166 * var(--palette-polarity)) calc(c + 0.006) calc(h + 4.5)
+  ); /* tertiary, placeholders, disabled */
 
-  --color-accent: #9a6a16; /* heliograph gold — primary accent                */
-  --color-accent-strong: #7e560f;
-  --color-accent-soft: rgba(154, 106, 22, 0.14);
-  --color-accent-sheen-bright: #efd078; /* metallic highlight — top stop of the accent sheen  */
-  --color-accent-sheen-deep: #b98323; /*   deep stop of the accent sheen                     */
-  /* Foreground on any saturated flat fill, not just the accent's — its one consumer
-     is the danger button's hover (ADR-0075). */
-  --color-on-fill: #fbf5e6;
-  --color-on-accent-sheen: #2a1f08; /* dark ink on the BRIGHT accent sheen — both themes    */
+  /* Drawn rules — the accent at the line-alpha ramp {1, 1.85, 0.44}. Translucent
+     in both schemes now, so Solar's rules take their colour from what they are
+     drawn over; they match their old values over `surface` (ADR-0075). */
+  --color-line: oklch(from var(--palette-accent) l c h / var(--palette-line-alpha));
+  --color-line-strong: oklch(from var(--palette-accent) l c h / calc(var(--palette-line-alpha) * 1.85));
+  --color-line-faint: oklch(from var(--palette-accent) l c h / calc(var(--palette-line-alpha) * 0.44));
+
+  --color-accent: var(--palette-accent); /* the through-line accent */
+  --color-accent-strong: oklch(
+    from var(--palette-accent) calc(l - 0.0858 * var(--palette-polarity)) calc(c - 0.016) calc(h + 3)
+  );
+  --color-accent-soft: oklch(from var(--palette-accent) l c h / 0.14);
+  /* The metallic sheen's two stops. `max(l, 0.876)` clamps for both of Hexly's
+     accents, which is why this highlight is the same colour in both schemes. */
+  --color-accent-sheen-bright: oklch(from var(--palette-accent) max(l, 0.876) 0.1 90);
+  --color-accent-sheen-deep: oklch(
+    from var(--palette-accent) calc(l + 0.087 * var(--palette-polarity)) calc(c + 0.011) calc(h - 2.5)
+  );
+  /* On-colours: the ground's own contrast colour, pulled back toward that ground
+     so it is never pure black or white — ADR-0006's warm through-line. The flip
+     is `contrast-color()`'s, so an Owner's accent picks its foreground itself.
+     `on-fill` is the foreground on any saturated flat fill, not just the
+     accent's — its one consumer is the danger button's hover (ADR-0075). */
+  --color-on-fill: color-mix(in srgb, contrast-color(var(--palette-accent)) 90%, var(--palette-accent));
+  --color-on-accent-sheen: color-mix(
+    in srgb,
+    contrast-color(var(--color-accent-sheen-bright)) 86%,
+    var(--color-accent-sheen-bright)
+  );
 
   --color-sea: #2f6f7a; /* lapis water — secondary accent                   */
   --color-sea-soft: rgba(47, 111, 122, 0.14);
@@ -115,25 +162,36 @@
   --color-astra: #5a4aa6; /* dusk violet — tertiary                         */
   --color-astra-soft: rgba(90, 74, 166, 0.14);
 
-  --color-danger: #a4402e; /* burnt-sienna marginalia — danger              */
-  --color-danger-soft: rgba(164, 64, 46, 0.14);
+  --color-danger: var(--palette-danger); /* burnt-sienna marginalia */
+  --color-danger-soft: oklch(from var(--palette-danger) l c h / 0.15);
 
-  --color-success: #4a6f2f; /* moss — confirmations / "online"             */
-  --color-success-soft: rgba(74, 111, 47, 0.16);
+  --color-success: var(--palette-success); /* moss — confirmations / "online" */
+  --color-success-soft: oklch(from var(--palette-success) l c h / 0.16);
 
   /* Canvas — the Vellum field: a calm warm paper plane. -bg/-mat are the
      directional gradient's light/deep stops; -glow pools soft light at the top
      edge and -edge is the soft vignette. The .field-grain overlay adds the paper
      tooth (codex vellum field). */
-  --color-canvas-bg: #efe2bf;
-  --color-canvas-mat: #e5d4a9;
-  --color-canvas-glow: rgba(255, 240, 202, 0.55); /* warm light at the field's top */
-  --color-canvas-edge: rgba(120, 86, 30, 0.14); /* soft sepia vignette           */
+  --color-canvas-bg: var(--palette-canvas);
+  --color-canvas-mat: oklch(
+    from var(--palette-canvas) calc(l - 0.036) calc(c + 0.0151 * var(--palette-polarity)) calc(h - 0.7)
+  );
+  /* A named literal, not a derivation (ADR-0075): Solar's field glow is a warm
+     highlight of its own paper and Astral's is a different-hue light source on
+     indigo — a 5× lift mismatch, which is two design ideas rather than one
+     parameterised one. The Astral value is in tokens.css beside the anchors. */
+  --color-canvas-glow: rgba(255, 240, 202, 0.55);
+  --color-canvas-edge: oklch(from var(--palette-soot) l c h / var(--palette-veil)); /* soft vignette */
   --color-hex-line: rgba(120, 96, 56, 0.42); /* grid ink                    */
   --color-feature-ink: #5a3e16; /* a placed Feature's marker — sepia ink    */
   --color-label-ink: #4a3a1e; /* free-positioned Label text — sepia ink     */
   --color-name-ink: #5a4a2c; /* a Hex name — muted sepia, quieter           */
-  --color-ink-stroke: #fbf6e7; /* halo behind name/label text — ivory on the light field, for legibility over any terrain (codex) */
+  /* Halo behind name/label text, for legibility over any terrain: the page
+     pushed one step *away* from the ink, which is the paper in Solar and the
+     night in Astral. The worst symmetric fit in the set (ΔE00 2.69/2.75). */
+  --color-ink-stroke: oklch(
+    from var(--palette-page) calc(l + 0.03 * var(--palette-polarity)) calc(c - 0.0126) calc(h + 2.5)
+  );
 
   /* Terrain fills — the base type of a hex. Tuned to read as hand-tinted
      washes on aged paper; the dark theme deepens them for the night chart. */

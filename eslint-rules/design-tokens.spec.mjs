@@ -44,6 +44,11 @@ describe('no-unknown-design-token', () => {
     });
   });
 
+  /**
+   * Two branches reach the same message and both carry weight: `--palette-accent` and `--palette-veil`
+   * are declared, so the manifest *tier* bars them; `--palette-nothing` is declared nowhere, and the
+   * name alone bars it — a mistyped anchor is still named as the layering mistake, not as a typo.
+   */
   it('bars a component from reaching past the semantic role to a Palette anchor', () => {
     tester.run('no-unknown-design-token', rule, {
       valid: [],
@@ -56,6 +61,11 @@ describe('no-unknown-design-token', () => {
         {
           code: 'const s = `:host { opacity: var(--palette-veil); }`',
           filename: IN_HEXMAP,
+          errors: [{ messageId: 'palette' }],
+        },
+        {
+          code: 'const s = `:host { color: var(--palette-nothing); }`',
+          filename: IN_UI,
           errors: [{ messageId: 'palette' }],
         },
       ],

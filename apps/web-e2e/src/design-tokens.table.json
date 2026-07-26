@@ -115,89 +115,133 @@
     "solar": "999px",
     "astral": "999px"
   },
+  "--palette-page": {
+    "solar": "rgb(241, 229, 199)",
+    "astral": "rgb(11, 12, 26)"
+  },
+  "--palette-ink": {
+    "solar": "rgb(46, 36, 18)",
+    "astral": "rgb(236, 227, 207)"
+  },
+  "--palette-ink-quiet": {
+    "solar": "rgb(111, 90, 54)",
+    "astral": "rgb(154, 160, 200)"
+  },
+  "--palette-accent": {
+    "solar": "rgb(154, 106, 22)",
+    "astral": "rgb(217, 178, 90)"
+  },
+  "--palette-danger": {
+    "solar": "rgb(164, 64, 46)",
+    "astral": "rgb(232, 138, 111)"
+  },
+  "--palette-success": {
+    "solar": "rgb(74, 111, 47)",
+    "astral": "rgb(134, 196, 106)"
+  },
+  "--palette-canvas": {
+    "solar": "rgb(239, 226, 191)",
+    "astral": "rgb(18, 21, 46)"
+  },
+  "--palette-soot": {
+    "solar": "rgb(60, 44, 22)",
+    "astral": "rgb(2, 2, 10)"
+  },
+  "--palette-polarity": {
+    "solar": "1",
+    "astral": "-1"
+  },
+  "--palette-line-alpha": {
+    "solar": "0.371",
+    "astral": "0.16"
+  },
+  "--palette-veil": {
+    "solar": "0.12",
+    "astral": "0.5"
+  },
   "--color-bg": {
     "solar": "rgb(241, 229, 199)",
     "astral": "rgb(11, 12, 26)"
   },
   "--color-bg-deep": {
-    "solar": "rgb(231, 216, 178)",
-    "astral": "rgb(7, 7, 16)"
+    "solar": "oklch(0.896689 0.0529423 88.7394)",
+    "astral": "oklch(0.13453 0.018169 279.451)"
   },
   "--color-surface": {
-    "solar": "rgb(251, 246, 231)",
-    "astral": "rgb(16, 19, 43)"
+    "solar": "oklch(0.969689 0.0223423 86.7394)",
+    "astral": "oklch(0.20753 0.048769 277.451)"
   },
   "--color-surface-raised": {
-    "solar": "rgb(255, 250, 240)",
-    "astral": "rgb(24, 28, 60)"
+    "solar": "oklch(0.990689 0.0135423 84.2394)",
+    "astral": "oklch(0.22853 0.057569 274.951)"
   },
   "--color-surface-sunken": {
-    "solar": "rgb(236, 224, 192)",
-    "astral": "rgb(12, 14, 34)"
+    "solar": "oklch(0.906689 0.0487423 89.7394)",
+    "astral": "oklch(0.17853 0.036569 280.451)"
   },
   "--color-overlay": {
-    "solar": "rgba(58, 44, 28, 0.42)",
-    "astral": "rgba(4, 4, 14, 0.62)"
+    "solar": "oklch(0.305948 0.0420615 73.9116 / 0.393405)",
+    "astral": "oklch(0.094139 0.0275525 279.72 / 0.737135)"
   },
   "--color-ink": {
     "solar": "rgb(46, 36, 18)",
     "astral": "rgb(236, 227, 207)"
   },
   "--color-ink-strong": {
-    "solar": "rgb(33, 26, 11)",
-    "astral": "rgb(251, 246, 231)"
+    "solar": "oklch(0.218382 0.0264858 85.2033)",
+    "astral": "oklch(0.966106 0.0213822 90.5649)"
   },
   "--color-ink-muted": {
     "solar": "rgb(111, 90, 54)",
     "astral": "rgb(154, 160, 200)"
   },
   "--color-ink-faint": {
-    "solar": "rgb(156, 138, 94)",
-    "astral": "rgb(102, 108, 149)"
+    "solar": "oklch(0.645857 0.0646971 84.6129)",
+    "astral": "oklch(0.548935 0.064605 282.669)"
   },
   "--color-line": {
-    "solar": "rgb(214, 195, 154)",
-    "astral": "rgba(217, 178, 90, 0.16)"
+    "solar": "oklch(0.56099 0.110721 75.2432 / 0.371)",
+    "astral": "oklch(0.780853 0.115859 85.5826 / 0.16)"
   },
   "--color-line-strong": {
-    "solar": "rgb(184, 154, 98)",
-    "astral": "rgba(217, 178, 90, 0.32)"
+    "solar": "oklch(0.56099 0.110721 75.2432 / 0.68635)",
+    "astral": "oklch(0.780853 0.115859 85.5826 / 0.296)"
   },
   "--color-line-faint": {
-    "solar": "rgba(120, 86, 30, 0.16)",
-    "astral": "rgba(217, 178, 90, 0.08)"
+    "solar": "oklch(0.56099 0.110721 75.2432 / 0.16324)",
+    "astral": "oklch(0.780853 0.115859 85.5826 / 0.0704)"
   },
   "--color-accent": {
     "solar": "rgb(154, 106, 22)",
     "astral": "rgb(217, 178, 90)"
   },
   "--color-accent-strong": {
-    "solar": "rgb(126, 86, 15)",
-    "astral": "rgb(240, 214, 138)"
+    "solar": "oklch(0.47519 0.0947205 78.2432)",
+    "astral": "oklch(0.866653 0.0998589 88.5826)"
   },
   "--color-accent-soft": {
-    "solar": "rgba(154, 106, 22, 0.14)",
-    "astral": "rgba(217, 178, 90, 0.14)"
+    "solar": "oklch(0.56099 0.110721 75.2432 / 0.14)",
+    "astral": "oklch(0.780853 0.115859 85.5826 / 0.14)"
   },
   "--color-accent-sheen-bright": {
-    "solar": "rgb(239, 208, 120)",
-    "astral": "rgb(240, 216, 151)"
+    "solar": "oklch(0.876 0.1 90)",
+    "astral": "oklch(0.876 0.1 90)"
   },
   "--color-accent-sheen-deep": {
-    "solar": "rgb(185, 131, 35)",
-    "astral": "rgb(197, 147, 53)"
+    "solar": "oklch(0.64799 0.121721 72.7432)",
+    "astral": "oklch(0.693853 0.126859 83.0826)"
   },
   "--color-on-fill": {
-    "solar": "rgb(251, 245, 230)",
-    "astral": "rgb(21, 17, 10)"
+    "solar": "color(srgb 0.960392 0.941569 0.908627)",
+    "astral": "color(srgb 0.085098 0.0698039 0.0352941)"
   },
   "--color-on-accent-sheen": {
-    "solar": "rgb(42, 31, 8)",
-    "astral": "rgb(21, 17, 10)"
+    "solar": "color(srgb 0.131593 0.116275 0.0746102)",
+    "astral": "color(srgb 0.131593 0.116275 0.0746102)"
   },
   "--color-accent-glow": {
-    "solar": "rgba(210, 150, 40, 0.5)",
-    "astral": "rgba(217, 178, 90, 0.5)"
+    "solar": "oklch(0.713 0.138082 76.2432 / 0.5)",
+    "astral": "oklch(0.780853 0.115859 86.5826 / 0.5)"
   },
   "--color-sea": {
     "solar": "rgb(47, 111, 122)",
@@ -220,36 +264,36 @@
     "astral": "rgb(232, 138, 111)"
   },
   "--color-danger-soft": {
-    "solar": "rgba(164, 64, 46, 0.14)",
-    "astral": "rgba(232, 138, 111, 0.16)"
+    "solar": "oklch(0.505226 0.136397 32.2532 / 0.15)",
+    "astral": "oklch(0.727034 0.121799 36.8359 / 0.15)"
   },
   "--color-success": {
     "solar": "rgb(74, 111, 47)",
     "astral": "rgb(134, 196, 106)"
   },
   "--color-success-soft": {
-    "solar": "rgba(74, 111, 47, 0.16)",
-    "astral": "rgba(134, 196, 106, 0.16)"
+    "solar": "oklch(0.498277 0.101818 133.77 / 0.16)",
+    "astral": "oklch(0.75708 0.137293 136.609 / 0.16)"
   },
   "--color-canvas-bg": {
     "solar": "rgb(239, 226, 191)",
     "astral": "rgb(18, 21, 46)"
   },
   "--color-canvas-mat": {
-    "solar": "rgb(229, 212, 169)",
-    "astral": "rgb(10, 12, 29)"
+    "solar": "oklch(0.878262 0.0632544 89.3132)",
+    "astral": "oklch(0.171861 0.0342641 275.378)"
   },
   "--color-canvas-glow": {
     "solar": "rgba(255, 240, 202, 0.55)",
     "astral": "rgba(58, 70, 140, 0.26)"
   },
   "--color-canvas-edge": {
-    "solar": "rgba(120, 86, 30, 0.14)",
-    "astral": "rgba(4, 4, 14, 0.5)"
+    "solar": "oklch(0.305948 0.0420615 73.9116 / 0.12)",
+    "astral": "oklch(0.094139 0.0275525 279.72 / 0.5)"
   },
   "--color-ink-stroke": {
-    "solar": "rgb(251, 246, 231)",
-    "astral": "rgb(10, 11, 22)"
+    "solar": "oklch(0.953689 0.0290423 91.2394)",
+    "astral": "oklch(0.13153 0.016869 281.951)"
   },
   "--color-hex-line": {
     "solar": "rgba(120, 96, 56, 0.42)",
@@ -340,31 +384,31 @@
     "astral": "68ch"
   },
   "--shadow-1": {
-    "solar": "0 1px 2px rgba(60, 44, 22, .12)",
-    "astral": "0 1px 2px rgba(0, 0, 0, .5)"
+    "solar": "0 1px 2px oklch(from rgb(60, 44, 22) l c h / 0.12)",
+    "astral": "0 1px 2px oklch(from rgb(2, 2, 10) l c h / 0.5)"
   },
   "--shadow-2": {
-    "solar": "0 4px 12px -2px rgba(60, 44, 22, .2)",
-    "astral": "0 6px 18px -4px rgba(0, 0, 0, .6)"
+    "solar": "0 4px 12px -2px oklch(from rgb(60, 44, 22) l c h / pow(0.12, .75) )",
+    "astral": "0 4px 12px -2px oklch(from rgb(2, 2, 10) l c h / pow(0.5, .75) )"
   },
   "--shadow-3": {
-    "solar": "0 16px 36px -8px rgba(50, 36, 18, .32)",
-    "astral": "0 22px 48px -10px rgba(0, 0, 0, .72)"
+    "solar": "0 16px 36px -8px oklch(from rgb(60, 44, 22) l c h / pow(0.12, .5) )",
+    "astral": "0 16px 36px -8px oklch(from rgb(2, 2, 10) l c h / pow(0.5, .5) )"
   },
   "--shadow-inset": {
-    "solar": "inset 0 1px 2px rgba(60, 44, 22, .12)",
-    "astral": "inset 0 1px 2px rgba(0, 0, 0, .4)"
+    "solar": "inset 0 1px 2px oklch(from rgb(60, 44, 22) l c h / 0.12)",
+    "astral": "inset 0 1px 2px oklch(from rgb(2, 2, 10) l c h / 0.5)"
   },
   "--shadow-focus": {
-    "solar": "0 0 0 3px rgba(154, 106, 22, .32)",
-    "astral": "0 0 0 3px rgba(230, 182, 82, .34)"
+    "solar": "0 0 0 3px oklch(from rgb(154, 106, 22) l c h / .345)",
+    "astral": "0 0 0 3px oklch(from rgb(217, 178, 90) l c h / .345)"
   },
   "--gradient-accent-sheen": {
-    "solar": "linear-gradient(180deg, rgb(239, 208, 120), rgb(185, 131, 35))",
-    "astral": "linear-gradient(180deg, rgb(240, 216, 151), rgb(197, 147, 53))"
+    "solar": "linear-gradient(180deg, oklch(0.876 0.1 90), oklch(0.64799 0.121721 72.7432))",
+    "astral": "linear-gradient(180deg, oklch(0.876 0.1 90), oklch(0.693853 0.126859 83.0826))"
   },
   "--gradient-accent-sheen-radial": {
-    "solar": "radial-gradient( circle at 50% 35%, rgb(239, 208, 120), rgb(185, 131, 35) )",
-    "astral": "radial-gradient( circle at 50% 35%, rgb(240, 216, 151), rgb(197, 147, 53) )"
+    "solar": "radial-gradient( circle at 50% 35%, oklch(0.876 0.1 90), oklch(0.64799 0.121721 72.7432) )",
+    "astral": "radial-gradient( circle at 50% 35%, oklch(0.876 0.1 90), oklch(0.693853 0.126859 83.0826) )"
   }
 }
