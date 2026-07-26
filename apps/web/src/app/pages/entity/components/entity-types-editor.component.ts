@@ -9,8 +9,8 @@ import { FieldControlComponent } from '@hexly/web-entity';
  * Pick, add, remove, and reorder an Entity's ordered Entity Type set, `types[0]` primary (ADR-0048).
  * Presentational: reads `types`/`metadata`, emits the authored set. Adding a type with unfilled required
  * Fields opens an inline prompt ({@link FieldControlComponent} + {@link validateFields}) offering to collect
- * them — the type is added either way, since classifying a thing is never gated on describing it
- * (ADR-0074). Removing only drops the lens, leaving its EntityDocument behind (CONTEXT.md → Field).
+ * them — filled or not, adding is never gated on describing (ADR-0074), and dismissing the prompt adds
+ * nothing (#338). Removing only drops the lens, leaving its EntityDocument behind (CONTEXT.md → Field).
  */
 @Component({
   selector: 'app-entity-types-editor',
@@ -85,7 +85,8 @@ import { FieldControlComponent } from '@hexly/web-entity';
       </div>
 
       <!-- Add-type prompt: the picked type's unfilled required Fields, offered before the add commits.
-           Both buttons commit it — the prompt informs, it never gates (ADR-0074). -->
+           Both add buttons commit it — the prompt informs, it never gates (ADR-0074) — and Cancel
+           dismisses it, so a mis-picked type is recoverable without adding then removing it (#338). -->
       @if (pendingType(); as pending) {
         <div
           class="rounded-md border border-line bg-surface-sunken p-3 flex flex-col gap-3"
@@ -110,6 +111,16 @@ import { FieldControlComponent } from '@hexly/web-entity';
             }
           </dl>
           <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              appButton
+              variant="ghost"
+              size="sm"
+              data-testid="type-add-cancel"
+              (click)="cancelAdd()"
+            >
+              {{ 'common.cancel' | transloco }}
+            </button>
             <button type="button" appButton size="sm" data-testid="type-add-bare" (click)="addWithoutFields()">
               {{ 'entityTypes.addWithoutFields' | transloco }}
             </button>
@@ -252,6 +263,11 @@ export class EntityTypesEditorComponent {
     const type = this.pendingType();
     if (!type) return;
     this.typesChange.emit([...this.types(), type]);
+    this.clearPending();
+  }
+
+  /** Dismiss the prompt, adding nothing — the picked type was the wrong one (#338). */
+  protected cancelAdd(): void {
     this.clearPending();
   }
 

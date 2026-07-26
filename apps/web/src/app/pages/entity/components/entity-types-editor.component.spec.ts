@@ -147,6 +147,25 @@ describe('EntityTypesEditor', () => {
     expect(q('type-add-prompt')).toBeNull();
   });
 
+  it('dismisses the prompt without adding the type, so a mis-picked type is recoverable (#338)', () => {
+    const fixture = render(['core.type.note']);
+
+    const add = q('type-add') as HTMLSelectElement;
+    add.value = 'test.type.monster';
+    add.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(q('type-add-prompt')).not.toBeNull();
+
+    q('type-add-cancel').click();
+    fixture.detectChanges();
+
+    // Nothing committed: neither the type nor an EntityDocument, and the picker is back.
+    expect(q('type-add-prompt')).toBeNull();
+    expect(emittedTypes).toEqual([]);
+    expect(emittedMetadata).toEqual([]);
+    expect(q('type-add')).not.toBeNull();
+  });
+
   it('skips the prompt when the required Field is already satisfied by existing EntityDocument (#189)', () => {
     // A re-added type whose values persist as free EntityDocument (CONTEXT.md → Field) needs no prompt.
     render(['core.type.note'], { 'test.field.lair': 'Sunken keep' });
