@@ -168,11 +168,9 @@ export const vaultImportOptionsSchema = z.object({
    * absent). Free text, folded through the Tag vocabulary by the importer — the configured knob needs
    * the same fold, so one site does it for both.
    *
-   * Unlike `inlineType`, a present-but-blank value is *no tag*, not an absent override: an author who
-   * empties the prefilled control on an Instance that configures a Tag means to mint untagged, and a
-   * blank-is-absent reading is the one thing a this-run override could not express (ADR-0073). There
-   * is no matching "no Type" — every Entity carries one. Bounded like every other name in the family
-   * ({@link nameSchema}): the value rides verbatim onto every Entity the run mints.
+   * Unlike `inlineType`, a present-but-blank value is *no tag*, not an absent override — emptying the
+   * prefilled control is the only way a run can say "untagged" (ADR-0073). Bounded like every other name
+   * in the family ({@link nameSchema}): it rides verbatim onto every Entity the run mints.
    */
   inlineTag: z.string().trim().max(255).optional(),
 });

@@ -6,16 +6,11 @@ import { ClientConfigStore, EntitiesClient } from '@hexly/web-core';
 import { DETAILED_ENTITY_CREATOR } from '@hexly/web-entity';
 
 /**
- * Inline Creation's writes (ADR-0073): the Entity a mention names, minted under the Instance's
- * `entities.inlineType`/`entities.inlineTag` — deliberately not the New button's `defaultType`, which
- * answers a different question — and into the World it is named from.
- *
- * Two paths over one set of knobs: {@link create} is the silent fast path, {@link createWithDetails}
- * seeds the same knobs into the create dialog for an author who wants Types and Tags set before the
- * thing exists. The dialog is a modal you ask for, so the fast path is unchanged by its existence.
- *
- * Unconditional by design: no mintable-Type filter and no create-dialog fallback, because an unfilled
- * `required` Field no longer refuses a write (ADR-0074).
+ * Inline Creation's writes (ADR-0073): the Entity a mention names, minted into the World it is named
+ * from under the Instance's `entities.inlineType`/`inlineTag` — not the New button's `defaultType`,
+ * which answers a different question. {@link create} mints silently, {@link createWithDetails} through
+ * the create dialog; neither filters Types nor falls back to a modal, since an unfilled `required` Field
+ * no longer refuses a write (ADR-0074).
  */
 @Injectable({ providedIn: 'root' })
 export class InlineEntityCreator {

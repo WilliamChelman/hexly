@@ -122,12 +122,9 @@ function linkTo(entity: EntitySummary, descriptor: string | null): EntityLinkAtt
 }
 
 /**
- * Mint the named Entity and drop its link where the mention was typed — {@link takeMention} owns the
- * across-the-round-trip half (the captured point, the undo retraction, the restore).
- *
- * A failed write puts the typed text back. So does declining the dialog (`null`) — unless the `@` came
- * from `/link`, which is ours to remove, so cancelling then reads exactly like `Esc` at the picker: we
- * clean up what we inserted, never what you typed.
+ * Mint the named Entity and land its link where the mention was typed; {@link takeMention} holds that
+ * place across the round trip. A failed write or a declined dialog puts the typed text back — except an
+ * `@` we inserted ourselves (`/link`), which is ours to remove (ADR-0073).
  */
 function mintAndLink(
   editor: Editor,

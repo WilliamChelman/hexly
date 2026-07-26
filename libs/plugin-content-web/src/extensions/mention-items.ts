@@ -62,15 +62,10 @@ export function parseMentionQuery(query: string): MentionQuery {
 }
 
 /**
- * The picker's rows for one query: the server's matches, then the two Create rows — appended **even when
- * there are matches**, because an existing "Jane Doe" must not block authoring a second, different
- * one, and the first of them active when nothing matches, so Enter never does nothing (ADR-0073).
- *
- * Order is the fast path first: plain Create is what Enter reaches on a miss, and the details row sits
- * below it as the one you go looking for.
- *
- * Without `canCreate` — the caller's Entity-creation standing in the host World — both rows are
- * *absent* rather than present-and-failing (ADR-0073).
+ * The picker's rows for one query: the matches, then plain Create and Create-with-details — kept even
+ * when something matches, since an existing "Jane Doe" must not block authoring a second one, and
+ * ordered fast path first so Enter on a miss reaches the silent mint. Without `canCreate` both are
+ * absent rather than present-and-failing (ADR-0073).
  */
 export function mentionItems(
   query: MentionQuery,

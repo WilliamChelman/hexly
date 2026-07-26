@@ -27,10 +27,9 @@ export interface PendingMention {
  * in the sentence they left it in, not under the caret they have since moved.
  *
  * **Undo during the flight retracts the gesture.** The deletion is an ordinary transaction, so Ctrl-Z
- * can put the typed text back while the mint is still out; inserting the link then would leave the
- * sentence holding both. So a settle that finds the typed text back where it was taken from inserts
- * nothing at all — the author said no, and the prose is whatever undo made it. (The Entity may already
- * be minted; the orphan is this PR's disclosed gap, corrupt prose is not.)
+ * can put the typed text back mid-mint; a settle that finds it back inserts nothing, rather than leaving
+ * the sentence holding both. The Entity may already exist — an orphan is the disclosed cost, corrupt
+ * prose is not.
  */
 export function takeMention(editor: Editor, range: { from: number; to: number }): PendingMention {
   const typed = editor.state.doc.textBetween(range.from, range.to);

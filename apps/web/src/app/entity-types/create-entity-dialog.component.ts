@@ -49,17 +49,12 @@ export type CreateEntityDialogResult = EntityDetail;
  * {@link DialogService}, seeded via its {@link DialogRef} — so a Command's `run()` launches it with
  * no reference to this component and no shared open-state signal to bridge them.
  *
- * It **returns** the created Entity and navigates nowhere: routing is its caller's concern (ADR-0073),
- * since a caller creating from mid-sentence must be left in its editor.
- *
- * A caller may also seed the name and the Tags, and pin the World: what Inline Creation's
- * `Create "…" with details…` row hands it, so the author sets Types and Tags before the thing exists
- * (ADR-0073).
+ * It **returns** the created Entity and navigates nowhere — routing is its caller's concern, and a
+ * caller may seed the name and Tags and pin the World (ADR-0073).
  *
  * The Command seeds one primary type; the embedded {@link EntityTypesEditorComponent} lets the author pick
- * more (ADR-0048), and the picked types' `required` Fields are collected below — as a prompt, not a gate:
- * they are marked with a `*` and Create stays live while they are empty (ADR-0074). Only a *present*
- * ill-typed value holds the create back.
+ * more (ADR-0048), and the picked types' `required` Fields are collected below as a prompt, not a gate —
+ * only a *present* ill-typed value holds Create back (ADR-0074).
  */
 @Component({
   selector: 'app-create-entity-dialog',
