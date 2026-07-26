@@ -1,5 +1,5 @@
 import { strToU8, zipSync } from 'fflate';
-import { enterLibrary, expect, importUnresolvedVault, test } from '../fixtures';
+import { confirmImport, enterLibrary, expect, importUnresolvedVault, pickVault, test } from '../fixtures';
 
 /**
  * `entities.inlineType: core.type.hex-map` + `entities.inlineTag: untriaged`, with `defaultType` left on
@@ -48,6 +48,26 @@ test('the vault import dialog opens prefilled with the same inline Type and Tag 
   await expect(page.getByTestId('import-create-unresolved')).toBeChecked();
   await expect(page.getByTestId('import-inline-type')).toHaveValue('core.type.hex-map');
   await expect(page.getByTestId('import-inline-tag')).toHaveValue('untriaged');
+});
+
+test('clearing the import dialog’s Tag mints untagged, on an Instance that configures one (#347)', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/');
+  await pickVault(page, Buffer.from(zipSync({ 'Keep.md': strToU8('Held against [[Zorblax]].') })));
+
+  // Emptying the prefilled control is the instruction *no tag* — an override that reads as absent
+  // would hand the run the Instance's `untriaged` right back (ADR-0073).
+  await page.getByTestId('import-inline-tag').fill('');
+  const summary = await confirmImport(page);
+  expect(summary.linksCreated).toBe(1);
+
+  const found = await (await request.get(`/api/entities?worldId=${summary.worldId}&q=Zorblax`)).json();
+  expect(found.items).toHaveLength(1);
+  // The Type still follows the Instance knob — only the Tag was cleared.
+  expect(found.items[0].types).toEqual(['core.type.hex-map']);
+  expect(found.items[0].tags).toEqual([]);
 });
 
 test('the details dialog opens prefilled with the same inline Type and Tag (#344)', async ({ page, request }) => {

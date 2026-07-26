@@ -11,6 +11,11 @@ export interface EntityTypes {
   /** Every registered type, in registration order: core, the bundled plugins, then the World's own. */
   readonly all: Signal<readonly TypeDefinition[]>;
   /**
+   * The types a user may create — {@link all} minus the **System-managed** ones (ADR-0068), which the
+   * system alone mints. What every create surface offers, so none of them restates the rule.
+   */
+  readonly creatable: Signal<readonly TypeDefinition[]>;
+  /**
    * A type's **display name** — the noun every surface shows for it ("Note", "Hex Map", "Deity").
    * A user-defined type's is authored data, never a transloco key.
    */

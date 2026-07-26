@@ -82,8 +82,12 @@ export class WorldsClient {
    * set the multipart boundary itself.
    *
    * `options` is this run's create-unresolved switch and Type/Tag overrides (ADR-0073), carried as
-   * plain multipart text fields. Omitting it — or leaving an override blank — falls back to the
+   * plain multipart text fields. Omitting it — or leaving the Type blank — falls back to the
    * Instance's own `entities.inlineType`/`entities.inlineTag` server-side.
+   *
+   * The Tag rides even when empty, because emptying the prefilled control is itself the instruction
+   * *no tag*: withholding the field would read as "no override" and hand the run the Instance's Tag,
+   * which is the one thing a this-run override then couldn't express (ADR-0073).
    */
   importVault(file: File, options?: VaultImportOptions): Observable<ImportSummary> {
     const form = new FormData();
@@ -91,7 +95,7 @@ export class WorldsClient {
     if (options) {
       form.append('createUnresolved', String(options.createUnresolved));
       if (options.inlineType) form.append('inlineType', options.inlineType);
-      if (options.inlineTag) form.append('inlineTag', options.inlineTag);
+      form.append('inlineTag', options.inlineTag ?? '');
     }
     return this.http.post<ImportSummary>('/api/worlds/import', form);
   }

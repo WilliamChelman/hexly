@@ -160,15 +160,26 @@ describe('WorldsClient', () => {
     req.flush(null);
   });
 
-  it('omits a blank override, so an untouched control falls back to the Instance default', () => {
+  it('omits a blank Type, so an untouched control falls back to the Instance default', () => {
     const file = new File([new Uint8Array([1])], 'Aldermoor.zip', { type: 'application/zip' });
-    client.importVault(file, { createUnresolved: true, inlineType: '', inlineTag: '' }).subscribe();
+    client.importVault(file, { createUnresolved: true, inlineType: '' }).subscribe();
 
     const req = http.expectOne('/api/worlds/import');
     const body = req.request.body as FormData;
     expect(body.get('createUnresolved')).toBe('true');
     expect(body.has('inlineType')).toBe(false);
-    expect(body.has('inlineTag')).toBe(false);
+    req.flush(null);
+  });
+
+  it('sends a cleared Tag rather than omitting it, so the run can mint untagged', () => {
+    const file = new File([new Uint8Array([1])], 'Aldermoor.zip', { type: 'application/zip' });
+    client.importVault(file, { createUnresolved: true, inlineTag: '' }).subscribe();
+
+    const req = http.expectOne('/api/worlds/import');
+    const body = req.request.body as FormData;
+    // Withholding it would read as "no override" and hand the run the Instance's own Tag — the one
+    // thing a this-run override then couldn't express (ADR-0073).
+    expect(body.get('inlineTag')).toBe('');
     req.flush(null);
   });
 

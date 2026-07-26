@@ -543,10 +543,7 @@ export class WorldsPage {
   protected readonly typeOptions = computed(() => {
     // Read as a reactive dependency, so the labels re-resolve on a language switch.
     this.transloco.activeLang();
-    const registered = this.types
-      .all()
-      .filter((def) => !def.systemManaged)
-      .map((def) => ({ id: def.id, label: this.types.name(def.id) }));
+    const registered = this.types.creatable().map((def) => ({ id: def.id, label: this.types.name(def.id) }));
     const configured = this.config.inlineType();
     return configured && !registered.some((option) => option.id === configured)
       ? [{ id: configured, label: configured }, ...registered]
