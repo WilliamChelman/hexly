@@ -63,7 +63,8 @@ test('the World field editor explains the required checkbox where the Owner tick
   await openWorldFieldEditor(page, worldId);
 
   await expect(page.getByTestId('field-required')).toBeVisible();
-  const hint = page.getByTestId('field-required-hint');
-  await expect(hint).toBeVisible();
-  await expect(hint).not.toBeEmpty();
+  // The copy itself, not merely "something rendered": an untranslated key would pass that and say nothing.
+  await expect(page.getByTestId('field-required-hint')).toHaveText(
+    'A prompt, not a rule: an entity that leaves this field empty is marked Incomplete where you edit it, but saving is never blocked.',
+  );
 });

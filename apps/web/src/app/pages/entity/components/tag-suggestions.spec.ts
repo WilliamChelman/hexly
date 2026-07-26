@@ -1,4 +1,4 @@
-import { tagItems } from './tag-suggestions';
+import { tagItems, withTags } from './tag-suggestions';
 
 describe('tagItems — Tag entry suggestions', () => {
   const vocab = ['deity', 'demigod', 'northern reach', 'ruined'];
@@ -38,5 +38,24 @@ describe('tagItems — Tag entry suggestions', () => {
     // 'undead' isn't in the last-saved vocab yet but is already on the entity; the "(new)"
     // row would be a silent no-op (deduped away on pick), so it must not appear.
     expect(tagItems('undead', vocab, ['undead'])).toEqual([]);
+  });
+});
+
+describe('withTags — free-text Tag entry', () => {
+  it('trims and lower-cases, so the form reads back what the server will store', () => {
+    expect(withTags([], '  Northern Reach ')).toEqual(['northern reach']);
+  });
+
+  it('comma-splits, for a pasted list', () => {
+    expect(withTags(['deity'], 'ruined, Undead,,  demigod ')).toEqual(['deity', 'ruined', 'undead', 'demigod']);
+  });
+
+  it('dedupes against what is already there, as the server does (entity.ts dedupedTags)', () => {
+    expect(withTags(['deity'], 'Deity, deity')).toEqual(['deity']);
+  });
+
+  it('leaves the list untouched when the entry names no tag — an Enter on blank adds nothing', () => {
+    const current = ['deity'];
+    expect(withTags(current, '  , ')).toBe(current);
   });
 });
