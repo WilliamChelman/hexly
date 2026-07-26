@@ -103,6 +103,17 @@ export function statBlockViewToggle(fieldKey = 'dnd.field.stat-block'): string {
   return viewInstanceKey({ viewId: 'dnd.view.stat-block', fieldKey });
 }
 
+/**
+ * Wait for the roaming write a Preferences change fires (ADR-0038). It is fire-and-forget, so a spec
+ * whose choice must not outlive it — the e2e account is shared and survives the entities-only reset —
+ * arms this before the change, and again before undoing it.
+ */
+export function preferencesPatched(page: Page): Promise<Response> {
+  return page.waitForResponse(
+    (res) => res.url().endsWith('/api/auth/me/preferences') && res.request().method() === 'PATCH' && res.ok(),
+  );
+}
+
 /** Wait for a successful entity PUT. There is no Save button (ADR-0026): pair this with Cmd/Ctrl+S. */
 export function waitForSave(page: Page): Promise<Response> {
   return page.waitForResponse(
