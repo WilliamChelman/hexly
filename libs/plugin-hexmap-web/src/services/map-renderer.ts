@@ -15,7 +15,7 @@ import {
   Point,
   rectFromCorners,
   Region,
-  terrainPalette,
+  terrainSet,
   TerrainId,
 } from '@hexly/plugin-hexmap';
 import { DesignToken, readDesignToken } from '@hexly/web-styles';
@@ -212,7 +212,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     const style = getComputedStyle(this.canvas);
     // Falls back to the manifest's declared value rather than a second copy of the palette (ADR-0075).
     const read = (name: DesignToken): string => readDesignToken(style, name);
-    const terrain = Object.fromEntries(terrainPalette.map((t) => [t.id, read(terrainFill(t.id))])) as Record<
+    const terrain = Object.fromEntries(terrainSet.map((t) => [t.id, read(terrainFill(t.id))])) as Record<
       TerrainId,
       string
     >;

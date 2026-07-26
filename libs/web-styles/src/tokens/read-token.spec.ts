@@ -10,7 +10,7 @@ function styleOf(values: Record<string, string>): CSSStyleDeclaration {
 describe('designTokenInitial', () => {
   it('answers with the value the manifest declares', () => {
     expect(designTokenInitial('--color-accent')).toBe(designToken('--color-accent')?.initial);
-    expect(designTokenInitial('--color-terrain-forest')).toBe('#6f9560');
+    expect(designTokenInitial('--radius-md')).toBe('6px');
   });
 });
 

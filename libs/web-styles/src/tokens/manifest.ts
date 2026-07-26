@@ -3,9 +3,9 @@ import { TokenDecl } from './design-token';
 /**
  * The design-token manifest — the single source of the token contract (ADR-0075).
  *
- * Declaration only: the values stay in `index.css` and `tokens.css`, and `manifest.spec.ts` holds the
- * two to each other in both directions. Tiers follow meaning, not location, so the hexmap tokens are
- * already tier 3 while their CSS still sits in core — the owning-plugin move is a later ticket.
+ * Declaration only: the values stay in `index.css` and `tokens.css` for tiers 1 and 2, and in the
+ * owning plugin's own stylesheet for tier 3; `manifest.spec.ts` holds the manifest and the
+ * stylesheets to each other in both directions, including which file may declare which tier.
  *
  * `as const` because `DesignToken` is read off it; consumers take the widened `DESIGN_TOKENS`.
  */
@@ -131,24 +131,27 @@ const DECLARATIONS = [
   { name: '--color-canvas-edge', tier: 'role', type: 'color', public: true, initial: 'rgba(60, 44, 22, 0.12)' },
   { name: '--color-ink-stroke', tier: 'role', type: 'color', public: true, initial: '#f7f0da' },
 
-  // ---- Tier 3 — the hexmap plugin's own vocabulary. Out of the public contract: a per-World terrain
-  //      set is a change to `terrainIdSchema` and a separate feature (ADR-0075). Still registered —
-  //      `map-renderer.ts` reads every one of these back and hands it to a 2D context. The styleguide's
-  //      terrain swatches read them from core and move out with them, ahead of the tier-aware lint rule.
+  // ---- Tier 3 — the hexmap plugin's own vocabulary, declared in `plugin-hexmap-web`'s own
+  //      `hexmap-tokens.css` and only *contracted* here (ADR-0075). Out of the public contract: a
+  //      per-World terrain set is a change to `terrainIdSchema` and a separate feature. Still
+  //      registered — `map-renderer.ts` reads every one of these back and hands it to a 2D context,
+  //      and a registration is document-wide however many stylesheets declare the values.
   {
     name: '--color-hex-line',
     tier: 'plugin',
     type: 'color',
     public: false,
     owner: 'hexmap',
-    initial: 'rgba(120, 96, 56, 0.42)',
+    initial: 'rgba(111, 90, 54, 0.371)',
   },
-  { name: '--color-feature-ink', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#5a3e16' },
-  { name: '--color-label-ink', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#4a3a1e' },
-  { name: '--color-name-ink', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#5a4a2c' },
-  { name: '--color-terrain-grass', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#b7be7e' },
-  { name: '--color-terrain-forest', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#6f9560' },
-  { name: '--color-terrain-ocean', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#7eaab0' },
+  { name: '--color-feature-ink', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#5f4418' },
+  { name: '--color-label-ink', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#523c17' },
+  { name: '--color-name-ink', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#5f4925' },
+  { name: '--color-terrain-grass', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#bcc37d' },
+  { name: '--color-terrain-forest', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#829f6c' },
+  { name: '--color-terrain-ocean', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#84a6aa' },
+  // A named literal rather than a derivation, like `--color-canvas-glow`: its two ColorSchemes are
+  // two design ideas, not one parameterised one (ADR-0075).
   {
     name: '--color-terrain-mountain',
     tier: 'plugin',
@@ -157,9 +160,8 @@ const DECLARATIONS = [
     owner: 'hexmap',
     initial: '#b9a489',
   },
-  { name: '--color-terrain-desert', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#e0c98c' },
-  { name: '--color-terrain-marsh', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#93a87f' },
-  { name: '--color-terrain-sky', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#a9c4d4' },
+  { name: '--color-terrain-desert', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#e0c37e' },
+  { name: '--color-terrain-sky', tier: 'plugin', type: 'color', public: false, owner: 'hexmap', initial: '#b0c3d3' },
 
   // ---- Motion. Out of the contract (spec §6): a reader accessibility concern, not an Owner's to set.
   { name: '--dur-instant', tier: 'role', type: 'time', public: false, initial: '80ms' },

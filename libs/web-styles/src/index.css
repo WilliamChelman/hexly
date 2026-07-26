@@ -186,25 +186,14 @@
      ColorSchemes. Its Astral value sits in tokens.css beside the anchors. */
   --color-canvas-glow: rgba(255, 240, 202, 0.55);
   --color-canvas-edge: oklch(from var(--palette-soot) l c h / var(--palette-veil)); /* soft vignette */
-  --color-hex-line: rgba(120, 96, 56, 0.42); /* grid ink                    */
-  --color-feature-ink: #5a3e16; /* a placed Feature's marker — sepia ink    */
-  --color-label-ink: #4a3a1e; /* free-positioned Label text — sepia ink     */
-  --color-name-ink: #5a4a2c; /* a Hex name — muted sepia, quieter           */
   /* The halo behind name/label text — the page pushed one step away from the
      ink. The worst symmetric fit in the set, ΔE00 2.69/2.75 (spike §5). */
   --color-ink-stroke: oklch(
     from var(--palette-page) calc(l + 0.03 * var(--palette-polarity)) calc(c - 0.0126) calc(h + 2.5)
   );
 
-  /* Terrain fills — the base type of a hex. Tuned to read as hand-tinted
-     washes on aged paper; the dark theme deepens them for the night chart. */
-  --color-terrain-grass: #b7be7e;
-  --color-terrain-forest: #6f9560;
-  --color-terrain-ocean: #7eaab0;
-  --color-terrain-mountain: #b9a489;
-  --color-terrain-desert: #e0c98c;
-  --color-terrain-marsh: #93a87f;
-  --color-terrain-sky: #a9c4d4; /* open air — a daylit pale cerulean        */
+  /* The grid rule, the marker inks and the terrain fills that used to sit here are the hexmap
+     plugin's own vocabulary and live in libs/plugin-hexmap-web/src/hexmap-tokens.css (ADR-0075). */
 
   /* Elevation (`--shadow-*`) lives in tokens.css as raw re-themable vars and is
      wrapped as a custom `@utility` below — not here; see the header note. */

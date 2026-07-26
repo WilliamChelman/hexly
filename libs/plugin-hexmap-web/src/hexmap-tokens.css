@@ -1,0 +1,48 @@
+/*
+ * The Hex Map plugin's own colour vocabulary — tier 3, declared in the plugin that names it
+ * (ADR-0075). Loaded by `apps/web/src/styles.css`; the `@property` registrations stay generated from
+ * the manifest in core, a registration being document-wide.
+ *
+ * Every colour here derives from a tier-2 role rather than from a `--palette-*` anchor, so a World
+ * Theme that re-themes the field or the ink re-tints the map with it. The exception is the alpha of
+ * `--color-hex-line`: no role spells that knob, and a relative colour function destructures a single
+ * colour, so quiet ink's channels and the drawn rule's alpha cannot come from one expression.
+ *
+ * Against the ten hand-tuned values these replace, the repaint costs ΔE00 ≤ 3.1 on eight of them and
+ * 4.4 on forest; the per-token table is in `docs/design/world-theme-spec.md` §3.
+ */
+:root {
+  /* The World's ink warmed with its accent, at two strengths; a Hex name is the Label's ink washed
+     one step back into the field, which is what makes it the quieter of the two. */
+  --color-feature-ink: color-mix(in oklab, var(--color-ink) 52%, var(--color-accent));
+  --color-label-ink: color-mix(in oklab, var(--color-ink) 64%, var(--color-accent));
+  --color-name-ink: color-mix(in oklab, var(--color-canvas-bg) 9%, var(--color-label-ink));
+
+  /* The grid is a drawn rule in quiet ink, at the drawn-rule opacity — no coefficient of its own. */
+  --color-hex-line: oklch(from var(--color-ink-muted) l c h / var(--palette-line-alpha));
+
+  /* Each terrain is a pigment of its own — no anchor set holds grass-green, so the hue is a named
+     literal in the sense ADR-0075 allows — half-washed into the World's field. The single shared
+     ratio is the falsifiable part: fitted per terrain these five land between 42% and 53%, where the
+     same-cost form riding the polarity knob instead of the field misses by ΔE00 7.0. The pigments
+     are written in OKLCH because forest's and ocean's leave sRGB; the washed results do not. */
+  --color-terrain-grass: color-mix(in oklab, var(--color-canvas-bg) 50%, oklch(0.679 0.143 120.7));
+  --color-terrain-forest: color-mix(in oklab, var(--color-canvas-bg) 50%, oklch(0.42 0.126 146.8));
+  --color-terrain-ocean: color-mix(in oklab, var(--color-canvas-bg) 50%, oklch(0.487 0.105 230.6));
+  --color-terrain-desert: color-mix(in oklab, var(--color-canvas-bg) 50%, oklch(0.739 0.14 86.7));
+  --color-terrain-sky: color-mix(in oklab, var(--color-canvas-bg) 50%, oklch(0.701 0.108 255.9));
+
+  /* A named literal (ADR-0075), on `--color-canvas-glow`'s precedent: warm tan by day and violet by
+     night is a change of hue the field's own shift does not account for, so no one pigment sits at
+     both ends of the wash. A formula that hit them anyway would promise a World Owner a
+     generalisation it does not have. Its Astral value sits below. */
+  --color-terrain-mountain: #b9a489;
+}
+
+/*
+ * The night half — the one terrain the wash does not carry, and nothing else: the five above are one
+ * expression each and re-resolve here off the roles the ColorScheme has already re-themed.
+ */
+:root[data-color-scheme='astral'] {
+  --color-terrain-mountain: #474264;
+}

@@ -296,48 +296,44 @@
     "astral": "oklch(0.13153 0.016869 281.951)"
   },
   "--color-hex-line": {
-    "solar": "rgba(120, 96, 56, 0.42)",
-    "astral": "rgba(160, 170, 235, 0.15)"
+    "solar": "oklch(0.479857 0.0586971 80.1129 / 0.371)",
+    "astral": "oklch(0.714935 0.058605 278.169 / 0.16)"
   },
   "--color-feature-ink": {
-    "solar": "rgb(90, 62, 22)",
-    "astral": "rgb(236, 212, 154)"
+    "solar": "oklab(0.408054 0.0162001 0.0686007)",
+    "astral": "oklab(0.851964 0.00516768 0.0701793)"
   },
   "--color-label-ink": {
-    "solar": "rgb(74, 58, 30)",
-    "astral": "rgb(236, 212, 154)"
+    "solar": "oklab(0.372761 0.0134303 0.0597235)",
+    "astral": "oklab(0.868374 0.00430091 0.0597172)"
   },
   "--color-name-ink": {
-    "solar": "rgb(90, 74, 44)",
-    "astral": "rgb(205, 191, 159)"
+    "solar": "oklab(0.421496 0.0122206 0.0586823)",
+    "astral": "oklab(0.808928 0.00438427 0.0499249)"
   },
   "--color-terrain-grass": {
-    "solar": "rgb(183, 190, 126)",
-    "astral": "rgb(76, 93, 59)"
+    "solar": "oklab(0.796631 -0.0365094 0.0855566)",
+    "astral": "oklab(0.44343 -0.0338902 0.0369361)"
   },
   "--color-terrain-forest": {
-    "solar": "rgb(111, 149, 96)",
-    "astral": "rgb(38, 66, 55)"
+    "solar": "oklab(0.667131 -0.0527217 0.0585736)",
+    "astral": "oklab(0.31393 -0.0501026 0.00995319)"
   },
   "--color-terrain-ocean": {
-    "solar": "rgb(126, 170, 176)",
-    "astral": "rgb(30, 58, 85)"
+    "solar": "oklab(0.700631 -0.0333289 -0.0164913)",
+    "astral": "oklab(0.34743 -0.0307098 -0.0651118)"
   },
   "--color-terrain-mountain": {
     "solar": "rgb(185, 164, 137)",
     "astral": "rgb(71, 66, 100)"
   },
   "--color-terrain-desert": {
-    "solar": "rgb(224, 201, 140)",
-    "astral": "rgb(107, 87, 54)"
-  },
-  "--color-terrain-marsh": {
-    "solar": "rgb(147, 168, 127)",
-    "astral": "rgb(58, 75, 68)"
+    "solar": "oklab(0.826631 0.00402391 0.0939611)",
+    "astral": "oklab(0.473431 0.00664307 0.0453406)"
   },
   "--color-terrain-sky": {
-    "solar": "rgb(169, 196, 212)",
-    "astral": "rgb(69, 82, 125)"
+    "solar": "oklab(0.807631 -0.0131608 -0.0282959)",
+    "astral": "oklab(0.45443 -0.0105416 -0.0769164)"
   },
   "--dur-instant": {
     "solar": "0.08s",

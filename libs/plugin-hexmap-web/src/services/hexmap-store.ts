@@ -17,7 +17,7 @@ import {
   Region,
   regionById,
   TerrainId,
-  terrainPalette,
+  terrainSet,
 } from '@hexly/plugin-hexmap';
 import { Patch } from '@hexly/immer';
 import { ENTITY_SESSION, EntityDock, VIEW_FIELD_KEY } from '@hexly/web-entity';
@@ -325,7 +325,7 @@ export class HexMapStore {
         break;
       }
       case 'terrain': {
-        const t = terrainPalette[n - 1];
+        const t = terrainSet[n - 1];
         if (t) this.armTerrain(t.id);
         break;
       }
