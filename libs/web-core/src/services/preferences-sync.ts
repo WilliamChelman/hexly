@@ -10,14 +10,14 @@ import {
 import { catchError, of } from 'rxjs';
 import { AuthUser, PreferencesPatch } from '@hexly/domain';
 import { FormatLocale, Locale, LocaleService } from '../i18n/locale.service';
-import { Theme, ThemeService } from './theme.service';
+import { ColorScheme, ColorSchemeService } from './color-scheme.service';
 import { AuthClient } from './auth.client';
 
 /** The three roaming prefs as concrete, client-side values ('' = unset). */
 interface Snapshot {
   locale: Locale;
   formatLocale: FormatLocale;
-  theme: Theme;
+  colorScheme: ColorScheme;
 }
 
 /**
@@ -36,7 +36,7 @@ interface Snapshot {
 export class PreferencesSync {
   private readonly http = inject(HttpClient);
   private readonly locale = inject(LocaleService);
-  private readonly theme = inject(ThemeService);
+  private readonly colorScheme = inject(ColorSchemeService);
   private readonly auth = inject(AuthClient);
 
   /**
@@ -52,7 +52,7 @@ export class PreferencesSync {
       const current: Snapshot = {
         locale: this.locale.lang(),
         formatLocale: this.locale.formatLocale(),
-        theme: this.theme.theme(),
+        colorScheme: this.colorScheme.colorScheme(),
       };
       untracked(() => this.reconcile(user, current));
     });
@@ -70,14 +70,14 @@ export class PreferencesSync {
       const target: Snapshot = {
         locale: user.preferences.locale ?? current.locale,
         formatLocale: user.preferences.formatLocale ?? current.formatLocale,
-        theme: user.preferences.theme ?? current.theme,
+        colorScheme: user.preferences.colorScheme ?? current.colorScheme,
       };
       this.synced = { userId: user.id, prefs: target };
       if (current.locale !== target.locale) this.locale.set(target.locale);
       if (current.formatLocale !== target.formatLocale) {
         this.locale.setFormatLocale(target.formatLocale);
       }
-      if (current.theme !== target.theme) this.theme.set(target.theme);
+      if (current.colorScheme !== target.colorScheme) this.colorScheme.set(target.colorScheme);
       return;
     }
 
@@ -89,7 +89,7 @@ export class PreferencesSync {
       ...(current.formatLocale !== prev.formatLocale && {
         formatLocale: current.formatLocale || null,
       }),
-      ...(current.theme !== prev.theme && { theme: current.theme }),
+      ...(current.colorScheme !== prev.colorScheme && { colorScheme: current.colorScheme }),
     };
     if (Object.keys(patch).length === 0) return;
 
@@ -102,7 +102,7 @@ export class PreferencesSync {
   }
 }
 
-/** Start the Preferences sync with the app, alongside provideTheme/provideLocale. */
+/** Start the Preferences sync with the app, alongside provideColorScheme/provideLocale. */
 export function providePreferencesSync(): EnvironmentProviders {
   return provideEnvironmentInitializer(() => void inject(PreferencesSync));
 }

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { AuthClient, ClientConfigStore, Locale, LocaleService, ThemeService } from '@hexly/web-core';
+import { AuthClient, ClientConfigStore, ColorSchemeService, Locale, LocaleService } from '@hexly/web-core';
 import {
   ButtonComponent,
   IconComponent,
@@ -15,7 +15,7 @@ import {
 
 /**
  * The header's account control (ADR-0015): a trigger opening a CDK menu with the
- * global, account-independent preferences — theme and language — plus the session
+ * global, account-independent preferences — ColorScheme and language — plus the session
  * action. Offered to everyone, anonymous public-link viewers included (ADR-0014);
  * the session row is Sign out when authenticated, Login otherwise.
  *
@@ -75,15 +75,17 @@ import {
         <button
           type="button"
           appMenuItem
-          [attr.aria-label]="(theme() === 'dark' ? 'common.theme.toSolar' : 'common.theme.toAstral') | transloco"
-          (triggered)="themeService.toggle()"
+          [attr.aria-label]="
+            (colorScheme() === 'astral' ? 'common.colorScheme.toSolar' : 'common.colorScheme.toAstral') | transloco
+          "
+          (triggered)="colorSchemeService.toggle()"
         >
-          @if (theme() === 'dark') {
+          @if (colorScheme() === 'astral') {
             <app-icon name="sun" [size]="18" />
-            <span>{{ 'common.theme.solar' | transloco }}</span>
+            <span>{{ 'common.colorScheme.solar' | transloco }}</span>
           } @else {
             <app-icon name="moon" [size]="18" />
-            <span>{{ 'common.theme.astral' | transloco }}</span>
+            <span>{{ 'common.colorScheme.astral' | transloco }}</span>
           }
         </button>
         <hr appRule class="mx-1 my-1" />
@@ -125,8 +127,8 @@ export class UserMenuComponent {
   private readonly auth = inject(AuthClient);
   private readonly locale = inject(LocaleService);
   private readonly clientConfig = inject(ClientConfigStore);
-  protected readonly themeService = inject(ThemeService);
-  protected readonly theme = this.themeService.theme;
+  protected readonly colorSchemeService = inject(ColorSchemeService);
+  protected readonly colorScheme = this.colorSchemeService.colorScheme;
 
   /** The signed-in user, or `null` when anonymous. */
   protected readonly user = this.auth.currentUser;

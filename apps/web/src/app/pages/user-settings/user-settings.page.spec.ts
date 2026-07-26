@@ -5,7 +5,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { DeploymentProfile } from '@hexly/domain';
 import { MockAuthClient, mockClientConfigStore } from '@hexly/web-core/testing';
-import { LocaleService, ThemeService, AuthClient, ClientConfigStore } from '@hexly/web-core';
+import { LocaleService, ColorSchemeService, AuthClient, ClientConfigStore } from '@hexly/web-core';
 import { UserSettingsPage } from './user-settings.page';
 
 describe('Settings page (ADR-0038)', () => {
@@ -69,12 +69,12 @@ describe('Settings page (ADR-0038)', () => {
     expect(TestBed.inject(LocaleService).formatLocale()).toBe('en-GB');
   });
 
-  it('writes theme and language through the same signals the user menu uses', () => {
+  it('writes the ColorScheme and language through the same signals the user menu uses', () => {
     const fixture = render();
 
-    el<HTMLElement>(fixture, 'theme-dark').click();
+    el<HTMLElement>(fixture, 'color-scheme-astral').click();
     fixture.detectChanges();
-    expect(TestBed.inject(ThemeService).theme()).toBe('dark');
+    expect(TestBed.inject(ColorSchemeService).colorScheme()).toBe('astral');
 
     const language = el<HTMLSelectElement>(fixture, 'language');
     language.value = 'fr';
@@ -159,7 +159,7 @@ describe('Settings page (ADR-0038)', () => {
     // No email address anywhere either, not merely no input for it.
     expect(html.textContent).not.toContain('ada@hexly.test');
 
-    for (const testid of ['theme-light', 'theme-dark', 'language', 'format-locale']) {
+    for (const testid of ['color-scheme-solar', 'color-scheme-astral', 'language', 'format-locale']) {
       expect(html.querySelector(`[data-testid="${testid}"]`)).not.toBeNull();
     }
   });

@@ -3,7 +3,7 @@
  * (ADR-0020). Both the app's real stylesheet (@import, emits once) and every
  * scoped component style (@reference '#app-styles.css', context-only) point
  * here, so tokens live in a leaf lib rather than inside a consuming app.
- * Order is load-bearing: tokens.css [data-theme] must cascade after the
+ * Order is load-bearing: tokens.css [data-color-scheme] must cascade after the
  * `tailwindcss` import and the @theme :root it emits.
  */
 @import 'tailwindcss';
@@ -17,9 +17,9 @@
  * (`var(--color-surface)`). One vocabulary, no parallel `--space-*` layer.
  *
  * Colours are declared *non-`inline`* so the override point is the generated
- * `--color-*`: the light value lives here, `[data-theme='dark']` (tokens.css,
- * imported after `tailwindcss`) reassigns it. Spacing/type/radii/fonts are
- * theme-invariant. Elevation can't live here — see the @utility block below.
+ * `--color-*`: the Solar value lives here, `[data-color-scheme='astral']`
+ * (tokens.css, imported after `tailwindcss`) reassigns it. Spacing/type/radii/fonts
+ * are ColorScheme-invariant. Elevation can't live here — see the @utility block below.
  *
  * Spacing uses Tailwind's default linear scale (`calc(var(--spacing) * N)`, base
  * 0.25rem) — no curated keys, every step open (ADR-0030, reverting ADR-0020's
@@ -73,10 +73,10 @@
   --radius-full: 999px;
 
   /* =======================================================================
-   * Colours — light theme "Solar" values (the day half of the Celestial
-   * Codex: an illuminated solar almanac — warm ivory paper, sun-gold ink).
-   * The dark "Astral" theme reassigns these generated --color-* in
-   * tokens.css under [data-theme].
+   * Colours — the "Solar" ColorScheme (the day half of the Celestial Codex:
+   * an illuminated solar almanac — warm ivory paper, sun-gold ink). The
+   * "Astral" ColorScheme reassigns these generated --color-* in tokens.css
+   * under [data-color-scheme].
    * ===================================================================== */
   --color-bg: #f1e5c7; /* the table / outer ivory paper                     */
   --color-bg-deep: #e7d8b2; /* shadowed paper behind panels                 */
@@ -144,7 +144,7 @@
 
 /*
  * Elevation utilities. A `@theme` `shadow-*` inlines its value (to leave room
- * for `--tw-shadow-color`), baking the light shadow and ignoring [data-theme].
+ * for `--tw-shadow-color`), baking the Solar shadow and ignoring [data-color-scheme].
  * Hexly never recolours a shadow via utility, so we wrap the raw re-themable
  * token instead: `shadow-1` → `box-shadow: var(--shadow-1)` (ADR-0021).
  * `--shadow-focus` has no utility — it's composed only in scoped focus rings.

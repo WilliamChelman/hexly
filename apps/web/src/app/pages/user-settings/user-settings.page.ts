@@ -7,8 +7,8 @@ import {
   LocaleService,
   AuthClient,
   ClientConfigStore,
-  ThemeService,
-  Theme,
+  ColorSchemeService,
+  ColorScheme,
   ToasterService,
 } from '@hexly/web-core';
 import {
@@ -52,27 +52,27 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
         {{ 'settings.preferences.heading' | transloco }}
       </h2>
       <div appPanel class="settings-panel">
-        <div appField [label]="'settings.preferences.theme' | transloco">
+        <div appField [label]="'settings.preferences.colorScheme' | transloco">
           <span class="flex gap-2" role="group">
             <button
               type="button"
               appButton
-              [active]="theme() === 'light'"
-              [attr.aria-pressed]="theme() === 'light'"
-              data-testid="theme-light"
-              (click)="setTheme('light')"
+              [active]="colorScheme() === 'solar'"
+              [attr.aria-pressed]="colorScheme() === 'solar'"
+              data-testid="color-scheme-solar"
+              (click)="setColorScheme('solar')"
             >
-              {{ 'common.theme.solar' | transloco }}
+              {{ 'common.colorScheme.solar' | transloco }}
             </button>
             <button
               type="button"
               appButton
-              [active]="theme() === 'dark'"
-              [attr.aria-pressed]="theme() === 'dark'"
-              data-testid="theme-dark"
-              (click)="setTheme('dark')"
+              [active]="colorScheme() === 'astral'"
+              [attr.aria-pressed]="colorScheme() === 'astral'"
+              data-testid="color-scheme-astral"
+              (click)="setColorScheme('astral')"
             >
-              {{ 'common.theme.astral' | transloco }}
+              {{ 'common.colorScheme.astral' | transloco }}
             </button>
           </span>
         </div>
@@ -206,10 +206,10 @@ export class UserSettingsPage {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   protected readonly locale = inject(LocaleService);
-  private readonly themeService = inject(ThemeService);
+  private readonly colorSchemeService = inject(ColorSchemeService);
 
   protected readonly user = this.auth.currentUser;
-  protected readonly theme = this.themeService.theme;
+  protected readonly colorScheme = this.colorSchemeService.colorScheme;
   protected readonly lang = this.locale.lang;
 
   /** Whether this deployment has an account to manage at all (ADR-0071). */
@@ -240,8 +240,8 @@ export class UserSettingsPage {
   protected readonly passwordError = signal<PasswordError>('');
   protected readonly changingPassword = signal(false);
 
-  protected setTheme(theme: Theme): void {
-    this.themeService.set(theme);
+  protected setColorScheme(colorScheme: ColorScheme): void {
+    this.colorSchemeService.set(colorScheme);
   }
 
   protected setLang(lang: Locale): void {

@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import type { Graph, GraphConfig } from '@cosmos.gl/graph';
 import { WorldGraph } from '@hexly/domain';
-import { Logger, ThemeService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
+import { ColorSchemeService, Logger, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
 import { FramingCamera, currentView, framingCamera, spaceScale } from './graph-camera';
 import { GraphFocus, graphFocus } from './graph-focus';
 import { GraphWarmPool, WarmGraph } from './graph-warm-pool';
@@ -78,7 +78,7 @@ const REHEAT_ALPHA = 0.3;
 /**
  * A dark outline stamped around the white Entity labels — four diagonal offsets for the body of the
  * contour, one soft drop for depth — so a name stays legible over a pale node, a dark one, or the
- * links crossing behind it, in either theme. Cheaper and crisper at 9px than `-webkit-text-stroke`,
+ * links crossing behind it, in either ColorScheme. Cheaper and crisper at 9px than `-webkit-text-stroke`,
  * which thins the glyphs.
  */
 const LABEL_CONTOUR = '-1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1px 0 #111, 0 1px 2px rgba(0,0,0,0.6)';
@@ -146,7 +146,7 @@ export class GraphCanvasComponent {
 
   private readonly hostEl = viewChild.required<ElementRef<HTMLDivElement>>('host');
   private readonly overlayEl = viewChild.required<ElementRef<HTMLDivElement>>('overlay');
-  private readonly theme = inject(ThemeService);
+  private readonly colorScheme = inject(ColorSchemeService);
   private readonly logger = inject(Logger);
   private readonly types = inject(ENTITY_TYPES);
   private readonly pool = inject(GraphWarmPool);
@@ -219,10 +219,10 @@ export class GraphCanvasComponent {
       );
     });
 
-    // A theme flip re-bakes the colours and nothing else. Remounting would restart the force
+    // A ColorScheme flip re-bakes the colours and nothing else. Remounting would restart the force
     // simulation and throw away the settled layout the reader is looking at, to change a hue.
     effect(() => {
-      this.theme.theme();
+      this.colorScheme.colorScheme();
       this.mounted?.drawing.focus.usePalette(palette(this.types.all()));
     });
 
@@ -261,7 +261,7 @@ export class GraphCanvasComponent {
     const config: GraphConfig = {
       backgroundColor: colors.background,
       // Colour changes snap unless a render asks for a fade by itself — the hover fade passes its
-      // own duration; mount and theme flips must not inherit cosmos.gl's 800 ms default.
+      // own duration; mount and ColorScheme flips must not inherit cosmos.gl's 800 ms default.
       transitionDuration: 0,
       enableDrag: true,
       // The seed ring is what this frames; `camera` judges it from the first tick onwards, so the

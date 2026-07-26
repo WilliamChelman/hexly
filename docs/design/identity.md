@@ -50,7 +50,7 @@ both generates an on-brand, theme-aware utility (`bg-surface`, `text-ink`,
 `text-gold`, `border-line-strong`, `font-display`, `rounded-lg`,
 `bg-terrain-forest`, `gap-5`, `text-md`) **and** is emitted as a CSS variable on
 `:root`/`:host` for scoped component styles to consume via `var(--…)`. Colours and
-shadows are declared non-`inline` so `[data-theme='dark']` (tokens.css) can
+shadows are declared non-`inline` so `[data-color-scheme='astral']` (tokens.css) can
 reassign the generated `--color-*`/`--shadow-*`; `static` disables theme-variable
 tree-shaking so tokens read only by the Canvas renderer (`getComputedStyle`) or by
 raw `var(--…)` still resolve. Spacing uses Tailwind's default linear scale
@@ -71,7 +71,7 @@ lettering uses `--tracking-wider` (0.14em) uppercase.
 ## Colour — semantic roles
 
 Tokens are named by role, themed by value. The light value lives in the `@theme`
-block (emitted to `:root`); `:root[data-theme='dark']` reassigns the generated
+block (emitted to `:root`); `:root[data-color-scheme='astral']` reassigns the generated
 `--color-*`.
 
 | Token                 | Role                                     | Parchment | Astral    |
@@ -101,12 +101,13 @@ canvas. The Canvas renderer reads them by name (ADR-0003).
   Reserved for interaction (hovers, presses) and theme transitions — no entrance
   animation on first render. Respects `prefers-reduced-motion`.
 
-## Theming mechanics
+## ColorScheme mechanics
 
-- The active theme is the `data-theme` attribute on `<html>`.
-- `ThemeService` (`apps/web/src/app/core/theme.service.ts`) owns it, persists to
-  `localStorage` (`hexly-theme`), and falls back to the OS preference when unset.
-- An inline boot script in `index.html` applies the theme **before first paint**
+- The active ColorScheme is the `data-color-scheme` attribute on `<html>`.
+- `ColorSchemeService` (`libs/web-core/src/services/color-scheme.service.ts`) owns it,
+  persists to `localStorage` (`hexly-color-scheme`), and falls back to the OS
+  preference when unset.
+- An inline boot script in `index.html` applies the ColorScheme **before first paint**
   (no flash). An explicit user choice always beats the OS preference.
 
 ## App shell
