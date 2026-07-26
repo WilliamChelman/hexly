@@ -1,3 +1,4 @@
+import { strToU8, zipSync } from 'fflate';
 import { enterLibrary, expect, test } from '../fixtures';
 
 /**
@@ -30,6 +31,23 @@ test('a mention mints under entities.inlineType and entities.inlineTag, not the 
   const minted = await (await request.get(`/api/entities/${await link.getAttribute('data-entity-id')}`)).json();
   expect(minted.types).toEqual(['core.type.hex-map']);
   expect(minted.tags).toEqual(['untriaged']);
+});
+
+test('the vault import dialog opens prefilled with the same inline Type and Tag (#347)', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('import-vault-input').setInputFiles({
+    name: 'Aldermoor.zip',
+    mimeType: 'application/zip',
+    // A one-note vault: the dialog is what this asserts, not what the import lands.
+    buffer: Buffer.from(zipSync({ 'Keep.md': strToU8('Held against [[Zorblax]].') })),
+  });
+
+  // The import's overrides are seeded from the Instance's Inline Creation knobs, not `defaultType` —
+  // an import mints by the hundred, so it must follow the same knob a mention does (ADR-0073).
+  await expect(page.getByTestId('import-options')).toBeVisible();
+  await expect(page.getByTestId('import-create-unresolved')).toBeChecked();
+  await expect(page.getByTestId('import-inline-type')).toHaveValue('core.type.hex-map');
+  await expect(page.getByTestId('import-inline-tag')).toHaveValue('untriaged');
 });
 
 test('the details dialog opens prefilled with the same inline Type and Tag (#344)', async ({ page, request }) => {

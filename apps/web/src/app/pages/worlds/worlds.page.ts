@@ -5,6 +5,7 @@ import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import {
   AuthClient,
+  ClientConfigStore,
   WorldStore,
   WorldsClient,
   ToasterService,
@@ -13,14 +14,17 @@ import {
   worldSettingsRoute,
 } from '@hexly/web-core';
 import { ImportSummary } from '@hexly/domain';
+import { ENTITY_TYPES } from '@hexly/web-entity';
 import {
   ButtonComponent,
   EyebrowComponent,
   PanelComponent,
   IconComponent,
   AutofocusDirective,
+  FieldComponent,
   InputComponent,
   DialogComponent,
+  SelectComponent,
   ACCENT_SIGIL,
   accentFor,
   monogram,
@@ -40,8 +44,10 @@ import {
     IconComponent,
     TranslocoPipe,
     AutofocusDirective,
+    FieldComponent,
     InputComponent,
     DialogComponent,
+    SelectComponent,
     RouterLink,
     NgTemplateOutlet,
   ],
@@ -370,6 +376,81 @@ import {
       </app-dialog>
     }
 
+    @if (pendingVault()) {
+      <!-- The one moment a bulk decision is made, so it is the moment the author can see and change
+           it (ADR-0073). All three apply to this run only; nothing here is persisted. -->
+      <app-dialog
+        [open]="true"
+        [heading]="'worlds.importOptionsHeading' | transloco"
+        (closed)="cancelImport()"
+        data-testid="import-options"
+      >
+        <label class="flex items-start gap-2 text-sm text-ink">
+          <input
+            type="checkbox"
+            class="mt-0.5 accent-gold"
+            data-testid="import-create-unresolved"
+            [checked]="createUnresolved()"
+            (change)="createUnresolved.set($any($event.target).checked)"
+          />
+          <span class="flex flex-col gap-0.5">
+            {{ 'worlds.importCreateUnresolved' | transloco }}
+            <span class="text-xs text-ink-muted">{{ 'worlds.importCreateUnresolvedHint' | transloco }}</span>
+          </span>
+        </label>
+        <!-- Both overrides are dead while the switch is off: nothing is created to carry them. -->
+        <label appField [label]="'worlds.importInlineType' | transloco">
+          <select
+            appSelect
+            class="w-full"
+            data-testid="import-inline-type"
+            [disabled]="!createUnresolved()"
+            (change)="inlineType.set($any($event.target).value)"
+          >
+            <!-- [selected] per-option, not [value] on the select: a value binding applies before the
+                 <option> children exist in the same change-detection pass and silently no-ops. -->
+            @for (type of typeOptions(); track type.id) {
+              <option [value]="type.id" [selected]="type.id === inlineType()">{{ type.label }}</option>
+            }
+          </select>
+        </label>
+        <!-- Free text, not a picker over the World's tags: the World is minted by this import and has
+             none yet (ADR-0073). -->
+        <label appField [label]="'worlds.importInlineTag' | transloco">
+          <input
+            type="text"
+            appInput
+            data-testid="import-inline-tag"
+            [value]="inlineTag()"
+            [disabled]="!createUnresolved()"
+            [attr.placeholder]="'worlds.importInlineTagHint' | transloco"
+            (input)="inlineTag.set($any($event.target).value)"
+            (keydown.enter)="confirmImport()"
+          />
+        </label>
+        <button
+          dialogFooter
+          type="button"
+          appButton
+          variant="default"
+          data-testid="cancel-import"
+          (click)="cancelImport()"
+        >
+          {{ 'common.cancel' | transloco }}
+        </button>
+        <button
+          dialogFooter
+          type="button"
+          appButton
+          variant="primary"
+          data-testid="confirm-import"
+          (click)="confirmImport()"
+        >
+          {{ 'worlds.importConfirm' | transloco }}
+        </button>
+      </app-dialog>
+    }
+
     @if (importSummary(); as summary) {
       <!-- The import's "what did we lose" report, shown before entering the new World. -->
       <app-dialog
@@ -418,6 +499,8 @@ export class WorldsPage {
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
+  private readonly config = inject(ClientConfigStore);
+  private readonly types = inject(ENTITY_TYPES);
 
   protected readonly loaded = this.store.loaded;
   protected readonly loadError = this.store.loadError;
@@ -445,6 +528,30 @@ export class WorldsPage {
   protected readonly importing = signal(false);
   protected readonly exportingId = signal<string | null>(null);
   protected readonly importSummary = signal<ImportSummary | null>(null);
+  /** The picked `.zip`, held while the options dialog is open — cancelling drops it unuploaded. */
+  protected readonly pendingVault = signal<File | null>(null);
+  protected readonly createUnresolved = signal(true);
+  protected readonly inlineType = signal('');
+  protected readonly inlineTag = signal('');
+
+  /**
+   * The Types this run may mint under: every registered Type bar the System-managed ones, which the
+   * system alone assigns (ADR-0068). The Instance's own `inlineType` joins under its raw id when the
+   * registry doesn't know it — the knob resolves verbatim with no boot-time validation (ADR-0073), so
+   * the control must be able to show what the server would otherwise have used.
+   */
+  protected readonly typeOptions = computed(() => {
+    // Read as a reactive dependency, so the labels re-resolve on a language switch.
+    this.transloco.activeLang();
+    const registered = this.types
+      .all()
+      .filter((def) => !def.systemManaged)
+      .map((def) => ({ id: def.id, label: this.types.name(def.id) }));
+    const configured = this.config.inlineType();
+    return configured && !registered.some((option) => option.id === configured)
+      ? [{ id: configured, label: configured }, ...registered]
+      : registered;
+  });
   protected readonly renamingId = signal<string | null>(null);
   protected readonly naming = signal(false);
   protected readonly newName = signal('');
@@ -559,16 +666,44 @@ export class WorldsPage {
       });
   }
 
-  /** Import the picked vault `.zip` into a fresh World. The input is cleared so
-   * re-picking the same file fires `change` again. */
+  /**
+   * A picked vault opens the options dialog rather than uploading (ADR-0073): the create-unresolved
+   * switch has to be reachable *before* the import, so a vault can come across creating nothing the
+   * author did not write. The three controls are re-seeded from the Instance defaults on every pick,
+   * which is what keeps a run's overrides from surviving to the next one.
+   *
+   * The input is cleared so re-picking the same file fires `change` again.
+   */
   protected onVaultPicked(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
     if (!file || this.importing()) return;
+    this.createUnresolved.set(true);
+    // `inlineType` reads `undefined` only when `/api/config` never landed; the first offered Type is
+    // then sent verbatim, so what the control shows is still what the run does.
+    this.inlineType.set(this.config.inlineType() ?? this.typeOptions()[0]?.id ?? '');
+    this.inlineTag.set(this.config.inlineTag() ?? '');
+    this.pendingVault.set(file);
+  }
+
+  /** Dropping the held file uploads nothing — the vault never left the browser. */
+  protected cancelImport(): void {
+    this.pendingVault.set(null);
+  }
+
+  /** Import the held vault `.zip` into a fresh World, under this run's options. */
+  protected confirmImport(): void {
+    const file = this.pendingVault();
+    if (!file || this.importing()) return;
+    this.pendingVault.set(null);
     this.importing.set(true);
     this.worldsClient
-      .importVault(file)
+      .importVault(file, {
+        createUnresolved: this.createUnresolved(),
+        inlineType: this.inlineType(),
+        inlineTag: this.inlineTag(),
+      })
       .pipe(finalize(() => this.importing.set(false)))
       .subscribe({
         next: (summary) => this.importSummary.set(summary),

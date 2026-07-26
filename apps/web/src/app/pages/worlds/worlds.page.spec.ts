@@ -1,12 +1,29 @@
 import { provideTranslocoTesting } from '../../../testing/transloco-testing';
+import { signal, WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { Subject, of, throwError } from 'rxjs';
 import { ImportSummary, WorldSummary } from '@hexly/domain';
-import { AuthClient, WorldsClient, ToasterService } from '@hexly/web-core';
-import { MockAuthClient, MockWorldsClient } from '@hexly/web-core/testing';
+import { AuthClient, ClientConfigStore, WorldsClient, ToasterService } from '@hexly/web-core';
+import { MockAuthClient, MockWorldsClient, mockClientConfigStore } from '@hexly/web-core/testing';
+import { TypeDefinition } from '@hexly/web-entity';
+import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { WorldsPage } from './worlds.page';
+
+/** The Types the import dialog offers — one ordinary, one System-managed the system alone assigns (ADR-0068). */
+const TYPES: TypeDefinition[] = [
+  { id: 'core.type.note', icon: 'note', graphColorToken: '--color-gold', labelText: 'Note', views: [] },
+  { id: 'world.type.rumour', icon: 'note', graphColorToken: '--color-gold', labelText: 'Rumour', views: [] },
+  {
+    id: 'core.type.asset',
+    icon: 'note',
+    graphColorToken: '--color-gold',
+    labelText: 'Asset',
+    views: [],
+    systemManaged: true,
+  },
+];
 
 function world(id: string, name = id, ownerId = 'u1'): WorldSummary {
   // Rights drive the owned/member distinction now (ADR-0039): the caller (u1) owning it
@@ -26,16 +43,24 @@ describe('WorldIndex', () => {
   let worldsClient: MockWorldsClient;
   let navigate: ReturnType<typeof vi.spyOn>;
   let auth: MockAuthClient;
+  // The Instance's Inline Creation knobs (ADR-0073), which the import dialog prefills from; a spec
+  // sets them before it renders.
+  let inlineType: WritableSignal<string | undefined>;
+  let inlineTag: WritableSignal<string | undefined>;
 
   beforeEach(async () => {
     auth = new MockAuthClient();
     worldsClient = new MockWorldsClient();
+    inlineType = signal<string | undefined>('core.type.note');
+    inlineTag = signal<string | undefined>(undefined);
     await TestBed.configureTestingModule({
       imports: [WorldsPage, provideTranslocoTesting()],
       providers: [
         provideRouter([]),
+        provideEntityTypesTesting(TYPES),
         { provide: AuthClient, useValue: auth },
         { provide: WorldsClient, useValue: worldsClient },
+        { provide: ClientConfigStore, useValue: mockClientConfigStore({ inlineType, inlineTag }) },
       ],
     }).compileComponents();
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
@@ -229,15 +254,148 @@ describe('WorldIndex', () => {
     return file;
   }
 
+  /** Pick a vault and confirm the options dialog it opens — the whole gesture, defaults untouched. */
+  function importVault(fixture: ReturnType<typeof render>, el: HTMLElement) {
+    const file = pickVault(el);
+    fixture.detectChanges();
+    ($(el, '[data-testid=confirm-import]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    return file;
+  }
+
+  const DEFAULT_OPTIONS = { createUnresolved: true, inlineType: 'core.type.note', inlineTag: '' };
+
+  it('opens the options dialog on a pick, and uploads nothing until it is confirmed', () => {
+    const fixture = render([]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    pickVault(el);
+    fixture.detectChanges();
+
+    expect($(el, '[data-testid=import-options]')).not.toBeNull();
+    expect(worldsClient.importVault).not.toHaveBeenCalled();
+    // Prefilled from the Instance defaults, so the common case needs no decision (ADR-0073).
+    expect(($(el, '[data-testid=import-create-unresolved]') as HTMLInputElement).checked).toBe(true);
+    expect(($(el, '[data-testid=import-inline-type]') as HTMLSelectElement).value).toBe('core.type.note');
+    expect(($(el, '[data-testid=import-inline-tag]') as HTMLInputElement).value).toBe('');
+  });
+
+  it('prefills the Type and Tag from the Instance’s Inline Creation knobs', () => {
+    inlineType.set('world.type.rumour');
+    inlineTag.set('untriaged');
+    const fixture = render([]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    pickVault(el);
+    fixture.detectChanges();
+
+    expect(($(el, '[data-testid=import-inline-type]') as HTMLSelectElement).value).toBe('world.type.rumour');
+    expect(($(el, '[data-testid=import-inline-tag]') as HTMLInputElement).value).toBe('untriaged');
+  });
+
+  it('offers every registered Type bar the System-managed ones', () => {
+    const fixture = render([]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    pickVault(el);
+    fixture.detectChanges();
+
+    const options = Array.from(($(el, '[data-testid=import-inline-type]') as HTMLSelectElement).options).map(
+      (o) => o.value,
+    );
+    expect(options).toEqual(['core.type.note', 'world.type.rumour']);
+  });
+
+  it('still offers an Instance inlineType the registry does not know — the knob resolves verbatim', () => {
+    inlineType.set('nope.type.unknown');
+    const fixture = render([]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    pickVault(el);
+    fixture.detectChanges();
+
+    const select = $(el, '[data-testid=import-inline-type]') as HTMLSelectElement;
+    expect(Array.from(select.options).map((o) => o.value)).toContain('nope.type.unknown');
+    expect(select.value).toBe('nope.type.unknown');
+  });
+
+  it('cancelling the options dialog uploads nothing', () => {
+    const fixture = render([]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    pickVault(el);
+    fixture.detectChanges();
+    ($(el, '[data-testid=cancel-import]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect($(el, '[data-testid=import-options]')).toBeNull();
+    expect(worldsClient.importVault).not.toHaveBeenCalled();
+  });
+
+  it('sends the chosen switch, Type, and Tag with the import', () => {
+    const fixture = render([]);
+    const el = fixture.nativeElement as HTMLElement;
+    worldsClient.importVault.mockReturnValue(of(importSummary()));
+
+    const file = pickVault(el);
+    fixture.detectChanges();
+    const toggle = $(el, '[data-testid=import-create-unresolved]') as HTMLInputElement;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event('change'));
+    const select = $(el, '[data-testid=import-inline-type]') as HTMLSelectElement;
+    select.value = 'world.type.rumour';
+    select.dispatchEvent(new Event('change'));
+    const tag = $(el, '[data-testid=import-inline-tag]') as HTMLInputElement;
+    // A Tag the World does not yet have — it is minted by this very import, so it has none.
+    tag.value = 'from the vault';
+    tag.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    ($(el, '[data-testid=confirm-import]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(worldsClient.importVault).toHaveBeenCalledWith(file, {
+      createUnresolved: false,
+      inlineType: 'world.type.rumour',
+      inlineTag: 'from the vault',
+    });
+  });
+
+  it('re-seeds the dialog from the Instance defaults, so a run’s overrides never reach the next', () => {
+    const fixture = render([]);
+    const el = fixture.nativeElement as HTMLElement;
+    worldsClient.importVault.mockReturnValue(of(importSummary()));
+
+    pickVault(el);
+    fixture.detectChanges();
+    const toggle = $(el, '[data-testid=import-create-unresolved]') as HTMLInputElement;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event('change'));
+    const tag = $(el, '[data-testid=import-inline-tag]') as HTMLInputElement;
+    tag.value = 'this-run';
+    tag.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    ($(el, '[data-testid=confirm-import]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    ($(el, '[data-testid=open-imported]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const file = pickVault(el);
+    fixture.detectChanges();
+    expect(($(el, '[data-testid=import-create-unresolved]') as HTMLInputElement).checked).toBe(true);
+    expect(($(el, '[data-testid=import-inline-tag]') as HTMLInputElement).value).toBe('');
+    ($(el, '[data-testid=confirm-import]') as HTMLButtonElement).click();
+
+    expect(worldsClient.importVault).toHaveBeenLastCalledWith(file, DEFAULT_OPTIONS);
+  });
+
   it('imports a picked vault and, from the summary, lands in the new World', () => {
     const fixture = render([]);
     const el = fixture.nativeElement as HTMLElement;
 
     worldsClient.importVault.mockReturnValue(of(importSummary({ linksCreated: 7 })));
-    const file = pickVault(el);
-    fixture.detectChanges();
+    const file = importVault(fixture, el);
 
-    expect(worldsClient.importVault).toHaveBeenCalledWith(file);
+    expect(worldsClient.importVault).toHaveBeenCalledWith(file, DEFAULT_OPTIONS);
     // Summary modal reports what landed (ADR-0033 "what did we lose").
     const modal = $(el, '[data-testid=import-summary]');
     expect(modal).not.toBeNull();
@@ -255,8 +413,7 @@ describe('WorldIndex', () => {
 
     const pending = new Subject<ImportSummary>();
     worldsClient.importVault.mockReturnValue(pending);
-    pickVault(el);
-    fixture.detectChanges();
+    importVault(fixture, el);
 
     const trigger = $(el, '[data-testid=import-vault]') as HTMLButtonElement;
     expect(trigger.disabled).toBe(true);
@@ -272,8 +429,7 @@ describe('WorldIndex', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     worldsClient.importVault.mockReturnValue(throwError(() => new Error('bad zip')));
-    pickVault(el);
-    fixture.detectChanges();
+    importVault(fixture, el);
 
     expect(
       TestBed.inject(ToasterService)
