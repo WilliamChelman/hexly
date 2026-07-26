@@ -78,13 +78,13 @@ import { DataTypeChoice } from '../utils/datatype-choices';
       @apply border-line-strong;
     }
     .dp-cell.is-on {
-      @apply border-gold bg-gold-soft ring-1 ring-gold/40;
+      @apply border-accent bg-accent-soft ring-1 ring-accent/40;
     }
     .dp-glyph {
       @apply grid size-8 shrink-0 place-items-center rounded-md bg-surface-sunken font-mono text-sm text-ink-strong;
     }
     .dp-cell.is-on .dp-glyph {
-      @apply bg-gold/15 text-gold;
+      @apply bg-accent/15 text-accent;
     }
     .dp-label {
       @apply text-sm font-medium text-ink-strong;

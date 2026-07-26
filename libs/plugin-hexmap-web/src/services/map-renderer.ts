@@ -111,11 +111,11 @@ interface Palette {
   readonly nameInk: string;
   /** The halo stroked behind name/label text for legibility, from `--ink-stroke`. */
   readonly inkStroke: string;
-  /** The gilded glow a Label's fill casts, from `--glow`. */
+  /** The gilded glow a Label's fill casts, from `--accent-glow`. */
   readonly glow: string;
-  /** The accent a selection highlight is stroked in, from `--gold-strong`. */
+  /** The accent a selection highlight is stroked in, from `--accent-strong`. */
   readonly selected: string;
-  /** The danger ink a blocked move cell is washed in, from `--ember`. */
+  /** The danger ink a blocked move cell is washed in, from `--danger`. */
   readonly blocked: string;
   /** One fill colour per terrain id, resolved from its `--terrain-*` token. */
   readonly terrain: Record<TerrainId, string>;
@@ -214,15 +214,15 @@ export class Canvas2dMapRenderer implements MapRenderer {
       string
     >;
     return {
-      hover: read('--color-gold-soft', 'rgba(212,175,55,.3)'),
+      hover: read('--color-accent-soft', 'rgba(212,175,55,.3)'),
       line: read('--color-hex-line', '#888'),
       featureInk: read('--color-feature-ink', '#f4ecd8'),
       labelInk: read('--color-label-ink', '#f4ecd8'),
       nameInk: read('--color-name-ink', '#f4ecd8'),
       inkStroke: read('--color-ink-stroke', '#0a0b16'),
-      glow: read('--color-glow', 'rgba(217,178,90,.5)'),
-      selected: read('--color-gold-strong', '#7e560f'),
-      blocked: read('--color-ember', '#a4402e'),
+      glow: read('--color-accent-glow', 'rgba(217,178,90,.5)'),
+      selected: read('--color-accent-strong', '#7e560f'),
+      blocked: read('--color-danger', '#a4402e'),
       terrain,
     };
   }

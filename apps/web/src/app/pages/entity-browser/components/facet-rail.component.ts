@@ -67,7 +67,7 @@ export interface FieldRangeChange {
           <button
             type="button"
             data-testid="facet-clear"
-            class="font-sans text-xs text-gold hover:underline"
+            class="font-sans text-xs text-accent hover:underline"
             (click)="clearAll.emit()"
           >
             {{ 'entityBrowser.facets.clearAll' | transloco }}
@@ -90,7 +90,7 @@ export interface FieldRangeChange {
                   type="button"
                   [attr.data-testid]="'facet-' + group.category + '-' + row.value"
                   [attr.aria-pressed]="row.active"
-                  class="w-full flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-gold/15 aria-pressed:text-gold"
+                  class="w-full flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent"
                   (click)="toggled.emit({ category: group.category, value: row.value })"
                 >
                   <span class="truncate">{{ row.label }}</span>
@@ -140,7 +140,7 @@ export interface FieldRangeChange {
                     type="button"
                     [attr.data-testid]="'facet-field-' + field.key + '-' + row.value"
                     [attr.aria-pressed]="row.active"
-                    class="w-full flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-gold/15 aria-pressed:text-gold"
+                    class="w-full flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent"
                     (click)="
                       fieldValueToggled.emit({
                         key: field.key,

@@ -59,7 +59,7 @@ import { LinkedEntity } from '@hexly/domain';
     @if (descriptor()) {
       <span
         data-testid="link-descriptor"
-        class="shrink-0 rounded-full bg-gold-soft px-1.5 text-[0.65rem] font-semibold leading-tight text-gold-strong"
+        class="shrink-0 rounded-full bg-accent-soft px-1.5 text-[0.65rem] font-semibold leading-tight text-accent-strong"
         >{{ descriptor() }}</span
       >
     }

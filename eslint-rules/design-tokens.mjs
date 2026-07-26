@@ -104,7 +104,7 @@ const noUnknownDesignToken = {
       const text = textOf(node);
       if (!text || !text.includes('var(--')) return;
       // Capture uppercase letters too: CSS custom properties are case-sensitive,
-      // so a typo'd `var(--Gold)` does not resolve to `--color-gold` and must
+      // so a typo'd `var(--Accent)` does not resolve to `--color-accent` and must
       // still be flagged rather than silently skipped by a lowercase-only match.
       for (const m of text.matchAll(/var\(\s*--([A-Za-z0-9_-]+)\s*[,)]/g)) {
         const name = m[1];

@@ -14,7 +14,7 @@ import { ButtonComponent, EyebrowComponent } from '@hexly/web-ui';
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <main class="mx-auto flex max-w-[40rem] flex-col items-center gap-3 px-6 py-[6rem] text-center">
-      <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'error.eyebrow' | transloco }}</span>
+      <span appEyebrow class="text-accent! tracking-[0.28em]">{{ 'error.eyebrow' | transloco }}</span>
       <h1 class="m-0 font-display text-[28px] leading-tight text-ink-strong">
         {{ 'error.heading' | transloco }}
       </h1>

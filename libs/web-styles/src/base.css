@@ -45,12 +45,12 @@ h4 {
 }
 
 a {
-  color: var(--color-gold-strong);
+  color: var(--color-accent-strong);
   text-decoration-color: var(--color-line-strong);
   text-underline-offset: 0.18em;
 }
 a:hover {
-  color: var(--color-gold);
+  color: var(--color-accent);
 }
 
 button,
@@ -62,7 +62,7 @@ textarea {
 }
 
 ::selection {
-  background: var(--color-gold-soft);
+  background: var(--color-accent-soft);
   color: var(--color-ink-strong);
 }
 

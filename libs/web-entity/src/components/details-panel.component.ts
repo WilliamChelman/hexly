@@ -96,7 +96,7 @@ import { FieldControlComponent } from './field-control.component';
               <span
                 [attr.data-testid]="'detail-field-incomplete-' + row.field.id"
                 [attr.title]="'fields.details.incompleteMark' | transloco"
-                class="ml-1 inline-block rounded-full bg-gold-soft px-1.5 align-middle text-[0.65rem] font-semibold leading-tight text-gold-strong"
+                class="ml-1 inline-block rounded-full bg-accent-soft px-1.5 align-middle text-[0.65rem] font-semibold leading-tight text-accent-strong"
                 >{{ 'fields.details.incomplete' | transloco }}</span
               >
             }

@@ -47,7 +47,7 @@ export type ButtonSize = 'md' | 'sm';
         color var(--dur-fast) var(--ease-out);
     }
     :host(:hover) {
-      @apply -translate-y-px shadow-2 border-gold;
+      @apply -translate-y-px shadow-2 border-accent;
     }
     :host(:active) {
       @apply translate-y-0 shadow-inset;
@@ -57,21 +57,21 @@ export type ButtonSize = 'md' | 'sm';
       @apply opacity-50 cursor-not-allowed transform-none shadow-none;
     }
 
-    /* Gilded — gradient fill, gold glow, inset top-highlight; glow grows on hover.
+    /* The accent sheen — gradient fill, accent glow, inset top-highlight; glow grows on hover.
        Fully raw: gradient, color-mix border, layered glow box-shadow — no utilities. */
     :host(.is-primary) {
-      --_fg: var(--color-on-gilded);
-      background: var(--gradient-gold);
-      border-color: color-mix(in srgb, var(--color-gold-bright) 70%, #fff);
+      --_fg: var(--color-on-accent-sheen);
+      background: var(--gradient-accent-sheen);
+      border-color: color-mix(in srgb, var(--color-accent-sheen-bright) 70%, #fff);
       box-shadow:
-        0 0 16px -2px var(--color-glow),
+        0 0 16px -2px var(--color-accent-glow),
         inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
     :host(.is-primary:hover) {
-      background: var(--gradient-gold);
-      border-color: color-mix(in srgb, var(--color-gold-bright) 80%, #fff);
+      background: var(--gradient-accent-sheen);
+      border-color: color-mix(in srgb, var(--color-accent-sheen-bright) 80%, #fff);
       box-shadow:
-        0 0 24px -2px var(--color-glow),
+        0 0 24px -2px var(--color-accent-glow),
         inset 0 1px 0 rgba(255, 255, 255, 0.55);
     }
     :host(.is-ghost) {
@@ -80,25 +80,25 @@ export type ButtonSize = 'md' | 'sm';
       @apply shadow-none;
     }
     :host(.is-ghost:hover) {
-      --_bg: var(--color-gold-soft);
+      --_bg: var(--color-accent-soft);
       border-color: transparent;
       @apply shadow-none;
     }
     :host(.is-danger) {
-      --_fg: var(--color-ember);
-      --_bd: color-mix(in oklab, var(--color-ember) 40%, var(--color-line));
+      --_fg: var(--color-danger);
+      --_bd: color-mix(in oklab, var(--color-danger) 40%, var(--color-line));
     }
     :host(.is-danger:hover) {
-      --_fg: var(--color-on-gold);
-      --_bg: var(--color-ember);
-      border-color: var(--color-ember);
+      --_fg: var(--color-on-fill);
+      --_bg: var(--color-danger);
+      border-color: var(--color-danger);
     }
     /* Selected/pressed — a sticky highlight for a button acting as a toggle or a
        segmented choice (the consumer drives it via [active] and owns aria-pressed).
        Composes over any variant; placed last so it wins the same-specificity tie. */
     :host(.is-active) {
       --_fg: var(--color-ink-strong);
-      --_bg: var(--color-gold-soft);
+      --_bg: var(--color-accent-soft);
     }
     :host(.is-sm) {
       @apply px-3 py-1 text-xs;

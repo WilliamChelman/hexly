@@ -216,7 +216,7 @@ type Gesture =
        deliberately-not-isolate note); any z-index here would paint boxes over the chrome's controls. */
     .element {
       @apply absolute pointer-events-auto rounded-sm cursor-move;
-      background: color-mix(in srgb, var(--color-gold-soft) 55%, transparent);
+      background: color-mix(in srgb, var(--color-accent-soft) 55%, transparent);
       border: 1px solid var(--color-line-strong);
     }
     /* World-sized content scaled by the camera zoom from the box's top-left, so its scaled footprint
@@ -229,12 +229,12 @@ type Gesture =
     .element.is-readonly {
       @apply cursor-default;
     }
-    /* A Text Block reads as paper carrying prose, not a gold placeholder; armed, it invites a caret. */
+    /* A Text Block reads as paper carrying prose, not an accent placeholder; armed, it invites a caret. */
     .element.is-text {
       @apply bg-surface-raised;
       border-color: var(--color-line);
     }
-    /* An Image frames its own Asset — a quiet sunken mat behind the letterboxed picture, not gold. */
+    /* An Image frames its own Asset — a quiet sunken mat behind the letterboxed picture, not the accent. */
     .element.is-image {
       @apply bg-surface-sunken overflow-hidden;
       border-color: var(--color-line);
@@ -248,13 +248,13 @@ type Gesture =
       @apply cursor-text;
     }
     .element.is-selected {
-      border-color: var(--color-gold);
-      box-shadow: 0 0 0 1px var(--color-gold);
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 1px var(--color-accent);
     }
     .handle {
       @apply absolute w-2 h-2 rounded-full pointer-events-auto;
-      background: var(--color-gold);
-      border: 1px solid var(--color-on-gilded, #fff);
+      background: var(--color-accent);
+      border: 1px solid var(--color-on-accent-sheen, #fff);
     }
   `,
 })

@@ -21,7 +21,7 @@ import { IconComponent } from '@hexly/web-ui';
     <input
       type="search"
       data-testid="entity-search"
-      class="w-full pl-10 pr-3 py-2.5 font-sans text-md text-ink-strong bg-surface rounded-sm border border-line focus:border-gold outline-none placeholder:text-ink-faint"
+      class="w-full pl-10 pr-3 py-2.5 font-sans text-md text-ink-strong bg-surface rounded-sm border border-line focus:border-accent outline-none placeholder:text-ink-faint"
       [value]="value()"
       [attr.aria-label]="'entityBrowser.searchLabel' | transloco"
       [attr.placeholder]="'entityBrowser.searchPlaceholder' | transloco"

@@ -704,7 +704,7 @@ describe('StatBlockView (draw-steel)', () => {
       },
       false,
     );
-    // A signature-categorised ability gets the gold accent bar even when its turn-slot type is not `main`.
-    expect(el.querySelector('[data-testid=ability-0]')?.getAttribute('class')).toContain('border-gold');
+    // A signature-categorised ability gets the accent bar even when its turn-slot type is not `main`.
+    expect(el.querySelector('[data-testid=ability-0]')?.getAttribute('class')).toContain('border-accent');
   });
 });

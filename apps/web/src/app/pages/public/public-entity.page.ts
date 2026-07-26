@@ -76,7 +76,7 @@ interface Followed {
       @apply flex items-center gap-2 bg-surface px-4 py-2 text-sm text-ink-muted;
     }
     .public-back {
-      @apply text-gold-strong;
+      @apply text-accent-strong;
     }
     .public-notfound {
       @apply mx-auto flex w-full max-w-2xl flex-col gap-2 p-6;

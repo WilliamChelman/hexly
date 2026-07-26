@@ -36,7 +36,7 @@ component `@reference`s the global sheet); only the custom core — private-var
 assignment, `color-mix`, gradients, bespoke transitions — stays raw CSS (ADR-0031).
 
 **Rule for slices:** style from semantic tokens — never hard-code a hex value.
-Ask for a role (`--color-ink`, `--color-gold`, `--color-terrain-forest`), not a
+Ask for a role (`--color-ink`, `--color-accent`, `--color-terrain-forest`), not a
 colour. A lint rule (`hexly-design/*`) enforces that every `var(--…)` resolves to
 a defined token and that built-in `shadow-*` utilities (which bake a light value)
 stay out (ADR-0021). Spacing is unfenced — it follows Tailwind's defaults (ADR-0030).
@@ -47,7 +47,7 @@ Tailwind v4 is wired in (`@tailwindcss/postcss`, configured in
 `apps/web/.postcssrc.json`; `@import "tailwindcss"` in `styles.css`). Every
 utility-shaped token is declared in the `@theme static` block, so the same value
 both generates an on-brand, theme-aware utility (`bg-surface`, `text-ink`,
-`text-gold`, `border-line-strong`, `font-display`, `rounded-lg`,
+`text-accent`, `border-line-strong`, `font-display`, `rounded-lg`,
 `bg-terrain-forest`, `gap-5`, `text-md`) **and** is emitted as a CSS variable on
 `:root`/`:host` for scoped component styles to consume via `var(--…)`. Colours and
 shadows are declared non-`inline` so `[data-theme='dark']` (tokens.css) can
@@ -80,11 +80,11 @@ block (emitted to `:root`); `:root[data-theme='dark']` reassigns the generated
 | `--color-surface`     | Paper / panels                           | `#f5ecd6` | `#161c38` |
 | `--color-ink`         | Primary text                             | `#2f2416` | `#e9e2cf` |
 | `--color-ink-muted`   | Secondary text                           | `#6f5d40` | `#aeb2cc` |
-| `--color-gold`        | Primary accent (compass / constellation) | `#9a6a16` | `#e6b652` |
+| `--color-accent`      | Primary accent (compass / constellation) | `#9a6a16` | `#e6b652` |
 | `--color-sea`         | Secondary (seas / aurora)                | `#2f6f6a` | `#54c8bb` |
 | `--color-astra`       | Tertiary (dusk / nebula)                 | `#5a4aa6` | `#a18cf0` |
-| `--color-ember`       | Danger (marginalia)                      | `#a4402e` | `#e88a6f` |
-| `--color-positive`    | Confirm / "online"                       | `#4a6f2f` | `#86c46a` |
+| `--color-danger`      | Danger (marginalia)                      | `#a4402e` | `#e88a6f` |
+| `--color-success`     | Confirm / "online"                       | `#4a6f2f` | `#86c46a` |
 | `--color-line-strong` | Drawn rules / borders                    | `#a8946a` | `#3d4878` |
 
 **Terrain fills** (`--color-terrain-grass|forest|ocean|mountain|desert|marsh|sky`)
