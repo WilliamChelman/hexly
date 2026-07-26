@@ -228,16 +228,15 @@ export class DetailsPanelComponent {
   });
 
   /** The forward-only validation of the live document, so an invalid control can flag itself (structured excluded). */
-  private readonly invalidKeys = computed(
-    () =>
-      new Set(
-        validateFields(
-          this.effective().filter((field) => !isStructuredDataType(field.dataType)),
-          this.doc(),
-          NO_STRUCTURED_DATA_TYPES,
-        ).errors.map((error) => error.key),
-      ),
-  );
+  private readonly invalidKeys = computed(() => {
+    const reading = validateFields(
+      this.effective().filter((field) => !isStructuredDataType(field.dataType)),
+      this.doc(),
+      NO_STRUCTURED_DATA_TYPES,
+    );
+    // Recombined (ADR-0074): an unfilled required Field flags exactly as an ill-typed one does.
+    return new Set([...reading.errors, ...reading.incomplete].map((error) => error.key));
+  });
 
   protected isInvalid(field: Field): boolean {
     return this.invalidKeys().has(field.id);

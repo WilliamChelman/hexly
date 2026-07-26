@@ -159,17 +159,20 @@ export class CreateEntityDialogComponent {
     this.fields().filter((field) => field.required && !isStructuredDataType(field.dataType)),
   );
 
-  /** Every picked type's required Fields must validate before the create is allowed (#189). */
-  protected readonly valid = computed(
-    () => validateFields(this.fields(), this.metadata(), NO_STRUCTURED_DATA_TYPES).ok,
+  /** The forward-only reading of the collected EntityDocument, both channels (ADR-0074). */
+  private readonly validation = computed(() =>
+    validateFields(this.fields(), this.metadata(), NO_STRUCTURED_DATA_TYPES),
   );
+
+  /**
+   * Every picked type's required Fields must validate before the create is allowed (#189) — absence still
+   * gates here, recombined (ADR-0074).
+   */
+  protected readonly valid = computed(() => this.validation().ok && this.validation().incomplete.length === 0);
 
   /** Keys still failing the forward-only gate, so a required control can flag itself invalid. */
   protected readonly invalidKeys = computed(
-    () =>
-      new Set(
-        validateFields(this.fields(), this.metadata(), NO_STRUCTURED_DATA_TYPES).errors.map((error) => error.key),
-      ),
+    () => new Set([...this.validation().errors, ...this.validation().incomplete].map((error) => error.key)),
   );
 
   /**

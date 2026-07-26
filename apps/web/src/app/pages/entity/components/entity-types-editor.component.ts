@@ -164,16 +164,19 @@ export class EntityTypesEditorComponent {
       .map((d) => d.id),
   );
 
+  /** The forward-only reading of the pending prompt, both channels (ADR-0074). */
+  private readonly pendingValidation = computed(() =>
+    validateFields(this.pendingFields(), this.pendingMetadata(), NO_STRUCTURED_DATA_TYPES),
+  );
+
+  /** Absence still holds the add, recombined (ADR-0074). */
   protected readonly pendingValid = computed(
-    () => validateFields(this.pendingFields(), this.pendingMetadata(), NO_STRUCTURED_DATA_TYPES).ok,
+    () => this.pendingValidation().ok && this.pendingValidation().incomplete.length === 0,
   );
 
   /** Keys still failing the forward-only gate, so a control can flag itself invalid. */
   protected readonly invalidPendingKeys = computed(
-    () =>
-      new Set(
-        validateFields(this.pendingFields(), this.pendingMetadata(), NO_STRUCTURED_DATA_TYPES).errors.map((e) => e.key),
-      ),
+    () => new Set([...this.pendingValidation().errors, ...this.pendingValidation().incomplete].map((e) => e.key)),
   );
 
   /** A friendly label: a registered type's name (authored, for a user-defined one), else the raw id. */
@@ -216,7 +219,11 @@ export class EntityTypesEditorComponent {
     select.value = '';
     if (!type || this.types().includes(type)) return;
     const required = this.registry.resolveFields([type]).filter((f) => f.required);
-    const unmet = required.filter((f) => !validateFields([f], this.metadata(), NO_STRUCTURED_DATA_TYPES).ok);
+    const unmet = required.filter((f) => {
+      const reading = validateFields([f], this.metadata(), NO_STRUCTURED_DATA_TYPES);
+      // Recombined (ADR-0074): an absent required Field still counts as unmet here.
+      return !reading.ok || reading.incomplete.length > 0;
+    });
     if (unmet.length === 0 || !this.promptOnAdd()) {
       this.typesChange.emit([...this.types(), type]);
       return;

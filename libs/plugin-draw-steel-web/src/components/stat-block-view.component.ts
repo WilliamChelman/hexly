@@ -302,10 +302,15 @@ export class StatBlockViewComponent {
   /** The live stat-block value — a lens over the one EntityDocument map, coerced to a bare record. */
   private readonly block = computed<Record<string, unknown>>(() => asBlock(readField(this.session.doc(), this.field_)));
 
-  /** The flat inner stats failing the forward-only gate — a mistyped stat at rest, never an absent one. */
-  private readonly invalidKeys = computed(
-    () => new Set(validateFields(DS_STAT_FIELDS, this.block(), NO_STRUCTURED_DATA_TYPES).errors.map((e) => e.key)),
-  );
+  /**
+   * The flat inner stats the forward-only gate reads as unfilled or mistyped, in practice only the latter
+   * (no stat is `required`) — both channels, permanently: an empty slot inside a structured View flags the
+   * block, it never gates the save (ADR-0074).
+   */
+  private readonly invalidKeys = computed(() => {
+    const reading = validateFields(DS_STAT_FIELDS, this.block(), NO_STRUCTURED_DATA_TYPES);
+    return new Set([...reading.errors, ...reading.incomplete].map((e) => e.key));
+  });
 
   /**
    * Whether the writer has this View in edit mode — a *local* presentation toggle, distinct from

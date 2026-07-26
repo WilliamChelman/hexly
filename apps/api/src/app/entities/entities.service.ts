@@ -788,8 +788,11 @@ export class EntitiesService {
     metadata: EntityDocument,
   ): void {
     const fields = this.worldTypeFields.effectiveFields(worldId, types, metadata);
+    // Recombined (ADR-0074): absence still rejects, until the demotion drops this `incomplete` spread.
+    const validation = validateFields(fields, metadata, this.typeFields.structuredDataTypes);
     const errors: FieldError[] = [
-      ...validateFields(fields, metadata, this.typeFields.structuredDataTypes).errors,
+      ...validation.errors,
+      ...validation.incomplete,
       ...this.linkTargetTypeErrors(userId, fields, metadata),
     ];
     if (errors.length > 0)
