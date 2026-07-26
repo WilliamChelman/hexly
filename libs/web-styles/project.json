@@ -3,5 +3,15 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/web-styles/src",
   "projectType": "library",
-  "tags": ["scope:web", "type:styles"]
+  "tags": ["scope:web", "type:styles"],
+  "targets": {
+    "test": {
+      "inputs": [
+        "default",
+        "{workspaceRoot}/apps/web/src/**/*",
+        "{workspaceRoot}/libs/*/src/**/*",
+        "{workspaceRoot}/libs/*/project.json"
+      ]
+    }
+  }
 }
