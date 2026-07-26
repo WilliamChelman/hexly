@@ -97,4 +97,30 @@ describe('EntityNameResolver', () => {
     expect(client.list).toHaveBeenCalledWith({ q: 'aval', limit: 20, includeHidden: true });
     expect(items.map((e) => e.id)).toEqual(['n1']);
   });
+
+  it('repeats a query from cache — a take-first search never revalidates', async () => {
+    const resolver = createResolver();
+    const client = TestBed.inject(EntitiesClient) as unknown as { list: (opts: EntityListParams) => unknown };
+    const list = vi.spyOn(client, 'list').mockReturnValue(of({ items: [], nextCursor: null }));
+
+    await resolver.search('zorblax');
+    await resolver.search('zorblax');
+
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-searches after forgetSearches, so an Entity just minted from a mention is offered (ADR-0073)', async () => {
+    const resolver = createResolver();
+    const client = TestBed.inject(EntitiesClient) as unknown as { list: (opts: EntityListParams) => unknown };
+    const list = vi
+      .spyOn(client, 'list')
+      .mockReturnValueOnce(of({ items: [], nextCursor: null }))
+      .mockReturnValueOnce(of({ items: [summary('n2', 'Zorblax')], nextCursor: null }));
+
+    expect(await resolver.search('zorblax')).toEqual([]);
+    resolver.forgetSearches();
+
+    expect((await resolver.search('zorblax')).map((e) => e.id)).toEqual(['n2']);
+    expect(list).toHaveBeenCalledTimes(2);
+  });
 });

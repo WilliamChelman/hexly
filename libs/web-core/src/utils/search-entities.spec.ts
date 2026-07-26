@@ -97,6 +97,27 @@ describe('searchEntities', () => {
     expect(list).toHaveBeenCalledTimes(1);
   });
 
+  it('memoises into a supplied cache, so its owner can forget a miss (ADR-0073)', async () => {
+    const list = vi.fn().mockReturnValue(of({ items: [summary('n1')], nextCursor: null }));
+    const client = { list } as unknown as EntitiesClient;
+    const query$ = new Subject<string>();
+    const cache = new Map<string, EntitySummary[]>();
+    const results$ = searchEntities(client, query$, { cache }).pipe(share());
+
+    const first = firstValueFrom(results$);
+    query$.next('a');
+    await first;
+    expect(cache.get('a')).toEqual([summary('n1')]);
+
+    // Cleared: the next identical query has nothing to paint from and hits the server again.
+    cache.clear();
+    const second = firstValueFrom(results$);
+    query$.next('a');
+    await second;
+
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+
   it('paints the cache then revalidates, replacing the results when they change', async () => {
     const list = vi
       .fn()

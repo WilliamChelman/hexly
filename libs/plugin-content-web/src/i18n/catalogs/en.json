@@ -28,7 +28,9 @@
   },
   "entityPicker": {
     "label": "Link an entity",
-    "empty": "No matching entities"
+    "empty": "No matching entities",
+    "create": "Create \"{{name}}\"",
+    "createError": "Could not create the entity"
   },
   "descriptorPicker": {
     "label": "Describe this link",

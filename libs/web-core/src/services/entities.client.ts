@@ -145,13 +145,21 @@ export class EntitiesClient {
   /**
    * Create an Entity with an ordered `types` set, `types[0]` primary (ADR-0048). `doc` seeds a
    * picked type's required Fields into the minted body. worldId omitted → the caller's first World.
+   * `tags` is the Tag set to mint with — Inline Creation's `entities.inlineTag` (ADR-0073).
    */
-  create(name: string, types: readonly EntityType[], worldId?: string, doc?: EntityDocument): Observable<EntityDetail> {
+  create(
+    name: string,
+    types: readonly EntityType[],
+    worldId?: string,
+    doc?: EntityDocument,
+    tags?: readonly string[],
+  ): Observable<EntityDetail> {
     return this.http.post<EntityDetail>('/api/entities', {
       name,
       types,
       ...(worldId ? { worldId } : {}),
       ...(doc ? { document: doc } : {}),
+      ...(tags?.length ? { tags } : {}),
     });
   }
 

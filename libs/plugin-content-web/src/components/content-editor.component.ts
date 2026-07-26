@@ -17,11 +17,14 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { Editor, JSONContent } from '@tiptap/core';
 import { catchError, firstValueFrom, of } from 'rxjs';
+import { TranslocoService } from '@jsverse/transloco';
+import { EntitySummary } from '@hexly/domain';
 import { RichContent, CONTENT_FIELD, tiptapContent } from '@hexly/plugin-content';
-import { EntitiesClient } from '@hexly/web-core';
+import { EntitiesClient, ToasterService } from '@hexly/web-core';
 import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { TiptapDirective } from '../directives/tiptap.directive';
 import { EntityNameResolver } from '../services/entity-name-resolver';
+import { InlineEntityCreator } from '../services/inline-entity-creator';
 import { CONTENT_EXTENSIONS } from '../extensions/content-extensions';
 import { entityLinkNode } from '../extensions/entity-link-node';
 import { calloutNode } from '../extensions/callout-node';
@@ -262,6 +265,10 @@ export class ContentEditorComponent {
   private readonly resolver = inject(EntityNameResolver);
   // The `::` picker's vocabulary source (#96): the owner's last-saved DISTINCT descriptors.
   private readonly entities = inject(EntitiesClient);
+  // The `@` picker's Create row writes through this (ADR-0073); it owns the Inline Creation knobs.
+  private readonly inlineCreator = inject(InlineEntityCreator);
+  private readonly toaster = inject(ToasterService);
+  private readonly transloco = inject(TranslocoService);
   private readonly environmentInjector = inject(EnvironmentInjector);
   // ContentEditor's own node injector — lives inside the router outlet, so the
   // entityLink node views created from it can resolve ActivatedRoute for routerLink.
@@ -419,6 +426,25 @@ export class ContentEditorComponent {
     this.editor()?.commands.focus('end');
   }
 
+  /**
+   * Mint the Entity an `@` mention names, into the open Entity's World — typing must never author a
+   * cross-World link (ADR-0073). A failed write is reported here and rethrown, so the extension can
+   * put the typed text back where it was.
+   */
+  private async mint(name: string): Promise<EntitySummary> {
+    try {
+      const worldId = this.session.current()?.worldId;
+      if (!worldId) throw new Error('Inline Creation needs an open Entity to take its World from');
+      const entity = await firstValueFrom(this.inlineCreator.create(name, worldId));
+      // The very next `@Zorblax` must offer this Entity, not repeat the miss that minted it (ADR-0073).
+      this.resolver.forgetSearches();
+      return entity;
+    } catch (error) {
+      this.toaster.show(this.transloco.translate('editor.entityPicker.createError'), 'error');
+      throw error;
+    }
+  }
+
   /** Buffer a TipTap `update` and arm the debounce; a doc value-equal to the baseline is normalisation, not an edit (#164). */
   private onDocChanged(json: JSONContent): void {
     // ponytail: JSON.stringify equality — ProseMirror JSON has deterministic key order, so this is
@@ -489,10 +515,11 @@ export class ContentEditorComponent {
       },
     });
 
-    const mention = entityMention(
-      () => this.entityPicker(),
-      (query) => this.resolver.search(query),
-    );
+    const mention = entityMention({
+      getPicker: () => this.entityPicker(),
+      search: (name) => this.resolver.search(name),
+      mint: (name) => this.mint(name),
+    });
 
     // The owner's descriptor vocabulary, fetched lazily on the first `::` and cached for
     // this editor's life. ponytail: a reload recreates the editor and refreshes it, so a

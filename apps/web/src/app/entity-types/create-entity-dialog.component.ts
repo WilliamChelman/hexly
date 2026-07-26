@@ -20,6 +20,12 @@ import { FieldControlComponent } from '@hexly/web-entity';
 /** What a create Command hands the dialog when it opens it: the seeded primary type (ADR-0048, #189). */
 export interface CreateEntityDialogData {
   readonly type: EntityType;
+  /**
+   * Pins the World and locks its select. A caller creating from inside an Entity passes that Entity's
+   * World, because minting elsewhere would author a cross-World link as a side effect of typing
+   * (ADR-0073). Omitted, the author picks.
+   */
+  readonly worldId?: string;
 }
 
 /** What the dialog closes with on a create — `undefined` on cancel. */
@@ -67,6 +73,7 @@ export type CreateEntityDialogResult = EntityDetail;
         <select
           class="w-full py-2 px-3 text-sm text-ink-strong bg-surface-sunken border border-line-strong rounded-md shadow-inset"
           data-testid="create-entity-world"
+          [disabled]="locked"
           (change)="onWorld($event)"
         >
           <!-- [selected] per-option, not [value] on the select: the select's
@@ -145,10 +152,12 @@ export class CreateEntityDialogComponent {
 
   protected readonly worlds = this.worldStore.worlds;
   protected readonly name = signal('');
-  // Default the World to the one already in scope, else the first loaded (ADR-0032). A fresh
-  // instance per open means these are plain initial values, not a reset effect.
+  /** A caller that pinned the World gets a locked select, not an offer (ADR-0073). */
+  protected readonly locked = this.dialogRef.data.worldId !== undefined;
+  // Default the World to the caller's pin, else the one already in scope, else the first loaded
+  // (ADR-0032). A fresh instance per open means these are plain initial values, not a reset effect.
   protected readonly worldId = signal<string | null>(
-    this.activeWorld.worldId() ?? this.worldStore.worlds()[0]?.id ?? null,
+    this.dialogRef.data.worldId ?? this.activeWorld.worldId() ?? this.worldStore.worlds()[0]?.id ?? null,
   );
   /** The working ordered type set the author builds through the embedded editor, seeded by the Command. */
   protected readonly types = signal<readonly EntityType[]>([this.dialogRef.data.type]);

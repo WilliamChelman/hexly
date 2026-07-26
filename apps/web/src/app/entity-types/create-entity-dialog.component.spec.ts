@@ -66,9 +66,13 @@ describe('CreateEntityDialog', () => {
     activeWorldId: string | null,
     seedType = 'core.type.note',
     setup?: () => void,
+    pinnedWorldId?: string,
   ) {
     entitiesClient = new MockEntitiesClient();
-    dialogRef = new DialogRef<CreateEntityDialogData, CreateEntityDialogResult>({ type: seedType });
+    dialogRef = new DialogRef<CreateEntityDialogData, CreateEntityDialogResult>({
+      type: seedType,
+      ...(pinnedWorldId ? { worldId: pinnedWorldId } : {}),
+    });
     closedWith = [];
     dialogRef.closed.subscribe((entity) => closedWith.push(entity));
     vi.spyOn(dialogRef, 'close');
@@ -108,6 +112,16 @@ describe('CreateEntityDialog', () => {
 
     const select: HTMLSelectElement = q(fixture, 'create-entity-world');
     expect(select.value).toBe('w1');
+  });
+
+  it('locks the World select to a caller-pinned World, over the active one (ADR-0073)', () => {
+    // A caller creating from inside an Entity pins that Entity's World: minting elsewhere would
+    // author a cross-World link as a side effect.
+    const fixture = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')], 'w2', undefined, undefined, 'w1');
+
+    const select: HTMLSelectElement = q(fixture, 'create-entity-world');
+    expect(select.value).toBe('w1');
+    expect(select.disabled).toBe(true);
   });
 
   it('creates the Entity in the selected World and closes with it as the result', () => {
