@@ -186,7 +186,7 @@ export interface EntityLinkRepairHost extends Pick<EntityLinkRepair, 'writable' 
               variant="ghost"
               size="sm"
               class="w-full justify-start!"
-              data-testid="entity-link-relink"
+              data-testid="entity-link-repair-relink"
               (click)="picking.set(true)"
             >
               {{ 'editor.entityLink.relink' | transloco }}

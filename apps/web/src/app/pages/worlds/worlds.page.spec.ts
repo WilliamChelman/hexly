@@ -258,7 +258,7 @@ describe('WorldIndex', () => {
   function importVault(fixture: ReturnType<typeof render>, el: HTMLElement) {
     const file = pickVault(el);
     fixture.detectChanges();
-    ($(el, '[data-testid=confirm-import]') as HTMLButtonElement).click();
+    ($(el, '[data-testid=import-confirm]') as HTMLButtonElement).click();
     fixture.detectChanges();
     return file;
   }
@@ -325,7 +325,7 @@ describe('WorldIndex', () => {
 
     pickVault(el);
     fixture.detectChanges();
-    ($(el, '[data-testid=cancel-import]') as HTMLButtonElement).click();
+    ($(el, '[data-testid=import-cancel]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     expect($(el, '[data-testid=import-options]')).toBeNull();
@@ -350,7 +350,7 @@ describe('WorldIndex', () => {
     tag.value = 'from the vault';
     tag.dispatchEvent(new Event('input'));
     fixture.detectChanges();
-    ($(el, '[data-testid=confirm-import]') as HTMLButtonElement).click();
+    ($(el, '[data-testid=import-confirm]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     expect(worldsClient.importVault).toHaveBeenCalledWith(file, {
@@ -374,7 +374,7 @@ describe('WorldIndex', () => {
     tag.value = 'this-run';
     tag.dispatchEvent(new Event('input'));
     fixture.detectChanges();
-    ($(el, '[data-testid=confirm-import]') as HTMLButtonElement).click();
+    ($(el, '[data-testid=import-confirm]') as HTMLButtonElement).click();
     fixture.detectChanges();
     ($(el, '[data-testid=open-imported]') as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -383,7 +383,7 @@ describe('WorldIndex', () => {
     fixture.detectChanges();
     expect(($(el, '[data-testid=import-create-unresolved]') as HTMLInputElement).checked).toBe(true);
     expect(($(el, '[data-testid=import-inline-tag]') as HTMLInputElement).value).toBe('');
-    ($(el, '[data-testid=confirm-import]') as HTMLButtonElement).click();
+    ($(el, '[data-testid=import-confirm]') as HTMLButtonElement).click();
 
     expect(worldsClient.importVault).toHaveBeenLastCalledWith(file, DEFAULT_OPTIONS);
   });

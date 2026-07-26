@@ -36,7 +36,7 @@ test('an Unresolved Link promotes in place: named from its label, with its displ
   await expect(page.getByTestId('entity-link-repair')).toBeVisible();
   // Both actions, and the Create row names the label's basename, not the prose phrasing it renders as.
   await expect(page.getByTestId('entity-link-repair-create')).toHaveText('Create "Zorblax"');
-  await expect(page.getByTestId('entity-link-relink')).toBeVisible();
+  await expect(page.getByTestId('entity-link-repair-relink')).toBeVisible();
 
   await page.getByTestId('entity-link-repair-create').click();
   await expect(page.getByTestId('entity-link-repair')).toHaveCount(0);
@@ -83,7 +83,7 @@ test('a dangling link is offered no Create, only the relink', async ({ page, req
 
   await link.click();
   await expect(page.getByTestId('entity-link-repair')).toBeVisible();
-  await expect(page.getByTestId('entity-link-relink')).toBeVisible();
+  await expect(page.getByTestId('entity-link-repair-relink')).toBeVisible();
   await expect(page.getByTestId('entity-link-repair-create')).toHaveCount(0);
 });
 
@@ -121,7 +121,7 @@ test('a caller with no create rights in the World is offered no Create, and can 
   await expect(editor.getByTestId('entity-link-repair-create')).toHaveCount(0);
 
   // Losing creation must not cost them retargeting.
-  await editor.getByTestId('entity-link-relink').click();
+  await editor.getByTestId('entity-link-repair-relink').click();
   await editor.getByTestId('entity-link-repair-picker-search').fill('Zorblax');
   await editor.getByTestId(`entity-link-repair-picker-option-${targetId}`).click();
   await expect(link).toHaveAttribute('data-entity-id', targetId);

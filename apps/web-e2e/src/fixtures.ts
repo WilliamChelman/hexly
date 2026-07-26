@@ -387,7 +387,7 @@ export async function confirmImport(page: Page): Promise<ImportSummary> {
   const imported = page.waitForResponse(
     (r) => r.url().endsWith('/api/worlds/import') && r.request().method() === 'POST' && r.ok(),
   );
-  await page.getByTestId('confirm-import').click();
+  await page.getByTestId('import-confirm').click();
   return (await (await imported).json()) as ImportSummary;
 }
 

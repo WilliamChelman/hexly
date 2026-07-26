@@ -144,7 +144,7 @@ describe('EntityLinkView', () => {
       const menu = document.body.querySelector('[data-testid=entity-link-repair]') as HTMLElement;
       expect(document.activeElement).toBe(menu.querySelector('[data-testid=entity-link-repair-create]'));
 
-      (menu.querySelector('[data-testid=entity-link-relink]') as HTMLElement).click();
+      (menu.querySelector('[data-testid=entity-link-repair-relink]') as HTMLElement).click();
       fixture.detectChanges();
       await flushMicrotasks();
 

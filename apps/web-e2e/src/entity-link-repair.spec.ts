@@ -36,7 +36,7 @@ function resolvedVault(): Buffer {
 async function relink(page: Page, query: string, targetId: string): Promise<void> {
   await page.getByTestId('entity-link').click();
   await expect(page.getByTestId('entity-link-repair')).toBeVisible();
-  await page.getByTestId('entity-link-relink').click();
+  await page.getByTestId('entity-link-repair-relink').click();
   await page.getByTestId('entity-link-repair-picker-search').fill(query);
   await page.getByTestId(`entity-link-repair-picker-option-${targetId}`).click();
   await expect(page.getByTestId('entity-link-repair')).toHaveCount(0);

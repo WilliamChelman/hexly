@@ -433,7 +433,7 @@ import {
           type="button"
           appButton
           variant="default"
-          data-testid="cancel-import"
+          data-testid="import-cancel"
           (click)="cancelImport()"
         >
           {{ 'common.cancel' | transloco }}
@@ -443,7 +443,7 @@ import {
           type="button"
           appButton
           variant="primary"
-          data-testid="confirm-import"
+          data-testid="import-confirm"
           (click)="confirmImport()"
         >
           {{ 'worlds.importConfirm' | transloco }}

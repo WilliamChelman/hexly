@@ -96,7 +96,7 @@ test('cancelling the options dialog uploads nothing', async ({ page }) => {
   });
 
   await pickVault(page, vaultZip());
-  await page.getByTestId('cancel-import').click();
+  await page.getByTestId('import-cancel').click();
   await expect(page.getByTestId('import-options')).toBeHidden();
 
   expect(posted).toBe(false);
