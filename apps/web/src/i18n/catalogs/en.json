@@ -424,6 +424,7 @@
     "nameLabel": "Label",
     "typeLabel": "Type",
     "required": "Required",
+    "requiredHint": "A prompt, not a rule: an entity that leaves this field empty is marked Incomplete where you edit it, but saving is never blocked.",
     "facetable": "Filterable",
     "decor": "Presentation only",
     "decorHint": "Hide this link by default on the graph and outbound references — for cover art and other presentation links.",

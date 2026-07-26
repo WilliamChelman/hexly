@@ -424,6 +424,7 @@
     "nameLabel": "Libellé",
     "typeLabel": "Type",
     "required": "Requis",
+    "requiredHint": "Une indication, pas une contrainte : une entité qui laisse ce champ vide est signalée comme incomplète là où vous la modifiez, sans que l'enregistrement soit jamais bloqué.",
     "facetable": "Filtrable",
     "decor": "Présentation seule",
     "decorHint": "Masquer ce lien par défaut sur le graphe et les références sortantes — pour les illustrations et autres liens de présentation.",

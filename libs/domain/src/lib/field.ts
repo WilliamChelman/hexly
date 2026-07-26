@@ -159,6 +159,11 @@ export const fieldSchemaSchema = z.object({
    */
   labelKey: z.string().trim().min(1).optional(),
   dataType: fieldDataTypeSchema,
+  /**
+   * **Advisory** (CONTEXT.md → Incomplete, ADR-0074): `required` prompts an author and flags a surface, it
+   * never refuses a write. An Entity missing one reads **Incomplete** ({@link FieldValidation.incomplete});
+   * only a *present* value of the wrong shape is an error.
+   */
   required: z.boolean().default(false),
   facetable: z.boolean().default(false),
   /**
@@ -210,6 +215,7 @@ export function defineField(definition: {
   readonly label: string;
   readonly labelKey?: string;
   readonly dataType: FieldDataType;
+  /** **Advisory** (ADR-0074): prompts an author and flags a surface; absence never refuses a write. */
   readonly required?: boolean;
   readonly facetable?: boolean;
   readonly vault?: { slot: VaultSlot };

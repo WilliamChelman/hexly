@@ -114,6 +114,8 @@ interface Draft {
           <input type="checkbox" data-testid="field-required" [formField]="fieldForm.required" />
           {{ 'worldFields.required' | transloco }}
         </label>
+        <!-- ADR-0074: the copy is the only migration a demoted expectation gets. -->
+        <p class="field-hint" data-testid="field-required-hint">{{ 'worldFields.requiredHint' | transloco }}</p>
         <label class="field-flag">
           <input type="checkbox" data-testid="field-facetable" [formField]="fieldForm.facetable" />
           {{ 'worldFields.facetable' | transloco }}

@@ -5,6 +5,7 @@ import {
   enterLibrary,
   expect,
   openDetails,
+  openWorldFieldEditor,
   test,
   type Page,
 } from './fixtures';
@@ -54,4 +55,15 @@ test('the Details panel marks an unfilled required Field Incomplete, and clears 
   // The mark flags, it never blocks: the control beside it is live, and filling it clears the reading.
   await page.getByTestId('detail-field-world.field.rank').locator('input').fill('Baronet');
   await expect(mark).toHaveCount(0);
+});
+
+/** There is no migration for an expectation (ADR-0074), so the checkbox carries the new meaning itself. */
+test('the World field editor explains the required checkbox where the Owner ticks it', async ({ page }) => {
+  const worldId = await enterLibrary(page);
+  await openWorldFieldEditor(page, worldId);
+
+  await expect(page.getByTestId('field-required')).toBeVisible();
+  const hint = page.getByTestId('field-required-hint');
+  await expect(hint).toBeVisible();
+  await expect(hint).not.toBeEmpty();
 });

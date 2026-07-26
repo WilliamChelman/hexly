@@ -224,6 +224,14 @@ export async function authorWorldType(
   await expect(page.getByTestId(`type-world.type.${type.id}`)).toBeVisible();
 }
 
+/** Open a blank World Field editor, for a spec that reads the form itself rather than a Field it authored. */
+export async function openWorldFieldEditor(page: Page, worldId: string): Promise<void> {
+  await page.goto(`/w/${worldId}/settings`);
+  // Settings is a master/detail layout; the type/field editors live under the Schema section.
+  await page.getByTestId('settings-nav-schema').click();
+  await page.getByTestId('field-new').click();
+}
+
 /**
  * Author a reusable World-defined Field in a World's settings (ADR-0054, #230, ADR-0056), and land back
  * on the Fields list with it saved. `segment` is the `world.`-less key the form slugs into `world.field.<segment>`
@@ -244,10 +252,7 @@ export async function authorWorldField(
     required?: boolean;
   },
 ): Promise<void> {
-  await page.goto(`/w/${worldId}/settings`);
-  // Settings is a master/detail layout; the type/field editors live under the Schema section.
-  await page.getByTestId('settings-nav-schema').click();
-  await page.getByTestId('field-new').click();
+  await openWorldFieldEditor(page, worldId);
   await page.getByTestId('field-name-input').fill(field.label);
   await page.getByTestId('field-key-input').fill(field.segment);
   if (field.kind) await page.getByTestId(`field-kind-option-${field.kind}`).click();
