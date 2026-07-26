@@ -39,6 +39,7 @@ import {
   updateWorldFieldRequestSchema,
   updateWorldRequestSchema,
   UserDefinedType,
+  vaultImportOptionsSchema,
   WorldDetail,
   WorldGraph,
   WorldMember,
@@ -94,6 +95,10 @@ export class WorldsController {
    * memory; the import pre-extracts Asset Stats/thumbnails (sharp, async, ADR-0065) then persists in
    * chunked transactions that each commit and yield (ADR-0046), and the {@link ImportSummary} reports
    * what landed and what was lost.
+   *
+   * The multipart body's non-file fields are this run's `VaultImportOptions` (ADR-0073) — the
+   * create-unresolved switch and the Type/Tag overrides. All are optional, so a caller that uploads only
+   * the file gets the defaults.
    */
   @Post('import')
   // Import mints a World, so it needs the World Creation capability too (ADR-0040).
@@ -102,9 +107,15 @@ export class WorldsController {
   // is set instance-wide via MulterModule (ADR-0036) and inherited here. The decompressed
   // ceiling (the real zip-bomb guard) lives in the importer, also config-driven.
   @UseInterceptors(FileInterceptor('file'))
-  import(@CurrentUser() user: AuthUser, @UploadedFile() file: UploadedZip | undefined): Promise<ImportSummary> {
+  import(
+    @CurrentUser() user: AuthUser,
+    @UploadedFile() file: UploadedZip | undefined,
+    @Body() body: unknown,
+  ): Promise<ImportSummary> {
     if (!file) throw new BadRequestException();
-    return this.importer.import(user.id, file.originalname, file.buffer);
+    const parsed = vaultImportOptionsSchema.safeParse(body ?? {});
+    if (!parsed.success) throw new BadRequestException();
+    return this.importer.import(user.id, file.originalname, file.buffer, parsed.data);
   }
 
   // World Creation capability required (ADR-0040); Superadmin bypasses in the guard.

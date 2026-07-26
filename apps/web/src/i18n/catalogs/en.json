@@ -288,6 +288,7 @@
     "importSummaryHeading": "Vault imported",
     "importNotes": "Notes imported",
     "importLinksResolved": "Links resolved",
+    "importLinksCreated": "Entities created",
     "importLinksDangling": "Links dangling",
     "importAssets": "Assets stored",
     "importSkipped": "Files skipped",

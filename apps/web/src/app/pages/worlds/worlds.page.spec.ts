@@ -208,6 +208,7 @@ describe('WorldIndex', () => {
     notesImported: 3,
     filesSkipped: 0,
     linksResolved: 1,
+    linksCreated: 0,
     linksDangling: 0,
     assetsStored: 0,
     constructsDegraded: {},
@@ -232,7 +233,7 @@ describe('WorldIndex', () => {
     const fixture = render([]);
     const el = fixture.nativeElement as HTMLElement;
 
-    worldsClient.importVault.mockReturnValue(of(importSummary()));
+    worldsClient.importVault.mockReturnValue(of(importSummary({ linksCreated: 7 })));
     const file = pickVault(el);
     fixture.detectChanges();
 
@@ -241,6 +242,8 @@ describe('WorldIndex', () => {
     const modal = $(el, '[data-testid=import-summary]');
     expect(modal).not.toBeNull();
     expect(modal?.textContent).toContain('3');
+    // ...including what the create-unresolved switch minted (ADR-0073).
+    expect($(el, '[data-testid=import-links-created]')?.textContent?.trim()).toBe('7');
 
     ($(el, '[data-testid=open-imported]') as HTMLButtonElement).click();
     expect(navigate).toHaveBeenCalledWith(['/w', 'w9', 'entities']);

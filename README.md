@@ -344,6 +344,14 @@ Neither Type id is checked at boot — an unregistered or disabled Type degrades
 at the point of use rather than failing the instance, exactly as `defaultType`
 already behaves.
 
+Both knobs are also what a **vault import** mints under: every `[[wikilink]]`
+naming no note becomes a real Entity rather than an **Unresolved Link**, so the
+vault's to-write list survives the trip (ADR-0073). An import may override the
+switch, the Type, and the Tag **for that run only** — nothing an import sends is
+written back to `hexly.yml`. An untyped `.md` file still lands on
+`entities.defaultType`: it is a note the vault held, not a name it only
+mentioned.
+
 `strictZipGuard` is a speed-vs-safety trade (ADR-0036). The default (`false`) batch-decompresses — several times faster on a large vault — and trusts the archive's declared sizes, which is right for a trusted personal/LAN instance importing your own vault. A maliciously crafted `.zip` can under-declare its size to slip past that check, so an **untrusted or public** instance should set `strictZipGuard: true`, which streams the archive and meters actual decompressed bytes to abort a zip bomb before it materializes. Either way `maxDecompressed` is enforced.
 
 ## Build, test, lint

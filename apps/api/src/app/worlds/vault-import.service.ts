@@ -2,6 +2,7 @@ import { basename, posix } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  emptyEntityDocument,
   EntityType,
   HEXLY_METADATA_PREFIX,
   HEXLY_TYPE_KEY,
@@ -12,10 +13,12 @@ import {
   tagsSchema,
   typesSchema,
   VaultImportContext,
+  VaultImportOptions,
 } from '@hexly/domain';
 import { bodyToFields, splitFrontmatter } from '@hexly/obsidian';
 import { AssetMintService } from '../assets/asset-mint.service';
 import { AssetExtraction } from '../assets/asset-extraction.service';
+import { HEXLY_CONFIG, type HexlyConfig } from '../config';
 import { DB, type Db } from '../db/db';
 import { EntitiesService } from '../entities/entities.service';
 import { TypeFieldRegistry } from '../entities/type-field-registry';
@@ -41,15 +44,17 @@ function* chunksOf<T>(items: readonly T[]): Generator<readonly T[]> {
  * composes; the converter lives behind the data-type, so this service imports no content plugin.
  *
  * Two-pass: pass 1 splits every file's frontmatter from its body and assigns it an id; pass 2 converts
- * each body Field, resolving each `[[wikilink]]` to the id of the note it names (dangling when none
- * matches) before persisting in chunks that each commit and yield (ADR-0046). Continue-on-error: a file
- * that can't be read or named is skipped and tallied, never aborting the import. The request awaits the
- * whole walk — no job to poll, unlike the Reindex.
+ * each body Field, resolving each `[[wikilink]]` to the id of the note it names — minting an Entity for
+ * one that names nothing, unless the run turns that off (ADR-0073) — before persisting in chunks that
+ * each commit and yield (ADR-0046). Continue-on-error: a file that can't be read or named is skipped and
+ * tallied, never aborting the import. The request awaits the whole walk — no job to poll, unlike the
+ * Reindex.
  */
 @Injectable()
 export class VaultImportService {
   constructor(
     @Inject(DB) private readonly db: Db,
+    @Inject(HEXLY_CONFIG) private readonly config: HexlyConfig,
     private readonly worlds: WorldsService,
     private readonly entities: EntitiesService,
     private readonly unzipper: VaultUnzipper,
@@ -57,7 +62,14 @@ export class VaultImportService {
     private readonly typeFields: TypeFieldRegistry,
   ) {}
 
-  async import(ownerId: string, filename: string, archive: Buffer): Promise<ImportSummary> {
+  // `options` is required rather than defaulted: `vaultImportOptionsSchema` alone says what "on by
+  // default" means, so a second default here could drift from it.
+  async import(
+    ownerId: string,
+    filename: string,
+    archive: Buffer,
+    options: VaultImportOptions,
+  ): Promise<ImportSummary> {
     // Decompress first: a malformed or oversized archive fails here (400/413) BEFORE any
     // World is minted, so a bad upload never leaves an orphan empty World behind. The
     // ceiling is baked into the injected VaultUnzipper (ADR-0036).
@@ -110,7 +122,24 @@ export class VaultImportService {
     // The "bare Note" default (ADR-0051); `undefined` when content is disabled (ADR-0052), so an
     // unstamped file lands typeless.
     const defaultType = this.typeFields.defaultType;
+    // Inline Creation's own knobs, this-run-overridable and persisted nowhere. Deliberately not
+    // `defaultType`, so two default Types are live in one import (ADR-0073).
+    const inlineType = options.inlineType ?? this.config.entities.inlineType;
+    // Folded through the Tag vocabulary like any other write, so a configured `Untriaged` still meets the
+    // author's `untriaged` in the Facet rail — the one thing `inlineTag` exists to do.
+    const inlineTags = tagsSchema.catch([]).parse([options.inlineTag ?? this.config.entities.inlineTag]);
+    // A minted Entity gets the Fields its Type declares, like every other mint (ADR-0050, ADR-0054):
+    // without them a Hex Map inline Type would open on a blank frame rather than a plane.
+    const inlineFields = resolveEffectiveFields({
+      types: [inlineType],
+      doc: {},
+      fieldResolver: this.typeFields.fieldResolver,
+      typeFieldRefs: this.typeFields.typeFieldRefs,
+    });
+    // A minted Entity has no vault path, so its only identity is its name — the whole dedup key.
+    const mintedByName = new Map<string, string>();
     let linksResolved = 0;
+    let linksCreated = 0;
     let linksDangling = 0;
     let assetsStored = 0;
     // Chunked commits, like the Reindex walk (ADR-0046): better-sqlite3 is synchronous, so one
@@ -148,11 +177,45 @@ export class VaultImportService {
         for (const note of chunk) {
           const noteDir = posix.dirname(note.path);
           const context: VaultImportContext = {
+            // The one seam every wikilink passes through, so auto-creation slots in on the miss and
+            // vault-wide dedup costs no extra pass (ADR-0073).
             resolveLink: (label) => {
               const id = index.resolve(label);
-              if (id) linksResolved++;
-              else linksDangling++;
-              return id;
+              if (id) {
+                linksResolved++;
+                return id;
+              }
+              if (!options.createUnresolved) {
+                linksDangling++;
+                return null;
+              }
+              // The basename, never the explicit path: `[[folder/Zorblax]]` names *Zorblax* (ADR-0073).
+              // A label that is no name at all stays an Unresolved Link rather than minting a blank.
+              const name = nameSchema.safeParse(posix.basename(label).replace(/\.md$/i, ''));
+              if (!name.success) {
+                linksDangling++;
+                return null;
+              }
+              // Case-insensitively, as ADR-0033 matches every other link label.
+              const key = name.data.toLowerCase();
+              const already = mintedByName.get(key);
+              if (already) {
+                linksResolved++;
+                return already;
+              }
+              const mintedId = randomUUID();
+              this.entities.importEntity({
+                ownerId,
+                worldId,
+                id: mintedId,
+                name: name.data,
+                types: [inlineType],
+                tags: inlineTags,
+                document: emptyEntityDocument(inlineFields, dataTypes),
+              });
+              mintedByName.set(key, mintedId);
+              linksCreated++;
+              return mintedId;
             },
             storeAsset: (src) => {
               if (!src || isExternalUrl(src)) return null;
@@ -210,6 +273,7 @@ export class VaultImportService {
       notesImported: notes.length,
       filesSkipped,
       linksResolved,
+      linksCreated,
       linksDangling,
       assetsStored,
       constructsDegraded,

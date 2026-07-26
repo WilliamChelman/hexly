@@ -288,6 +288,7 @@
     "importSummaryHeading": "Coffre importé",
     "importNotes": "Notes importées",
     "importLinksResolved": "Liens résolus",
+    "importLinksCreated": "Entités créées",
     "importLinksDangling": "Liens orphelins",
     "importAssets": "Ressources stockées",
     "importSkipped": "Fichiers ignorés",

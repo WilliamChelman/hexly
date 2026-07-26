@@ -383,6 +383,9 @@ import {
           <dd class="m-0 text-ink text-right">{{ summary.notesImported }}</dd>
           <dt>{{ 'worlds.importLinksResolved' | transloco }}</dt>
           <dd class="m-0 text-ink text-right">{{ summary.linksResolved }}</dd>
+          <!-- What the create-unresolved switch actually did (ADR-0073), beside what it didn't. -->
+          <dt>{{ 'worlds.importLinksCreated' | transloco }}</dt>
+          <dd class="m-0 text-ink text-right" data-testid="import-links-created">{{ summary.linksCreated }}</dd>
           <dt>{{ 'worlds.importLinksDangling' | transloco }}</dt>
           <dd class="m-0 text-ink text-right">{{ summary.linksDangling }}</dd>
           <dt>{{ 'worlds.importAssets' | transloco }}</dt>

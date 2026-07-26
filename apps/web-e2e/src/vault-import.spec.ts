@@ -19,7 +19,8 @@ function vaultZip(): Buffer {
           'Lady Mara rules the northern reach. Her seat is the [[Keep]].',
         ].join('\n'),
       ),
-      'Keep.md': strToU8('The northern keep guards the pass.'),
+      // [[Zorblax]] names no note, so the create-unresolved switch (on by default) mints it (ADR-0073).
+      'Keep.md': strToU8('The northern keep guards the pass against [[Zorblax]].'),
     }),
   );
 }
@@ -39,16 +40,20 @@ test('imports a vault from the World Index, landing in the new World with a reso
   const summary = await (await imported).json();
   expect(summary.notesImported).toBe(2);
   expect(summary.linksResolved).toBe(1);
+  // The web import sends no options, so it gets the default: the unresolved name is minted.
+  expect(summary.linksCreated).toBe(1);
 
   // The summary modal reports the import before the user enters the World (the
   // native <dialog> inside app-dialog is the visible surface — assert its button).
   await expect(page.getByTestId('open-imported')).toBeVisible();
+  await expect(page.getByTestId('import-links-created')).toHaveText('1');
 
-  // Land in the new World's Entity browser, showing the imported notes.
+  // Land in the new World's Entity browser, showing the imported notes — and the minted Entity beside them.
   await page.getByTestId('open-imported').click();
   await expect(page).toHaveURL(new RegExp(`/w/${segRe(summary.worldId)}/entities$`));
   await expect(page.getByRole('link', { name: 'Mara' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Keep' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Zorblax' })).toBeVisible();
 
   // Open the note carrying the wikilink; its frontmatter came across as read-only
   // EntityDocument, including the provenance key hexly.sourcePath. The inline metadata

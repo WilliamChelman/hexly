@@ -5,7 +5,7 @@
  */
 
 import * as z from 'zod';
-import { ENTITY_LIST_MAX_LIMIT, nameSchema } from './entity';
+import { ENTITY_LIST_MAX_LIMIT, entityTypeSchema, nameSchema } from './entity';
 
 /**
  * A World container (CONTEXT.md → World): a `name` and its `owners`. A World
@@ -132,6 +132,48 @@ export interface WorldDetail extends WorldSummary {
 }
 
 /**
+ * A blank override is an absent one, so an untouched free-text control falls back to the Instance
+ * default rather than 400ing or writing an empty string where a value is expected.
+ */
+function blankIsAbsent<T extends z.ZodType<unknown, string>>(value: T) {
+  return z
+    .string()
+    .trim()
+    .transform((s) => s || undefined)
+    .pipe(value.optional())
+    .optional();
+}
+
+/**
+ * POST /worlds/import's non-file fields (ADR-0073) — a multipart body, so every value arrives as a
+ * string and a boolean is accepted in either shape. All three apply to **this run only** and are
+ * persisted nowhere: an override the caller omits falls back to `entities.inlineType` /
+ * `entities.inlineTag`.
+ */
+export const vaultImportOptionsSchema = z.object({
+  /**
+   * Mint an Entity for each wikilink that names no imported note, rather than leaving an **Unresolved
+   * Link**. Defaults **on**: an importer arrives with Obsidian's model, where an unresolved wikilink is
+   * a visible to-write list rather than inert text (ADR-0073).
+   */
+  createUnresolved: z.union([z.boolean(), z.stringbool()]).default(true),
+  /**
+   * The Entity Type everything this run creates carries; absent → `entities.inlineType`. Shape-checked
+   * here because this one crosses the trust boundary, unlike the config knob it overrides — a malformed
+   * id would land in `types[0]`, which every reader treats as a registered key.
+   */
+  inlineType: blankIsAbsent(entityTypeSchema),
+  /**
+   * The Tag everything this run creates carries; absent → `entities.inlineTag` (itself often absent).
+   * Free text, folded through the Tag vocabulary by the importer — the configured knob needs the same
+   * fold, so one site does it for both.
+   */
+  inlineTag: blankIsAbsent(z.string()),
+});
+
+export type VaultImportOptions = z.infer<typeof vaultImportOptionsSchema>;
+
+/**
  * The result of a vault import. Unreadable files are skipped (never abort the
  * import) and tallied. `constructsDegraded` sums the per-file degradation
  * tallies from the markdown converter; `assetsStored` counts unique embedded
@@ -141,7 +183,14 @@ export interface ImportSummary {
   readonly worldId: string;
   readonly notesImported: number;
   readonly filesSkipped: number;
+  /** Wikilinks answered by an already-known Entity — an imported note, or one this run already minted. */
   readonly linksResolved: number;
+  /**
+   * Wikilinks that named nothing and minted an Entity — one apiece, since the second `[[Zorblax]]` is
+   * answered from the run's mints and tallies as resolved, so this reads equally as a count of Entities
+   * created (ADR-0073). Always 0 with the create-unresolved switch off.
+   */
+  readonly linksCreated: number;
   readonly linksDangling: number;
   readonly assetsStored: number;
   readonly constructsDegraded: Record<string, number>;

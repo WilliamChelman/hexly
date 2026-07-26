@@ -123,6 +123,7 @@ describe('WorldsClient', () => {
       notesImported: 3,
       filesSkipped: 0,
       linksResolved: 1,
+      linksCreated: 0,
       linksDangling: 0,
       assetsStored: 0,
       constructsDegraded: {},
