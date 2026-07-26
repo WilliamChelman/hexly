@@ -24,6 +24,9 @@ import { FieldControlComponent } from './field-control.component';
  * type/field management the header's dialogs also offer, all through the `ENTITY_SESSION`/`ENTITY_TYPES`
  * seams — so it never reaches for `apps/web`'s concrete session or registry.
  *
+ * A `required` Field left unfilled reads **Incomplete** here — the one surface that says so, and the minimum
+ * replacement for the gate absence used to be (ADR-0074). It marks the row and blocks nothing.
+ *
  * The panel itself is always readable; each management affordance is write-gated (ADR-0037), so a
  * read-only session (World/Entity Viewer) sees the same substance with disabled controls and no add,
  * remove, attach, or detach. An untyped key — a value from a missing or disabled Plugin — never hides;
@@ -87,6 +90,15 @@ import { FieldControlComponent } from './field-control.component';
             {{ row.label }}
             @if (row.field.required) {
               <span class="text-danger" aria-hidden="true">&nbsp;*</span>
+            }
+            <!-- The Incomplete mark: it carries its own words, where an ill-typed value reads aria-invalid (ADR-0074). -->
+            @if (isIncomplete(row.field)) {
+              <span
+                [attr.data-testid]="'detail-field-incomplete-' + row.field.id"
+                [attr.title]="'fields.details.incompleteMark' | transloco"
+                class="ml-1 inline-block rounded-full bg-gold-soft px-1.5 align-middle text-[0.65rem] font-semibold leading-tight text-gold-strong"
+                >{{ 'fields.details.incomplete' | transloco }}</span
+              >
             }
           </span>
           <!-- Detach is offered only for an attached extra (a type-default Field is dropped by removing its type),
@@ -227,19 +239,28 @@ export class DetailsPanelComponent {
       .map(([key, value]) => ({ key, value: displayPlain(value) }));
   });
 
-  /** The forward-only validation of the live document, so an invalid control can flag itself (structured excluded). */
-  private readonly invalidKeys = computed(() => {
-    const reading = validateFields(
+  /**
+   * The forward-only validation of the live document (structured Fields excluded), kept on its two channels
+   * rather than recombined (ADR-0074).
+   */
+  private readonly reading = computed(() =>
+    validateFields(
       this.effective().filter((field) => !isStructuredDataType(field.dataType)),
       this.doc(),
       NO_STRUCTURED_DATA_TYPES,
-    );
-    // Recombined (ADR-0074): an unfilled required Field flags exactly as an ill-typed one does.
-    return new Set([...reading.errors, ...reading.incomplete].map((error) => error.key));
-  });
+    ),
+  );
+
+  private readonly invalidKeys = computed(() => new Set(this.reading().errors.map((error) => error.key)));
+  private readonly incompleteKeys = computed(() => new Set(this.reading().incomplete.map((entry) => entry.key)));
 
   protected isInvalid(field: Field): boolean {
     return this.invalidKeys().has(field.id);
+  }
+
+  /** Whether the Field reads **Incomplete** (CONTEXT.md → Incomplete): marked `required`, left unfilled. */
+  protected isIncomplete(field: Field): boolean {
+    return this.incompleteKeys().has(field.id);
   }
 
   /** The Field's raw value straight off the live document map — the lens the control reads. */

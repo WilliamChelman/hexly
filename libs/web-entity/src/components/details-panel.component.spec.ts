@@ -19,6 +19,7 @@ import { DetailsPanelComponent } from './details-panel.component';
 describe('DetailsPanel', () => {
   const DEITY = 'world.type.deity' as EntityType;
   const HERO = 'world.type.hero' as EntityType;
+  const KNIGHT = 'world.type.knight' as EntityType;
 
   /** A user-defined type whose name is authored data — Deity declares the Domain Field by default. */
   const deityDef: TypeDefinition = {
@@ -27,6 +28,15 @@ describe('DetailsPanel', () => {
     views: [],
     labelText: 'Deity',
     fieldRefs: ['world.field.domain'],
+    graphColorToken: '--color-ink-muted',
+  };
+  /** A type declaring two `required` Fields — the Incomplete reading's fixture (ADR-0074). */
+  const knightDef: TypeDefinition = {
+    id: KNIGHT,
+    icon: 'label',
+    views: [],
+    labelText: 'Knight',
+    fieldRefs: ['world.field.epithet', 'world.field.rank'],
     graphColorToken: '--color-ink-muted',
   };
   const heroDef: TypeDefinition = {
@@ -42,6 +52,19 @@ describe('DetailsPanel', () => {
   const domainField = defineField({ id: 'world.field.domain', label: 'Domain', dataType: { kind: 'string' } });
   const mottoField = defineField({ id: 'world.field.motto', label: 'Motto', dataType: { kind: 'string' } });
   const gridField = defineField({ id: 'world.field.grid', label: 'Grid', dataType: { kind: 'core.datatype.grid' } });
+  // A `required` string and a `required` number, so absence (Incomplete) and an ill-typed value (invalid) part.
+  const epithetField = defineField({
+    id: 'world.field.epithet',
+    label: 'Epithet',
+    dataType: { kind: 'string' },
+    required: true,
+  });
+  const rankField = defineField({
+    id: 'world.field.rank',
+    label: 'Rank',
+    dataType: { kind: 'number' },
+    required: true,
+  });
 
   const deityDetail = (document: Record<string, unknown> = {}): EntityDetail => ({
     id: 'd1',
@@ -57,6 +80,12 @@ describe('DetailsPanel', () => {
     document,
   });
 
+  /** The same Entity also typed Knight, so its two `required` Fields ride the effective set. */
+  const knightDetail = (document: Record<string, unknown> = {}): EntityDetail => ({
+    ...deityDetail(document),
+    types: [DEITY, KNIGHT],
+  });
+
   let session: FakeEntitySession;
 
   beforeEach(async () => {
@@ -64,7 +93,10 @@ describe('DetailsPanel', () => {
       imports: [DetailsPanelComponent, provideTranslocoTesting(WEB_ENTITY_TEST_CATALOGS)],
       providers: [
         provideFakeEntitySession(),
-        provideEntityTypesTesting([deityDef, heroDef], [domainField, mottoField, gridField]),
+        provideEntityTypesTesting(
+          [deityDef, heroDef, knightDef],
+          [domainField, mottoField, gridField, epithetField, rankField],
+        ),
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -179,15 +211,52 @@ describe('DetailsPanel', () => {
     expect(plain?.querySelector('input')).toBeNull();
   });
 
+  it('marks an unfilled required Field Incomplete, and never with the invalid treatment', () => {
+    session.loadDetail(knightDetail({ 'world.field.rank': 3 }));
+    const { el } = mount();
+
+    // Absent: the Incomplete mark, and nothing of the invalid treatment (ADR-0074).
+    const epithet = q(el, 'detail-field-world.field.epithet');
+    expect(q(el, 'detail-field-incomplete-world.field.epithet')).not.toBeNull();
+    expect(epithet?.querySelector('[aria-invalid]')).toBeNull();
+    // Filled: no mark at all, though the Field is still declared `required`.
+    expect(q(el, 'detail-field-incomplete-world.field.rank')).toBeNull();
+  });
+
+  it('keeps a Field the Incomplete mark flags editable — it prompts, it never blocks', () => {
+    session.loadDetail(knightDetail());
+    const { el, fixture } = mount();
+
+    const input = q(el, 'detail-field-world.field.epithet')?.querySelector('input') as HTMLInputElement;
+    expect(input.disabled).toBe(false);
+    input.value = 'Grey-eyed';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(session.doc()['world.field.epithet']).toBe('Grey-eyed');
+    // Filling it clears the reading.
+    expect(q(el, 'detail-field-incomplete-world.field.epithet')).toBeNull();
+  });
+
+  it('reads a present but ill-typed required value as invalid, not as Incomplete', () => {
+    session.loadDetail(knightDetail({ 'world.field.rank': 'archon' }));
+    const { el } = mount();
+
+    const rank = q(el, 'detail-field-world.field.rank');
+    expect(rank?.querySelector('[aria-invalid]')).not.toBeNull();
+    expect(q(el, 'detail-field-incomplete-world.field.rank')).toBeNull();
+  });
+
   it('renders fully read-only for a read-only session — values shown, no management controls', () => {
     session.setWritable(false);
-    session.loadDetail(deityDetail({ 'world.field.domain': 'War', 'legacy.key': 'kept' }));
+    session.loadDetail(knightDetail({ 'world.field.domain': 'War', 'legacy.key': 'kept' }));
     session.setFields(['world.field.motto']);
     const { el } = mount();
 
-    // Values are still shown.
+    // Values are still shown, and so is the Incomplete reading — the panel's substance is always readable.
     expect(q(el, 'detail-field-world.field.domain')?.querySelector('input')?.value).toBe('War');
     expect(q(el, 'detail-plain')?.textContent).toContain('kept');
+    expect(q(el, 'detail-field-incomplete-world.field.epithet')).not.toBeNull();
     // The Field control is disabled.
     expect(q(el, 'detail-field-world.field.domain')?.querySelector('input')?.disabled).toBe(true);
     // No add/remove/attach/detach affordances.

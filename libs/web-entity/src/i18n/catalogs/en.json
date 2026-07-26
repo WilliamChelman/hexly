@@ -18,7 +18,9 @@
     "removeType": "Remove type {{ type }}",
     "attachField": "Attach a field…",
     "detachField": "Detach field {{ field }}",
-    "fieldsEmpty": "No fields"
+    "fieldsEmpty": "No fields",
+    "incomplete": "Incomplete",
+    "incompleteMark": "Incomplete — this entity's types expect a value here; you can fill it in later"
   },
   "links": {
     "toggle": "Toggle links",

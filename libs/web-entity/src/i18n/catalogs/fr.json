@@ -18,7 +18,9 @@
     "removeType": "Retirer le type {{ type }}",
     "attachField": "Attacher un champ…",
     "detachField": "Détacher le champ {{ field }}",
-    "fieldsEmpty": "Aucun champ"
+    "fieldsEmpty": "Aucun champ",
+    "incomplete": "Incomplet",
+    "incompleteMark": "Incomplet — les types de cette entité attendent une valeur ici ; vous pourrez la remplir plus tard"
   },
   "links": {
     "toggle": "Afficher/masquer les liens",
