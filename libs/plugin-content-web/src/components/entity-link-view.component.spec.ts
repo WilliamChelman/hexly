@@ -1,11 +1,13 @@
-import { ComponentRef } from '@angular/core';
+import { ApplicationRef, ComponentRef, EnvironmentInjector, Injector, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { Editor } from '@tiptap/core';
 import { EntitySummary } from '@hexly/domain';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
+import { CONTENT_EXTENSIONS } from '../extensions/content-extensions';
 import { EntityNameResolver, EntityResolution } from '../services/entity-name-resolver';
-import { EntityLinkViewComponent } from './entity-link-view.component';
+import { EntityLinkRepair, EntityLinkViewComponent, createEntityLinkNodeView } from './entity-link-view.component';
 
 /** A resolver stub that reports a fixed live name for every id (no HTTP). */
 class StubResolver {
@@ -14,6 +16,9 @@ class StubResolver {
     return this.resolution;
   }
 }
+
+/** The popover takes the keyboard a microtask after the render that portals it (see the component). */
+const flushMicrotasks = () => new Promise((resolve) => queueMicrotask(resolve as () => void));
 
 const found = (name: string): EntityResolution => ({
   status: 'found',
@@ -27,6 +32,7 @@ describe('EntityLinkView', () => {
     display?: string | null;
     heading?: string | null;
     descriptor?: string | null;
+    repair?: EntityLinkRepair;
   }) {
     const fixture = TestBed.createComponent(EntityLinkViewComponent);
     const ref = fixture.componentRef as ComponentRef<EntityLinkViewComponent>;
@@ -35,8 +41,19 @@ describe('EntityLinkView', () => {
     if ('display' in inputs) ref.setInput('display', inputs.display ?? null);
     if ('heading' in inputs) ref.setInput('heading', inputs.heading ?? null);
     if ('descriptor' in inputs) ref.setInput('descriptor', inputs.descriptor ?? null);
+    if (inputs.repair) ref.setInput('repair', inputs.repair);
     fixture.detectChanges();
     return fixture;
+  }
+
+  /** A repair whose two standings are open, recording what the popover asks of the document. */
+  function repairStub() {
+    return {
+      writable: signal(true),
+      creatable: signal(true),
+      retarget: vi.fn<(entity: EntitySummary) => void>(),
+      promote: vi.fn<(name: string) => void>(),
+    } satisfies EntityLinkRepair;
   }
 
   function configure(resolution: EntityResolution) {
@@ -113,6 +130,62 @@ describe('EntityLinkView', () => {
       const link = fixture.nativeElement.querySelector('[data-testid=entity-link]');
       expect(link.textContent).toContain('the old wyrm');
       expect(link.textContent).not.toContain('Zorblax');
+    });
+
+    it('moves the keyboard into the popover it portals away, and again into the picker', async () => {
+      // The popover is appended to the end of <body>, so Tab from the pill would skip straight past it.
+      configure(found('Avalon'));
+      const fixture = mount({ entityId: '', label: 'Zorblax', repair: repairStub() });
+
+      (fixture.nativeElement.querySelector('[data-testid=entity-link]') as HTMLElement).click();
+      fixture.detectChanges();
+      await flushMicrotasks();
+
+      const menu = document.body.querySelector('[data-testid=entity-link-repair]') as HTMLElement;
+      expect(document.activeElement).toBe(menu.querySelector('[data-testid=entity-link-repair-create]'));
+
+      (menu.querySelector('[data-testid=entity-link-relink]') as HTMLElement).click();
+      fixture.detectChanges();
+      await flushMicrotasks();
+
+      // The action list became the picker: the keyboard follows it rather than staying on a gone button.
+      expect(document.activeElement?.tagName).toBe('INPUT');
+      fixture.destroy();
+    });
+
+    it('mints once while a promotion is out — clicking Create again is not a second Entity', async () => {
+      // The link stays unresolved until the mint lands, so its popover can be opened and asked again —
+      // and a second mint is exactly the duplicate ADR-0073 keeps Create away from a dangling link over.
+      configure(found('Avalon'));
+      const editor = new Editor({ extensions: CONTENT_EXTENSIONS });
+      editor.commands.insertEntityLink({ entityId: '', label: 'Zorblax' });
+      const node = editor.state.doc.nodeAt(1)!;
+      const mint = vi.fn(() => new Promise<EntitySummary>(() => undefined));
+      const view = createEntityLinkNodeView(
+        node,
+        editor,
+        () => 1,
+        { writable: signal(true), creatable: signal(true), mint },
+        TestBed.inject(EnvironmentInjector),
+        TestBed.inject(Injector),
+        TestBed.inject(ApplicationRef),
+      );
+      const appRef = TestBed.inject(ApplicationRef);
+      appRef.tick();
+
+      const promote = async () => {
+        ((view.dom as HTMLElement).querySelector('[data-testid=entity-link]') as HTMLElement).click();
+        appRef.tick();
+        await flushMicrotasks();
+        (document.body.querySelector('[data-testid=entity-link-repair-create]') as HTMLElement).click();
+        appRef.tick();
+      };
+      await promote();
+      await promote();
+
+      expect(mint).toHaveBeenCalledTimes(1);
+      view.destroy?.();
+      editor.destroy();
     });
 
     it('still carries a Link Descriptor badge, in its own hue', () => {

@@ -291,7 +291,10 @@ export class EntityLinkViewComponent {
     afterRenderEffect(() => {
       if (!this.repairOpen()) return;
       this.picking();
-      this.repairMenu()?.nativeElement.querySelector<HTMLElement>('input, button')?.focus();
+      const menu = this.repairMenu()?.nativeElement;
+      // After the render callbacks, not during: `appBodyPortal` relocates this very element in one of
+      // them, and moving a node blurs whatever inside it held the keyboard.
+      queueMicrotask(() => menu?.querySelector<HTMLElement>('input, button')?.focus());
     });
   }
 
