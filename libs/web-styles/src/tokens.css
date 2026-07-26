@@ -49,31 +49,27 @@
   --container-reading: 68ch;
 
   /* ---- Elevation — warm, paper-soft drop shadows. Raw re-themable vars
-     (ADR-0021); index.css wraps 1/2/3/inset as `@utility shadow-*`.
-     Geometry is now identical in both ColorSchemes (ADR-0075): the old
-     Astral/Solar offset ratios were 1.0, 1.5 and 1.375, which no single scale
-     can be, and read as drift. Only the colour and its alpha re-theme.
-     The ladder is a power of the veil, not a multiple of it: in log-opacity the
-     two schemes agree on the same exponents (1, 0.75, 0.5) to within 3%, where a
-     multiple would have to be 1.67 in Solar and 1.2 in Astral. */
+     (ADR-0021); index.css wraps 1/2/3/inset as `@utility shadow-*`. One geometry
+     for both ColorSchemes (ADR-0075) — only the colour and its alpha re-theme.
+     The 1/2/3 ladder is a *power* of the veil rather than a multiple of it,
+     because the two ColorSchemes agree on the exponents 1, 0.75 and 0.5 to
+     within 3% where a multiple would have to be 1.67 in Solar and 1.2 in Astral.
+     The inset well is not on that ladder — it takes `shadow-1`'s own alpha,
+     exact in Solar and 0.5 against a 0.40 target in Astral. */
   --shadow-1: 0 1px 2px oklch(from var(--palette-soot) l c h / var(--palette-veil));
   --shadow-2: 0 4px 12px -2px oklch(from var(--palette-soot) l c h / calc(pow(var(--palette-veil), 0.75)));
   --shadow-3: 0 16px 36px -8px oklch(from var(--palette-soot) l c h / calc(pow(var(--palette-veil), 0.5)));
   --shadow-inset: inset 0 1px 2px oklch(from var(--palette-soot) l c h / var(--palette-veil));
-  --shadow-focus: 0 0 0 3px oklch(from var(--palette-accent) l c h / 0.345); /* focus-visible ring */
+  /* The focus ring is off the ladder too: a fixed alpha both ColorSchemes fit. */
+  --shadow-focus: 0 0 0 3px oklch(from var(--palette-accent) l c h / 0.345);
 
-  /* ---- The accent sheen — the gilded metallic material + its glow. Raw vars
-     consumed by scoped styles; the gradients re-theme via their stop vars. */
+  /* ---- The accent sheen's gradients. Not utility-shaped, so `@theme` can't hold
+     them; they re-theme through the stops they name. */
   --gradient-accent-sheen: linear-gradient(180deg, var(--color-accent-sheen-bright), var(--color-accent-sheen-deep));
   --gradient-accent-sheen-radial: radial-gradient(
     circle at 50% 35%,
     var(--color-accent-sheen-bright),
     var(--color-accent-sheen-deep)
-  );
-  /* The accent lifted to a light-source lightness — it glows in Solar, where the
-     accent is dark, and stays put in Astral, where it is already bright. */
-  --color-accent-glow: oklch(
-    from var(--palette-accent) max(l, 0.713) calc(c + (0.713 - min(l, 0.713)) * 0.18) calc(h + 1) / 0.5
   );
 
   color-scheme: light;
@@ -95,8 +91,7 @@
   /* ---- Tier 1 — the Astral Palette. */
   --palette-page: #0b0c1a; /* the night table                               */
   --palette-ink: #ece3cf; /* starlit parchment text                         */
-  --palette-ink-quiet: #9aa0c8; /* cool lavender-grey — its own hue, and the
-     reason quiet ink is an anchor rather than a step off `--palette-ink`    */
+  --palette-ink-quiet: #9aa0c8; /* cool lavender-grey                       */
   --palette-accent: #d9b25a; /* constellation gold leaf                     */
   --palette-danger: #e88a6f; /* warm coral marginalia                       */
   --palette-success: #86c46a; /* aurora green                               */

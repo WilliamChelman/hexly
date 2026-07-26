@@ -79,23 +79,19 @@
   --radius-full: 999px;
 
   /* =======================================================================
-   * Colours — tier 2, the semantic roles, each *derived* from the tier-1
-   * Palette in tokens.css (ADR-0075). One expression per role, byte-identical
-   * in both ColorSchemes: only the eight anchors and three knobs differ, so
-   * re-theming is a 12-value job rather than a 35-value one. Relative colour
-   * syntax resolves at computed-value time, so swapping [data-color-scheme]
-   * re-resolves every role off the new Palette with no rule per scheme.
+   * Colours — tier 2, the semantic roles, each derived from the tier-1 Palette
+   * in tokens.css (ADR-0075). One expression per role, byte-identical in both
+   * ColorSchemes: only the eight anchors and three knobs differ. Relative
+   * colour syntax resolves at computed-value time, so swapping
+   * [data-color-scheme] re-resolves every role off the new Palette.
    *
-   * The coefficients were fitted numerically against the values these roles
-   * shipped as; the authority is docs/design/spike-token-derivation.md §2 and
-   * they are copied from it, not re-derived here. An expression that used a
-   * knob with both a scale and an offset would hit any two schemes exactly and
-   * so prove nothing — every knob below carries a single coefficient.
+   * Every coefficient below is copied from the fit in
+   * docs/design/spike-token-derivation.md §2, and each knob carries exactly one
+   * of them — ADR-0075 rejects a knob used affinely.
    * ===================================================================== */
 
-  /* Paper. `bg-deep` and the surfaces ride the paper ramp: lightness steps away
-     from the page, chroma sloped against it at ±0.42 per unit of lightness —
-     the mirror symmetry the polarity knob carries. */
+  /* The paper ramp: lightness steps off the page, chroma sloped against it at
+     ±0.42 per unit — the mirror symmetry the polarity knob carries. */
   --color-bg: var(--palette-page); /* the table / outer paper */
   --color-bg-deep: oklch(from var(--palette-page) calc(l - 0.027) calc(c + 0.0113 * var(--palette-polarity)) h);
   --color-surface: oklch(
@@ -110,13 +106,13 @@
   --color-surface-sunken: oklch(
     from var(--palette-page) calc(l - 0.017 * var(--palette-polarity)) calc(c + 0.0071) calc(h + 1)
   );
-  /* Scrim behind modals: the soot anchor at a power of the veil. `veil^0.44`
-     rather than a scale-and-offset, which would be the two alphas in disguise. */
+  /* The scrim is soot, not the page: it is dark in *both* ColorSchemes, so it is
+     the one paper role the polarity knob cannot carry. Its alpha rides a power
+     of the veil rather than a scale-and-offset, which would be two literals. */
   --color-overlay: oklch(from var(--palette-soot) l c h / calc(pow(var(--palette-veil), 0.44)));
 
-  /* Ink. The ramp spans ±0.373 OKLab-L about the primary ink; quiet ink is its
-     own anchor because its hue *rotates* between schemes, which no fixed offset
-     off `--palette-ink` reaches (it collapses to grey, ΔE00 15.8). */
+  /* Quiet ink is its own anchor because its hue *rotates* between ColorSchemes;
+     off `--palette-ink` at any fixed offset it collapses to grey (ΔE00 15.8). */
   --color-ink: var(--palette-ink); /* primary text */
   --color-ink-strong: oklch(
     from var(--palette-ink) calc(l - 0.0485 * var(--palette-polarity)) calc(c - 0.007) calc(h + 4)
@@ -138,15 +134,18 @@
     from var(--palette-accent) calc(l - 0.0858 * var(--palette-polarity)) calc(c - 0.016) calc(h + 3)
   );
   --color-accent-soft: oklch(from var(--palette-accent) l c h / 0.14);
-  /* The metallic sheen's two stops. `max(l, 0.876)` clamps for both of Hexly's
-     accents, which is why this highlight is the same colour in both schemes. */
+  /* The bright stop is a theme-invariant constant in disguise, and knowingly so
+     (spike §5): `max(l, 0.876)` clamps for any accent short of a near-white one,
+     and the chroma and hue are fixed, so a World's accent moves this only by
+     being lighter than the clamp. Taking the accent's own hue instead costs
+     ΔE00 7.2 against the highlight Solar ships. */
   --color-accent-sheen-bright: oklch(from var(--palette-accent) max(l, 0.876) 0.1 90);
   --color-accent-sheen-deep: oklch(
     from var(--palette-accent) calc(l + 0.087 * var(--palette-polarity)) calc(c + 0.011) calc(h - 2.5)
   );
-  /* On-colours: the ground's own contrast colour, pulled back toward that ground
+  /* An on-colour is its ground's contrast colour pulled back toward that ground,
      so it is never pure black or white — ADR-0006's warm through-line. The flip
-     is `contrast-color()`'s, so an Owner's accent picks its foreground itself.
+     is `contrast-color()`'s, so an Owner's accent picks its own foreground.
      `on-fill` is the foreground on any saturated flat fill, not just the
      accent's — its one consumer is the danger button's hover (ADR-0075). */
   --color-on-fill: color-mix(in srgb, contrast-color(var(--palette-accent)) 90%, var(--palette-accent));
@@ -155,6 +154,11 @@
     contrast-color(var(--color-accent-sheen-bright)) 86%,
     var(--color-accent-sheen-bright)
   );
+  /* The accent lifted to a light-source lightness — it glows in Solar, where the
+     accent is dark, and stays put in Astral, where it already is one. */
+  --color-accent-glow: oklch(
+    from var(--palette-accent) max(l, 0.713) calc(c + (0.713 - min(l, 0.713)) * 0.18) calc(h + 1) / 0.5
+  );
 
   --color-sea: #2f6f7a; /* lapis water — secondary accent                   */
   --color-sea-soft: rgba(47, 111, 122, 0.14);
@@ -162,6 +166,8 @@
   --color-astra: #5a4aa6; /* dusk violet — tertiary                         */
   --color-astra-soft: rgba(90, 74, 166, 0.14);
 
+  /* The `-soft` alphas are per-role, not a ramp: each is the one the two
+     ColorSchemes already agreed on, to within 0.01 (spike §2). */
   --color-danger: var(--palette-danger); /* burnt-sienna marginalia */
   --color-danger-soft: oklch(from var(--palette-danger) l c h / 0.15);
 
@@ -176,19 +182,16 @@
   --color-canvas-mat: oklch(
     from var(--palette-canvas) calc(l - 0.036) calc(c + 0.0151 * var(--palette-polarity)) calc(h - 0.7)
   );
-  /* A named literal, not a derivation (ADR-0075): Solar's field glow is a warm
-     highlight of its own paper and Astral's is a different-hue light source on
-     indigo — a 5× lift mismatch, which is two design ideas rather than one
-     parameterised one. The Astral value is in tokens.css beside the anchors. */
+  /* The one named literal (ADR-0075) — a 5× lift mismatch between the two
+     ColorSchemes. Its Astral value sits in tokens.css beside the anchors. */
   --color-canvas-glow: rgba(255, 240, 202, 0.55);
   --color-canvas-edge: oklch(from var(--palette-soot) l c h / var(--palette-veil)); /* soft vignette */
   --color-hex-line: rgba(120, 96, 56, 0.42); /* grid ink                    */
   --color-feature-ink: #5a3e16; /* a placed Feature's marker — sepia ink    */
   --color-label-ink: #4a3a1e; /* free-positioned Label text — sepia ink     */
   --color-name-ink: #5a4a2c; /* a Hex name — muted sepia, quieter           */
-  /* Halo behind name/label text, for legibility over any terrain: the page
-     pushed one step *away* from the ink, which is the paper in Solar and the
-     night in Astral. The worst symmetric fit in the set (ΔE00 2.69/2.75). */
+  /* The halo behind name/label text — the page pushed one step away from the
+     ink. The worst symmetric fit in the set, ΔE00 2.69/2.75 (spike §5). */
   --color-ink-stroke: oklch(
     from var(--palette-page) calc(l + 0.03 * var(--palette-polarity)) calc(c - 0.0126) calc(h + 2.5)
   );
