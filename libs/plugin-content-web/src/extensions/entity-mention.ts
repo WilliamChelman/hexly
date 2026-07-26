@@ -1,11 +1,12 @@
 import { Editor, Extension } from '@tiptap/core';
-import { PluginKey, Transaction } from '@tiptap/pm/state';
+import { PluginKey } from '@tiptap/pm/state';
 import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { EntitySummary } from '@hexly/domain';
 import { EntityLinkAttrs } from '@hexly/plugin-content';
 import { EntityPickerComponent } from '../components/entity-picker.component';
 import { entityLinkNode } from './entity-link-node';
 import { MentionCreate, MentionCreateDetails, MentionItem, mentionItems, parseMentionQuery } from './mention-items';
+import { takeMention } from './pending-mention';
 
 /** What the editor supplies the `@` trigger; each callback is deferred so the editor builds first. */
 export interface EntityMentionPorts {
@@ -121,17 +122,12 @@ function linkTo(entity: EntitySummary, descriptor: string | null): EntityLinkAtt
 }
 
 /**
- * Mint the named Entity and drop its link where the mention was typed.
+ * Mint the named Entity and drop its link where the mention was typed — {@link takeMention} owns the
+ * across-the-round-trip half (the captured point, the undo retraction, the restore).
  *
- * The typed text goes *before* the await: `@tiptap/suggestion` fires `onExit` the instant the popup
- * closes, so the suggestion range is dead by the time the write lands (ADR-0073) — which is also what
- * lets the details row's dialog outlive the popup. The insertion point is the captured one, mapped
- * through every transaction since — the author keeps writing across the round trip, and the link belongs
- * in the sentence they left it in, not under the caret they have since moved.
- *
- * A failed write puts the typed text back the same way. So does declining the dialog (`null`) — unless
- * the `@` came from `/link`, which is ours to remove, so cancelling then reads exactly like `Esc` at the
- * picker: we clean up what we inserted, never what you typed.
+ * A failed write puts the typed text back. So does declining the dialog (`null`) — unless the `@` came
+ * from `/link`, which is ours to remove, so cancelling then reads exactly like `Esc` at the picker: we
+ * clean up what we inserted, never what you typed.
  */
 function mintAndLink(
   editor: Editor,
@@ -140,35 +136,14 @@ function mintAndLink(
   mint: (name: string) => Promise<EntitySummary | null>,
   restoreOnDecline: boolean,
 ): void {
-  const typed = editor.state.doc.textBetween(range.from, range.to);
-  editor.chain().focus().deleteRange(range).run();
-
-  // Bias left (-1): text the author types at this very position belongs *after* the pending link,
-  // so the mention keeps its place in the sentence rather than being pushed to the end of it.
-  let at = range.from;
-  const track = ({ transaction }: { transaction: Transaction }) => (at = transaction.mapping.map(at, -1));
-  editor.on('transaction', track);
+  const pending = takeMention(editor, range);
 
   void mint(row.name).then(
-    (entity) =>
-      finish(() => {
-        if (entity) insertAt(editor, at, { type: entityLinkNode.name, attrs: linkTo(entity, row.descriptor) });
-        else if (restoreOnDecline) insertAt(editor, at, typed);
-      }),
-    () => finish(() => insertAt(editor, at, typed)),
+    (entity) => {
+      if (entity) pending.land({ type: entityLinkNode.name, attrs: linkTo(entity, row.descriptor) });
+      else if (restoreOnDecline) pending.restore();
+      else pending.discard();
+    },
+    () => pending.restore(),
   );
-
-  function finish(insert: () => void): void {
-    editor.off('transaction', track);
-    if (!editor.isDestroyed) insert();
-  }
-}
-
-/**
- * Insert at a tracked position without moving the caret: the author owns it. With nothing typed since,
- * `at` *is* the caret, and mapping carries it past the new node — so the ordinary case still lands the
- * cursor after the link.
- */
-function insertAt(editor: Editor, at: number, content: Parameters<Editor['commands']['insertContentAt']>[1]): void {
-  editor.chain().focus().insertContentAt(at, content, { updateSelection: false }).run();
 }
