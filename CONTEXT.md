@@ -379,7 +379,7 @@ The account-owned page where a signed-in user edits their own **Preferences** an
 _Avoid_: Account settings, profile page, options
 
 **Preferences**:
-A user's roaming presentation choices — UI **Locale**, **Format Locale**, and theme — bound to the account so they follow the user across devices.
+A user's roaming presentation choices — UI **Locale**, **Format Locale**, and **ColorScheme** — bound to the account so they follow the user across devices.
 _Avoid_: Settings, options, config
 
 **Locale**:
@@ -389,6 +389,20 @@ _Avoid_: Language (as a field name), i18n, region
 **Format Locale**:
 A user's chosen **regional formatting** (a BCP-47 tag) for dates, numbers, and times, independent of the UI **Locale**; defaults to it when unset.
 _Avoid_: Date format, regional settings, locale (bare — that means the UI language)
+
+## Appearance
+
+**ColorScheme**:
+The day/night axis the interface is painted along — `Solar` (light) or `Astral` (dark). A user **Preference**, never a World's to set: a **World Theme** supplies both, and the reader chooses which one they see.
+_Avoid_: Theme (bare), dark mode, colour mode, scheme (bare), light/dark toggle
+
+**World Theme**:
+The presentation a **World Owner** authors for one World — a **Palette** per **ColorScheme**, plus a radius set and a font pairing. Purely presentational: it never changes what an Entity contains or who may read it, and a reader keeps their own **ColorScheme** within it.
+_Avoid_: Skin, style, branding, world palette, theme (bare — that used to mean the **ColorScheme**)
+
+**Palette**:
+The small set of anchor colours one **ColorScheme** of a **World Theme** is authored as; every other colour the interface uses derives from it. What an Owner actually fills in.
+_Avoid_: Swatch set, colour scheme, theme; terrain palette (that set is the **Terrain** list)
 
 ## Self-hosting
 
