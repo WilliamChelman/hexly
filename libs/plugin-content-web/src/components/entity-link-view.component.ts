@@ -70,61 +70,41 @@ export interface EntityLinkRepairHost extends Pick<EntityLinkRepair, 'writable' 
   // descriptor badge can anchor to the pill's top-right corner (see below).
   host: { class: 'relative inline-block align-baseline' },
   template: `
-    @switch (tone()) {
-      @case ('unresolved') {
-        <!-- No id ever: a name waiting to be written. Tinted and dashed rather than
-             faded, so it reads as unfinished rather than broken (ADR-0073). The dash
-             carries the distinction without relying on hue. Non-navigable: no target. -->
-        <span
-          data-testid="entity-link"
-          data-unresolved=""
-          [attr.title]="'editor.entityLink.unresolved' | transloco"
-          class="inline-block rounded bg-astra-soft px-1.5 py-0.5 leading-tight text-astra underline decoration-dashed underline-offset-2"
-          [class.cursor-pointer]="repairable()"
-          [attr.role]="repairable() ? 'button' : null"
-          [attr.tabindex]="repairable() ? 0 : null"
-          [attr.aria-haspopup]="repairable() ? 'dialog' : null"
-          [attr.aria-expanded]="repairable() ? repairOpen() : null"
-          (click)="toggleRepair()"
-          (keydown.enter)="toggleRepair()"
-          (keydown.space)="toggleRepair(); $event.preventDefault()"
-          >{{ text() }}</span
-        >
-      }
-      @case ('dangling') {
-        <!-- Target missing/deleted: last-known label, non-navigable (issue #78). -->
-        <span
-          data-testid="entity-link"
-          data-dangling=""
-          [attr.data-entity-id]="entityId()"
-          [attr.title]="'editor.entityLink.dangling' | transloco"
-          class="inline-block rounded bg-ink-faint/15 px-1.5 py-0.5 italic leading-tight text-ink-muted"
-          [class.cursor-pointer]="repairable()"
-          [attr.role]="repairable() ? 'button' : null"
-          [attr.tabindex]="repairable() ? 0 : null"
-          [attr.aria-haspopup]="repairable() ? 'dialog' : null"
-          [attr.aria-expanded]="repairable() ? repairOpen() : null"
-          (click)="toggleRepair()"
-          (keydown.enter)="toggleRepair()"
-          (keydown.space)="toggleRepair(); $event.preventDefault()"
-          >{{ text() }}</span
-        >
-      }
-      @default {
-        <!-- routerLink gives a real href, so the browser handles Ctrl/Cmd/middle-click
-             (open in a new tab) while a plain click SPA-navigates through the same
-             flush-on-leave guard as the back-to-library link. Reachable because the
-             node view is created with ContentEditor's element Injector, which resolves
-             the route's ActivatedRoute (createEntityLinkNodeView). -->
-        <a
-          data-testid="entity-link"
-          [attr.data-entity-id]="entityId()"
-          [routerLink]="['/entities', entityId()]"
-          [fragment]="heading() || undefined"
-          class="cursor-pointer inline-block rounded bg-gold-soft px-1.5 py-0.5 leading-tight text-gold-strong no-underline transition-colors hover:bg-gold/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold"
-          >{{ text() }}</a
-        >
-      }
+    @if (tone() === 'live') {
+      <!-- routerLink gives a real href, so the browser handles Ctrl/Cmd/middle-click
+           (open in a new tab) while a plain click SPA-navigates through the same
+           flush-on-leave guard as the back-to-library link. Reachable because the
+           node view is created with ContentEditor's element Injector, which resolves
+           the route's ActivatedRoute (createEntityLinkNodeView). -->
+      <a
+        data-testid="entity-link"
+        [attr.data-entity-id]="entityId()"
+        [routerLink]="['/entities', entityId()]"
+        [fragment]="heading() || undefined"
+        class="cursor-pointer inline-block rounded bg-gold-soft px-1.5 py-0.5 leading-tight text-gold-strong no-underline transition-colors hover:bg-gold/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold"
+        >{{ text() }}</a
+      >
+    } @else {
+      <!-- Both broken renderings, one element: they differ in tone and in the data attribute a spec
+           reads them apart by, never in the repair affordance, which must not drift (ADR-0073). -->
+      <span
+        data-testid="entity-link"
+        [attr.data-unresolved]="tone() === 'unresolved' ? '' : null"
+        [attr.data-dangling]="tone() === 'dangling' ? '' : null"
+        [attr.data-entity-id]="tone() === 'dangling' ? entityId() : null"
+        [attr.title]="brokenTitleKey() | transloco"
+        class="inline-block rounded px-1.5 py-0.5 leading-tight"
+        [class]="brokenTone()"
+        [class.cursor-pointer]="repairable()"
+        [attr.role]="repairable() ? 'button' : null"
+        [attr.tabindex]="repairable() ? 0 : null"
+        [attr.aria-haspopup]="repairable() ? 'dialog' : null"
+        [attr.aria-expanded]="repairable() ? repairOpen() : null"
+        (click)="toggleRepair()"
+        (keydown.enter)="toggleRepair()"
+        (keydown.space)="toggleRepair(); $event.preventDefault()"
+        >{{ text() }}</span
+      >
     }
     <!-- The Link Descriptor (#96) rides on the pill's top-right corner as a small
          badge: right edge flush with the pill (right-0), growing leftward, so the
@@ -238,6 +218,21 @@ export class EntityLinkViewComponent {
     const r = this.resolution();
     return r?.status === 'found' ? r.entity.name : this.label();
   });
+
+  /**
+   * A broken pill's tone. An Unresolved Link is tinted and dashed rather than faded, so it reads as
+   * unfinished rather than broken, and the dash carries that without relying on hue (ADR-0073); a
+   * dangling one is the muted last-known label (issue #78). Neither is navigable.
+   */
+  protected readonly brokenTone = computed(() =>
+    this.tone() === 'unresolved'
+      ? 'bg-astra-soft text-astra underline decoration-dashed underline-offset-2'
+      : 'bg-ink-faint/15 italic text-ink-muted',
+  );
+
+  protected readonly brokenTitleKey = computed(() =>
+    this.tone() === 'unresolved' ? 'editor.entityLink.unresolved' : 'editor.entityLink.dangling',
+  );
 
   /** Only a broken link is repairable, and only where the surface accepts writes (ADR-0073). */
   protected readonly repairable = computed(() => this.tone() !== 'live' && !!this.repair()?.writable());

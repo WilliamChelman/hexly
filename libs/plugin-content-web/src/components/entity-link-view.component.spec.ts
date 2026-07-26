@@ -111,6 +111,9 @@ describe('EntityLinkView', () => {
       expect(link.textContent).toContain('Zorblax');
       // Non-navigable, exactly as a dangling link is.
       expect(link.tagName).toBe('SPAN');
+      // Unfinished, not broken: tinted and dashed, and carrying the shared pill shape.
+      expect(link.classList.contains('decoration-dashed')).toBe(true);
+      expect(link.classList.contains('rounded')).toBe(true);
     });
 
     it('stays distinct from a dangling link, whose target went away', () => {
@@ -121,6 +124,10 @@ describe('EntityLinkView', () => {
       expect(link.hasAttribute('data-dangling')).toBe(true);
       expect(link.hasAttribute('data-unresolved')).toBe(false);
       expect(link.tagName).toBe('SPAN');
+      // Muted and italic, never the unresolved dash — the two tones must stay apart.
+      expect(link.classList.contains('italic')).toBe(true);
+      expect(link.classList.contains('decoration-dashed')).toBe(false);
+      expect(link.classList.contains('rounded')).toBe(true);
     });
 
     it('keeps the `[[Target|display]]` override', () => {
