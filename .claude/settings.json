@@ -1,4 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "disableArtifact": true
+  "disableArtifact": true,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command' | grep -qE -- '(--skip-nx-cache|NX_SKIP_NX_CACHE)' && printf '%s' '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"Blocked: --skip-nx-cache / NX_SKIP_NX_CACHE throws away the Nx cache that makes repeat runs nearly free, and was a large time cost in past agent runs. Re-run without it. If you genuinely suspect a stale cached result, run `nx reset` once and say why. See CLAUDE.md -> End-to-end tests.\"}}' || true",
+            "timeout": 10,
+            "statusMessage": "Checking for Nx cache skipping"
+          }
+        ]
+      }
+    ]
+  }
 }
