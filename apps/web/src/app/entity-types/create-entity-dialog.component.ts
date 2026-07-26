@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import {
+  EntityDetail,
   EntityType,
   Field as FieldDef,
   isStructuredDataType,
@@ -11,7 +11,7 @@ import {
   validateFields,
   writeField,
 } from '@hexly/domain';
-import { ActiveWorld, EntitiesClient, WorldStore, entityRoute } from '@hexly/web-core';
+import { ActiveWorld, EntitiesClient, WorldStore } from '@hexly/web-core';
 import { ButtonComponent, FieldComponent, InputComponent, DialogComponent, DialogRef } from '@hexly/web-ui';
 import { TypeRegistry } from './type-registry';
 import { EntityTypesEditorComponent } from '../pages/entity/components/entity-types-editor.component';
@@ -22,11 +22,17 @@ export interface CreateEntityDialogData {
   readonly type: EntityType;
 }
 
+/** What the dialog closes with on a create — `undefined` on cancel. */
+export type CreateEntityDialogResult = EntityDetail;
+
 /**
  * The create-Entity flow behind the `>`-prefix Create Note / Create Map Commands (ADR-0032): name +
  * World select, prefilled to `activeWorld() ?? worlds()[0]`. Opened on demand through
  * {@link DialogService}, seeded via its {@link DialogRef} — so a Command's `run()` launches it with
  * no reference to this component and no shared open-state signal to bridge them.
+ *
+ * It **returns** the created Entity and navigates nowhere: routing is its caller's concern (ADR-0073),
+ * since a caller creating from mid-sentence must be left in its editor.
  *
  * The Command seeds one primary type; the embedded {@link EntityTypesEditorComponent} lets the author pick
  * more (ADR-0048), and the picked types' `required` Fields are collected below — as a prompt, not a gate:
@@ -129,12 +135,11 @@ export interface CreateEntityDialogData {
   `,
 })
 export class CreateEntityDialogComponent {
-  private readonly dialogRef = inject(DialogRef) as DialogRef<CreateEntityDialogData>;
+  private readonly dialogRef = inject(DialogRef) as DialogRef<CreateEntityDialogData, CreateEntityDialogResult>;
   private readonly typeRegistry = inject(TypeRegistry);
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly worldStore = inject(WorldStore);
-  private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -213,9 +218,6 @@ export class CreateEntityDialogComponent {
     this.entitiesClient
       .create(name, types, worldId, Object.keys(metadata).length ? metadata : undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((entity) => {
-        this.dialogRef.close();
-        void this.router.navigate(entityRoute(entity.worldId, entity.id));
-      });
+      .subscribe((entity) => this.dialogRef.close(entity));
   }
 }

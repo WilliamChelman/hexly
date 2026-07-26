@@ -1,13 +1,16 @@
 import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { defineField, EntityDetail, WorldSummary } from '@hexly/domain';
 import { emptyRichContent } from '@hexly/plugin-content';
 import { ActiveWorld, EntitiesClient, WorldStore } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { DialogRef } from '@hexly/web-ui';
-import { CreateEntityDialogComponent, CreateEntityDialogData } from './create-entity-dialog.component';
+import {
+  CreateEntityDialogComponent,
+  CreateEntityDialogData,
+  CreateEntityDialogResult,
+} from './create-entity-dialog.component';
 import { TypeRegistry } from './type-registry';
 import { TypeDefinition } from '@hexly/web-entity';
 import { CORE_VIEW_RICH_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
@@ -52,8 +55,9 @@ function world(id: string, name: string): WorldSummary {
 
 describe('CreateEntityDialog', () => {
   let entitiesClient: MockEntitiesClient;
-  let navigate: ReturnType<typeof vi.spyOn>;
-  let dialogRef: DialogRef<CreateEntityDialogData>;
+  let dialogRef: DialogRef<CreateEntityDialogData, CreateEntityDialogResult>;
+  /** What the dialog closed with, in order — the seam its callers read (ADR-0073). */
+  let closedWith: (CreateEntityDialogResult | undefined)[];
 
   // The dialog seeds itself from `DialogRef.data` at creation (no more open-state signal), so a
   // seeded type's registration must land via `setup` *before* the component is built.
@@ -64,20 +68,22 @@ describe('CreateEntityDialog', () => {
     setup?: () => void,
   ) {
     entitiesClient = new MockEntitiesClient();
-    dialogRef = new DialogRef<CreateEntityDialogData>({ type: seedType });
+    dialogRef = new DialogRef<CreateEntityDialogData, CreateEntityDialogResult>({ type: seedType });
+    closedWith = [];
+    dialogRef.closed.subscribe((entity) => closedWith.push(entity));
     vi.spyOn(dialogRef, 'close');
     TestBed.configureTestingModule({
       imports: [CreateEntityDialogComponent, provideTranslocoTesting()],
+      // No `provideRouter`: the dialog returns its Entity and routes nowhere (ADR-0073), so a
+      // reinstated Router injection fails the whole spec rather than passing a spy quietly.
       providers: [
         providePluginContent(),
         providePluginHexmap(),
-        provideRouter([]),
         { provide: EntitiesClient, useValue: entitiesClient },
         { provide: WorldStore, useValue: { worlds: () => worlds } },
         { provide: DialogRef, useValue: dialogRef },
       ],
     });
-    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     TestBed.inject(ActiveWorld).set(activeWorldId);
     setup?.();
     const fixture = TestBed.createComponent(CreateEntityDialogComponent);
@@ -104,7 +110,7 @@ describe('CreateEntityDialog', () => {
     expect(select.value).toBe('w1');
   });
 
-  it('creates the Entity in the selected World and navigates to it', () => {
+  it('creates the Entity in the selected World and closes with it as the result', () => {
     const fixture = render([world('w1', 'Aldermoor')], 'w1');
     const created: EntityDetail = {
       id: 'e1',
@@ -131,8 +137,9 @@ describe('CreateEntityDialog', () => {
 
     // The seeded type rides as a one-element ordered set; no EntityDocument (core types declare no Fields).
     expect(entitiesClient.create).toHaveBeenCalledWith('The Reach', ['core.type.note'], 'w1', undefined);
-    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'e1']);
-    expect(dialogRef.close).toHaveBeenCalled();
+    // The created Entity is the result; where to go next is the caller's call (ADR-0073).
+    expect(dialogRef.close).toHaveBeenCalledWith(created);
+    expect(closedWith).toEqual([created]);
   });
 
   it('lets the author add a second type before creating, sending the ordered set (#189)', () => {
@@ -254,13 +261,14 @@ describe('CreateEntityDialog', () => {
     expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['test.type.monster'], 'w1', undefined);
   });
 
-  it('closes without creating anything on cancel', () => {
+  it('closes with no result and creates nothing on cancel', () => {
     const fixture = render([world('w1', 'Aldermoor')], 'w1');
 
     (q(fixture, 'create-entity-cancel') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     expect(entitiesClient.create).not.toHaveBeenCalled();
-    expect(dialogRef.close).toHaveBeenCalled();
+    expect(dialogRef.close).toHaveBeenCalledWith();
+    expect(closedWith).toEqual([undefined]);
   });
 });

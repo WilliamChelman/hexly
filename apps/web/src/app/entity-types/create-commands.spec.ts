@@ -1,21 +1,33 @@
 import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginDrawSteel } from '@hexly/plugin-draw-steel/web';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { firstValueFrom } from 'rxjs';
-import { DialogService } from '@hexly/web-ui';
+import { EntityDetail } from '@hexly/domain';
+import { DialogRef, DialogService } from '@hexly/web-ui';
 import { CreateCommands } from './create-commands';
-import { CreateEntityDialogComponent } from './create-entity-dialog.component';
+import {
+  CreateEntityDialogComponent,
+  CreateEntityDialogData,
+  CreateEntityDialogResult,
+} from './create-entity-dialog.component';
 import { TypeRegistry } from './type-registry';
+
+/** All this Command reads off the dialog's result is where to route (ADR-0073). */
+const created = { id: 'e1', worldId: 'w1', name: 'The Reach' } as EntityDetail;
 
 describe('CreateCommands', () => {
   let provider: CreateCommands;
   let open: ReturnType<typeof vi.fn>;
+  let dialogRef: DialogRef<CreateEntityDialogData, CreateEntityDialogResult>;
+  let navigate: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    open = vi.fn();
+    dialogRef = new DialogRef<CreateEntityDialogData, CreateEntityDialogResult>({ type: 'core.type.note' });
+    open = vi.fn().mockReturnValue(dialogRef);
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
       providers: [
@@ -23,9 +35,11 @@ describe('CreateCommands', () => {
         providePluginHexmap(),
         providePluginDnd(),
         providePluginDrawSteel(),
+        provideRouter([]),
         { provide: DialogService, useValue: { open } },
       ],
     });
+    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     provider = TestBed.inject(CreateCommands);
   });
 
@@ -76,6 +90,24 @@ describe('CreateCommands', () => {
     const [, createMap] = await firstValueFrom(provider.search(''));
     createMap.run();
     expect(open).toHaveBeenCalledWith(CreateEntityDialogComponent, { type: 'core.type.hex-map' });
+  });
+
+  it('navigates to the Entity the dialog closes with — the dialog only returns it (ADR-0073)', async () => {
+    const [createNote] = await firstValueFrom(provider.search(''));
+    createNote.run();
+
+    dialogRef.close(created);
+
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'e1']);
+  });
+
+  it('navigates nowhere when the dialog is cancelled', async () => {
+    const [createNote] = await firstValueFrom(provider.search(''));
+    createNote.run();
+
+    dialogRef.close();
+
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it('narrows to commands whose label matches the typed query, case-insensitively', async () => {
