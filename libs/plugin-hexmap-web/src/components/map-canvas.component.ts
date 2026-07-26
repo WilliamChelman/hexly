@@ -26,8 +26,8 @@ import {
   regionById,
 } from '@hexly/plugin-hexmap';
 import {
+  ColorSchemeService,
   ShortcutService,
-  ThemeService,
   ToasterService,
   isInteractiveTarget,
   isTrackpadWheel,
@@ -127,7 +127,7 @@ const HEX_DRAG_THRESHOLD = 4;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
       background-size: 180px 180px;
     }
-    :host-context([data-theme='dark']) .field-grain {
+    :host-context([data-color-scheme='astral']) .field-grain {
       @apply opacity-[0.05] mix-blend-screen;
     }
     /* Soft edge vignette: clear centre, sinking to the themed edge ink at the corners. */
@@ -215,7 +215,7 @@ export class MapCanvasComponent {
    */
   private gestureButton: number | null = null;
 
-  private readonly theme = inject(ThemeService);
+  private readonly colorScheme = inject(ColorSchemeService);
   private readonly store = inject(HexMapStore);
   private readonly shortcuts = inject(ShortcutService);
   /** The route-scoped session; `writable()` gates every keyboard mutation (ADR-0037/0062). */
@@ -251,10 +251,10 @@ export class MapCanvasComponent {
     // Reading the signals inside renderFrame() registers them as dependencies.
     effect(() => this.renderFrame());
 
-    // Render inputs are read untracked: only a theme switch may drive this path,
+    // Render inputs are read untracked: only a ColorScheme switch may drive this path,
     // which re-reads the palette via `getComputedStyle`.
     effect(() => {
-      this.theme.theme();
+      this.colorScheme.colorScheme();
       if (!this.renderer) return;
       this.renderer.refreshTheme();
       untracked(() => this.renderFrame());

@@ -1,10 +1,10 @@
 /*
- * Hexly design tokens — the theme-variant + non-utility layer.
+ * Hexly design tokens — the ColorScheme-variant + non-utility layer.
  *
  * Utility-shaped tokens (colours, fonts, type, spacing, radii) live in the
  * `@theme` block in styles.css (ADR-0020). This file carries what `@theme` can't:
- *   1. The DARK theme — reassigning the generated `--color-*` / `--shadow-*`
- *      under [data-theme='dark']. Imported after `tailwindcss`, so it cascades
+ *   1. The Astral ColorScheme — reassigning the generated `--color-*` / `--shadow-*`
+ *      under [data-color-scheme='astral']. Imported after `tailwindcss`, so it cascades
  *      over the `:root` Tailwind emits.
  *   2. Raw non-utility tokens — motion (`--dur-*`/`--ease-*`), elevation
  *      (`--shadow-*`, see ADR-0021), layout rails (`--rail-*`, `--container-reading`).
@@ -53,13 +53,13 @@
 }
 
 /* =========================================================================
- * Dark theme — "Astral"
+ * The Astral ColorScheme — the night half
  * The same chart at night: midnight-indigo paper, constellation-gold,
- * aurora-teal. Text stays warm parchment-cream so the two themes read as
+ * aurora-teal. Text stays warm parchment-cream so the two ColorSchemes read as
  * one identity at different hours. Reassigns the generated --color-* /
  * --shadow-* declared (light) in the styles.css @theme block.
  * ======================================================================= */
-:root[data-theme='dark'] {
+:root[data-color-scheme='astral'] {
   --color-bg: #0b0c1a; /* the night table                                   */
   --color-bg-deep: #070710;
   --color-surface: #10132b; /* lifted indigo panel                          */

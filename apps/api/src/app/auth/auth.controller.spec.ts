@@ -49,7 +49,7 @@ describe('Auth endpoints', () => {
       email: 'ada@hexly.test',
       displayName: 'Ada',
       // A fresh user has expressed no Preferences: an empty bag, so the client
-      // falls back to its own detection (browser language, OS theme) (ADR-0038).
+      // falls back to its own detection (browser language, OS ColorScheme) (ADR-0038).
       preferences: {},
       // Seeded with the `create-worlds` role granted (ADR-0040, ADR-0047); the web
       // nav gates the "New World" affordance on it. No `manage-users` role.
@@ -67,11 +67,11 @@ describe('Auth endpoints', () => {
     // A later partial write must not clobber the earlier pref: PATCH merges.
     const patched = await agent
       .patch('/auth/me/preferences')
-      .send({ theme: 'dark', formatLocale: 'en-GB' })
+      .send({ colorScheme: 'astral', formatLocale: 'en-GB' })
       .expect(200);
     expect(patched.body).toEqual({
       locale: 'fr',
-      theme: 'dark',
+      colorScheme: 'astral',
       formatLocale: 'en-GB',
     });
 
@@ -79,7 +79,7 @@ describe('Auth endpoints', () => {
     const me = await agent.get('/auth/me').expect(200);
     expect(me.body.preferences).toEqual({
       locale: 'fr',
-      theme: 'dark',
+      colorScheme: 'astral',
       formatLocale: 'en-GB',
     });
   });

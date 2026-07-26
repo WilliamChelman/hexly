@@ -241,11 +241,11 @@
     "userMenu": "Ouvrir le menu utilisateur",
     "signOut": "Se déconnecter",
     "login": "Connexion",
-    "theme": {
+    "colorScheme": {
       "solar": "Solaire (clair)",
       "astral": "Astral (sombre)",
-      "toSolar": "Passer au thème solaire",
-      "toAstral": "Passer au thème astral"
+      "toSolar": "Passer au schéma de couleurs solaire",
+      "toAstral": "Passer au schéma de couleurs astral"
     },
     "cancel": "Annuler",
     "close": "Fermer",
@@ -489,7 +489,7 @@
     "subhead": "Vos préférences suivent votre compte sur tous vos appareils.",
     "preferences": {
       "heading": "Préférences",
-      "theme": "Thème",
+      "colorScheme": "Schéma de couleurs",
       "language": "Langue",
       "formatLocale": "Format régional",
       "formatLocaleHint": "Le format des dates et des nombres, indépendant de la langue.",

@@ -120,15 +120,15 @@ describe('AuthScopedStorage', () => {
       expect(storage.getItem('foo')).toBe('bar');
     });
 
-    it('leaves non-prefixed keys (e.g. device-level theme) untouched on a cross-user login', () => {
+    it('leaves non-prefixed keys (e.g. the device-level ColorScheme) untouched on a cross-user login', () => {
       login('u1');
-      localStorage.setItem('hexly-theme', 'dark'); // device-level, not via this store
+      localStorage.setItem('hexly-color-scheme', 'astral'); // device-level, not via this store
       storage.setItem('foo', 'from-u1');
 
       login('u2');
 
       expect(storage.getItem('foo')).toBeNull(); // scoped key wiped
-      expect(localStorage.getItem('hexly-theme')).toBe('dark'); // device key kept
+      expect(localStorage.getItem('hexly-color-scheme')).toBe('astral'); // device key kept
     });
   });
 
@@ -136,68 +136,68 @@ describe('AuthScopedStorage', () => {
     it('falls back to detect() when nothing is stored', () => {
       const apply = vi.fn();
       const pref = storage.preference({
-        storageKey: 'hexly-theme',
-        values: ['light', 'dark'] as const,
-        detect: () => 'light' as const,
+        storageKey: 'hexly-color-scheme',
+        values: ['solar', 'astral'] as const,
+        detect: () => 'solar' as const,
         apply,
       });
 
-      expect(pref.value()).toBe('light');
-      expect(apply).toHaveBeenCalledWith('light');
+      expect(pref.value()).toBe('solar');
+      expect(apply).toHaveBeenCalledWith('solar');
     });
 
     it('reads the stored value instead of detecting', () => {
-      storage.setItem('hexly-theme', 'dark');
+      storage.setItem('hexly-color-scheme', 'astral');
       const pref = storage.preference({
-        storageKey: 'hexly-theme',
-        values: ['light', 'dark'] as const,
-        detect: () => 'light' as const,
+        storageKey: 'hexly-color-scheme',
+        values: ['solar', 'astral'] as const,
+        detect: () => 'solar' as const,
         apply: vi.fn(),
       });
 
-      expect(pref.value()).toBe('dark');
+      expect(pref.value()).toBe('astral');
     });
 
     it('ignores stored values not in the values list', () => {
-      storage.setItem('hexly-theme', 'solarized'); // not a valid value
+      storage.setItem('hexly-color-scheme', 'solarized'); // not a valid value
       const pref = storage.preference({
-        storageKey: 'hexly-theme',
-        values: ['light', 'dark'] as const,
-        detect: () => 'light' as const,
+        storageKey: 'hexly-color-scheme',
+        values: ['solar', 'astral'] as const,
+        detect: () => 'solar' as const,
         apply: vi.fn(),
       });
 
-      expect(pref.value()).toBe('light');
+      expect(pref.value()).toBe('solar');
     });
 
     it('set() updates the signal, calls apply, and persists to storage', () => {
       const apply = vi.fn();
       const pref = storage.preference({
-        storageKey: 'hexly-theme',
-        values: ['light', 'dark'] as const,
-        detect: () => 'light' as const,
+        storageKey: 'hexly-color-scheme',
+        values: ['solar', 'astral'] as const,
+        detect: () => 'solar' as const,
         apply,
       });
 
-      pref.set('dark');
+      pref.set('astral');
 
-      expect(pref.value()).toBe('dark');
-      expect(apply).toHaveBeenLastCalledWith('dark');
-      expect(storage.getItem('hexly-theme')).toBe('dark');
+      expect(pref.value()).toBe('astral');
+      expect(apply).toHaveBeenLastCalledWith('astral');
+      expect(storage.getItem('hexly-color-scheme')).toBe('astral');
     });
 
     it('reads the stored value when authenticated', () => {
       login('u1');
-      storage.setItem('hexly-theme', 'dark');
+      storage.setItem('hexly-color-scheme', 'astral');
       const pref = storage.preference({
-        storageKey: 'hexly-theme',
-        values: ['light', 'dark'] as const,
-        detect: () => 'light' as const,
+        storageKey: 'hexly-color-scheme',
+        values: ['solar', 'astral'] as const,
+        detect: () => 'solar' as const,
         apply: vi.fn(),
       });
 
-      expect(pref.value()).toBe('dark');
-      expect(localStorage.getItem('hexly-u:hexly-theme')).toBe('dark'); // namespaced
+      expect(pref.value()).toBe('astral');
+      expect(localStorage.getItem('hexly-u:hexly-color-scheme')).toBe('astral'); // namespaced
     });
   });
 });

@@ -12,7 +12,7 @@ import {
   TranslationTitleStrategy,
   provideEagerTranslations,
   provideLocale,
-  provideTheme,
+  provideColorScheme,
   providePreferencesSync,
   provideClientConfig,
   CORE_TRANSLATIONS,
@@ -76,9 +76,9 @@ export const appConfig: ApplicationConfig = {
     // resolve per the active locale's plural rules. It delegates {{…}} to the
     // default transpiler, so existing double-brace interpolation is unaffected.
     provideTranslocoMessageformat(),
-    // Apply the persisted/OS theme and load the active language's catalog
+    // Apply the persisted/OS ColorScheme and load the active language's catalog
     // during bootstrap, before the first paint and initial navigation.
-    provideTheme(),
+    provideColorScheme(),
     provideLocale(),
     // Roam Preferences with the account (ADR-0038): hydrate from /auth/me,
     // push signal changes back as PATCHes.

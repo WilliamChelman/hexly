@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { DeploymentProfile } from '@hexly/domain';
-import { AuthClient, ClientConfigStore, LocaleService, ThemeService } from '@hexly/web-core';
+import { AuthClient, ClientConfigStore, ColorSchemeService, LocaleService } from '@hexly/web-core';
 import { MockAuthClient, mockClientConfigStore } from '@hexly/web-core/testing';
 import { UserMenuComponent } from './user-menu.component';
 
@@ -71,7 +71,7 @@ describe('UserMenu', () => {
     expect(trigger(fixture)).not.toBeNull();
   });
 
-  it('opens a menu with theme and language commands', () => {
+  it('opens a menu with ColorScheme and language commands', () => {
     const fixture = TestBed.createComponent(UserMenuComponent);
     fixture.detectChanges();
 
@@ -79,18 +79,18 @@ describe('UserMenu', () => {
 
     expect(menu.getAttribute('role')).toBe('menu');
     expect(menu.querySelectorAll('[role=menuitemradio]').length).toBe(2);
-    expect(item(menu, /theme/i)).toBeTruthy();
+    expect(item(menu, /colour scheme/i)).toBeTruthy();
   });
 
-  it('toggles the theme from the menu', () => {
-    const theme = TestBed.inject(ThemeService);
+  it('toggles the ColorScheme from the menu', () => {
+    const colorScheme = TestBed.inject(ColorSchemeService);
     const fixture = TestBed.createComponent(UserMenuComponent);
     fixture.detectChanges();
 
-    const before = theme.theme();
-    item(openMenu(fixture), /theme/i).click();
+    const before = colorScheme.colorScheme();
+    item(openMenu(fixture), /colour scheme/i).click();
 
-    expect(theme.theme()).not.toBe(before);
+    expect(colorScheme.colorScheme()).not.toBe(before);
   });
 
   it('marks the active language and flips it live', () => {
@@ -169,16 +169,16 @@ describe('UserMenu', () => {
       expect(() => item(menu, /login/i)).toThrow();
     });
 
-    it('keeps the account-independent preferences: theme and language', () => {
+    it('keeps the account-independent preferences: ColorScheme and language', () => {
       signIn();
-      const theme = TestBed.inject(ThemeService);
+      const colorScheme = TestBed.inject(ColorSchemeService);
       const locale = TestBed.inject(LocaleService);
       const fixture = TestBed.createComponent(UserMenuComponent);
       fixture.detectChanges();
 
-      const before = theme.theme();
-      item(openMenu(fixture), /theme/i).click();
-      expect(theme.theme()).not.toBe(before);
+      const before = colorScheme.colorScheme();
+      item(openMenu(fixture), /colour scheme/i).click();
+      expect(colorScheme.colorScheme()).not.toBe(before);
 
       // Re-opened: triggering a menu item closes the panel, as it does in the server profile.
       item(openMenu(fixture), /français/i).click();

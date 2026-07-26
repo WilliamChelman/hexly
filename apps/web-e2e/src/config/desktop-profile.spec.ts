@@ -26,7 +26,7 @@ test('the desktop profile has no login page and no route to one', async ({ page,
   await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(0);
 });
 
-test('the user menu keeps theme and language and drops the session and the identity', async ({ page }) => {
+test('the user menu keeps the ColorScheme and language and drops the session and the identity', async ({ page }) => {
   await page.goto('/worlds');
 
   // Located by component, not by accessible name: this spec flips the language below.
@@ -41,10 +41,10 @@ test('the user menu keeps theme and language and drops the session and the ident
   await expect(trigger).not.toContainText('E2E Tester');
   await expect(menu).not.toContainText('E2E Tester');
 
-  // Theme and language are account-independent preferences and stay.
-  const theme = await page.locator('html').getAttribute('data-theme');
-  await menu.getByRole('menuitem', { name: /switch to (solar|astral) theme/i }).click();
-  await expect(page.locator('html')).not.toHaveAttribute('data-theme', String(theme));
+  // The ColorScheme and the language are account-independent preferences and stay.
+  const colorScheme = await page.locator('html').getAttribute('data-color-scheme');
+  await menu.getByRole('menuitem', { name: /switch to the (solar|astral) colour scheme/i }).click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-color-scheme', String(colorScheme));
 
   await trigger.click();
   const languages = page.getByRole('menu').getByRole('menuitemradio');
@@ -62,7 +62,7 @@ test('the user menu keeps theme and language and drops the session and the ident
 test('Settings keeps its Preferences and offers no Profile section and no password form', async ({ page }) => {
   await page.goto('/settings');
 
-  for (const testid of ['theme-light', 'theme-dark', 'language', 'format-locale']) {
+  for (const testid of ['color-scheme-solar', 'color-scheme-astral', 'language', 'format-locale']) {
     await expect(page.getByTestId(testid)).toBeVisible();
   }
   // There is no account to manage, because there is no password anywhere (ADR-0070).

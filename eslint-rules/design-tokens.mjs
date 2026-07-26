@@ -62,8 +62,8 @@ function loadCss(cwd) {
       readAny = true;
       for (const m of txt.matchAll(/--([a-z0-9][a-z0-9-]*)\s*:/g)) tokens.add(m[1]);
       // Shadow utilities are the `@utility shadow-*` declarations; only these
-      // respect the [data-theme] reassignment — Tailwind's built-ins bake a
-      // light-mode value (ADR-0021).
+      // respect the [data-color-scheme] reassignment — Tailwind's built-ins bake a
+      // Solar value (ADR-0021).
       for (const m of txt.matchAll(/@utility\s+(shadow-[a-z0-9-]+)/g)) shadowUtilities.add(m[1]);
     } catch {
       /* token file not found from this cwd */
@@ -128,7 +128,7 @@ const noBuiltinShadow = {
     schema: [],
     messages: {
       builtin:
-        'Built-in shadow utility `{{cls}}` bakes a light-mode value and ignores [data-theme]. Use shadow-1, shadow-2, shadow-3, or shadow-inset instead (ADR-0021).',
+        'Built-in shadow utility `{{cls}}` bakes a Solar value and ignores [data-color-scheme]. Use shadow-1, shadow-2, shadow-3, or shadow-inset instead (ADR-0021).',
     },
   },
   create(context) {

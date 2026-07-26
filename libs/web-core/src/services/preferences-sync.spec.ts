@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { AuthUser, Preferences } from '@hexly/domain';
 import { provideTranslocoTesting } from '../i18n/transloco-testing';
 import { LocaleService } from '../i18n/locale.service';
-import { detectTheme, ThemeService } from './theme.service';
+import { ColorSchemeService, detectColorScheme } from './color-scheme.service';
 import { AuthClient } from './auth.client';
 import { MockAuthClient } from '../testing/auth-client.mock';
 import { PreferencesSync } from './preferences-sync';
@@ -13,7 +13,7 @@ describe('PreferencesSync (ADR-0038)', () => {
   let auth: MockAuthClient;
   let http: HttpTestingController;
   let locale: LocaleService;
-  let theme: ThemeService;
+  let colorScheme: ColorSchemeService;
   let originalLanguage: PropertyDescriptor | undefined;
 
   const ada = (preferences: Preferences): AuthUser => ({
@@ -39,7 +39,7 @@ describe('PreferencesSync (ADR-0038)', () => {
     });
     TestBed.inject(PreferencesSync);
     locale = TestBed.inject(LocaleService);
-    theme = TestBed.inject(ThemeService);
+    colorScheme = TestBed.inject(ColorSchemeService);
     http = TestBed.inject(HttpTestingController);
     TestBed.flushEffects();
   });
@@ -60,12 +60,12 @@ describe('PreferencesSync (ADR-0038)', () => {
   it('adopts server Preferences when the session resolves — server wins over the local cache', () => {
     localStorage.setItem('hexly-u:hexly-locale', 'en');
 
-    auth.setUser(ada({ locale: 'fr', theme: 'dark', formatLocale: 'en-GB' }));
+    auth.setUser(ada({ locale: 'fr', colorScheme: 'astral', formatLocale: 'en-GB' }));
     TestBed.flushEffects();
 
     expect(locale.lang()).toBe('fr');
     expect(locale.formatLocale()).toBe('en-GB');
-    expect(theme.theme()).toBe('dark');
+    expect(colorScheme.colorScheme()).toBe('astral');
     // The boot cache is overwritten too, so the next reload paints right away.
     expect(localStorage.getItem('hexly-u:hexly-locale')).toBe('fr');
     // Hydration is a read, never an echo back to the server.
@@ -85,18 +85,18 @@ describe('PreferencesSync (ADR-0038)', () => {
     http.expectNone('/api/auth/me/preferences');
   });
 
-  it('keeps a device-local theme when the account bag has no theme (ADR-0038)', () => {
-    // Theme is persisted unscoped (read before login), so an absent server theme
-    // must not reset a device-local choice to the OS default. Pick the opposite
-    // of detection so a regression to detectTheme() would flip it.
-    const local = detectTheme() === 'dark' ? 'light' : 'dark';
-    theme.set(local);
+  it('keeps a device-local ColorScheme when the account bag has none (ADR-0038)', () => {
+    // The ColorScheme is persisted unscoped (read before login), so an absent server
+    // value must not reset a device-local choice to the OS default. Pick the opposite
+    // of detection so a regression to detectColorScheme() would flip it.
+    const local = detectColorScheme() === 'astral' ? 'solar' : 'astral';
+    colorScheme.set(local);
     TestBed.flushEffects();
 
     auth.setUser(ada({}));
     TestBed.flushEffects();
 
-    expect(theme.theme()).toBe(local);
+    expect(colorScheme.colorScheme()).toBe(local);
     http.expectNone('/api/auth/me/preferences');
   });
 
@@ -127,7 +127,7 @@ describe('PreferencesSync (ADR-0038)', () => {
 
   it('persists nothing while anonymous — public-link viewers stay local-only', () => {
     locale.set('fr');
-    theme.set('dark');
+    colorScheme.set('astral');
     TestBed.flushEffects();
 
     http.expectNone('/api/auth/me/preferences');

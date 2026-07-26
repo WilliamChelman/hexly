@@ -15,7 +15,7 @@ function hashId(id: string): string {
 const SCOPE_KEY = 'hexly-scope';
 
 // Namespace for every key written through this store. Wiped wholesale on a
-// cross-user login — kept distinct from device-level keys (e.g. `hexly-theme`)
+// cross-user login — kept distinct from device-level keys (e.g. `hexly-color-scheme`)
 // so those are never caught in the sweep.
 const PREFIX = 'hexly-u:';
 

@@ -9,7 +9,7 @@ test('the rail navigates, exposes account controls, and pages own their headers'
 
   // Account + appearance live behind the avatar.
   await page.getByRole('button', { name: 'Open user menu' }).click();
-  await expect(page.getByRole('menuitem', { name: /Switch to (solar|astral) theme/ })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: /Switch to the (solar|astral) colour scheme/ })).toBeVisible();
   await expect(page.getByRole('menuitemradio', { name: 'Français' })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeVisible();
   await page.keyboard.press('Escape');

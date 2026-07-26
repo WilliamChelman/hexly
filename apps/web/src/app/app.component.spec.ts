@@ -59,8 +59,8 @@ describe('App', () => {
     expect(fixture.nativeElement.querySelector('app-nav-rail')).toBeNull();
   });
 
-  it('applies a theme to the document on boot', () => {
+  it('applies a ColorScheme to the document on boot', () => {
     TestBed.createComponent(AppComponent);
-    expect(document.documentElement.dataset['theme']).toMatch(/^(light|dark)$/);
+    expect(document.documentElement.dataset['colorScheme']).toMatch(/^(solar|astral)$/);
   });
 });

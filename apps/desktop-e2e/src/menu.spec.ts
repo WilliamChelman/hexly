@@ -130,7 +130,7 @@ test('the displayed chord dispatches in the renderer, and the menu item runs the
 
   // From somewhere else first, so the navigation is a claim worth making.
   await run.window.goto(`${run.origin}/settings`);
-  await expect(run.window.getByTestId('theme-light')).toBeVisible();
+  await expect(run.window.getByTestId('color-scheme-solar')).toBeVisible();
 
   await clickMenuItem(run.app, 'go-worlds');
 

@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Point } from '@hexly/plugin-board';
-import { isTrackpadWheel, ThemeService, wheelDeltaPixels } from '@hexly/web-core';
+import { ColorSchemeService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { Camera, fitCamera } from '../utils/camera';
 import { DRAG_THRESHOLD } from '../utils/gesture';
@@ -142,7 +142,7 @@ export class BoardCanvasComponent {
 
   protected readonly zoomPercent = computed(() => Math.round(this.cam.zoom() * 100));
 
-  private readonly theme = inject(ThemeService);
+  private readonly colorScheme = inject(ColorSchemeService);
   private readonly destroyRef = inject(DestroyRef);
 
   private ctx: CanvasRenderingContext2D | null = null;
@@ -166,9 +166,9 @@ export class BoardCanvasComponent {
     // Reading the camera inside renderFrame() registers it as a dependency, so a pan/zoom repaints.
     effect(() => this.renderFrame());
 
-    // A theme switch re-reads the dot colour via getComputedStyle, then repaints untracked.
+    // A ColorScheme switch re-reads the dot colour via getComputedStyle, then repaints untracked.
     effect(() => {
-      this.theme.theme();
+      this.colorScheme.colorScheme();
       if (!this.ctx) return;
       this.refreshTheme();
       untracked(() => this.renderFrame());

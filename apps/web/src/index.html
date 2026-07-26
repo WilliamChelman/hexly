@@ -12,17 +12,17 @@
     <link rel="preload" href="/fonts/marcellus-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <!--
-      Resolve the theme before first paint to avoid a flash. Mirrors
-      ThemeService: stored choice wins, else follow the OS preference.
+      Resolve the ColorScheme before first paint to avoid a flash. Mirrors
+      ColorSchemeService: stored choice wins, else follow the OS preference.
     -->
     <script>
       (function () {
         try {
-          var stored = localStorage.getItem('hexly-theme');
-          var dark = stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+          var stored = localStorage.getItem('hexly-color-scheme');
+          var astral = stored === 'astral' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.dataset.colorScheme = astral ? 'astral' : 'solar';
         } catch (e) {
-          document.documentElement.dataset.theme = 'light';
+          document.documentElement.dataset.colorScheme = 'solar';
         }
       })();
     </script>
