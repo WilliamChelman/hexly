@@ -5,7 +5,8 @@ export type DeploymentProfile = (typeof DEPLOYMENT_PROFILES)[number];
 /**
  * The client's view of the Instance Configuration (ADR-0052, Seam 4): the subset served, unauthenticated,
  * by `GET /api/config`. A projection of the server's `HexlyConfig`, not a second store — room for future
- * client knobs, today Plugin enablement, the default create Type, and ADR-0071's two deployment knobs.
+ * client knobs, today Plugin enablement, the default create Type, ADR-0073's two Inline Creation knobs,
+ * and ADR-0071's two deployment knobs.
  */
 export interface ClientConfig {
   /** This Instance's Deployment Profile (ADR-0071). */
@@ -17,6 +18,10 @@ export interface ClientConfig {
   entities: {
     /** The Type id the "New" button mints by default; resolved softly, client-side. */
     defaultType: string;
+    /** The Type id Inline Creation mints, deliberately not `defaultType` (ADR-0073); resolved softly, client-side. */
+    inlineType: string;
+    /** The Tag applied to everything created inline (ADR-0073); absent unless the operator names one. */
+    inlineTag?: string;
   };
 }
 

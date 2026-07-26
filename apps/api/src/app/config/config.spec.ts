@@ -59,7 +59,7 @@ describe('loadConfig', () => {
     search: { weights: { name: 10, tags: 5, content: 1 } },
     liveFollow: { heartbeatSeconds: 30 },
     features: { plugin: {}, collaboration: true },
-    entities: { defaultType: 'core.type.note' },
+    entities: { defaultType: 'core.type.note', inlineType: 'core.type.note' },
     // No `assets.dir`: absent stays absent, and the assets seam supplies the default root.
     assets: {},
   };
@@ -279,5 +279,48 @@ describe('loadConfig: entities.defaultType (ADR-0052)', () => {
     expect(loadConfig(dataDir('entities:\n  defaultType: nope.type.unknown\n'), PLUGINS).entities.defaultType).toBe(
       'nope.type.unknown',
     );
+  });
+});
+
+describe('loadConfig: the Inline Creation knobs (ADR-0073)', () => {
+  it('defaults inlineType to core.type.note when absent', () => {
+    expect(loadConfig(dataDir(), PLUGINS).entities.inlineType).toBe('core.type.note');
+    expect(loadConfig(':memory:', PLUGINS).entities.inlineType).toBe('core.type.note');
+  });
+
+  it('resolves a present inlineType verbatim, separately from defaultType', () => {
+    const config = loadConfig(dataDir('entities:\n  defaultType: core.type.hex-map\n'), PLUGINS);
+
+    expect(config.entities.defaultType).toBe('core.type.hex-map');
+    expect(config.entities.inlineType).toBe('core.type.note');
+  });
+
+  it('resolves inlineType with no validation against the Type registry, like defaultType beside it', () => {
+    // A nonsense id degrades at the point of use; this knob never fails boot (ADR-0073).
+    expect(loadConfig(dataDir('entities:\n  inlineType: nope.type.unknown\n'), PLUGINS).entities.inlineType).toBe(
+      'nope.type.unknown',
+    );
+  });
+
+  it('rejects a non-string inlineType, naming the key', () => {
+    expect(() => loadConfig(dataDir('entities:\n  inlineType: 42\n'), PLUGINS)).toThrow(/inlineType/);
+    expect(() => loadConfig(dataDir('entities:\n  inlineType: true\n'), PLUGINS)).toThrow(/inlineType/);
+  });
+
+  it('leaves inlineTag absent — not empty — when unset, so nothing is imposed on authors', () => {
+    expect(loadConfig(dataDir(), PLUGINS).entities.inlineTag).toBeUndefined();
+    expect(loadConfig(':memory:', PLUGINS).entities.inlineTag).toBeUndefined();
+    expect(
+      loadConfig(dataDir('entities:\n  defaultType: core.type.note\n'), PLUGINS).entities.inlineTag,
+    ).toBeUndefined();
+  });
+
+  it('resolves a present inlineTag verbatim', () => {
+    expect(loadConfig(dataDir('entities:\n  inlineTag: untriaged\n'), PLUGINS).entities.inlineTag).toBe('untriaged');
+  });
+
+  it('fails boot on an empty or wrong-typed inlineTag, naming the key', () => {
+    expect(() => loadConfig(dataDir('entities:\n  inlineTag: ""\n'), PLUGINS)).toThrow(/inlineTag/);
+    expect(() => loadConfig(dataDir('entities:\n  inlineTag: 7\n'), PLUGINS)).toThrow(/inlineTag/);
   });
 });

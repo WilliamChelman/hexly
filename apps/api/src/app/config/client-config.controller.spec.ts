@@ -7,16 +7,16 @@ import { HexlyConfig, HEXLY_CONFIG } from './config';
 function configWith(
   plugin: HexlyConfig['features']['plugin'],
   defaultType: string,
-  deployment: { profile?: DeploymentProfile; collaboration?: boolean } = {},
+  rest: { profile?: DeploymentProfile; collaboration?: boolean; inlineType?: string; inlineTag?: string } = {},
 ): HexlyConfig {
   return {
-    profile: deployment.profile ?? 'server',
+    profile: rest.profile ?? 'server',
     import: { maxUpload: 0, maxDecompressed: 0, strictZipGuard: false },
     assets: {},
     search: { weights: { name: 10, tags: 5, content: 1 } },
     liveFollow: { heartbeatSeconds: 30 },
-    features: { plugin: plugin, collaboration: deployment.collaboration ?? true },
-    entities: { defaultType },
+    features: { plugin: plugin, collaboration: rest.collaboration ?? true },
+    entities: { defaultType, inlineType: rest.inlineType ?? 'core.type.note', inlineTag: rest.inlineTag },
   };
 }
 
@@ -44,7 +44,7 @@ describe('ClientConfigController', () => {
         hexmap: { enabled: false },
         dnd: { enabled: true },
       },
-      entities: { defaultType: 'core.type.note' },
+      entities: { defaultType: 'core.type.note', inlineType: 'core.type.note' },
     });
   });
 
@@ -70,6 +70,24 @@ describe('ClientConfigController', () => {
     const controller = await controllerFor(configWith({}, 'world.type.deity'));
 
     expect(controller.getConfig().entities.defaultType).toBe('world.type.deity');
+  });
+
+  it('carries the two Inline Creation knobs, independently of defaultType (ADR-0073)', async () => {
+    const controller = await controllerFor(
+      configWith({}, 'core.type.hex-map', { inlineType: 'world.type.rumour', inlineTag: 'untriaged' }),
+    );
+
+    expect(controller.getConfig().entities).toEqual({
+      defaultType: 'core.type.hex-map',
+      inlineType: 'world.type.rumour',
+      inlineTag: 'untriaged',
+    });
+  });
+
+  it('leaves inlineTag off the payload when the Instance sets none', async () => {
+    const controller = await controllerFor(configWith({}, 'core.type.note'));
+
+    expect(JSON.parse(JSON.stringify(controller.getConfig().entities))).not.toHaveProperty('inlineTag');
   });
 
   it('carries the Deployment Profile and Collaboration flag (ADR-0071)', async () => {

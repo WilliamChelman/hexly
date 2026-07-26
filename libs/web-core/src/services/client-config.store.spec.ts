@@ -29,7 +29,7 @@ describe('ClientConfigStore', () => {
   it('fetches GET /api/config and exposes the enabled-Plugin set and default type', async () => {
     await initWith({
       plugins: { content: { enabled: true }, hexmap: { enabled: false }, dnd: { enabled: true } },
-      entities: { defaultType: 'core.type.note' },
+      entities: { defaultType: 'core.type.note', inlineType: 'core.type.note' },
     });
 
     expect([...store.enabledPlugins()].sort()).toEqual(['content', 'dnd']);
@@ -52,8 +52,39 @@ describe('ClientConfigStore', () => {
     expect(store.defaultType()).toBeUndefined();
   });
 
+  describe('the Inline Creation knobs (ADR-0073)', () => {
+    it('exposes both, read separately from the default create Type', async () => {
+      await initWith({
+        plugins: {},
+        entities: { defaultType: 'core.type.hex-map', inlineType: 'world.type.rumour', inlineTag: 'untriaged' },
+      });
+
+      expect(store.defaultType()).toBe('core.type.hex-map');
+      expect(store.inlineType()).toBe('world.type.rumour');
+      expect(store.inlineTag()).toBe('untriaged');
+    });
+
+    it('reads the Tag as unset when the Instance configures none', async () => {
+      await initWith({ plugins: {}, entities: { defaultType: 'core.type.note', inlineType: 'core.type.note' } });
+
+      expect(store.inlineTag()).toBeUndefined();
+    });
+
+    it('reads both as unset before init resolves and after a failed fetch', async () => {
+      expect(store.inlineType()).toBeUndefined();
+      expect(store.inlineTag()).toBeUndefined();
+
+      const done = store.init();
+      http.expectOne('/api/config').flush('boom', { status: 500, statusText: 'Server Error' });
+      await done;
+
+      expect(store.inlineType()).toBeUndefined();
+      expect(store.inlineTag()).toBeUndefined();
+    });
+  });
+
   describe('the deployment knobs (ADR-0071)', () => {
-    const PLUGINS_AND_TYPE = { plugins: {}, entities: { defaultType: 'core.type.note' } };
+    const PLUGINS_AND_TYPE = { plugins: {}, entities: { defaultType: 'core.type.note', inlineType: 'core.type.note' } };
 
     it('reads Collaboration on and the server profile before init resolves', () => {
       expect(store.isCollaborationEnabled()).toBe(true);

@@ -146,10 +146,21 @@ function buildConfigSchema(plugins: readonly PluginConfigContribution[]) {
         collaboration: z.boolean().default(true),
       })
       .prefault({}),
-    // The Entity Type the "New" button mints by default (ADR-0052). Resolved verbatim, with no boot-time
-    // validation against the enabled set — a soft client-side fallback handles absence, so this knob
-    // never fails boot and stays independent of `features.plugin`.
-    entities: z.object({ defaultType: z.string().default('core.type.note') }).prefault({}),
+    // Every Type id here resolves verbatim, with no boot-time validation against the enabled set — a soft
+    // client-side fallback handles absence, so these knobs never fail boot and stay independent of
+    // `features.plugin`.
+    entities: z
+      .object({
+        // The Entity Type the "New" button mints by default (ADR-0052).
+        defaultType: z.string().default('core.type.note'),
+        // The Entity Type Inline Creation mints; separate from `defaultType`, which answers a different
+        // question (ADR-0073).
+        inlineType: z.string().default('core.type.note'),
+        // A Tag applied to everything created inline (ADR-0073); absent by default. `min(1)` because an
+        // empty string is not a Tag, as `assets.dir` is not a path.
+        inlineTag: z.string().min(1).optional(),
+      })
+      .prefault({}),
   });
 }
 
@@ -197,6 +208,10 @@ export interface HexlyConfig {
   entities: {
     /** The Entity Type the "New" button mints by default (ADR-0052); resolved verbatim, unvalidated. */
     defaultType: string;
+    /** The Entity Type Inline Creation mints (ADR-0073); resolved verbatim, unvalidated. */
+    inlineType: string;
+    /** The Tag applied to everything created inline (ADR-0073); absent unless the operator names one. */
+    inlineTag?: string;
   };
 }
 
@@ -216,7 +231,11 @@ function processConfig(raw: HexlyConfigRaw, pins: DeploymentPins): HexlyConfig {
       plugin: raw.features.plugin,
       collaboration: pins.collaboration ?? raw.features.collaboration,
     },
-    entities: { defaultType: raw.entities.defaultType },
+    entities: {
+      defaultType: raw.entities.defaultType,
+      inlineType: raw.entities.inlineType,
+      inlineTag: raw.entities.inlineTag,
+    },
   };
 }
 
