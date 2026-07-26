@@ -19,6 +19,7 @@ const PLUGIN_DISABLED_PORT = basePort + 1;
 const DEFAULT_TYPE_PORT = basePort + 2;
 const COLLAB_OFF_PORT = basePort + 3;
 const DESKTOP_PORT = basePort + 4;
+const INLINE_TYPE_PORT = basePort + 5;
 
 // dnd off: its Types degrade to the generic Field View, values intact (ADR-0052).
 const DISABLE_DND_YAML = ['features:', '  plugin:', '    dnd:', '      enabled: false', ''].join('\n');
@@ -27,6 +28,9 @@ const DEFAULT_HEXMAP_YAML = ['entities:', '  defaultType: core.type.hex-map', ''
 // Collaboration off (ADR-0071): still a server profile, so it keeps its login page. Shared with the
 // desktop run, whose profile the boot script pins instead — there is no hexly.yml key for it.
 const COLLABORATION_OFF_YAML = ['features:', '  collaboration: false', ''].join('\n');
+// Inline Creation's own Type and Tag (ADR-0073), left divergent from `defaultType` — the two knobs
+// answer different questions, so a mention must not follow the New button's.
+const INLINE_TYPE_YAML = ['entities:', '  inlineType: core.type.hex-map', '  inlineTag: untriaged', ''].join('\n');
 
 /** One `e2e-server.mjs` invocation: its own port, throwaway Instance Directory, and optional hexly.yml. */
 function server(
@@ -129,6 +133,12 @@ export default defineConfig({
     authenticated('desktop', DESKTOP_PORT, {
       testMatch: /.*[/\\]config[/\\]desktop-profile\.spec\.ts/,
     }),
+    // entities.inlineType / entities.inlineTag set away from defaultType (ADR-0073, #343): Inline
+    // Creation follows its own knobs.
+    setup('inline-type', INLINE_TYPE_PORT),
+    authenticated('inline-type', INLINE_TYPE_PORT, {
+      testMatch: /.*[/\\]config[/\\]inline-type\.spec\.ts/,
+    }),
   ],
   webServer: [
     server(DEFAULT_PORT),
@@ -145,5 +155,6 @@ export default defineConfig({
       soleUser: true,
       profile: 'desktop',
     }),
+    server(INLINE_TYPE_PORT, { instanceSubdir: 'web-e2e-inline-type', configYaml: INLINE_TYPE_YAML }),
   ],
 });

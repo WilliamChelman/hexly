@@ -6,6 +6,7 @@ import {
   EnvironmentInjector,
   Injector,
   afterRenderEffect,
+  computed,
   effect,
   inject,
   input,
@@ -16,12 +17,15 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { Editor, JSONContent } from '@tiptap/core';
-import { catchError, firstValueFrom, of } from 'rxjs';
+import { Observable, catchError, firstValueFrom, of } from 'rxjs';
+import { TranslocoService } from '@jsverse/transloco';
+import { EntitySummary } from '@hexly/domain';
 import { RichContent, CONTENT_FIELD, tiptapContent } from '@hexly/plugin-content';
-import { EntitiesClient } from '@hexly/web-core';
+import { ActiveWorld, EntitiesClient, ToasterService } from '@hexly/web-core';
 import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { TiptapDirective } from '../directives/tiptap.directive';
 import { EntityNameResolver } from '../services/entity-name-resolver';
+import { InlineEntityCreator } from '../services/inline-entity-creator';
 import { CONTENT_EXTENSIONS } from '../extensions/content-extensions';
 import { entityLinkNode } from '../extensions/entity-link-node';
 import { calloutNode } from '../extensions/callout-node';
@@ -35,7 +39,7 @@ import { DescriptorPickerComponent } from './descriptor-picker.component';
 import { descriptorSuggestion } from '../extensions/descriptor-suggestion';
 import { LinkTextPickerComponent } from './link-text-picker.component';
 import { linkTextSuggestion } from '../extensions/link-text-suggestion';
-import { createEntityLinkNodeView } from './entity-link-view.component';
+import { EntityLinkRepairHost, createEntityLinkNodeView } from './entity-link-view.component';
 import { FormattingMenuComponent } from './formatting-menu.component';
 import { BubbleMenuDirective } from '../directives/bubble-menu.directive';
 
@@ -262,6 +266,13 @@ export class ContentEditorComponent {
   private readonly resolver = inject(EntityNameResolver);
   // The `::` picker's vocabulary source (#96): the owner's last-saved DISTINCT descriptors.
   private readonly entities = inject(EntitiesClient);
+  // The `@` picker's Create rows write through this (ADR-0073); it owns the Inline Creation knobs.
+  private readonly inlineCreator = inject(InlineEntityCreator);
+  // The host Entity's World, pinned by the route guard — the source of the create standing those rows
+  // hang on (ADR-0039).
+  private readonly activeWorld = inject(ActiveWorld);
+  private readonly toaster = inject(ToasterService);
+  private readonly transloco = inject(TranslocoService);
   private readonly environmentInjector = inject(EnvironmentInjector);
   // ContentEditor's own node injector — lives inside the router outlet, so the
   // entityLink node views created from it can resolve ActivatedRoute for routerLink.
@@ -282,6 +293,23 @@ export class ContentEditorComponent {
    * the static-preview role a separate read-only component used to fill before this became the one renderer.
    */
   readonly editable = input(true);
+
+  /**
+   * Whether a broken Entity Link may be retargeted in place — the same standing that makes the prose
+   * editable, because retargeting *is* a write. A read-only viewer keeps the inert label (ADR-0073).
+   */
+  private readonly canRepairLinks = computed(() => this.editable() && this.session.writable());
+
+  /**
+   * The `create-entity` Right on the World a mint would land in (ADR-0039) — matched against the World
+   * {@link mintThrough} writes to, so an unloaded or mismatched World gates rather than offering
+   * exactly what the server would refuse. Backs both the `@` picker's Create rows and an Unresolved
+   * Link's *Create*, which are the same write (ADR-0073).
+   */
+  private readonly canCreate = computed(() => {
+    const world = this.activeWorld.world();
+    return !!world && world.id === this.session.current()?.worldId && world.rights.includes('create-entity');
+  });
 
   private readonly slashMenu = viewChild(SlashMenuComponent);
   private readonly entityPicker = viewChild(EntityPickerComponent);
@@ -419,6 +447,38 @@ export class ContentEditorComponent {
     this.editor()?.commands.focus('end');
   }
 
+  /**
+   * Mint the Entity an `@` mention names, into the open Entity's World — typing must never author a
+   * cross-World link (ADR-0073). A failed write is reported here and rethrown, so the extension can
+   * put the typed text back where it was.
+   */
+  private async mint(name: string): Promise<EntitySummary> {
+    return this.mintThrough((worldId) => this.inlineCreator.create(name, worldId));
+  }
+
+  /**
+   * The details path (ADR-0073): the same mint through the create dialog, World locked to the open
+   * Entity's. `null` is the author cancelling — no link, and the extension leaves the typed text.
+   */
+  private async mintWithDetails(name: string): Promise<EntitySummary | null> {
+    return this.mintThrough((worldId) => this.inlineCreator.createWithDetails(name, worldId));
+  }
+
+  /** Both Create rows share one shape: the World guard, the failure toast, and the resolver's refresh. */
+  private async mintThrough<T extends EntitySummary | null>(write: (worldId: string) => Observable<T>): Promise<T> {
+    try {
+      const worldId = this.session.current()?.worldId;
+      if (!worldId) throw new Error('Inline Creation needs an open Entity to take its World from');
+      const entity = await firstValueFrom(write(worldId));
+      // The very next `@Zorblax` must offer this Entity, not repeat the miss that minted it (ADR-0073).
+      if (entity) this.resolver.forgetSearches();
+      return entity;
+    } catch (error) {
+      this.toaster.show(this.transloco.translate('editor.entityPicker.createError'), 'error');
+      throw error;
+    }
+  }
+
   /** Buffer a TipTap `update` and arm the debounce; a doc value-equal to the baseline is normalisation, not an edit (#164). */
   private onDocChanged(json: JSONContent): void {
     // ponytail: JSON.stringify equality — ProseMirror JSON has deterministic key order, so this is
@@ -469,9 +529,17 @@ export class ContentEditorComponent {
     const environmentInjector = this.environmentInjector;
     const elementInjector = this.injector;
     const appRef = this.appRef;
+    // A broken link's popover writes through the same two standings and the same mint the `@` picker
+    // does — Create there and Create here are one write (ADR-0073).
+    const repairHost: EntityLinkRepairHost = {
+      writable: this.canRepairLinks,
+      creatable: this.canCreate,
+      mint: (name) => this.mint(name),
+    };
     const entityLinkWithView = entityLinkNode.extend({
       addNodeView() {
-        return ({ node }) => createEntityLinkNodeView(node, environmentInjector, elementInjector, appRef);
+        return ({ node, editor, getPos }) =>
+          createEntityLinkNodeView(node, editor, getPos, repairHost, environmentInjector, elementInjector, appRef);
       },
     });
 
@@ -489,10 +557,13 @@ export class ContentEditorComponent {
       },
     });
 
-    const mention = entityMention(
-      () => this.entityPicker(),
-      (query) => this.resolver.search(query),
-    );
+    const mention = entityMention({
+      getPicker: () => this.entityPicker(),
+      search: (name) => this.resolver.search(name),
+      canCreate: this.canCreate,
+      mint: (name) => this.mint(name),
+      mintWithDetails: (name) => this.mintWithDetails(name),
+    });
 
     // The owner's descriptor vocabulary, fetched lazily on the first `::` and cached for
     // this editor's life. ponytail: a reload recreates the editor and refreshes it, so a

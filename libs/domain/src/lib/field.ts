@@ -159,6 +159,11 @@ export const fieldSchemaSchema = z.object({
    */
   labelKey: z.string().trim().min(1).optional(),
   dataType: fieldDataTypeSchema,
+  /**
+   * **Advisory** (CONTEXT.md → Incomplete, ADR-0074): `required` prompts an author and flags a surface, it
+   * never refuses a write. An Entity missing one reads **Incomplete** ({@link FieldValidation.incomplete});
+   * only a *present* value of the wrong shape is an error.
+   */
   required: z.boolean().default(false),
   facetable: z.boolean().default(false),
   /**
@@ -210,6 +215,7 @@ export function defineField(definition: {
   readonly label: string;
   readonly labelKey?: string;
   readonly dataType: FieldDataType;
+  /** **Advisory** (ADR-0074): prompts an author and flags a surface; absence never refuses a write. */
   readonly required?: boolean;
   readonly facetable?: boolean;
   readonly vault?: { slot: VaultSlot };
@@ -280,9 +286,10 @@ export function resolveEffectiveFields(args: {
 }
 
 /**
- * Why one Field failed validation: `required` (absent), `type` (present but ill-typed), or
- * `unknown-data-type` — a Field naming a **Structured Data Type** the host has not registered
- * (ADR-0050). The last is a broken *declaration*, not a bad value: raised by
+ * What one Field reads as: `type` (present but ill-typed), `unknown-data-type` — a Field naming a
+ * **Structured Data Type** the host has not registered (ADR-0050) — or `required` (absent). The last is
+ * advisory: an **Incomplete** reading on {@link FieldValidation.incomplete}, never in the errors array
+ * (ADR-0074). `unknown-data-type` is a broken *declaration*, not a bad value: raised by
  * {@link unresolvedDataTypeErrors} where a Type is declared, never by the value gate.
  */
 export interface FieldError {
@@ -290,17 +297,24 @@ export interface FieldError {
   readonly code: 'required' | 'type' | 'unknown-data-type';
 }
 
-/** The outcome of {@link validateFields}: `ok` with the offending Fields, if any. */
+/**
+ * The outcome of {@link validateFields}, on two channels a caller must not conflate (ADR-0074):
+ * `errors` are the shape violations and `ok` follows them alone; `incomplete` is the advisory reading of
+ * the `required` Fields left unfilled, which flags a surface rather than refusing a write. A caller that
+ * gates on absence too recombines the two itself.
+ */
 export interface FieldValidation {
   readonly ok: boolean;
   readonly errors: readonly FieldError[];
+  readonly incomplete: readonly FieldError[];
 }
 
 /**
  * The **forward-only** validation gate (CONTEXT.md → Field, ADR-0048): validate a resolved Field set
- * against an Entity's EntityDocument. A required Field must be present; a *present* value — required or not
- * — must match its data-type. An absent optional Field is fine, and any EntityDocument key with no Field is
- * ignored entirely (a Field is a lens, not a whitelist).
+ * against an Entity's EntityDocument. The rule is **shape violations are errors; absence is a hint**
+ * (ADR-0074): a *present* value — required or not — must match its data-type, while a `required` Field
+ * with no value reads as `incomplete` and never as an error. An absent optional Field is nothing at all,
+ * and any EntityDocument key with no Field is ignored entirely (a Field is a lens, not a whitelist).
  *
  * The caller decides *when* to enforce it — active typed edits only, never on import or data at rest,
  * so already stored EntityDocument is never retroactively invalidated.
@@ -316,17 +330,18 @@ export function validateFields(
   dataTypes: StructuredDataTypeSet,
 ): FieldValidation {
   const errors: FieldError[] = [];
+  const incomplete: FieldError[] = [];
   for (const field of fields) {
     const matches = valueMatcher(field.dataType, dataTypes);
     if (!matches) continue;
     const value = doc?.[field.id];
     if (isAbsent(value)) {
-      if (field.required) errors.push({ key: field.id, code: 'required' });
+      if (field.required) incomplete.push({ key: field.id, code: 'required' });
       continue;
     }
     if (!matches(value)) errors.push({ key: field.id, code: 'type' });
   }
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors, incomplete };
 }
 
 /**

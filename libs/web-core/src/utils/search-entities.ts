@@ -25,6 +25,12 @@ const CACHE_LIMIT = 50;
  * (ADR-0066) — surfaces that render a preview tile (the Command Palette) set it, plain pickers don't. */
 export interface SearchEntitiesOptions {
   readonly thumbnails?: boolean;
+  /**
+   * The stale-while-revalidate store, supplied by a caller that must be able to *drop* it: a
+   * take-first consumer never revalidates, so one that writes an Entity its own next search has to
+   * find (Inline Creation, ADR-0073) clears this. Omitted, the stream owns a private one.
+   */
+  readonly cache?: Map<string, EntitySummary[]>;
 }
 
 /**
@@ -43,7 +49,7 @@ export function searchEntities(
 ): Observable<EntitySummary[]> {
   // Per call, so it lives with the stream (a per-surface resolver's cache dies with
   // the surface; the app-lifetime palette's persists but self-heals via revalidation).
-  const cache = new Map<string, EntitySummary[]>();
+  const cache = opts.cache ?? new Map<string, EntitySummary[]>();
   return query$.pipe(
     debounceTime(SEARCH_DEBOUNCE_MS),
     map((query) => query.trim()),

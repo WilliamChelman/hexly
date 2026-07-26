@@ -20,8 +20,8 @@ const NOTE_VIEW = contentViewToggle();
 test('creates a dnd.type.monster, fills its stat block, and reads it back', async ({ page, request }) => {
   await enterLibrary(page);
 
-  // The monster's stat block is structured now (ADR-0055), so it has no required *scalar* Field: the
-  // create Command mints it blind, like a Note, and the block is filled in place. No create dialog.
+  // The monster's stat block is structured (ADR-0055), so it is edited in place on its own View
+  // rather than typed into a form row at create time.
   const id = await createEntity(page, 'dnd.type.monster');
   await expect(page.getByTestId('title')).toBeVisible();
 

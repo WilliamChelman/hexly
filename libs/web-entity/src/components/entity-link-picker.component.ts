@@ -28,9 +28,9 @@ import { ENTITY_TYPES } from '../models/entity-types';
  *
  * The host owns the link: this component only reads the current value and emits the next one.
  *
- * Create-and-link offers every Type the {@link ENTITY_TYPES} registry knows, except a type declaring a
- * **required** Field: it cannot be minted blind (the write gate), and there is no room mid-pick for the
- * dialog that would collect one.
+ * Create-and-link offers every Type the {@link ENTITY_TYPES} registry calls creatable — a System-managed
+ * one is the system's to assign (ADR-0068), and a `required` Field no longer withholds anything
+ * (ADR-0074).
  */
 @Component({
   selector: 'app-entity-link-picker',
@@ -154,14 +154,9 @@ export class EntityLinkPickerComponent {
    */
   protected readonly creatable = computed(() => {
     this.transloco.activeLang();
-    return (
-      this.types
-        .all()
-        // Offer only Types whose effective Fields are all optional — a required Field a bare create
-        // can't satisfy would bounce off the forward-only gate (resolved by id now, ADR-0054).
-        .filter((def) => !this.types.resolveFields([def.id]).some((field) => field.required))
-        .map((def) => ({ id: def.id, name: this.types.name(def.id) }))
-    );
+    // Whatever the registry calls creatable, `required` Fields and all — an absent one no longer
+    // refuses the write (ADR-0074), so nothing is withheld here that mints from every other surface.
+    return this.types.creatable().map((def) => ({ id: def.id, name: this.types.name(def.id) }));
   });
 
   constructor() {

@@ -22,3 +22,17 @@ export function tagItems(query: string, vocab: readonly string[], added: readonl
     .filter((v) => !addedSet.has(v.value.toLowerCase()))
     .map((v) => ({ id: v.id, tag: v.value, isNew: v.isNew }));
 }
+
+/**
+ * Fold free-text tag entry into `current`. Comma-splits for paste; trims, lower-cases and dedupes so the
+ * form reads back what the server will store (entity.ts `dedupedTags`) rather than echoing it a beat
+ * later. One rule, shared by the open Entity's tag editor and the create dialog's (ADR-0073) — two copies
+ * of a normalization the server also owns is one drift too many.
+ */
+export function withTags(current: readonly string[], raw: string): readonly string[] {
+  const incoming = raw
+    .split(',')
+    .map((tag) => tag.trim().toLowerCase())
+    .filter(Boolean);
+  return incoming.length ? [...new Set([...current, ...incoming])] : current;
+}

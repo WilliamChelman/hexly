@@ -1,7 +1,8 @@
 import { basename, posix } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import {
+  emptyEntityDocument,
   EntityType,
   HEXLY_METADATA_PREFIX,
   HEXLY_TYPE_KEY,
@@ -12,10 +13,13 @@ import {
   tagsSchema,
   typesSchema,
   VaultImportContext,
+  VaultImportOptions,
+  wikilinkName,
 } from '@hexly/domain';
 import { bodyToFields, splitFrontmatter } from '@hexly/obsidian';
 import { AssetMintService } from '../assets/asset-mint.service';
 import { AssetExtraction } from '../assets/asset-extraction.service';
+import { HEXLY_CONFIG, type HexlyConfig } from '../config';
 import { DB, type Db } from '../db/db';
 import { EntitiesService } from '../entities/entities.service';
 import { TypeFieldRegistry } from '../entities/type-field-registry';
@@ -41,15 +45,17 @@ function* chunksOf<T>(items: readonly T[]): Generator<readonly T[]> {
  * composes; the converter lives behind the data-type, so this service imports no content plugin.
  *
  * Two-pass: pass 1 splits every file's frontmatter from its body and assigns it an id; pass 2 converts
- * each body Field, resolving each `[[wikilink]]` to the id of the note it names (dangling when none
- * matches) before persisting in chunks that each commit and yield (ADR-0046). Continue-on-error: a file
- * that can't be read or named is skipped and tallied, never aborting the import. The request awaits the
- * whole walk — no job to poll, unlike the Reindex.
+ * each body Field, resolving each `[[wikilink]]` to the id of the note it names — minting an Entity for
+ * one that names nothing, unless the run turns that off (ADR-0073) — before persisting in chunks that
+ * each commit and yield (ADR-0046). Continue-on-error: a file that can't be read or named is skipped and
+ * tallied, never aborting the import. The request awaits the whole walk — no job to poll, unlike the
+ * Reindex.
  */
 @Injectable()
 export class VaultImportService {
   constructor(
     @Inject(DB) private readonly db: Db,
+    @Inject(HEXLY_CONFIG) private readonly config: HexlyConfig,
     private readonly worlds: WorldsService,
     private readonly entities: EntitiesService,
     private readonly unzipper: VaultUnzipper,
@@ -57,7 +63,21 @@ export class VaultImportService {
     private readonly typeFields: TypeFieldRegistry,
   ) {}
 
-  async import(ownerId: string, filename: string, archive: Buffer): Promise<ImportSummary> {
+  // `options` is required rather than defaulted: `vaultImportOptionsSchema` alone says what "on by
+  // default" means, so a second default here could drift from it.
+  async import(
+    ownerId: string,
+    filename: string,
+    archive: Buffer,
+    options: VaultImportOptions,
+  ): Promise<ImportSummary> {
+    // A **caller-supplied** Type the system alone assigns is refused before anything is minted:
+    // an import writes through the internal path ADR-0068 exempts from the type gate, so this run's
+    // knob is the one place a request could name one. The *configured* knob is left alone — it
+    // resolves verbatim, unvalidated at boot (ADR-0073).
+    if (options.inlineType && this.typeFields.systemManagedTypes.includes(options.inlineType)) {
+      throw new BadRequestException();
+    }
     // Decompress first: a malformed or oversized archive fails here (400/413) BEFORE any
     // World is minted, so a bad upload never leaves an orphan empty World behind. The
     // ceiling is baked into the injected VaultUnzipper (ADR-0036).
@@ -110,7 +130,28 @@ export class VaultImportService {
     // The "bare Note" default (ADR-0051); `undefined` when content is disabled (ADR-0052), so an
     // unstamped file lands typeless.
     const defaultType = this.typeFields.defaultType;
+    // Inline Creation's own knobs, this-run-overridable and persisted nowhere. Deliberately not
+    // `defaultType`, so two default Types are live in one import (ADR-0073).
+    const inlineType = options.inlineType ?? this.config.entities.inlineType;
+    // Folded through the Tag vocabulary like any other write, so a configured `Untriaged` still meets the
+    // author's `untriaged` in the Facet rail — the one thing `inlineTag` exists to do. An override sent
+    // blank is *no tag*, not an absent one: clearing the control is how a run opts out of a configured
+    // Tag (ADR-0073).
+    const inlineTag = options.inlineTag ?? this.config.entities.inlineTag;
+    const inlineTags = tagsSchema.catch([]).parse(inlineTag ? [inlineTag] : []);
+    // A minted Entity gets the Fields its Type declares, like every other mint (ADR-0050, ADR-0054):
+    // without them a Hex Map inline Type would open on a blank frame rather than a plane.
+    const inlineFields = resolveEffectiveFields({
+      types: [inlineType],
+      doc: {},
+      fieldResolver: this.typeFields.fieldResolver,
+      typeFieldRefs: this.typeFields.typeFieldRefs,
+    });
+    // A minted Entity has no vault path, so its only identity is its name — the whole dedup key.
+    const mintedByName = new Map<string, string>();
+    const maxCreated = this.config.import.maxCreatedEntities;
     let linksResolved = 0;
+    let linksCreated = 0;
     let linksDangling = 0;
     let assetsStored = 0;
     // Chunked commits, like the Reindex walk (ADR-0046): better-sqlite3 is synchronous, so one
@@ -148,11 +189,53 @@ export class VaultImportService {
         for (const note of chunk) {
           const noteDir = posix.dirname(note.path);
           const context: VaultImportContext = {
+            // The one seam every wikilink passes through, so auto-creation slots in on the miss and
+            // vault-wide dedup costs no extra pass (ADR-0073).
             resolveLink: (label) => {
-              const id = index.resolve(label);
-              if (id) linksResolved++;
-              else linksDangling++;
-              return id;
+              const id = index.resolve(label, noteDir);
+              if (id) {
+                linksResolved++;
+                return id;
+              }
+              if (!options.createUnresolved) {
+                linksDangling++;
+                return null;
+              }
+              // The basename, never the explicit path: `[[folder/Zorblax]]` names *Zorblax* (ADR-0073) —
+              // shared with the editor's promotion, so one link never names two Entities. A label that
+              // is no name at all stays an Unresolved Link rather than minting a blank.
+              const name = nameSchema.safeParse(wikilinkName(label));
+              if (!name.success) {
+                linksDangling++;
+                return null;
+              }
+              // Case-insensitively, as ADR-0033 matches every other link label.
+              const key = name.data.toLowerCase();
+              const already = mintedByName.get(key);
+              if (already) {
+                linksResolved++;
+                return already;
+              }
+              // Past the run's ceiling the link stays unresolved rather than minting — one note's links
+              // all mint inside that note's single synchronous transaction — and tallies as dangling, so
+              // the import still lands and the summary says what happened (ADR-0073).
+              if (mintedByName.size >= maxCreated) {
+                linksDangling++;
+                return null;
+              }
+              const mintedId = randomUUID();
+              this.entities.importEntity({
+                ownerId,
+                worldId,
+                id: mintedId,
+                name: name.data,
+                types: [inlineType],
+                tags: inlineTags,
+                document: emptyEntityDocument(inlineFields, dataTypes),
+              });
+              mintedByName.set(key, mintedId);
+              linksCreated++;
+              return mintedId;
             },
             storeAsset: (src) => {
               if (!src || isExternalUrl(src)) return null;
@@ -210,6 +293,7 @@ export class VaultImportService {
       notesImported: notes.length,
       filesSkipped,
       linksResolved,
+      linksCreated,
       linksDangling,
       assetsStored,
       constructsDegraded,
@@ -246,17 +330,33 @@ class NoteIndex {
     }
   }
 
-  /** Returns the target note's id, or null when the label names no imported note (a dangling link). */
-  resolve(label: string): string | null {
-    const key = normalizeKey(label);
-    const found = key.includes('/') ? this.byPath.get(key) : this.byBasename.get(key);
-    return found ?? null;
+  /**
+   * Returns the target note's id, or null when the label names no imported note (a dangling link).
+   *
+   * Resolved over the candidate ladder {@link AssetIndex} walks, and for the same reason: a form the
+   * index could have answered must not fall through, now that a miss mints a duplicate rather than an
+   * inert dangling link (ADR-0073). Note-relative first (Obsidian's stock "relative path to file"
+   * setting writes `[[../places/Rivendell]]`), then vault-root, then basename — the last of which still
+   * finds the note in a vault zipped inside a wrapper directory no `.obsidian/` marked for stripping.
+   * Both path candidates precede the basename one, so a path-qualified link keeps disambiguating two
+   * notes that share a filename (ADR-0033).
+   */
+  resolve(label: string, noteDir: string): string | null {
+    return (
+      this.byPath.get(normalizeKey(posix.join(noteDir, label))) ??
+      this.byPath.get(normalizeKey(label)) ??
+      this.byBasename.get(posix.basename(normalizeKey(label))) ??
+      null
+    );
   }
 }
 
-/** Lower-case and drop a trailing `.md` so link labels and vault paths compare uniformly. */
+/**
+ * Lower-case, resolve `./`/`../`, drop a leading `/` or `./` and a trailing `.md`, so link labels and
+ * vault paths compare uniformly whichever of Obsidian's link-format settings wrote them.
+ */
 function normalizeKey(value: string): string {
-  return value.toLowerCase().replace(/\.md$/, '');
+  return posix.normalize(value.replace(/^\/+/, '')).replace(/^\.\//, '').toLowerCase().replace(/\.md$/, '');
 }
 
 /**

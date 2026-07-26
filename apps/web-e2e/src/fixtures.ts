@@ -1,5 +1,7 @@
 import { join } from 'node:path';
-import { test as base, expect, type APIRequestContext, type Page, type Response } from '@playwright/test';
+import { test as base, expect, type APIRequestContext, type Browser, type Page, type Response } from '@playwright/test';
+import { strToU8, zipSync } from 'fflate';
+import { TEST_GRANTEE } from './test-user';
 // The app's own pretty-URL codec (ADR-0042). Imported by file path, not via the @hexly/web-core
 // barrel: the barrel re-exports the Angular services layer, which must stay out of the Playwright
 // process. The nx module-boundary rule is waived for these pure utils via eslint.config.mjs `allow`.
@@ -137,6 +139,49 @@ export async function openEntityActions(page: Page): Promise<void> {
   await page.getByTestId('entity-actions').click();
 }
 
+/** Grant the second seeded user a role on the open Entity, through the header's Share dialog (ADR-0037). */
+export async function shareOpenEntity(page: Page, role: 'editor' | 'viewer'): Promise<void> {
+  await openEntityActions(page);
+  await page.getByTestId('manage-owners').click();
+  await page.getByTestId('grant-add-select').selectOption({ label: TEST_GRANTEE.displayName });
+  await page.getByTestId('grant-add-role').selectOption(role);
+  const granted = page.waitForResponse(
+    (r) => /\/api\/entities\/[\w-]+\/grants$/.test(r.url()) && r.request().method() === 'POST' && r.ok(),
+  );
+  await page.getByTestId('grant-add').click();
+  await granted;
+  await page.getByTestId('owners-close').click();
+}
+
+/** Add the second seeded user to a World with `role`, from the World's Settings Access pane. */
+export async function addWorldMember(page: Page, worldSeg: string, role: 'contributor' | 'viewer'): Promise<void> {
+  await page.goto(`/w/${worldSeg}/settings`);
+  // Owner-set and member-set share `add-select`/`add` testids, so scope to the member controls.
+  const memberAdd = page.locator('app-member-set');
+  await memberAdd.getByTestId('add-select').selectOption({ label: TEST_GRANTEE.displayName });
+  await memberAdd.getByTestId('add-role').selectOption(role);
+  const added = page.waitForResponse(
+    (r) => /\/api\/worlds\/[\w-]+\/members$/.test(r.url()) && r.request().method() === 'POST' && r.ok(),
+  );
+  await memberAdd.getByTestId('add').click();
+  await added;
+}
+
+/**
+ * Log the second seeded user in through the real UI, in their own cookie-less context — the project's
+ * authenticated storage state is the *first* user's, so a second standing needs its own context.
+ */
+export async function signInGrantee(browser: Browser): Promise<Page> {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(TEST_GRANTEE.email);
+  await page.getByLabel('Password').fill(TEST_GRANTEE.password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveTitle(/Worlds/);
+  return page;
+}
+
 /**
  * Open an Entity by id through the World-agnostic `/entities/:id` link, which the redirect guard
  * heals into its canonical `/w/:worldId/entities/:id` route (ADR-0025, ADR-0042). Lets a spec that
@@ -167,8 +212,7 @@ export async function enterLibrary(page: Page): Promise<string> {
 /**
  * Create an Entity of `typeId` through the "New" split button's type menu, open it, and return its
  * canonical id. The caller must already be on a surface carrying the button — `enterLibrary`, or an
- * empty World Dashboard. A Type declaring a *required* Field opens the create dialog instead, and is
- * not creatable through this helper (see `dnd-monster.spec.ts`).
+ * empty World Dashboard. Every Type mints this way, `required` Fields and all (ADR-0074).
  */
 export async function createEntity(page: Page, typeId: string): Promise<string> {
   await page.getByTestId('new-entity-menu').click();
@@ -188,12 +232,14 @@ export interface AuthoredField {
 
 /**
  * Author a user-defined type in a World's settings, and land back on the types list with it saved.
- * `id` is the bare id the form takes; the World's namespace makes it `world.type.<id>`.
+ * `id` is the bare id the form takes; the World's namespace makes it `world.type.<id>`. `fields` are
+ * minted inline; `refs` name already-authored Fields to reference by id (ADR-0054) — the way to give a
+ * type a Field whose own flags (`required`, say) the Fields editor set.
  */
 export async function authorWorldType(
   page: Page,
   worldId: string,
-  type: { id: string; name: string; fields: readonly AuthoredField[] },
+  type: { id: string; name: string; fields: readonly AuthoredField[]; refs?: readonly string[] },
 ): Promise<void> {
   await page.goto(`/w/${worldId}/settings`);
   // Settings is a master/detail layout; the type/field editors live under the Schema section.
@@ -214,8 +260,21 @@ export async function authorWorldType(
     await expect(page.getByTestId(`field-ref-checkbox-world.field.${field.segment}`)).toBeChecked();
   }
 
+  for (const id of type.refs ?? []) {
+    await page.getByTestId(`field-ref-checkbox-${id}`).click();
+    await expect(page.getByTestId(`field-ref-checkbox-${id}`)).toBeChecked();
+  }
+
   await page.getByTestId('type-save').click();
   await expect(page.getByTestId(`type-world.type.${type.id}`)).toBeVisible();
+}
+
+/** Open a blank World Field editor, for a spec that reads the form itself rather than a Field it authored. */
+export async function openWorldFieldEditor(page: Page, worldId: string): Promise<void> {
+  await page.goto(`/w/${worldId}/settings`);
+  // Settings is a master/detail layout; the type/field editors live under the Schema section.
+  await page.getByTestId('settings-nav-schema').click();
+  await page.getByTestId('field-new').click();
 }
 
 /**
@@ -223,22 +282,28 @@ export async function authorWorldType(
  * on the Fields list with it saved. `segment` is the `world.`-less key the form slugs into `world.field.<segment>`
  * (its id *and* document key); the label drives it but the fixture sets it explicitly. `kind` defaults to
  * the form's `string`; `options` fills an enum's comma-separated list. `decor` (ADR-0069) checks the
- * "presentation only" box, offered only on an `entityLink` kind.
+ * "presentation only" box, offered only on an `entityLink` kind. `required` (ADR-0074) checks the box that
+ * makes the Field a prompt on the surfaces that render it — never a gate on a write.
  */
 export async function authorWorldField(
   page: Page,
   worldId: string,
-  field: { segment: string; label: string; kind?: string; options?: string; decor?: boolean },
+  field: {
+    segment: string;
+    label: string;
+    kind?: string;
+    options?: string;
+    decor?: boolean;
+    required?: boolean;
+  },
 ): Promise<void> {
-  await page.goto(`/w/${worldId}/settings`);
-  // Settings is a master/detail layout; the type/field editors live under the Schema section.
-  await page.getByTestId('settings-nav-schema').click();
-  await page.getByTestId('field-new').click();
+  await openWorldFieldEditor(page, worldId);
   await page.getByTestId('field-name-input').fill(field.label);
   await page.getByTestId('field-key-input').fill(field.segment);
   if (field.kind) await page.getByTestId(`field-kind-option-${field.kind}`).click();
   if (field.options !== undefined) await page.getByTestId('field-options').fill(field.options);
   if (field.decor) await page.getByTestId('field-decor').check();
+  if (field.required) await page.getByTestId('field-required').check();
   await page.getByTestId('field-save').click();
   await expect(page.getByTestId(`field-world.field.${field.segment}`)).toBeVisible();
 }
@@ -296,4 +361,54 @@ export async function addType(page: Page, typeId: string): Promise<void> {
   await page.getByTestId('edit-types').click();
   await page.getByTestId('type-add').selectOption(typeId);
   await page.getByTestId('types-close').click();
+}
+
+/** The summary a vault import returns off the wire (ADR-0033, ADR-0073). */
+export interface ImportSummary {
+  worldId: string;
+  notesImported: number;
+  linksResolved: number;
+  linksCreated: number;
+  linksDangling: number;
+}
+
+/**
+ * Pick a vault on the World Index's hidden file input; `setInputFiles` bypasses the click. The options
+ * dialog opens and nothing uploads until {@link confirmImport} (ADR-0073), so every spec picking a vault
+ * pairs the two.
+ */
+export async function pickVault(page: Page, zip: Buffer, name = 'Aldermoor.zip'): Promise<void> {
+  await page.getByTestId('import-vault-input').setInputFiles({ name, mimeType: 'application/zip', buffer: zip });
+  await expect(page.getByTestId('import-options')).toBeVisible();
+}
+
+/** Confirm the options dialog and read the import summary off the wire. */
+export async function confirmImport(page: Page): Promise<ImportSummary> {
+  const imported = page.waitForResponse(
+    (r) => r.url().endsWith('/api/worlds/import') && r.request().method() === 'POST' && r.ok(),
+  );
+  await page.getByTestId('import-confirm').click();
+  return (await (await imported).json()) as ImportSummary;
+}
+
+/**
+ * Land a one-note vault with auto-creation switched off and open its note, whose sole wikilink — which
+ * carries both a heading anchor and a display override — stayed an Unresolved Link. Import is the only
+ * producer of one (ADR-0073), so this is the seed every broken-link spec starts from.
+ */
+export async function importUnresolvedVault(page: Page): Promise<{ worldId: string }> {
+  await page.goto('/');
+  // A folder-qualified target, which Obsidian writes whenever two notes share a basename: the name a
+  // promotion mints is the basename of it, never the path (ADR-0073).
+  const keep = 'The northern keep guards the pass against [[bestiary/Zorblax#Lair|the old wyrm]], and holds.';
+  await pickVault(page, Buffer.from(zipSync({ 'Keep.md': strToU8(keep) })));
+  await page.getByTestId('import-create-unresolved').uncheck();
+  const summary = await confirmImport(page);
+  expect(summary.linksCreated).toBe(0);
+  expect(summary.linksDangling).toBe(1);
+
+  await page.getByTestId('open-imported').click();
+  await page.getByRole('link', { name: 'Keep' }).click();
+  await expect(page.getByTestId('title')).toHaveText('Keep');
+  return { worldId: summary.worldId };
 }

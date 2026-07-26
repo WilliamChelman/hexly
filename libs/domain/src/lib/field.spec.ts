@@ -316,9 +316,9 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054/ADR-00
     typeFieldRefs,
   });
 
-  it('runs forward-only validation over the effective set — required-if-required, tolerant at rest', () => {
-    // `dnd.field.cr` (a type default) present and well-typed passes; a missing required attached Field fails; an
-    // ill-typed value at rest is tolerated (never retroactively invalidated).
+  it('runs forward-only validation over the effective set — incomplete-if-required, tolerant at rest', () => {
+    // `dnd.field.cr` (a type default) present and well-typed passes; a missing required attached Field reads
+    // incomplete (ADR-0074); an ill-typed value at rest is tolerated (never retroactively invalidated).
     expect(validate(effective, { 'dnd.field.cr': 3 }, DATA_TYPES).ok).toBe(true);
     const required = resolveEffectiveFields({
       types: [],
@@ -326,7 +326,7 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054/ADR-00
       fieldResolver: (id) => (id === 'world.field.element' ? { ...element, required: true } : undefined),
       typeFieldRefs,
     });
-    expect(validate(required, {}).errors).toEqual([{ key: 'world.field.element', code: 'required' }]);
+    expect(validate(required, {}).incomplete).toEqual([{ key: 'world.field.element', code: 'required' }]);
   });
 
   it('derives facets, resolves structured Fields, and harvests link edges over the effective set', () => {
@@ -397,18 +397,31 @@ describe('validateFields (forward-only)', () => {
     });
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
+    expect(result.incomplete).toEqual([]);
   });
 
   it('passes when an optional Field is simply absent', () => {
-    expect(validate(fields, { name: 'Kobold' }).ok).toBe(true);
-    // No metadata at all still passes as long as no required Field exists — here `name` is required.
+    const result = validate(fields, { name: 'Kobold' });
+    expect(result.ok).toBe(true);
+    expect(result.incomplete).toEqual([]);
+    // No metadata at all reads clean once the required `name` is out of the set.
     expect(validate([fields[1]], undefined).ok).toBe(true);
   });
 
-  it('rejects a missing required Field', () => {
+  // ADR-0074: shape violations are errors, absence is a hint. A caller that still wants to gate on
+  // absence recombines the two channels itself.
+  it('reads a missing required Field as incomplete, never as an error', () => {
     const result = validate(fields, { cr: 1 });
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.incomplete).toEqual([{ key: 'name', code: 'required' }]);
+  });
+
+  it('still errors on a present but ill-typed value of a required Field', () => {
+    const result = validate(fields, { name: 42 });
     expect(result.ok).toBe(false);
-    expect(result.errors).toContainEqual({ key: 'name', code: 'required' });
+    expect(result.errors).toEqual([{ key: 'name', code: 'type' }]);
+    expect(result.incomplete).toEqual([]);
   });
 
   it('rejects a wrong data-type for each kind', () => {
@@ -798,11 +811,12 @@ describe('Structured Data Type (ADR-0050)', () => {
       ]);
     });
 
-    it('leaves an absent optional value alone, and still misses a required one', () => {
+    it('leaves an absent optional value alone, and reads an absent required one as incomplete', () => {
       expect(validate([boardField], {}, DATA_TYPES).ok).toBe(true);
-      expect(validate([{ ...boardField, required: true }], {}, DATA_TYPES).errors).toEqual([
-        { key: 'board', code: 'required' },
-      ]);
+      const required = validate([{ ...boardField, required: true }], {}, DATA_TYPES);
+      expect(required.ok).toBe(true);
+      expect(required.errors).toEqual([]);
+      expect(required.incomplete).toEqual([{ key: 'board', code: 'required' }]);
     });
 
     // The absent-plugin path (ADR-0050): a Field whose data-type went missing stays saveable, its
@@ -811,7 +825,10 @@ describe('Structured Data Type (ADR-0050)', () => {
       // The empty set stands for the build without the plugin: nothing resolves `test.datatype.board`.
       expect(validate([boardField], { board: { tiles: [{ entityId: 'riverbend' }] } }).ok).toBe(true);
       expect(validate([boardField], { board: 'garbage' }).ok).toBe(true);
-      expect(validate([{ ...boardField, required: true }], {}).ok).toBe(true);
+      // Inert means skipped on both channels — not even an incomplete reading for a required Field.
+      const inertRequired = validate([{ ...boardField, required: true }], {});
+      expect(inertRequired.ok).toBe(true);
+      expect(inertRequired.incomplete).toEqual([]);
     });
   });
 

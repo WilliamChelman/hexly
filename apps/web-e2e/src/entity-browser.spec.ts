@@ -35,6 +35,34 @@ test('a note round-trips: create → appears → open → rename → delete', as
   await expect(page.getByTestId('empty')).toBeVisible();
 });
 
+/**
+ * The create dialog returns its Entity and navigates nowhere (ADR-0073); landing the author on what
+ * they just made is this Command's own doing, so the palette journey has to be walked to see it.
+ */
+test('the Command palette’s Create Note opens the Entity the dialog returns, and cancelling stays put', async ({
+  page,
+}) => {
+  await enterLibrary(page);
+
+  await page.keyboard.press('ControlOrMeta+k');
+  await page.getByTestId('command-palette-input').fill('>note');
+  await page.getByTestId('command-palette-option-create-core.type.note').click();
+
+  await page.getByTestId('create-entity-name').fill('Lady Mara');
+  await page.getByTestId('create-entity-submit').click();
+
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page.getByTestId('title')).toHaveText('Lady Mara');
+
+  // And a cancelled dialog leaves the author where they were.
+  await page.getByRole('link', { name: 'Library' }).click();
+  await page.keyboard.press('ControlOrMeta+k');
+  await page.getByTestId('command-palette-input').fill('>note');
+  await page.getByTestId('command-palette-option-create-core.type.note').click();
+  await page.getByTestId('create-entity-cancel').click();
+  await expect(page).toHaveURL(/\/entities$/);
+});
+
 test('an owner toggles a note to shared and the Visibility facet reflects it', async ({ page }) => {
   await enterLibrary(page);
 

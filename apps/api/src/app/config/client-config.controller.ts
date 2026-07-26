@@ -33,7 +33,11 @@ export class ClientConfigController {
       plugins: Object.fromEntries(
         Object.entries(this.config.features.plugin).map(([id, plugin]) => [id, projectPlugin(plugin)]),
       ),
-      entities: { defaultType: this.config.entities.defaultType },
+      entities: {
+        defaultType: this.config.entities.defaultType,
+        inlineType: this.config.entities.inlineType,
+        inlineTag: this.config.entities.inlineTag,
+      },
     };
   }
 }

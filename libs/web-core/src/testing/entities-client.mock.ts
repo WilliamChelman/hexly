@@ -43,7 +43,13 @@ export class MockEntitiesClient {
   );
   create =
     vi.fn<
-      (name: string, types: readonly EntityType[], worldId?: string, doc?: EntityDocument) => Observable<EntityDetail>
+      (
+        name: string,
+        types: readonly EntityType[],
+        worldId?: string,
+        doc?: EntityDocument,
+        tags?: readonly string[],
+      ) => Observable<EntityDetail>
     >();
   load = vi.fn<(id: string) => Observable<EntityDetail>>();
   listDescriptors = vi.fn<() => Observable<string[]>>();

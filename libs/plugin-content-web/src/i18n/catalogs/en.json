@@ -28,7 +28,10 @@
   },
   "entityPicker": {
     "label": "Link an entity",
-    "empty": "No matching entities"
+    "empty": "No matching entities",
+    "create": "Create \"{{name}}\"",
+    "createDetails": "Create \"{{name}}\" with details…",
+    "createError": "Could not create the entity"
   },
   "descriptorPicker": {
     "label": "Describe this link",
@@ -57,7 +60,13 @@
     "linkPlaceholder": "Paste or type a URL"
   },
   "entityLink": {
-    "dangling": "This entity is unavailable"
+    "create": "Create \"{{name}}\"",
+    "dangling": "This entity is unavailable",
+    "relink": "Link to an existing Entity…",
+    "relinkEmpty": "No matching entities",
+    "relinkSearch": "Search entities",
+    "repairLabel": "Repair this link",
+    "unresolved": "No entity by this name yet"
   },
   "note": {
     "name": "Note",

@@ -6,6 +6,7 @@ import { ActivatedRoute, provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { EntityDetail } from '@hexly/domain';
 import { RichContent, CONTENT_FORMAT, tiptapContent } from '@hexly/plugin-content';
+import { ActiveWorld } from '@hexly/web-core';
 import { Editor } from '@tiptap/core';
 import { FakeEntitySession, provideFakeEntitySession } from '@hexly/web-entity/testing';
 import { VIEW_FIELD_KEY } from '@hexly/web-entity';
@@ -311,6 +312,65 @@ describe('ContentEditor', () => {
 
     expect(spy).toHaveBeenCalled();
     expect(JSON.stringify((session.doc()['core.field.content'] as RichContent).snapshot)).toContain('!');
+  });
+
+  describe('the `@` picker’s Create rows (ADR-0073)', () => {
+    /** A resolver that answers every query with one match and no HTTP, so the rows settle at once. */
+    const stubResolver = {
+      resolve: () => ({ status: 'loading' }),
+      search: async () => [{ id: 'e9', name: 'Zorblax the Devourer', types: ['core.type.note'] }],
+    };
+
+    /** Pin the World the route is on — the standing a mint would land against. */
+    function pinWorld(world: { id: string; rights: string[] } | null) {
+      TestBed.overrideProvider(ActiveWorld, { useValue: { world: () => world } });
+    }
+
+    /** Open the `@` picker on a name and let its rows settle. */
+    async function openPicker(fixture: ReturnType<typeof create>) {
+      editorOf(fixture).commands.insertContent('@Zorblax');
+      // @tiptap/suggestion resolves items() async, then fires onStart.
+      await new Promise((resolve) => setTimeout(resolve));
+      fixture.detectChanges();
+      // Caret-anchored and teleported to <body> (BodyPortalDirective), so query the document — and take
+      // the newest, since a previous test's portaled popup outlives its fixture at the end of <body>.
+      const pickers = document.body.querySelectorAll('[data-testid=entity-picker]');
+      return pickers[pickers.length - 1] as HTMLElement;
+    }
+
+    beforeEach(() => TestBed.overrideProvider(EntityNameResolver, { useValue: stubResolver }));
+
+    it('offers Create in the open Entity’s own World, holding the create-entity Right', async () => {
+      pinWorld({ id: 'w1', rights: ['read', 'create-entity'] });
+      TestBed.inject(FakeEntitySession).loadDetail(note('Lady Mara'));
+
+      const picker = await openPicker(create());
+
+      expect(picker.querySelector('[data-testid=entity-picker-create]')).not.toBeNull();
+    });
+
+    it('withholds Create when the pinned World is not the one the mint would land in', async () => {
+      // Mid-navigation, or a stale route World: offering a row here would offer exactly the write the
+      // server would refuse, in a World the author never named.
+      pinWorld({ id: 'w2', rights: ['read', 'create-entity'] });
+      TestBed.inject(FakeEntitySession).loadDetail(note('Lady Mara'));
+
+      const picker = await openPicker(create());
+
+      expect(picker.querySelector('[data-testid=entity-picker-create]')).toBeNull();
+      expect(picker.querySelector('[data-testid=entity-picker-create-details]')).toBeNull();
+      // Picking an existing Entity is untouched — a caller who cannot create can still link.
+      expect(picker.querySelector('[data-testid=entity-picker-option-e9]')).not.toBeNull();
+    });
+
+    it('withholds Create while no World is loaded at all', async () => {
+      pinWorld(null);
+      TestBed.inject(FakeEntitySession).loadDetail(note('Lady Mara'));
+
+      const picker = await openPicker(create());
+
+      expect(picker.querySelector('[data-testid=entity-picker-create]')).toBeNull();
+    });
   });
 
   it('reads and writes the Field named by VIEW_FIELD_KEY, not the canonical content key (ADR-0051)', () => {

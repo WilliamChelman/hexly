@@ -1,5 +1,4 @@
-import { enterLibrary, expect, test } from './fixtures';
-import { TEST_GRANTEE } from './test-user';
+import { addWorldMember, enterLibrary, expect, signInGrantee, test } from './fixtures';
 // The pretty-URL codec (ADR-0042), imported by path like the other framework-free e2e utils in
 // fixtures.ts: `enterLibrary` yields the URL's `slug-base62` segment, but the API keys on the raw id.
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
@@ -48,26 +47,10 @@ test('a reachable non-Owner cannot import: no run trigger in the UI, and the ser
   // World at all (404). The Access section is Settings' default pane.
   const worldSeg = await enterLibrary(page);
   const worldId = idFromSegment(worldSeg); // the raw id the API keys on, decoded from the pretty segment
-  await page.goto(`/w/${worldSeg}/settings`);
-  // Owner-set and member-set share `add-select`/`add` testids, so scope to the member controls.
-  const memberAdd = page.locator('app-member-set');
-  await memberAdd.getByTestId('add-select').selectOption({ label: TEST_GRANTEE.displayName });
-  await memberAdd.getByTestId('add-role').selectOption('viewer');
-  const memberAdded = page.waitForResponse(
-    (r) => /\/api\/worlds\/[\w-]+\/members$/.test(r.url()) && r.request().method() === 'POST' && r.ok(),
-  );
-  await memberAdd.getByTestId('add').click();
-  await memberAdded;
+  await addWorldMember(page, worldSeg, 'viewer');
 
-  // The Viewer logs in through the real UI, in their own cookie-less context (overriding the project's
-  // authenticated default).
-  const otherContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
-  const other = await otherContext.newPage();
-  await other.goto('/login');
-  await other.getByLabel('Email').fill(TEST_GRANTEE.email);
-  await other.getByLabel('Password').fill(TEST_GRANTEE.password);
-  await other.getByRole('button', { name: 'Sign in' }).click();
-  await expect(other).toHaveTitle(/Worlds/);
+  const other = await signInGrantee(browser);
+  const otherContext = other.context();
 
   // The Settings shell renders for any reader, but every Importer surface is Owner-gated server-side
   // (ADR-0039, ADR-0060): the panel's list load is refused, so it settles on its empty state and

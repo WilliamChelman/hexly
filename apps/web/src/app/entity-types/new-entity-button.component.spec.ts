@@ -13,10 +13,8 @@ import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
 import { PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { TypeDefinition } from '@hexly/web-entity';
-import { DialogService } from '@hexly/web-ui';
 import { NewEntityButtonComponent } from './new-entity-button.component';
 import { TypeRegistry } from './type-registry';
-import { CreateEntityDialogComponent } from './create-entity-dialog.component';
 
 /**
  * A {@link ClientConfigStore} whose default Type and enabled set the test drives (ADR-0052, Seam 4):
@@ -49,23 +47,15 @@ const created = (id: string, name: string, types: string[]) =>
     document: { content: { format: 'tiptap-v1', snapshot: {} } },
   }) as unknown as EntityDetail;
 
-/** A minimal registered TypeDefinition referencing its Fields by id (ADR-0054) — the fixture for the dialog gate. */
-function worldType(id: string, fieldRefs: string[]): TypeDefinition {
+/** A user-defined TypeDefinition referencing its Fields by id (ADR-0054), named by authored copy (#191). */
+function worldType(id: string, labelText: string, fieldRefs: string[]): TypeDefinition {
   return {
     id: id as TypeDefinition['id'],
     icon: 'label',
+    labelText,
     views: [],
     fieldRefs,
     graphColorToken: '--color-ink-muted',
-    labels: {
-      name: `${id}.name`,
-      eyebrow: `${id}.eyebrow`,
-      titleLabel: `${id}.titleLabel`,
-      rename: `${id}.rename`,
-      editorLabel: `${id}.editorLabel`,
-      create: `${id}.create`,
-      untitled: `${id}.untitled`,
-    },
   };
 }
 
@@ -74,11 +64,9 @@ describe('NewEntityButton', () => {
   let navigate: ReturnType<typeof vi.spyOn>;
   let defaultType: WritableSignal<string | undefined>;
   let enabled: WritableSignal<ReadonlySet<string> | null>;
-  let openDialog: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     entities = new MockEntitiesClient();
-    openDialog = vi.fn();
     // Unset default + unloaded enabled set: the pre-config-fetch state, where the button resolves
     // to the first enabled Type (core.type.note) — today's "New Note" behaviour, unchanged (ADR-0052).
     defaultType = signal<string | undefined>(undefined);
@@ -91,7 +79,6 @@ describe('NewEntityButton', () => {
         provideRouter([]),
         { provide: EntitiesClient, useValue: entities },
         { provide: ClientConfigStore, useValue: fakeClientConfig(defaultType, enabled) },
-        { provide: DialogService, useValue: { open: openDialog } },
         providePluginContent(),
         providePluginHexmap(),
         providePluginDnd(),
@@ -245,33 +232,22 @@ describe('NewEntityButton', () => {
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'm1']);
   });
 
-  it('opens the create dialog for a Type with a required Field, rather than minting an unsavable Entity', () => {
-    // A World type referencing a required scalar Field: a blind create would land the author on an
-    // Entity the write gate refuses to save (#187), so the dialog collects it first (#189). (`dnd.type.monster`
-    // no longer has a required *scalar* Field — its stat block is structured, ADR-0055 — so it creates blind.)
+  it('mints a Type carrying a required Field directly, with no create-dialog fallback (ADR-0074)', () => {
+    // A World type referencing a required scalar Field. Absence no longer refuses a write, so the button
+    // has no branch left to take: it mints, and the empty Field reads **Incomplete** on the Entity.
     const registry = TestBed.inject(TypeRegistry);
     registry.setWorldFields([
       defineField({ id: 'world.field.rank', label: 'Rank', dataType: { kind: 'number' }, required: true }),
     ]);
-    registry.register(worldType('world.type.knight', ['world.field.rank']));
+    registry.register(worldType('world.type.knight', 'Knight', ['world.field.rank']));
     const fixture = render();
+    entities.create.mockReturnValueOnce(of(created('k1', 'Knight', ['world.type.knight'])));
 
     openMenu(fixture);
     menuItem('world.type.knight')!.click();
 
-    expect(entities.create).not.toHaveBeenCalled();
-    expect(openDialog).toHaveBeenCalledWith(CreateEntityDialogComponent, { type: 'world.type.knight' });
-  });
-
-  it('creates a dnd.type.monster blind — its stat block is structured, so it has no required scalar Field (ADR-0055)', () => {
-    const fixture = render();
-    entities.create.mockReturnValueOnce(of(created('m1', 'Untitled monster', ['dnd.type.monster'])));
-
-    openMenu(fixture);
-    menuItem('dnd.type.monster')!.click();
-
-    expect(entities.create).toHaveBeenCalledWith('Untitled monster', ['dnd.type.monster'], 'w1');
-    expect(openDialog).not.toHaveBeenCalled();
+    expect(entities.create).toHaveBeenCalledWith('Knight', ['world.type.knight'], 'w1');
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'k1']);
   });
 
   it('names the type in French when French is the active language', () => {

@@ -3,6 +3,7 @@
  */
 export * from './components';
 export * from './graph';
+export * from './models/detailed-entity-creator';
 export * from './models/embed';
 export * from './models/entity-session';
 export * from './models/entity-types';

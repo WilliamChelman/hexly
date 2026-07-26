@@ -274,6 +274,9 @@ import:
     false # false: fast import, guard on the zip's *declared* size.
     # true: slower, streams and meters *actual* output to abort a
     #       bomb mid-inflate — set on an untrusted/public instance.
+  maxCreatedEntities: 5000 # ceiling on the Entities one import mints for unresolved
+  #     wikilinks (ADR-0073); past it they land as Unresolved Links and the
+  #     summary counts them dangling, rather than the import failing.
 assets:
   dir: /Volumes/big-disk/hexly-assets # where Asset bytes are stored (ADR-0034);
   #     absolute, or relative to the Instance Directory. Omit the key — the default —
@@ -291,6 +294,11 @@ features:
   plugin: # per-Plugin enablement (ADR-0052); every bundled Plugin is on by default
     dnd:
       enabled: false # a disabled Plugin's Types degrade to the generic View, values intact
+entities:
+  defaultType: core.type.note # the Entity Type the "New" button mints (ADR-0052)
+  inlineType: core.type.note # the Entity Type Inline Creation mints (ADR-0073)
+  inlineTag: untriaged # a Tag put on everything created inline (ADR-0073);
+  #     omit the key — the default — and nothing is tagged.
 ```
 
 With `collaboration: false` the sharing and user-management endpoints — entity
@@ -320,6 +328,32 @@ Changing `assets.dir` **does not move the bytes you already have**: it is read
 once at boot and simply becomes the new root, so Assets stored under the old one
 read as missing until you move them. Moving them is your own operation — stop the
 instance, copy `<old-root>/<worldId>/…` into the new root, restart.
+
+`entities.defaultType` and `entities.inlineType` sit next to each other and are
+**not** the same knob, because they answer different questions (ADR-0073).
+`defaultType` is _"the user asked for an Entity — which kind?"_ — your opinion
+about your campaign, and rightly `core.type.hex-map` on a map-first instance.
+`inlineType` faces _"nobody has said what this is yet"_, which is the question
+**Inline Creation** asks when an Entity is minted from a name rather than from a
+create surface. Share one value between them and a map-first instance mints a
+Hex Map from a name typed mid-sentence.
+
+`entities.inlineTag` is the triage lever for that pile: everything created
+inline carries it, so the untriaged names are one click away in the Tag facet.
+Unset by default and the string is yours to choose, so nothing is imposed on
+authors who do not want the bookkeeping.
+
+Neither Type id is checked at boot — an unregistered or disabled Type degrades
+at the point of use rather than failing the instance, exactly as `defaultType`
+already behaves.
+
+Both knobs are also what a **vault import** mints under: every `[[wikilink]]`
+naming no note becomes a real Entity rather than an **Unresolved Link**, so the
+vault's to-write list survives the trip (ADR-0073). An import may override the
+switch, the Type, and the Tag **for that run only** — nothing an import sends is
+written back to `hexly.yml`. An untyped `.md` file still lands on
+`entities.defaultType`: it is a note the vault held, not a name it only
+mentioned.
 
 `strictZipGuard` is a speed-vs-safety trade (ADR-0036). The default (`false`) batch-decompresses — several times faster on a large vault — and trusts the archive's declared sizes, which is right for a trusted personal/LAN instance importing your own vault. A maliciously crafted `.zip` can under-declare its size to slip past that check, so an **untrusted or public** instance should set `strictZipGuard: true`, which streams the archive and meters actual decompressed bytes to abort a zip bomb before it materializes. Either way `maxDecompressed` is enforced.
 

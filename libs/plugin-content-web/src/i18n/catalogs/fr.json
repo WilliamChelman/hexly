@@ -28,7 +28,10 @@
   },
   "entityPicker": {
     "label": "Lier une entité",
-    "empty": "Aucune entité correspondante"
+    "empty": "Aucune entité correspondante",
+    "create": "Créer « {{name}} »",
+    "createDetails": "Créer « {{name}} » avec des détails…",
+    "createError": "Impossible de créer l'entité"
   },
   "descriptorPicker": {
     "label": "Décrire ce lien",
@@ -57,7 +60,13 @@
     "linkPlaceholder": "Collez ou saisissez une URL"
   },
   "entityLink": {
-    "dangling": "Cette entité est indisponible"
+    "create": "Créer « {{name}} »",
+    "dangling": "Cette entité est indisponible",
+    "relink": "Lier à une entité existante…",
+    "relinkEmpty": "Aucune entité correspondante",
+    "relinkSearch": "Rechercher des entités",
+    "repairLabel": "Réparer ce lien",
+    "unresolved": "Aucune entité ne porte encore ce nom"
   },
   "note": {
     "name": "Note",

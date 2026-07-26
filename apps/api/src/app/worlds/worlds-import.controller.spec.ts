@@ -15,8 +15,21 @@ import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from '../entities/entities.module';
 import { ConfigModule } from '../config/config.module';
+import { HEXLY_CONFIG, HexlyConfig, loadConfig } from '../config';
+import { BUNDLED_PLUGIN_CONFIGS } from '../entities/bundled-plugins';
 import { WorldsModule } from './worlds.module';
 import { CHUNK_SIZE } from './vault-import.service';
+
+/**
+ * POST a vault with its per-run options (ADR-0073) as the multipart body's non-file fields — strings,
+ * because that is what a multipart body carries. No options means "upload only the file", the shape the
+ * web client still sends.
+ */
+function importVault(agent: request.Agent, zip: Buffer, options: Record<string, string> = {}) {
+  let req = agent.post('/worlds/import');
+  for (const [key, value] of Object.entries(options)) req = req.field(key, value);
+  return req.attach('file', zip, 'Aldermoor.zip').expect(201);
+}
 
 /** Build an in-memory `.zip` from a vault-relative path → text (or raw bytes) map. */
 function vaultZip(files: Record<string, string | Uint8Array>): Buffer {
@@ -96,17 +109,33 @@ describe('Vault import endpoint', () => {
   let db: Db;
   let assetsDir: string;
 
-  beforeEach(async () => {
+  /**
+   * Boot an Instance over its own throwaway DB, seeded with Ada. `entities` re-states the Instance
+   * Configuration's `entities` block, for the specs that need Inline Creation's knobs pointed somewhere
+   * visible (ADR-0073); `importConfig` does the same for the `import` block, so a spec can meet a
+   * ceiling without writing the thousands of links the shipped one takes. Absent, the loader's defaults stand.
+   */
+  async function boot(
+    entities?: Partial<HexlyConfig['entities']>,
+    importConfig?: Partial<HexlyConfig['import']>,
+  ): Promise<void> {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
-    assetsDir = mkdtempSync(join(tmpdir(), 'hexly-import-assets-'));
-    const moduleRef = await Test.createTestingModule({
+    const builder = Test.createTestingModule({
       imports: [ConfigModule, AuthModule, WorldsModule, EntitiesModule],
     })
       .overrideProvider(DB)
       .useValue(db)
       .overrideProvider(ASSETS_DIR)
-      .useValue(assetsDir)
-      .compile();
+      .useValue(assetsDir);
+    if (entities || importConfig) {
+      const base = loadConfig(':memory:', BUNDLED_PLUGIN_CONFIGS);
+      builder.overrideProvider(HEXLY_CONFIG).useValue({
+        ...base,
+        entities: { ...base.entities, ...entities },
+        import: { ...base.import, ...importConfig },
+      });
+    }
+    const moduleRef = await builder.compile();
 
     app = moduleRef.createNestApplication();
     app.use(cookieParser());
@@ -117,6 +146,11 @@ describe('Vault import endpoint', () => {
     await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', {
       roles: ['create-worlds'],
     });
+  }
+
+  beforeEach(async () => {
+    assetsDir = mkdtempSync(join(tmpdir(), 'hexly-import-assets-'));
+    await boot();
   });
 
   afterEach(async () => {
@@ -364,15 +398,15 @@ describe('Vault import endpoint', () => {
     );
   });
 
-  it('reports dangling links, degraded constructs, and zero assets in the summary', async () => {
+  it('reports degraded constructs and zero assets in the summary', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const zip = vaultZip({
       'Keep.md': 'Guarded by [[Lady Mara]] and the [[Watch]].[^1]\n\n[^1]: A footnote.',
     });
 
-    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+    const res = await importVault(ada, zip, { createUnresolved: 'false' });
 
-    // Wikilinks are dangling this slice (resolution is the next one); no assets yet.
+    // Neither wikilink names an imported note, and the switch is off — no assets either.
     expect(res.body.linksResolved).toBe(0);
     expect(res.body.linksDangling).toBe(2);
     expect(res.body.assetsStored).toBe(0);
@@ -433,14 +467,69 @@ describe('Vault import endpoint', () => {
     expect(keep.links[1].attrs.entityId).toBe(byPath['North/Guard.md']);
   });
 
-  it('leaves a wikilink to a nonexistent note dangling, resolving only the ones that exist', async () => {
+  /**
+   * Obsidian's link format is a per-vault setting, so the same note may be named three ways. A form the
+   * index cannot answer is no longer inert now that a miss mints (ADR-0073) — it would silently double
+   * its target — so each shape has to land on the note that is already in the import.
+   */
+  describe('link forms other than the exact vault path', () => {
+    it('resolves a note-relative [[../folder/Note]] to the note it names, minting nothing', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // Obsidian's stock "Relative path to file" setting writes every cross-folder link this way.
+      const zip = vaultZip({
+        'people/Alice.md': 'Rode to [[../places/Rivendell]] and stayed.',
+        'places/Rivendell.md': '# Rivendell',
+      });
+
+      const res = await importVault(ada, zip);
+
+      expect(res.body).toMatchObject({ linksResolved: 1, linksCreated: 0, linksDangling: 0 });
+      const byPath = await pathsToIds(ada, res.body.worldId);
+      const alice = await linksOf(ada, res.body.worldId, 'Alice');
+      expect(alice.links[0].attrs.entityId).toBe(byPath['places/Rivendell.md']);
+    });
+
+    it('resolves a same-folder [[./Note]] to its sibling', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({
+        'people/Alice.md': 'Travels with [[./Bob]].',
+        'people/Bob.md': '# Bob',
+      });
+
+      const res = await importVault(ada, zip);
+
+      expect(res.body).toMatchObject({ linksResolved: 1, linksCreated: 0, linksDangling: 0 });
+      const byPath = await pathsToIds(ada, res.body.worldId);
+      const alice = await linksOf(ada, res.body.worldId, 'Alice');
+      expect(alice.links[0].attrs.entityId).toBe(byPath['people/Bob.md']);
+    });
+
+    it('resolves a vault-absolute link inside a wrapper directory no .obsidian marked for stripping', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // Zipped without its config folder, so `reroot` finds no marker and every path keeps `Aldermoor/`
+      // while the links stay vault-relative — the basename fallback is what still finds the note.
+      const zip = vaultZip({
+        'Aldermoor/Keep.md': 'Rode to [[places/Rivendell]] and stayed.',
+        'Aldermoor/places/Rivendell.md': '# Rivendell',
+      });
+
+      const res = await importVault(ada, zip);
+
+      expect(res.body).toMatchObject({ linksResolved: 1, linksCreated: 0, linksDangling: 0 });
+      const byPath = await pathsToIds(ada, res.body.worldId);
+      const keep = await linksOf(ada, res.body.worldId, 'Keep');
+      expect(keep.links[0].attrs.entityId).toBe(byPath['Aldermoor/places/Rivendell.md']);
+    });
+  });
+
+  it('leaves a wikilink to a nonexistent note unresolved with the switch off, resolving only the ones that exist', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const zip = vaultZip({
       'Keep.md': 'Held by [[Lady Mara]] against the [[Shadow King]].',
       'Lady Mara.md': '# Lady Mara',
     });
 
-    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+    const res = await importVault(ada, zip, { createUnresolved: 'false' });
 
     // One target exists, one does not.
     expect(res.body.linksResolved).toBe(1);
@@ -449,9 +538,286 @@ describe('Vault import endpoint', () => {
     const mara = await linksOf(ada, res.body.worldId, 'Lady Mara');
     const keep = await linksOf(ada, res.body.worldId, 'Keep');
     expect(keep.links[0].attrs.entityId).toBe(mara.id);
-    // The unresolved link keeps its intent — a dangling entityLink, not plain text.
+    // The Unresolved Link keeps its intent — an id-less entityLink, not plain text (ADR-0073).
     expect(keep.links[1].attrs.entityId).toBeNull();
     expect(keep.links[1].attrs.label).toBe('Shadow King');
+  });
+
+  /**
+   * The create-unresolved switch (ADR-0073) — on by default, because an importer arrives with Obsidian's
+   * model, where an unresolved wikilink is a visible to-write list rather than inert text. The whole
+   * on/off × override/default matrix lives here: it is far cheaper than a browser can carry.
+   */
+  describe('create-unresolved', () => {
+    it('mints an Entity for an unresolved wikilink by default, linked by id and carrying the inline Type', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      const res = await importVault(ada, zip);
+
+      // Created, not dangling — and counted as its own thing, so the author reads what the switch did.
+      expect(res.body).toMatchObject({ linksResolved: 0, linksCreated: 1, linksDangling: 0 });
+
+      const { summary } = await entityNamed(ada, res.body.worldId, 'Zorblax');
+      // `entities.inlineType` defaults to core.type.note; no Tag, because `inlineTag` is unset by default.
+      expect(summary?.types).toEqual(['core.type.note']);
+      expect(summary?.tags).toEqual([]);
+
+      const keep = await linksOf(ada, res.body.worldId, 'Keep');
+      expect(keep.links[0].attrs.entityId).toBe(summary?.id);
+
+      // An ordinary Entity: the edge index records the link with no re-save (ADR-0046).
+      const { referencedBy } = (await ada.get(`/entities/${summary?.id}/references`).expect(200)).body;
+      expect(referencedBy).toHaveLength(1);
+    });
+
+    it('creates nothing with the switch off, leaving an Unresolved Link — today’s behaviour', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      const res = await importVault(ada, zip, { createUnresolved: 'false' });
+
+      expect(res.body).toMatchObject({ linksResolved: 0, linksCreated: 0, linksDangling: 1 });
+      const list = await ada.get(`/entities?worldId=${res.body.worldId}`).expect(200);
+      expect(list.body.items.map((e: { name: string }) => e.name)).toEqual(['Keep']);
+    });
+
+    it('converges two notes naming the same thing on one Entity, answering the second from the index', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({
+        'Keep.md': 'Held against [[Zorblax]].',
+        'Watch.md': 'Also wary of [[Zorblax]].',
+      });
+
+      const res = await importVault(ada, zip);
+
+      // One Entity minted; the second link is answered from the index, so it tallies as resolved.
+      expect(res.body).toMatchObject({ linksResolved: 1, linksCreated: 1, linksDangling: 0 });
+
+      const { summary } = await entityNamed(ada, res.body.worldId, 'Zorblax');
+      const keep = await linksOf(ada, res.body.worldId, 'Keep');
+      const watch = await linksOf(ada, res.body.worldId, 'Watch');
+      expect(keep.links[0].attrs.entityId).toBe(summary?.id);
+      expect(watch.links[0].attrs.entityId).toBe(summary?.id);
+    });
+
+    it('converges [[Zorblax]] and [[zorblax]] on one Entity — ADR-0033’s case-insensitive matching, intact', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]], feared as [[zorblax]].' });
+
+      const res = await importVault(ada, zip);
+
+      expect(res.body).toMatchObject({ linksResolved: 1, linksCreated: 1, linksDangling: 0 });
+      const keep = await linksOf(ada, res.body.worldId, 'Keep');
+      expect(keep.links[0].attrs.entityId).toBe(keep.links[1].attrs.entityId);
+    });
+
+    it('names a created Entity after the basename, and converges the bare form on it', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // A mint has no vault path, so its only identity is its name: the bare form finds the one the
+      // path-qualified form minted (ADR-0073).
+      const zip = vaultZip({ 'Keep.md': 'Held against [[folder/Zorblax]], feared as [[Zorblax]].' });
+
+      const res = await importVault(ada, zip);
+
+      expect(res.body).toMatchObject({ linksResolved: 1, linksCreated: 1, linksDangling: 0 });
+      const { summary } = await entityNamed(ada, res.body.worldId, 'Zorblax');
+      const keep = await linksOf(ada, res.body.worldId, 'Keep');
+      expect(keep.links[0].attrs.entityId).toBe(summary?.id);
+      expect(keep.links[1].attrs.entityId).toBe(summary?.id);
+    });
+
+    it('mints a created Entity with its Type’s Field defaults, like every other mint', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      const res = await importVault(ada, zip, { inlineType: 'core.type.hex-map' });
+
+      // Without the defaults a Hex Map would open on a blank frame rather than a plane (ADR-0050).
+      const { detail } = await entityNamed(ada, res.body.worldId, 'Zorblax');
+      expect(detail.document['core.field.grid']).toBeDefined();
+    });
+
+    it('folds the Tag through the Tag vocabulary, so it meets an author’s own spelling', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      const res = await importVault(ada, zip, { inlineTag: ' Untriaged ' });
+
+      // Facet values are case-folded, so an unfolded `Untriaged` would sit beside `untriaged` forever.
+      expect((await entityNamed(ada, res.body.worldId, 'Zorblax')).summary?.tags).toEqual(['untriaged']);
+    });
+
+    it('rejects a malformed Type override rather than writing it into types[0]', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      await ada.post('/worlds/import').field('inlineType', 'nonsense').attach('file', zip, 'Aldermoor.zip').expect(400);
+    });
+
+    it('rejects a System-managed Type override, and mints no World for the refused run', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      // The asset type is the system's to assign (ADR-0068); the importer's exemption from the write
+      // gate covers frontmatter round-tripping an export, not a Type this request picked.
+      await ada
+        .post('/worlds/import')
+        .field('inlineType', 'core.type.asset')
+        .attach('file', zip, 'Aldermoor.zip')
+        .expect(400);
+      expect((await ada.get('/worlds').expect(200)).body).toEqual([]);
+    });
+
+    it('rejects an overlong Tag override rather than stamping it onto every Entity the run mints', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      await ada
+        .post('/worlds/import')
+        .field('inlineTag', 'x'.repeat(256))
+        .attach('file', zip, 'Aldermoor.zip')
+        .expect(400);
+    });
+
+    it('stops minting at the run’s ceiling, tallying the rest as dangling rather than failing the import', async () => {
+      // One note's links all mint inside its own transaction, so the ceiling is what keeps a crafted
+      // archive of nothing but distinct wikilinks from pinning the process (ADR-0073).
+      await app.close();
+      await boot(undefined, { maxCreatedEntities: 2 });
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]], [[Morblax]] and [[Norblax]].' });
+
+      const res = await importVault(ada, zip);
+
+      // The import lands, and the summary says exactly what it did rather than reading as a success.
+      expect(res.body).toMatchObject({ linksResolved: 0, linksCreated: 2, linksDangling: 1 });
+      const list = await ada.get(`/entities?worldId=${res.body.worldId}`).expect(200);
+      expect(list.body.items.map((e: { name: string }) => e.name).sort()).toEqual(['Keep', 'Morblax', 'Zorblax']);
+      // The one past the ceiling keeps its intent — an id-less entityLink, as with the switch off.
+      const keep = await linksOf(ada, res.body.worldId, 'Keep');
+      expect(keep.links[2].attrs).toMatchObject({ entityId: null, label: 'Norblax' });
+    });
+
+    it('applies the per-run Type and Tag overrides over the configured defaults, persisting neither', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      const res = await importVault(ada, zip, {
+        inlineType: 'core.type.hex-map',
+        inlineTag: 'untriaged',
+      });
+
+      expect((await entityNamed(ada, res.body.worldId, 'Zorblax')).summary).toMatchObject({
+        types: ['core.type.hex-map'],
+        tags: ['untriaged'],
+      });
+
+      // This run only: the next import, sending nothing, is back on the Instance defaults.
+      const next = await importVault(ada, vaultZip({ 'Hall.md': 'Held against [[Zorblax]].' }));
+      expect((await entityNamed(ada, next.body.worldId, 'Zorblax')).summary).toMatchObject({
+        types: ['core.type.note'],
+        tags: [],
+      });
+    });
+
+    it('lands an untyped .md file on the default Type and a created mention on the inline Type, in one import', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      // Two default Types live at once, and that is the point (ADR-0073): a note the vault held is not
+      // a name it only mentioned.
+      const res = await importVault(ada, zip, { inlineType: 'core.type.hex-map' });
+
+      expect((await entityNamed(ada, res.body.worldId, 'Keep')).summary?.types).toEqual(['core.type.note']);
+      expect((await entityNamed(ada, res.body.worldId, 'Zorblax')).summary?.types).toEqual(['core.type.hex-map']);
+    });
+
+    it('treats a blank Type override as an absent one, falling back to the Instance defaults', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      // A control the author never touched (#347) sends an empty string; that must land, not 400. Blank
+      // reads as absent for the Type and as *no tag* for the Tag — here the Instance configures neither.
+      const res = await importVault(ada, zip, { inlineType: '', inlineTag: '  ' });
+
+      expect((await entityNamed(ada, res.body.worldId, 'Zorblax')).summary).toMatchObject({
+        types: ['core.type.note'],
+        tags: [],
+      });
+    });
+
+    it('rejects a switch that is neither on nor off, rather than guessing', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+      await ada
+        .post('/worlds/import')
+        .field('createUnresolved', 'maybe')
+        .attach('file', zip, 'Aldermoor.zip')
+        .expect(400);
+    });
+
+    it('does not let a created Entity shadow a note in a later chunk', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // `A Note` links a name only `Zorblax.md` holds, and that file sorts after a full chunk of fillers —
+      // pass 1 indexes every note before pass 2 runs, so the link resolves rather than minting a twin.
+      const files: Record<string, string> = { 'A Note.md': 'Held against [[Zorblax]].' };
+      for (let i = 0; i < CHUNK_SIZE; i++) files[`Filler ${String(i).padStart(3, '0')}.md`] = 'Filler.';
+      files['Zorblax.md'] = '# Zorblax';
+
+      const res = await importVault(ada, vaultZip(files));
+
+      expect(res.body).toMatchObject({ linksResolved: 1, linksCreated: 0, linksDangling: 0 });
+    });
+
+    describe('under an Instance that points the Inline Creation knobs somewhere else', () => {
+      beforeEach(async () => {
+        // Re-boot rather than reconfigure: `app.close()` takes the DB with it, so the replacement gets
+        // its own — the config is read once at boot, as it is on a real Instance (ADR-0036).
+        await app.close();
+        await boot({ inlineType: 'core.type.hex-map', inlineTag: 'untriaged' });
+      });
+
+      it('mints under the configured inline Type and Tag, while an untyped .md file keeps the default Type', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+        const res = await importVault(ada, zip);
+
+        expect((await entityNamed(ada, res.body.worldId, 'Zorblax')).summary).toMatchObject({
+          types: ['core.type.hex-map'],
+          tags: ['untriaged'],
+        });
+        expect((await entityNamed(ada, res.body.worldId, 'Keep')).summary?.types).toEqual(['core.type.note']);
+      });
+
+      it('lets a per-run override beat the configured knobs', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+        const res = await importVault(ada, zip, { inlineType: 'core.type.note', inlineTag: 'this-run' });
+
+        expect((await entityNamed(ada, res.body.worldId, 'Zorblax')).summary).toMatchObject({
+          types: ['core.type.note'],
+          tags: ['this-run'],
+        });
+      });
+
+      it('lets a cleared Tag mint untagged — the one override a blank-is-absent reading could not express', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const zip = vaultZip({ 'Keep.md': 'Held against [[Zorblax]].' });
+
+        // Sent, and empty: emptying the prefilled control is the instruction *no tag* (ADR-0073), not
+        // "no override" — which would hand the run the Instance's `untriaged` right back.
+        const res = await importVault(ada, zip, { inlineTag: '' });
+
+        expect((await entityNamed(ada, res.body.worldId, 'Zorblax')).summary).toMatchObject({
+          types: ['core.type.hex-map'],
+          tags: [],
+        });
+      });
+    });
   });
 
   it('resolves display/heading links to entityIds while leaving ![[embed]] a plain, uncounted link', async () => {
@@ -504,17 +870,18 @@ describe('Vault import endpoint', () => {
     expect(keep.links[0].attrs.entityId).toBe(byPath['South/Guard.md']);
   });
 
-  it('treats a same-note anchor [[#heading]] as neither resolved nor dangling', async () => {
+  it('treats a same-note anchor [[#heading]] as neither resolved, created, nor dangling', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const zip = vaultZip({
       'Keep.md': 'Jump to [[#Defenses]] below.',
     });
 
-    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+    const res = await importVault(ada, zip);
 
-    // An in-note anchor names no note, so it is not a lost link.
-    expect(res.body.linksResolved).toBe(0);
-    expect(res.body.linksDangling).toBe(0);
+    // An in-note anchor names no note, so it is not a lost link — and not a name to mint either.
+    expect(res.body).toMatchObject({ linksResolved: 0, linksCreated: 0, linksDangling: 0 });
+    const list = await ada.get(`/entities?worldId=${res.body.worldId}`).expect(200);
+    expect(list.body.items).toHaveLength(1);
   });
 
   it('ignores .obsidian config, but mints every binary as an Asset (ADR-0065)', async () => {

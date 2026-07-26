@@ -10,6 +10,7 @@ export * from './lib/field';
 export * from './lib/structured-data-type';
 export * from './lib/view-placement';
 export * from './lib/entity-edges';
+export * from './lib/wikilink';
 export * from './lib/derive-document-state';
 export * from './lib/join-search-text';
 export * from './lib/asset';

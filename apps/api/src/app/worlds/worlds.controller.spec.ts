@@ -68,7 +68,7 @@ describe('Worlds endpoints', () => {
       name: 'Aldermoor',
       // Ownership is a symmetric set (ADR-0037): the creator is its sole Owner.
       owners: [expect.any(String)],
-      rights: ['read', 'manage'],
+      rights: ['read', 'create-entity', 'manage'],
       // No Home Entity is minted — the landing is a derived Dashboard (ADR-0043).
       entityCount: 0,
       // A fresh World carries no Owner-curated pins (ADR-0043, #168).
@@ -115,7 +115,7 @@ describe('Worlds endpoints', () => {
       id: expect.any(String),
       name: expect.any(String),
       owners: [expect.any(String)],
-      rights: ['read', 'manage'],
+      rights: ['read', 'create-entity', 'manage'],
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
     });
@@ -146,23 +146,63 @@ describe('Worlds endpoints', () => {
     expect(res.body).toEqual(created.body);
   });
 
-  it('carries the caller’s Rights: manage for an Owner, read-only for a member (ADR-0039)', async () => {
+  it('carries the caller’s Rights: manage for an Owner, create-entity for a Contributor (ADR-0039)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
 
-    // Owner holds read + manage on both Detail and summary.
-    expect(world.body.rights).toEqual(['read', 'manage']);
+    // Owner holds the full set on both Detail and summary.
+    expect(world.body.rights).toEqual(['read', 'create-entity', 'manage']);
     const adaList = await ada.get('/worlds').expect(200);
-    expect(adaList.body.find((w: { id: string }) => w.id === world.body.id).rights).toEqual(['read', 'manage']);
+    expect(adaList.body.find((w: { id: string }) => w.id === world.body.id).rights).toEqual([
+      'read',
+      'create-entity',
+      'manage',
+    ]);
 
-    // A plain member reaches the World read-only — no manage.
+    // A Contributor may author Entities but not manage the World — the `owner ∨ contributor` rule
+    // the Entity-creation filter enforces, made client-readable (ADR-0073).
     const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
     db.$client
       .prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, 'contributor')`)
       .run(world.body.id, bobId);
     const bob = await signIn('bob@hexly.test', 'battery staple');
-    expect((await bob.get(`/worlds/${world.body.id}`).expect(200)).body.rights).toEqual(['read']);
-    expect((await bob.get('/worlds').expect(200)).body[0].rights).toEqual(['read']);
+    expect((await bob.get(`/worlds/${world.body.id}`).expect(200)).body.rights).toEqual(['read', 'create-entity']);
+    expect((await bob.get('/worlds').expect(200)).body[0].rights).toEqual(['read', 'create-entity']);
+
+    // A World Viewer reaches it read-only.
+    const camId = await app.get(AuthService).seedUser('cam@hexly.test', 'stapler battery', 'Cam');
+    db.$client
+      .prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, 'viewer')`)
+      .run(world.body.id, camId);
+    const cam = await signIn('cam@hexly.test', 'stapler battery');
+    expect((await cam.get(`/worlds/${world.body.id}`).expect(200)).body.rights).toEqual(['read']);
+    expect((await cam.get('/worlds').expect(200)).body[0].rights).toEqual(['read']);
+  });
+
+  // The Editor of one Entity is not a Contributor in its World: they reach the World (ADR-0037's
+  // grant residue) but hold no `create-entity`, which is what makes the Create rows absent rather
+  // than present-and-failing (ADR-0073, #345).
+  it('withholds create-entity from an Entity Editor with no member row, and the write agrees', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+    const note = await ada
+      .post('/entities')
+      .send({ name: 'Lady Mara', types: ['core.type.note'], worldId: world.body.id })
+      .expect(201);
+
+    const evaId = await app.get(AuthService).seedUser('eva@hexly.test', 'quiet lantern', 'Eva');
+    await ada.post(`/entities/${note.body.id}/grants`).send({ userId: evaId, role: 'editor' }).expect(200);
+
+    const eva = await signIn('eva@hexly.test', 'quiet lantern');
+    expect((await eva.get(`/worlds/${world.body.id}`).expect(200)).body.rights).toEqual(['read']);
+    expect((await eva.get('/worlds').expect(200)).body[0].rights).toEqual(['read']);
+
+    // The Right is the same rule the write enforces — the create resolves its target World through
+    // `canCreateEntityFilter`, so a caller without the standing finds no writable World (404).
+    await eva
+      .post('/entities')
+      .send({ name: 'Zorblax', types: ['core.type.note'], worldId: world.body.id })
+      .expect(404);
   });
 
   it('reports the count of Entities a delete would destroy on the Detail', async () => {

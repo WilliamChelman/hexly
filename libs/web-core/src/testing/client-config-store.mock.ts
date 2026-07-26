@@ -6,6 +6,8 @@ import { ClientConfigStore } from '../services/client-config.store';
 export interface ClientConfigOverrides {
   readonly enabledPlugins?: Signal<ReadonlySet<string>>;
   readonly defaultType?: Signal<string | undefined>;
+  readonly inlineType?: Signal<string | undefined>;
+  readonly inlineTag?: Signal<string | undefined>;
   readonly collaboration?: Signal<boolean>;
   readonly profile?: Signal<DeploymentProfile>;
 }
@@ -23,6 +25,8 @@ export function mockClientConfigStore(overrides: ClientConfigOverrides = {}): Cl
   return {
     enabledPlugins: enabled,
     defaultType: overrides.defaultType ?? signal(undefined),
+    inlineType: overrides.inlineType ?? signal(undefined),
+    inlineTag: overrides.inlineTag ?? signal(undefined),
     pluginConfig: () => undefined,
     // Unstated `enabledPlugins` means "everything on", as the unresolved real store reads.
     isPluginEnabled: (id: string) => !overrides.enabledPlugins || enabled().has(id),

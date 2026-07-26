@@ -238,6 +238,19 @@ describe('EntitiesClient', () => {
     req.flush(aldermoor);
   });
 
+  it('mints with a Tag set when given — Inline Creation’s `entities.inlineTag` (ADR-0073)', () => {
+    client.create('Zorblax', ['core.type.note'], 'w9', undefined, ['untriaged']).subscribe();
+
+    const req = http.expectOne('/api/entities');
+    expect(req.request.body).toEqual({
+      name: 'Zorblax',
+      types: ['core.type.note'],
+      worldId: 'w9',
+      tags: ['untriaged'],
+    });
+    req.flush(aldermoor);
+  });
+
   it('loads an entity by id', () => {
     let loaded: EntityDetail | undefined;
     client.load('e1').subscribe((e) => (loaded = e));

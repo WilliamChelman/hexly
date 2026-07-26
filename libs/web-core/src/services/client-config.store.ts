@@ -13,9 +13,9 @@ import { ClientConfig, ClientPluginConfig, DeploymentProfile } from '@hexly/doma
 
 /**
  * The browser's end of the client config channel (ADR-0052, Seam 4): the enabled-Plugin set, the default
- * create Type, and ADR-0071's Deployment Profile and Collaboration flag, hydrated once at boot from
- * `GET /api/config`. Signals, not a resource, so a future live path (ADR-0044) can push a fresh set in
- * without touching the readers.
+ * create Type, ADR-0073's two Inline Creation knobs, and ADR-0071's Deployment Profile and Collaboration
+ * flag, hydrated once at boot from `GET /api/config`. Signals, not a resource, so a future live path
+ * (ADR-0044) can push a fresh set in without touching the readers.
  *
  * Owns a predicate per flag rather than exposing raw values for callers to interpret. Until {@link init}
  * resolves (or if it fails) every gate falls open; the boot fetch is an `APP_INITIALIZER`, so nothing in the
@@ -30,6 +30,8 @@ export class ClientConfigStore {
   private readonly enabledSignal = signal<ReadonlySet<string>>(new Set());
   private readonly configsSignal = signal<Readonly<Record<string, ClientPluginConfig>>>({});
   private readonly defaultTypeSignal = signal<string | undefined>(undefined);
+  private readonly inlineTypeSignal = signal<string | undefined>(undefined);
+  private readonly inlineTagSignal = signal<string | undefined>(undefined);
   private readonly loadedSignal = signal(false);
   // Fall-open seeds, so an unresolved fetch and a failed one need no separate handling.
   private readonly collaborationSignal = signal(true);
@@ -45,6 +47,12 @@ export class ClientConfigStore {
 
   /** The Type id the "New" button mints by default; `undefined` until {@link init} resolves. */
   readonly defaultType: Signal<string | undefined> = this.defaultTypeSignal.asReadonly();
+
+  /** The Type id Inline Creation mints, separate from {@link defaultType} (ADR-0073); `undefined` until {@link init} resolves. */
+  readonly inlineType: Signal<string | undefined> = this.inlineTypeSignal.asReadonly();
+
+  /** The Tag applied to everything created inline (ADR-0073); `undefined` until {@link init} resolves, and when none is configured. */
+  readonly inlineTag: Signal<string | undefined> = this.inlineTagSignal.asReadonly();
 
   /** Whether `id`'s Plugin is enabled; reactive. Everything reads enabled until config loads (ADR-0052). */
   isPluginEnabled(id: string): boolean {
@@ -75,6 +83,8 @@ export class ClientConfigStore {
       this.enabledSignal.set(new Set(enabledIds));
       this.configsSignal.set(config.plugins);
       this.defaultTypeSignal.set(config.entities.defaultType);
+      this.inlineTypeSignal.set(config.entities.inlineType);
+      this.inlineTagSignal.set(config.entities.inlineTag);
       // Defaulted again: a payload that omits a flag must not close a gate (ADR-0071).
       this.collaborationSignal.set(config.collaboration ?? true);
       this.profileSignal.set(config.profile ?? 'server');

@@ -5,7 +5,7 @@ import { ChipComponent } from '@hexly/web-ui';
 import { EntitiesClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
 import { TagPickerComponent } from './tag-picker.component';
-import { tagItems } from './tag-suggestions';
+import { tagItems, withTags } from './tag-suggestions';
 
 /**
  * Free-text tag editor for the open Entity (CONTEXT.md → Tag), with autocomplete over the
@@ -119,18 +119,10 @@ export class EntityTagsComponent {
     this.picker().close();
   }
 
-  /**
-   * Comma-splits for paste; trims, lower-cases and deduplicates against current tags to
-   * match server normalization immediately (entity.ts dedupedTags).
-   */
+  /** Normalization is shared with the create dialog's tag editor, so the two cannot drift. */
   private addTags(raw: string): void {
-    const incoming = raw
-      .split(',')
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean);
-    const next = [...this.tags()];
-    for (const tag of incoming) if (!next.includes(tag)) next.push(tag);
-    if (next.length !== this.tags().length) this.session.setTags(next);
+    const next = withTags(this.tags(), raw);
+    if (next.length !== this.tags().length) this.session.setTags([...next]);
   }
 
   /** The next save persists the removal. */

@@ -1,4 +1,4 @@
-import { inject, Provider, signal } from '@angular/core';
+import { computed, inject, Provider, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { Field } from '@hexly/domain';
 import { ENTITY_TYPES, EntityTypes } from '../models/entity-types';
@@ -17,6 +17,8 @@ const CORE_NOTE = 'core.type.note';
 export class FakeEntityTypes implements EntityTypes {
   private readonly definitions = signal<readonly TypeDefinition[]>([]);
   readonly all = this.definitions.asReadonly();
+  /** Mirror the real registry: a System-managed Type (ADR-0068) is never user-creatable. */
+  readonly creatable = computed(() => this.all().filter((def) => !def.systemManaged));
 
   /** The spec's registered Fields by id (ADR-0054) — what a type's `fieldRefs` and an attached `fieldIds` resolve against. */
   private readonly fieldsById: Map<string, Field>;

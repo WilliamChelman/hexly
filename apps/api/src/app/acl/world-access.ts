@@ -1,5 +1,5 @@
 import { WorldVerb } from '@hexly/domain';
-import { and, eq, sql, SQLWrapper } from 'drizzle-orm';
+import { and, eq, inArray, sql, SQLWrapper } from 'drizzle-orm';
 import { Db } from '../db/db';
 import { entities, entityGrants, worldLinks, worldMembers, worlds } from '../db/schema';
 import { isSuperadmin } from './owner-set';
@@ -83,12 +83,15 @@ export function tokenReachesWorld(db: Db, token: string, id: string): boolean {
 }
 
 /**
- * The caller's World Rights from a resolved management standing (ADR-0039). Every reachable World
- * carries `read` (a decision only exists when reachable); an Owner (or Superadmin, folded into
- * `isOwner`) also `manage`. Order is stable.
+ * The caller's World Rights from a resolved standing (ADR-0039). Every reachable World carries
+ * `read` (a decision only exists when reachable); an Owner or Contributor also `create-entity` —
+ * the same `owner ∨ contributor` rule {@link canCreateEntityFilter} enforces on the write, so the
+ * client hides the Create rows it would refuse rather than showing them and failing (ADR-0073); an
+ * Owner (or Superadmin, folded into `isOwner`) also `manage`. Order is stable.
  */
-export function worldRightsOf(a: { isOwner: boolean }): WorldVerb[] {
+export function worldRightsOf(a: { isOwner: boolean; canContribute: boolean }): WorldVerb[] {
   const rights: WorldVerb[] = ['read'];
+  if (a.canContribute) rights.push('create-entity');
   if (a.isOwner) rights.push('manage');
   return rights;
 }
@@ -103,6 +106,11 @@ export interface WorldAccess {
   rightsOf: typeof worldRightsOf;
   /** Whether the caller manages a World, from an *already-loaded* Owner set (no extra query). */
   managedBy(owners: string[]): boolean;
+  /**
+   * Which of `ids` the caller may create Entities in — the page form of {@link decideMeta}'s
+   * `canContribute`, in one caller-scoped read so a World list never fans out per World (ADR-0039).
+   */
+  contributingIn(ids: readonly string[]): Set<string>;
   /** The World row if the caller can reach `id`, else undefined (unreachable ≡ missing). */
   decide(id: string): typeof worlds.$inferSelect | undefined;
   /**
@@ -123,6 +131,17 @@ export function worldAccess(db: Db, userId: string): WorldAccess {
     rightsOf: worldRightsOf,
     managedBy(owners) {
       return superadmin || owners.includes(userId);
+    },
+    contributingIn(ids) {
+      if (ids.length === 0) return new Set();
+      // The Entity-creation predicate itself, batched over the page — one rule, not a second copy of
+      // it; the Superadmin bypass rides along inside the filter.
+      const rows = db
+        .select({ id: worlds.id })
+        .from(worlds)
+        .where(and(inArray(worlds.id, [...ids]), canCreateEntityFilter(userId, superadmin)))
+        .all();
+      return new Set(rows.map((r) => r.id));
     },
     decide(id) {
       return db

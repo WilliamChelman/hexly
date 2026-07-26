@@ -13,6 +13,7 @@ import {
   UpdateUserDefinedTypeRequest,
   UpdateWorldFieldRequest,
   UserDefinedType,
+  VaultImportOptions,
   Visibility,
   WorldDetail,
   WorldMember,
@@ -28,7 +29,7 @@ export class MockWorldsClient {
   watch = vi.fn<(id: string) => Observable<Watched<WorldDetail>>>(() => NEVER);
   watchAll = vi.fn<(ids: string[]) => Observable<FollowSignal>>(() => NEVER);
   create = vi.fn<(name: string) => Observable<WorldDetail>>();
-  importVault = vi.fn<(file: File) => Observable<ImportSummary>>();
+  importVault = vi.fn<(file: File, options?: VaultImportOptions) => Observable<ImportSummary>>();
   exportVault = vi.fn<(id: string) => Observable<Blob>>();
   get = vi.fn<(id: string) => Observable<WorldDetail>>();
   rename = vi.fn<(id: string, name: string) => Observable<WorldDetail>>();

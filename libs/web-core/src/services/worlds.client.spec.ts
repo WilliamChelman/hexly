@@ -123,6 +123,7 @@ describe('WorldsClient', () => {
       notesImported: 3,
       filesSkipped: 0,
       linksResolved: 1,
+      linksCreated: 0,
       linksDangling: 0,
       assetsStored: 0,
       constructsDegraded: {},
@@ -136,9 +137,50 @@ describe('WorldsClient', () => {
     expect(req.request.headers.has('Content-Type')).toBe(false);
     const body = req.request.body as FormData;
     expect(body.get('file')).toBe(file);
+    // No options: the server's own defaults answer for the whole run (ADR-0073).
+    expect(body.has('createUnresolved')).toBe(false);
+    expect(body.has('inlineType')).toBe(false);
+    expect(body.has('inlineTag')).toBe(false);
     req.flush(importSummary);
 
     expect(got).toEqual(importSummary);
+  });
+
+  it('carries the import run’s switch and Type/Tag overrides as multipart text fields', () => {
+    const file = new File([new Uint8Array([1])], 'Aldermoor.zip', { type: 'application/zip' });
+    client
+      .importVault(file, { createUnresolved: false, inlineType: 'world.type.rumour', inlineTag: 'untriaged' })
+      .subscribe();
+
+    const req = http.expectOne('/api/worlds/import');
+    const body = req.request.body as FormData;
+    expect(body.get('createUnresolved')).toBe('false');
+    expect(body.get('inlineType')).toBe('world.type.rumour');
+    expect(body.get('inlineTag')).toBe('untriaged');
+    req.flush(null);
+  });
+
+  it('omits a blank Type, so an untouched control falls back to the Instance default', () => {
+    const file = new File([new Uint8Array([1])], 'Aldermoor.zip', { type: 'application/zip' });
+    client.importVault(file, { createUnresolved: true, inlineType: '' }).subscribe();
+
+    const req = http.expectOne('/api/worlds/import');
+    const body = req.request.body as FormData;
+    expect(body.get('createUnresolved')).toBe('true');
+    expect(body.has('inlineType')).toBe(false);
+    req.flush(null);
+  });
+
+  it('sends a cleared Tag rather than omitting it, so the run can mint untagged', () => {
+    const file = new File([new Uint8Array([1])], 'Aldermoor.zip', { type: 'application/zip' });
+    client.importVault(file, { createUnresolved: true, inlineTag: '' }).subscribe();
+
+    const req = http.expectOne('/api/worlds/import');
+    const body = req.request.body as FormData;
+    // Withholding it would read as "no override" and hand the run the Instance's own Tag — the one
+    // thing a this-run override then couldn't express (ADR-0073).
+    expect(body.get('inlineTag')).toBe('');
+    req.flush(null);
   });
 
   it('exports a world as a binary zip blob', () => {

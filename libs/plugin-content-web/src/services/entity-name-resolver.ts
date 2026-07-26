@@ -42,7 +42,11 @@ export class EntityNameResolver {
 
   // Picker's live query stream, shared so overlapping awaits collapse onto one debounced search.
   private readonly pickerQuery$ = new Subject<string>();
-  private readonly pickerResults$ = searchEntities(this.client, this.pickerQuery$).pipe(share());
+  // Owned here, not left inside the stream, so {@link forgetSearches} can drop it.
+  private readonly searchCache = new Map<string, EntitySummary[]>();
+  private readonly pickerResults$ = searchEntities(this.client, this.pickerQuery$, { cache: this.searchCache }).pipe(
+    share(),
+  );
 
   /**
    * The owner's entities matching `query`, server-filtered (ADR-0025 `q`) — the
@@ -55,6 +59,16 @@ export class EntityNameResolver {
     const result = firstValueFrom(this.pickerResults$);
     this.pickerQuery$.next(query);
     return result;
+  }
+
+  /**
+   * Forget the memoised searches. {@link search} takes the first emission, so a repeated query paints
+   * the cache and never revalidates — the miss that offered `Create "Zorblax"` would otherwise answer
+   * the *next* `@Zorblax` and the two mentions would not converge (ADR-0073). All of them, not the one
+   * name: every prefix typed on the way to it cached the same miss.
+   */
+  forgetSearches(): void {
+    this.searchCache.clear();
   }
 
   private scheduleFlush(): void {

@@ -41,7 +41,7 @@ const deity: TypeDefinition = {
   graphColorToken: '--color-ink-muted',
 };
 
-/** A required Field the monster references — it cannot be minted blind, so create-and-link never offers the type. */
+/** A required Field the monster references — a prompt, never a gate (ADR-0074). */
 const crField = defineField({
   id: 'dnd.field.cr',
   label: 'Challenge Rating',
@@ -50,8 +50,11 @@ const crField = defineField({
   facetable: true,
 });
 
-/** A type whose referenced Field is **required**: create-and-link never offers it. */
+/** A type whose referenced Field is **required**: create-and-link offers it like any other. */
 const monster: TypeDefinition = codeType('dnd.type.monster', [crField.id]);
+
+/** A System-managed type (ADR-0068), as `core.type.asset` is: never user-creatable. */
+const systemType: TypeDefinition = { ...codeType('test.type.system'), systemManaged: true };
 
 function summary(id: string, name: string): EntitySummary {
   return {
@@ -91,10 +94,10 @@ describe('EntityLinkPicker', () => {
       imports: [Host, provideTranslocoTesting(WEB_ENTITY_TEST_CATALOGS)],
       providers: [
         provideRouter([]),
-        // Note, Map, a World's own Deity, and a Monster whose CR is required — the registry the app
-        // composes, as a lib reads it. The picker never learns which of these is which.
+        // Note, Map, a World's own Deity, a Monster whose CR is required, and a System-managed type —
+        // the registry the app composes, as a lib reads it. The picker never learns which is which.
         ...provideEntityTypesTesting(
-          [codeType('core.type.note'), codeType('core.type.hex-map'), deity, monster],
+          [codeType('core.type.note'), codeType('core.type.hex-map'), deity, monster, systemType],
           [crField],
         ),
         {
@@ -230,14 +233,23 @@ describe('EntityLinkPicker', () => {
       expect(byId(fixture, 'entity-link-create-world.type.deity')?.textContent).toContain('Deity');
     });
 
-    it('leaves out a type with a required Field — it cannot be minted blind', () => {
+    it('offers a type declaring a required Field like any other (ADR-0074)', () => {
       const fixture = render();
       click(fixture, 'entity-link-pick');
       fixture.detectChanges();
 
-      // dnd.type.monster's CR is required (#187): creating one blind would land the author on an Entity
-      // that cannot be saved, and there is no room mid-pick for the dialog that collects it.
-      expect(byId(fixture, 'entity-link-create-dnd.type.monster')).toBeNull();
+      // dnd.type.monster's CR is required. The bare create lands it Incomplete rather than refused, so
+      // withholding it here would be the one surface that still bends around a gate nothing enforces.
+      expect(byId(fixture, 'entity-link-create-dnd.type.monster')).not.toBeNull();
+    });
+
+    it('leaves out a System-managed type — the system alone assigns it (ADR-0068)', () => {
+      const fixture = render();
+      click(fixture, 'entity-link-pick');
+      fixture.detectChanges();
+
+      // The write choke point refuses a user-initiated create carrying one, so the button would only fail.
+      expect(byId(fixture, 'entity-link-create-test.type.system')).toBeNull();
     });
 
     it('creates an Entity of the chosen type and links it in one flow', () => {
