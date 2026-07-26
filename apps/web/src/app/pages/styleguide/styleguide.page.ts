@@ -23,14 +23,16 @@ import {
   SwatchComponent,
   TextareaComponent,
 } from '@hexly/web-ui';
+import { DesignToken } from '@hexly/web-styles';
 
+// Each `token` reaches the template spliced into `var(…)`, which the lint rule cannot see (ADR-0075).
 interface SwatchRow {
-  readonly token: string;
+  readonly token: DesignToken;
   /** A `styleguide.swatch.*` translation key for the role's display name. */
   readonly nameKey: string;
 }
 interface TypeRow {
-  readonly token: string;
+  readonly token: DesignToken;
   readonly size: string;
   readonly sample: string;
 }
@@ -644,7 +646,7 @@ export class StyleguidePage {
 
   protected readonly spacing = [1, 2, 3, 4, 6, 8, 12];
 
-  protected readonly radii = ['--radius-sm', '--radius-md', '--radius-lg', '--radius-xl'];
+  protected readonly radii: readonly DesignToken[] = ['--radius-sm', '--radius-md', '--radius-lg', '--radius-xl'];
 
   /** Drives the live dialog specimen. */
   protected readonly dialogOpen = signal(false);

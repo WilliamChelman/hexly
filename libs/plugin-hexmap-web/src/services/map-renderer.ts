@@ -18,7 +18,9 @@ import {
   terrainPalette,
   TerrainId,
 } from '@hexly/plugin-hexmap';
+import { DesignToken, readDesignToken } from '@hexly/web-styles';
 import { Camera } from '../utils/camera';
+import { terrainFill } from '../utils/catalog-keys';
 import type { Selection } from './hexmap-store';
 import type { MapRenderer, MarqueeOverride, RenderOverrides } from '../models/map-renderer';
 
@@ -208,21 +210,22 @@ export class Canvas2dMapRenderer implements MapRenderer {
   /** Resolve the themed colours from CSS in a single style read. */
   private readPalette(): Palette {
     const style = getComputedStyle(this.canvas);
-    const read = (name: string, fallback: string): string => style.getPropertyValue(name).trim() || fallback;
-    const terrain = Object.fromEntries(terrainPalette.map((t) => [t.id, read(t.fill, '#888')])) as Record<
+    // Falls back to the manifest's declared value rather than a second copy of the palette (ADR-0075).
+    const read = (name: DesignToken): string => readDesignToken(style, name);
+    const terrain = Object.fromEntries(terrainPalette.map((t) => [t.id, read(terrainFill(t.id))])) as Record<
       TerrainId,
       string
     >;
     return {
-      hover: read('--color-accent-soft', 'rgba(212,175,55,.3)'),
-      line: read('--color-hex-line', '#888'),
-      featureInk: read('--color-feature-ink', '#f4ecd8'),
-      labelInk: read('--color-label-ink', '#f4ecd8'),
-      nameInk: read('--color-name-ink', '#f4ecd8'),
-      inkStroke: read('--color-ink-stroke', '#0a0b16'),
-      glow: read('--color-accent-glow', 'rgba(217,178,90,.5)'),
-      selected: read('--color-accent-strong', '#7e560f'),
-      blocked: read('--color-danger', '#a4402e'),
+      hover: read('--color-accent-soft'),
+      line: read('--color-hex-line'),
+      featureInk: read('--color-feature-ink'),
+      labelInk: read('--color-label-ink'),
+      nameInk: read('--color-name-ink'),
+      inkStroke: read('--color-ink-stroke'),
+      glow: read('--color-accent-glow'),
+      selected: read('--color-accent-strong'),
+      blocked: read('--color-danger'),
       terrain,
     };
   }

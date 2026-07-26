@@ -216,7 +216,12 @@ export function isDesignToken(name: string): name is DesignToken {
   return BY_NAME.has(name);
 }
 
-/** The declaration for a token name, or `undefined` if nothing declares it. */
+/**
+ * The declaration for a token name, or `undefined` if nothing declares it — never `undefined` once the
+ * name is narrowed to {@link DesignToken}, which is read off the very declarations this indexes.
+ */
+export function designToken(name: DesignToken): DesignTokenDecl;
+export function designToken(name: string): DesignTokenDecl | undefined;
 export function designToken(name: string): DesignTokenDecl | undefined {
   return BY_NAME.get(name);
 }

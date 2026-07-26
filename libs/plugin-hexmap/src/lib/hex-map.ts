@@ -24,7 +24,11 @@ export interface Terrain {
   readonly id: string;
   /** Human-facing name for the palette (CONTEXT.md vocabulary). */
   readonly label: string;
-  /** The CSS custom property the renderer fills painted hexes with. */
+  /**
+   * The CSS custom property the renderer fills painted hexes with. Left a `string` here and narrowed to
+   * `DesignToken` by `terrainFill` in the web half: the API's graph reaches this kernel (ADR-0058), so
+   * it must not hold an edge to `web-styles`.
+   */
   readonly fill: string;
 }
 

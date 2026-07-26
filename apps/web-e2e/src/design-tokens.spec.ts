@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { DESIGN_TOKENS, registeredTokens } from '@hexly/web-styles';
+import { DESIGN_TOKENS, DesignToken, registeredTokens } from '@hexly/web-styles';
 import { enterLibrary, expect, test } from './fixtures';
 
 /** The `@property` registrations, in a real engine — jsdom has none, so nothing else can see them. */
@@ -8,7 +8,7 @@ import { enterLibrary, expect, test } from './fixtures';
 const ABSOLUTE_COLOR = /^(rgba?|oklch|oklab|lab|lch|color)\(/;
 
 /** What the document resolves each token to, as the Canvas renderers read them (ADR-0075). */
-function resolve(page: Page, names: readonly string[]): Promise<Record<string, string>> {
+function resolve(page: Page, names: readonly DesignToken[]): Promise<Record<string, string>> {
   return page.evaluate((tokens) => {
     const style = getComputedStyle(document.documentElement);
     return Object.fromEntries(tokens.map((name) => [name, style.getPropertyValue(name).trim()]));
