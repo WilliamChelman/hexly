@@ -554,7 +554,8 @@ describe('Entities endpoints', () => {
   });
 
   // The forward-only Field gate (ADR-0048): an active typed edit (a save asserting a `types` set,
-  // as the generic Field view or a plugin form does) must satisfy its types' Fields, while the same
+  // as the generic Field view or a plugin form does) must fit the shape its types' Fields declare, an
+  // unanswered `required` Field being Incomplete rather than a violation (ADR-0074), while the same
   // body arriving via import or already at rest is tolerated untouched.
   describe('the forward-only Field gate on active typed edits', () => {
     // A plugin-style type declaring a required string Field and an optional number Field.
@@ -570,7 +571,8 @@ describe('Entities endpoints', () => {
       ...metadata,
     });
 
-    it('rejects a typed edit that omits a required Field', async () => {
+    // Absence is Incomplete, never a refused write (ADR-0074).
+    it('accepts a typed edit that omits a required Field, storing the document as sent', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['core.type.note'] });
 
@@ -582,12 +584,44 @@ describe('Entities endpoints', () => {
           tags: [],
           types: ['test.type.beast'],
         })
+        .expect(200);
+      expect(res.body.types).toEqual(['test.type.beast']);
+      expect(res.body.document).toEqual({ 'core.field.content': emptyRichContent(), 'test.field.cr': 10 });
+    });
+
+    it('accepts a create of a Type whose required Field is absent', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+
+      const res = await ada
+        .post('/entities')
+        .send({ name: 'Aboleth', types: ['test.type.beast'], document: bodyWith({ 'test.field.cr': 10 }) })
+        .expect(201);
+
+      expect(res.body.document['test.field.name']).toBeUndefined();
+      expect(res.body.document['test.field.cr']).toBe(10);
+    });
+
+    // The create door was already exempt (ADR-0048) — like an import it establishes at-rest data — so a
+    // shape violation is refused at the first typed save, not at the mint.
+    it('takes an ill-typed value on create, and refuses the same value on the typed save', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+
+      const created = await ada
+        .post('/entities')
+        .send({ name: 'Aboleth', types: ['test.type.beast'], document: bodyWith({ 'test.field.cr': 'huge' }) })
+        .expect(201);
+
+      const res = await ada
+        .put(`/entities/${created.body.id}`)
+        .send({
+          document: bodyWith({ 'test.field.cr': 'huge' }),
+          version: created.body.version,
+          tags: [],
+          types: ['test.type.beast'],
+        })
         .expect(400);
       expect(res.body.code).toBe('invalid-fields');
-      expect(res.body.data.fields).toContainEqual({
-        key: 'test.field.name',
-        code: 'required',
-      });
+      expect(res.body.data.fields).toContainEqual({ key: 'test.field.cr', code: 'type' });
     });
 
     it('rejects a typed edit whose Field value mismatches its data-type', async () => {
@@ -649,7 +683,7 @@ describe('Entities endpoints', () => {
       const worldId = created.body.worldId;
 
       // Import: bulk-inserted EntityDocument never faces the gate (ADR-0033), whatever it holds — a typed
-      // import (#203) included.
+      // import (#203) included, and `test.field.name` is required and absent here.
       app.get(EntitiesService).importEntity({
         ownerId: adaId,
         worldId,
@@ -671,6 +705,41 @@ describe('Entities endpoints', () => {
         'core.field.content': emptyRichContent(),
         'test.field.cr': 'wrong at rest',
       });
+    });
+
+    // The stored flag is read as a prompt now, so no migration rewrites it (ADR-0074).
+    it('keeps a World Field marked required working, its absence no longer refusing the save', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const worldId = (await ada.get('/worlds').expect(200)).body[0].id;
+      await ada
+        .post(`/worlds/${worldId}/fields`)
+        .send({ ...SIZE_FIELD, required: true })
+        .expect(201);
+      const created = await ada
+        .post('/entities')
+        .send({ name: 'Ealdred', types: ['core.type.note'], document: { 'world.field.size': null }, worldId })
+        .expect(201);
+
+      await ada
+        .put(`/entities/${created.body.id}`)
+        .send({
+          document: { 'core.field.content': emptyRichContent(), 'world.field.size': null },
+          version: created.body.version,
+          tags: [],
+          types: ['core.type.note'],
+        })
+        .expect(200);
+
+      // The same Field with a value outside its enum is still a shape violation.
+      await ada
+        .put(`/entities/${created.body.id}`)
+        .send({
+          document: { 'core.field.content': emptyRichContent(), 'world.field.size': 'Colossal' },
+          version: created.body.version + 1,
+          tags: [],
+          types: ['core.type.note'],
+        })
+        .expect(400);
     });
   });
 
@@ -2168,6 +2237,36 @@ describe('Entities endpoints', () => {
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('invalid-fields');
       expect(res.body.data.fields).toContainEqual({ key: 'test.field.lair', code: 'type' });
+    });
+
+    // Off-type *and* unreadable: the constraint is checked through the caller's read filter, so the
+    // target resolves to no row and the link stays inert rather than 400-ing the save (ADR-0046).
+    it('accepts a link at an off-type target the caller cannot read', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const note = await ada
+        .post('/entities')
+        .send({ name: 'Ada’s Private Note', types: ['core.type.note'] })
+        .expect(201);
+      const worldId = note.body.worldId;
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      app.get(WorldsService).addMember(adaId, worldId, bobId, 'contributor');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+      const created = await bob
+        .post('/entities')
+        .send({ name: 'Aboleth', types: ['core.type.note'], worldId })
+        .expect(201);
+
+      const res = await bob.put(`/entities/${created.body.id}`).send({
+        document: {
+          'core.field.content': emptyRichContent(),
+          'test.field.lair': { entityId: note.body.id, label: 'Ada’s Private Note' },
+        },
+        version: 1,
+        tags: [],
+        types: ['test.type.monster'],
+      });
+
+      expect(res.status).toBe(200);
     });
 
     it('never leaks a private target’s name through the link facet label (ADR-0046)', async () => {

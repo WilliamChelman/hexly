@@ -762,7 +762,7 @@ export class EntitiesService {
 
   /**
    * The forward-only Field gate (ADR-0048, ADR-0054, ADR-0057). A save carrying an explicit `types` set is
-   * an active typed edit, so its EntityDocument must satisfy the *effective* set — including the extras the
+   * an active typed edit, so its EntityDocument must fit the shape of the *effective* set — including the extras the
    * document itself attaches, so an attached Field validates even when its types never named it (story 15). A
    * save carrying no `types` is a plain body edit, left untouched, so a document at rest — or a foreign
    * import re-saved — is never retroactively invalidated.
@@ -776,10 +776,10 @@ export class EntitiesService {
   }
 
   /**
-   * Resolve the effective Field set and reject (400 {@link EntityErrorCode.InvalidFields}) when the
-   * EntityDocument leaves a required Field unmet, ill-types a present value, or an Entity-Link Field
-   * points at a *resolvable* Entity whose types miss its target-type constraint. A missing or
-   * inaccessible link target stays inert — never an error.
+   * Resolve the effective Field set and reject (400 {@link EntityErrorCode.InvalidFields}) on a **shape**
+   * violation only (ADR-0074): an ill-typed *present* value, or an Entity-Link Field pointing at a
+   * *resolvable* Entity whose types miss its target-type constraint. An absent `required` Field and a
+   * missing or inaccessible link target both stay inert — never an error.
    */
   private assertTypedFieldsValid(
     userId: string,
@@ -788,11 +788,9 @@ export class EntitiesService {
     metadata: EntityDocument,
   ): void {
     const fields = this.worldTypeFields.effectiveFields(worldId, types, metadata);
-    // Recombined (ADR-0074): absence still rejects, until the demotion drops this `incomplete` spread.
-    const validation = validateFields(fields, metadata, this.typeFields.structuredDataTypes);
+    // Absence is Incomplete — a state a surface flags, never a refused write (ADR-0074).
     const errors: FieldError[] = [
-      ...validation.errors,
-      ...validation.incomplete,
+      ...validateFields(fields, metadata, this.typeFields.structuredDataTypes).errors,
       ...this.linkTargetTypeErrors(userId, fields, metadata),
     ];
     if (errors.length > 0)
