@@ -93,7 +93,8 @@
     "confirmAdd": "Ajouter le type",
     "addWithoutFields": "Ajouter sans les remplir",
     "requiredFieldsHeading": "Champs requis",
-    "requiredFieldsHint": "Vous pourrez les remplir plus tard."
+    "requiredFieldsHint": "Vous pourrez les remplir plus tard.",
+    "createError": "Création impossible. Veuillez réessayer."
   },
   "editorShell": {
     "tabTitle": "Hexly",

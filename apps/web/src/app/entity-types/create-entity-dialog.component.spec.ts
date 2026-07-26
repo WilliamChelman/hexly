@@ -1,6 +1,6 @@
 import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { defineField, EntityDetail, WorldSummary } from '@hexly/domain';
 import { emptyRichContent } from '@hexly/plugin-content';
 import { ActiveWorld, EntitiesClient, WorldStore } from '@hexly/web-core';
@@ -314,6 +314,28 @@ describe('CreateEntityDialog', () => {
     fixture.detectChanges();
 
     expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['test.type.monster'], 'w1', undefined, undefined);
+  });
+
+  it('reports a failed create and stays open, rather than stranding a caller waiting on it (ADR-0073)', () => {
+    const fixture = render([world('w1', 'Aldermoor')], 'w1', undefined, undefined, { name: 'Zorblax' });
+    entitiesClient.create.mockReturnValue(throwError(() => new Error('500')));
+
+    (q(fixture, 'create-entity-submit') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(q(fixture, 'create-entity-error')).not.toBeNull();
+    // Still open, with what was typed: a mention is holding the author's prose until this closes, so a
+    // silent failure would strand both — Cancel is the way out, and it settles the caller as a decline.
+    expect(dialogRef.close).not.toHaveBeenCalled();
+    expect(closedWith).toEqual([]);
+    expect((q(fixture, 'create-entity-name') as HTMLInputElement).value).toBe('Zorblax');
+
+    entitiesClient.create.mockReturnValue(of({ id: 'e1' } as EntityDetail));
+    (q(fixture, 'create-entity-submit') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    // A retry that lands clears the message and closes with the Entity.
+    expect(closedWith).toEqual([{ id: 'e1' }]);
   });
 
   it('closes with no result and creates nothing on cancel', () => {

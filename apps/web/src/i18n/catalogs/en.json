@@ -93,7 +93,8 @@
     "confirmAdd": "Add type",
     "addWithoutFields": "Add without them",
     "requiredFieldsHeading": "Required fields",
-    "requiredFieldsHint": "You can fill these in later."
+    "requiredFieldsHint": "You can fill these in later.",
+    "createError": "Couldn't create that. Please try again."
   },
   "editorShell": {
     "tabTitle": "Hexly",

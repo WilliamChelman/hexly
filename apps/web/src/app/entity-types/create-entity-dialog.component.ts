@@ -172,6 +172,13 @@ export type CreateEntityDialogResult = EntityDetail;
           </dl>
         </div>
       }
+      <!-- The failure is reported *here*, not as a toast: a native <dialog> owns the top layer, so a
+           toast would sit behind it — and a caller may be waiting on this dialog (ADR-0073). -->
+      @if (failed()) {
+        <p role="alert" data-testid="create-entity-error" class="m-0 text-sm text-danger">
+          {{ 'entityTypes.createError' | transloco }}
+        </p>
+      }
       <button dialogFooter type="button" appButton data-testid="create-entity-cancel" (click)="cancel()">
         {{ 'common.cancel' | transloco }}
       </button>
@@ -213,6 +220,9 @@ export class CreateEntityDialogComponent {
   protected readonly types = signal<readonly EntityType[]>([this.dialogRef.data.type]);
   /** The EntityDocument collected for a picked type's required Fields, sent with the create. */
   protected readonly metadata = signal<EntityDocument>({});
+
+  /** Whether the last create came back a failure — the dialog stays open on one, with what was typed. */
+  protected readonly failed = signal(false);
 
   /** The union of Field schemas the picked types afford (primary first, deduped) — via the registry. */
   private readonly fields = computed(() => this.typeRegistry.resolveFields(this.types()));
@@ -290,9 +300,16 @@ export class CreateEntityDialogComponent {
     const name = this.name().trim() || this.typeRegistry.chromeLabel(types[0], 'untitled');
     const metadata = this.metadata();
     const tags = this.tags();
+    this.failed.set(false);
     this.entitiesClient
       .create(name, types, worldId, Object.keys(metadata).length ? metadata : undefined, tags.length ? tags : undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((entity) => this.dialogRef.close(entity));
+      .subscribe({
+        next: (entity) => this.dialogRef.close(entity),
+        // Staying open with the message is the whole fix: a mention is holding the author's typed text
+        // until this dialog closes (ADR-0073), so a silent failure strands both — Retry or Cancel, and
+        // Cancel settles the caller as a decline does.
+        error: () => this.failed.set(true),
+      });
   }
 }
