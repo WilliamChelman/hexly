@@ -80,7 +80,7 @@ block (emitted to `:root`); `:root[data-color-scheme='astral']` reassigns the ge
 | `--color-surface`     | Paper / panels                           | `#f5ecd6` | `#161c38` |
 | `--color-ink`         | Primary text                             | `#2f2416` | `#e9e2cf` |
 | `--color-ink-muted`   | Secondary text                           | `#6f5d40` | `#aeb2cc` |
-| `--color-accent`      | Primary accent (compass / constellation) | `#9a6a16` | `#e6b652` |
+| `--color-accent`      | Primary accent (compass / constellation) | `#8c5e00` | `#d9b25a` |
 | `--color-tone-1…8`    | The categorical set (below)              | derived   | derived   |
 | `--color-danger`      | Danger (marginalia)                      | `#a4402e` | `#e88a6f` |
 | `--color-success`     | Confirm / "online"                       | `#4a6f2f` | `#86c46a` |

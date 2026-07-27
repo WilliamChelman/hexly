@@ -11,6 +11,12 @@ relative luminance, the CSS Color 4 gamut-mapping algorithm and the Viénot–Br
 dichromat model implemented from scratch (CIEDE2000 validated against Sharma's
 test vectors; the dichromat model validated on the red/green and blue/yellow axes).
 
+Those token values are the ones that shipped through #359–#376, and the accent among
+them has since moved: Solar's is `#8c5e00`, not the `#9a6a16` §1 tabulates and §5 quotes
+at 4.37:1. The eight tones the spike recommended are derived off it and moved with it —
+what they measure **as shipped today** is `world-theme-spec.md` §2.3. This section is the
+analysis that chose them and is left at the values it was computed from.
+
 ---
 
 ## Verdict

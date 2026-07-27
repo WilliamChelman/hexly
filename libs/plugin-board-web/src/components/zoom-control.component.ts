@@ -64,7 +64,7 @@ import { IconComponent } from '@hexly/web-ui';
         color var(--dur-fast) var(--ease-out);
     }
     .lvl:hover {
-      @apply bg-accent-soft text-accent;
+      @apply bg-accent-soft text-accent-strong;
     }
     .div {
       @apply w-px h-4 bg-line;

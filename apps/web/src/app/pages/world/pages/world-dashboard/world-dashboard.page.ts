@@ -64,7 +64,7 @@ const MAPS_LIMIT = 8;
             [attr.aria-label]="e.name"
           >
             <span
-              class="font-display text-md text-ink-strong leading-tight line-clamp-2 group-hover:text-accent transition-colors"
+              class="font-display text-md text-ink-strong leading-tight line-clamp-2 group-hover:text-accent-strong transition-colors"
               >{{ e.name }}</span
             >
           </a>
@@ -79,7 +79,7 @@ const MAPS_LIMIT = 8;
 
     <app-page-header sticky>
       <div pageHeaderTitle class="flex flex-col">
-        <span appEyebrow class="text-accent! tracking-[0.28em]">{{ 'worldDashboard.eyebrow' | transloco }}</span>
+        <span appEyebrow class="text-accent-strong! tracking-[0.28em]">{{ 'worldDashboard.eyebrow' | transloco }}</span>
         <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
           {{ worldName() }}
         </h1>

@@ -291,6 +291,10 @@ If it is intent, it costs two more per-scheme literals for `shadow-2` and `shado
   not a derivation, it is a **theme-invariant constant** — and that is arguably correct
   (`--color-on-gilded`'s own comment already says "both themes"). The two current values
   are only ΔE00 4.64 apart, i.e. they are the same colour tuned twice.
+  **Shipped as written, then amended.** "Arguably correct" was the hedge doing the work:
+  a constant stop means a World anchored to violet keeps a **gold** sheen on its primary
+  buttons, which the epic hit three times. The hue is now the accent's own at `calc(h + 9.5)`,
+  at ΔE00 1.92 / 2.17 against the stops above — see `world-theme-spec.md` §2.2.
 - **`surface-sunken` (1.02 / 0.95).** The fit is numerically clean and it does capture the
   documented `bg`↔`surface-sunken` swap: `l − 0.017·tone` off `--a-page` is darker than
   the page in Solar and lighter in Astral, exactly as the current values are. **But the

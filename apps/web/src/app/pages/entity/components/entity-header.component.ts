@@ -48,7 +48,7 @@ import { EntityViewStore } from '../services/entity-view-store';
     <app-page-header>
       <div pageHeaderTitle class="flex items-center gap-3 min-w-0 flex-1">
         <div class="flex items-center gap-3 shrink-0">
-          <span appEyebrow class="text-accent! tracking-[0.28em] whitespace-nowrap">{{ eyebrow() }}</span>
+          <span appEyebrow class="text-accent-strong! tracking-[0.28em] whitespace-nowrap">{{ eyebrow() }}</span>
           <!--
             Text is driven imperatively (effect, never while focused) rather than
             interpolated, so re-renders can't move the caret mid-edit.

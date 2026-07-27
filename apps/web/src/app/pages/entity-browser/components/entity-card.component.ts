@@ -104,7 +104,7 @@ export interface EntityCardVm {
             [attr.aria-label]="card().title"
           >
             <span
-              class="font-display text-lg text-ink-strong leading-tight line-clamp-2 group-hover:text-accent transition-colors"
+              class="font-display text-lg text-ink-strong leading-tight line-clamp-2 group-hover:text-accent-strong transition-colors"
               data-testid="entity-title"
               >{{ card().title }}</span
             >

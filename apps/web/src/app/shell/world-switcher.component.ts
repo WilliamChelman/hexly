@@ -51,7 +51,7 @@ import {
            crest from reading as a second copy of the user menu. -->
       <span
         data-testid="switcher-initial"
-        class="grid place-items-center shrink-0 rounded-md font-mono text-2xs text-accent bg-surface-sunken border border-accent ring-2 ring-accent/30 [box-shadow:0_0_10px_-2px_var(--color-accent-glow)] transition-colors"
+        class="grid place-items-center shrink-0 rounded-md font-mono text-2xs text-accent-strong bg-surface-sunken border border-accent ring-2 ring-accent/30 [box-shadow:0_0_10px_-2px_var(--color-accent-glow)] transition-colors"
         [class]="expanded() ? 'size-7' : 'size-6 group-hover:bg-accent-soft group-hover:ring-accent/60'"
         aria-hidden="true"
         >{{ initial() }}</span

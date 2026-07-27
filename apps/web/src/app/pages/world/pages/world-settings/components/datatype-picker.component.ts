@@ -84,7 +84,7 @@ import { DataTypeChoice } from '../utils/datatype-choices';
       @apply grid size-8 shrink-0 place-items-center rounded-md bg-surface-sunken font-mono text-sm text-ink-strong;
     }
     .dp-cell.is-on .dp-glyph {
-      @apply bg-accent/15 text-accent;
+      @apply bg-accent/15 text-accent-strong;
     }
     .dp-label {
       @apply text-sm font-medium text-ink-strong;
