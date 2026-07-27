@@ -7,9 +7,10 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
  * the page-owned Dock.
  *
  * Its scrollbar recedes until hover so it never competes with the floating Dock, and it clears the Dock by
- * right-padding from the page-owned `--reading-dock-inset` (inherited in) rather than moving, so the bar
+ * right-padding from the page-owned `--_reading-dock-inset` (inherited in) rather than moving, so the bar
  * stays at the true viewport edge. `class: contents` so the `absolute inset-0` surface positions against
- * the page's `<main>`; `data-content-scroll` is the Outline's scroll root.
+ * the page's `<main>`; `data-content-scroll` is the Outline's scroll root. That pair is `--_…` because a
+ * container-query result is a private indirection var, not a design token (ADR-0075).
  */
 @Component({
   selector: 'app-reading-surface',
@@ -19,9 +20,9 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
     .reading-scroll {
       scrollbar-gutter: stable;
       scrollbar-color: transparent transparent;
-      padding-right: var(--reading-dock-inset, 0rem);
+      padding-right: var(--_reading-dock-inset, 0rem);
       /* The page zeroes the duration while the Panel is being dragged, so the column tracks the grip. */
-      transition: padding-right var(--reading-dock-transition, 200ms);
+      transition: padding-right var(--_reading-dock-transition, 200ms);
     }
     .reading-scroll:hover {
       scrollbar-color: var(--color-line-strong) transparent;

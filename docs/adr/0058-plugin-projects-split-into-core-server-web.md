@@ -27,7 +27,8 @@ already had (`web/ → lib/ ← server/`):**
   core + `@hexly/domain`, nothing framework-bound.
 - **`plugin-X-web`** — the `/web` adapter plus the plugin's `i18n/` and `testing/` halves, at
   `@hexly/plugin-X/web`, `/testing`, (`/i18n`). Depends on core + the web libs; the Angular/TipTap/lucide/
-  transloco weight is confined here, and it keeps the Angular unit-test target and design-token lint.
+  transloco weight is confined here, and it keeps the Angular unit-test target. (The design-token lint
+  was a `-web` property too until it moved to the root config, where it governs all 32 projects.)
 
 Consumer import paths are unchanged — the `tsconfig.base.json` aliases now point at the new project dirs.
 The API's project graph reaches only `plugin-X` and `plugin-X-server`; it can no longer reach a project that
