@@ -1,5 +1,5 @@
 import { DESIGN_TOKENS } from '@hexly/web-styles';
-import { canonicalTokenValue } from './design-token-value';
+import { canonicalTokenValue, colorTokenHex } from './design-token-value';
 import { PALETTE_TOKENS, WORLD_THEME_VERSION, WorldThemeInput, worldThemeSchema } from './world-theme';
 
 /** The World Theme write choke point (ADR-0076): as much about what cannot round-trip as what can. */
@@ -174,5 +174,31 @@ describe('worldThemeSchema', () => {
       expect([decl.name, once]).not.toEqual([decl.name, undefined]);
       expect([decl.name, canonicalTokenValue(decl.type, once as string)]).toEqual([decl.name, once]);
     }
+  });
+});
+
+/** The notation a native colour control speaks, against the OKLCH the choke point stores (#371). */
+describe('colorTokenHex', () => {
+  it('round-trips a stored anchor back to the hex an Owner picked', () => {
+    for (const hex of ['#f1e5c7', '#2e2412', '#9a6a16', '#0b0c1a', '#ffffff', '#000000']) {
+      expect(colorTokenHex(canonicalTokenValue('color', hex) as string)).toBe(hex);
+    }
+  });
+
+  it('reads the `rgb()` a browser resolves a registered token to — the editor’s seed', () => {
+    expect(colorTokenHex('rgb(11, 12, 26)')).toBe('#0b0c1a');
+  });
+
+  it('drops alpha, which a native colour control cannot carry', () => {
+    expect(colorTokenHex('oklch(0.5 0.1 40 / 0.5)')).toBe(colorTokenHex('oklch(0.5 0.1 40)'));
+  });
+
+  it('answers `undefined` for what is not a colour, rather than a black an Owner never chose', () => {
+    expect(colorTokenHex('url(https://evil.example/p.png)')).toBeUndefined();
+    expect(colorTokenHex('')).toBeUndefined();
+  });
+
+  it('clamps a wide-gamut anchor into sRGB, the only gamut the control has', () => {
+    expect(colorTokenHex('oklch(0.7 0.37 145)')).toMatch(/^#[0-9a-f]{6}$/);
   });
 });
