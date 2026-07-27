@@ -81,7 +81,7 @@ export interface EntityLinkRepairHost extends Pick<EntityLinkRepair, 'writable' 
         [attr.data-entity-id]="entityId()"
         [routerLink]="['/entities', entityId()]"
         [fragment]="heading() || undefined"
-        class="cursor-pointer inline-block rounded bg-accent-soft px-1.5 py-0.5 leading-tight text-accent-strong no-underline transition-colors hover:bg-accent/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        class="cursor-pointer inline-block rounded-sm bg-accent-soft px-1.5 py-0.5 leading-tight text-accent-strong no-underline transition-colors hover:bg-accent/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >{{ text() }}</a
       >
     } @else {
@@ -93,7 +93,7 @@ export interface EntityLinkRepairHost extends Pick<EntityLinkRepair, 'writable' 
         [attr.data-dangling]="tone() === 'dangling' ? '' : null"
         [attr.data-entity-id]="tone() === 'dangling' ? entityId() : null"
         [attr.title]="brokenTitleKey() | transloco"
-        class="inline-block rounded px-1.5 py-0.5 leading-tight"
+        class="inline-block rounded-sm px-1.5 py-0.5 leading-tight"
         [class]="brokenTone()"
         [class.cursor-pointer]="repairable()"
         [attr.role]="repairable() ? 'button' : null"

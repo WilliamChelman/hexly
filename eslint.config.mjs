@@ -18,6 +18,9 @@ export default [
       // wherever one can be written, and an opt-in list had it covering 6 of 13 browser libs.
       'hexly-design/no-unknown-design-token': 'error',
       'hexly-design/no-builtin-shadow': 'error',
+      // A corner may only take a step the manifest declares, so a World Theme's corner-radius set
+      // reaches every one of them (ADR-0076).
+      'hexly-design/no-builtin-radius': 'error',
     },
   },
   {

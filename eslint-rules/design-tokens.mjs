@@ -89,6 +89,19 @@ const loadShadowUtilities = rereadOnChange(
   },
 );
 
+/**
+ * The corner steps a World's radius set actually reaches: the manifest's `--radius-*` tokens, as
+ * `rounded-*` suffixes. Tailwind's own `@theme` also declares `--radius-xs/-2xl/-3xl/-4xl`, which
+ * ours does not override and the manifest does not carry — so those steps are fixed lengths however
+ * an Owner sets their corners (ADR-0076).
+ */
+function radiusSteps() {
+  const prefix = '--radius-';
+  return new Set(
+    [...loadManifest().keys()].filter((name) => name.startsWith(prefix)).map((name) => name.slice(prefix.length)),
+  );
+}
+
 /** Paths compare by `/`, whatever the platform wrote them with. */
 function posix(filename) {
   return filename.replaceAll('\\', '/');
@@ -140,6 +153,45 @@ function textOf(node) {
   if (node.type === 'TemplateLiteral') text = node.quasis.map((q) => q.value.raw).join(' ');
   return text === null ? null : text.replace(/\/\*[\s\S]*?\*\//g, ' ');
 }
+
+/**
+ * The utility names in a class string. Separators cover Angular's template punctuation, so a
+ * variant prefix (`hover:shadow-lg`) and a binding (`[class]="'rounded'"`) both yield the bare
+ * utility; a trailing `!` is Tailwind's important flag on the same utility, not part of its name.
+ */
+function* classTokens(text) {
+  for (const raw of text.split(/[\s"'`=<>(){},;:]+/)) yield raw.replace(/!$/, '');
+}
+
+/**
+ * The visitors a class-string rule needs: every template literal (component templates and scoped
+ * styles alike), plus the string literals that carry classes — a `class:` property or raw markup.
+ * Shared so the two utility fences below cannot drift apart on what they even look at.
+ */
+function classStringVisitors(scan) {
+  const visit = (node) => {
+    const text = textOf(node);
+    if (text) scan(node, text);
+  };
+  return {
+    TemplateLiteral: visit,
+    Literal(node) {
+      if (typeof node.value !== 'string') return;
+      const p = node.parent;
+      const isClassProp =
+        !!p && p.type === 'Property' && p.value === node && (p.key.name === 'class' || p.key.value === 'class');
+      if (isClassProp || node.value.includes('class=')) visit(node);
+    },
+  };
+}
+
+/**
+ * Every spelling of the radius utility, split into the corners it lands on and the scale step it
+ * takes — `rounded-tl-md` is the `md` step on one corner. The step is optional because bare
+ * `rounded` is the whole point: it is a hard-coded 4px, not a step. The side alternatives are
+ * written out so `rounded-sm` reads as the `sm` step and not as the `s` side.
+ */
+const RADIUS_UTILITY = /^rounded(?:-(?:s|e|t|r|b|l|ss|se|ee|es|tl|tr|br|bl))?(?:-(.+))?$/;
 
 const noUnknownDesignToken = {
   meta: {
@@ -194,8 +246,8 @@ const noBuiltinShadow = {
   },
   create(context) {
     const shadowUtilities = loadShadowUtilities();
-    function scan(node, text) {
-      for (const tok of text.split(/[\s"'`=<>(){},;:]+/)) {
+    return classStringVisitors((node, text) => {
+      for (const tok of classTokens(text)) {
         if (!tok.startsWith('shadow-') && tok !== 'shadow') continue;
         if (tok.includes('[')) continue; // explicit arbitrary value — intentional opt-out
         if (tok === 'shadow-none') continue; // no shadow at all — nothing themeable to bake
@@ -203,23 +255,45 @@ const noBuiltinShadow = {
           context.report({ node, messageId: 'builtin', data: { cls: tok } });
         }
       }
-    }
-    return {
-      TemplateLiteral(node) {
-        const text = textOf(node);
-        if (text) scan(node, text);
-      },
-      Literal(node) {
-        if (typeof node.value !== 'string') return;
-        const p = node.parent;
-        const isClassProp =
-          !!p && p.type === 'Property' && p.value === node && (p.key.name === 'class' || p.key.value === 'class');
-        if (isClassProp || node.value.includes('class=')) {
-          const t = textOf(node);
-          if (t) scan(node, t);
+    });
+  },
+};
+
+const noBuiltinRadius = {
+  meta: {
+    type: 'problem',
+    docs: {
+      description:
+        "Disallow radius utilities no `--radius-*` token backs, so every corner follows a World Theme's corner set (ADR-0076).",
+    },
+    schema: [],
+    messages: {
+      bare: "Bare `{{cls}}` is a hard-coded 4px that exists outside the token contract, so a World Theme's corner set never reaches it. Name a step: {{steps}} (or `rounded-none`) — ADR-0076.",
+      offScale:
+        "`{{cls}}` takes a step the manifest does not declare — Tailwind's own scale, or nothing at all — so a World Theme's corner set never reaches it. Name a step: {{steps}} (or `rounded-none`) — ADR-0076.",
+    },
+  },
+  create(context) {
+    const steps = radiusSteps();
+    const named = [...steps].map((step) => `\`rounded-${step}\``).join(', ');
+    return classStringVisitors((node, text) => {
+      for (const cls of classTokens(text)) {
+        const match = RADIUS_UTILITY.exec(cls);
+        if (!match) continue;
+        const step = match[1];
+        if (step === undefined) {
+          context.report({ node, messageId: 'bare', data: { cls, steps: named } });
+          continue;
         }
-      },
-    };
+        if (step === 'none') continue; // squares the corner outright — nothing for a set to carry
+        // A bracket is a stated choice, not the accidental default this rule exists to catch, and
+        // it is the only way to spell a corner off the ladder — `rounded-[calc(var(--radius-md)*2)]`
+        // included. Same opt-out `no-builtin-shadow` grants.
+        if (step.startsWith('[')) continue;
+        if (steps.has(step)) continue;
+        context.report({ node, messageId: 'offScale', data: { cls, steps: named } });
+      }
+    });
   },
 };
 
@@ -227,5 +301,6 @@ export default {
   rules: {
     'no-unknown-design-token': noUnknownDesignToken,
     'no-builtin-shadow': noBuiltinShadow,
+    'no-builtin-radius': noBuiltinRadius,
   },
 };

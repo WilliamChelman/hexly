@@ -118,7 +118,7 @@ export interface FieldRangeChange {
                 [attr.aria-label]="field.minLabel"
                 [value]="field.gte"
                 [attr.placeholder]="field.min"
-                class="w-full min-w-0 rounded border border-line bg-surface px-2 py-1 font-sans text-sm"
+                class="w-full min-w-0 rounded-md border border-line bg-surface px-2 py-1 font-sans text-sm"
                 (change)="emitRange(field.key, 'gte', $event)"
               />
               <span class="text-ink-faint" aria-hidden="true">–</span>
@@ -128,7 +128,7 @@ export interface FieldRangeChange {
                 [attr.aria-label]="field.maxLabel"
                 [value]="field.lte"
                 [attr.placeholder]="field.max"
-                class="w-full min-w-0 rounded border border-line bg-surface px-2 py-1 font-sans text-sm"
+                class="w-full min-w-0 rounded-md border border-line bg-surface px-2 py-1 font-sans text-sm"
                 (change)="emitRange(field.key, 'lte', $event)"
               />
             </div>

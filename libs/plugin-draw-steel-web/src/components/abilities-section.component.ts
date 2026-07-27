@@ -55,7 +55,7 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
           <!-- Tracked by index: an ability has no stable key and may be blank or duplicate. The nested
                tier loop shadows the loop index, so the ability's own is aliased for its handlers to reach. -->
           @for (ability of abilities(); track $index; let abilityIndex = $index; let first = $first; let last = $last) {
-            <div class="rounded border border-line bg-surface-sunken p-2" [attr.data-testid]="'ability-' + $index">
+            <div class="rounded-md border border-line bg-surface-sunken p-2" [attr.data-testid]="'ability-' + $index">
               <div class="flex items-center gap-2">
                 <input
                   appInput
@@ -204,7 +204,7 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
 
               <!-- Power roll vs flat effect: a mutually-exclusive toggle so the printed block reads as one. -->
               @if (ability.powerRoll; as roll) {
-                <div class="mt-2 rounded border border-line bg-surface p-2" data-testid="ability-powerroll">
+                <div class="mt-2 rounded-md border border-line bg-surface p-2" data-testid="ability-powerroll">
                   <div class="flex items-center justify-between gap-2">
                     <label
                       class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-ink-muted"
@@ -298,7 +298,7 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
                     }}</span>
                   </span>
                   <span
-                    class="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                    class="rounded-sm px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
                     [class]="pill(ability)"
                   >
                     {{ 'drawSteel.statBlock.abilityTypeOption.' + ability.type | transloco }}
@@ -331,7 +331,7 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
                     {{ ability.target || '—' }}
                   </span>
                   @for (kw of ability.keywords; track kw) {
-                    <span class="inline-flex items-center gap-1 rounded bg-surface-sunken px-1.5 py-0.5 text-2xs">
+                    <span class="inline-flex items-center gap-1 rounded-sm bg-surface-sunken px-1.5 py-0.5 text-2xs">
                       @if (keywordGlyph(kw); as g) {
                         <app-icon [name]="g" class="text-sm text-tone-1" />
                       }
@@ -361,7 +361,7 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
                       />
                     </div>
                     <!-- A's tier table: bordered, striped rows, glyph + band + text; the resolved tier highlights. -->
-                    <div class="overflow-hidden rounded border border-line">
+                    <div class="overflow-hidden rounded-md border border-line">
                       @for (tier of tierKeys; track tier.key; let i = $index) {
                         <div
                           class="flex items-center gap-2 px-2 py-1 text-sm"

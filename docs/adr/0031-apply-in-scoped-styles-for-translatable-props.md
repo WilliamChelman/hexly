@@ -33,7 +33,7 @@ Tailwind v4 resolves `@reference` through `enhanced-resolve`, which honors the `
 
 ## Tooling
 
-The `hexly-design` lint rules (`no-unknown-design-token`, `no-builtin-shadow`) now **strip CSS block comments before scanning**, so a prose word like "shadow" or a `var(--…)` shown in an example comment no longer false-positives. Authors must still avoid a literal `*/` inside a block comment (it closes the comment early — write `--dur-… / --ease-…`, not `--dur-*/--ease-*`); that's a CSS limitation, not lintable.
+The `hexly-design` lint rules (`no-unknown-design-token`, `no-builtin-shadow`, and `no-builtin-radius` since ADR-0076) now **strip CSS block comments before scanning**, so a prose word like "shadow" or "rounded", or a `var(--…)` shown in an example comment, no longer false-positives. Authors must still avoid a literal `*/` inside a block comment (it closes the comment early — write `--dur-… / --ease-…`, not `--dur-*/--ease-*`); that's a CSS limitation, not lintable.
 
 ## Consequences
 
