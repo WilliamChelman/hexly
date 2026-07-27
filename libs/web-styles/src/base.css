@@ -38,7 +38,9 @@ h2,
 h3,
 h4 {
   font-family: var(--font-display);
-  font-weight: var(--font-weight-semibold);
+  /* Regular, not the UA's bold: Marcellus ships a single 400 face, so a heading asking for more
+     gets a synthesised faux-bold — the call the map renderer already made for its labels (#85). */
+  font-weight: var(--font-weight-regular);
   line-height: var(--leading-tight);
   color: var(--color-ink-strong);
   letter-spacing: var(--tracking-tight);
