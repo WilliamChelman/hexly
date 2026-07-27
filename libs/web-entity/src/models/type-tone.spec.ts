@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORICAL_TONES, typeTone } from './type-tone';
+import { CATEGORICAL_TONES } from '@hexly/web-ui';
+import { typeColorToken, typeTone } from './type-tone';
 
 /**
- * The categorical tone an Entity Type is painted with (ADR-0075). Two properties are the contract:
- * the same type id always lands on the same tone — no registration order, no plugin load order, no
- * run-to-run drift — and a type that says which tone it wants gets it.
+ * The categorical tone an Entity Type wears (ADR-0075). Two properties are the contract: the same type
+ * id always lands on the same tone — no registration order, no plugin load order, no run-to-run
+ * drift — and a type that says which tone it wants gets it.
  */
 describe('typeTone', () => {
   it('gives a type with no declared tone one of the eight categoricals', () => {
@@ -68,5 +69,16 @@ describe('typeTone', () => {
 
   it('lets a type declare the accent, which is not in the derived set', () => {
     expect(typeTone({ id: 'core.type.hex-map', tone: 'accent' })).toBe('accent');
+  });
+});
+
+describe('typeColorToken', () => {
+  it('paints a categorical type with its own tone, so its node and its chips cannot disagree', () => {
+    expect(typeColorToken({ id: 'core.type.note' })).toBe('--color-tone-5');
+    expect(typeColorToken({ id: 'core.type.note', tone: 'tone-7' })).toBe('--color-tone-7');
+  });
+
+  it('lets a type opt out of the categorical set by naming a token outright', () => {
+    expect(typeColorToken({ id: 'core.type.note', graphColorToken: '--color-ink-muted' })).toBe('--color-ink-muted');
   });
 });

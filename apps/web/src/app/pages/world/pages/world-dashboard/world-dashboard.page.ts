@@ -5,14 +5,14 @@ import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
 import { ActiveWorld, EntitiesClient, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
 import { CORE_VIEW_MAP, EntitySearchPickerComponent } from '@hexly/web-entity';
 import {
-  ACCENT_BAR,
+  TONE_BAR,
   ButtonComponent,
   EyebrowComponent,
   IconComponent,
   IconName,
   PageHeaderComponent,
   PanelComponent,
-  accentFor,
+  toneFor,
 } from '@hexly/web-ui';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NewEntityButtonComponent } from '../../../../entity-types/new-entity-button.component';
@@ -324,7 +324,7 @@ export class WorldDashboardPage {
   }
 
   protected bar(id: string): string {
-    return ACCENT_BAR[accentFor(id)];
+    return TONE_BAR[toneFor(id)];
   }
 
   protected typeIcon(type: EntityType): IconName {

@@ -69,15 +69,17 @@ export interface TypeDefinition {
   readonly fieldRefs?: readonly string[];
   /**
    * The CSS custom property the World Graph paints this type's nodes with (resolved to RGBA per
-   * ColorScheme, ADR-0007). Manifest-typed, so a rename that misses one plugin is a compile
-   * error (ADR-0075).
+   * ColorScheme, ADR-0007). Manifest-typed, so a rename that misses one plugin is a compile error.
+   *
+   * Omit it and the graph paints the type's own {@link tone}, which is what a categorical type wants —
+   * declaring both is two sources for one colour. Present only where a type opts *out* of the
+   * categorical set: the neutral default, and the two surfaces that are the accent (ADR-0075).
    */
-  readonly graphColorToken: DesignToken;
+  readonly graphColorToken?: DesignToken;
   /**
-   * This type's categorical {@link ChipTone}, pinned. Omit it and {@link typeTone} derives one from the
-   * id — stable across runs and across plugins — so declaring one is how a plugin refuses a tone
-   * another plugin's type already took (ADR-0075). It is the chip's colour, not the graph's: the graph
-   * paints nodes with {@link graphColorToken}, which may name a non-categorical role.
+   * This type's categorical {@link ChipTone}, pinned. Omit it and the tone derives from the id —
+   * stable across runs and across plugins — so declaring one is how a type refuses a tone another
+   * already took (ADR-0075).
    */
   readonly tone?: ChipTone;
   /**

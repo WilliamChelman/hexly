@@ -27,5 +27,6 @@ export * from './components/panel.component';
 export * from './components/rule.component';
 export * from './components/select.component';
 export * from './utils/sigil';
+export * from './utils/tone';
 export * from './components/swatch.component';
 export * from './components/textarea.component';

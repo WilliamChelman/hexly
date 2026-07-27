@@ -111,10 +111,8 @@ const DECLARATIONS = [
   { name: '--color-on-accent-sheen', tier: 'role', type: 'color', public: true, initial: '#221e13' },
   { name: '--color-accent-glow', tier: 'role', type: 'color', public: true, initial: 'rgba(211, 149, 39, 0.5)' },
 
-  // The categorical set — eight tones rotated off the accent (ADR-0075, spike-tone-rotation.md §7).
-  // Eight and not twelve because the accent sits *between* danger and success, so their exclusions
-  // merge into one forbidden zone leaving a single ~161° arc. The `-soft` fills are emphasis, not
-  // identity: they land within ΔE00 1.4 of each other, so a chip's category rides its text and border.
+  // The categorical set — eight tones rotated off the accent (ADR-0075). Public because a World Theme
+  // that moves the accent moves these with it, which is why they are derived rather than authored.
   { name: '--color-tone-1', tier: 'role', type: 'color', public: true, initial: '#006761' },
   { name: '--color-tone-1-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(0, 99, 99, 0.14)' },
   { name: '--color-tone-2', tier: 'role', type: 'color', public: true, initial: '#006478' },

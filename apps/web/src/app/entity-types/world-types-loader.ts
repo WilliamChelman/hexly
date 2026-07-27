@@ -76,7 +76,7 @@ function toDefinition(type: AvailableType, resolveField: (id: string) => Field |
     // Structured Data Type (#201), derived from the referenced Fields.
     views: type.views ?? userTypeViews(fields),
     fieldRefs: type.fieldRefs,
-    graphColorToken: '--color-ink-muted',
+    // Names no colour, so it takes its derived tone — the one its chips already wear (ADR-0075).
     // Project the System-managed marker across the web seam (ADR-0068) — the leak's root cause was a
     // marker that never crossed. A user-defined type never carries it (the write schema omits it), but
     // the projection stays faithful so the pickers/Details panel derive uniformly from one flag.

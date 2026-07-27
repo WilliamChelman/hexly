@@ -9,9 +9,9 @@ import {
   PanelComponent,
   IconComponent,
   IconName,
-  ACCENT_BAR,
-  ACCENT_SIGIL,
-  accentFor,
+  TONE_BAR,
+  TONE_SIGIL,
+  toneFor,
 } from '@hexly/web-ui';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
@@ -184,8 +184,8 @@ export class EntityCardComponent {
   private readonly types = inject(TypeRegistry);
   private readonly transloco = inject(TranslocoService);
 
-  protected readonly bar = computed(() => ACCENT_BAR[accentFor(this.card().id)]);
-  protected readonly sigil = computed(() => ACCENT_SIGIL[accentFor(this.card().id)]);
+  protected readonly bar = computed(() => TONE_BAR[toneFor(this.card().id)]);
+  protected readonly sigil = computed(() => TONE_SIGIL[toneFor(this.card().id)]);
   /** The Entity type's registered icon (a hex map reads as terrain, a note as a label). */
   protected readonly typeIcon = computed<IconName>(() => this.types.resolve(this.card().type).icon);
   /** The primary type's display name, resolved by the registry (a user-defined name is never translated). */

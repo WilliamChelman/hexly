@@ -26,12 +26,8 @@ export const DND_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     // The stat block placed by its `{ field }` — the `dnd.datatype.stat-block` data-type's View, labelled by the
     // Field (ADR-0055) — then the content View by id, so a monster opens on its stats with a Note toggle.
     views: [{ field: DND_STAT_BLOCK_KEY }, CORE_VIEW_RICH_CONTENT],
-    // Pinned rather than derived: tone-5 is the violet this type has always shipped as, and it is not
-    // the tone its id hashes to — which the core asset type already holds. This is the collision the
-    // explicit override exists for (ADR-0075). The graph paints its nodes the same tone, so the two
-    // surfaces agree; both are categorical, and deliberately not the Danger red.
-    tone: 'tone-5',
-    graphColorToken: '--color-tone-5',
+    // No `tone` and no `graphColorToken`: this type is categorical, so it takes its derived tone on
+    // both surfaces (ADR-0075). Declaring either would be pinning a colour nothing asked to pin.
     // A plugin ships translated copy, so its chrome is transloco keys — unlike a user-defined type,
     // whose every label is its one authored name (#191).
     labels: {

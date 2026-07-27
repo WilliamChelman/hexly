@@ -6,6 +6,7 @@ import {
   ButtonGroupComponent,
   CartoucheComponent,
   ChipComponent,
+  ChipTone,
   CoordComponent,
   DialogComponent,
   DotComponent,
@@ -25,7 +26,6 @@ import {
   TextareaComponent,
 } from '@hexly/web-ui';
 import { DesignToken } from '@hexly/web-styles';
-import { CATEGORICAL_TONES } from '@hexly/web-entity';
 
 // Each `token` reaches the template spliced into `var(…)`, which the lint rule cannot see (ADR-0075).
 interface SwatchRow {
@@ -255,14 +255,13 @@ interface TypeRow {
               <app-coord>q 12 · r −4</app-coord>
               <kbd appKbd>⌘ Z</kbd>
             </div>
-            <!-- The eight categoricals side by side, each with a glyph, because that is the comparison
-                 the set has to survive — and the glyph is what carries the category where the hue
-                 cannot (ADR-0075). -->
-            <div class="specimen-row" data-testid="tone-chips">
-              @for (tone of tones; track tone) {
-                <app-chip [tone]="tone" [attr.data-testid]="'tone-chip-' + tone">
-                  <app-icon [name]="toneIcons[$index]" [size]="12" />
-                  {{ tone }}
+            <!-- Side by side, with glyphs: mutual distinguishability is all the set claims, so a row is
+                 the only honest way to read it (ADR-0075). -->
+            <div class="specimen-row">
+              @for (row of tones; track row.tone) {
+                <app-chip [tone]="row.tone">
+                  <app-icon [name]="row.icon" [size]="12" />
+                  {{ row.tone }}
                 </app-chip>
               }
             </div>
@@ -614,22 +613,16 @@ export class StyleguidePage {
     { token: '--color-line-strong', nameKey: 'styleguide.swatch.drawnRule' },
   ];
 
-  /**
-   * The categorical set (ADR-0075). Rendered as its own row rather than mixed in with the semantic
-   * roles because it is one vocabulary, and the eight only mean anything read against each other.
-   */
-  protected readonly tones = CATEGORICAL_TONES;
-
-  /** One glyph per tone in the chip specimen — the channel that survives where the hue does not. */
-  protected readonly toneIcons: readonly IconName[] = [
-    'region',
-    'label',
-    'library',
-    'graph',
-    'terrain',
-    'user',
-    'globe',
-    'link',
+  /** The categorical set, each with a glyph — the channel that survives where the hue does not. */
+  protected readonly tones: readonly { tone: ChipTone; icon: IconName }[] = [
+    { tone: 'tone-1', icon: 'region' },
+    { tone: 'tone-2', icon: 'label' },
+    { tone: 'tone-3', icon: 'library' },
+    { tone: 'tone-4', icon: 'graph' },
+    { tone: 'tone-5', icon: 'terrain' },
+    { tone: 'tone-6', icon: 'user' },
+    { tone: 'tone-7', icon: 'globe' },
+    { tone: 'tone-8', icon: 'link' },
   ];
 
   protected readonly terrain: SwatchRow[] = [
