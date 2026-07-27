@@ -484,6 +484,33 @@
       "polarity": "Le sens de tous les dégradés : papier clair ou sombre.",
       "lineAlpha": "La force avec laquelle les filets se lisent.",
       "veil": "Le poids des ombres, des voiles et de la vignette."
+    },
+    "radiiHeading": "Angles",
+    "radiiLede": "La netteté ou la douceur des angles de ce monde. Un seul jeu couvre boutons, cartes, dialogues et pastilles.",
+    "radiiCustom": "Ce monde porte son propre jeu d’angles. En choisir un ici le remplacera.",
+    "radii": {
+      "sharp": "Nets",
+      "default": "Par défaut",
+      "soft": "Doux"
+    },
+    "radiiHint": {
+      "sharp": "Aucun arrondi — sévère, tracé à la règle.",
+      "default": "Ce monde n’en définit aucun.",
+      "soft": "Largement arrondi — accueillant."
+    },
+    "fontsHeading": "Typographie",
+    "fontsLede": "Les caractères de ce monde — titrage, texte, cartouche et chasse fixe, choisis par paire.",
+    "fonts": {
+      "default": "Par défaut",
+      "codex": "Codex"
+    },
+    "fontsHint": {
+      "default": "Ce monde n’en définit aucune.",
+      "codex": "Titrage Marcellus, texte Source Serif, cartouche Cinzel Decorative, chasse fixe JetBrains Mono."
+    },
+    "fontsSpecimen": {
+      "display": "La Route aux neuf détours",
+      "body": "À trois jours à l’est du fleuve, la route bifurque à une borne brisée."
     }
   },
   "imports": {

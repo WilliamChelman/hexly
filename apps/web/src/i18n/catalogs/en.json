@@ -484,6 +484,33 @@
       "polarity": "Which way every ramp runs: light paper or dark.",
       "lineAlpha": "How strongly drawn rules read.",
       "veil": "How heavy shadows, scrims and the vignette sit."
+    },
+    "radiiHeading": "Corners",
+    "radiiLede": "How sharp or soft this world reads. One set covers every button, card, dialog and chip.",
+    "radiiCustom": "This world carries a corner set of its own. Picking one of these replaces it.",
+    "radii": {
+      "sharp": "Sharp",
+      "default": "Default",
+      "soft": "Soft"
+    },
+    "radiiHint": {
+      "sharp": "No rounding at all — drafted, severe.",
+      "default": "This world sets none.",
+      "soft": "Generously rounded — inviting."
+    },
+    "fontsHeading": "Type",
+    "fontsLede": "The faces this world is set in — display, body, cartouche and monospace, picked as a pairing.",
+    "fonts": {
+      "default": "Default",
+      "codex": "Codex"
+    },
+    "fontsHint": {
+      "default": "This world sets none.",
+      "codex": "Marcellus display, Source Serif body, Cinzel Decorative cartouche, JetBrains Mono."
+    },
+    "fontsSpecimen": {
+      "display": "The Ninefold Road",
+      "body": "Three days east of the river, the road forks at a broken milestone."
     }
   },
   "imports": {

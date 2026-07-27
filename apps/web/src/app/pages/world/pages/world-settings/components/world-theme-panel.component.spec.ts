@@ -4,7 +4,7 @@ import { WORLD_THEME_VERSION, WorldDetail, WorldTheme, WorldThemeInput, colorTok
 import { ActiveWorld, INSTANCE_THEME, WorldThemeLayer, WorldsClient } from '@hexly/web-core';
 import { MockWorldsClient } from '@hexly/web-core/testing';
 import { provideTranslocoTesting } from '../../../../../../testing/transloco-testing';
-import { PALETTE_CONTROLS } from '../utils/theme-draft';
+import { PALETTE_CONTROLS, RADIUS_PRESETS } from '../utils/theme-draft';
 import { WorldThemePanelComponent } from './world-theme-panel.component';
 
 /** The World Theme editor: what it opens an unthemed World at, and what a save actually sends. */
@@ -106,5 +106,62 @@ describe('WorldThemePanel', () => {
 
     expect((at(fixture, 'theme-reset') as HTMLButtonElement).disabled).toBe(true);
     expect((at(fixture, 'theme-save') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  /** The non-colour half (#375): a corner-radius set and a font pairing, each picked whole. */
+  describe('the corner-radius set and the font pairing', () => {
+    const pick = (fixture: ComponentFixture<WorldThemePanelComponent>, testid: string): void => {
+      at(fixture, testid).click();
+      fixture.detectChanges();
+    };
+
+    const sharp = RADIUS_PRESETS.find((preset) => preset.id === 'sharp')!.radii;
+
+    it('sends the picked set’s five values, alongside the Palette a first edit materialises', () => {
+      const fixture = mount(null);
+
+      pick(fixture, 'theme-radii-sharp');
+
+      expect(save(fixture)?.radii).toEqual(sharp);
+    });
+
+    it('stores no set at all for the Hexly default — that is what a World wearing it carries', () => {
+      const fixture = mount(null, { ...stored(), radii: sharp });
+
+      pick(fixture, 'theme-radii-default');
+
+      expect(save(fixture)?.radii).toBeUndefined();
+    });
+
+    it('shows both defaults as picked on a World that sets neither — an absence is still a choice', () => {
+      const fixture = mount(null);
+
+      expect((at(fixture, 'theme-radii-default') as HTMLInputElement).checked).toBe(true);
+      expect((at(fixture, 'theme-font-default') as HTMLInputElement).checked).toBe(true);
+    });
+
+    it('opens on the set and the pairing the World stored, not on the default', () => {
+      const fixture = mount(null, { ...stored(), radii: sharp, fontPairing: 'codex' });
+
+      expect((at(fixture, 'theme-radii-sharp') as HTMLInputElement).checked).toBe(true);
+      expect((at(fixture, 'theme-font-codex') as HTMLInputElement).checked).toBe(true);
+    });
+
+    it('says so when a World carries a set no offered one matches, rather than showing a wrong one', () => {
+      // The schema takes any set of the five (ADR-0076), so one authored over the API is legitimate.
+      const fixture = mount(null, { ...stored(), radii: { '--radius-md': '4px' } });
+
+      expect(at(fixture, 'theme-radii-custom')).toBeTruthy();
+    });
+
+    it('sends the picked pairing, and leaves the set the World already carried alone', () => {
+      const fixture = mount(null, { ...stored(), radii: sharp });
+
+      pick(fixture, 'theme-font-codex');
+
+      const sent = save(fixture);
+      expect(sent?.fontPairing).toBe('codex');
+      expect(sent?.radii).toEqual(sharp);
+    });
   });
 });

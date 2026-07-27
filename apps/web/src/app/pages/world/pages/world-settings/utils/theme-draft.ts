@@ -7,8 +7,11 @@
  * beside it, held to the manifest's own tier-1 slice by this file's spec.
  */
 
-import { DESIGN_TOKENS, DesignToken, TokenType, readDesignToken } from '@hexly/web-styles';
+import { DESIGN_TOKENS, DesignToken, PublicDesignToken, TokenType, readDesignToken } from '@hexly/web-styles';
 import {
+  FONT_PAIRINGS,
+  FONT_PAIRING_IDS,
+  FontPairingId,
   PALETTE_TOKENS,
   WORLD_THEME_VERSION,
   WorldTheme,
@@ -72,6 +75,75 @@ export const PALETTE_CONTROLS: readonly PaletteControl[] = DESIGN_TOKENS.filter(
     ...(KNOB_RANGES[decl.name] ? { range: KNOB_RANGES[decl.name] } : {}),
   }),
 );
+
+/** Which corner-radius set a World wears; `default` is the one it wears by carrying none. */
+export type RadiusPresetId = 'sharp' | 'default' | 'soft';
+
+/** One offered set: the id its copy is keyed on, and the five values it stores. */
+export interface RadiusPreset {
+  readonly id: RadiusPresetId;
+  /** Absent for the Hexly default — a World wears that one by storing no set (ADR-0076). */
+  readonly radii?: WorldTheme['radii'];
+}
+
+/**
+ * The radius sets on offer, sharp to soft (spec §5.1, #375).
+ *
+ * Sets rather than five free lengths, though the schema takes any set of the five: the five are one
+ * ladder and not five decisions — an Owner given text fields can author `sm` above `xl`, or an `em`,
+ * which `--radius-*` cannot carry at all (they are `@property`-registered, so a font-relative length
+ * computes at the declaring element, ADR-0075). The axis the ticket names is sharp-versus-soft, and
+ * that is one control.
+ *
+ * Stored as their values and never as an id, so renaming or dropping a set here costs no stored Theme
+ * a migration, and a set authored over the API stays as valid as one picked here.
+ */
+export const RADIUS_PRESETS: readonly RadiusPreset[] = [
+  {
+    id: 'sharp',
+    radii: {
+      '--radius-sm': '0px',
+      '--radius-md': '0px',
+      '--radius-lg': '0px',
+      '--radius-xl': '0px',
+      // Squared too: a pill or an avatar left round in an otherwise drafted World reads as an oversight.
+      '--radius-full': '0px',
+    },
+  },
+  { id: 'default' },
+  {
+    id: 'soft',
+    radii: {
+      '--radius-sm': '6px',
+      '--radius-md': '12px',
+      '--radius-lg': '18px',
+      '--radius-xl': '28px',
+      // A pill is already as round as it goes; softening the ladder does not make it rounder.
+      '--radius-full': '999px',
+    },
+  },
+];
+
+/** Which offered set `radii` is, or `undefined` for one authored outside this editor. */
+export function radiusPresetOf(radii: WorldTheme['radii']): RadiusPresetId | undefined {
+  const stored = stable(radii && Object.keys(radii).length ? radii : undefined);
+  return RADIUS_PRESETS.find((preset) => stable(preset.radii) === stored)?.id;
+}
+
+/** One offered pairing: its id, and the four `--font-*` stacks picking it writes. */
+export interface FontPairingChoice {
+  readonly id: FontPairingId;
+  readonly tokens: Readonly<Partial<Record<PublicDesignToken, string>>>;
+}
+
+/**
+ * The curated pairings on offer (spec §5.4), read off the domain's own table rather than restated —
+ * so a pairing added there is pickable, and shows its specimen in its own faces, with no edit here.
+ */
+export const FONT_PAIRING_CHOICES: readonly FontPairingChoice[] = FONT_PAIRING_IDS.map((id) => ({
+  id,
+  tokens: FONT_PAIRINGS[id],
+}));
 
 /**
  * A World Theme as it is being edited. `null` is its own state and not an empty one: the World carries

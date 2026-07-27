@@ -1,7 +1,8 @@
 import { ApplicationInitStatus, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { InstanceTheme, WorldTheme, WorldThemePalette } from '@hexly/domain';
+import { FONT_PAIRINGS, FontPairingId, InstanceTheme, WorldTheme, WorldThemePalette } from '@hexly/domain';
+import { PublicDesignToken } from '@hexly/web-styles';
 import { ColorSchemeService } from './color-scheme.service';
 import {
   INSTANCE_THEME,
@@ -74,6 +75,22 @@ describe('the World Theme resolution chain (ADR-0076)', () => {
 
     expect(declarations.solar['--font-display']).toContain('Marcellus');
     expect(declarations.astral['--font-mono']).toContain('JetBrains Mono');
+  });
+
+  it('writes whatever the curated table names, so a pairing added to it needs no change here (#375)', () => {
+    // The evidence for "adding a second pairing requires no applier change": an entry that did not
+    // exist when this function was written resolves through it, stacks and all.
+    const table = FONT_PAIRINGS as Record<string, Readonly<Partial<Record<PublicDesignToken, string>>>>;
+    table['grimoire'] = { '--font-display': "'Cinzel Decorative', serif", '--font-body': "'Marcellus', serif" };
+    try {
+      const declarations = resolveWorldTheme([theme({ fontPairing: 'grimoire' as FontPairingId })]);
+
+      expect(declarations.solar['--font-display']).toBe("'Cinzel Decorative', serif");
+      // Scheme-independent, like the radii: a pairing is one decision, not one per ColorScheme.
+      expect(declarations.astral['--font-body']).toBe("'Marcellus', serif");
+    } finally {
+      delete table['grimoire'];
+    }
   });
 
   it('applies a tier-2 override per ColorScheme, over the anchors it opts out of', () => {

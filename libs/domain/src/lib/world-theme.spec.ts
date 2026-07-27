@@ -1,6 +1,8 @@
 import { DESIGN_TOKENS } from '@hexly/web-styles';
 import { canonicalTokenValue, colorTokenHex } from './design-token-value';
 import {
+  FONT_PAIRINGS,
+  FONT_PAIRING_IDS,
   instanceThemeSchema,
   PALETTE_TOKENS,
   WORLD_THEME_VERSION,
@@ -158,6 +160,13 @@ describe('worldThemeSchema', () => {
     it('accepts a curated pairing id and refuses an unlisted one', () => {
       expect(parse({ ...theme(), fontPairing: 'codex' })?.fontPairing).toBe('codex');
       expect(parse({ ...theme(), fontPairing: 'comic-sans' as never })).toBeUndefined();
+    });
+
+    it('draws the ids it accepts from the curated set alone, so a second pairing is no schema edit (#375)', () => {
+      // Half of "adding a second pairing requires no schema or applier change": the schema restates no
+      // id, and the table cannot carry one without its stacks. The applier's half is its own spec.
+      expect(worldThemeSchema.shape.fontPairing.unwrap().options).toEqual([...FONT_PAIRING_IDS]);
+      expect(Object.keys(FONT_PAIRINGS)).toEqual([...FONT_PAIRING_IDS]);
     });
   });
 

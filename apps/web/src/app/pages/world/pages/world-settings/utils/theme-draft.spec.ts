@@ -1,16 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { DESIGN_TOKENS } from '@hexly/web-styles';
-import { PALETTE_TOKENS, WORLD_THEME_VERSION, WorldTheme, WorldThemePalette } from '@hexly/domain';
+import { DESIGN_TOKENS, designTokenInitial } from '@hexly/web-styles';
+import {
+  FONT_PAIRINGS,
+  FONT_PAIRING_IDS,
+  PALETTE_TOKENS,
+  WORLD_THEME_VERSION,
+  WorldTheme,
+  WorldThemePalette,
+  worldThemeSchema,
+} from '@hexly/domain';
 import { WorldThemeLayer } from '@hexly/web-core';
 import {
   COLOR_SCHEMES,
+  FONT_PAIRING_CHOICES,
   PALETTE_CONTROLS,
+  RADIUS_PRESETS,
   ThemeDraft,
   controlValue,
   defaultPalettes,
   draftFrom,
   draftToTheme,
   hexlyPalette,
+  radiusPresetOf,
   sameDraft,
   withControlValue,
 } from './theme-draft';
@@ -77,6 +88,62 @@ describe('the Palette controls the manifest declares', () => {
     expect(lineAlpha?.max).toBeLessThanOrEqual(0.55);
     expect(veil?.min).toBeGreaterThan(0);
     expect(veil?.max).toBeLessThan(1);
+  });
+});
+
+/**
+ * The non-colour half an Owner authors (#375). Both are *sets*, picked whole: a radius ladder is one
+ * decision in five values, and a pairing one in four.
+ */
+describe('the corner-radius sets an Owner picks between', () => {
+  /** The manifest's own answer to what a radius set is made of (ADR-0075) — the schema's key set too. */
+  const RADIUS_TOKENS = DESIGN_TOKENS.filter((decl) => decl.public && decl.type === 'length').map((decl) => decl.name);
+
+  it('offers the Hexly default as an absence, so a World that picks it stores no set at all', () => {
+    expect(RADIUS_PRESETS.find((preset) => preset.id === 'default')?.radii).toBeUndefined();
+  });
+
+  it('writes every radius the manifest declares, so no set leaves half a ladder behind', () => {
+    for (const preset of RADIUS_PRESETS.filter((preset) => preset.radii)) {
+      expect([preset.id, Object.keys(preset.radii ?? {}).sort()]).toEqual([preset.id, [...RADIUS_TOKENS].sort()]);
+    }
+  });
+
+  it('authors only values the write choke point accepts — no percentage, no font-relative length', () => {
+    // `--radius-*` are `@property`-registered, so an `em` computes at the element that declares them
+    // and would silently mean twice the *root* size (ADR-0075). The schema refuses one; so must a set.
+    for (const preset of RADIUS_PRESETS) {
+      const parsed = worldThemeSchema.safeParse({ ...theme(), radii: preset.radii });
+      expect([preset.id, parsed.success]).toEqual([preset.id, true]);
+    }
+  });
+
+  it('runs from sharp to soft, so the axis an Owner is offered is the one the set moves', () => {
+    const md = (id: string) => RADIUS_PRESETS.find((preset) => preset.id === id)?.radii?.['--radius-md'];
+
+    expect(md('sharp')).toBe('0px');
+    expect(parseFloat(md('soft') ?? '')).toBeGreaterThan(parseFloat(designTokenInitial('--radius-md')));
+  });
+
+  it('names the set a stored Theme carries, and none for one authored outside the editor', () => {
+    expect(radiusPresetOf(undefined)).toBe('default');
+    expect(radiusPresetOf(RADIUS_PRESETS.find((preset) => preset.id === 'sharp')?.radii)).toBe('sharp');
+    // The schema takes any set of the five (ADR-0076); this editor offers a ladder, so it says so.
+    expect(radiusPresetOf({ '--radius-md': '4px' })).toBeUndefined();
+  });
+});
+
+describe('the font pairings an Owner picks between', () => {
+  it('offers exactly the curated set the domain declares — no second list of pairings (#375)', () => {
+    expect(FONT_PAIRING_CHOICES.map((choice) => choice.id)).toEqual([...FONT_PAIRING_IDS]);
+  });
+
+  it('carries each pairing’s own stacks, so a specimen cannot show a face the pairing will not apply', () => {
+    // Half of "a second pairing needs no editor change" either: the picker renders each option in the
+    // faces the table names, so an entry added there arrives with its specimen already right.
+    for (const choice of FONT_PAIRING_CHOICES) {
+      expect(choice.tokens).toEqual(FONT_PAIRINGS[choice.id]);
+    }
   });
 });
 
