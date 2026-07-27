@@ -1,8 +1,15 @@
 import { ApplicationInitStatus, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FONT_PAIRINGS, FontPairingId, InstanceTheme, WorldTheme, WorldThemePalette } from '@hexly/domain';
-import { PublicDesignToken } from '@hexly/web-styles';
+import {
+  FONT_PAIRINGS,
+  FontPairingId,
+  InstanceTheme,
+  OVERRIDABLE_TOKENS,
+  WorldTheme,
+  WorldThemePalette,
+} from '@hexly/domain';
+import { PublicDesignToken, isSettableToken } from '@hexly/web-styles';
 import { ColorSchemeService } from './color-scheme.service';
 import {
   INSTANCE_THEME,
@@ -104,6 +111,22 @@ describe('the World Theme resolution chain (ADR-0076)', () => {
 
   it('resolves to nothing at all when every layer is empty — the Hexly default', () => {
     expect(resolveWorldTheme([null, undefined])).toEqual({ solar: {}, astral: {} });
+  });
+
+  it('resolves only tokens the fences admit, so nothing it writes survives a reload half-applied', () => {
+    // `declaredOnly` and the pre-paint replay both fence on `isSettableToken`; a token the chain writes
+    // but the fence drops would paint once and vanish on the next restore (ADR-0076).
+    const overrides = Object.fromEntries(OVERRIDABLE_TOKENS.map((decl) => [decl.name, decl.initial]));
+    const declarations = resolveWorldTheme([
+      theme({
+        fontPairing: 'codex',
+        radii: { '--radius-sm': '1px', '--radius-md': '2px', '--radius-lg': '3px' },
+        overrides: { solar: overrides, astral: overrides },
+      } as Partial<WorldTheme>),
+    ]);
+
+    const written = [...Object.keys(declarations.solar), ...Object.keys(declarations.astral)];
+    expect(written.filter((name) => !isSettableToken(name))).toEqual([]);
   });
 });
 
@@ -314,6 +337,27 @@ describe('WorldThemeApplier (ADR-0076)', () => {
     TestBed.inject(WorldThemeApplier);
 
     expect(read('--not-a-token')).toBe('');
+  });
+
+  it('ignores a cached token no Theme may set, whatever the manifest declares it', () => {
+    // The gradient is declared but not public, and unregistered — no `@property` type would discard a
+    // `url()` in it, and the server's choke point already refuses the key (ADR-0076).
+    localStorage.setItem(
+      WORLD_THEME_CACHE_KEY,
+      JSON.stringify([
+        {
+          scope: `w/${segment(WORLD_ID)}`,
+          solar: { '--gradient-accent-sheen': 'url(https://example.invalid/pixel.png)', '--dur-fast': '9s' },
+          astral: {},
+        },
+      ]),
+    );
+
+    at(`/w/${WORLD_SEG}`);
+    TestBed.inject(WorldThemeApplier);
+
+    expect(read('--gradient-accent-sheen')).toBe('');
+    expect(read('--dur-fast')).toBe('');
   });
 });
 

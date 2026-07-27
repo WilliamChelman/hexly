@@ -2,7 +2,7 @@
 // `@hexly/domain` once the World Theme schema is generated from it (ADR-0076). Those builds run under
 // `isolatedModules`, where a re-exported type has to say so.
 export type { DesignToken, DesignTokenDecl, PublicDesignToken } from './tokens/manifest';
-export { DESIGN_TOKENS, designToken, isDesignToken } from './tokens/manifest';
+export { DESIGN_TOKENS, SETTABLE_TOKENS, designToken, isDesignToken, isSettableToken } from './tokens/manifest';
 export type { Tier, TokenDecl, TokenType } from './tokens/design-token';
 export { designTokenPropertyBlock, registeredTokens } from './tokens/property-block';
 export { designTokenInitial, designTokenStyle, readDesignToken } from './tokens/read-token';

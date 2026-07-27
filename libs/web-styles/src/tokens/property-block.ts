@@ -1,5 +1,5 @@
 import { TokenType } from './design-token';
-import { DesignTokenDecl, DESIGN_TOKENS } from './manifest';
+import { DesignTokenDecl, DESIGN_TOKENS, SETTABLE_TOKENS } from './manifest';
 
 /** Where the generated block is written, relative to the repo root. */
 export const DESIGN_TOKEN_PROPERTIES_PATH = 'libs/web-styles/src/tokens/design-token-properties.css';
@@ -7,7 +7,7 @@ export const DESIGN_TOKEN_PROPERTIES_PATH = 'libs/web-styles/src/tokens/design-t
 /** The pre-paint replay's allowlist is generated into this file too (ADR-0076). */
 export const PRE_PAINT_REPLAY_PATH = 'apps/web/src/index.html';
 
-/** The command that rewrites them, quoted back at whoever let them drift apart. */
+/** Quoted in the drift specs' failure messages, so the fix arrives with the failure. */
 export const GENERATE_COMMAND = 'pnpm tokens:generate';
 
 /** Fences the generated allowlist inside {@link PRE_PAINT_REPLAY_PATH}. */
@@ -72,10 +72,12 @@ export function designTokenPropertyBlock(): string {
  *
  * The replay runs before Angular, so `declaredOnly` cannot reach it: without this the cache decides
  * which custom properties land on the root, and a `url()` on an unregistered name has nothing to
- * discard it. Split from one string because 112 names as an array literal is mostly punctuation.
+ * discard it. Fenced on {@link SETTABLE_TOKENS} rather than the whole manifest, so the cache admits no
+ * more than the server's write choke point does. Split from one string because the names as an array
+ * literal are mostly punctuation.
  */
 export function designTokenAllowlistScript(indent = '        '): string {
-  const names = DESIGN_TOKENS.map((decl) => decl.name).join(',');
+  const names = SETTABLE_TOKENS.map((decl) => decl.name).join(',');
   return [
     `${indent}${ALLOWLIST_OPEN}`,
     `${indent}var ALLOWED = '${names}'.split(',');`,

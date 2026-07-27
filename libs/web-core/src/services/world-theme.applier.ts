@@ -10,7 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { FONT_PAIRINGS, PALETTE_TOKENS, WorldTheme, WorldThemePalette } from '@hexly/domain';
-import { DesignToken, isDesignToken } from '@hexly/web-styles';
+import { DesignToken, isSettableToken } from '@hexly/web-styles';
 import { ColorScheme, ColorSchemeService } from './color-scheme.service';
 import { safeJsonParse, safeStorageGet, safeStorageSet } from '../utils/safe';
 import { segment } from '../utils/pretty-id';
@@ -131,11 +131,14 @@ interface CachedScope {
   readonly astral: ThemeDeclarations;
 }
 
-/** Keep only what the manifest declares: the pre-paint replay writes the cache back unchecked. */
+/**
+ * Keep only what a Theme may set: the cache is untrusted, and the write choke point refuses the rest —
+ * a settable gradient would be the one place a `url()` could reach the page (ADR-0076).
+ */
 function declaredOnly(value: unknown): ThemeDeclarations {
   if (typeof value !== 'object' || value === null) return {};
   return Object.fromEntries(
-    Object.entries(value).filter(([name, raw]) => isDesignToken(name) && typeof raw === 'string'),
+    Object.entries(value).filter(([name, raw]) => isSettableToken(name) && typeof raw === 'string'),
   );
 }
 
@@ -252,9 +255,8 @@ export class WorldThemeApplier {
   }
 
   /**
-   * Remember this World's own resolved Theme, most recent first. Unscoped by account like the
-   * ColorScheme and for its reason — the script that replays it cannot know the user hash — and a Theme
-   * is served to anonymous Public Link holders anyway.
+   * Remember this World's own resolved Theme, most recent first. Unscoped by account, because the
+   * script that replays it cannot know the user hash.
    */
   private cache(scope: string, declarations: ThemeDeclarationSet | null): void {
     const others = readCache().filter((entry) => entry.scope !== scope);

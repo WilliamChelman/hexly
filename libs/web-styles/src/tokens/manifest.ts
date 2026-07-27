@@ -358,6 +358,27 @@ export function isDesignToken(name: string): name is DesignToken {
 }
 
 /**
+ * The tokens a World Theme may write (ADR-0076): the tier-1 Palette, which the anchors and knobs
+ * resolve into, and the public tier-2 roles the radius set, the font pairing and the overrides key.
+ * Out of it: the private scale, motion, the rails, a plugin's tier-3 vocabulary, and the gradients —
+ * the one place a `url()` could reach the page.
+ *
+ * The one source every fence reads, so the pre-paint replay, the cache filter and the server's write
+ * choke point cannot admit different sets (ADR-0075); `OVERRIDABLE_TOKENS` narrows this rather than
+ * restating it.
+ */
+export const SETTABLE_TOKENS: readonly DesignTokenDecl[] = DESIGN_TOKENS.filter(
+  (decl) => decl.tier === 'palette' || (decl.public && decl.tier === 'role'),
+);
+
+const SETTABLE_NAMES: ReadonlySet<string> = new Set(SETTABLE_TOKENS.map((decl) => decl.name));
+
+/** Narrow a custom-property name to one of {@link SETTABLE_TOKENS} — what untrusted JSON is fenced on. */
+export function isSettableToken(name: string): name is DesignToken {
+  return SETTABLE_NAMES.has(name);
+}
+
+/**
  * The declaration for a token name, or `undefined` if nothing declares it — never `undefined` once the
  * name is narrowed to {@link DesignToken}, which is read off the very declarations this indexes.
  */

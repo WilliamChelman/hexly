@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { DESIGN_TOKENS } from './manifest';
+import { DESIGN_TOKENS, SETTABLE_TOKENS } from './manifest';
 import {
   DESIGN_TOKEN_PROPERTIES_PATH,
   GENERATE_COMMAND,
@@ -56,13 +56,32 @@ describe('the @property registration block', () => {
     expect(undeclared.map((decl) => decl.name)).toEqual([]);
   });
 
-  it("fences the pre-paint replay with the manifest's own names", () => {
+  it('fences the pre-paint replay on the tokens a Theme may set', () => {
     // The replay paints before Angular, so `declaredOnly` cannot reach it and this allowlist is the
     // only thing standing between untrusted cached JSON and the root (ADR-0076).
     const committed = allowlistIn(committedAt(PRE_PAINT_REPLAY_PATH));
     expect(committed, `the allowlist is generated from the manifest — run \`${GENERATE_COMMAND}\``).toEqual(
-      DESIGN_TOKENS.map((decl) => decl.name),
+      SETTABLE_TOKENS.map((decl) => decl.name),
     );
+  });
+
+  it('keeps the gradients out of the replay, so no cached value can carry a url() to the page', () => {
+    // Unregistered by type, so there is no `@property` syntax to discard a bad value: the fence is all
+    // that refuses one, and the server's choke point already does (ADR-0076).
+    const committed = allowlistIn(committedAt(PRE_PAINT_REPLAY_PATH));
+    const gradients = DESIGN_TOKENS.filter((decl) => decl.type === 'gradient').map((decl) => decl.name);
+    expect(gradients.length).toBeGreaterThan(0);
+    expect(committed).toEqual(expect.not.arrayContaining(gradients));
+  });
+
+  it('admits the tier-1 Palette and the public roles, and nothing a Theme cannot write', () => {
+    const names = SETTABLE_TOKENS.map((decl) => decl.name);
+    // The anchors are private yet written: an Owner sets them as `solar`/`astral`, not as overrides.
+    expect(names).toEqual(expect.arrayContaining(['--palette-accent', '--palette-veil']));
+    expect(names).toEqual(expect.arrayContaining(['--color-accent', '--radius-md', '--shadow-1', '--font-body']));
+    expect(names).not.toContain('--text-base');
+    expect(names).not.toContain('--dur-fast');
+    expect(names).not.toContain('--color-terrain-grass');
   });
 
   it('never registers an initial value the engine would refuse', () => {
