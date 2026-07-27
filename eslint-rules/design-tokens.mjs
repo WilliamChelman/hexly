@@ -2,8 +2,10 @@
  * Hexly design-token ESLint rules (ADR-0020, amended by ADR-0075).
  *
  * no-unknown-design-token — every `var(--…)` must resolve to a token the manifest declares
- * (or a private `--_…` component-local variable), and must sit on the right side of the tier
- * boundary. A token typo fails silently in CSS (`var(--danger)` resolves to nothing), and
+ * (or a private `--_…` variable), and must sit on the right side of the tier boundary. `--_` marks a
+ * value outside the token contract, not one confined to a single component — a layout measurement a
+ * page publishes for a descendant to read is still nothing a World Owner may set (ADR-0020).
+ * A token typo fails silently in CSS (`var(--danger)` resolves to nothing), and
  * stylelint can't see it: component styles are CSS-in-TS template strings, so the check runs
  * in ESLint over string/template literals.
  *
@@ -166,7 +168,7 @@ const noUnknownDesignToken = {
       // still be flagged rather than silently skipped by a lowercase-only match.
       for (const m of text.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)\s*[,)]/g)) {
         const name = m[1];
-        if (name.startsWith('--_')) continue; // component-local indirection var
+        if (name.startsWith('--_')) continue; // private indirection var, outside the contract
         if (BUILTIN_TOKENS.has(name)) continue;
         const decl = byName.get(name);
         const messageId = disallowedReason(name, decl, context.filename);

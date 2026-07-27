@@ -53,7 +53,7 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
         var(--_dock-footprint),
         max(0rem, calc(2 * var(--_dock-footprint) + var(--_reading-column) - 100cqi))
       );
-      --reading-dock-inset: min(var(--_dock-reserve), max(var(--_dock-chrome), calc(100cqi - var(--_reading-floor))));
+      --_reading-dock-inset: min(var(--_dock-reserve), max(var(--_dock-chrome), calc(100cqi - var(--_reading-floor))));
     }
     .reading.dock-open main {
       /* --_dock-panel-width is the live Panel width, bound by the page from the Dock; the 0.5rem is the
@@ -62,7 +62,7 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
     }
     /* Under the grip the column must track the pointer, not settle behind it. */
     .reading.dock-resizing main {
-      --reading-dock-transition: 0ms;
+      --_reading-dock-transition: 0ms;
     }
   `,
   // EntityViewStore is page-scoped: it reads the open Entity's types off the session, provided above
