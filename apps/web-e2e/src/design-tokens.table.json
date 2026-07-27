@@ -415,14 +415,6 @@
     "solar": "56px",
     "astral": "56px"
   },
-  "--rail-status": {
-    "solar": "30px",
-    "astral": "30px"
-  },
-  "--rail-inspector": {
-    "solar": "320px",
-    "astral": "320px"
-  },
   "--container-reading": {
     "solar": "68ch",
     "astral": "68ch"
