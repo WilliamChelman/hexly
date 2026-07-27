@@ -11,8 +11,6 @@ import { booleanAttribute, ChangeDetectionStrategy, Component, input } from '@an
   selector: '[appEyebrow]',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    // No weight class: Marcellus ships a single 400 face, so anything heavier is a synthesised
-    // faux-bold — the same call the map renderer already made for hex names and labels (#85).
     class: 'font-display text-2xs tracking-wider uppercase text-ink-muted',
     '[class.is-marked]': 'mark()',
   },

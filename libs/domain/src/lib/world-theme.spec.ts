@@ -276,8 +276,8 @@ describe('instanceThemeSchema', () => {
 
   it('holds an operator to the same contract as an Owner — a token outside it is refused', () => {
     expect(parse({ version: 1, radii: { '--text-base': '1rem' } })).toBeUndefined();
-    // A declared token that is deliberately private, so this refusal is the contract talking and not
-    // an unknown name being rejected on its way past.
+    // A declared token held out of the contract (ADR-0076), so the refusal is the contract talking
+    // rather than an unknown name bouncing off the manifest.
     expect(parse({ version: 1, overrides: { solar: { '--rail-header': '900px' } } })).toBeUndefined();
     expect(parse({ version: 1, fontPairing: 'comic-sans' })).toBeUndefined();
   });
