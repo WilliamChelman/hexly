@@ -38,7 +38,9 @@
  * via `getComputedStyle` (ADR-0003), references the scanner can't see.
  */
 @theme static {
-  --font-cartouche: 'Cinzel Decorative', 'Marcellus', Georgia, serif;
+  --font-cartouche: 'Cinzel Decorative', 'Marcellus', Georgia, serif; /* bundled at 700 */
+  /* Bundled at 400 only, so nothing may ask this face for a heavier weight — the browser answers
+     with a synthesised faux-bold (identity.md, "Typography"; the call #85 made for the map). */
   --font-display: 'Marcellus', Georgia, serif;
   --font-body: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono Variable', 'SFMono-Regular', Menlo, monospace;
@@ -60,8 +62,8 @@
 
   --tracking-tight: -0.01em;
   --tracking-normal: 0;
-  --tracking-wide: 0.04em;
-  --tracking-wider: 0.14em; /* Cinzel small-caps cartouche lettering        */
+  --tracking-wide: 0.04em; /* the gentler step: the cartouche wordmark      */
+  --tracking-wider: 0.14em; /* widest: uppercase micro-labels, eyebrows     */
 
   --font-weight-regular: 400;
   --font-weight-medium: 500;

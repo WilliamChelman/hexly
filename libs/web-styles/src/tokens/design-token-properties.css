@@ -422,13 +422,3 @@
   inherits: true;
   initial-value: 56px;
 }
-@property --rail-status {
-  syntax: '<length>';
-  inherits: true;
-  initial-value: 30px;
-}
-@property --rail-inspector {
-  syntax: '<length>';
-  inherits: true;
-  initial-value: 320px;
-}

@@ -137,7 +137,7 @@
   },
   "styleguide": {
     "tabTitle": "Hexly — Système de design",
-    "backToMap": "Retour à la carte",
+    "backToWorlds": "Retour aux mondes",
     "eyebrow": "Système de design Hexly",
     "heroTitle": "La table du cartographe,<br />à la lueur des étoiles.",
     "heroLede": "Une seule identité racontée à deux heures du jour. <strong>Solaire</strong> est l’almanach ensoleillé posé sur la table du cartographe ; <strong>Astral</strong> est la même carte sous le ciel nocturne. L’or est le fil conducteur — encre d’héliographe le jour, lignes de constellations la nuit — et le texte reste d’un crème ivoire chaleureux dans les deux. Tout ce qui suit est piloté par la même couche de propriétés personnalisées CSS que <code>apps/web</code> embarque.",
@@ -159,11 +159,11 @@
       "desert": "Désert",
       "sky": "Ciel"
     },
-    "fontDisplay": "Cinzel · titrage",
-    "fontBody": "Spectral · corps",
+    "fontDisplay": "Marcellus · titrage",
+    "fontBody": "Source Serif 4 · corps",
     "fontCoord": "JetBrains Mono · coordonnées",
     "paletteSemantic": "Palette · rôles sémantiques",
-    "paletteNote": "Les tranches demandent un rôle, jamais une couleur brute. Thème actif affiché.",
+    "paletteNote": "Les tranches demandent un rôle, jamais une couleur brute. Schéma de couleurs actif affiché.",
     "paletteTerrain": "Palette · remplissages de terrain",
     "typeScale": "Échelle typographique",
     "spacing": "Espacement",

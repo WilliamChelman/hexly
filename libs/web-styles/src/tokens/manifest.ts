@@ -187,8 +187,6 @@ const DECLARATIONS = [
 
   // ---- Layout rails. Out of the contract (spec §6).
   { name: '--rail-header', tier: 'role', type: 'length', public: false, initial: '56px' },
-  { name: '--rail-status', tier: 'role', type: 'length', public: false, initial: '30px' },
-  { name: '--rail-inspector', tier: 'role', type: 'length', public: false, initial: '320px' },
   // `ch` is measured against the reading column's own font, not the root's — see `unregistered`.
   { name: '--container-reading', tier: 'role', type: 'length', public: false, unregistered: true, initial: '68ch' },
 

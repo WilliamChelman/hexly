@@ -38,7 +38,8 @@ h2,
 h3,
 h4 {
   font-family: var(--font-display);
-  font-weight: var(--font-weight-semibold);
+  /* Regular rather than the UA's bold: the display face carries only 400 (see `--font-display`). */
+  font-weight: var(--font-weight-regular);
   line-height: var(--leading-tight);
   color: var(--color-ink-strong);
   letter-spacing: var(--tracking-tight);

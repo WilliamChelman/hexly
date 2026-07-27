@@ -70,7 +70,7 @@ interface TypeRow {
   template: `
     <main class="max-w-[1080px] mx-auto pt-6 px-6 pb-24 flex flex-col gap-16">
       <header class="guide-top flex justify-between items-center">
-        <a appButton variant="ghost" size="sm" routerLink="/">← {{ 'styleguide.backToMap' | transloco }}</a>
+        <a appButton variant="ghost" size="sm" routerLink="/">← {{ 'styleguide.backToWorlds' | transloco }}</a>
       </header>
 
       <section class="hero flex flex-col gap-4 pt-12 pb-6 border-b border-line">

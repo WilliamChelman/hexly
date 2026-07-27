@@ -50,8 +50,6 @@
 
   /* ---- Layout rails (fixed chrome dimensions) --------------------------- */
   --rail-header: 56px;
-  --rail-status: 30px;
-  --rail-inspector: 320px;
   --container-reading: 68ch;
 
   /* ---- Elevation — warm, paper-soft drop shadows. Raw re-themable vars

@@ -29,8 +29,8 @@ describe('Styleguide', () => {
     switchTo(fixture, 'fr');
 
     const guide = el.querySelector('.guide-top') as HTMLElement;
-    expect(guide.textContent).toContain('Retour à la carte');
-    expect(guide.textContent).not.toContain('Back to map');
+    expect(guide.textContent).toContain('Retour aux mondes');
+    expect(guide.textContent).not.toContain('Back to worlds');
 
     const hero = el.querySelector('.hero') as HTMLElement;
     expect(hero.textContent).toContain('table du cartographe');
