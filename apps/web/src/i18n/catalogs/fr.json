@@ -454,6 +454,12 @@
   "worldTheme": {
     "heading": "Thème du monde",
     "subhead": "L’apparence que porte ce monde : huit couleurs d’ancrage et trois réglages par schéma de couleurs, dont toutes les autres couleurs découlent. Les modifications s’appliquent au fur et à mesure ; chaque lecteur garde son propre schéma de couleurs.",
+    "copyHeading": "Copier depuis un autre monde",
+    "copyLede": "Reprenez le thème d’un autre monde qui vous appartient. Il est copié, non lié : vous pourrez le modifier ici, et les changements ultérieurs de l’autre monde ne le suivront pas.",
+    "copyLabel": "Monde dont copier le thème",
+    "copy": "Copier le thème",
+    "copyEmpty": "Aucun de vos autres mondes ne porte encore de thème. Créez-en un n’importe où et il pourra être copié ici.",
+    "copyLoadError": "Impossible de charger les mondes dont vous pouvez copier un thème.",
     "paletteHeading": "Palette",
     "overridesHeading": "Jetons individuels",
     "overridesHint": "Toutes les couleurs ci-dessus découlent de la palette. Là où la valeur dérivée ne vous convient pas, sélectionnez-la et fixez la vôtre ; l’effacer rend le jeton à la palette.",

@@ -397,3 +397,113 @@ test('a mid-tone accent and a tone rotated into a status colour each get their o
   expect(await brightnessOnRoot(page, '--color-on-fill')).toBeGreaterThan(600);
   // Nothing is saved here, so nothing needs handing back: leaving the editor is a cancel (#371).
 });
+
+/** One ColorScheme's eleven authored values, as a World an Owner has already themed carries them. */
+const SOURCE_PALETTE = {
+  page: '#f1e5c7',
+  ink: '#2e2412',
+  inkQuiet: '#6f5a36',
+  accent: '#6a2ab0',
+  danger: '#a4402e',
+  success: '#4a6f2f',
+  canvas: '#efe2bf',
+  soot: '#3c2c16',
+  polarity: 1,
+  lineAlpha: 0.371,
+  veil: 0.12,
+};
+
+/**
+ * A whole authored Theme, corner set and all, so the copy has more than a Palette to carry. The radii
+ * are spelled out rather than taken from the editor's preset table: that table lives behind Angular
+ * imports this process must not pull in (see `fixtures.ts`).
+ */
+const SOURCE_THEME = {
+  version: 1,
+  solar: SOURCE_PALETTE,
+  astral: { ...SOURCE_PALETTE, polarity: -1 },
+  radii: {
+    '--radius-sm': '0px',
+    '--radius-md': '0px',
+    '--radius-lg': '0px',
+    '--radius-xl': '0px',
+    '--radius-full': '0px',
+  },
+};
+
+/** Mint a World of the caller's own and give it `theme`, returning its id. */
+async function themedWorld(request: APIRequestContext, name: string, theme: unknown): Promise<string> {
+  const created = await request.post('/api/worlds', { data: { name } });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const { id } = await created.json();
+  expect((await request.patch(`/api/worlds/${id}`, { data: { theme } })).ok()).toBeTruthy();
+  return id;
+}
+
+test('an Owner copies another World’s Theme in, keeps editing it, and the source stops mattering', async ({
+  page,
+  request,
+}) => {
+  const worldSeg = await enterLibrary(page);
+  const worldId = idFromSegment(worldSeg);
+  // The suite's reset keeps Worlds *and* their Themes, so an earlier spec may have left this one
+  // themed; the copy is judged against a World that carries none.
+  await clearTheme(request, worldId);
+  const sourceId = await themedWorld(request, 'Whisperwood', SOURCE_THEME);
+  // A World of theirs carrying no Theme has nothing to copy, so it must not be on the list at all.
+  const unthemed = await (await request.post('/api/worlds', { data: { name: 'Nothing authored yet' } })).json();
+
+  await openThemeEditor(page, worldSeg);
+
+  // The offer is the server's (`GET /worlds/:id/theme-sources`): the caller's *other* Worlds, carrying
+  // a Theme. Neither this World nor the unthemed one qualifies, so neither is offered.
+  const options = page.getByTestId('theme-copy-source').locator('option');
+  await expect(options.filter({ hasText: 'Whisperwood' })).toHaveCount(1);
+  const offered = await options.evaluateAll((all) => all.map((one) => (one as HTMLOptionElement).value));
+  expect(offered).not.toContain(unthemed.id);
+  expect(offered).not.toContain(worldId);
+
+  const source = await storedTheme(page, sourceId);
+  await page.getByTestId('theme-copy-source').selectOption(sourceId);
+  await page.getByTestId('theme-copy').click();
+
+  // Staged, not applied (#376): the whole contract previews at once — the corner set as much as the
+  // anchors — and *nothing is stored*, so an Owner judges the copy in place before committing to it.
+  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(source.solar.accent);
+  await expect.poll(() => inlineOnRoot(page, '--radius-md')).toBe('0px');
+  expect(await storedTheme(page, worldId)).toBeFalsy();
+
+  // Which means cancel is still cancel: a copy previewed and thought better of costs nothing.
+  await page.getByTestId('theme-discard').click();
+  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe('');
+  await expect.poll(() => inlineOnRoot(page, '--radius-md')).toBe('');
+
+  // Copy again, then edit the copy before saving — it is this World's own draft, not a reference.
+  await page.getByTestId('theme-copy').click();
+  await page.getByTestId('theme-control-solar-ink').fill('#112233');
+  await saveTheme(page);
+
+  const copied = await storedTheme(page, worldId);
+  expect(copied.solar.accent).toBe(source.solar.accent);
+  expect(copied.astral.polarity).toBe(-1);
+  expect(copied.radii['--radius-md']).toBe('0px');
+  // The edit rode the same save, through the same PATCH choke point as any other Theme write.
+  expect(copied.solar.ink).not.toBe(source.solar.ink);
+
+  // A duplicate, not a link (ADR-0076): re-theming the source afterwards leaves the copy alone.
+  expect(
+    (
+      await request.patch(`/api/worlds/${sourceId}`, {
+        data: { theme: { ...SOURCE_THEME, solar: { ...SOURCE_PALETTE, accent: '#0a7d55' } } },
+      })
+    ).ok(),
+  ).toBeTruthy();
+
+  await page.reload();
+  expect(await storedTheme(page, worldId)).toEqual(copied);
+  // And what renders is still the copy's accent, not the source's new one.
+  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(copied.solar.accent);
+
+  await clearTheme(page.request, worldId);
+  await clearTheme(page.request, sourceId);
+});

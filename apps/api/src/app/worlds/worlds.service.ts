@@ -13,16 +13,17 @@ import {
   WorldDetail,
   WorldMember,
   WorldSummary,
+  WorldThemeSource,
 } from '@hexly/domain';
 import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_FILTER } from '@hexly/plugin-asset';
-import { and, asc, count, eq, inArray, ne } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNotNull, ne } from 'drizzle-orm';
 import { AssetsService } from '../assets/assets.service';
 import { AssetMintService } from '../assets/asset-mint.service';
 import { EntitiesService } from '../entities/entities.service';
 import { AclSetResult, gate, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
 import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
-import { worldAccess, worldRightsOf } from '../acl/world-access';
+import { worldAccess, worldOwnerFilter, worldRightsOf } from '../acl/world-access';
 import { sharedVisibility } from '../acl/entity-access';
 import { NudgeBus } from '../events/nudge-bus';
 import { WorldWrites } from './world-writes';
@@ -167,6 +168,30 @@ export class WorldsService {
     const next = this.writes.update(world, patch);
     // Only an Owner reaches update (checked above), so full Rights.
     return this.toDetail(next, userId);
+  }
+
+  /**
+   * The Worlds whose Theme may be copied into World `id` (#376), for that World's Owner:
+   * reachable-but-not-Owner → 403, unreachable → 404.
+   *
+   * "Another World they own" is decided here and nowhere else. {@link worldOwnerFilter} carries no
+   * Superadmin bypass, so the set is the caller's *personal* ownership — a World they merely read is
+   * withheld rather than filtered out client-side, which is what keeps this an authorisation answer
+   * instead of a picker convenience. `id` itself is excluded ("another"), and so is any World carrying
+   * no Theme: there is nothing there to copy, so it is never offered (ADR-0076).
+   */
+  themeSources(userId: string, id: string): AclSetResult<WorldThemeSource[]> {
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
+    const rows = this.db
+      .select({ id: worlds.id, name: worlds.name, theme: worlds.theme })
+      .from(worlds)
+      .where(and(worldOwnerFilter(userId), ne(worlds.id, id), isNotNull(worlds.theme)))
+      // By name: the Owner picks by the name they gave it, not by when they made it.
+      .orderBy(asc(worlds.name), asc(worlds.id))
+      .all();
+    // The column is nullable, so the type needs the narrowing the WHERE already did.
+    return { status: 'ok', value: rows.filter((row): row is WorldThemeSource => !!row.theme) };
   }
 
   /**

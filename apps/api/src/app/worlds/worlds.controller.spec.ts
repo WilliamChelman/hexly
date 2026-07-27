@@ -543,6 +543,77 @@ describe('Worlds endpoints', () => {
       expect(read.body.name).toBe('Shared lore');
       expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.entityCount).toBe(1);
     });
+
+    /**
+     * The copy sources (#376): which Worlds' Themes an Owner may copy *into* this one. A duplicate and
+     * not a link (ADR-0076), so this route only hands over values — what makes the copy a write is the
+     * PATCH that follows, and nothing here bypasses it.
+     */
+    describe('copying a Theme from another World (#376)', () => {
+      it('offers the caller’s other themed Worlds, and neither this one nor an unthemed one', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const target = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+        const source = await ada.post('/worlds').send({ name: 'Whisperwood' }).expect(201);
+        await ada.patch(`/worlds/${source.body.id}`).send({ theme: THEME }).expect(200);
+        // A World of Ada's carrying no Theme has nothing to copy, so it is not on offer (#376).
+        await ada.post('/worlds').send({ name: 'Unthemed' }).expect(201);
+        await ada.patch(`/worlds/${target.body.id}`).send({ theme: THEME }).expect(200);
+
+        const res = await ada.get(`/worlds/${target.body.id}/theme-sources`).expect(200);
+
+        // The target itself is excluded: "another World" is the server's answer, not the picker's.
+        expect(res.body).toEqual([
+          { id: source.body.id, name: 'Whisperwood', theme: expect.objectContaining({ version: 1 }) },
+        ]);
+        // The values come over whole, so the copy the client stages is the source World's own Theme.
+        expect(res.body[0].theme).toEqual((await ada.get(`/worlds/${source.body.id}`).expect(200)).body.theme);
+      });
+
+      it('withholds a themed World the caller only reads — ownership is the server’s to decide', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const adasWorld = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+        await ada.patch(`/worlds/${adasWorld.body.id}`).send({ theme: THEME }).expect(200);
+
+        const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob', {
+          roles: ['create-worlds'],
+        });
+        // Bob reaches Ada's themed World as a Contributor, and owns a themed World of his own.
+        addMember(adasWorld.body.id, bobId, 'contributor');
+        const bob = await signIn('bob@hexly.test', 'battery staple');
+        const bobsTarget = await bob.post('/worlds').send({ name: 'Bob’s target' }).expect(201);
+        const bobsSource = await bob.post('/worlds').send({ name: 'Bob’s source' }).expect(201);
+        await bob.patch(`/worlds/${bobsSource.body.id}`).send({ theme: THEME }).expect(200);
+
+        const res = await bob.get(`/worlds/${bobsTarget.body.id}/theme-sources`).expect(200);
+
+        // A World he merely reads is not a source, however visible its Theme is on the read path.
+        expect(res.body.map((w: { id: string }) => w.id)).toEqual([bobsSource.body.id]);
+      });
+
+      it('refuses a Contributor and a Viewer of the World being themed, and 404s an unreachable one', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+
+        const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+        addMember(world.body.id, bobId, 'contributor');
+        const cassId = await app.get(AuthService).seedUser('cass@hexly.test', 'quiet library', 'Cass');
+        addMember(world.body.id, cassId, 'viewer');
+        const danId = await app.get(AuthService).seedUser('dan@hexly.test', 'no relation here', 'Dan');
+        expect(danId).toBeTruthy();
+
+        // Asking what may be copied *in* is part of theming, so it answers to the same Owner gate.
+        await (await signIn('bob@hexly.test', 'battery staple'))
+          .get(`/worlds/${world.body.id}/theme-sources`)
+          .expect(403);
+        await (await signIn('cass@hexly.test', 'quiet library'))
+          .get(`/worlds/${world.body.id}/theme-sources`)
+          .expect(403);
+        // Unreachable is indistinguishable from nonexistent (ADR-0004).
+        await (await signIn('dan@hexly.test', 'no relation here'))
+          .get(`/worlds/${world.body.id}/theme-sources`)
+          .expect(404);
+      });
+    });
   });
 
   describe('World Assets (#269, ADR-0034)', () => {

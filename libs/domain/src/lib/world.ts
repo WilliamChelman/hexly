@@ -138,6 +138,17 @@ export interface WorldDetail extends WorldSummary {
 }
 
 /**
+ * A World whose Theme may be copied into another one (#376): what `GET /worlds/:id/theme-sources`
+ * returns. The Theme rides whole because the copy is a duplicate, not a link (ADR-0076) — the client
+ * stages these values as its own draft and stores them through the ordinary write choke point.
+ */
+export interface WorldThemeSource {
+  readonly id: string;
+  readonly name: string;
+  readonly theme: WorldTheme;
+}
+
+/**
  * A blank override is an absent one, so an untouched free-text control falls back to the Instance
  * default rather than 400ing or writing an empty string where a value is expected.
  */
