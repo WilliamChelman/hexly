@@ -27,7 +27,9 @@ export interface FieldChoice {
     <div class="fp-chips">
       @for (f of selectedFields(); track f.id) {
         <button type="button" class="fp-chip" [attr.aria-label]="'✕ ' + f.label" (click)="toggled.emit(f.id)">
-          <app-chip tone="accent">{{ f.label }} <span aria-hidden="true">✕</span></app-chip>
+          <!-- A selected Field, not an Entity Type: the accent tone is emphasis here, so there is no
+               category for a glyph to carry (ADR-0075). -->
+          <app-chip tone="accent" [icon]="null">{{ f.label }} <span aria-hidden="true">✕</span></app-chip>
         </button>
       } @empty {
         <span class="fp-chips-empty">{{ 'picker.selectedEmpty' | transloco }}</span>

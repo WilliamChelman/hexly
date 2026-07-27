@@ -117,7 +117,8 @@ export type CreateEntityDialogResult = EntityDetail;
       <div appField [label]="'entityTags.heading' | transloco">
         <div class="flex flex-wrap items-center gap-2" data-testid="create-entity-tags">
           @for (tag of tags(); track tag) {
-            <app-chip>
+            <!-- A tag names no category, so it is icon-less by declaration (ADR-0075). -->
+            <app-chip [icon]="null">
               {{ tag }}
               <button
                 type="button"

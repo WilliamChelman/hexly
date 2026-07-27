@@ -13,12 +13,11 @@ export const terrainKey = (id: TerrainId): string => `map.terrain.${id}`;
 export const featureKey = (id: FeatureId): string => `map.feature.${id}`;
 
 /**
- * The terrain set's fills at the token type. The callback's return annotation is what holds each
- * `fill` to the manifest (ADR-0075); it lives here rather than on `Terrain.fill` because the API's
- * graph reaches the kernel that declares the set (ADR-0058). The cast only restores the key totality
- * `Object.fromEntries` widens away — `TerrainId` is the set's own ids.
+ * The terrain set's fills, keyed for lookup. `Terrain.fill` is `DesignToken` at its own declaration
+ * (ADR-0075, #364), so nothing is recovered here — the annotation only restores the key totality
+ * `Object.fromEntries` widens away.
  */
-const TERRAIN_FILL = Object.fromEntries(terrainSet.map((t): [TerrainId, DesignToken] => [t.id, t.fill])) as Readonly<
+const TERRAIN_FILL = Object.fromEntries(terrainSet.map((t) => [t.id, t.fill])) as Readonly<
   Record<TerrainId, DesignToken>
 >;
 

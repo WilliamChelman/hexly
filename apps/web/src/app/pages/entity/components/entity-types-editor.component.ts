@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Field, EntityDocument, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
-import { ButtonComponent, ChipComponent, ChipTone, IconComponent, IconName } from '@hexly/web-ui';
+import { ButtonComponent, ChipComponent, ChipTone, IconName } from '@hexly/web-ui';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { FieldControlComponent, typeTone } from '@hexly/web-entity';
 
@@ -15,15 +15,14 @@ import { FieldControlComponent, typeTone } from '@hexly/web-entity';
 @Component({
   selector: 'app-entity-types-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, ChipComponent, IconComponent, ButtonComponent, FieldControlComponent],
+  imports: [TranslocoPipe, ChipComponent, ButtonComponent, FieldControlComponent],
   template: `
     <div class="flex flex-col gap-3" data-testid="entity-types-editor">
       <div class="flex flex-wrap items-center gap-2">
         @for (type of types(); track type; let i = $index) {
           <!-- The icon, not the tone, is what carries the category: the tone arc is the deuteranope
                confusion line (ADR-0075). Primacy is the "· Primary" marker, never the colour. -->
-          <app-chip [tone]="toneOf(type)" [attr.data-testid]="'type-chip-' + type">
-            <app-icon [name]="iconOf(type)" [size]="12" />
+          <app-chip [tone]="toneOf(type)" [icon]="iconOf(type)" [attr.data-testid]="'type-chip-' + type">
             {{ typeLabel(type) }}
             @if (i === 0) {
               <span class="text-2xs opacity-70" data-testid="type-primary"

@@ -18,7 +18,9 @@ import { tagItems, withTags } from './tag-suggestions';
   template: `
     <div class="flex flex-wrap items-center gap-2" data-testid="entity-tags">
       @for (tag of tags(); track tag) {
-        <app-chip>
+        <!-- A tag is not an Entity Type and wears no tone, so it names no category for a glyph to
+             carry — icon-less by declaration rather than by omission (ADR-0075). -->
+        <app-chip [icon]="null">
           {{ tag }}
           <!-- The remove affordance is edit-only: a read-only opener sees the tag, can't drop it. -->
           @if (writable()) {

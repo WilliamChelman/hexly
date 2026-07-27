@@ -19,7 +19,8 @@ import { ChipComponent, InputComponent, SelectComponent } from '@hexly/web-ui';
   template: `
     <div class="flex flex-wrap items-center gap-1.5">
       @for (token of tokens(); track token) {
-        <app-chip>
+        <!-- A stat-block keyword names no category, so it is icon-less by declaration (ADR-0075). -->
+        <app-chip [icon]="null">
           {{ token }}
           <button
             type="button"

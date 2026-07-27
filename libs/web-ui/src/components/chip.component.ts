@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { IconComponent } from '../icon/icon.component';
+import { IconName } from '../icon/icon-registry';
 
 /**
  * Colour family of a chip — undefined is the neutral chip. `tone-1…8` are the categorical set,
@@ -7,17 +9,18 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 export type ChipTone = 'accent' | 'tone-1' | 'tone-2' | 'tone-3' | 'tone-4' | 'tone-5' | 'tone-6' | 'tone-7' | 'tone-8';
 
 /**
- * A chip / badge. Projects its content, which may include an icon or a nested swatch.
- * `tone` selects a colour family; omit it for the neutral chip. See ADR-0007.
+ * A chip / badge: a leading glyph, then whatever the caller projects. `tone` selects a colour family;
+ * omit it for the neutral chip. See ADR-0007.
  *
- *   <app-chip>Default</app-chip>
- *   <app-chip tone="tone-3"><app-icon name="region" [size]="12" />Settlement</app-chip>
+ *   <app-chip [icon]="null">Default</app-chip>
+ *   <app-chip tone="tone-3" icon="region">Settlement</app-chip>
  *
  * The category rides the text and border colour, never the `-soft` fill (ADR-0075).
  */
 @Component({
   selector: 'app-chip',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [IconComponent],
   host: {
     '[class.is-accent]': "tone() === 'accent'",
     '[class.is-tone-1]': "tone() === 'tone-1'",
@@ -29,7 +32,10 @@ export type ChipTone = 'accent' | 'tone-1' | 'tone-2' | 'tone-3' | 'tone-4' | 't
     '[class.is-tone-7]': "tone() === 'tone-7'",
     '[class.is-tone-8]': "tone() === 'tone-8'",
   },
-  template: `<ng-content />`,
+  template: `@if (icon(); as glyph) {
+      <app-icon [name]="glyph" [size]="12" />
+    }
+    <ng-content />`,
   styles: `
     @reference '#app-styles.css';
 
@@ -81,4 +87,11 @@ export type ChipTone = 'accent' | 'tone-1' | 'tone-2' | 'tone-3' | 'tone-4' | 't
 })
 export class ChipComponent {
   readonly tone = input<ChipTone>();
+  /**
+   * The glyph the chip leads with — the chip's own property rather than a caller's projection, since
+   * the tones sit on the deuteranope confusion arc and the icon, not the colour, is what carries the
+   * category (ADR-0075, #368). Required so no chip is silently colour-only; `null` is the explicit
+   * icon-less chip, for one that names no category at all.
+   */
+  readonly icon = input.required<IconName | null>();
 }

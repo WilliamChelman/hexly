@@ -5,6 +5,7 @@
  */
 
 import * as z from 'zod';
+import type { DesignToken } from '@hexly/web-styles';
 import { Axial } from './coordinates';
 
 /** The document key for a coordinate: `"q,r"`, so the hex Record is plain JSON. */
@@ -25,11 +26,12 @@ export interface Terrain {
   /** Human-facing name for the terrain set (CONTEXT.md vocabulary). */
   readonly label: string;
   /**
-   * The CSS custom property the renderer fills painted hexes with. Left a `string` here and narrowed to
-   * `DesignToken` by `terrainFill` in the web half: the API's graph reaches this kernel (ADR-0058), so
-   * it must not hold an edge to `web-styles`.
+   * The CSS custom property the renderer fills painted hexes with, held to the manifest here at the
+   * point of declaration so a stale token name is a compile error (ADR-0075, #364). The import is
+   * type-only, so the kernel the API's graph reaches (ADR-0058) gains no runtime edge — and `domain`
+   * already carries the same manifest edge for the World Theme schema.
    */
-  readonly fill: string;
+  readonly fill: DesignToken;
 }
 
 /**

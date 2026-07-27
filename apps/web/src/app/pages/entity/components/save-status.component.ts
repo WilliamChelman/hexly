@@ -29,7 +29,9 @@ const QUIET: Record<QuietState, { icon: IconName; key: string }> = {
   template: `
     <span aria-live="polite" class="inline-flex items-center">
       @if (conflict()) {
-        <app-chip tone="accent" data-testid="conflict">
+        <!-- The exceptional states are spelled out in words, and the accent tone is emphasis rather than
+             one of the categorical tones, so there is no category for a glyph to carry (ADR-0075). -->
+        <app-chip tone="accent" [icon]="null" data-testid="conflict">
           {{ 'editorShell.save.conflict' | transloco }}
           <button
             type="button"
@@ -44,9 +46,9 @@ const QUIET: Record<QuietState, { icon: IconName; key: string }> = {
           }
         </app-chip>
       } @else if (error() === 'readonly') {
-        <app-chip data-testid="readonly">{{ 'editorShell.save.readonly' | transloco }}</app-chip>
+        <app-chip [icon]="null" data-testid="readonly">{{ 'editorShell.save.readonly' | transloco }}</app-chip>
       } @else if (error() === 'save') {
-        <app-chip tone="accent" data-testid="save-error">
+        <app-chip tone="accent" [icon]="null" data-testid="save-error">
           {{ 'editorShell.save.failed' | transloco }}
           <button
             type="button"

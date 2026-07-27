@@ -78,9 +78,11 @@ interface TypeRow {
         <h1 class="text-3xl leading-[1.06]" [innerHTML]="'styleguide.heroTitle' | transloco"></h1>
         <p class="hero-lede" [innerHTML]="'styleguide.heroLede' | transloco"></p>
         <div class="flex flex-wrap gap-2 mt-2">
-          <app-chip tone="accent">{{ 'styleguide.fontDisplay' | transloco }}</app-chip>
-          <app-chip tone="tone-3">{{ 'styleguide.fontBody' | transloco }}</app-chip>
-          <app-chip tone="tone-7">{{ 'styleguide.fontCoord' | transloco }}</app-chip>
+          <!-- Each names a typeface, so each leads with the typography glyph; the tones are the
+               decoration ADR-0075 allows colour to be once identity rides another channel. -->
+          <app-chip tone="accent" icon="label">{{ 'styleguide.fontDisplay' | transloco }}</app-chip>
+          <app-chip tone="tone-3" icon="label">{{ 'styleguide.fontBody' | transloco }}</app-chip>
+          <app-chip tone="tone-7" icon="label">{{ 'styleguide.fontCoord' | transloco }}</app-chip>
         </div>
       </section>
 
@@ -250,8 +252,8 @@ interface TypeRow {
               {{ 'styleguide.chipsCoords' | transloco }}
             </figcaption>
             <div class="specimen-row">
-              <app-chip>{{ 'styleguide.chipDefault' | transloco }}</app-chip>
-              <app-chip tone="accent">{{ 'styleguide.chipSettlement' | transloco }}</app-chip>
+              <app-chip [icon]="null">{{ 'styleguide.chipDefault' | transloco }}</app-chip>
+              <app-chip tone="accent" icon="region">{{ 'styleguide.chipSettlement' | transloco }}</app-chip>
               <app-coord>q 12 · r −4</app-coord>
               <kbd appKbd>⌘ Z</kbd>
             </div>
@@ -259,8 +261,7 @@ interface TypeRow {
                  the only honest way to read it (ADR-0075). -->
             <div class="specimen-row">
               @for (row of tones; track row.tone) {
-                <app-chip [tone]="row.tone">
-                  <app-icon [name]="row.icon" [size]="12" />
+                <app-chip [tone]="row.tone" [icon]="row.icon">
                   {{ row.tone }}
                 </app-chip>
               }
