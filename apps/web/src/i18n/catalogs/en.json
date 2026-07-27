@@ -502,6 +502,29 @@
       "polarity": "Which way every ramp runs: light paper or dark.",
       "lineAlpha": "How strongly drawn rules read.",
       "veil": "How heavy shadows, scrims and the vignette sit."
+    },
+    "role": {
+      "ink": "Ink",
+      "ink-muted": "Quiet ink",
+      "accent": "Accent",
+      "surface": "Surface",
+      "bg": "Page",
+      "danger": "Danger",
+      "success": "Success",
+      "tone-1": "Category 1",
+      "tone-2": "Category 2",
+      "tone-3": "Category 3",
+      "tone-4": "Category 4",
+      "tone-5": "Category 5",
+      "tone-6": "Category 6",
+      "tone-7": "Category 7",
+      "tone-8": "Category 8"
+    },
+    "contrast": {
+      "clear": "Readable: every pair clears 4.5:1.",
+      "contrast": "{{ink}} on {{ground}} is {{ratio}}:1, under the 4.5:1 floor for body text.",
+      "midToneAccent": "This accent is mid-tone: no automatic text colour is readable on it ({{ratio}}:1). Pick a lighter or darker accent.",
+      "toneCollision": "{{tone}} has rotated close to {{status}} (ΔE {{distance}}); a chip may read as {{status}}."
     }
   },
   "imports": {

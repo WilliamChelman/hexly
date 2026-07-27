@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
-import { DESIGN_TOKENS, DesignToken, registeredTokens, TokenType } from '@hexly/web-styles';
+import { DESIGN_TOKENS, DesignToken, measureScheme, registeredTokens, TokenType } from '@hexly/web-styles';
 import { expect, preferencesPatched, test } from './fixtures';
 
 /**
@@ -181,4 +181,48 @@ test('every token reads back resolved and matches the committed table, in both C
   }
 
   expect(table).toEqual(JSON.parse(readFileSync(TABLE_PATH, 'utf8')) as TokenTable);
+});
+
+test('the contrast report measures the ColorScheme the reader is not in, roles included', async ({ page }) => {
+  await page.goto('/settings');
+  // Same reason as `collect`: the ColorScheme roams and hydrates when `/auth/me` resolves (ADR-0038).
+  await expect(page.getByTestId('email')).not.toBeEmpty();
+
+  const table = JSON.parse(readFileSync(TABLE_PATH, 'utf8')) as TokenTable;
+  const names = DESIGN_TOKENS.map((decl) => decl.name);
+  const active = (await page.locator('html').getAttribute('data-color-scheme')) as ColorScheme;
+  const inactive = active === 'solar' ? 'astral' : 'solar';
+
+  // A tier-2 override, inline on the root, standing in for the one the applier writes there for the
+  // *active* scheme. Left in place it would be inherited by the scheme being measured, so the report
+  // for one Palette would carry the other's opt-outs — which is why `declarations` replaces what is
+  // inline rather than layering over it (ADR-0076).
+  await page.evaluate(() => document.documentElement.style.setProperty('--color-bg', 'rgb(1, 2, 3)'));
+  const inlineBefore = await page.evaluate(() => document.documentElement.getAttribute('style'));
+
+  // The editor's own measurement, handed to the browser rather than restated here: what only an engine
+  // can answer is this call, and `contrast.spec.ts` covers the judging that reads its result (ADR-0076).
+  const measured = await page.evaluate(measureScheme, { scheme: inactive, declarations: {}, tokens: names });
+
+  // Every declared token, exactly as the *other* ColorScheme renders it — the tier-2 roles included,
+  // which is the half an offscreen probe silently gets wrong (see `world-theme.spec.ts`). Half a Theme
+  // would otherwise ship unchecked, with a report that looked like it had checked it.
+  expect(measured).toEqual(Object.fromEntries(names.map((name) => [name, table[name][inactive]])));
+
+  // Non-vacuous by construction: what the document is still painting is the *active* scheme's answer —
+  // the override included, since that is what an inline property does. Without this, the assertion
+  // above would be satisfied by a measurement that had quietly read the reader's own scheme all along,
+  // in a run where both columns happened to agree.
+  expect(await resolve(page, ['--color-bg', '--color-ink'])).toEqual({
+    '--color-bg': 'rgb(1, 2, 3)',
+    '--color-ink': table['--color-ink'][active],
+  });
+  expect(measured['--color-bg']).not.toBe(table['--color-bg'][active]);
+
+  // The root is measured on and put straight back inside one task — no paint happens inside a task, so
+  // the reader never glimpses the ColorScheme they are not in, and nothing outlives the reading.
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', active);
+  expect(await page.evaluate(() => document.documentElement.getAttribute('style'))).toBe(inlineBefore);
+
+  await page.evaluate(() => document.documentElement.style.removeProperty('--color-bg'));
 });

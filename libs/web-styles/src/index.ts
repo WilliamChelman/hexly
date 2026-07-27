@@ -6,3 +6,7 @@ export { DESIGN_TOKENS, designToken, isDesignToken } from './tokens/manifest';
 export type { Tier, TokenDecl, TokenType } from './tokens/design-token';
 export { designTokenPropertyBlock, registeredTokens } from './tokens/property-block';
 export { designTokenInitial, designTokenStyle, readDesignToken } from './tokens/read-token';
+// The judging (`themeWarnings`, `contrastRatio`, `deltaE00`, the thresholds) stays inside
+// `./contrast`, where its own spec reaches it: `contrastReport` is the whole face of it (ADR-0076).
+export type { ThemeWarning } from './contrast/contrast';
+export { contrastReport, measureScheme, rasteriseColors } from './contrast/measure';

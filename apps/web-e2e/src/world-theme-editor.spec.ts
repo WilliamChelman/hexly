@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { designToken } from '@hexly/web-styles';
+import { designToken, rasteriseColors } from '@hexly/web-styles';
 import { PALETTE_TOKENS } from '@hexly/domain';
 import { enterLibrary, expect, signInGrantee, test } from './fixtures';
 import { TEST_GRANTEE } from './test-user';
@@ -9,9 +9,10 @@ import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 /**
  * A World Owner authors their Palette and watches it apply (ADR-0076, #371).
  *
- * The unit tests own the mapping — draft to layer, reset, which control a declared type picks. What
- * only a browser can answer is here: that moving a control re-themes the running interface, that both
- * ColorSchemes are authorable from one seat, and that a Contributor never reaches the editor at all.
+ * The unit tests own the mapping — draft to layer, reset, which control a declared type picks, and what
+ * a set of measured colours is worth (`contrast.spec.ts`). What only a browser can answer is here: that
+ * moving a control re-themes the running interface, that both ColorSchemes are authorable and *reported
+ * on* from one seat, and that a Contributor never reaches the editor at all.
  */
 
 /**
@@ -47,6 +48,22 @@ async function saveTheme(page: Page): Promise<void> {
   );
   await page.getByTestId('theme-save').click();
   await saved;
+}
+
+/**
+ * Hand the World back its unthemed self: reset stages the Hexly default and saving is what commits it.
+ * The suite's reset keeps Worlds, so a Theme authored here outlives the spec that wrote it — and a
+ * deliberately illegible one would go on to paint every spec that runs after.
+ */
+async function restoreDefaultTheme(page: Page): Promise<void> {
+  await page.getByTestId('theme-reset').click();
+  await saveTheme(page);
+}
+
+/** How light a resolved colour is, 0..765 — enough to tell a near-black foreground from a near-white. */
+async function brightnessOnRoot(page: Page, name: string): Promise<number> {
+  const [rgb] = await page.evaluate(rasteriseColors, [await resolvedOnRoot(page, name)]);
+  return rgb[0] + rgb[1] + rgb[2];
 }
 
 /** The World's Theme as stored — the only witness to what a save actually persisted. */
@@ -180,4 +197,70 @@ test('a Contributor does not reach the Theme editor', async ({ page, request, br
   await expect(contributor.getByTestId('theme-save')).toHaveCount(0);
 
   await contributor.context().close();
+});
+
+test('the readability report covers the ColorScheme the author is not looking at, and a failing Theme still saves', async ({
+  page,
+}) => {
+  const worldSeg = await enterLibrary(page);
+  const worldId = idFromSegment(worldSeg);
+  await openThemeEditor(page, worldSeg);
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'solar');
+  await expect(page.locator('[data-testid^="theme-warning-astral"]')).toHaveCount(0);
+
+  // Astral ink a shade off the Astral page — illegible, in the half of the Theme nobody is looking at.
+  await page.getByTestId('theme-control-astral-ink').fill('#12142a');
+
+  const astral = page.getByTestId('theme-warning-astral-contrast-ink-bg');
+  await expect(astral).toBeVisible();
+  // The ratio is shown, so an Owner judges rather than guesses (ADR-0076).
+  await expect(astral).toHaveText(/\d+\.\d\d:1/);
+  await expect(page.getByTestId('theme-warning-astral-contrast-ink-surface')).toBeVisible();
+  // The reader is in Solar and Solar's ink has not moved, so the warning cannot be the active Palette's
+  // wearing the other one's name. That is the assertion the whole feature turns on.
+  await expect(page.getByTestId('theme-warning-solar-contrast-ink-bg')).toHaveCount(0);
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'solar');
+
+  // And the mirror image: put Astral back, break Solar, and the two reports swap over.
+  await page.getByTestId('theme-control-astral-ink').fill('#ece3cf');
+  await page.getByTestId('theme-control-solar-ink').fill('#efe4c8');
+  await expect(page.getByTestId('theme-warning-solar-contrast-ink-bg')).toBeVisible();
+  await expect(page.getByTestId('theme-warning-astral-contrast-ink-bg')).toHaveCount(0);
+
+  // Warn, never block: a deliberately oppressive Palette in a horror World is a legitimate choice, and
+  // a block just gets routed around by overriding a different token (ADR-0076).
+  await saveTheme(page);
+  expect(await storedTheme(page, worldId)).toBeTruthy();
+
+  await restoreDefaultTheme(page);
+});
+
+test('a mid-tone accent and a tone rotated into a status colour each get their own warning, and on-colours flip unasked', async ({
+  page,
+}) => {
+  const worldSeg = await enterLibrary(page);
+  await openThemeEditor(page, worldSeg);
+
+  // `contrast-color()` answers black or white and nothing between, so a mid-tone accent is one no
+  // automatic foreground rescues — CSS cannot resolve it, and only reading it back makes it visible.
+  await page.getByTestId('theme-control-solar-accent').fill('#bb00ff');
+  await expect(page.getByTestId('theme-warning-solar-midtone')).toBeVisible();
+
+  // Re-anchoring the accent rotates all eight categorical tones with it, so the exclusion arc computed
+  // against Hexly's accent stops holding for theirs: at this hue, tone 3 lands on danger (ADR-0075).
+  await page.getByTestId('theme-control-solar-accent').fill('#0099cc');
+  await expect(page.getByTestId('theme-warning-solar-midtone')).toHaveCount(0);
+  await expect(page.getByTestId('theme-warning-solar-tone-3-danger')).toBeVisible();
+
+  // On-colours flip silently and with no control of their own: the Owner moved the accent, and the
+  // foreground that sits on it went the other way (ADR-0076).
+  await expect(page.getByTestId('theme-control-solar-onFill')).toHaveCount(0);
+  await page.getByTestId('theme-control-solar-accent').fill('#f5e6b0');
+  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe('#f5e6b0');
+  expect(await brightnessOnRoot(page, '--color-on-fill')).toBeLessThan(200);
+
+  await page.getByTestId('theme-control-solar-accent').fill('#241a05');
+  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe('#241a05');
+  expect(await brightnessOnRoot(page, '--color-on-fill')).toBeGreaterThan(600);
+  // Nothing is saved here, so nothing needs handing back: leaving the editor is a cancel (#371).
 });
