@@ -113,7 +113,7 @@ describe('EntityLinkView', () => {
       expect(link.tagName).toBe('SPAN');
       // Unfinished, not broken: tinted and dashed, and carrying the shared pill shape.
       expect(link.classList.contains('decoration-dashed')).toBe(true);
-      expect(link.classList.contains('rounded')).toBe(true);
+      expect(link.classList.contains('rounded-sm')).toBe(true);
     });
 
     it('stays distinct from a dangling link, whose target went away', () => {
@@ -127,7 +127,7 @@ describe('EntityLinkView', () => {
       // Muted and italic, never the unresolved dash — the two tones must stay apart.
       expect(link.classList.contains('italic')).toBe(true);
       expect(link.classList.contains('decoration-dashed')).toBe(false);
-      expect(link.classList.contains('rounded')).toBe(true);
+      expect(link.classList.contains('rounded-sm')).toBe(true);
     });
 
     it('keeps the `[[Target|display]]` override', () => {

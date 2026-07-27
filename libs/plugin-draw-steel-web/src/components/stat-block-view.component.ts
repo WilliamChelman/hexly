@@ -131,7 +131,7 @@ import { dsIcon } from '../ds-glyphs';
             }
           </div>
           <div
-            class="shrink-0 rounded border border-accent/40 bg-accent-soft px-2.5 py-1 text-center leading-none text-accent-strong"
+            class="shrink-0 rounded-sm border border-accent/40 bg-accent-soft px-2.5 py-1 text-center leading-none text-accent-strong"
           >
             <div class="text-2xs font-bold uppercase tracking-widest">
               {{ 'drawSteel.statBlock.stat.ev' | transloco }}

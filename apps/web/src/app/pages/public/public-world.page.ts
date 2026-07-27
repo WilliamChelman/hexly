@@ -55,7 +55,7 @@ import { EyebrowComponent } from '@hexly/web-ui';
       @apply mx-auto flex w-full max-w-2xl flex-col gap-3 p-6;
     }
     .public-banner {
-      @apply rounded bg-surface px-3 py-2 text-sm text-ink-muted;
+      @apply rounded-md bg-surface px-3 py-2 text-sm text-ink-muted;
     }
     .public-title {
       @apply font-display text-2xl text-ink-strong;

@@ -153,3 +153,78 @@ describe('no-builtin-shadow', () => {
     });
   });
 });
+
+describe('no-builtin-radius', () => {
+  const rule = designTokens.rules['no-builtin-radius'];
+
+  it('flags the bare `rounded` utility, on every corner it can name', () => {
+    tester.run('no-builtin-radius', rule, {
+      valid: [],
+      invalid: [
+        // The steps it offers are read off the manifest, so the advice cannot drift from the
+        // set a World Theme actually writes (ADR-0076).
+        {
+          code: 'const c = `class="rounded border border-line"`',
+          errors: [
+            {
+              message:
+                "Bare `rounded` is a hard-coded 4px that exists outside the token contract, so a World Theme's corner set never reaches it. Name a step: `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl`, `rounded-full` (or `rounded-none`) — ADR-0076.",
+            },
+          ],
+        },
+        // A side/corner variant with no step is the same hard-coded 4px on fewer corners.
+        {
+          code: 'const c = `class="rounded-t rounded-bl"`',
+          errors: [{ messageId: 'bare' }, { messageId: 'bare' }],
+        },
+        { code: 'const x = { class: "rounded" }', errors: [{ messageId: 'bare' }] },
+        // Variants and the important flag are spellings of the same utility.
+        { code: 'const c = `class="hover:rounded"`', errors: [{ messageId: 'bare' }] },
+        { code: 'const c = `class="rounded!"`', errors: [{ messageId: 'bare' }] },
+      ],
+    });
+  });
+
+  it("flags the scale steps Tailwind declares and the manifest doesn't", () => {
+    tester.run('no-builtin-radius', rule, {
+      valid: [],
+      invalid: [
+        { code: 'const c = `class="rounded-xs"`', errors: [{ messageId: 'offScale' }] },
+        { code: 'const c = `class="rounded-2xl"`', errors: [{ messageId: 'offScale' }] },
+        { code: 'const c = `class="rounded-t-3xl"`', errors: [{ messageId: 'offScale' }] },
+        { code: 'const c = `class="rounded-4xl"`', errors: [{ messageId: 'offScale' }] },
+      ],
+    });
+  });
+
+  it('accepts the manifest-backed steps, on any corner and behind any variant', () => {
+    tester.run('no-builtin-radius', rule, {
+      valid: [
+        { code: 'const c = `class="rounded-sm rounded-md rounded-lg rounded-xl rounded-full"`' },
+        // `rounded-sm` is the `sm` step, not the `s` (inline-start) side with no step.
+        { code: 'const c = `class="rounded-s-md rounded-tl-lg rounded-b-sm"`' },
+        { code: 'const c = `class="focus-visible:rounded-md"`' },
+        // rounded-none squares the corner outright — nothing for a World's set to carry.
+        { code: 'const c = `class="rounded-none"`' },
+        // Arbitrary values are an explicit opt-out, as they are for elevation.
+        { code: 'const c = `class="rounded-[3px] rounded-b-[calc(var(--radius-md)*2)]"`' },
+        // Words that merely start with the utility's name are not it.
+        { code: 'const c = `class="roundedish"`' },
+      ],
+      invalid: [],
+    });
+  });
+
+  it('reads an @apply in a scoped styles block, and leaves prose alone', () => {
+    tester.run('no-builtin-radius', rule, {
+      valid: [
+        { code: 'const s = `.banner { @apply rounded-md bg-surface; }`' },
+        // "rounded" is an ordinary English word, so a comment on either side of the
+        // template boundary is prose and not a utility.
+        { code: 'const s = `.card { /* a rounded card */ @apply rounded-lg; }`' },
+        { code: 'const t = `<!-- a rounded card + rounded toggle strip --><div class="rounded-lg"></div>`' },
+      ],
+      invalid: [{ code: 'const s = `.banner { @apply rounded bg-surface; }`', errors: [{ messageId: 'bare' }] }],
+    });
+  });
+});

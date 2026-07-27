@@ -23,13 +23,13 @@ import { SelectComponent } from '@hexly/web-ui';
       <div class="flex flex-wrap items-center gap-2">
         @for (type of rows(); track type) {
           <span
-            class="inline-flex items-center gap-1 rounded border border-line bg-surface-sunken px-2 py-0.5 text-sm"
+            class="inline-flex items-center gap-1 rounded-sm border border-line bg-surface-sunken px-2 py-0.5 text-sm"
             [attr.data-testid]="'damage-' + mapKey() + '-' + type"
           >
             <span class="text-ink-muted">{{ 'drawSteel.statBlock.damage.' + type | transloco }}</span>
             <input
               type="number"
-              class="w-12 rounded border border-line bg-surface px-1 text-sm"
+              class="w-12 rounded-md border border-line bg-surface px-1 text-sm"
               [value]="valueOf(type)"
               (input)="emit(type, $event)"
             />

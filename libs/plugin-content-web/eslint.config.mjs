@@ -14,6 +14,9 @@ export default [
       // shadow utilities are barred because they bake in a light value (ADR-0021).
       'hexly-design/no-unknown-design-token': 'error',
       'hexly-design/no-builtin-shadow': 'error',
+      // A corner may only take a step the manifest declares, so a World Theme's
+      // corner-radius set reaches every one of them (ADR-0076).
+      'hexly-design/no-builtin-radius': 'error',
       '@angular-eslint/directive-selector': [
         'error',
         {

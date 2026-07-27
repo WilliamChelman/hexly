@@ -26,7 +26,7 @@ import { Trait } from '@hexly/plugin-draw-steel';
         <div class="flex flex-col gap-3">
           <!-- Tracked by index: a trait has no stable key and may be blank or duplicate. -->
           @for (trait of traits(); track $index; let first = $first; let last = $last) {
-            <div class="rounded border border-line bg-surface-sunken p-2" [attr.data-testid]="'trait-' + $index">
+            <div class="rounded-md border border-line bg-surface-sunken p-2" [attr.data-testid]="'trait-' + $index">
               <div class="flex items-center gap-2">
                 <input
                   appInput

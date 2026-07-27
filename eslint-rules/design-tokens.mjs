@@ -35,6 +35,9 @@ const UTILITY_FILES = ['libs/web-styles/src/index.css', 'libs/web-styles/src/tok
  */
 const BUILTIN_TOKENS = new Set(['--font-sans', '--font-serif', '--spacing']);
 
+/** The manifest namespace `rounded-*` resolves against. */
+const RADIUS_PREFIX = '--radius-';
+
 /** A file's mtime, or `null` when it isn't there. */
 function mtime(file) {
   try {
@@ -87,6 +90,22 @@ const loadShadowUtilities = rereadOnChange(
   },
 );
 
+/**
+ * The corner steps a World's radius set actually reaches: the manifest's `--radius-*` tokens, as
+ * `rounded-*` suffixes. Tailwind's own `@theme` also declares `--radius-xs/-2xl/-3xl/-4xl`, which
+ * ours does not override and the manifest does not carry — so those steps are fixed lengths however
+ * an Owner sets their corners (ADR-0076).
+ */
+const loadRadiusSteps = rereadOnChange(
+  () => mtime(MANIFEST),
+  () =>
+    new Set(
+      [...loadManifest().keys()]
+        .filter((name) => name.startsWith(RADIUS_PREFIX))
+        .map((name) => name.slice(RADIUS_PREFIX.length)),
+    ),
+);
+
 /** Paths compare by `/`, whatever the platform wrote them with. */
 function posix(filename) {
   return filename.replaceAll('\\', '/');
@@ -128,16 +147,24 @@ function disallowedReason(name, decl, filename) {
 }
 
 /**
- * Raw text of a string Literal or TemplateLiteral node, with CSS block comments stripped:
- * a comment word like "shadow" or a `var(--…)` shown in an example would otherwise trip
- * the token/shadow scans. Class names never live in comments, so the drop is safe.
+ * Raw text of a string Literal or TemplateLiteral node, with CSS block and HTML comments stripped:
+ * a comment word like "shadow" or "rounded", or a `var(--…)` shown in an example, would otherwise
+ * trip the scans below. Class names never live in comments, so the drop is safe.
  */
 function textOf(node) {
   let text = null;
   if (node.type === 'Literal') text = typeof node.value === 'string' ? node.value : null;
   if (node.type === 'TemplateLiteral') text = node.quasis.map((q) => q.value.raw).join(' ');
-  return text === null ? null : text.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  return text === null ? null : text.replace(/\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->/g, ' ');
 }
+
+/**
+ * Every spelling of the radius utility, split into the corners it lands on and the scale step it
+ * takes — `rounded-tl-md` is the `md` step on one corner. The step is optional because bare
+ * `rounded` is the whole point: it is a hard-coded 4px, not a step. Alternation order does not
+ * matter, since the engine backtracks — `rounded-sm` reads as the `sm` step, not the `s` side.
+ */
+const RADIUS_UTILITY = /^rounded(?:-(?:s|e|t|r|b|l|ss|se|ee|es|tl|tr|br|bl))?(?:-(.+))?$/;
 
 const noUnknownDesignToken = {
   meta: {
@@ -221,9 +248,64 @@ const noBuiltinShadow = {
   },
 };
 
+const noBuiltinRadius = {
+  meta: {
+    type: 'problem',
+    docs: {
+      description:
+        "Disallow radius utilities no `--radius-*` token backs, so every corner follows a World Theme's corner set (ADR-0076).",
+    },
+    schema: [],
+    messages: {
+      bare: "Bare `{{cls}}` is a hard-coded 4px that exists outside the token contract, so a World Theme's corner set never reaches it. Name a step: {{steps}} (or `rounded-none`) — ADR-0076.",
+      offScale:
+        '`{{cls}}` takes a step Tailwind declares and the manifest does not, so it is a fixed length however an Owner sets their corners. Name a step: {{steps}} (or `rounded-none`) — ADR-0076.',
+    },
+  },
+  create(context) {
+    const steps = loadRadiusSteps();
+    const named = [...steps].map((step) => `\`rounded-${step}\``).join(', ');
+    function scan(node, text) {
+      for (const raw of text.split(/[\s"'`=<>(){},;:]+/)) {
+        // Tailwind spells `!important` as a trailing `!`; it is the same utility.
+        const cls = raw.replace(/!$/, '');
+        if (!cls.startsWith('rounded')) continue;
+        const match = RADIUS_UTILITY.exec(cls);
+        if (!match) continue;
+        const step = match[1];
+        if (step === undefined) {
+          context.report({ node, messageId: 'bare', data: { cls, steps: named } });
+          continue;
+        }
+        if (step === 'none') continue; // squares the corner outright — nothing for a set to carry
+        if (step.startsWith('[')) continue; // explicit arbitrary value — intentional opt-out
+        if (steps.has(step)) continue;
+        context.report({ node, messageId: 'offScale', data: { cls, steps: named } });
+      }
+    }
+    return {
+      TemplateLiteral(node) {
+        const text = textOf(node);
+        if (text) scan(node, text);
+      },
+      Literal(node) {
+        if (typeof node.value !== 'string') return;
+        const p = node.parent;
+        const isClassProp =
+          !!p && p.type === 'Property' && p.value === node && (p.key.name === 'class' || p.key.value === 'class');
+        if (isClassProp || node.value.includes('class=')) {
+          const t = textOf(node);
+          if (t) scan(node, t);
+        }
+      },
+    };
+  },
+};
+
 export default {
   rules: {
     'no-unknown-design-token': noUnknownDesignToken,
     'no-builtin-shadow': noBuiltinShadow,
+    'no-builtin-radius': noBuiltinRadius,
   },
 };
