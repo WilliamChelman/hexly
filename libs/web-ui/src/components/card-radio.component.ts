@@ -1,29 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
 /**
- * A group of {@link CardRadioComponent}s. The consumer owns the label and the selection state; the
- * group owns the `radiogroup` role and the wrapping. See ADR-0007.
- *
- *   <div appCardRadioGroup [attr.aria-label]="'Corners' | transloco">
- *     <app-card-radio name="theme-radii" …>…</app-card-radio>
- *   </div>
- */
-@Component({
-  selector: '[appCardRadioGroup]',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { role: 'radiogroup' },
-  template: `<ng-content />`,
-  styles: `
-    @reference '#app-styles.css';
-
-    :host {
-      @apply flex flex-wrap gap-3;
-    }
-  `,
-})
-export class CardRadioGroupComponent {}
-
-/**
  * One radio rendered as a card: the control, its name and hint, and a specimen of what it picks.
  *
  * Two projection slots because the specimen sits differently per picker and that is the only thing
