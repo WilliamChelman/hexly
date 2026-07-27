@@ -1,6 +1,6 @@
 import type { Graph } from '@cosmos.gl/graph';
 import { LinkedEntity } from '@hexly/domain';
-import { Palette, linkColors, pointColors } from './graph-palette';
+import { GraphColors, linkColors, pointColors } from './graph-colors';
 
 /**
  * How long the pointer must settle before the focus fade commits. A sweep across the canvas fires a
@@ -22,10 +22,11 @@ export interface GraphFocus {
   /** Commit a hover once the pointer settles; `undefined` clears the focus. */
   hover(index: number | undefined): void;
   /**
-   * Bake a palette into the base colours and apply it, keeping any committed focus — a theme flip
-   * moves the hue without remounting, so the settled layout the reader is looking at survives it.
+   * Bake a resolved colour set into the base colours and apply it, keeping any committed focus — a
+   * theme flip moves the hue without remounting, so the settled layout the reader is looking at
+   * survives it.
    */
-  usePalette(next: Palette): void;
+  useColors(next: GraphColors): void;
   /** The hovered Entity and its neighbours while a focus is applied — `null` when none is. */
   focused(): ReadonlySet<number> | null;
   /** Drop a pending commit, so a debounced hover can never fire against a destroyed graph. */
@@ -37,16 +38,16 @@ export interface GraphFocusOptions {
   readonly nodes: readonly LinkedEntity[];
   /** The payload's flat source/target pair array. */
   readonly links: Float32Array;
-  /** The palette to open on — applied at once, so this is also the mount's colour seeding. */
-  readonly palette: Palette;
+  /** The colours to open on — applied at once, so this is also the mount's colour seeding. */
+  readonly colors: GraphColors;
   /** The focus moved: the label pass owes the neighbourhood its names, even if its loop has parked. */
   readonly onChange: () => void;
 }
 
-export function graphFocus({ cosmos, nodes, links, palette, onChange }: GraphFocusOptions): GraphFocus {
+export function graphFocus({ cosmos, nodes, links, colors, onChange }: GraphFocusOptions): GraphFocus {
   const incident = incidentLinks(links, nodes.length);
   const everyPoint = Array.from({ length: nodes.length }, (_, i) => i);
-  let colors: Palette;
+  let applied: GraphColors;
   let basePointColors: Float32Array;
   let baseLinkColors: Float32Array;
   /** The committed hover target, so a theme flip can re-bake colours without losing the focus. */
@@ -70,7 +71,7 @@ export function graphFocus({ cosmos, nodes, links, palette, onChange }: GraphFoc
       for (let i = 0; i < nodes.length; i++) if (!kept.has(i)) points[i * 4 + 3] *= HOVER_DIM;
       const linkRgba = baseLinkColors.slice();
       for (let alpha = 3; alpha < linkRgba.length; alpha += 4) linkRgba[alpha] *= HOVER_DIM;
-      for (const link of incident[index]) linkRgba.set(colors.linkHighlight, link * 4);
+      for (const link of incident[index]) linkRgba.set(applied.linkHighlight, link * 4);
       cosmos.setPointColors(points);
       cosmos.setLinkColors(linkRgba);
       // The rings are one global colour, so a dimmed node's ring cannot fade with its body — it hands
@@ -81,18 +82,18 @@ export function graphFocus({ cosmos, nodes, links, palette, onChange }: GraphFoc
     onChange();
   };
 
-  const usePalette = (next: Palette) => {
-    colors = next;
+  const useColors = (next: GraphColors) => {
+    applied = next;
     basePointColors = pointColors(nodes, next);
     baseLinkColors = linkColors(links.length / 2, next);
     // Every node wears a hairline ring, so a node the field's hue washes out keeps its shape.
     cosmos.setConfigPartial({ backgroundColor: next.background, outlinedPointRingColor: next.ring });
     applyFocus(focusIndex, 0);
   };
-  usePalette(palette);
+  useColors(colors);
 
   return {
-    usePalette,
+    useColors,
     hover(index) {
       // Each over/out reschedules the same timer, so a burst of them while sweeping the canvas
       // collapses to a single apply on the target the pointer finally rests on.

@@ -6,8 +6,12 @@ import { typeColorToken } from '../models/type-tone';
 /** The border ring's share of the ink colour's alpha — a hairline, not a second halo. */
 const NODE_RING_ALPHA = 0.5;
 
-/** The graph's colours, resolved from the live theme's tokens — cosmos.gl wants 0..1 RGBA floats. */
-export interface Palette {
+/**
+ * The graph's colours, resolved from the live theme's tokens — cosmos.gl wants 0..1 RGBA floats.
+ * Not a "palette": that is the World Theme's word now (CONTEXT.md), and this is a colour per Entity
+ * Type plus the field the nodes sit on.
+ */
+export interface GraphColors {
   /**
    * What the graph is drawn on — RGBA, not the token's own string: cosmos.gl parses a colour string
    * itself and answers black to the `oklch()` a derived token resolves to (ADR-0075).
@@ -24,7 +28,7 @@ export interface Palette {
   readonly ring: [number, number, number, number];
 }
 
-export function palette(defs: readonly TypeDefinition[]): Palette {
+export function graphColors(defs: readonly TypeDefinition[]): GraphColors {
   const style = designTokenStyle();
   const byType = new Map<string, [number, number, number, number]>();
   for (const def of defs) {
@@ -44,26 +48,29 @@ export function palette(defs: readonly TypeDefinition[]): Palette {
 }
 
 /** One RGBA quad per point, by point index; a node's colour is its type's registered hue. */
-export function pointColors(nodes: readonly LinkedEntity[], palette: Palette): Float32Array {
-  const colors = new Float32Array(nodes.length * 4);
+export function pointColors(nodes: readonly LinkedEntity[], colors: GraphColors): Float32Array {
+  const buffer = new Float32Array(nodes.length * 4);
   for (let i = 0; i < nodes.length; i++) {
     // Colour by the node's primary type (`types[0]`); an unregistered or absent one takes the fallback.
-    colors.set(palette.byType.get(nodes[i].types[0]) ?? palette.node, i * 4);
+    buffer.set(colors.byType.get(nodes[i].types[0]) ?? colors.node, i * 4);
   }
-  return colors;
+  return buffer;
 }
 
 /** One RGBA quad per link, by link index. */
-export function linkColors(count: number, palette: Palette): Float32Array {
-  const colors = new Float32Array(count * 4);
-  for (let i = 0; i < count; i++) colors.set(palette.link, i * 4);
-  return colors;
+export function linkColors(count: number, colors: GraphColors): Float32Array {
+  const buffer = new Float32Array(count * 4);
+  for (let i = 0; i < count; i++) buffer.set(colors.link, i * 4);
+  return buffer;
 }
 
 /**
  * Any CSS colour — hex, `rgb()`, `oklch()` — as cosmos.gl's 0..1 RGBA floats. A 1×1 canvas is the
  * browser's own parser, which is the only parser guaranteed to accept whatever notation a derived
  * token resolves to (ADR-0075); every colour a renderer is handed goes through here first.
+ *
+ * Not `rasteriseColors` from `@hexly/web-styles`, which answers 8-bit RGB: alpha is a value here —
+ * the ring rides the ink's, and the hover fade scales it.
  */
 function toRgba(css: string): [number, number, number, number] {
   const canvas = document.createElement('canvas');

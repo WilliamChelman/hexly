@@ -1,7 +1,14 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
-import { DESIGN_TOKENS, DesignToken, measureScheme, registeredTokens, TokenType } from '@hexly/web-styles';
+import {
+  DESIGN_TOKENS,
+  DesignToken,
+  measureScheme,
+  rasteriseColors,
+  registeredTokens,
+  TokenType,
+} from '@hexly/web-styles';
 import { expect, preferencesPatched, test } from './fixtures';
 
 /**
@@ -54,27 +61,6 @@ function resolve(page: Page, names: readonly DesignToken[]): Promise<Record<stri
     const style = getComputedStyle(document.documentElement);
     return Object.fromEntries(tokens.map((name) => [name, style.getPropertyValue(name).trim()]));
   }, names as string[]);
-}
-
-/**
- * Each CSS colour as a 2D drawing context rasterises it — 8-bit RGBA, whatever syntax it was written
- * in. That is both the comparison a hex and an `oklch()` can share and the exact parse the Canvas
- * renderers make (`graph-palette.ts`), so a colour neither form parses fails here rather than there.
- */
-function rasterise(page: Page, values: readonly string[]): Promise<number[][]> {
-  return page.evaluate((colors) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 1;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) throw new Error('no 2d context');
-    return colors.map((value) => {
-      ctx.clearRect(0, 0, 1, 1);
-      ctx.fillStyle = '#000000';
-      ctx.fillStyle = value;
-      ctx.fillRect(0, 0, 1, 1);
-      return [...ctx.getImageData(0, 0, 1, 1).data];
-    });
-  }, values as string[]);
 }
 
 /** Paint the app in `scheme` through the real preference control, and wait for the root to carry it. */
@@ -156,14 +142,19 @@ test('every token reads back resolved and matches the committed table, in both C
   // so `manifest.spec.ts` can only check it is a literal. This is where it is held to the engine: the
   // initial is the fallback three Canvas renderers take when a property fails to resolve (ADR-0075),
   // and a stale one is a second, silently wrong copy of the palette.
+  //
+  // Compared as the editor's own rasteriser sees them, handed to the browser rather than restated here:
+  // that is both the comparison a hex and an `oklch()` can share and the exact parse the Canvas renderers
+  // make (`graph-colors.ts`). It answers alpha too, so a translucent initial is held to that as well —
+  // eighteen of these are, and a drifted `/ 0.14` would otherwise pass on colour alone.
   const colors = registeredTokens().filter((decl) => decl.type === 'color');
   const [resolved, initials] = await Promise.all([
-    rasterise(
-      page,
+    page.evaluate(
+      rasteriseColors,
       colors.map((decl) => table[decl.name].solar),
     ),
-    rasterise(
-      page,
+    page.evaluate(
+      rasteriseColors,
       colors.map((decl) => decl.initial),
     ),
   ]);

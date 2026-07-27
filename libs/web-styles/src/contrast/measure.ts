@@ -68,9 +68,13 @@ export function measureScheme(measurement: SchemeMeasurement): Record<string, st
 /**
  * Each CSS colour as a 2D drawing context rasterises it: 8-bit sRGB, gamut-mapped exactly as a display
  * will get it, which is what makes a ratio over these the one a reader experiences. It is also the only
- * parse an `oklch()`, a `color(srgb …)` and a hex share. Alpha is dropped — a Palette's anchors are opaque.
+ * parse an `oklch()`, a `color(srgb …)` and a hex share.
+ *
+ * Alpha is answered rather than dropped: a contrast caller composites through `ground` and reads only
+ * the first three channels, but the token snapshot holds a translucent `initial` to its alpha too, and
+ * the serialisation boundary below forbids a second function to answer it.
  */
-export function rasteriseColors(values: readonly string[], ground?: string): [number, number, number][] {
+export function rasteriseColors(values: readonly string[], ground?: string): [number, number, number, number][] {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 1;
   const context = canvas.getContext('2d', { willReadFrequently: true });
@@ -88,8 +92,8 @@ export function rasteriseColors(values: readonly string[], ground?: string): [nu
     }
     context.fillStyle = value;
     context.fillRect(0, 0, 1, 1);
-    const [red, green, blue] = context.getImageData(0, 0, 1, 1).data;
-    return [red, green, blue];
+    const [red, green, blue, alpha] = context.getImageData(0, 0, 1, 1).data;
+    return [red, green, blue, alpha];
   });
 }
 
@@ -111,7 +115,11 @@ export function contrastReport(
   const resolved = measureScheme({ scheme, declarations, tokens: wanted });
   if (wanted.some((token) => !resolved[token])) return null;
 
-  const rasterised = rasteriseColors(CONTRAST_TOKENS.map((token) => resolved[token]));
+  // Narrowed to the three channels a ratio is over: these are opaque, and the chip fills below have
+  // already been composited through their ground.
+  const rasterised = rasteriseColors(CONTRAST_TOKENS.map((token) => resolved[token])).map(
+    ([red, green, blue]): Rgb => [red, green, blue],
+  );
   const measured: MeasuredScheme = Object.fromEntries(CONTRAST_TOKENS.map((token, i) => [token, rasterised[i]]));
 
   const fills: Record<string, Record<string, Rgb>> = {};
@@ -119,7 +127,7 @@ export function contrastReport(
     const over = rasteriseColors(
       fillTokens.map((fill) => resolved[fill]),
       resolved[ground],
-    );
+    ).map(([red, green, blue]): Rgb => [red, green, blue]);
     TONE_FILLS.forEach(([tone], i) => ((fills[tone] ??= {})[ground] = over[i]));
   }
   return themeWarnings(measured, fills);

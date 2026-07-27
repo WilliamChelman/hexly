@@ -17,7 +17,7 @@ import { FramingCamera, currentView, framingCamera, spaceScale } from './graph-c
 import { GraphFocus, graphFocus } from './graph-focus';
 import { GraphWarmPool, WarmGraph } from './graph-warm-pool';
 import { GraphPayload, graphPayload } from './graph-payload';
-import { palette } from './graph-palette';
+import { graphColors } from './graph-colors';
 import { SPACE, centerPoint, positionsById, seedBuffers } from './graph-seed';
 import { LabelGrid, selectLabels } from './select-labels';
 import { ENTITY_TYPES } from '../models/entity-types';
@@ -185,7 +185,7 @@ export class GraphCanvasComponent {
       // New data re-seeds the *live* graph. Rebuilding it instead would recreate a WebGL context and
       // recompile cosmos.gl's shaders on the main thread — which is what every depth flip and decor
       // reveal in the Local Graph Panel used to cost (ADR-0072).
-      // `untracked`: the swap bakes the palette, and the type registry it reads is a signal — a plugin
+      // `untracked`: the swap bakes the colours, and the type registry it reads is a signal — a plugin
       // registering a type must not read as new graph data.
       const live = this.mounted;
       if (live && live.host === host) return void untracked(() => this.swap(live, graph, center));
@@ -223,7 +223,7 @@ export class GraphCanvasComponent {
     // simulation and throw away the settled layout the reader is looking at, to change a hue.
     effect(() => {
       this.colorScheme.colorScheme();
-      this.mounted?.drawing.focus.usePalette(palette(this.types.all()));
+      this.mounted?.drawing.focus.useColors(graphColors(this.types.all()));
     });
 
     // The labels follow their box — a Dock Panel dragged wider (ADR-0067), a window resize. cosmos.gl
@@ -247,7 +247,7 @@ export class GraphCanvasComponent {
 
     const payload = graphPayload(graph);
     const { nodes, links } = payload;
-    const colors = palette(this.types.all());
+    const colors = graphColors(this.types.all());
     const centerIndex = centerPoint(payload, center);
     const { positions, sizes } = seedBuffers(payload, centerIndex);
     // The settle mark describes the payload on screen (a hook for tests waiting on the layout), so a
@@ -341,7 +341,7 @@ export class GraphCanvasComponent {
     const drawing: Drawing = {
       payload,
       positions,
-      focus: graphFocus({ cosmos, nodes, links, palette: colors, onChange: () => this.wake() }),
+      focus: graphFocus({ cosmos, nodes, links, colors, onChange: () => this.wake() }),
       settled: false,
     };
 
@@ -398,7 +398,7 @@ export class GraphCanvasComponent {
       cosmos,
       nodes,
       links,
-      palette: palette(this.types.all()),
+      colors: graphColors(this.types.all()),
       onChange: () => this.wake(),
     });
     // `render` is where cosmos.gl adopts the staged data — it re-derives the counts and rebuilds the
