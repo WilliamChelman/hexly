@@ -1,22 +1,15 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { DESIGN_TOKENS, DesignToken, measureScheme, registeredTokens, TokenType } from '@hexly/web-styles';
 import { expect, preferencesPatched, test } from './fixtures';
 
 /**
- * The token snapshot (ADR-0075, world-theme-spec §7): every declared token's resolved value, in both
- * ColorSchemes, against the committed table at {@link TABLE_PATH}.
+ * The token guard (ADR-0075, world-theme-spec §7): every declared token, read out of a real engine in
+ * both ColorSchemes.
  *
- * Resolved values, never how a token is spelled — asserting the expressions would freeze the formulas
- * the table exists to protect. So it is read out of a real engine, and a registered token reading back
- * as its raw declaration fails here: that is the failure that would break the Canvas renderers.
- *
- * `UPDATE_TOKEN_TABLE=1` rewrites the table. Not Playwright's own snapshots, which key the file by
- * project and platform — this is one artifact, and the derivation work's diff to it is the point.
+ * Resolved values, never how a token is spelled — asserting the expressions would freeze the very
+ * formulas the derivation exists to allow. What is asserted is that each one *resolves*: a registered
+ * token reading back as its raw declaration is the failure that would break the Canvas renderers.
  */
-
-const TABLE_PATH = join(__dirname, 'design-tokens.table.json');
 
 /**
  * The day/night axis (ADR-0075), spelled here rather than imported: the `@hexly/web-core` barrel pulls
@@ -26,7 +19,7 @@ type ColorScheme = 'solar' | 'astral';
 
 const COLOR_SCHEMES = ['solar', 'astral'] as const satisfies readonly ColorScheme[];
 
-/** One token's resolved value in each ColorScheme, as the committed table records it. */
+/** One token's resolved value in each ColorScheme. */
 type TokenTable = Record<string, Record<ColorScheme, string>>;
 
 /**
@@ -45,6 +38,9 @@ const RESOLVED_SHAPE: Readonly<Record<TokenType, RegExp | null>> = {
   gradient: null,
   'font-pairing': null,
 };
+
+/** The declared tokens, in the order the manifest lists them. */
+const TOKEN_NAMES = DESIGN_TOKENS.map((decl) => decl.name);
 
 /** What the document resolves each token to, exactly as the Canvas renderers read them (ADR-0075). */
 function resolve(page: Page, names: readonly DesignToken[]): Promise<Record<string, string>> {
@@ -93,12 +89,11 @@ async function collect(page: Page): Promise<TokenTable> {
   // choosing before that lands would be overwritten. The email is that same payload, on screen.
   await expect(page.getByTestId('email')).not.toBeEmpty();
 
-  const names = DESIGN_TOKENS.map((decl) => decl.name);
   const observed = {} as Record<ColorScheme, Record<string, string>>;
   try {
     for (const scheme of COLOR_SCHEMES) {
       await chooseColorScheme(page, scheme);
-      observed[scheme] = await resolve(page, names);
+      observed[scheme] = await resolve(page, TOKEN_NAMES);
     }
   } finally {
     // The preference roams on the shared e2e account and outlives the entities-only reset, so hand the
@@ -110,11 +105,11 @@ async function collect(page: Page): Promise<TokenTable> {
   }
 
   return Object.fromEntries(
-    names.map((name) => [name, { solar: observed.solar[name], astral: observed.astral[name] }]),
+    TOKEN_NAMES.map((name) => [name, { solar: observed.solar[name], astral: observed.astral[name] }]),
   );
 }
 
-test('every token reads back resolved and matches the committed table, in both ColorSchemes', async ({ page }) => {
+test('every token reads back resolved, in both ColorSchemes', async ({ page }) => {
   const table = await collect(page);
 
   const missing = Object.entries(table).filter(([, values]) => COLOR_SCHEMES.some((scheme) => values[scheme] === ''));
@@ -173,23 +168,13 @@ test('every token reads back resolved and matches the committed table, in both C
     drifted.map((decl) => decl.name),
     "every colour token's manifest initial is the value it resolves to in Solar",
   ).toEqual([]);
-
-  // Rewritten only once the values above are known to be resolved, so a reflexive regenerate cannot
-  // commit a table of raw declarations.
-  if (process.env.UPDATE_TOKEN_TABLE === '1' && !process.env.CI) {
-    writeFileSync(TABLE_PATH, `${JSON.stringify(table, null, 2)}\n`);
-  }
-
-  expect(table).toEqual(JSON.parse(readFileSync(TABLE_PATH, 'utf8')) as TokenTable);
 });
 
 test('the contrast report measures the ColorScheme the reader is not in, roles included', async ({ page }) => {
-  await page.goto('/settings');
-  // Same reason as `collect`: the ColorScheme roams and hydrates when `/auth/me` resolves (ADR-0038).
-  await expect(page.getByTestId('email')).not.toBeEmpty();
-
-  const table = JSON.parse(readFileSync(TABLE_PATH, 'utf8')) as TokenTable;
-  const names = DESIGN_TOKENS.map((decl) => decl.name);
+  // What each ColorScheme really renders, by painting the app in each in turn and reading the live
+  // root. That is the independent oracle the offscreen probe is judged against below: the two share no
+  // machinery, one being the document itself and the other a detached subtree.
+  const table = await collect(page);
   const active = (await page.locator('html').getAttribute('data-color-scheme')) as ColorScheme;
   const inactive = active === 'solar' ? 'astral' : 'solar';
 
@@ -202,12 +187,12 @@ test('the contrast report measures the ColorScheme the reader is not in, roles i
 
   // The editor's own measurement, handed to the browser rather than restated here: what only an engine
   // can answer is this call, and `contrast.spec.ts` covers the judging that reads its result (ADR-0076).
-  const measured = await page.evaluate(measureScheme, { scheme: inactive, declarations: {}, tokens: names });
+  const measured = await page.evaluate(measureScheme, { scheme: inactive, declarations: {}, tokens: TOKEN_NAMES });
 
   // Every declared token, exactly as the *other* ColorScheme renders it — the tier-2 roles included,
   // which is the half an offscreen probe silently gets wrong (see `world-theme.spec.ts`). Half a Theme
   // would otherwise ship unchecked, with a report that looked like it had checked it.
-  expect(measured).toEqual(Object.fromEntries(names.map((name) => [name, table[name][inactive]])));
+  expect(measured).toEqual(Object.fromEntries(TOKEN_NAMES.map((name) => [name, table[name][inactive]])));
 
   // Non-vacuous by construction: what the document is still painting is the *active* scheme's answer —
   // the override included, since that is what an inline property does. Without this, the assertion

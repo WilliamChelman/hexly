@@ -148,7 +148,7 @@ describe('themeWarnings', () => {
   });
 
   it('leaves the eight tones alone when the accent has kept them out of the exclusion arc', () => {
-    // The tightest two pairs Hexly's own Palette ships, read off `design-tokens.table.json`: Astral
+    // The tightest two pairs Hexly's own Palette ships, measured off the resolved tokens: Astral
     // tone-8 against danger and Solar tone-1 against success. The threshold is calibrated on the
     // design's own revealed tolerance (spike-tone-rotation.md §2), so it must not condemn it.
     const astralToneEight: Rgb = [229, 140, 174];
