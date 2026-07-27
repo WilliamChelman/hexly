@@ -451,6 +451,41 @@
     "updateError": "Couldn't save that field. Please try again.",
     "removeError": "Couldn't delete that field. Please try again."
   },
+  "worldTheme": {
+    "heading": "World theme",
+    "subhead": "The presentation this world wears: eight anchor colours and three knobs per colour scheme, with every other colour derived from them. Changes apply as you make them; readers keep their own colour scheme within it.",
+    "paletteHeading": "Palette",
+    "save": "Save",
+    "reset": "Reset to the Hexly default",
+    "unsaved": "Unsaved changes.",
+    "saveError": "Could not save the world theme.",
+    "token": {
+      "page": "Page",
+      "ink": "Ink",
+      "inkQuiet": "Quiet ink",
+      "accent": "Accent",
+      "danger": "Danger",
+      "success": "Success",
+      "canvas": "Canvas",
+      "soot": "Soot",
+      "polarity": "Polarity",
+      "lineAlpha": "Rule opacity",
+      "veil": "Veil"
+    },
+    "hint": {
+      "page": "The table the paper sits on.",
+      "ink": "Primary text ink.",
+      "inkQuiet": "Secondary ink — it carries its own hue.",
+      "accent": "The through-line accent; the categorical colours rotate off it.",
+      "danger": "Danger.",
+      "success": "Confirmation.",
+      "canvas": "The map field.",
+      "soot": "Shadow and scrim ink.",
+      "polarity": "Which way every ramp runs: light paper or dark.",
+      "lineAlpha": "How strongly drawn rules read.",
+      "veil": "How heavy shadows, scrims and the vignette sit."
+    }
+  },
   "imports": {
     "heading": "Imports",
     "subhead": "Bring in a managed reference library from a plugin's source. A reimport overwrites the set; your hand-authored entities are untouched.",

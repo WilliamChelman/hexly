@@ -114,6 +114,15 @@ describe('WorldsClient', () => {
     expect(updated?.pinnedEntityIds).toEqual(['p2', 'p1']);
   });
 
+  it('sets the World Theme via a wholesale PATCH, and clears it with an explicit null', () => {
+    client.setTheme('w1', null).subscribe();
+
+    const req = http.expectOne('/api/worlds/w1');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ theme: null });
+    req.flush({ ...detail, theme: null });
+  });
+
   it('imports a vault zip as multipart and returns the summary', () => {
     const file = new File([new Uint8Array([1, 2, 3])], 'Aldermoor.zip', {
       type: 'application/zip',

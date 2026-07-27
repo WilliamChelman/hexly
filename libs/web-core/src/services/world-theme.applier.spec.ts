@@ -247,6 +247,46 @@ describe('WorldThemeApplier (ADR-0076)', () => {
     expect(read('--palette-accent')).toBe('oklch(0.6 0.2 300)');
   });
 
+  it('paints an unsaved draft over the stored Theme, and takes it back when the editor closes', () => {
+    const applier = TestBed.inject(WorldThemeApplier);
+    applier.scope({ worldId: WORLD_ID }, theme());
+
+    applier.preview({ solar: { accent: 'oklch(0.5 0.2 300)' } });
+    expect(read('--palette-accent')).toBe('oklch(0.5 0.2 300)');
+
+    applier.preview(undefined);
+    expect(read('--palette-accent')).toBe('oklch(0.55 0.14 40)');
+  });
+
+  it('previews the Hexly default, so a staged reset shows what saving it would give', () => {
+    const applier = TestBed.inject(WorldThemeApplier);
+    applier.scope({ worldId: WORLD_ID }, theme());
+
+    applier.preview(null);
+
+    expect(read('--palette-accent')).toBe('');
+  });
+
+  it('never caches a preview — a draft abandoned by a reload must not come back painted', () => {
+    const applier = TestBed.inject(WorldThemeApplier);
+    applier.scope({ worldId: WORLD_ID }, theme());
+
+    applier.preview({ solar: { accent: 'oklch(0.5 0.2 300)' } });
+
+    expect(localStorage.getItem(WORLD_THEME_CACHE_KEY)).not.toContain('oklch(0.5 0.2 300)');
+  });
+
+  it('keeps the preview on top when the World read lands under it', () => {
+    const applier = TestBed.inject(WorldThemeApplier);
+    applier.scope({ worldId: WORLD_ID }, theme());
+    applier.preview({ solar: { accent: 'oklch(0.5 0.2 300)' } });
+
+    // The live-follow refetch a save triggers (ADR-0044) arrives while the Owner is still editing.
+    applier.scope({ worldId: WORLD_ID }, theme({ solar: palette({ accent: 'oklch(0.7 0.1 200)' }) }));
+
+    expect(read('--palette-accent')).toBe('oklch(0.5 0.2 300)');
+  });
+
   it('ignores a cache entry that is not a set of declared design tokens', () => {
     localStorage.setItem(
       WORLD_THEME_CACHE_KEY,

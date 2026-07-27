@@ -7,8 +7,9 @@ import { OwnerSetComponent, MemberSetComponent, PublicLinkComponent } from '@hex
 import { WorldTypesPanelComponent } from './components/world-types-panel.component';
 import { WorldFieldsPanelComponent } from './components/world-fields-panel.component';
 import { WorldImportsPanelComponent } from './components/world-imports-panel.component';
+import { WorldThemePanelComponent } from './components/world-theme-panel.component';
 
-type Section = 'access' | 'schema' | 'imports' | 'sharing';
+type Section = 'access' | 'schema' | 'theme' | 'imports' | 'sharing';
 
 interface SectionItem {
   readonly section: Section;
@@ -39,6 +40,7 @@ interface SectionItem {
     WorldTypesPanelComponent,
     WorldFieldsPanelComponent,
     WorldImportsPanelComponent,
+    WorldThemePanelComponent,
   ],
   template: `
     @if (worldId(); as id) {
@@ -83,6 +85,13 @@ interface SectionItem {
               <h2 class="group-head">{{ 'worldFields.heading' | transloco }}</h2>
               <p class="detail-sub">{{ 'worldFields.subhead' | transloco }}</p>
               <div class="pane" appPanel><app-world-fields [id]="id" /></div>
+            }
+            @case ('theme') {
+              <header class="detail-head">
+                <h1 class="detail-title">{{ 'worldTheme.heading' | transloco }}</h1>
+                <p class="detail-sub">{{ 'worldTheme.subhead' | transloco }}</p>
+              </header>
+              <div class="pane" appPanel><app-world-theme [id]="id" /></div>
             }
             @case ('imports') {
               <header class="detail-head">
@@ -146,15 +155,20 @@ interface SectionItem {
 export class WorldSettingsPage {
   private readonly router = inject(Router);
   private readonly clientConfig = inject(ClientConfigStore);
-  readonly worldId = inject(ActiveWorld).worldId;
+  private readonly activeWorld = inject(ActiveWorld);
+  readonly worldId = this.activeWorld.worldId;
 
   readonly items = computed<readonly SectionItem[]>(() => {
     const collaboration = this.clientConfig.isCollaborationEnabled();
+    // A Theme is authored, not read: only a caller who may manage the World gets the editor (ADR-0039),
+    // the same right the rail gates this whole page on.
+    const canManage = !!this.activeWorld.world()?.rights?.includes('manage');
     return [
       ...(collaboration
         ? [{ section: 'access' as const, icon: 'user' as const, label: 'collab.members.heading' }]
         : []),
       { section: 'schema' as const, icon: 'label' as const, label: 'worldTypes.heading' },
+      ...(canManage ? [{ section: 'theme' as const, icon: 'palette' as const, label: 'worldTheme.heading' }] : []),
       { section: 'imports' as const, icon: 'download' as const, label: 'imports.heading' },
       ...(collaboration
         ? [{ section: 'sharing' as const, icon: 'share' as const, label: 'collab.publicLink.worldHeading' }]
@@ -162,8 +176,15 @@ export class WorldSettingsPage {
     ];
   });
 
-  /** The open group; derived from {@link items} so a cut section can never stay selected. */
-  readonly active = linkedSignal<Section>(() => this.items()[0].section);
+  /**
+   * The open group. Derived from {@link items} so a cut section can never stay selected — but *only*
+   * a section that is actually gone moves the selection: {@link items} re-reads the active World, and
+   * a World refresh (saving a Theme re-pins one) must not throw an Owner out of the pane they are in.
+   */
+  readonly active = linkedSignal<readonly Section[], Section>({
+    source: () => this.items().map((item) => item.section),
+    computation: (sections, previous) => (previous && sections.includes(previous.value) ? previous.value : sections[0]),
+  });
 
   leave(): void {
     this.router.navigate(['/']);

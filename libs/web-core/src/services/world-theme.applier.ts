@@ -164,6 +164,8 @@ export class WorldThemeApplier {
    */
   private current: string | null | undefined;
   private declarations: ThemeDeclarationSet = NOTHING;
+  /** An Owner's unsaved draft, painted instead of {@link declarations} while the editor is open. */
+  private previewed: ThemeDeclarationSet | undefined;
   /** What the last write put on the root, so the next one takes back what it no longer sets. */
   private written: readonly string[] = [];
   private readonly _revision = signal(0);
@@ -205,6 +207,19 @@ export class WorldThemeApplier {
   }
 
   /**
+   * Paint an editor's draft over whatever the scope resolved to, so an Owner judges a Theme rather than
+   * imagines it (#371). `undefined` drops the draft and the saved Theme comes back; `null` previews the
+   * Hexly default, which is what a staged reset has to show.
+   *
+   * Uncached and scope-independent by design: a draft is not what this World is themed as, so a reload
+   * — or another tab — must not paint it, and the World read landing underneath must not take it back.
+   */
+  preview(theme: WorldThemeLayer | null | undefined): void {
+    this.previewed = theme === undefined ? undefined : resolveWorldTheme([this.instance, theme]);
+    this.write();
+  }
+
+  /**
    * Paint `scope` from the cache — all that is known of it before its World read resolves. Re-entering
    * a scope already painted is skipped: it would roll an authoritative Theme back to a cached one.
    */
@@ -228,7 +243,7 @@ export class WorldThemeApplier {
 
   /** Write the active Palette on the root, taking back whatever the last write set and this one doesn't. */
   private write(): void {
-    const next = this.declarations[this.colorScheme.colorScheme()];
+    const next = (this.previewed ?? this.declarations)[this.colorScheme.colorScheme()];
     const style = document.documentElement.style;
     for (const name of this.written) if (!(name in next)) style.removeProperty(name);
     for (const [name, value] of Object.entries(next)) style.setProperty(name, value);

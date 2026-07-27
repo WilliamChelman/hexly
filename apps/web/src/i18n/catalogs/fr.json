@@ -451,6 +451,41 @@
     "updateError": "Impossible d'enregistrer ce champ. Veuillez réessayer.",
     "removeError": "Impossible de supprimer ce champ. Veuillez réessayer."
   },
+  "worldTheme": {
+    "heading": "Thème du monde",
+    "subhead": "L’apparence que porte ce monde : huit couleurs d’ancrage et trois réglages par schéma de couleurs, dont toutes les autres couleurs découlent. Les modifications s’appliquent au fur et à mesure ; chaque lecteur garde son propre schéma de couleurs.",
+    "paletteHeading": "Palette",
+    "save": "Enregistrer",
+    "reset": "Revenir au thème Hexly par défaut",
+    "unsaved": "Modifications non enregistrées.",
+    "saveError": "Impossible d’enregistrer le thème du monde.",
+    "token": {
+      "page": "Page",
+      "ink": "Encre",
+      "inkQuiet": "Encre discrète",
+      "accent": "Accent",
+      "danger": "Danger",
+      "success": "Réussite",
+      "canvas": "Canevas",
+      "soot": "Suie",
+      "polarity": "Polarité",
+      "lineAlpha": "Opacité des filets",
+      "veil": "Voile"
+    },
+    "hint": {
+      "page": "La table sur laquelle repose le papier.",
+      "ink": "Encre principale du texte.",
+      "inkQuiet": "Encre secondaire — elle porte sa propre teinte.",
+      "accent": "L’accent directeur ; les couleurs catégorielles pivotent autour de lui.",
+      "danger": "Danger.",
+      "success": "Confirmation.",
+      "canvas": "Le champ de la carte.",
+      "soot": "Encre des ombres et des voiles.",
+      "polarity": "Le sens de tous les dégradés : papier clair ou sombre.",
+      "lineAlpha": "La force avec laquelle les filets se lisent.",
+      "veil": "Le poids des ombres, des voiles et de la vignette."
+    }
+  },
   "imports": {
     "heading": "Imports",
     "subhead": "Importez une bibliothèque de référence gérée depuis la source d'un plugin. Un réimport écrase l'ensemble ; vos entités créées à la main ne sont pas touchées.",

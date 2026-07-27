@@ -18,6 +18,7 @@ import {
   WorldDetail,
   WorldMember,
   WorldSummary,
+  WorldThemeInput,
 } from '@hexly/domain';
 import { Watched } from '../services/live-follow';
 
@@ -34,6 +35,7 @@ export class MockWorldsClient {
   get = vi.fn<(id: string) => Observable<WorldDetail>>();
   rename = vi.fn<(id: string, name: string) => Observable<WorldDetail>>();
   setPins = vi.fn<(id: string, pinnedEntityIds: string[]) => Observable<WorldDetail>>();
+  setTheme = vi.fn<(id: string, theme: WorldThemeInput | null) => Observable<WorldDetail>>();
   delete = vi.fn<(id: string) => Observable<void>>();
   // Defaults to an empty set so a spec that mounts the owner-set panel without
   // caring about it still renders; override per test as needed.

@@ -4,7 +4,7 @@
  * stores: a `url()` is refused because it is not a colour, not stripped out of one.
  */
 
-import { converter, parse as parseColor } from 'culori';
+import { clampGamut, converter, formatHex, parse as parseColor } from 'culori';
 import { TokenType } from '@hexly/web-styles';
 
 /**
@@ -68,6 +68,21 @@ function canonicalColor(raw: string): string | undefined {
   return opacity === 1
     ? `oklch(${lightness} ${chroma} ${hue})`
     : `oklch(${lightness} ${chroma} ${hue} / ${round(opacity, 4)})`;
+}
+
+/**
+ * The sRGB hex of a colour value, or `undefined` if it is not a colour — what a native `<input
+ * type="color">` shows for a stored anchor, and what the Theme editor seeds its controls from (#371).
+ * The inverse direction needs nothing: a hex is a colour, so {@link canonicalTokenValue} takes one.
+ *
+ * Lossy on purpose, in the one direction the control is: alpha is dropped and a wide-gamut anchor is
+ * gamut-mapped, because the control carries neither. Editing such an anchor therefore rewrites it to
+ * what was shown — which is the honest reading of a control an Owner just moved.
+ */
+export function colorTokenHex(raw: string): string | undefined {
+  const parsed = parseNeverThrows(raw.trim());
+  if (!parsed) return undefined;
+  return formatHex(clampGamut('rgb')(parsed));
 }
 
 /** A `<number>`, re-emitted from the parsed value. */
