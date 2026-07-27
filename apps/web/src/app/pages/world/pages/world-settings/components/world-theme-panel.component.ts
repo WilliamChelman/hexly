@@ -12,34 +12,29 @@ import {
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { WorldThemePalette } from '@hexly/domain';
 import { ActiveWorld, ColorScheme, ToasterService, WorldThemeApplier, WorldsClient } from '@hexly/web-core';
-import { ButtonComponent } from '@hexly/web-ui';
+import { ButtonComponent, EyebrowComponent } from '@hexly/web-ui';
 import { ThemeDraft, draftFrom, draftToTheme, hexlyPalette, sameDraft, withControlValue } from '../utils/theme-draft';
 import { PaletteEdit, ThemePaletteComponent } from './theme-palette.component';
 
 /**
- * The World Theme editor (ADR-0076, #371): a World Owner authors their Palette — both ColorSchemes'
- * anchors and knobs — and watches it apply as they type.
+ * The World Theme editor (ADR-0076): a World Owner authors both ColorSchemes' anchors and knobs and
+ * watches them apply. Preview goes through {@link WorldThemeApplier.preview} — the same resolution
+ * chain the saved Theme paints by, so what the Owner judges is what the World will look like.
  *
- * Live preview goes through {@link WorldThemeApplier.preview}, the same resolution chain the saved
- * Theme is painted by, so what the Owner judges is what the World will look like rather than an
- * approximation of it. A preview is deliberately not cached and not scoped: a draft abandoned by a
- * reload, a navigation, or another tab is simply gone.
- *
- * The draft is a Theme *or* `null`, and `null` is a state rather than an empty one — it is the World
- * carrying no Theme, which is what **reset** stages and what saving it then clears the World back to.
- * Everything commits at one point, so **discard** always answers **reset** as well as every anchor
- * moved since the panel opened.
- *
- * Extension points, all of them draft fields this editor already round-trips untouched: #374's
- * per-token overrides (`overrides`), and #375's radii and font pairing (`radii`, `fontPairing`).
+ * The draft is a World Theme *or* `null`, `null` being the World carrying none: what **reset** stages,
+ * and what saving it clears the World back to. One commit point, so **cancel** answers reset too.
  */
 @Component({
   selector: 'app-world-theme',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, ButtonComponent, ThemePaletteComponent],
+  imports: [TranslocoPipe, ButtonComponent, EyebrowComponent, ThemePaletteComponent],
   template: `
     <div class="theme-editor">
-      <app-theme-palette [palettes]="palettes()" (changed)="apply($event)" />
+      <!-- One section per part of the contract; the radius set and font pairing take their own. -->
+      <section class="group">
+        <h2 appEyebrow>{{ 'worldTheme.paletteHeading' | transloco }}</h2>
+        <app-theme-palette [palettes]="palettes()" (changed)="apply($event)" />
+      </section>
 
       <div class="actions">
         <button
@@ -75,6 +70,9 @@ import { PaletteEdit, ThemePaletteComponent } from './theme-palette.component';
     .theme-editor {
       @apply flex flex-col gap-5;
     }
+    .group {
+      @apply flex flex-col gap-3;
+    }
     .actions {
       @apply flex flex-wrap items-center gap-2;
     }
@@ -92,19 +90,17 @@ export class WorldThemePanelComponent {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
 
-  /**
-   * Hexly's own two Palettes, read off the document once — what the controls show for a World with no
-   * Theme, and the values a first edit materialises a draft from.
-   */
+  /** Hexly's own two Palettes: what the controls show for an unthemed World, and what a first edit
+   * materialises a draft from. */
   private readonly defaults: Readonly<Record<ColorScheme, WorldThemePalette>> = {
     solar: hexlyPalette('solar'),
     astral: hexlyPalette('astral'),
   };
 
   /**
-   * The Theme as stored, from the World the resolver already pinned (ADR-0028) — no second read. Keyed
-   * on its serialised form so a live-follow refetch that touched something else does not look like a
-   * Theme change and take an Owner's in-progress draft away.
+   * The Theme as stored, off the World the resolver already pinned (ADR-0028) — no second read. Keyed
+   * on its serialised form, so a live-follow refetch that touched something else cannot read as a Theme
+   * change and take an in-progress draft away.
    */
   private readonly storedJson = computed(() => JSON.stringify(this.activeWorld.world()?.theme ?? null));
   private readonly stored = computed(() => draftFrom(JSON.parse(this.storedJson())));
@@ -130,8 +126,8 @@ export class WorldThemePanelComponent {
 
   /**
    * Fold one moved control into the draft. A first edit on an unthemed World materialises the whole
-   * Theme from the Hexly default, because a stored Theme carries both Palettes entire — there is no
-   * "this anchor only" to send.
+   * Theme from the Hexly default: a stored Theme carries both Palettes entire (ADR-0076), so there is
+   * no "this anchor only" to send.
    */
   protected apply({ scheme, control, raw }: PaletteEdit): void {
     const draft: ThemeDraft = this.draft() ?? { ...this.defaults };

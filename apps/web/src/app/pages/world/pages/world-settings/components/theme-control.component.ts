@@ -3,16 +3,11 @@ import { InputComponent } from '@hexly/web-ui';
 import { TokenControl } from '../utils/theme-draft';
 
 /**
- * One design-token control, chosen by the token's **declared type** (ADR-0075) and never by its name:
- * the manifest is what says a token holds a colour or a number, and the editor asking it is what makes
- * a newly declared token authorable without a change here.
+ * One design-token control, chosen by the token's **declared type** (ADR-0075) and never by its name —
+ * which is what makes a newly declared token authorable without a change here. The switch is total: a
+ * type with no control of its own gets a text field, so no token renders as nothing.
  *
- * Type-driven and tier-agnostic on purpose — the same component serves the tier-1 anchors and knobs
- * (#371), a tier-2 override (#374), and a radius (#375). A type with no control of its own falls back
- * to a plain text field, which is the honest offer for a value the editor has no better shape for.
- *
- * Emits on `input` rather than `change`, because the point of the editor is that the interface
- * re-themes while the control is still being dragged.
+ * Emits on `input`, not `change` — the interface re-themes while the control is still being dragged.
  */
 @Component({
   selector: 'app-theme-control',

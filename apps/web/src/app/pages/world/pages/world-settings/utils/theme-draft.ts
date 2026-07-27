@@ -8,13 +8,19 @@
  */
 
 import { DESIGN_TOKENS, DesignToken, TokenType, readDesignToken } from '@hexly/web-styles';
-import { PALETTE_TOKENS, WORLD_THEME_VERSION, WorldTheme, WorldThemeInput, WorldThemePalette } from '@hexly/domain';
-import { colorTokenHex } from '@hexly/domain';
+import {
+  PALETTE_TOKENS,
+  WORLD_THEME_VERSION,
+  WorldTheme,
+  WorldThemeInput,
+  WorldThemePalette,
+  colorTokenHex,
+} from '@hexly/domain';
 import { ColorScheme } from '@hexly/web-core';
 
 /**
- * The two halves an Owner authors in one sitting. A Theme and a reader's ColorScheme are orthogonal
- * (ADR-0006), so authoring only the scheme you happen to be sitting in ships half a Theme.
+ * The two halves an Owner authors in one sitting — a World Theme and a reader's ColorScheme are
+ * orthogonal (ADR-0006).
  */
 export const COLOR_SCHEMES = ['solar', 'astral'] as const satisfies readonly ColorScheme[];
 
@@ -26,14 +32,9 @@ export interface KnobRange {
 }
 
 /**
- * What each knob's ramp was actually fitted at (#366). The manifest declares a knob's *type* and the
- * `@property` registration its syntax; neither says how far it may travel, and all three of these
- * misbehave outside their range rather than merely looking odd:
- *
- * - **polarity** is a scheme's mirror axis, not a scalar — every ramp's direction is its sign, and the
- *   spike fitted ±1. A two-member domain says so; intermediate values interpolate but are untested.
- * - **line-alpha** is multiplied by 1.85 for `line-strong`, which clips above ~0.54.
- * - **veil** is exponentiated for the shadow ladder, so 0 and 1 are both degenerate.
+ * What each knob's ramp was fitted at (#366) — the manifest declares a knob's type, never how far it
+ * may travel. Polarity is a mirror axis rather than a scalar, so its domain has two members; line-alpha
+ * is multiplied by 1.85 and clips above ~0.54; veil is exponentiated, so 0 and 1 are both degenerate.
  */
 const KNOB_RANGES: Readonly<Partial<Record<DesignToken, KnobRange>>> = {
   '--palette-polarity': { min: -1, max: 1, step: 2 },
@@ -41,11 +42,7 @@ const KNOB_RANGES: Readonly<Partial<Record<DesignToken, KnobRange>>> = {
   '--palette-veil': { min: 0.01, max: 0.99, step: 0.01 },
 };
 
-/**
- * One authorable value: the token it writes, the type that picks its control, and — for a knob — the
- * domain that bounds it. Deliberately not Palette-specific: the same shape describes a tier-2 override
- * (#374) and a radius (#375), so one control component serves all three.
- */
+/** One authorable value: the token it writes, the type that picks its control, and a knob's domain. */
 export interface TokenControl {
   readonly token: DesignToken;
   readonly type: TokenType;
@@ -77,11 +74,9 @@ export const PALETTE_CONTROLS: readonly PaletteControl[] = DESIGN_TOKENS.filter(
 );
 
 /**
- * A Theme as it is being edited. `null` is its own state and not an empty one: it means the World
- * carries no Theme, which is what reset returns to and what the controls then show the default for.
- *
- * Everything but the two Palettes rides through untouched — this editor authors tier 1, and #374 and
- * #375 author the rest, so a save from here must not drop what another surface stored.
+ * A World Theme as it is being edited. `null` is its own state and not an empty one: the World carries
+ * none, which is what reset stages. Everything but the two Palettes rides through untouched, so a save
+ * from this editor cannot drop what a surface authoring the rest of the contract stored.
  */
 export interface ThemeDraft {
   readonly solar: WorldThemePalette;
@@ -91,11 +86,11 @@ export interface ThemeDraft {
   readonly overrides?: WorldTheme['overrides'];
 }
 
-/** The draft a stored Theme opens as; `null`/`undefined` for a World that carries none. */
+/** The draft a stored World Theme opens as; `null`/`undefined` for a World that carries none. */
 export function draftFrom(theme: WorldTheme | null | undefined): ThemeDraft | null {
   if (!theme) return null;
-  // Field by field, not a spread minus `version`: the draft's shape is this editor's, and the version
-  // it is re-stamped with on the way out is the contract this build knows rather than the one it read.
+  // Field by field rather than a spread minus `version`: what goes back out is stamped with the
+  // contract this build knows, not the one it read.
   const { solar, astral, radii, fontPairing, overrides } = theme;
   return { solar, astral, radii, fontPairing, overrides };
 }
@@ -106,9 +101,9 @@ export function draftToTheme(draft: ThemeDraft): WorldThemeInput {
 }
 
 /**
- * Whether two drafts are the same Theme — what "unsaved changes" is asked of. Key order is normalised,
- * because a draft's Palettes are rebuilt field by field while the saved one arrives as the server
- * serialised it, and an editor that called those different would offer to save nothing.
+ * Whether two drafts are the same World Theme — what "unsaved changes" is asked of. Key order is
+ * normalised, because a draft's Palettes are rebuilt field by field while the saved one arrives as the
+ * server serialised it.
  */
 export function sameDraft(a: ThemeDraft | null, b: ThemeDraft | null): boolean {
   return stable(a) === stable(b);
@@ -130,9 +125,8 @@ export function controlValue(palette: WorldThemePalette, control: PaletteControl
 }
 
 /**
- * `palette` with `control`'s field set from what the control emitted. A colour is stored as authored —
- * canonicalising is the write choke point's job (ADR-0076), and doing it here would be a second answer
- * to it. A knob that does not read as a number leaves its field alone rather than storing `NaN`.
+ * `palette` with `control`'s field set from what the control emitted. A colour is stored as authored:
+ * canonicalising is the write choke point's (ADR-0076), and a second answer to it would drift from it.
  */
 export function withControlValue(palette: WorldThemePalette, control: PaletteControl, raw: string): WorldThemePalette {
   if (control.type !== 'number') return { ...palette, [control.field]: raw };
@@ -142,12 +136,10 @@ export function withControlValue(palette: WorldThemePalette, control: PaletteCon
 }
 
 /**
- * Hexly's own Palette for a ColorScheme, read off the document rather than restated here.
- *
- * The probe works because tier-1 declarations key off `[data-color-scheme]` on *any* element, not
- * `:root[…]` (ADR-0076): the rule declares the anchors on the probe, which beats the World Theme
- * inherited from the root — so this answers the default whichever Theme is currently painted, and for
- * the ColorScheme the reader is not in. Only jsdom takes the manifest fallback.
+ * Hexly's own Palette for a ColorScheme, read off the document rather than restated here. Tier-1
+ * declarations key off `[data-color-scheme]` on *any* element (ADR-0076), so the rule declares the
+ * anchors on the probe and beats the World Theme inherited from the root — the default answers
+ * whichever Theme is painted, and for the ColorScheme the reader is not in. Only jsdom falls back.
  */
 export function hexlyPalette(scheme: ColorScheme): WorldThemePalette {
   const probe = document.createElement('div');

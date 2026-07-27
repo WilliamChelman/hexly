@@ -456,12 +456,13 @@
     "removeError": "Couldn't delete that field. Please try again."
   },
   "worldTheme": {
-    "heading": "Palette",
-    "subhead": "Eight anchor colours and three knobs per colour scheme; every other colour in the world is derived from them. Changes apply as you make them.",
-    "save": "Save theme",
+    "heading": "World theme",
+    "subhead": "The presentation this world wears: eight anchor colours and three knobs per colour scheme, with every other colour derived from them. Changes apply as you make them; readers keep their own colour scheme within it.",
+    "paletteHeading": "Palette",
+    "save": "Save",
     "reset": "Reset to the Hexly default",
     "unsaved": "Unsaved changes.",
-    "saveError": "Could not save the theme.",
+    "saveError": "Could not save the world theme.",
     "token": {
       "page": "Page",
       "ink": "Ink",

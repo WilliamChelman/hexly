@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test';
-import { DESIGN_TOKENS } from '@hexly/web-styles';
-import { addWorldMember, enterLibrary, expect, signInGrantee, test } from './fixtures';
+import { designToken } from '@hexly/web-styles';
+import { PALETTE_TOKENS } from '@hexly/domain';
+import { enterLibrary, expect, signInGrantee, test } from './fixtures';
+import { TEST_GRANTEE } from './test-user';
 // The app's own pretty-URL codec (ADR-0042), imported by file path for the reason `fixtures.ts` gives.
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
@@ -12,10 +14,13 @@ import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
  * ColorSchemes are authorable from one seat, and that a Contributor never reaches the editor at all.
  */
 
-/** The stored Palette field each tier-1 token is authored through, straight off the manifest. */
-const PALETTE_FIELDS = DESIGN_TOKENS.filter((decl) => decl.tier === 'palette').map((decl) => ({
-  field: decl.name.replace(/^--palette-/, '').replace(/-(\w)/g, (_, c: string) => c.toUpperCase()),
-  type: decl.type,
+/**
+ * Every authorable value, named as the stored Theme names it and typed as the manifest declares it —
+ * both ends off their own source, so nothing here is a list this spec keeps in step by hand.
+ */
+const PALETTE_FIELDS = Object.entries(PALETTE_TOKENS).map(([field, token]) => ({
+  field,
+  type: designToken(token).type,
 }));
 
 /** A custom property as it sits *inline* on `<html>` — empty when the applier has written none. */
@@ -150,15 +155,27 @@ test('a Theme edit changes nothing about what Entities contain or who can read t
   expect(after.edges).toEqual(before.edges);
 });
 
-test('a Contributor does not reach the Theme editor', async ({ page, browser }) => {
+test('a Contributor does not reach the Theme editor', async ({ page, request, browser }) => {
   const worldSeg = await enterLibrary(page);
-  await addWorldMember(page, worldSeg, 'contributor');
+  // Over the API rather than the Access pane: the reset keeps Worlds *and* their members, so by the
+  // time this spec runs the second user may already hold a role here — and the add picker, which
+  // offers only non-members, would then have nothing to select. The POST is an upsert either way.
+  const directory: { id: string; displayName: string }[] = await (await request.get('/api/users/directory')).json();
+  const grantee = directory.find((user) => user.displayName === TEST_GRANTEE.displayName);
+  expect(grantee, 'the second seeded user is in the Instance directory').toBeTruthy();
+  const added = await request.post(`/api/worlds/${idFromSegment(worldSeg)}/members`, {
+    data: { userId: grantee!.id, role: 'contributor' },
+  });
+  expect(added.ok(), await added.text()).toBeTruthy();
 
   const contributor = await signInGrantee(browser);
   await contributor.goto(`/w/${worldSeg}/settings`);
 
-  // Authoring a Theme is a manage right (ADR-0039); a Contributor writes Entities, not identity.
-  await expect(contributor.getByTestId('settings-nav-schema')).toHaveCount(0);
+  // The Settings shell renders for any reader, so anchor on a section that is *there* first — an
+  // absence asserted before the rail renders is an absence of everything, and proves nothing.
+  await expect(contributor.getByTestId('settings-nav-schema')).toBeVisible();
+
+  // Authoring identity is a manage right (ADR-0039); a Contributor writes Entities, not the World.
   await expect(contributor.getByTestId('settings-nav-theme')).toHaveCount(0);
   await expect(contributor.getByTestId('theme-save')).toHaveCount(0);
 

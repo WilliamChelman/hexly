@@ -13,12 +13,10 @@ export interface PaletteEdit {
 }
 
 /**
- * The Palette an Owner authors: a row per tier-1 token, a column per ColorScheme (ADR-0075, #371).
+ * The Palettes an Owner authors: a row per tier-1 token, a column per ColorScheme (ADR-0075).
  *
- * Both halves side by side rather than behind a switch, because a Theme and a reader's ColorScheme are
- * orthogonal (ADR-0006) — an Owner who can only reach the scheme they are sitting in ships half a
- * Theme, and one who has to toggle their *own* scheme to reach the other half is being asked to change
- * a reading preference to do an authoring job.
+ * Side by side rather than behind a switch — an Owner made to toggle their *own* ColorScheme to reach
+ * the other half is being asked to change a reading preference to do an authoring job (ADR-0006).
  *
  * The rows are the manifest's tier-1 slice, so a newly declared anchor or knob appears here on its own.
  */
@@ -44,7 +42,7 @@ export interface PaletteEdit {
         @for (scheme of schemes; track scheme) {
           <app-theme-control
             [control]="control"
-            [value]="valueOf(scheme, control)"
+            [value]="valueFor(scheme, control)"
             [label]="
               ('worldTheme.token.' + control.field | transloco) + ' — ' + ('common.colorScheme.' + scheme | transloco)
             "
@@ -84,7 +82,7 @@ export class ThemePaletteComponent {
   protected readonly controls = PALETTE_CONTROLS;
   protected readonly schemes = COLOR_SCHEMES;
 
-  protected valueOf(scheme: ColorScheme, control: PaletteControl): string {
+  protected valueFor(scheme: ColorScheme, control: PaletteControl): string {
     return controlValue(this.palettes()[scheme], control);
   }
 }

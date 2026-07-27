@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
-import { WorldDetail } from '@hexly/domain';
+import { WorldDetail, WorldVerb } from '@hexly/domain';
 import {
   WorldsClient,
   EntitiesClient,
@@ -81,7 +81,7 @@ describe('WorldSettings', () => {
   });
 
   /** Pin a World detail carrying `rights` — the only thing the Theme section is gated on. */
-  function pin(rights: string[]): void {
+  function pin(rights: WorldVerb[]): void {
     TestBed.inject(ActiveWorld).set({
       id: 'w1',
       name: 'Aldermoor',
@@ -98,8 +98,8 @@ describe('WorldSettings', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-theme"]')).not.toBeNull();
 
-    // A Contributor writes Entities; a Theme is the World's identity, which is a manage right (ADR-0039).
-    pin(['contribute']);
+    // A Contributor writes Entities; a World Theme is identity, which is a manage right (ADR-0039).
+    pin(['read', 'create-entity']);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-theme"]')).toBeNull();
   });

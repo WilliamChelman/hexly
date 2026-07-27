@@ -456,12 +456,13 @@
     "removeError": "Impossible de supprimer ce champ. Veuillez réessayer."
   },
   "worldTheme": {
-    "heading": "Palette",
-    "subhead": "Huit couleurs d’ancrage et trois réglages par schéma de couleurs ; toutes les autres couleurs du monde en découlent. Les modifications s’appliquent au fur et à mesure.",
-    "save": "Enregistrer le thème",
+    "heading": "Thème du monde",
+    "subhead": "L’apparence que porte ce monde : huit couleurs d’ancrage et trois réglages par schéma de couleurs, dont toutes les autres couleurs découlent. Les modifications s’appliquent au fur et à mesure ; chaque lecteur garde son propre schéma de couleurs.",
+    "paletteHeading": "Palette",
+    "save": "Enregistrer",
     "reset": "Revenir au thème Hexly par défaut",
     "unsaved": "Modifications non enregistrées.",
-    "saveError": "Impossible d’enregistrer le thème.",
+    "saveError": "Impossible d’enregistrer le thème du monde.",
     "token": {
       "page": "Page",
       "ink": "Encre",
