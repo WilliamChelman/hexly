@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal } from '@angular/core';
-import { Router } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
-import { ActiveWorld, ClientConfigStore } from '@hexly/web-core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
+import { map, switchMap } from 'rxjs';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { ActiveWorld, ClientConfigStore, TitleService } from '@hexly/web-core';
 import { EyebrowComponent, PanelComponent, IconComponent, IconName } from '@hexly/web-ui';
 import { OwnerSetComponent, MemberSetComponent, PublicLinkComponent } from '@hexly/web-entity';
 import { WorldTypesPanelComponent } from './components/world-types-panel.component';
@@ -25,6 +27,9 @@ interface SectionItem {
  * can cost the user reach to this World, so it drops back to the World Index.
  *
  * With Collaboration off (ADR-0071) the rail carries only the schema and imports groups.
+ *
+ * The open group lives in the URL's `section` param, so a refresh or a shared link lands on the same
+ * pane rather than the top of the rail — and names the tab title with it (ADR-0014).
  */
 @Component({
   selector: 'app-world-settings',
@@ -53,7 +58,7 @@ interface SectionItem {
               class="rail-item"
               [class.is-active]="active() === item.section"
               [attr.data-testid]="'settings-nav-' + item.section"
-              (click)="active.set(item.section)"
+              (click)="select(item.section)"
             >
               <app-icon [name]="item.icon" [size]="18" />
               <span>{{ item.label | transloco }}</span>
@@ -154,6 +159,7 @@ interface SectionItem {
 })
 export class WorldSettingsPage {
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly clientConfig = inject(ClientConfigStore);
   private readonly activeWorld = inject(ActiveWorld);
   readonly worldId = this.activeWorld.worldId;
@@ -176,15 +182,44 @@ export class WorldSettingsPage {
     ];
   });
 
+  private readonly routedSection = toSignal(this.route.queryParamMap.pipe(map((q) => q.get('section'))));
+
   /**
-   * The open group. Derived from {@link items} so a cut section can never stay selected — but *only*
-   * a section that is actually gone moves the selection: {@link items} re-reads the active World, and
-   * a World refresh (saving a Theme re-pins one) must not throw an Owner out of the pane they are in.
+   * The open group: whatever the URL names, narrowed to {@link items} so a section the rail does not
+   * carry — cut by config or by rights, or simply a stale link — falls back to the first one rather
+   * than showing an empty detail. The fallback only reads the rail, so a World refresh (saving a Theme
+   * re-pins one) leaves the URL, and the open pane, alone.
    */
-  readonly active = linkedSignal<readonly Section[], Section>({
-    source: () => this.items().map((item) => item.section),
-    computation: (sections, previous) => (previous && sections.includes(previous.value) ? previous.value : sections[0]),
+  readonly active = computed<Section>(() => {
+    const sections = this.items().map((item) => item.section);
+    const routed = this.routedSection();
+    return sections.find((section) => section === routed) ?? sections[0];
   });
+
+  constructor() {
+    const transloco = inject(TranslocoService);
+    const titles = inject(TitleService);
+    // The tab reads "Hexly — World theme": the open group's own rail label names it, so the two
+    // cannot drift, and selectTranslate re-resolves it on a live language switch (ADR-0014).
+    const label = toSignal(
+      toObservable(computed(() => this.items().find((item) => item.section === this.active())?.label)).pipe(
+        switchMap((key) => (key ? transloco.selectTranslate(key) : [null])),
+      ),
+    );
+    effect(() => titles.setDocumentName(label() ?? null));
+    // A stale section name would otherwise shadow the next page's title.
+    inject(DestroyRef).onDestroy(() => titles.setDocumentName(null));
+  }
+
+  /** Open a group by putting it in the URL, replacing rather than stacking so Back leaves the page. */
+  select(section: Section): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { section },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
 
   leave(): void {
     this.router.navigate(['/']);

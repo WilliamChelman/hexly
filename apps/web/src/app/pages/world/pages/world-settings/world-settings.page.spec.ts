@@ -12,6 +12,7 @@ import {
   AuthClient,
   ActiveWorld,
   ClientConfigStore,
+  TitleService,
 } from '@hexly/web-core';
 import {
   MockWorldsClient,
@@ -104,11 +105,11 @@ describe('WorldSettings', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-theme"]')).toBeNull();
   });
 
-  it('keeps the open section through a World refresh, so saving a Theme does not close the pane', () => {
+  it('keeps the open section through a World refresh, so saving a Theme does not close the pane', async () => {
     pin(['manage']);
     const fixture = TestBed.createComponent(WorldSettingsPage);
     fixture.detectChanges();
-    fixture.componentInstance.active.set('theme');
+    await TestBed.inject(Router).navigate([], { queryParams: { section: 'theme' } });
     fixture.detectChanges();
 
     // Saving a Theme re-pins the World, which re-derives the rail from it.
@@ -117,6 +118,48 @@ describe('WorldSettings', () => {
 
     expect(fixture.componentInstance.active()).toBe('theme');
     expect(fixture.nativeElement.querySelector('app-world-theme')).not.toBeNull();
+  });
+
+  it('opens the section the URL names, and puts the section picked from the rail into the URL', async () => {
+    pin(['manage']);
+    const router = TestBed.inject(Router);
+    await router.navigate([], { queryParams: { section: 'sharing' } });
+    const fixture = TestBed.createComponent(WorldSettingsPage);
+    fixture.detectChanges();
+    expect(fixture.debugElement.query(By.directive(PublicLinkComponent))).not.toBeNull();
+
+    fixture.nativeElement.querySelector('[data-testid="settings-nav-theme"]').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(router.url).toContain('section=theme');
+    expect(fixture.nativeElement.querySelector('app-world-theme')).not.toBeNull();
+  });
+
+  it('falls back to the first section when the URL names one the rail does not carry', async () => {
+    collaboration.set(false);
+    await TestBed.inject(Router).navigate([], { queryParams: { section: 'sharing' } });
+    const fixture = TestBed.createComponent(WorldSettingsPage);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.active()).toBe('schema');
+    expect(fixture.nativeElement.querySelector('app-world-types')).not.toBeNull();
+  });
+
+  it('names the tab after the open section, and clears it on the way out', async () => {
+    pin(['manage']);
+    const titles = TestBed.inject(TitleService);
+    const named = vi.spyOn(titles, 'setDocumentName');
+    const fixture = TestBed.createComponent(WorldSettingsPage);
+    fixture.detectChanges();
+    expect(named).toHaveBeenLastCalledWith('Members');
+
+    await TestBed.inject(Router).navigate([], { queryParams: { section: 'theme' } });
+    fixture.detectChanges();
+    expect(named).toHaveBeenLastCalledWith('World theme');
+
+    fixture.destroy();
+    expect(named).toHaveBeenLastCalledWith(null);
   });
 
   it('leaves for the World Index once the user resigns', () => {

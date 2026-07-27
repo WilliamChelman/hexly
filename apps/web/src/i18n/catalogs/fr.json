@@ -451,6 +451,10 @@
     "updateError": "Impossible d'enregistrer ce champ. Veuillez réessayer.",
     "removeError": "Impossible de supprimer ce champ. Veuillez réessayer."
   },
+  "worldSettings": {
+    "tabTitle": "Hexly — Paramètres du monde",
+    "tabTitleNamed": "Hexly — {{name}}"
+  },
   "worldTheme": {
     "heading": "Thème du monde",
     "subhead": "L’apparence que porte ce monde : huit couleurs d’ancrage et trois réglages par schéma de couleurs, dont toutes les autres couleurs découlent. Les modifications s’appliquent au fur et à mesure ; chaque lecteur garde son propre schéma de couleurs.",

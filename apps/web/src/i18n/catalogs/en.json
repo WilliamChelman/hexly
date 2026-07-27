@@ -451,6 +451,10 @@
     "updateError": "Couldn't save that field. Please try again.",
     "removeError": "Couldn't delete that field. Please try again."
   },
+  "worldSettings": {
+    "tabTitle": "Hexly — World settings",
+    "tabTitleNamed": "Hexly — {{name}}"
+  },
   "worldTheme": {
     "heading": "World theme",
     "subhead": "The presentation this world wears: eight anchor colours and three knobs per colour scheme, with every other colour derived from them. Changes apply as you make them; readers keep their own colour scheme within it.",
