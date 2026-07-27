@@ -9,8 +9,10 @@
  * Against the ten hand-tuned values these replace, the repaint costs ΔE00 ≤ 3.1 on eight of them and
  * 4.4 on forest; the per-token table is in `docs/design/world-theme-spec.md` §3.
  */
-/* Keyed off the attribute rather than `:root` so a scoped subtree re-resolves too (#370); both blocks
-   are specificity (0,1,0), so this one must stay above the astral block. */
+/* Keyed off the attribute rather than `:root` only because the two blocks must have equal specificity
+   (0,1,0), so this one has to stay above the astral block. It buys no scoped re-resolve: the tier-2
+   roles these read are declared once at `:root` by `@theme static`, so a subtree carrying the other
+   ColorScheme inherits the roles the root already derived (`web-styles/src/contrast/measure.ts`). */
 :root,
 [data-color-scheme='solar'] {
   /* The World's ink warmed with its accent, at two strengths; a Hex name is the Label's ink washed

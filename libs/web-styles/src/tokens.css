@@ -59,10 +59,8 @@
      (ADR-0021); index.css wraps 1/2/3/inset as `@utility shadow-*`. One geometry
      for both ColorSchemes (ADR-0075) — only the colour and its alpha re-theme.
      The 1/2/3 ladder is a *power* of the veil rather than a multiple of it,
-     because the two ColorSchemes agree on the exponents 1, 0.75 and 0.5 to
-     within 3% where a multiple would have to be 1.67 in Solar and 1.2 in Astral.
-     The inset well is not on that ladder — it takes `shadow-1`'s own alpha,
-     exact in Solar and 0.5 against a 0.40 target in Astral. */
+     which is the only form both ColorSchemes fit (world-theme-spec.md §2). The
+     inset well is off that ladder and takes `shadow-1`'s own alpha. */
   --shadow-1: 0 1px 2px oklch(from var(--palette-soot) l c h / var(--palette-veil));
   --shadow-2: 0 4px 12px -2px oklch(from var(--palette-soot) l c h / calc(pow(var(--palette-veil), 0.75)));
   --shadow-3: 0 16px 36px -8px oklch(from var(--palette-soot) l c h / calc(pow(var(--palette-veil), 0.5)));

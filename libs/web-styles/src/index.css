@@ -83,9 +83,11 @@
   /* =======================================================================
    * Colours — tier 2, the semantic roles, each derived from the tier-1 Palette
    * in tokens.css (ADR-0075). One expression per role, byte-identical in both
-   * ColorSchemes: only the eight anchors and three knobs differ. Relative
-   * colour syntax resolves at computed-value time, so swapping
-   * [data-color-scheme] re-resolves every role off the new Palette.
+   * ColorSchemes: only the eight anchors and three knobs differ. `@theme static`
+   * declares them at `:root` and nowhere else, so it is the *root's*
+   * [data-color-scheme] that re-resolves them off the new Palette; a scoped
+   * subtree carries the anchors and inherits the roles the root already derived,
+   * which is why the contrast report re-dresses the root (contrast/measure.ts).
    *
    * Every coefficient below is copied from the fit in
    * docs/design/spike-token-derivation.md §2, and each knob carries exactly one
@@ -93,20 +95,25 @@
    * ===================================================================== */
 
   /* The paper ramp: lightness steps off the page, chroma sloped against it at
-     ±0.42 per unit — the mirror symmetry the polarity knob carries. */
+     ±0.42 per unit — the mirror symmetry the polarity knob carries. Each step *folds*
+     at the 0/1 boundary rather than clipping into it, so a page an Owner sets at either
+     extreme keeps the ramp's spacing instead of collapsing the roles onto the page;
+     inert wherever the ramp already fits, which both shipped Palettes do. */
   --color-bg: var(--palette-page); /* the table / outer paper */
-  --color-bg-deep: oklch(from var(--palette-page) calc(l - 0.027) calc(c + 0.0113 * var(--palette-polarity)) h);
+  --color-bg-deep: oklch(
+    from var(--palette-page) calc(1 - abs(1 - abs(l - 0.027))) calc(c + 0.0113 * var(--palette-polarity)) h
+  );
   --color-surface: oklch(
-    from var(--palette-page) calc(l + 0.046) calc(c - 0.0193 * var(--palette-polarity)) calc(h - 2)
+    from var(--palette-page) calc(1 - abs(1 - abs(l + 0.046))) calc(c - 0.0193 * var(--palette-polarity)) calc(h - 2)
   );
   --color-surface-raised: oklch(
-    from var(--palette-page) calc(l + 0.067) calc(c - 0.0281 * var(--palette-polarity)) calc(h - 4.5)
+    from var(--palette-page) calc(1 - abs(1 - abs(l + 0.067))) calc(c - 0.0281 * var(--palette-polarity)) calc(h - 4.5)
   );
   /* The well sits below the page in Solar and above it in Astral — the swap the
      polarity knob exists for. Parented to the page, not to `surface`, because
      against `surface` the two schemes' offsets differ by 2.6× (spike §5). */
   --color-surface-sunken: oklch(
-    from var(--palette-page) calc(l - 0.017 * var(--palette-polarity)) calc(c + 0.0071) calc(h + 1)
+    from var(--palette-page) calc(1 - abs(1 - abs(l - 0.017 * var(--palette-polarity)))) calc(c + 0.0071) calc(h + 1)
   );
   /* The scrim is soot, not the page: it is dark in *both* ColorSchemes, so it is
      the one paper role the polarity knob cannot carry. Its alpha rides a power
@@ -170,26 +177,42 @@
     from var(--palette-accent) max(l, 0.713) calc(c + (0.713 - min(l, 0.713)) * 0.18) calc(h + 1) / 0.5
   );
 
-  /* The categorical tones (ADR-0075). Eight, because the accent sits *between*
-     danger and success, so excluding both leaves one ~161° arc, not two pockets.
-     The two lightness rows are load-bearing: at the accent's own `l` most of that
-     arc misses 4.5:1 in Solar (spike-tone-rotation.md §5).
-     The polarity term is what carries a chip over AA. A chip's text sits on its own
-     tone at 14%, so the fill drags the ground toward the text and the two rows push
-     opposite ways per ColorScheme — no pair of plain multipliers clears 4.5:1 in
-     both (best is 4.54, and only by collapsing the rows into one). Stepping each
-     row away from the page by a polarity-carried offset does, at 4.81 worst across
-     all sixteen tone/ground pairs; `contrast.ts` measures it. */
-  --color-tone-1: oklch(from var(--color-accent) calc(l * 0.82 - 0.0375 * var(--palette-polarity)) c calc(h + 113));
-  --color-tone-2: oklch(from var(--color-accent) calc(l * 0.82 - 0.0375 * var(--palette-polarity)) c calc(h + 136));
-  --color-tone-3: oklch(from var(--color-accent) calc(l * 0.82 - 0.0375 * var(--palette-polarity)) c calc(h + 161));
-  --color-tone-4: oklch(from var(--color-accent) calc(l * 0.95 - 0.0375 * var(--palette-polarity)) c calc(h + 193));
-  --color-tone-5: oklch(from var(--color-accent) calc(l * 0.82 - 0.0375 * var(--palette-polarity)) c calc(h + 207));
-  --color-tone-6: oklch(from var(--color-accent) calc(l * 0.95 - 0.0375 * var(--palette-polarity)) c calc(h + 230));
-  --color-tone-7: oklch(from var(--color-accent) calc(l * 0.82 - 0.0375 * var(--palette-polarity)) c calc(h + 250));
-  --color-tone-8: oklch(from var(--color-accent) calc(l * 0.95 - 0.0375 * var(--palette-polarity)) c calc(h + 270));
+  /* The categorical tones (ADR-0075). Eight, because the accent sits *between* danger
+     and success, so excluding both leaves one ~161° arc, not two pockets. The two
+     lightness rows and the polarity offset are the fit that carries a chip's own text
+     over AA at 4.81 worst case (spike-tone-rotation.md §5; `contrast.ts` measures it).
+     Off the *anchor*, like every sibling role, so an override of `--color-accent` is
+     the leaf opt-out world-theme-spec.md §5.1 sells it as; clamped so an extreme accent
+     cannot push a row out of the band where a tone is still text and the arc still
+     holds the chroma that separates eight of them (§4). */
+  --color-tone-1: oklch(
+    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 113)
+  );
+  --color-tone-2: oklch(
+    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 136)
+  );
+  --color-tone-3: oklch(
+    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 161)
+  );
+  --color-tone-4: oklch(
+    from var(--palette-accent) clamp(0.25, l * 0.95 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 193)
+  );
+  --color-tone-5: oklch(
+    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 207)
+  );
+  --color-tone-6: oklch(
+    from var(--palette-accent) clamp(0.25, l * 0.95 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 230)
+  );
+  --color-tone-7: oklch(
+    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 250)
+  );
+  --color-tone-8: oklch(
+    from var(--palette-accent) clamp(0.25, l * 0.95 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 270)
+  );
   /* Emphasis, not identity: at α 0.14 the eight fills sit under a JND apart, so a
-     chip's category rides its text and border instead (ADR-0075). */
+     chip's category rides its text and border instead (ADR-0075). Each fill reads its
+     own tone rather than the anchor — the one role pair where that is right, because a
+     chip's text and its ground have to move together or the AA pair above breaks. */
   --color-tone-1-soft: oklch(from var(--color-tone-1) l c h / 0.14);
   --color-tone-2-soft: oklch(from var(--color-tone-2) l c h / 0.14);
   --color-tone-3-soft: oklch(from var(--color-tone-3) l c h / 0.14);
@@ -213,7 +236,8 @@
      tooth (codex vellum field). */
   --color-canvas-bg: var(--palette-canvas);
   --color-canvas-mat: oklch(
-    from var(--palette-canvas) calc(l - 0.036) calc(c + 0.0151 * var(--palette-polarity)) calc(h - 0.7)
+    from var(--palette-canvas) calc(1 - abs(1 - abs(l - 0.036))) calc(c + 0.0151 * var(--palette-polarity))
+      calc(h - 0.7)
   );
   /* The one named literal (ADR-0075) — a 5× lift mismatch between the two
      ColorSchemes. Its Astral value sits in tokens.css beside the anchors. */
@@ -222,7 +246,7 @@
   /* The halo behind name/label text — the page pushed one step away from the
      ink. The worst symmetric fit in the set, ΔE00 2.69/2.75 (spike §5). */
   --color-ink-stroke: oklch(
-    from var(--palette-page) calc(l + 0.03 * var(--palette-polarity)) calc(c - 0.0126) calc(h + 2.5)
+    from var(--palette-page) calc(1 - abs(1 - abs(l + 0.03 * var(--palette-polarity)))) calc(c - 0.0126) calc(h + 2.5)
   );
 
   /* The grid rule, the marker inks and the terrain fills that used to sit here are the hexmap
