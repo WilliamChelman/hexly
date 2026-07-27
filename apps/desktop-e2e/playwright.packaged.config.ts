@@ -14,7 +14,12 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
-  reporter: process.env.CI ? [['html', { open: 'never' }], ['list']] : 'list',
+  // Pinned as in apps/web-e2e, and suffixed so this run's artifacts sit beside the gate suite's rather
+  // than overwriting them.
+  outputDir: join(__dirname, 'test-results-packaged'),
+  reporter: process.env.CI
+    ? [['html', { open: 'never', outputFolder: join(__dirname, 'playwright-report-packaged') }], ['list']]
+    : 'list',
   // A packaged launch boots Nest and runs migrations, then thumbnails through libvips.
   timeout: 180_000,
 });
