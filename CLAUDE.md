@@ -14,16 +14,9 @@ Canonical label vocabulary — `needs-triage`, `needs-info`, `ready-for-agent`, 
 
 Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
-## End-to-end tests
+## Testing
 
-The Playwright suite is self-contained — its `webServer` boots the app + API against a freshly-seeded throwaway DB. `dist/apps/api` (+ seed) and `dist/apps/web` must be built first; `nx e2e web-e2e` builds them for you.
-
-It is serial by design (`workers: 1`) and boots seven servers, so a full run costs several minutes on top of the builds. Iterate narrow, confirm wide:
-
-- While iterating, run one spec: `npx playwright test -c apps/web-e2e/playwright.config.ts <spec>`, with `E2E_REUSE_SERVER=1` to skip re-booting the servers (local only).
-- Once, before calling the work done, run `nx e2e web-e2e` with `E2E_REUSE_SERVER` unset. That is the run you may report as green.
-
-Same shape for unit tests: `nx test <project>` while you work, `nx run-many -t test` at the end. `nx test api` is marked flaky — re-run before believing a red.
+See `docs/agents/testing.md`.
 
 ## Code comments
 
