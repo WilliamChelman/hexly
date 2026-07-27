@@ -290,37 +290,37 @@
 @property --color-hex-line {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(120, 96, 56, 0.42);
+  initial-value: rgba(111, 90, 54, 0.371);
 }
 @property --color-feature-ink {
   syntax: '<color>';
   inherits: true;
-  initial-value: #5a3e16;
+  initial-value: #5f4418;
 }
 @property --color-label-ink {
   syntax: '<color>';
   inherits: true;
-  initial-value: #4a3a1e;
+  initial-value: #523c17;
 }
 @property --color-name-ink {
   syntax: '<color>';
   inherits: true;
-  initial-value: #5a4a2c;
+  initial-value: #5f4925;
 }
 @property --color-terrain-grass {
   syntax: '<color>';
   inherits: true;
-  initial-value: #b7be7e;
+  initial-value: #bcc37d;
 }
 @property --color-terrain-forest {
   syntax: '<color>';
   inherits: true;
-  initial-value: #6f9560;
+  initial-value: #829f6c;
 }
 @property --color-terrain-ocean {
   syntax: '<color>';
   inherits: true;
-  initial-value: #7eaab0;
+  initial-value: #84a6aa;
 }
 @property --color-terrain-mountain {
   syntax: '<color>';
@@ -330,17 +330,12 @@
 @property --color-terrain-desert {
   syntax: '<color>';
   inherits: true;
-  initial-value: #e0c98c;
-}
-@property --color-terrain-marsh {
-  syntax: '<color>';
-  inherits: true;
-  initial-value: #93a87f;
+  initial-value: #e0c37e;
 }
 @property --color-terrain-sky {
   syntax: '<color>';
   inherits: true;
-  initial-value: #a9c4d4;
+  initial-value: #b0c3d3;
 }
 @property --dur-instant {
   syntax: '<time>';

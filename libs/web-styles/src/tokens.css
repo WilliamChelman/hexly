@@ -84,8 +84,7 @@
  * This block is the Astral **Palette**, and almost nothing else: the semantic roles
  * are derived once in index.css and re-resolve here off these anchors (ADR-0075).
  * What remains beside it is what the derivation does not reach — the one named
- * literal, the categorical pair awaiting the `--color-tone-*` rotation, and the
- * hexmap plugin's tier-3 vocabulary awaiting its move out of core.
+ * literal and the categorical pair awaiting the `--color-tone-*` rotation.
  * ======================================================================= */
 :root[data-color-scheme='astral'] {
   /* ---- Tier 1 — the Astral Palette. */
@@ -110,19 +109,6 @@
 
   --color-astra: #a18cf0; /* nebula violet                                  */
   --color-astra-soft: rgba(161, 140, 240, 0.16);
-
-  --color-hex-line: rgba(160, 170, 235, 0.15);
-  --color-feature-ink: #ecd49a; /* a placed Feature's marker — gilded       */
-  --color-label-ink: #ecd49a; /* free-positioned Label text — gilded cream   */
-  --color-name-ink: #cdbf9f; /* a Hex name — dimmed parchment               */
-
-  --color-terrain-grass: #4c5d3b;
-  --color-terrain-forest: #264237;
-  --color-terrain-ocean: #1e3a55;
-  --color-terrain-mountain: #474264;
-  --color-terrain-desert: #6b5736;
-  --color-terrain-marsh: #3a4b44;
-  --color-terrain-sky: #45527d; /* open air — deep twilight indigo          */
 
   color-scheme: dark;
 }

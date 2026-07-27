@@ -6,12 +6,12 @@ import {
   labelSchema,
   parseCoordKey,
   regionSchema,
-  terrainPalette,
+  terrainSet,
 } from './hex-map';
 
-describe('terrainPalette', () => {
+describe('terrainSet', () => {
   it('offers the built-in terrains with stable ids and display labels', () => {
-    const byId = new Map(terrainPalette.map((t) => [t.id, t.label]));
+    const byId = new Map(terrainSet.map((t) => [t.id, t.label]));
 
     expect(byId.get('grass')).toBe('Grassland');
     expect(byId.get('forest')).toBe('Forest');

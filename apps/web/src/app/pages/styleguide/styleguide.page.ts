@@ -605,6 +605,11 @@ export class StyleguidePage {
     { token: '--color-line-strong', nameKey: 'styleguide.swatch.drawnRule' },
   ];
 
+  /**
+   * The hexmap plugin's terrain fills — tier 3, named here under the exemption this page holds, since
+   * rendering every token in the system is what it is for (ADR-0075, world-theme-spec §4). The spec
+   * holds the list to `terrainSet`.
+   */
   protected readonly terrain: SwatchRow[] = [
     { token: '--color-terrain-grass', nameKey: 'styleguide.swatch.grassland' },
     { token: '--color-terrain-forest', nameKey: 'styleguide.swatch.forest' },
@@ -614,7 +619,7 @@ export class StyleguidePage {
       nameKey: 'styleguide.swatch.mountains',
     },
     { token: '--color-terrain-desert', nameKey: 'styleguide.swatch.desert' },
-    { token: '--color-terrain-marsh', nameKey: 'styleguide.swatch.marsh' },
+    { token: '--color-terrain-sky', nameKey: 'styleguide.swatch.sky' },
   ];
 
   protected readonly typeScale: TypeRow[] = [

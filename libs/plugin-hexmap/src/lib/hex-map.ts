@@ -22,7 +22,7 @@ export function parseCoordKey(key: string): Axial {
 export interface Terrain {
   /** Stable identifier referenced by every Hex; never shown to the user. */
   readonly id: string;
-  /** Human-facing name for the palette (CONTEXT.md vocabulary). */
+  /** Human-facing name for the terrain set (CONTEXT.md vocabulary). */
   readonly label: string;
   /**
    * The CSS custom property the renderer fills painted hexes with. Left a `string` here and narrowed to
@@ -33,10 +33,10 @@ export interface Terrain {
 }
 
 /**
- * The built-in terrain palette. Ids are stable (stored in documents); labels
- * and fills are presentation.
+ * The built-in terrain set — "palette" is the World Theme's word now, and this is a list of Terrains
+ * (CONTEXT.md). Ids are stable (stored in documents); labels and fills are presentation.
  */
-export const terrainPalette = [
+export const terrainSet = [
   { id: 'grass', label: 'Grassland', fill: '--color-terrain-grass' },
   { id: 'forest', label: 'Forest', fill: '--color-terrain-forest' },
   { id: 'ocean', label: 'Ocean', fill: '--color-terrain-ocean' },
@@ -45,19 +45,19 @@ export const terrainPalette = [
   { id: 'sky', label: 'Sky', fill: '--color-terrain-sky' },
 ] as const satisfies readonly Terrain[];
 
-/** Build a Zod enum from a palette's ids, isolating the non-empty-tuple cast Zod requires. */
+/** Build a Zod enum from a set's ids, isolating the non-empty-tuple cast Zod requires. */
 function idEnum<Id extends string>(ids: readonly Id[]) {
   return z.enum(ids as [Id, ...Id[]]);
 }
 
-/** A terrain id constrained to the built-in palette — the source of truth. */
-export const terrainIdSchema = idEnum(terrainPalette.map((t) => t.id));
+/** A terrain id constrained to the built-in set — the source of truth. */
+export const terrainIdSchema = idEnum(terrainSet.map((t) => t.id));
 
 /** A built-in Feature icon: a stable `id`, a `label`, and its marker artwork. */
 export interface Feature {
   /** Stable identifier a Hex references; stored in documents, never shown. */
   readonly id: string;
-  /** Human-facing name for the palette (CONTEXT.md → Feature). */
+  /** Human-facing name for the Feature library (CONTEXT.md → Feature). */
   readonly label: string;
   /** The SVG path (`d`) of the marker, drawn in a 24×24 box. */
   readonly path: string;
@@ -155,8 +155,8 @@ export const hexMapSchema = z.object({
   labels: z.array(labelSchema).default([]),
 });
 
-/** A terrain id from the built-in palette — the literal union of every id. */
-export type TerrainId = (typeof terrainPalette)[number]['id'];
+/** A terrain id from the built-in set — the literal union of every id. */
+export type TerrainId = (typeof terrainSet)[number]['id'];
 /** A feature id from the built-in library — the literal union of every id. */
 export type FeatureId = (typeof featureLibrary)[number]['id'];
 
@@ -165,7 +165,7 @@ export type FeatureId = (typeof featureLibrary)[number]['id'];
  * caller applies its own fallback (e.g. the raw id, or `null` for "no hex").
  */
 export function terrainLabel(id: TerrainId): string | undefined {
-  return terrainPalette.find((t) => t.id === id)?.label;
+  return terrainSet.find((t) => t.id === id)?.label;
 }
 
 /** The human label for a feature id, or `undefined` if it is not a built-in. */
