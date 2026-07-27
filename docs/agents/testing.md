@@ -6,7 +6,7 @@ Iterate narrow, confirm wide. Only the wide run may be reported as green.
 | -------------------------------------- | ---------------------------------------------------- |
 | One e2e spec                           | `nx e2e web-e2e --testFiles=<spec>`                  |
 | One e2e test                           | `nx e2e web-e2e --testFiles=<spec> --grep "<title>"` |
-| All e2e, before calling it done        | `nx e2e web-e2e`                                     |
+| All e2e, if needed                     | `nx e2e web-e2e`                                     |
 | One project's unit tests               | `nx test <project>`                                  |
 | All unit tests, before calling it done | `nx run-many -t test`                                |
 
