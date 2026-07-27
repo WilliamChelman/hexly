@@ -27,8 +27,10 @@ import {
   draftToTheme,
   sameDraft,
   withControlValue,
+  withOverride,
 } from '../utils/theme-draft';
 import { PaletteEdit, ThemePaletteComponent } from './theme-palette.component';
+import { OverrideEdit, ThemeOverridesComponent } from './theme-overrides.component';
 
 /**
  * The World Theme editor (ADR-0076): a World Owner authors both ColorSchemes' anchors and knobs and
@@ -41,13 +43,19 @@ import { PaletteEdit, ThemePaletteComponent } from './theme-palette.component';
 @Component({
   selector: 'app-world-theme',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, ButtonComponent, EyebrowComponent, ThemePaletteComponent],
+  imports: [TranslocoPipe, ButtonComponent, EyebrowComponent, ThemePaletteComponent, ThemeOverridesComponent],
   template: `
     <div class="theme-editor">
       <!-- One section per part of the contract; the radius set and font pairing take their own. -->
       <section class="group">
         <h2 appEyebrow>{{ 'worldTheme.paletteHeading' | transloco }}</h2>
         <app-theme-palette [palettes]="palettes()" (changed)="apply($event)" />
+      </section>
+
+      <section class="group">
+        <h2 appEyebrow>{{ 'worldTheme.overridesHeading' | transloco }}</h2>
+        <p class="hint">{{ 'worldTheme.overridesHint' | transloco }}</p>
+        <app-theme-overrides [overrides]="draft()?.overrides" (changed)="applyOverride($event)" />
       </section>
 
       <div class="actions">
@@ -92,6 +100,9 @@ import { PaletteEdit, ThemePaletteComponent } from './theme-palette.component';
     }
     .unsaved {
       @apply text-xs text-ink-muted;
+    }
+    .hint {
+      @apply -mt-1 text-xs text-ink-muted;
     }
   `,
 })
@@ -148,6 +159,20 @@ export class WorldThemePanelComponent {
   protected apply({ scheme, control, raw }: PaletteEdit): void {
     const draft: ThemeDraft = this.draft() ?? { ...this.defaults };
     this.draft.set({ ...draft, [scheme]: withControlValue(draft[scheme], control, raw) });
+  }
+
+  /**
+   * Fold one tier-2 opt-out into the draft (#374). Materialises the whole Theme for the same reason a
+   * moved anchor does — a stored Theme carries both Palettes entire.
+   *
+   * An emptied field is left alone rather than stored or read as a clear, as {@link withControlValue}
+   * leaves an emptied knob: it is not a value of any token's type, and clearing mid-retype would take
+   * the field away from under the Owner. Clearing is the ✕.
+   */
+  protected applyOverride({ scheme, control, raw }: OverrideEdit): void {
+    if (raw !== null && raw.trim() === '') return;
+    const draft: ThemeDraft = this.draft() ?? { ...this.defaults };
+    this.draft.set({ ...draft, overrides: withOverride(draft.overrides, scheme, control.token, raw) });
   }
 
   /** Stage the Hexly default. Saving it is what actually returns the World to it. */

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DESIGN_TOKENS } from '@hexly/web-styles';
-import { PALETTE_TOKENS, WORLD_THEME_VERSION, WorldTheme, WorldThemePalette } from '@hexly/domain';
+import { DESIGN_TOKENS, designTokenInitial } from '@hexly/web-styles';
+import { OVERRIDABLE_TOKENS, PALETTE_TOKENS, WORLD_THEME_VERSION, WorldTheme, WorldThemePalette } from '@hexly/domain';
 import { WorldThemeLayer } from '@hexly/web-core';
 import {
   COLOR_SCHEMES,
+  OVERRIDE_GROUPS,
   PALETTE_CONTROLS,
   ThemeDraft,
   controlValue,
@@ -11,8 +12,11 @@ import {
   draftFrom,
   draftToTheme,
   hexlyPalette,
+  overrideSeed,
+  overrideValue,
   sameDraft,
   withControlValue,
+  withOverride,
 } from './theme-draft';
 
 function palette(over: Partial<WorldThemePalette> = {}): WorldThemePalette {
@@ -147,6 +151,147 @@ describe('the draft an Owner edits', () => {
 
   it('names both ColorSchemes, because an Owner who authors one ships half a Theme (ADR-0006)', () => {
     expect([...COLOR_SCHEMES]).toEqual(['solar', 'astral']);
+  });
+});
+
+/**
+ * The tier-2 opt-outs (#374). The slice is the schema's own key set, not a filter written twice, so
+ * these tests are about what the editor *does* with it: how it is grouped, what a control shows, and
+ * that clearing leaves an absent key rather than a literal.
+ */
+describe('the override controls the manifest declares', () => {
+  const flat = OVERRIDE_GROUPS.flatMap((group) => group.controls);
+
+  it('offers exactly the tokens the write choke point accepts as override keys', () => {
+    // Sorted, because grouping re-orders: what must match is the *set*, and each token's declared type.
+    expect(flat.map((control) => control.token).sort()).toEqual(OVERRIDABLE_TOKENS.map((decl) => decl.name).sort());
+    for (const decl of OVERRIDABLE_TOKENS) {
+      expect([decl.name, flat.find((control) => control.token === decl.name)?.type]).toEqual([decl.name, decl.type]);
+    }
+  });
+
+  it('offers no private Palette anchor and no plugin’s own vocabulary (ADR-0075)', () => {
+    const offered = new Set<string>(flat.map((control) => control.token));
+
+    expect(offered.has('--palette-accent')).toBe(false);
+    expect(offered.has('--color-terrain-grass')).toBe(false);
+    // Nor the radii, which are scheme-independent and authored once (#375), nor the type scale.
+    expect(offered.has('--radius-md')).toBe(false);
+    expect(offered.has('--text-base')).toBe(false);
+  });
+
+  it('puts every token in exactly one group, so none is unreachable and none is offered twice', () => {
+    expect(flat).toHaveLength(new Set(flat.map((control) => control.token)).size);
+    expect(flat).toHaveLength(OVERRIDABLE_TOKENS.length);
+  });
+
+  it('groups by the role family an Owner arrives asking about, not by declaration order', () => {
+    const groupOf = (token: string) =>
+      OVERRIDE_GROUPS.find((group) => group.controls.some((control) => control.token === token))?.id;
+
+    expect(groupOf('--color-surface-raised')).toBe('surfaces');
+    expect(groupOf('--color-ink-muted')).toBe('ink');
+    // A foreground *is* an ink, whatever fill it sits on.
+    expect(groupOf('--color-on-accent-sheen')).toBe('ink');
+    expect(groupOf('--color-line-faint')).toBe('lines');
+    expect(groupOf('--color-accent-sheen-deep')).toBe('accent');
+    expect(groupOf('--color-tone-8-soft')).toBe('tones');
+    expect(groupOf('--color-danger-soft')).toBe('status');
+    expect(groupOf('--color-canvas-glow')).toBe('canvas');
+    expect(groupOf('--shadow-focus')).toBe('elevation');
+  });
+
+  it('claims every token it offers, so nothing falls through to the catch-all today', () => {
+    expect(OVERRIDE_GROUPS.map((group) => group.id)).not.toContain('other');
+  });
+
+  it('seeds a new override from the value the manifest declares, for the ColorScheme it cannot read', () => {
+    const inkMuted = flat.find((control) => control.token === '--color-ink-muted')!;
+
+    expect(overrideSeed(inkMuted, false)).toBe(designTokenInitial('--color-ink-muted'));
+  });
+
+  it('seeds a shadow from the declaration even for the live scheme — unregistered, so it never resolves', () => {
+    // `@property` has no syntax component for a shadow (ADR-0075), so the document answers with an
+    // unsubstituted `oklch(from …)` expression rather than a value the choke point would take.
+    const shadow = flat.find((control) => control.token === '--shadow-1')!;
+
+    expect(overrideSeed(shadow, true)).toBe(designTokenInitial('--shadow-1'));
+  });
+});
+
+describe('the value an override control shows and the value it writes back', () => {
+  const inkMuted = OVERRIDE_GROUPS.flatMap((g) => g.controls).find((c) => c.token === '--color-ink-muted')!;
+  const shadow1 = OVERRIDE_GROUPS.flatMap((g) => g.controls).find((c) => c.token === '--shadow-1')!;
+
+  it('shows nothing for a token nobody overrode — that token is derived, not set to anything', () => {
+    expect(overrideValue(undefined, 'solar', inkMuted)).toBeUndefined();
+    expect(overrideValue({ astral: { '--color-ink-muted': '#123456' } }, 'solar', inkMuted)).toBeUndefined();
+  });
+
+  it('shows a colour override as the hex a native colour control speaks', () => {
+    expect(overrideValue({ solar: { '--color-ink-muted': 'oklch(0.4879 0.0554 82.6)' } }, 'solar', inkMuted)).toMatch(
+      /^#[0-9a-f]{6}$/,
+    );
+  });
+
+  it('shows a shadow override verbatim — a text field speaks the value as authored', () => {
+    const stored = '0 1px 2px rgba(0, 0, 0, 0.4)';
+
+    expect(overrideValue({ solar: { '--shadow-1': stored } }, 'solar', shadow1)).toBe(stored);
+  });
+
+  it('writes one ColorScheme’s override without touching the other’s', () => {
+    const next = withOverride({ astral: { '--color-ink': '#fff' } }, 'solar', '--color-ink-muted', '#112233');
+
+    expect(next).toEqual({ astral: { '--color-ink': '#fff' }, solar: { '--color-ink-muted': '#112233' } });
+  });
+});
+
+/**
+ * Clearing is an *absence*, not a value. The applier takes back whatever a previous write set and this
+ * one does not (ADR-0076), so a missing key is what returns a token to its derived value — writing the
+ * derived value as a literal would freeze it against the next anchor move instead.
+ */
+describe('clearing an override', () => {
+  it('removes the key rather than emptying it', () => {
+    const next = withOverride(
+      { solar: { '--color-ink': '#111111', '--color-ink-muted': '#222222' } },
+      'solar',
+      '--color-ink',
+      null,
+    );
+
+    expect(next).toEqual({ solar: { '--color-ink-muted': '#222222' } });
+    expect(Object.keys(next?.solar ?? {})).not.toContain('--color-ink');
+  });
+
+  it('drops a ColorScheme left with nothing, and the block itself when both are', () => {
+    const one = withOverride({ solar: { '--color-ink': '#111111' }, astral: {} }, 'solar', '--color-ink', null);
+
+    expect(one).toBeUndefined();
+  });
+
+  it('returns the draft to the one it started as, so setting then clearing is not an unsaved change', () => {
+    const before = draft();
+    const set = { ...before, overrides: withOverride(before.overrides, 'solar', '--color-ink', '#111111') };
+    const cleared = { ...set, overrides: withOverride(set.overrides, 'solar', '--color-ink', null) };
+
+    expect(sameDraft(before, set)).toBe(false);
+    expect(sameDraft(before, cleared)).toBe(true);
+  });
+
+  it('leaves an overridden token at its override while every other one follows the anchors', () => {
+    // The acceptance criterion that proves overrides sit *after* the derivation (ADR-0076): re-anchoring
+    // rewrites tier 1, and the opt-out rides through untouched because it is not derived from it.
+    const overrides = withOverride(undefined, 'solar', '--color-ink-muted', '#112233');
+    const accent = PALETTE_CONTROLS.find((control) => control.field === 'accent')!;
+    const before: ThemeDraft = { ...draft(), overrides };
+
+    const reanchored: ThemeDraft = { ...before, solar: withControlValue(before.solar, accent, '#6a2ab0') };
+
+    expect(reanchored.solar.accent).toBe('#6a2ab0');
+    expect(reanchored.overrides).toEqual({ solar: { '--color-ink-muted': '#112233' } });
   });
 });
 
