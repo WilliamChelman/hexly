@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { enterLibrary, entityIdFromUrl, expect, flushSave, segRe, test } from './fixtures';
+import { enterLibrary, entitiesNamed, entityIdFromUrl, expect, flushSave, segRe, test } from './fixtures';
 
 /**
  * Inline Creation (issue #343, ADR-0073): `@` plus a name nothing matches creates the Entity and links
@@ -231,8 +231,7 @@ test('two mentions of one name inside a single round trip converge on one Entity
   expect(await links.nth(1).getAttribute('data-entity-id')).toBe(first);
 
   // One Entity, not two spellings of the same name drifting apart (ADR-0073).
-  const found = await (await request.get('/api/entities?q=Zorblax')).json();
-  expect(found.items).toHaveLength(1);
+  expect(await entitiesNamed(request, 'Zorblax')).toHaveLength(1);
 });
 
 test('Esc at the picker leaves the typed name as plain prose and creates nothing', async ({ page, request }) => {
@@ -256,6 +255,26 @@ test('Esc at the picker leaves the typed name as plain prose and creates nothing
   await expect(surface).toContainText('@Zorblax');
   await expect(page.getByTestId('entity-link')).toHaveCount(0);
 
-  const found = await (await request.get('/api/entities?q=Zorblax')).json();
-  expect(found.items).toHaveLength(0);
+  expect(await entitiesNamed(request, 'Zorblax')).toHaveLength(0);
+});
+
+test('the note being written in is never offered as a match for the mention typed into it', async ({ page }) => {
+  await enterLibrary(page);
+  await page.getByTestId('new-default-entity').click();
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  const hostId = entityIdFromUrl(page);
+
+  const surface = page.getByTestId('note-content');
+  await surface.click();
+  await page.keyboard.type('Zorblax hunts the pass. ');
+  // Saved, so the host's own prose is in the index `q` reads (ADR-0035) — the state an autosave drops
+  // the author into mid-mention, which used to put the note at the top of its own picker.
+  await flushSave(page);
+
+  await mention(page, 'Zorblax');
+  await expect(page.getByTestId(`entity-picker-option-${hostId}`)).toHaveCount(0);
+
+  // So Enter still reaches the mint it promises (ADR-0073), not a link back to this note.
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('entity-link')).toHaveText('Zorblax');
 });

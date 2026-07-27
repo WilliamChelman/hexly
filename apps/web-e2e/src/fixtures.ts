@@ -114,6 +114,16 @@ export function preferencesPatched(page: Page): Promise<Response> {
   );
 }
 
+/**
+ * The Entities `q` returns that are actually *named* `name`. A hit count answers a different question:
+ * `q` is full-text over prose (ADR-0035), so a note matches the mention typed into it as soon as an
+ * autosave indexes the text — which says nothing about what was created.
+ */
+export async function entitiesNamed(request: APIRequestContext, name: string): Promise<{ name: string }[]> {
+  const found = await (await request.get(`/api/entities?q=${encodeURIComponent(name)}`)).json();
+  return (found.items as { name: string }[]).filter((entity) => entity.name === name);
+}
+
 /** Wait for a successful entity PUT. There is no Save button (ADR-0026): pair this with Cmd/Ctrl+S. */
 export function waitForSave(page: Page): Promise<Response> {
   return page.waitForResponse(

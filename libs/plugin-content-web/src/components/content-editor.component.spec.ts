@@ -363,6 +363,27 @@ describe('ContentEditor', () => {
       expect(picker.querySelector('[data-testid=entity-picker-option-e9]')).not.toBeNull();
     });
 
+    it('never offers the Entity being written in, however it came back a match', async () => {
+      // An autosave indexes the prose being typed (ADR-0035), so the open note matches its own mention;
+      // that row would sit above both Create rows and cost Enter the mint it promises (ADR-0073).
+      TestBed.overrideProvider(EntityNameResolver, {
+        useValue: {
+          ...stubResolver,
+          search: async () => [
+            { id: 'n1', name: 'Lady Mara', types: ['core.type.note'] },
+            { id: 'e9', name: 'Zorblax the Devourer', types: ['core.type.note'] },
+          ],
+        },
+      });
+      pinWorld({ id: 'w1', rights: ['read', 'create-entity'] });
+      TestBed.inject(FakeEntitySession).loadDetail(note('Lady Mara'));
+
+      const picker = await openPicker(create());
+
+      expect(picker.querySelector('[data-testid=entity-picker-option-n1]')).toBeNull();
+      expect(picker.querySelector('[data-testid=entity-picker-option-e9]')).not.toBeNull();
+    });
+
     it('withholds Create while no World is loaded at all', async () => {
       pinWorld(null);
       TestBed.inject(FakeEntitySession).loadDetail(note('Lady Mara'));
