@@ -6,3 +6,14 @@ export { DESIGN_TOKENS, designToken, isDesignToken } from './tokens/manifest';
 export type { Tier, TokenDecl, TokenType } from './tokens/design-token';
 export { designTokenPropertyBlock, registeredTokens } from './tokens/property-block';
 export { designTokenInitial, designTokenStyle, readDesignToken } from './tokens/read-token';
+export type { MeasuredScheme, Rgb, ThemeWarning } from './contrast/contrast';
+export {
+  BODY_CONTRAST_MIN,
+  CONTRAST_TOKENS,
+  TONE_CONFUSION_MAX,
+  contrastRatio,
+  deltaE00,
+  themeWarnings,
+} from './contrast/contrast';
+export type { SchemeMeasurement } from './contrast/measure';
+export { contrastReport, measureScheme, rasteriseColors } from './contrast/measure';

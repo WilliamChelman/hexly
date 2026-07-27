@@ -484,6 +484,29 @@
       "polarity": "Le sens de tous les dégradés : papier clair ou sombre.",
       "lineAlpha": "La force avec laquelle les filets se lisent.",
       "veil": "Le poids des ombres, des voiles et de la vignette."
+    },
+    "role": {
+      "ink": "Encre",
+      "ink-muted": "Encre discrète",
+      "accent": "Accent",
+      "surface": "Surface",
+      "bg": "Page",
+      "danger": "Danger",
+      "success": "Réussite",
+      "tone-1": "Catégorie 1",
+      "tone-2": "Catégorie 2",
+      "tone-3": "Catégorie 3",
+      "tone-4": "Catégorie 4",
+      "tone-5": "Catégorie 5",
+      "tone-6": "Catégorie 6",
+      "tone-7": "Catégorie 7",
+      "tone-8": "Catégorie 8"
+    },
+    "contrast": {
+      "clear": "Lisible : toutes les paires atteignent 4,5:1.",
+      "contrast": "{{ink}} sur {{ground}} : {{ratio}}:1, sous le seuil de 4,5:1 du texte courant.",
+      "midToneAccent": "Cet accent est de ton moyen : aucune couleur de texte automatique n’y est lisible ({{ratio}}:1). Choisissez un accent plus clair ou plus foncé.",
+      "toneCollision": "{{tone}} a pivoté trop près de {{status}} (ΔE {{distance}}) ; une puce risque de se lire comme {{status}}."
     }
   },
   "imports": {
