@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Locator } from '@playwright/test';
 import { rasteriseColors } from '@hexly/web-styles';
 import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
@@ -54,16 +54,16 @@ test('hides orphan entities behind a generic show-orphans toggle', async ({ page
 });
 
 /**
- * The colour the drawing is actually painted on, as composited. cosmos.gl's WebGL context is not
- * `preserveDrawingBuffer`, so the canvas answers nothing when sampled in-page — a screenshot is the only
- * reading of it a reader would recognise.
+ * The colour `canvas` is painted, as composited — via a screenshot, because cosmos.gl's WebGL context is
+ * not `preserveDrawingBuffer` and so answers nothing sampled in-page. The modal pixel, since the
+ * background is the largest thing in a sparse graph and no one spot is known to be clear of nodes.
  *
- * The modal pixel rather than a chosen one: the field is by far the largest thing in a sparse graph, so
- * nothing has to guess where the layout left a gap.
+ * The `<canvas>` itself, never the div around it: cosmos.gl mirrors the same colour onto that div's CSS
+ * `background-color`, which a CSS parser would resolve — the very thing this has to see past.
  */
-async function fieldColor(page: Page, canvas: Locator): Promise<number[]> {
+async function paintedBackground(canvas: Locator): Promise<[number, number, number]> {
   const shot = (await canvas.screenshot()).toString('base64');
-  return page.evaluate(async (encoded) => {
+  return canvas.page().evaluate(async (encoded) => {
     const blob = await (await fetch(`data:image/png;base64,${encoded}`)).blob();
     const bitmap = await createImageBitmap(blob);
     const surface = document.createElement('canvas');
@@ -78,23 +78,18 @@ async function fieldColor(page: Page, canvas: Locator): Promise<number[]> {
       const packed = (pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2];
       tally.set(packed, (tally.get(packed) ?? 0) + 1);
     }
-    let field = 0;
+    let painted = 0;
     let most = -1;
-    for (const [packed, count] of tally) if (count > most) [field, most] = [packed, count];
-    return [(field >> 16) & 255, (field >> 8) & 255, field & 255];
+    for (const [packed, count] of tally) if (count > most) [painted, most] = [packed, count];
+    return [(painted >> 16) & 255, (painted >> 8) & 255, painted & 255] as [number, number, number];
   }, shot);
 }
 
 /**
- * The graph's field is `--color-surface-sunken`, judged at the pixels.
- *
- * Nothing weaker sees this. Tier 2 derives, so the token resolves to `oklch()` (ADR-0075), and cosmos.gl
- * — a WebGL renderer that parses colour strings itself, with d3-color — answers black to a notation it
- * does not know. Every guard that stops at the resolved *value* passes such a colour: the token snapshot
- * accepts `oklch(` as resolved, and its rasterise reads through a 2D context, which parses `oklch()`
- * happily. Only the drawing knows what the renderer made of it.
- *
- * One orphan Entity, shown through the filter: the fewer nodes, the less of the field they cover.
+ * The graph draws on `--color-surface-sunken`, judged at the pixels — the only reading that sees what a
+ * WebGL renderer made of a colour. Tier 2 derives, so the token resolves to `oklch()` (ADR-0075), and
+ * cosmos.gl parses colour strings itself and answers black to a notation it does not know; every guard
+ * that stops at the resolved *value* passes such a colour, including the token snapshot's own rasterise.
  */
 test('draws on the sunken surface rather than on black', async ({ page }) => {
   const worldId = await enterLibrary(page);
@@ -102,21 +97,25 @@ test('draws on the sunken surface rather than on black', async ({ page }) => {
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
   await page.goto(`/w/${worldId}/graph`);
+  // The World's one Entity links to nothing, so the filter is what puts a drawing on screen at all —
+  // and one node is the least of the background any drawing can cover.
   await page.getByTestId('graph-filters').click();
   await page.getByTestId('graph-orphans-toggle').click();
 
-  const canvas = page.getByTestId('graph-canvas');
-  await expect(canvas.locator('canvas')).toBeVisible();
+  // The layout's own hook: it marks a graph that has ticked, so the reading is of a drawn frame rather
+  // than of whatever the canvas held before cosmos.gl's first.
+  const drawing = page.getByTestId('graph-canvas');
+  await expect(drawing).toHaveAttribute('data-settled', 'true', { timeout: 20_000 });
 
   const sunken = await page.evaluate(() =>
     getComputedStyle(document.documentElement).getPropertyValue('--color-surface-sunken').trim(),
   );
-  // The expected colour comes from the live token through the same rasterise the contrast report uses,
-  // so the assertion holds in whichever ColorScheme the suite is painted in.
+  // Expected from the live token through the rasterise the contrast report uses, so the assertion holds
+  // in whichever ColorScheme the suite is painted in.
   const [expected] = await page.evaluate(rasteriseColors, [sunken]);
-  const field = await fieldColor(page, canvas);
+  const painted = await paintedBackground(drawing.locator('canvas'));
 
   // One 8-bit step of slack, for the trip through the GPU's unorm conversion and the screenshot's encode.
-  const drifted = field.filter((channel, i) => Math.abs(channel - expected[i]) > 1);
-  expect(drifted, `the field reads ${field} where ${sunken} rasterises to ${expected}`).toEqual([]);
+  const drifted = painted.filter((channel, i) => Math.abs(channel - expected[i]) > 1);
+  expect(drifted, `the graph reads ${painted} where ${sunken} rasterises to ${expected}`).toEqual([]);
 });

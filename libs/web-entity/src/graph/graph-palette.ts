@@ -9,10 +9,8 @@ const NODE_RING_ALPHA = 0.5;
 /** The graph's colours, resolved from the live theme's tokens — cosmos.gl wants 0..1 RGBA floats. */
 export interface Palette {
   /**
-   * The field the graph is drawn on. RGBA rather than the token's own string: cosmos.gl parses a
-   * colour string with d3-color, which knows nothing of the `oklch()` a derived token resolves to
-   * (ADR-0075) and silently yields black. Every other colour here already goes through the browser's
-   * parser; this one has no excuse to be different.
+   * What the graph is drawn on — RGBA, not the token's own string: cosmos.gl parses a colour string
+   * itself and answers black to the `oklch()` a derived token resolves to (ADR-0075).
    */
   readonly background: [number, number, number, number];
   /** RGBA node colour per Entity type, keyed by type id — the type's tone or its declared token, resolved (ADR-0048). */
