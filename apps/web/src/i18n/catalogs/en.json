@@ -531,7 +531,7 @@
       "contrast": "{{ink}} on {{ground}} is {{ratio}}:1, under the 4.5:1 floor for body text.",
       "midToneAccent": "This accent is mid-tone: no automatic text colour is readable on it ({{ratio}}:1). Pick a lighter or darker accent.",
       "toneCollision": "{{tone}} has rotated close to {{status}} (ΔE {{distance}}); a chip may read as {{status}}.",
-      "chipContrast": "Category {{tone}} chips read at {{ratio}}:1 on {{ground}} — under the 4.5:1 floor. Their text carries the category, so it has to be legible."
+      "chipContrast": "{{ink}} chips read at {{ratio}}:1 on {{ground}} — under the 4.5:1 floor. Their text carries the meaning, so it has to be legible."
     },
     "radiiHeading": "Corners",
     "radiiLede": "How sharp or soft this world reads. One set covers every button, card, dialog and chip.",

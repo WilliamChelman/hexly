@@ -15,7 +15,7 @@ import {
   CONTRAST_TOKENS,
   MeasuredScheme,
   Rgb,
-  TONE_FILLS,
+  CHIP_FILLS,
   ThemeWarning,
   themeWarnings,
 } from './contrast';
@@ -110,7 +110,7 @@ export function contrastReport(
 ): readonly ThemeWarning[] | null {
   // The soft fills are measured too, and only here: they are 14% opaque, so they have to be composited
   // before the alpha is gone (`chipWarnings`).
-  const fillTokens = TONE_FILLS.map(([, fill]) => fill);
+  const fillTokens = CHIP_FILLS.map(([, fill]) => fill);
   const wanted = [...CONTRAST_TOKENS, ...fillTokens];
   const resolved = measureScheme({ scheme, declarations, tokens: wanted });
   if (wanted.some((token) => !resolved[token])) return null;
@@ -128,7 +128,7 @@ export function contrastReport(
       fillTokens.map((fill) => resolved[fill]),
       resolved[ground],
     ).map(([red, green, blue]): Rgb => [red, green, blue]);
-    TONE_FILLS.forEach(([tone], i) => ((fills[tone] ??= {})[ground] = over[i]));
+    CHIP_FILLS.forEach(([tone], i) => ((fills[tone] ??= {})[ground] = over[i]));
   }
   return themeWarnings(measured, fills);
 }

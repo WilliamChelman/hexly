@@ -186,28 +186,28 @@
      cannot push a row out of the band where a tone is still text and the arc still
      holds the chroma that separates eight of them (§4). */
   --color-tone-1: oklch(
-    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 113)
+    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 81)
   );
   --color-tone-2: oklch(
-    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 136)
+    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 117)
   );
   --color-tone-3: oklch(
-    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 161)
+    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 153)
   );
   --color-tone-4: oklch(
-    from var(--palette-accent) clamp(0.25, l * 0.95 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 193)
+    from var(--palette-accent) clamp(0.25, l * 0.95 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 189)
   );
   --color-tone-5: oklch(
-    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 207)
+    from var(--palette-accent) clamp(0.25, l * 0.95 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 225)
   );
   --color-tone-6: oklch(
-    from var(--palette-accent) clamp(0.25, l * 0.95 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 230)
+    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 261)
   );
   --color-tone-7: oklch(
-    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 250)
+    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 297)
   );
   --color-tone-8: oklch(
-    from var(--palette-accent) clamp(0.25, l * 0.95 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 270)
+    from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 333)
   );
   /* Emphasis, not identity: at α 0.14 the eight fills sit under a JND apart, so a
      chip's category rides its text and border instead (ADR-0075). Each fill reads its

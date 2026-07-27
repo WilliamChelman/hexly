@@ -393,11 +393,12 @@ test('a mid-tone accent and a tone rotated into a status colour each get their o
   await page.getByTestId('theme-control-solar-accent').fill('#bb00ff');
   await expect(page.getByTestId('theme-warning-solar-midtone')).toBeVisible();
 
-  // Re-anchoring the accent rotates all eight categorical tones with it, so the exclusion arc computed
-  // against Hexly's accent stops holding for theirs: at this hue, tone 3 lands on danger (ADR-0075).
+  // Re-anchoring the accent rotates all eight categorical tones with it, so the exclusion the check
+  // computes against Hexly's accent stops holding for theirs: at this hue tone 6 lands on success,
+  // ΔE00 5.6 against a bar of 10 (ADR-0075).
   await page.getByTestId('theme-control-solar-accent').fill('#0099cc');
   await expect(page.getByTestId('theme-warning-solar-midtone')).toHaveCount(0);
-  await expect(page.getByTestId('theme-warning-solar-tone-3-danger')).toBeVisible();
+  await expect(page.getByTestId('theme-warning-solar-tone-6-success')).toBeVisible();
 
   // On-colours flip silently and with no control of their own: the Owner moved the accent, and the
   // foreground that sits on it went the other way (ADR-0076).

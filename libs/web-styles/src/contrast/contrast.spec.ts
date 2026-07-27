@@ -8,7 +8,7 @@ import {
   MeasuredScheme,
   Rgb,
   TONE_CONFUSION_MAX,
-  TONE_FILLS,
+  CHIP_FILLS,
   contrastRatio,
   deltaE00,
   themeWarnings,
@@ -35,10 +35,17 @@ function measured(over: Partial<Record<DesignToken, Rgb>> = {}): MeasuredScheme 
   };
 }
 
-/** Composited chip fills, black by default — the tones are white in {@link measured}, so nothing warns. */
+/**
+ * Composited chip fills, chosen so nothing warns until a case makes it: black under the tones, which
+ * {@link measured} leaves white, and white under the two status inks, which it makes a dark red and a
+ * dark green. A status ink is on the list too, and no fill darker than `[200, 0, 0]` can clear 4.5:1.
+ */
 function fills(over: ChipFills = {}): ChipFills {
   const base = Object.fromEntries(
-    TONE_FILLS.map(([tone]) => [tone, Object.fromEntries(CHIP_GROUNDS.map((ground) => [ground, BLACK]))]),
+    CHIP_FILLS.map(([ink]) => [
+      ink,
+      Object.fromEntries(CHIP_GROUNDS.map((ground) => [ground, ink.startsWith('--color-tone-') ? BLACK : WHITE])),
+    ]),
   );
   return { ...base, ...over };
 }
@@ -209,8 +216,25 @@ describe('themeWarnings', () => {
 
     expect(warnings).toContainEqual({
       kind: 'chipContrast',
-      tone: '--color-tone-2',
+      ink: '--color-tone-2',
       ground: '--color-bg',
+      ratio: expect.any(Number),
+    });
+  });
+
+  it('warns on a status chip too, which is the same component as a category one', () => {
+    // `bg-danger-soft` with `text-danger` is a chip like any other (stat-block-view.component.ts), and
+    // an Owner authors the danger anchor — so leaving the status roles off the list left the check
+    // blind on Hexly's own Solar Palette, where three of these pairs sat under the floor.
+    const warnings = report(
+      { '--color-danger': [200, 0, 0] },
+      fills({ '--color-danger': { '--color-surface': [0x33, 0x33, 0x33], '--color-bg': [0x22, 0x22, 0x22] } }),
+    );
+
+    expect(warnings).toContainEqual({
+      kind: 'chipContrast',
+      ink: '--color-danger',
+      ground: expect.any(String),
       ratio: expect.any(Number),
     });
   });

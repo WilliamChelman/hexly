@@ -86,9 +86,9 @@ export class ThemeContrastComponent {
         };
       case 'chipContrast':
         return {
-          key: `chip-${role(warning.tone)}-${role(warning.ground)}`,
+          key: `chip-${role(warning.ink)}-${role(warning.ground)}`,
           copy,
-          params: { tone: name(warning.tone), ground: name(warning.ground), ratio: warning.ratio.toFixed(2) },
+          params: { ink: name(warning.ink), ground: name(warning.ground), ratio: warning.ratio.toFixed(2) },
         };
     }
   }

@@ -33,8 +33,8 @@
   /* Darkened, and only in L, because ADR-0076's report warned on Hexly's own
      untouched Palette — world-theme-spec.md §1. */
   --palette-accent: #8c5e00; /* heliograph gold — the through-line accent   */
-  --palette-danger: #a4402e; /* burnt-sienna marginalia                     */
-  --palette-success: #4a6f2f; /* moss                                       */
+  --palette-danger: #a21b01; /* burnt-sienna marginalia                     */
+  --palette-success: #325e01; /* moss                                       */
   --palette-canvas: #efe2bf; /* the map field                               */
   --palette-soot: #3c2c16; /* shadow / scrim ink — warm sepia, and lighter
      than `--palette-ink`, which is why it is its own anchor                 */
@@ -97,8 +97,8 @@
   --palette-ink: #ece3cf; /* starlit parchment text                         */
   --palette-ink-quiet: #9aa0c8; /* cool lavender-grey                       */
   --palette-accent: #d9b25a; /* constellation gold leaf                     */
-  --palette-danger: #e88a6f; /* warm coral marginalia                       */
-  --palette-success: #86c46a; /* aurora green                               */
+  --palette-danger: #fe7a54; /* warm coral marginalia                       */
+  --palette-success: #71ca42; /* aurora green                               */
   --palette-canvas: #12152e; /* the map field at night                      */
   --palette-soot: #02020a; /* near-black scrim ink                          */
   --palette-polarity: -1;

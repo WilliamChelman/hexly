@@ -531,7 +531,7 @@
       "contrast": "{{ink}} sur {{ground}} : {{ratio}}:1, sous le seuil de 4,5:1 du texte courant.",
       "midToneAccent": "Cet accent est de ton moyen : aucune couleur de texte automatique n’y est lisible ({{ratio}}:1). Choisissez un accent plus clair ou plus foncé.",
       "toneCollision": "{{tone}} a pivoté trop près de {{status}} (ΔE {{distance}}) ; une puce risque de se lire comme {{status}}.",
-      "chipContrast": "Les puces de la catégorie {{tone}} sont à {{ratio}}:1 sur {{ground}} — sous le seuil de 4,5:1. C'est leur texte qui porte la catégorie : il doit rester lisible."
+      "chipContrast": "Les puces {{ink}} sont à {{ratio}}:1 sur {{ground}} — sous le seuil de 4,5:1. C'est leur texte qui porte le sens : il doit rester lisible."
     },
     "radiiHeading": "Angles",
     "radiiLede": "La netteté ou la douceur des angles de ce monde. Un seul jeu couvre boutons, cartes, dialogues et pastilles.",

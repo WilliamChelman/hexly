@@ -85,12 +85,12 @@
 @property --palette-danger {
   syntax: '<color>';
   inherits: true;
-  initial-value: #a4402e;
+  initial-value: #a21b01;
 }
 @property --palette-success {
   syntax: '<color>';
   inherits: true;
-  initial-value: #4a6f2f;
+  initial-value: #325e01;
 }
 @property --palette-canvas {
   syntax: '<color>';
@@ -130,12 +130,12 @@
 @property --color-surface {
   syntax: '<color>';
   inherits: true;
-  initial-value: #fcf4e4;
+  initial-value: #fcf4e5;
 }
 @property --color-surface-raised {
   syntax: '<color>';
   inherits: true;
-  initial-value: #fffbf2;
+  initial-value: #fffcf2;
 }
 @property --color-surface-sunken {
   syntax: '<color>';
@@ -200,7 +200,7 @@
 @property --color-accent-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(141, 94, 0, 0.14);
+  initial-value: rgba(142, 92, 0, 0.14);
 }
 @property --color-accent-sheen-bright {
   syntax: '<color>';
@@ -230,102 +230,102 @@
 @property --color-tone-1 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #005550;
+  initial-value: #00552b;
 }
 @property --color-tone-1-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: oklch(0.387633 0.109056 188.68 / 0.14);
+  initial-value: oklch(0.387633 0.109056 156.68 / 0.14);
 }
 @property --color-tone-2 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #005266;
+  initial-value: #005554;
 }
 @property --color-tone-2-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: oklch(0.387633 0.109056 211.68 / 0.14);
+  initial-value: oklch(0.387633 0.109056 192.68 / 0.14);
 }
 @property --color-tone-3 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #004b76;
+  initial-value: #004d72;
 }
 @property --color-tone-3-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: oklch(0.387633 0.109056 236.68 / 0.14);
+  initial-value: oklch(0.387633 0.109056 228.68 / 0.14);
 }
 @property --color-tone-4 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #3e5293;
+  initial-value: #385493;
 }
 @property --color-tone-4-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: oklch(0.455032 0.109056 268.68 / 0.14);
+  initial-value: oklch(0.455032 0.109056 264.68 / 0.14);
 }
 @property --color-tone-5 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #3e3a7c;
+  initial-value: #614689;
 }
 @property --color-tone-5-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: oklch(0.387633 0.109056 282.68 / 0.14);
+  initial-value: oklch(0.455032 0.109056 300.68 / 0.14);
 }
 @property --color-tone-6 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #664486;
+  initial-value: #67295a;
 }
 @property --color-tone-6-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: oklch(0.455032 0.109056 305.68 / 0.14);
+  initial-value: oklch(0.387633 0.109056 336.68 / 0.14);
 }
 @property --color-tone-7 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #612c63;
+  initial-value: #732534;
 }
 @property --color-tone-7-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: oklch(0.387633 0.109056 325.68 / 0.14);
+  initial-value: oklch(0.387633 0.109056 12.6796 / 0.14);
 }
 @property --color-tone-8 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #803a64;
+  initial-value: #702d00;
 }
 @property --color-tone-8-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: oklch(0.455032 0.109056 345.68 / 0.14);
+  initial-value: oklch(0.387633 0.109056 48.6796 / 0.14);
 }
 @property --color-danger {
   syntax: '<color>';
   inherits: true;
-  initial-value: #a4402e;
+  initial-value: #a21b01;
 }
 @property --color-danger-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(164, 64, 46, 0.15);
+  initial-value: rgba(161, 27, 0, 0.15);
 }
 @property --color-success {
   syntax: '<color>';
   inherits: true;
-  initial-value: #4a6f2f;
+  initial-value: #325e01;
 }
 @property --color-success-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(74, 111, 47, 0.16);
+  initial-value: rgba(50, 93, 0, 0.16);
 }
 @property --color-canvas-bg {
   syntax: '<color>';

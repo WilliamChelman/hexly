@@ -19,11 +19,12 @@ export type MeasuredScheme = Readonly<Partial<Record<DesignToken, Rgb>>>;
 export const BODY_CONTRAST_MIN = 4.5;
 
 /**
- * The ΔE00 below which a category tone reads as a status colour — the design's own revealed tolerance,
- * not a literature number (`docs/design/spike-tone-rotation.md` §2). Hexly's eight clear it by 0.6 at
- * the tightest, thin because the exclusion arc was placed at this very threshold.
+ * The ΔE00 below which a category tone reads as a status colour. Lowered from 20 once the status
+ * anchors were intensified: at 20 the tones were confined to one ~157° arc and read as one family,
+ * which is a worse failure than a tone sitting nearer a status colour it also carries an icon against.
+ * Hexly's eight clear it by 2.3 at the tightest (`docs/design/spike-tone-rotation.md` §2).
  */
-export const TONE_CONFUSION_MAX = 20;
+export const TONE_CONFUSION_MAX = 10;
 
 /**
  * The pairs a reader reads prose through: **the two inks against both grounds a panel and the page put
@@ -49,10 +50,16 @@ const TONES: readonly DesignToken[] = DESIGN_TOKENS.filter((decl) => /^--color-t
   (decl) => decl.name,
 );
 
-/** Each tone's soft fill, paired with its tone — what a chip puts its own text on. */
-export const TONE_FILLS: readonly (readonly [DesignToken, DesignToken])[] = TONES.map((tone) => [
-  tone,
-  `${tone}-soft` as DesignToken,
+/**
+ * Each chip's soft fill, paired with the ink that sits on it — what a chip puts its own text on.
+ *
+ * The status roles are in it, not just the tones: `bg-danger-soft` with `text-danger` is the same
+ * component as a category chip, and an Owner authors those two anchors as well, so leaving them out
+ * left the check blind on the surface it was written for.
+ */
+export const CHIP_FILLS: readonly (readonly [DesignToken, DesignToken])[] = [...TONES, ...STATUS_ROLES].map((ink) => [
+  ink,
+  `${ink}-soft` as DesignToken,
 ]);
 
 /**
@@ -80,10 +87,13 @@ export type ThemeWarning =
       readonly against: DesignToken;
       readonly distance: number;
     }
-  /** A chip's own text on its own fill, over the ground that reads worst of the two it may sit on. */
+  /**
+   * A chip's own text on its own fill, over the ground that reads worst of the two it may sit on.
+   * `ink` rather than `tone`: a status chip is checked here too, and it is not a category.
+   */
   | {
       readonly kind: 'chipContrast';
-      readonly tone: DesignToken;
+      readonly ink: DesignToken;
       readonly ground: DesignToken;
       readonly ratio: number;
     };
@@ -111,19 +121,19 @@ export function themeWarnings(measured: MeasuredScheme, fills: ChipFills): reado
 }
 
 /**
- * A chip carries its category in its *text*, on its own tone at 14% (ADR-0075) — so the pair that has
- * to clear AA is the tone against that fill composited over the ground, not against the ground itself.
+ * A chip carries its meaning in its *text*, on its own colour at ~14% (ADR-0075) — so the pair that has
+ * to clear AA is the ink against that fill composited over the ground, not against the ground itself.
  * Only the worse ground is reported: a chip is one component, and the Owner fixes it once.
  */
 function* chipWarnings(color: (token: DesignToken) => Rgb, fills: ChipFills): Generator<ThemeWarning> {
-  for (const [tone] of TONE_FILLS) {
+  for (const [ink] of CHIP_FILLS) {
     const overGround = CHIP_GROUNDS.map((ground) => {
-      const fill = fills[tone]?.[ground];
-      if (!fill) throw new Error(`contrast report: ${tone} was not composited over ${ground}`);
-      return { ground, ratio: contrastRatio(color(tone), fill) };
+      const fill = fills[ink]?.[ground];
+      if (!fill) throw new Error(`contrast report: ${ink} was not composited over ${ground}`);
+      return { ground, ratio: contrastRatio(color(ink), fill) };
     });
     const worst = overGround.reduce((one, two) => (two.ratio < one.ratio ? two : one));
-    if (worst.ratio < BODY_CONTRAST_MIN) yield { kind: 'chipContrast', tone, ...worst };
+    if (worst.ratio < BODY_CONTRAST_MIN) yield { kind: 'chipContrast', ink, ...worst };
   }
 }
 
