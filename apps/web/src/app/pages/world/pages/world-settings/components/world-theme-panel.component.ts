@@ -79,7 +79,11 @@ import { ThemeCopyComponent } from './theme-copy.component';
       <section class="group">
         <h2 appEyebrow>{{ 'worldTheme.overridesHeading' | transloco }}</h2>
         <p class="hint">{{ 'worldTheme.overridesHint' | transloco }}</p>
-        <app-theme-overrides [overrides]="draft()?.overrides" (changed)="applyOverride($event)" />
+        <app-theme-overrides
+          [overrides]="draft()?.overrides"
+          [declarations]="declarations()"
+          (changed)="applyOverride($event)"
+        />
       </section>
 
       <section class="group">

@@ -271,18 +271,25 @@ describe('the override controls the manifest declares', () => {
     expect(OVERRIDE_GROUPS.map((group) => group.id)).not.toContain('other');
   });
 
-  it('seeds a new override from the value the manifest declares, for the ColorScheme it cannot read', () => {
+  it('seeds a new override at the value the row was showing, so opting out changes nothing on screen', () => {
     const inkMuted = flat.find((control) => control.token === '--color-ink-muted')!;
 
-    expect(overrideSeed(inkMuted, false)).toBe(designTokenInitial('--color-ink-muted'));
+    // Verbatim, not through `colorTokenHex`: a translucent role would lose its alpha to the hex.
+    expect(overrideSeed(inkMuted, 'oklch(0.4879 0.0554 82.6 / 0.4)')).toBe('oklch(0.4879 0.0554 82.6 / 0.4)');
   });
 
-  it('seeds a shadow from the declaration even for the live scheme — unregistered, so it never resolves', () => {
+  it('falls back to the manifest where the resolved value is no colour the choke point would take', () => {
+    const inkMuted = flat.find((control) => control.token === '--color-ink-muted')!;
+
+    expect(overrideSeed(inkMuted, '')).toBe(designTokenInitial('--color-ink-muted'));
+  });
+
+  it('seeds a shadow from the declaration whatever resolved, being unregistered and never a value', () => {
     // `@property` has no syntax component for a shadow (ADR-0075), so the document answers with an
     // unsubstituted `oklch(from …)` expression rather than a value the choke point would take.
     const shadow = flat.find((control) => control.token === '--shadow-1')!;
 
-    expect(overrideSeed(shadow, true)).toBe(designTokenInitial('--shadow-1'));
+    expect(overrideSeed(shadow, '0 1px 2px oklch(from #3c2c16 l c h / 0.12)')).toBe(designTokenInitial('--shadow-1'));
   });
 });
 

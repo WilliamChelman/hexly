@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { DESIGN_TOKENS, designToken, isDesignToken } from './manifest';
+import { tokenDerivation } from './declared';
 
 /**
  * The manifest declares the contract; the stylesheets still hold the values. These tests are the
@@ -93,10 +94,13 @@ describe('the design-token manifest', () => {
   /**
    * A token the stylesheets *compute* from another one, rather than state: an alias of an anchor, or a
    * colour function over one. A gradient naming its two stops is not one — it is exactly what it says.
+   *
+   * Through {@link tokenDerivation}, which is what the Theme editor marks its rows with (#374): the
+   * question "is this stated or computed" gets one answer, whether it is asked of the file on disk or
+   * of the CSSOM.
    */
   function isDerived(name: string): boolean {
-    const value = declared.get(name) ?? '';
-    return /^var\(--palette-|oklch\(from|color-mix\(|contrast-color\(/.test(value);
+    return tokenDerivation(declared.get(name) ?? '').kind !== 'literal';
   }
 
   it("carries each literal token's Solar value as its initial", () => {

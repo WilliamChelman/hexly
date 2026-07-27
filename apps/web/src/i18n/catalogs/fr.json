@@ -466,9 +466,13 @@
     "copyLoadError": "Impossible de charger les mondes dont vous pouvez copier un thème.",
     "paletteHeading": "Palette",
     "overridesHeading": "Jetons individuels",
-    "overridesHint": "Toutes les couleurs ci-dessus découlent de la palette. Là où la valeur dérivée ne vous convient pas, sélectionnez-la et fixez la vôtre ; l’effacer rend le jeton à la palette.",
-    "derived": "Dérivé",
-    "setOverride": "Redéfinir {{name}}",
+    "overridesHint": "Chaque jeton ci-dessous suit la palette tant que vous ne le fixez pas, et chaque case montre ce qu’il rend actuellement. La plupart découlent des ancres ; quelques-uns sont une ancre sous un autre nom, et quelques-uns sont des valeurs fixes qu’aucune ancre n’atteint. Sélectionnez-en un pour fixer le vôtre ; l’effacer rend le jeton à la palette.",
+    "derivation": {
+      "derived": "Dérivé",
+      "anchor": "Ancre",
+      "literal": "Fixe"
+    },
+    "setOverride": "Redéfinir {{name}}, actuellement {{value}}",
     "overrideOf": "Redéfinition de {{name}}",
     "clearOverride": "Effacer la redéfinition de {{name}}",
     "overriddenCount": "{{count}} redéfini(s)",
@@ -557,8 +561,8 @@
       "codex": "Codex"
     },
     "fontsHint": {
-      "default": "Ce monde n’en définit aucune.",
-      "codex": "Titrage Marcellus, texte Source Serif, cartouche Cinzel Decorative, chasse fixe JetBrains Mono."
+      "default": "Ce monde n’en définit aucune ; il suit les caractères d’Hexly, quels qu’ils deviennent.",
+      "codex": "Les caractères d’Hexly, fixés sur ce monde — Marcellus, Source Serif, Cinzel Decorative, JetBrains Mono. La même typographie que la valeur par défaut aujourd’hui ; un changement ultérieur de celle-ci ne la déplacera pas."
     },
     "fontsSpecimen": {
       "display": "La Route aux neuf détours",

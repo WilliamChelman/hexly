@@ -466,9 +466,13 @@
     "copyLoadError": "Could not load the worlds you can copy a theme from.",
     "paletteHeading": "Palette",
     "overridesHeading": "Individual tokens",
-    "overridesHint": "Every colour above is derived from the palette. Where the derived value is not what you wanted, select it and set your own; clearing it hands the token back to the palette.",
-    "derived": "Derived",
-    "setOverride": "Override {{name}}",
+    "overridesHint": "Each token below follows the palette until you set it, and every cell shows what it currently renders as. Most are derived from the anchors; a few are an anchor under another name, and a few are fixed values no anchor reaches. Select one to set your own; clearing it hands the token back to the palette.",
+    "derivation": {
+      "derived": "Derived",
+      "anchor": "Anchor",
+      "literal": "Fixed"
+    },
+    "setOverride": "Override {{name}}, currently {{value}}",
     "overrideOf": "Override of {{name}}",
     "clearOverride": "Clear the override of {{name}}",
     "overriddenCount": "{{count}} overridden",
@@ -557,8 +561,8 @@
       "codex": "Codex"
     },
     "fontsHint": {
-      "default": "This world sets none.",
-      "codex": "Marcellus display, Source Serif body, Cinzel Decorative cartouche, JetBrains Mono."
+      "default": "This world sets none; it follows Hexly's own faces, whatever they become.",
+      "codex": "Hexly's own faces, pinned to this world — Marcellus, Source Serif, Cinzel Decorative, JetBrains Mono. The same type as the default today; a later change to the default will not move it."
     },
     "fontsSpecimen": {
       "display": "The Ninefold Road",

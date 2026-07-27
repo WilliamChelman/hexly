@@ -9,6 +9,7 @@ import {
   colorTokenHex,
 } from '@hexly/domain';
 import { ActiveWorld, INSTANCE_THEME, WorldThemeLayer, WorldsClient } from '@hexly/web-core';
+import { designTokenInitial } from '@hexly/web-styles';
 import { MockWorldsClient } from '@hexly/web-core/testing';
 import { provideTranslocoTesting } from '../../../../../../testing/transloco-testing';
 import { PALETTE_CONTROLS, RADIUS_PRESETS } from '../utils/theme-draft';
@@ -120,7 +121,7 @@ describe('WorldThemePanel', () => {
    * through the DOM an Owner actually drives — and that clearing sends an *absence*.
    */
   describe('overriding an individual token', () => {
-    /** Turn a derived row into an override, then move the control it put there. */
+    /** Turn an untouched row into an override, then move the control it put there. */
     function override(fixture: ComponentFixture<WorldThemePanelComponent>, key: string, value: string): void {
       at(fixture, `theme-override-set-solar-${key}`).click();
       fixture.detectChanges();
@@ -139,6 +140,33 @@ describe('WorldThemePanel', () => {
       // ADR-0075's tier boundary: the anchors are authored as the Palette, and tier 3 is not ours.
       expect(at(fixture, 'theme-override-set-solar-palette-accent')).toBeNull();
       expect(at(fixture, 'theme-override-set-solar-color-terrain-grass')).toBeNull();
+    });
+
+    /**
+     * The row shows what the token *is*, not a word for where it came from: "derived" was untrue of
+     * `--color-canvas-glow`, a named literal, and of the seven roles that are a tier-1 anchor under
+     * another name (ADR-0075). jsdom resolves no derivation, so what it shows here is the manifest's
+     * own value — which is the fallback, and still the token's value rather than its provenance.
+     */
+    it('shows an untouched row as the value it renders as, in both ColorSchemes', () => {
+      const fixture = mount(null);
+
+      for (const scheme of ['solar', 'astral']) {
+        const cell = at(fixture, `theme-override-set-${scheme}-color-canvas-glow`);
+        expect(cell.textContent?.trim()).toBe(colorTokenHex(designTokenInitial('--color-canvas-glow')));
+        expect(cell.getAttribute('aria-label')).toContain(designTokenInitial('--color-canvas-glow'));
+      }
+    });
+
+    it('seeds a new override at that same value, so opting a token out changes nothing on screen', () => {
+      const fixture = mount(null);
+
+      at(fixture, 'theme-override-set-astral-color-canvas-glow').click();
+      fixture.detectChanges();
+
+      // Seeded verbatim rather than through the hex, which would drop this role's 0.55 alpha. The
+      // ColorScheme the reader is not in is seeded from its own measurement now, not from the root.
+      expect(save(fixture)?.overrides?.astral?.['--color-canvas-glow']).toBe(designTokenInitial('--color-canvas-glow'));
     });
 
     it('sends the override per ColorScheme, alongside a Palette it materialised whole', () => {

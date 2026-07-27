@@ -34,7 +34,7 @@ async function openGroup(page: Page, group: string): Promise<void> {
   await page.getByTestId(`theme-override-group-${group}`).locator('summary').click();
 }
 
-/** Turn a derived row into an override and set it to `value`. */
+/** Turn an untouched row into an override and set it to `value`. */
 async function override(page: Page, scheme: string, key: string, value: string): Promise<void> {
   await page.getByTestId(`theme-override-set-${scheme}-${key}`).click();
   await page.getByTestId(`theme-override-${scheme}-${key}`).fill(value);
@@ -111,6 +111,111 @@ test('an override beats the derivation, per ColorScheme, and clearing hands the 
 
   await page.reload();
   expect(await inlineOnRoot(page, '--color-tone-1')).toBe('');
+});
+
+test('an untouched row shows the value its own ColorScheme renders, not a word for where it came from', async ({
+  page,
+}) => {
+  const worldSeg = await enterLibrary(page);
+  await openThemeEditor(page, worldSeg);
+  await openGroup(page, 'tones');
+
+  const solar = page.getByTestId('theme-override-set-solar-color-tone-5');
+  const astral = page.getByTestId('theme-override-set-astral-color-tone-5');
+
+  // The cell carries the value; where it came from is the row's mark, one column over. The two used to
+  // be one word, and that word was wrong wherever the value was not an expression over the anchors.
+  await expect(solar).toHaveText(/^#[0-9a-f]{6}$/i);
+  await expect(astral).toHaveText(/^#[0-9a-f]{6}$/i);
+
+  // And each column is measured under *its own* Palette. On an unedited World, Solar's roles resolve
+  // to exactly what the manifest declares (`manifest.spec.ts`) — so a fallback to the manifest for the
+  // ColorScheme the reader is not in would put the same value in both cells. It does not.
+  const shown = { solar: await solar.innerText(), astral: await astral.innerText() };
+  expect(shown.astral).not.toBe(shown.solar);
+
+  // And each is what its own opt-out starts at, so the click that departs from the derivation moves
+  // nothing — in the ColorScheme the reader is not in as much as in the one they are.
+  await solar.click();
+  await astral.click();
+  await expect(page.getByTestId('theme-override-solar-color-tone-5')).toHaveValue(shown.solar);
+  await expect(page.getByTestId('theme-override-astral-color-tone-5')).toHaveValue(shown.astral);
+});
+
+/**
+ * The mark on an untouched row, and the two things it rests on. Only a browser can answer either: the
+ * derivations are read from the CSSOM, and jsdom loads no stylesheet at all.
+ */
+test('marks each untouched row with where its value comes from, off the stylesheet that declares it', async ({
+  page,
+}) => {
+  const worldSeg = await enterLibrary(page);
+  await openThemeEditor(page, worldSeg);
+  await openGroup(page, 'surfaces');
+  await openGroup(page, 'canvas');
+
+  // An expression over tier 1, an anchor under another name, and a value stated outright — the three
+  // the old blanket "derived" collapsed into one, and got wrong for eight of the fifty-one rows.
+  await expect(page.getByTestId('theme-derivation-color-surface-raised')).toHaveText('Derived');
+  await expect(page.getByTestId('theme-derivation-color-bg')).toHaveText('Anchor');
+  await expect(page.getByTestId('theme-derivation-color-canvas-glow')).toHaveText('Fixed');
+
+  // And the formula is the declaration itself, not a description of it.
+  await expect(page.locator('[data-testid="theme-derivation-color-bg"] ~ code')).toHaveText('--palette-page');
+  await expect(page.locator('[data-testid="theme-derivation-color-surface-raised"] ~ code')).toHaveAttribute(
+    'title',
+    /^oklch\(from var\(--palette-page\)/,
+  );
+
+  const marks = await page.locator('[data-testid^="theme-derivation-"]').allInnerTexts();
+  expect(marks, 'every offered row is marked — a row the CSSOM read missed would carry none').toHaveLength(51);
+});
+
+/**
+ * What the row mark assumes: a tier-2 role is one expression for both ColorSchemes (ADR-0075), so it
+ * can be read once. A ColorScheme that reassigns a public role therefore states a literal — the mark is
+ * read as Solar, and this is what says that reading answers for Astral too.
+ */
+test('declares every public role once, so a ColorScheme only ever restates a literal', async ({ page }) => {
+  await enterLibrary(page);
+
+  const reassigned = await page.evaluate(() => {
+    const found: { name: string; value: string }[] = [];
+    const walk = (rules: CSSRuleList) => {
+      for (const rule of Array.from(rules)) {
+        // Tailwind lowers each `@property` into a `@supports` block that restates the resolved value.
+        if (rule instanceof CSSSupportsRule) continue;
+        // A scheme's *own* block. `:root, [data-color-scheme='solar']` carries the shared declarations
+        // and is not one: naming the root is what makes a rule answer for both.
+        const selector = rule instanceof CSSStyleRule ? rule.selectorText : '';
+        if (rule instanceof CSSStyleRule && /\[data-color-scheme=/.test(selector) && !/:root|:host/.test(selector)) {
+          for (const name of Array.from(rule.style)) {
+            if (/^--(color|shadow)-/.test(name)) {
+              found.push({ name, value: rule.style.getPropertyValue(name).trim() });
+            }
+          }
+        }
+        const nested = (rule as CSSGroupingRule).cssRules;
+        if (nested) walk(nested);
+      }
+    };
+    for (const sheet of Array.from(document.styleSheets)) {
+      try {
+        walk(sheet.cssRules);
+      } catch {
+        /* a cross-origin sheet declares none of ours */
+      }
+    }
+    return found;
+  });
+
+  // What a scheme states alone is a named literal — the two ColorSchemes' field glows are two design
+  // ideas, not one parameterised one — and nothing in it may reach for an anchor.
+  expect(reassigned, 'the astral block declares at least the one named literal').not.toHaveLength(0);
+  const computed = reassigned.filter(({ value }) =>
+    /var\(--palette-|oklch\(\s*from|color-mix\(|contrast-color\(/.test(value),
+  );
+  expect(computed.map(({ name }) => name)).toEqual([]);
 });
 
 test('re-anchoring the Palette moves every derived token and leaves the overridden one alone', async ({ page }) => {

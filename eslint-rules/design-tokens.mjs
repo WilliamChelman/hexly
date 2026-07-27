@@ -126,6 +126,16 @@ function owningPlugin(filename) {
 const STYLEGUIDE = 'apps/web/src/app/pages/styleguide/';
 
 /**
+ * The one file exempt from this rule outright, and the only grant of its kind: it classifies
+ * declaration *strings*, so every `var(--…)` in it is a fixture rather than a style. The exemption has
+ * to be from the manifest too, not just the tier boundary — a tier-1 anchor is the reference the
+ * classifier exists to recognise, and a name no manifest declares is the one it has to refuse, so both
+ * are cases it must be able to write down. Spelled as a path for the reason the styleguide is: the
+ * grant stays reviewable in one place, and no lint config can hand it to anyone else.
+ */
+const DECLARATION_FIXTURES = 'libs/web-styles/src/tokens/declared.spec.ts';
+
+/**
  * Why a `var(--…)` reference is not allowed from this file, or `null` when it is fine.
  *
  * An undeclared name is a typo first and a tier breach second — including in the styleguide, which
@@ -134,7 +144,9 @@ const STYLEGUIDE = 'apps/web/src/app/pages/styleguide/';
  * reference is named as the layering mistake it is from the first one written.
  */
 function disallowedReason(name, decl, filename) {
-  const everyTier = posix(filename).includes(STYLEGUIDE);
+  const path = posix(filename);
+  if (path.endsWith(DECLARATION_FIXTURES)) return null;
+  const everyTier = path.includes(STYLEGUIDE);
   if (!decl) return !everyTier && name.startsWith('--palette-') ? 'palette' : 'unknown';
   if (everyTier) return null;
   if (decl.tier === 'palette') return 'palette';

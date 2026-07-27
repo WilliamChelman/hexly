@@ -15,6 +15,7 @@ const IN_HEXMAP = '/repo/libs/plugin-hexmap-web/src/components/inspector.compone
 const IN_BOARD = '/repo/libs/plugin-board-web/src/components/board-canvas.component.ts';
 const IN_UI = '/repo/libs/web-ui/src/components/chip.component.ts';
 const IN_STYLEGUIDE = '/repo/apps/web/src/app/pages/styleguide/styleguide.page.ts';
+const IN_FIXTURES = '/repo/libs/web-styles/src/tokens/declared.spec.ts';
 
 describe('no-unknown-design-token', () => {
   const rule = designTokens.rules['no-unknown-design-token'];
@@ -110,6 +111,27 @@ describe('no-unknown-design-token', () => {
           code: 'const s = `:host { color: var(--palette-inkk); }`',
           filename: IN_STYLEGUIDE,
           errors: [{ messageId: 'unknown' }],
+        },
+      ],
+    });
+  });
+
+  /**
+   * The declaration-classifier's fixtures are exempt from the manifest as well as the tier boundary:
+   * an anchor is the reference it exists to recognise, and an undeclared name the one it must refuse,
+   * so both have to be writable there. The grant is that file and no other in the same directory.
+   */
+  it('exempts the declaration fixtures outright, and nothing beside them', () => {
+    tester.run('no-unknown-design-token', rule, {
+      valid: [
+        { code: "const s = tokenDerivation('var(--palette-page)')", filename: IN_FIXTURES },
+        { code: "const s = tokenDerivation('var(--not-a-token)')", filename: IN_FIXTURES },
+      ],
+      invalid: [
+        {
+          code: "const s = tokenDerivation('var(--palette-page)')",
+          filename: '/repo/libs/web-styles/src/tokens/read-token.spec.ts',
+          errors: [{ messageId: 'palette' }],
         },
       ],
     });

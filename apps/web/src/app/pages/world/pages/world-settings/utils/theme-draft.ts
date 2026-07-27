@@ -11,10 +11,13 @@ import {
   DESIGN_TOKENS,
   DesignToken,
   PublicDesignToken,
+  TokenDerivation,
   TokenType,
+  declaredTokenValues,
   designTokenInitial,
-  designTokenStyle,
+  measureScheme,
   readDesignToken,
+  tokenDerivation,
 } from '@hexly/web-styles';
 import {
   FONT_PAIRINGS,
@@ -28,7 +31,13 @@ import {
   WorldThemePalette,
   colorTokenHex,
 } from '@hexly/domain';
-import { ColorScheme, ThemeDeclarations, WorldThemeLayer, resolveWorldTheme } from '@hexly/web-core';
+import {
+  ColorScheme,
+  ThemeDeclarationSet,
+  ThemeDeclarations,
+  WorldThemeLayer,
+  resolveWorldTheme,
+} from '@hexly/web-core';
 
 /**
  * The two halves an Owner authors in one sitting — a World Theme and a reader's ColorScheme are
@@ -149,16 +158,73 @@ export const OVERRIDE_GROUPS: readonly OverrideGroup[] = (() => {
 /** Both ColorSchemes' opt-outs, as a draft carries them. */
 export type ThemeOverrides = WorldTheme['overrides'];
 
+/** Every override row, ungrouped — what a measurement asks the engine for in one pass. */
+const OVERRIDE_CONTROLS: readonly OverrideControl[] = OVERRIDE_GROUPS.flatMap((group) => group.controls);
+
+/** What each overridable role resolves to, per ColorScheme — one value per row of the grid. */
+export type ResolvedRoles = Readonly<Record<ColorScheme, Readonly<Partial<Record<PublicDesignToken, string>>>>>;
+
 /**
- * What a new override starts at: the resolved value for the ColorScheme the reader is `live` in, so
- * opting a token out changes nothing on screen. The other falls back to the manifest and cannot do
- * better — a probe inherits the root's already-derived roles (ADR-0075). Taken verbatim rather than
- * through {@link colorTokenHex}, which would drop a translucent role's alpha.
+ * What every overridable role currently *is*, measured under the draft the preview paints by — so a row
+ * an Owner has not touched shows the colour it renders as rather than a word for where it came from.
+ * "Derived" was a claim on eight of the fifty-one rows it could not make: seven are a tier-1 anchor
+ * under another name, and `--color-canvas-glow` is a named literal each ColorScheme states outright
+ * (ADR-0075). The value is true of all fifty-one.
+ *
+ * Measured on the root rather than an offscreen probe, and for the ColorScheme the reader is *not* in
+ * too — the tier-2 roles are declared once at `:root`, so a probe inherits the reader's own (ADR-0076).
+ * Only jsdom takes the manifest fallback.
  */
-export function overrideSeed(control: OverrideControl, live: boolean): string {
+export function resolvedRoles(declarations: ThemeDeclarationSet): ResolvedRoles {
+  const tokens = OVERRIDE_CONTROLS.map((control) => control.token);
+  const forScheme = (scheme: ColorScheme) => {
+    const measured = measureScheme({ scheme, declarations: declarations[scheme], tokens });
+    return Object.fromEntries(tokens.map((token) => [token, measured[token] || designTokenInitial(token)]));
+  };
+  return { solar: forScheme('solar'), astral: forScheme('astral') };
+}
+
+/** How each override row gets its value, keyed by the token — what the row is marked with (#374). */
+export type RoleDerivations = Readonly<Partial<Record<PublicDesignToken, TokenDerivation>>>;
+
+let derivations: RoleDerivations | undefined;
+
+/**
+ * Where each overridable role's value comes from, read off the stylesheet that declares it — so the
+ * mark on a row is the stylesheet's own answer and not a list beside it (ADR-0075).
+ *
+ * Read once and kept: the stylesheets do not change under a running app, and this walks every rule of
+ * every sheet. Read as Solar, which is where the derivations *are* — a tier-2 role is one expression
+ * for both ColorSchemes, and a ColorScheme that reassigns one is by construction stating a literal
+ * outright. `world-theme-overrides.spec.ts` holds that to the stylesheets in a real engine.
+ *
+ * Empty under jsdom, which loads no stylesheet: an unmarked row is the honest answer where nothing
+ * declares anything, and the value beside it is still the value.
+ */
+export function roleDerivations(): RoleDerivations {
+  if (derivations) return derivations;
+  const declared = declaredTokenValues('solar');
+  derivations = Object.fromEntries(
+    OVERRIDE_CONTROLS.filter((control) => declared[control.token]).map((control) => [
+      control.token,
+      tokenDerivation(declared[control.token] as string),
+    ]),
+  );
+  return derivations;
+}
+
+/**
+ * What a new override starts at: the value the row was showing, so opting a token out changes nothing
+ * on screen. Taken verbatim rather than through {@link colorTokenHex}, which would drop a translucent
+ * role's alpha.
+ *
+ * A non-colour falls back to the manifest's own value: a `--shadow-*` reads back with its relative
+ * colour unevaluated — the engine defers that to the use site — and the write choke point takes a
+ * `<color>`, not an expression over one (ADR-0076).
+ */
+export function overrideSeed(control: OverrideControl, resolved: string): string {
   const declared = designTokenInitial(control.token);
-  if (!live || control.type !== 'color') return declared;
-  const resolved = readDesignToken(designTokenStyle(), control.token);
+  if (control.type !== 'color') return declared;
   return colorTokenHex(resolved) === undefined ? declared : resolved;
 }
 

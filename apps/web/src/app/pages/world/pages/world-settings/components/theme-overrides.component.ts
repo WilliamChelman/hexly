@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ColorScheme, ColorSchemeService } from '@hexly/web-core';
+import { ColorScheme, ThemeDeclarationSet } from '@hexly/web-core';
 import { ButtonComponent } from '@hexly/web-ui';
+import { colorTokenHex } from '@hexly/domain';
+import { TokenDerivation } from '@hexly/web-styles';
 import {
   COLOR_SCHEMES,
   OVERRIDE_GROUPS,
@@ -11,6 +13,8 @@ import {
   ThemeOverrides,
   overrideSeed,
   overrideValue,
+  resolvedRoles,
+  roleDerivations,
 } from '../utils/theme-draft';
 import { ThemeControlComponent } from './theme-control.component';
 
@@ -25,8 +29,9 @@ export type OverrideEdit = SchemeEdit<OverrideControl, string | null>;
  * is reachable (ADR-0075). ~50 rows in declaration order is a wall, hence a collapsed block per role
  * family, each summary counting its own overrides.
  *
- * A row is either derived or overridden, never "overridden at the derived value": a colour well opened
- * at black would claim the token *is* black.
+ * A row is either untouched or overridden, never "overridden at the derived value": a colour well opened
+ * at black would claim the token *is* black. An untouched row therefore shows what the token currently
+ * resolves to and nothing about where that came from — see {@link resolvedRoles}.
  */
 @Component({
   selector: 'app-theme-overrides',
@@ -54,23 +59,57 @@ export type OverrideEdit = SchemeEdit<OverrideControl, string | null>;
 
           @for (control of group.controls; track control.token) {
             <!-- The token's own name is the label: it is what the Owner sees in devtools, it needs no
-                 translation, and a second vocabulary beside the manifest is a second thing to drift. -->
-            <code class="row-name">{{ control.token }}</code>
+                 translation, and a second vocabulary beside the manifest is a second thing to drift.
+                 Under it, where the value comes from — the stylesheet's own declaration, marked and
+                 then shown, so "derived" is a claim the row can back rather than one it just makes. -->
+            <div class="row-label">
+              <code class="row-name">{{ control.token }}</code>
+              @let from = derivationOf(control);
+              @if (from) {
+                <span class="derivation">
+                  <span class="mark" [attr.data-testid]="'theme-derivation-' + control.slug">
+                    {{ 'worldTheme.derivation.' + from.kind | transloco }}
+                  </span>
+                  <!-- The expression is pure CSS, so it is shown as written; the full text is the
+                       title, since a fold on every row would be a wall the mark exists to avoid. -->
+                  @if (formula(from); as text) {
+                    <code class="formula" [attr.title]="from.formula">{{ text }}</code>
+                  }
+                </span>
+              }
+            </div>
             @for (scheme of schemes; track scheme) {
               @let value = valueFor(scheme, control);
               <!-- The row's token name is shared by both cells, so each control names its own. -->
               @let name = control.token + ' — ' + ('common.colorScheme.' + scheme | transloco);
               <div class="cell">
                 @if (value === undefined) {
+                  @let current = resolvedFor(scheme, control);
                   <button
                     appButton
                     variant="ghost"
                     size="sm"
+                    class="current"
                     [attr.data-testid]="'theme-override-set-' + scheme + '-' + control.slug"
-                    [attr.aria-label]="'worldTheme.setOverride' | transloco: { name }"
-                    (click)="changed.emit({ scheme, control, raw: seed(control, scheme) })"
+                    [attr.aria-label]="'worldTheme.setOverride' | transloco: { name, value: current }"
+                    (click)="changed.emit({ scheme, control, raw: seed(control, current) })"
                   >
-                    {{ 'worldTheme.derived' | transloco }}
+                    <!-- The value the row currently renders as, in the medium it renders in: a swatch for
+                         a colour, a chip wearing the elevation for one of those. A translucent role
+                         shows the panel through it, which the hex beside it cannot — the readout is
+                         lossy in the one direction the colour well is, as its hex helper says. -->
+                    @switch (medium(control)) {
+                      @case ('swatch') {
+                        <span class="swatch"><span class="swatch-fill" [style.background]="current"></span></span>
+                        <span class="readout">{{ hex(current) }}</span>
+                      }
+                      @case ('elevation') {
+                        <span class="elevation-chip" [style.boxShadow]="current"></span>
+                      }
+                      @default {
+                        <span class="readout">{{ current }}</span>
+                      }
+                    }
                   </button>
                 } @else {
                   <app-theme-control
@@ -130,13 +169,33 @@ export type OverrideEdit = SchemeEdit<OverrideControl, string | null>;
     }
     .grid {
       @apply grid items-center gap-x-4 gap-y-2 py-2 pl-4;
-      grid-template-columns: minmax(11rem, 1fr) minmax(8rem, 1fr) minmax(8rem, 1fr);
+      grid-template-columns: minmax(20rem, 2.4fr) minmax(7.5rem, 1fr) minmax(7.5rem, 1fr);
     }
     .scheme-head {
       @apply pb-1 font-display text-sm text-ink-strong;
     }
+    .row-label {
+      @apply flex min-w-0 flex-col gap-0.5;
+    }
     .row-name {
       @apply truncate font-mono text-2xs text-ink-muted;
+    }
+    .derivation {
+      @apply flex min-w-0 items-baseline gap-1.5;
+    }
+    .mark {
+      @apply flex-none rounded-full bg-surface-sunken px-1.5 py-px text-2xs text-ink-faint;
+    }
+    /* Two lines, then the title: a derivation is ~110 characters at its longest, which wraps to two
+       here and to a wall of five if every one of ~50 rows is let run. */
+    .formula {
+      @apply min-w-0 font-mono text-2xs leading-snug text-ink-faint;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      /* Breaks at the expression's own brackets rather than mid-token, as break-all would. */
+      overflow-wrap: anywhere;
     }
     .cell {
       @apply flex min-w-0 items-center gap-1;
@@ -144,22 +203,88 @@ export type OverrideEdit = SchemeEdit<OverrideControl, string | null>;
     .control {
       @apply min-w-0 flex-1;
     }
+    .current {
+      @apply min-w-0 flex-1 justify-start gap-2;
+    }
+    /* A chequer under the fill, so a translucent role reads as translucent rather than as a pale
+       colour: the hex beside it is the colour, and is the one thing that cannot carry the alpha. */
+    .swatch {
+      @apply h-5 w-5 flex-none overflow-hidden rounded-sm border border-line-faint bg-surface-raised;
+      background-image: conic-gradient(
+        var(--color-surface-sunken) 0 25%,
+        transparent 0 50%,
+        var(--color-surface-sunken) 0 75%,
+        transparent 0
+      );
+      background-size: 0.5rem 0.5rem;
+    }
+    .swatch-fill {
+      @apply block h-full w-full;
+    }
+    .elevation-chip {
+      @apply h-5 w-8 flex-none rounded-sm bg-surface-raised;
+    }
+    .readout {
+      @apply truncate font-mono text-2xs tabular-nums text-ink-muted;
+    }
   `,
 })
 export class ThemeOverridesComponent {
-  /** The draft's opt-outs; `undefined` for a Theme that has none — every role is derived. */
+  /** The draft's opt-outs; `undefined` for a Theme that has none — every role follows the Palette. */
   readonly overrides = input<ThemeOverrides>();
 
-  readonly changed = output<OverrideEdit>();
+  /** The whole chain the preview paints by, which is what an untouched row has to be measured over. */
+  readonly declarations = input.required<ThemeDeclarationSet>();
 
-  private readonly colorScheme = inject(ColorSchemeService);
+  readonly changed = output<OverrideEdit>();
 
   protected readonly groups = OVERRIDE_GROUPS;
   protected readonly schemes = COLOR_SCHEMES;
 
-  /** Only the reader's own ColorScheme is the one the document has resolved — see {@link overrideSeed}. */
-  protected seed(control: OverrideControl, scheme: ColorScheme): string {
-    return overrideSeed(control, scheme === this.colorScheme.colorScheme());
+  /**
+   * What each row renders as right now, both ColorSchemes at once. A `computed` may do this for the
+   * reason the contrast report may: `measureScheme` clears what is inline, reads, and restores the root
+   * in a `finally`, all inside one task — so it is a function of its declarations and the stylesheets.
+   */
+  private readonly resolved = computed(() => resolvedRoles(this.declarations()));
+
+  /** Read once for the whole grid: the stylesheets are fixed, and the walk is over every rule. */
+  private readonly derivations = roleDerivations();
+
+  protected resolvedFor(scheme: ColorScheme, control: OverrideControl): string {
+    return this.resolved()[scheme][control.token] ?? '';
+  }
+
+  protected derivationOf(control: OverrideControl): TokenDerivation | undefined {
+    return this.derivations[control.token];
+  }
+
+  /**
+   * What the mark is followed by: the expression for a derivation, the one token an alias renames, and
+   * nothing for a literal — the swatch beside it already *is* the value, so restating it says nothing.
+   */
+  protected formula(from: TokenDerivation): string {
+    if (from.kind === 'derived') return from.formula;
+    return from.kind === 'anchor' ? (from.sources[0] ?? '') : '';
+  }
+
+  /**
+   * How an untouched row shows its value, off the token's declared type (ADR-0075) — never its name, as
+   * in {@link ThemeControlComponent}. Named rather than switched on the type in the template because
+   * `no-builtin-shadow` reads a template's every word as a class name, and the type is one of its own.
+   */
+  protected medium(control: OverrideControl): 'swatch' | 'elevation' | 'text' {
+    if (control.type === 'color') return 'swatch';
+    return control.type === 'shadow' ? 'elevation' : 'text';
+  }
+
+  /** The readout beside a swatch; the resolved value itself where it is no colour a hex can hold. */
+  protected hex(resolved: string): string {
+    return colorTokenHex(resolved) ?? resolved;
+  }
+
+  protected seed(control: OverrideControl, resolved: string): string {
+    return overrideSeed(control, resolved);
   }
 
   protected valueFor(scheme: ColorScheme, control: OverrideControl): string | undefined {
