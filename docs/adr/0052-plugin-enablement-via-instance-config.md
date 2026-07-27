@@ -72,7 +72,10 @@ only knob a single well-typed field.
   knob later touches only that Plugin, never `config.ts`. Unknown Plugin ids and unknown sub-keys are
   **stripped, not rejected** — consistent with the rest of `hexly.yml` (ADR-0036, `config.ts`), one rule across
   the file. This is the one place we accept ADR-0036's own warned-against failure (a typo'd `plugin.hexmpa`
-  silently no-ops) in exchange for a single consistent config discipline.
+  silently no-ops) in exchange for a single consistent config discipline. (**Amended by #372:** "one rule
+  across the file" now has an exception — the `theme` block (ADR-0076) rejects unknown keys, because a
+  stripped anchor is not a silent no-op but branding applied in part, which that feature's acceptance
+  criteria forbid.)
 
 ## Considered Options
 

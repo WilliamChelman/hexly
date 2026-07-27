@@ -404,6 +404,10 @@ _Avoid_: Skin, style, branding, world palette, theme (bare — that used to mean
 The small set of anchor colours one **ColorScheme** of a **World Theme** is authored as; every other colour the interface uses derives from it. What an Owner actually fills in.
 _Avoid_: Swatch set, colour scheme, theme; terrain palette (that set is the **Terrain** list)
 
+**Instance Default Theme**:
+The presentation an operator sets for a whole deployment, in **Instance Configuration** — the same anchors as a **World Theme**, from a different source, and any subset of them. A starting point, not an imposition: a World's own **World Theme** wins over it field by field, and the chain is Instance Default Theme → **World Theme** → the reader's **ColorScheme**. Ships empty. Shortened to "Instance default" in running prose, and to `InstanceTheme` in code.
+_Avoid_: Global theme, site theme, default palette, instance branding, house style
+
 ## Self-hosting
 
 **Plugin**:

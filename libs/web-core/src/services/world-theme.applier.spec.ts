@@ -1,12 +1,15 @@
+import { ApplicationInitStatus, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { WorldTheme, WorldThemePalette } from '@hexly/domain';
+import { InstanceTheme, WorldTheme, WorldThemePalette } from '@hexly/domain';
 import { ColorSchemeService } from './color-scheme.service';
 import {
   INSTANCE_THEME,
+  INSTANCE_THEME_READY,
   WORLD_THEME_CACHE_KEY,
   WorldThemeApplier,
   WorldThemeLayer,
+  provideWorldTheme,
   resolveWorldTheme,
   worldThemeScope,
 } from './world-theme.applier';
@@ -254,5 +257,47 @@ describe('WorldThemeApplier (ADR-0076)', () => {
     TestBed.inject(WorldThemeApplier);
 
     expect(read('--not-a-token')).toBe('');
+  });
+});
+
+describe('the Instance default’s arrival (ADR-0076, #372)', () => {
+  const root = document.documentElement;
+  const read = (name: string) => root.style.getPropertyValue(name);
+
+  afterEach(() => root.removeAttribute('style'));
+
+  it('holds the applier back until the operator’s layer has arrived', async () => {
+    // The hazard the readiness token exists for: Angular starts every app initializer in order but
+    // awaits them together, so an Instance default fetched over HTTP is not there yet when a *sync*
+    // initializer would have constructed the applier — and it would silently never be applied.
+    let arrive!: () => void;
+    const fetched = new Promise<void>((resolve) => (arrive = resolve));
+    const layer = signal<WorldThemeLayer | null>(null);
+    TestBed.configureTestingModule({
+      providers: [
+        provideWorldTheme(),
+        { provide: INSTANCE_THEME_READY, useValue: fetched },
+        { provide: INSTANCE_THEME, useFactory: () => layer() },
+      ],
+    });
+
+    // Injecting anything makes TestBed run the initializers, exactly as bootstrap would.
+    const boot = TestBed.inject(ApplicationInitStatus);
+    expect(read('--palette-accent')).toBe('');
+
+    layer.set({ solar: { accent: 'oklch(0.6 0.2 300)' } });
+    arrive();
+    await boot.donePromise;
+
+    expect(read('--palette-accent')).toBe('oklch(0.6 0.2 300)');
+  });
+
+  it('takes a loaded Instance default as a layer of the chain, with no shape of its own', () => {
+    // A compile-time check as much as a runtime one: what `hexly.yml` parses to is what the applier
+    // resolves, so the two cannot drift into two shapes of the same thing.
+    const loaded: InstanceTheme = { version: 1, solar: { accent: 'oklch(0.6 0.2 300)' } };
+    const layer: WorldThemeLayer = loaded;
+
+    expect(resolveWorldTheme([layer]).solar['--palette-accent']).toBe('oklch(0.6 0.2 300)');
   });
 });

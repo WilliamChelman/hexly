@@ -1,3 +1,5 @@
+import { InstanceTheme } from './world-theme';
+
 /** Pinned by the entry point, with no `hexly.yml` key of its own (ADR-0071). */
 export const DEPLOYMENT_PROFILES = ['desktop', 'server'] as const;
 export type DeploymentProfile = (typeof DEPLOYMENT_PROFILES)[number];
@@ -23,6 +25,11 @@ export interface ClientConfig {
     /** The Tag applied to everything created inline (ADR-0073); absent unless the operator names one. */
     inlineTag?: string;
   };
+  /**
+   * The Instance operator's default Theme (ADR-0076, #372) — the resolution chain's first layer,
+   * beneath every World's own. Absent unless the operator authored one; the chain ships empty.
+   */
+  theme?: InstanceTheme;
 }
 
 /** A single Plugin's client-visible config — `enabled`, plus any Plugin-specific client knobs it exposes. */

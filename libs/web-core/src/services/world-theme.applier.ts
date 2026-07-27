@@ -2,6 +2,7 @@ import {
   EnvironmentProviders,
   Injectable,
   InjectionToken,
+  Injector,
   Signal,
   effect,
   inject,
@@ -34,10 +35,24 @@ export interface WorldThemeLayer {
   readonly overrides?: WorldTheme['overrides'];
 }
 
-/** The chain's first layer — an operator's own branding (ADR-0036 config YAML). Ships empty until #372. */
+/**
+ * The chain's first layer — an operator's own branding, authored in `hexly.yml` (ADR-0036) and served
+ * on the client config channel (#372). `null` for a deployment that set none, which is what ships.
+ */
 export const INSTANCE_THEME = new InjectionToken<WorldThemeLayer | null>('hexly.instanceTheme', {
   providedIn: 'root',
   factory: () => null,
+});
+
+/**
+ * Settled before the applier constructs, so {@link INSTANCE_THEME} is resolvable by the time it is
+ * read. Angular starts every app initializer in registration order but awaits them *together*, so a
+ * default fetched over HTTP (#372) would read as absent however its provider is ordered. A build
+ * whose layer needs no fetch waits on the default, which is already settled.
+ */
+export const INSTANCE_THEME_READY = new InjectionToken<Promise<unknown>>('hexly.instanceThemeReady', {
+  providedIn: 'root',
+  factory: () => Promise.resolve(),
 });
 
 /** What one ColorScheme resolves to: token name → value, exactly as the applier writes it. */
@@ -233,7 +248,14 @@ export class WorldThemeApplier {
   }
 }
 
-/** Instantiate {@link WorldThemeApplier} during bootstrap, before the app renders anything. */
+/**
+ * Instantiate {@link WorldThemeApplier} during bootstrap, before the app renders anything — and after
+ * {@link INSTANCE_THEME_READY}, so the chain's first layer is in place rather than arriving late.
+ */
 export function provideWorldTheme(): EnvironmentProviders {
-  return provideAppInitializer(() => void inject(WorldThemeApplier));
+  return provideAppInitializer(() => {
+    // Taken eagerly: the injection context ends when this returns, and the construction is deferred.
+    const injector = inject(Injector);
+    return inject(INSTANCE_THEME_READY).then(() => void injector.get(WorldThemeApplier));
+  });
 }

@@ -83,9 +83,44 @@ describe('ClientConfigStore', () => {
     });
   });
 
-  describe('the deployment knobs (ADR-0071)', () => {
-    const PLUGINS_AND_TYPE = { plugins: {}, entities: { defaultType: 'core.type.note', inlineType: 'core.type.note' } };
+  /** The two blocks every payload must carry, for the describes whose subject is neither. */
+  const PLUGINS_AND_TYPE = { plugins: {}, entities: { defaultType: 'core.type.note', inlineType: 'core.type.note' } };
 
+  describe('the Instance default Theme (ADR-0076, #372)', () => {
+    const BRANDED = { version: 1 as const, solar: { accent: 'oklch(0.5 0.1 150)' } };
+
+    it('exposes the layer the operator configured, for the applier to resolve the chain under', async () => {
+      await initWith({ ...PLUGINS_AND_TYPE, theme: BRANDED });
+
+      expect(store.instanceTheme()).toEqual(BRANDED);
+    });
+
+    it('reads null before init resolves, and when the Instance sets none', async () => {
+      expect(store.instanceTheme()).toBeNull();
+
+      await initWith(PLUGINS_AND_TYPE);
+      expect(store.instanceTheme()).toBeNull();
+    });
+
+    it('reads null after a failed fetch, so a dead channel is an unbranded Instance', async () => {
+      const done = store.init();
+      http.expectOne('/api/config').flush('boom', { status: 500, statusText: 'Server Error' });
+      await done;
+
+      expect(store.instanceTheme()).toBeNull();
+    });
+
+    it('fetches once however many callers await it — the applier waits on the same promise', async () => {
+      const first = store.init();
+      const second = store.init();
+      http.expectOne('/api/config').flush({ ...PLUGINS_AND_TYPE, theme: BRANDED });
+      await Promise.all([first, second]);
+
+      expect(store.instanceTheme()).toEqual(BRANDED);
+    });
+  });
+
+  describe('the deployment knobs (ADR-0071)', () => {
     it('reads Collaboration on and the server profile before init resolves', () => {
       expect(store.isCollaborationEnabled()).toBe(true);
       expect(store.isDesktopProfile()).toBe(false);

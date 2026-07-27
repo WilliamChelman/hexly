@@ -16,6 +16,7 @@ import {
   provideWorldTheme,
   providePreferencesSync,
   provideClientConfig,
+  provideInstanceTheme,
   CORE_TRANSLATIONS,
 } from '@hexly/web-core';
 // The `/i18n` entry points carry the scope declaration and nothing else: importing a lib's
@@ -83,6 +84,8 @@ export const appConfig: ApplicationConfig = {
     // After the ColorScheme, whose Palette a World Theme replaces (ADR-0076): the applier adopts what
     // `index.html`'s pre-paint replay put on the root, so leaving the World can take it back.
     provideWorldTheme(),
+    // The chain's first layer (#372): an operator's branding, off the client config channel above.
+    provideInstanceTheme(),
     provideLocale(),
     // Roam Preferences with the account (ADR-0038): hydrate from /auth/me,
     // push signal changes back as PATCHes.
