@@ -26,8 +26,10 @@ export const FONT_PAIRING_IDS = ['codex'] as const;
 
 /**
  * Each stored Palette field and the tier-1 token it writes (spec §1): eight anchors carrying the
- * identity, three knobs the derivation reads. #366 declares these in the manifest, collapsing this
- * table into a `tier === 'palette'` filter; until then it is the mapping the applier reads.
+ * identity, three knobs the derivation reads. Spelled out rather than derived from the manifest's
+ * `tier === 'palette'` slice, because a derived table types as `Record<string, string>` and the
+ * applier keys a `DesignToken` record with it; the spec holds both ends of the mapping to their
+ * sources instead, so drift is a red test rather than a wider type.
  */
 export const PALETTE_TOKENS = {
   page: '--palette-page',

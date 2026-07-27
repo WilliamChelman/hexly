@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { EMPTY, catchError, of, switchMap } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { PublicWorldView } from '@hexly/domain';
-import { PublicClient, AppShellStore, EVICTED } from '@hexly/web-core';
+import { PublicClient, AppShellStore, EVICTED, WorldThemeApplier } from '@hexly/web-core';
 import { EyebrowComponent } from '@hexly/web-ui';
 
 /**
@@ -75,6 +75,7 @@ export class PublicWorldPage {
   private readonly route = inject(ActivatedRoute);
   private readonly client = inject(PublicClient);
   private readonly shell = inject(AppShellStore);
+  private readonly theme = inject(WorldThemeApplier);
 
   readonly view = signal<PublicWorldView | null>(null);
   readonly notFound = signal(false);
@@ -105,6 +106,9 @@ export class PublicWorldPage {
         } else {
           this.notFound.set(true);
         }
+        // A visitor with no account is themed exactly as a member is: the Theme rides the
+        // unauthenticated read, and the token is the only World identity they ever hold (ADR-0076).
+        this.theme.scope({ publicToken: this.token() }, w?.theme ?? null);
       });
 
     // EVICTED (link revoked, World deleted, a 403/404 refetch) → the dead-link panel, without a
@@ -115,7 +119,13 @@ export class PublicWorldPage {
         switchMap((f) => (f === null ? EMPTY : this.client.watchWorld(f.token, f.id))),
         takeUntilDestroyed(),
       )
-      .subscribe((result) => (result === EVICTED ? this.evict() : this.view.set(result)));
+      .subscribe((result) => {
+        if (result === EVICTED) return this.evict();
+        this.view.set(result);
+        // A Theme edit rides the same World nudge as a rename (ADR-0044), so an anonymous reader
+        // re-paints without a refresh too.
+        this.theme.scope({ publicToken: this.token() }, result.theme ?? null);
+      });
   }
 
   /** Blank the World and show the dead-link panel — access ended on the open screen. */
