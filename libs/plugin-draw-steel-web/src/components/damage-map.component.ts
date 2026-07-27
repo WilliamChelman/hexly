@@ -29,7 +29,7 @@ import { SelectComponent } from '@hexly/web-ui';
             <span class="text-ink-muted">{{ 'drawSteel.statBlock.damage.' + type | transloco }}</span>
             <input
               type="number"
-              class="w-12 rounded-md border border-line bg-surface px-1 text-sm"
+              class="w-12 rounded-sm border border-line bg-surface px-1 text-sm"
               [value]="valueOf(type)"
               (input)="emit(type, $event)"
             />

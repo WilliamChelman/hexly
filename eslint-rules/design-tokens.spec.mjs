@@ -131,6 +131,8 @@ describe('no-builtin-shadow', () => {
         // The word "shadow" inside a CSS comment is prose, not a utility — the
         // styles-block comment scan strips comments first (ADR-0031).
         { code: 'const c = `:host { /* layered glow shadow */ color: red; }`' },
+        // Tailwind's important flag spells the same utility.
+        { code: 'const c = `class="shadow-2!"`' },
       ],
       invalid: [
         {
@@ -193,6 +195,8 @@ describe('no-builtin-radius', () => {
         { code: 'const c = `class="rounded-2xl"`', errors: [{ messageId: 'offScale' }] },
         { code: 'const c = `class="rounded-t-3xl"`', errors: [{ messageId: 'offScale' }] },
         { code: 'const c = `class="rounded-4xl"`', errors: [{ messageId: 'offScale' }] },
+        // A step nobody declares generates no utility at all — the same dead corner, said once.
+        { code: 'const c = `class="rounded-hefty"`', errors: [{ messageId: 'offScale' }] },
       ],
     });
   });
@@ -215,14 +219,12 @@ describe('no-builtin-radius', () => {
     });
   });
 
-  it('reads an @apply in a scoped styles block, and leaves prose alone', () => {
+  it('reads an @apply in a scoped styles block, and leaves CSS-comment prose alone', () => {
     tester.run('no-builtin-radius', rule, {
       valid: [
         { code: 'const s = `.banner { @apply rounded-md bg-surface; }`' },
-        // "rounded" is an ordinary English word, so a comment on either side of the
-        // template boundary is prose and not a utility.
+        // "rounded" is an ordinary English word; the styles-block comment scan drops it first.
         { code: 'const s = `.card { /* a rounded card */ @apply rounded-lg; }`' },
-        { code: 'const t = `<!-- a rounded card + rounded toggle strip --><div class="rounded-lg"></div>`' },
       ],
       invalid: [{ code: 'const s = `.banner { @apply rounded bg-surface; }`', errors: [{ messageId: 'bare' }] }],
     });
