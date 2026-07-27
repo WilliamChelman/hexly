@@ -4,9 +4,15 @@ import { PublicDesignToken, designTokenInitial } from '@hexly/web-styles';
 import { FontPairingId } from '@hexly/domain';
 import { FONT_PAIRING_CHOICES, FontPairingChoice } from '../utils/theme-draft';
 
+/** What the absence is keyed on — no pairing is a `FontPairingId`, and it still needs copy and a test id. */
+const DEFAULT_KEY = 'default';
+
 /** One option on offer: a curated pairing, or the absence a World wears by storing no pairing. */
 interface PairingOption {
+  /** What the option is stored as — absent for the absence, which is a choice and so has a name too. */
   readonly id?: FontPairingId;
+  /** That name: what its copy and its test id are keyed on. */
+  readonly key: string;
   readonly tokens: FontPairingChoice['tokens'];
 }
 
@@ -14,9 +20,9 @@ interface PairingOption {
  * The font pairing an Owner picks (spec §5.4, #375). Curated from the bundled families rather than
  * uploaded — a pairing naming a family the app does not ship would render as nothing (ADR-0076).
  *
- * Each option is a **specimen**: the four faces it writes, rendered in themselves. Read off the
- * pairing's own stacks, so an entry added to the curated table shows correctly with no edit here — and
- * so the picker cannot claim a face the applier will not write.
+ * Each option is a **specimen**: the four faces it writes, rendered in themselves, off the pairing's
+ * own stacks — so the picker cannot show a face the applier will not write, and a pairing added to the
+ * curated table needs only its copy.
  */
 @Component({
   selector: 'app-theme-fonts',
@@ -24,19 +30,19 @@ interface PairingOption {
   imports: [TranslocoPipe],
   template: `
     <div class="pairings" role="radiogroup" [attr.aria-label]="'worldTheme.fontsHeading' | transloco">
-      @for (option of options; track option.id ?? 'default') {
+      @for (option of options; track option.key) {
         <label class="pairing">
           <span class="head">
             <input
               type="radio"
               name="theme-font-pairing"
-              [attr.data-testid]="'theme-font-' + (option.id ?? 'default')"
-              [checked]="(option.id ?? 'default') === selected()"
+              [attr.data-testid]="'theme-font-' + option.key"
+              [checked]="option.key === selected()"
               (change)="picked.emit(option.id)"
             />
             <span class="labels">
-              <span class="name">{{ 'worldTheme.fonts.' + (option.id ?? 'default') | transloco }}</span>
-              <span class="hint">{{ 'worldTheme.fontsHint.' + (option.id ?? 'default') | transloco }}</span>
+              <span class="name">{{ 'worldTheme.fonts.' + option.key | transloco }}</span>
+              <span class="hint">{{ 'worldTheme.fontsHint.' + option.key | transloco }}</span>
             </span>
           </span>
           <span class="specimen" aria-hidden="true">
@@ -99,10 +105,12 @@ export class ThemeFontsComponent {
 
   readonly picked = output<FontPairingId | undefined>();
 
-  protected readonly options: readonly PairingOption[] = [{ tokens: {} }, ...FONT_PAIRING_CHOICES];
+  protected readonly options: readonly PairingOption[] = [
+    { key: DEFAULT_KEY, tokens: {} },
+    ...FONT_PAIRING_CHOICES.map((choice) => ({ ...choice, key: choice.id })),
+  ];
 
-  /** The picked option, named — "no pairing of its own" is a choice here, so it is a name and not a gap. */
-  protected readonly selected = computed(() => this.fontPairing() ?? 'default');
+  protected readonly selected = computed(() => this.fontPairing() ?? DEFAULT_KEY);
 
   /**
    * The face this option sets for a token. The default option falls back to the manifest rather than to

@@ -87,16 +87,10 @@ export interface RadiusPreset {
 }
 
 /**
- * The radius sets on offer, sharp to soft (spec §5.1, #375).
- *
- * Sets rather than five free lengths, though the schema takes any set of the five: the five are one
- * ladder and not five decisions — an Owner given text fields can author `sm` above `xl`, or an `em`,
- * which `--radius-*` cannot carry at all (they are `@property`-registered, so a font-relative length
- * computes at the declaring element, ADR-0075). The axis the ticket names is sharp-versus-soft, and
- * that is one control.
- *
- * Stored as their values and never as an id, so renaming or dropping a set here costs no stored Theme
- * a migration, and a set authored over the API stays as valid as one picked here.
+ * The radius sets on offer, sharp to soft (spec §5.1). Sets rather than five free lengths, though the
+ * schema takes any set of the five: the five are one ladder, and a free `em` is a value `--radius-*`
+ * cannot carry at all (ADR-0075). Stored as their values and never as an id, so renaming one here is
+ * no migration against stored Themes.
  */
 export const RADIUS_PRESETS: readonly RadiusPreset[] = [
   {
@@ -126,8 +120,9 @@ export const RADIUS_PRESETS: readonly RadiusPreset[] = [
 
 /** Which offered set `radii` is, or `undefined` for one authored outside this editor. */
 export function radiusPresetOf(radii: WorldTheme['radii']): RadiusPresetId | undefined {
-  const stored = stable(radii && Object.keys(radii).length ? radii : undefined);
-  return RADIUS_PRESETS.find((preset) => stable(preset.radii) === stored)?.id;
+  // Both sides normalised to an object: an absent set and an empty one are the same World.
+  const stored = stable(radii ?? {});
+  return RADIUS_PRESETS.find((preset) => stable(preset.radii ?? {}) === stored)?.id;
 }
 
 /** One offered pairing: its id, and the four `--font-*` stacks picking it writes. */
@@ -137,8 +132,8 @@ export interface FontPairingChoice {
 }
 
 /**
- * The curated pairings on offer (spec §5.4), read off the domain's own table rather than restated —
- * so a pairing added there is pickable, and shows its specimen in its own faces, with no edit here.
+ * The curated pairings on offer (spec §5.4), read off the domain's own table rather than restated, so
+ * a pairing added there is pickable with no edit here — its name and hint are copy, and are not.
  */
 export const FONT_PAIRING_CHOICES: readonly FontPairingChoice[] = FONT_PAIRING_IDS.map((id) => ({
   id,

@@ -176,12 +176,23 @@ export class WorldThemePanelComponent {
    * (ADR-0076), and cleared outright for the Hexly default — a World wears that one by carrying none.
    */
   protected pickRadii(preset: RadiusPreset): void {
-    this.draft.set({ ...this.materialised(), radii: preset.radii });
+    this.draft.set(this.picked({ radii: preset.radii }));
   }
 
   /** Fold a picked font pairing into the draft; `undefined` is the pairing the stylesheet ships. */
   protected pickFontPairing(id: FontPairingId | undefined): void {
-    this.draft.set({ ...this.materialised(), fontPairing: id });
+    this.draft.set(this.picked({ fontPairing: id }));
+  }
+
+  /**
+   * The draft a pick lands on. Picking the default on a World that carries no Theme leaves it carrying
+   * none: it is what that World already wears, and materialising a whole Theme to say so would offer a
+   * save that stores twenty-two anchors and changes nothing.
+   */
+  private picked(part: Partial<ThemeDraft>): ThemeDraft | null {
+    const draft = this.draft();
+    if (!draft && Object.values(part).every((value) => value === undefined)) return null;
+    return { ...(draft ?? this.materialised()), ...part };
   }
 
   /**

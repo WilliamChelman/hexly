@@ -133,6 +133,18 @@ describe('WorldThemePanel', () => {
       expect(save(fixture)?.radii).toBeUndefined();
     });
 
+    it('leaves a World carrying no Theme carrying none when the default is what was picked', () => {
+      const fixture = mount(null);
+
+      // Dispatched rather than clicked: a checked radio emits nothing, and the invariant being held
+      // here is the handler's — picking what a World already wears must not stage a whole Theme.
+      at(fixture, 'theme-radii-default').dispatchEvent(new Event('change'));
+      at(fixture, 'theme-font-default').dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect((at(fixture, 'theme-save') as HTMLButtonElement).disabled).toBe(true);
+    });
+
     it('shows both defaults as picked on a World that sets neither — an absence is still a choice', () => {
       const fixture = mount(null);
 

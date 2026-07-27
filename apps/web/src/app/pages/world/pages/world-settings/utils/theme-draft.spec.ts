@@ -139,8 +139,6 @@ describe('the font pairings an Owner picks between', () => {
   });
 
   it('carries each pairing’s own stacks, so a specimen cannot show a face the pairing will not apply', () => {
-    // Half of "a second pairing needs no editor change" either: the picker renders each option in the
-    // faces the table names, so an entry added there arrives with its specimen already right.
     for (const choice of FONT_PAIRING_CHOICES) {
       expect(choice.tokens).toEqual(FONT_PAIRINGS[choice.id]);
     }

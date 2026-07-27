@@ -83,11 +83,9 @@ function radiusLadder(page: Page): Promise<string[]> {
 }
 
 /**
- * Every element rendering a corner from `ladder`, named for a failure to be readable. The claim a
- * radius set makes is "throughout", and no list of selectors states that — every `rounded-*` utility
- * resolves through the same five tokens (ADR-0075), so a set that squares the ladder squares them all.
- *
- * The picker's own swatches are excluded: each shows the set it *offers*, not the one in force.
+ * Every element rendering a corner from `ladder`. The claim a radius set makes is "throughout", which
+ * no list of selectors states — every `rounded-*` utility resolves through the same five tokens
+ * (ADR-0075). The picker's own swatches are excluded: each shows the set it offers, not the one in force.
  */
 function elementsRoundedBy(page: Page, ladder: readonly string[]): Promise<string[]> {
   return page.evaluate(
