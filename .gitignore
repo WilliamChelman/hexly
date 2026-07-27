@@ -59,14 +59,15 @@ vitest.config.*.timestamp*
 
 __screenshots__/
 
-# Playwright e2e
-/test-results
+# Playwright e2e — each config pins its folders to its own project, so nothing lands at the root.
 /apps/web-e2e/.auth
 /apps/web-e2e/test-results
 /apps/web-e2e/playwright-report
 /apps/web-e2e/blob-report
 /apps/desktop-e2e/test-results
 /apps/desktop-e2e/playwright-report
+/apps/desktop-e2e/test-results-packaged
+/apps/desktop-e2e/playwright-report-packaged
 /apps/desktop-e2e/blob-report
 /playwright/.cache
 .playwright-mcp/

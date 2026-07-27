@@ -117,7 +117,13 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['html', { open: 'never' }], ['list']] : 'list',
+  // Pinned: Playwright resolves both folders against the nearest package.json — the workspace root —
+  // not the config directory, so left implicit they miss project.json's `outputs`, .gitignore and
+  // CI's upload alike.
+  outputDir: join(__dirname, 'test-results'),
+  reporter: process.env.CI
+    ? [['html', { open: 'never', outputFolder: join(__dirname, 'playwright-report') }], ['list']]
+    : 'list',
   use: {
     baseURL: urlFor(DEFAULT_PORT),
     trace: 'on-first-retry',

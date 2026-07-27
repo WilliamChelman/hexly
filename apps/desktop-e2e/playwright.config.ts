@@ -18,7 +18,11 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
-  reporter: process.env.CI ? [['html', { open: 'never' }], ['list']] : 'list',
+  // Pinned as in apps/web-e2e: Playwright would resolve these to the workspace root.
+  outputDir: join(__dirname, 'test-results'),
+  reporter: process.env.CI
+    ? [['html', { open: 'never', outputFolder: join(__dirname, 'playwright-report') }], ['list']]
+    : 'list',
   // A test boots Nest, runs migrations and opens a window — twice, for the relaunch fact.
   timeout: 180_000,
 });
