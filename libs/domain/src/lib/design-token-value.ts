@@ -2,13 +2,21 @@
  * Typed design-token values — the World Theme write choke point (ADR-0076), where an Owner's value is
  * parsed and what stores is re-serialised from that parse. Nothing is sanitised into something that
  * stores: a `url()` is refused because it is not a colour, not stripped out of one.
+ *
+ * Whatever stores re-parses to itself. The editor re-sends a draft seeded from the stored Theme, so a
+ * value this file accepts once and refuses on the way back in would brick every later save.
  */
 
 import { clampGamut, converter, formatHex, parse as parseColor } from 'culori';
 import { TokenType } from '@hexly/web-styles';
 
-/** Room for a multi-layer shadow — the manifest's longest is 44 — and none for a pathological string. */
-const MAX_RAW_LENGTH = 240;
+/**
+ * How long a value may be, raw and canonical alike — clear of the widest shadow the limits below admit
+ * once every colour word has expanded to OKLCH (494), and nowhere near a pathological string. One
+ * bound for both, because a canonical form past the gate its own input cleared would store and then
+ * fail its own re-parse (ADR-0076); the spec's widest case is what holds the two ends together.
+ */
+const MAX_VALUE_LENGTH = 512;
 
 /** How many `box-shadow` layers a value may carry, and how many words one layer may hold. */
 const MAX_SHADOW_LAYERS = 4;
@@ -59,11 +67,11 @@ function canonicalColor(raw: string): string | undefined {
   if (!Number.isFinite(l) || !Number.isFinite(c)) return undefined;
   const lightness = round(clamp(l, 0, 1), 4);
   const chroma = round(Math.max(c, 0), 4);
-  const hue = round(Number.isFinite(h) ? (((h as number) % 360) + 360) % 360 : 0, 2);
-  const opacity = clamp(alpha ?? 1, 0, 1);
-  return opacity === 1
-    ? `oklch(${lightness} ${chroma} ${hue})`
-    : `oklch(${lightness} ${chroma} ${hue} / ${round(opacity, 4)})`;
+  // Wrapped after rounding, and the alpha tested after it: a hue that rounds up to 360 and an alpha
+  // that rounds up to 1 each re-parse as something else, and this has to re-parse to itself.
+  const hue = (Number.isFinite(h) ? round((((h as number) % 360) + 360) % 360, 2) : 0) % 360;
+  const opacity = round(clamp(alpha ?? 1, 0, 1), 4);
+  return opacity === 1 ? `oklch(${lightness} ${chroma} ${hue})` : `oklch(${lightness} ${chroma} ${hue} / ${opacity})`;
 }
 
 /**
@@ -199,10 +207,13 @@ export function isSettableTokenType(type: TokenType): boolean {
 
 /**
  * The canonical form of `raw` for a token of `type`, or `undefined` if it is not a value of that type.
- * The single entry point the schema validates through.
+ * The single entry point the schema validates through, and idempotent (ADR-0076).
  */
 export function canonicalTokenValue(type: TokenType, raw: string): string | undefined {
   const canonicalise = CANONICALISERS[type];
-  if (!canonicalise || raw.length > MAX_RAW_LENGTH) return undefined;
-  return canonicalise(raw);
+  if (!canonicalise || raw.length > MAX_VALUE_LENGTH) return undefined;
+  const canonical = canonicalise(raw);
+  if (canonical === undefined) return undefined;
+  // A value too long to be sent back is refused here rather than trimmed into one that would be.
+  return canonical.length <= MAX_VALUE_LENGTH ? canonical : undefined;
 }

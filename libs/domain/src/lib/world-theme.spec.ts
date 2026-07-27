@@ -94,6 +94,14 @@ describe('worldThemeSchema', () => {
     expect(parse(theme({ solar: { ...theme().solar, polarity: Number.NaN } }))).toBeUndefined();
   });
 
+  it('holds polarity to the ±1 axis it is authored on, at the schema and not only at the control', () => {
+    // The editor's slider is not the boundary — a `PATCH /worlds/:id` is. Off the axis, every derived
+    // tone goes black for readers who did not choose the Theme and cannot opt out of it (ADR-0076).
+    expect(parse(theme({ solar: { ...theme().solar, polarity: 500 } }))).toBeUndefined();
+    expect(parse(theme({ solar: { ...theme().solar, polarity: -1.5 } }))).toBeUndefined();
+    expect(parse(theme({ solar: { ...theme().solar, polarity: 0 } }))?.solar.polarity).toBe(0);
+  });
+
   describe('overrides', () => {
     const withOverride = (name: string, value: unknown) =>
       parse({ ...theme(), overrides: { solar: { [name]: value } } });

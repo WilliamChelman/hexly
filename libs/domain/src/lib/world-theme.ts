@@ -8,7 +8,14 @@
  */
 
 import * as z from 'zod';
-import { DESIGN_TOKENS, DesignToken, DesignTokenDecl, PublicDesignToken, designToken } from '@hexly/web-styles';
+import {
+  DESIGN_TOKENS,
+  DesignToken,
+  DesignTokenDecl,
+  PublicDesignToken,
+  SETTABLE_TOKENS,
+  designToken,
+} from '@hexly/web-styles';
 import { canonicalTokenValue, isSettableTokenType } from './design-token-value';
 
 /**
@@ -83,6 +90,12 @@ function tokenEnum(decls: readonly DesignTokenDecl[]) {
 const colorValue = tokenValue('color');
 /** An opacity: outside 0–1 it is not one, so it is refused rather than clamped. */
 const alphaKnob = z.number().min(0).max(1);
+/**
+ * The ramp-direction and paper-chroma-slope knob, authored as ±1 (spec §1). Bounded here and not only
+ * in the editor's control, because this is what a `PATCH /worlds/:id` validates against — and a
+ * polarity off the mirror axis drives every derived tone to black for readers who never chose it.
+ */
+const polarityKnob = z.number().min(-1).max(1);
 
 /**
  * One ColorScheme's Palette. A World Theme carries two, because a Theme and a reader's ColorScheme are
@@ -91,7 +104,7 @@ const alphaKnob = z.number().min(0).max(1);
  *
  * The `satisfies` is the fence: a field per tier-1 token and no others, checked by the compiler. The
  * shapes stay written out because the manifest types both alphas and polarity as `number`, and only
- * this file knows an alpha is bounded.
+ * this file knows what each knob's domain is.
  */
 const paletteSchema = z.object({
   page: colorValue,
@@ -102,8 +115,7 @@ const paletteSchema = z.object({
   success: colorValue,
   canvas: colorValue,
   soot: colorValue,
-  /** The ramp-direction and paper-chroma-slope knob; the spike authored it as ±1 (spec §1). */
-  polarity: z.number(),
+  polarity: polarityKnob,
   lineAlpha: alphaKnob,
   veil: alphaKnob,
 } satisfies Record<PaletteField, z.ZodType>);
@@ -113,7 +125,7 @@ const paletteSchema = z.object({
  * `--radius-*` family — the type scale and the layout rails are structure, not identity, and out of the
  * contract (ADR-0076). Scheme-independent, which is why they sit here rather than in the overrides.
  */
-const RADIUS_TOKENS = DESIGN_TOKENS.filter((decl) => decl.public && decl.type === 'length');
+const RADIUS_TOKENS = SETTABLE_TOKENS.filter((decl) => decl.type === 'length');
 
 const radiiSchema = z.partialRecord(tokenEnum(RADIUS_TOKENS), tokenValue('length'));
 
@@ -125,15 +137,15 @@ const radiiSchema = z.partialRecord(tokenEnum(RADIUS_TOKENS), tokenValue('length
  *
  * `tier === 'role'` rather than `tier !== 'palette'`: tier 3 is out because it is a plugin's own
  * concept and not the design system's (ADR-0075), which has to hold whether or not a plugin ever marks
- * one of its tokens public. Excluded by the `public` flag alone, it would be excluded by accident.
+ * one of its tokens public. Left to `SETTABLE_TOKENS`, it would be excluded by accident.
  *
  * Exported because the editor renders a control per entry (#374). The schema's key set *is* the
  * editor's control set, rather than the same filter written twice — which is what ADR-0075 means by
  * one manifest generating both, and what stops an Owner being offered a token the choke point refuses.
  */
-export const OVERRIDABLE_TOKENS = DESIGN_TOKENS.filter(
-  (decl) => decl.public && decl.tier === 'role' && decl.type !== 'length' && isSettableTokenType(decl.type),
-  // Narrowed here rather than at each reader: the `public` filter one line up is what makes it true.
+export const OVERRIDABLE_TOKENS = SETTABLE_TOKENS.filter(
+  (decl) => decl.tier === 'role' && decl.type !== 'length' && isSettableTokenType(decl.type),
+  // Narrowed here rather than at each reader: a settable tier-2 role is public by construction.
 ) as readonly (DesignTokenDecl & { readonly name: PublicDesignToken })[];
 
 /**
