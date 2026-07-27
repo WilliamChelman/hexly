@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { enterLibrary, entityIdFromUrl, expect, test } from './fixtures';
+import { enterLibrary, entitiesNamed, entityIdFromUrl, expect, test } from './fixtures';
 
 /**
  * Inline Creation's details path (issue #344, ADR-0073): `Create "…" with details…` opens the ordinary
@@ -13,6 +13,9 @@ import { enterLibrary, entityIdFromUrl, expect, test } from './fixtures';
 async function mention(page: Page, query: string): Promise<void> {
   await page.keyboard.type(`@${query}`);
   await expect(page.getByTestId('entity-picker-create-details')).toHaveText(`Create "${query}" with details…`);
+  // The arrow keys below count rows, so a match would move the details row out from under them and
+  // Enter would mint silently instead. Fail here, where the reason is legible.
+  await expect(page.getByTestId('entity-picker').getByRole('option')).toHaveCount(2);
 }
 
 /** Open a fresh note and put the caret in its prose. */
@@ -145,6 +148,5 @@ test('cancelling leaves the typed text in the prose and creates nothing', async 
   // We clean up what we inserted, never what you typed — cancelling reads exactly like Esc at the picker.
   await expect(page.getByTestId('note-content')).toContainText('Feared by @Zorblax');
   await expect(page.getByTestId('entity-link')).toHaveCount(0);
-  const found = await (await request.get('/api/entities?q=Zorblax')).json();
-  expect(found.items).toHaveLength(0);
+  expect(await entitiesNamed(request, 'Zorblax')).toHaveLength(0);
 });

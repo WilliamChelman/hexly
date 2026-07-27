@@ -448,6 +448,16 @@ export class ContentEditorComponent {
   }
 
   /**
+   * The Entities an `@` mention may link — never the one being written in. `q` is full-text over prose
+   * (ADR-0035), so an autosave landing mid-mention indexes the name being typed and the host starts
+   * matching itself; offered, that row costs Enter the mint it promises (ADR-0073).
+   */
+  private async searchLinkTargets(name: string): Promise<EntitySummary[]> {
+    const hostId = this.session.current()?.id;
+    return (await this.resolver.search(name)).filter((entity) => entity.id !== hostId);
+  }
+
+  /**
    * Mint the Entity an `@` mention names, into the open Entity's World — typing must never author a
    * cross-World link (ADR-0073). A failed write is reported here and rethrown, so the extension can
    * put the typed text back where it was.
@@ -559,7 +569,7 @@ export class ContentEditorComponent {
 
     const mention = entityMention({
       getPicker: () => this.entityPicker(),
-      search: (name) => this.resolver.search(name),
+      search: (name) => this.searchLinkTargets(name),
       canCreate: this.canCreate,
       mint: (name) => this.mint(name),
       mintWithDetails: (name) => this.mintWithDetails(name),
