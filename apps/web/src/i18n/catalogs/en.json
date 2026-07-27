@@ -525,6 +525,33 @@
       "contrast": "{{ink}} on {{ground}} is {{ratio}}:1, under the 4.5:1 floor for body text.",
       "midToneAccent": "This accent is mid-tone: no automatic text colour is readable on it ({{ratio}}:1). Pick a lighter or darker accent.",
       "toneCollision": "{{tone}} has rotated close to {{status}} (ΔE {{distance}}); a chip may read as {{status}}."
+    },
+    "radiiHeading": "Corners",
+    "radiiLede": "How sharp or soft this world reads. One set covers every button, card, dialog and chip.",
+    "radiiCustom": "This world carries a corner set of its own. Picking one of these replaces it.",
+    "radii": {
+      "sharp": "Sharp",
+      "default": "Default",
+      "soft": "Soft"
+    },
+    "radiiHint": {
+      "sharp": "No rounding at all — drafted, severe.",
+      "default": "This world sets none.",
+      "soft": "Generously rounded — inviting."
+    },
+    "fontsHeading": "Type",
+    "fontsLede": "The faces this world is set in — display, body, cartouche and monospace, picked as a pairing.",
+    "fonts": {
+      "default": "Default",
+      "codex": "Codex"
+    },
+    "fontsHint": {
+      "default": "This world sets none.",
+      "codex": "Marcellus display, Source Serif body, Cinzel Decorative cartouche, JetBrains Mono."
+    },
+    "fontsSpecimen": {
+      "display": "The Ninefold Road",
+      "body": "Three days east of the river, the road forks at a broken milestone."
     }
   },
   "imports": {

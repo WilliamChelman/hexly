@@ -10,7 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { WorldThemePalette } from '@hexly/domain';
+import { FontPairingId, WorldThemePalette } from '@hexly/domain';
 import {
   ActiveWorld,
   ColorScheme,
@@ -23,6 +23,7 @@ import {
 } from '@hexly/web-core';
 import { ButtonComponent, EyebrowComponent } from '@hexly/web-ui';
 import {
+  RadiusPreset,
   ThemeDraft,
   defaultPalettes,
   draftFrom,
@@ -33,6 +34,8 @@ import {
 } from '../utils/theme-draft';
 import { PaletteEdit, ThemePaletteComponent } from './theme-palette.component';
 import { OverrideEdit, ThemeOverridesComponent } from './theme-overrides.component';
+import { ThemeFontsComponent } from './theme-fonts.component';
+import { ThemeRadiiComponent } from './theme-radii.component';
 
 /**
  * The World Theme editor (ADR-0076): a World Owner authors both ColorSchemes' anchors and knobs and
@@ -45,7 +48,15 @@ import { OverrideEdit, ThemeOverridesComponent } from './theme-overrides.compone
 @Component({
   selector: 'app-world-theme',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, ButtonComponent, EyebrowComponent, ThemePaletteComponent, ThemeOverridesComponent],
+  imports: [
+    TranslocoPipe,
+    ButtonComponent,
+    EyebrowComponent,
+    ThemePaletteComponent,
+    ThemeOverridesComponent,
+    ThemeRadiiComponent,
+    ThemeFontsComponent,
+  ],
   template: `
     <div class="theme-editor">
       <!-- One section per part of the contract; the radius set and font pairing take their own. -->
@@ -58,6 +69,18 @@ import { OverrideEdit, ThemeOverridesComponent } from './theme-overrides.compone
         <h2 appEyebrow>{{ 'worldTheme.overridesHeading' | transloco }}</h2>
         <p class="hint">{{ 'worldTheme.overridesHint' | transloco }}</p>
         <app-theme-overrides [overrides]="draft()?.overrides" (changed)="applyOverride($event)" />
+      </section>
+
+      <section class="group">
+        <h2 appEyebrow>{{ 'worldTheme.radiiHeading' | transloco }}</h2>
+        <p class="lede">{{ 'worldTheme.radiiLede' | transloco }}</p>
+        <app-theme-radii [radii]="draft()?.radii" (picked)="pickRadii($event)" />
+      </section>
+
+      <section class="group">
+        <h2 appEyebrow>{{ 'worldTheme.fontsHeading' | transloco }}</h2>
+        <p class="lede">{{ 'worldTheme.fontsLede' | transloco }}</p>
+        <app-theme-fonts [fontPairing]="draft()?.fontPairing" (picked)="pickFontPairing($event)" />
       </section>
 
       <div class="actions">
@@ -105,6 +128,9 @@ import { OverrideEdit, ThemeOverridesComponent } from './theme-overrides.compone
     }
     .hint {
       @apply -mt-1 text-xs text-ink-muted;
+    }
+    .lede {
+      @apply -mt-2 text-xs text-ink-muted;
     }
   `,
 })
@@ -164,13 +190,9 @@ export class WorldThemePanelComponent {
     inject(DestroyRef).onDestroy(() => this.applier.preview(undefined));
   }
 
-  /**
-   * Fold one moved control into the draft. A first edit on an unthemed World materialises the whole
-   * Theme from the Hexly default: a stored Theme carries both Palettes entire (ADR-0076), so there is
-   * no "this anchor only" to send.
-   */
+  /** Fold one moved control into the draft. */
   protected apply({ scheme, control, raw }: PaletteEdit): void {
-    const draft: ThemeDraft = this.draft() ?? { ...this.defaults };
+    const draft = this.materialised();
     this.draft.set({ ...draft, [scheme]: withControlValue(draft[scheme], control, raw) });
   }
 
@@ -186,6 +208,39 @@ export class WorldThemePanelComponent {
     if (raw !== null && raw.trim() === '') return;
     const draft: ThemeDraft = this.draft() ?? { ...this.defaults };
     this.draft.set({ ...draft, overrides: withOverride(draft.overrides, scheme, control.token, raw) });
+  }
+
+  /**
+   * Fold a picked corner-radius set into the draft (#375). Stored as its five values and not as an id
+   * (ADR-0076), and cleared outright for the Hexly default — a World wears that one by carrying none.
+   */
+  protected pickRadii(preset: RadiusPreset): void {
+    this.draft.set(this.picked({ radii: preset.radii }));
+  }
+
+  /** Fold a picked font pairing into the draft; `undefined` is the pairing the stylesheet ships. */
+  protected pickFontPairing(id: FontPairingId | undefined): void {
+    this.draft.set(this.picked({ fontPairing: id }));
+  }
+
+  /**
+   * The draft a pick lands on. Picking the default on a World that carries no Theme leaves it carrying
+   * none: it is what that World already wears, and materialising a whole Theme to say so would offer a
+   * save that stores twenty-two anchors and changes nothing.
+   */
+  private picked(part: Partial<ThemeDraft>): ThemeDraft | null {
+    const draft = this.draft();
+    if (!draft && Object.values(part).every((value) => value === undefined)) return null;
+    return { ...(draft ?? this.materialised()), ...part };
+  }
+
+  /**
+   * The draft an edit lands on. A first edit to an unthemed World materialises the whole Theme from the
+   * Hexly default: a stored Theme carries both Palettes entire (ADR-0076), so there is no "this anchor
+   * only" to send.
+   */
+  private materialised(): ThemeDraft {
+    return this.draft() ?? { ...this.defaults };
   }
 
   /** Stage the Hexly default. Saving it is what actually returns the World to it. */

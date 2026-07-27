@@ -1,6 +1,6 @@
-import type { Page } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
 import { designToken, rasteriseColors } from '@hexly/web-styles';
-import { PALETTE_TOKENS } from '@hexly/domain';
+import { FONT_PAIRINGS, PALETTE_TOKENS } from '@hexly/domain';
 import { enterLibrary, expect, signInGrantee, test } from './fixtures';
 import { TEST_GRANTEE } from './test-user';
 // The app's own pretty-URL codec (ADR-0042), imported by file path for the reason `fixtures.ts` gives.
@@ -71,6 +71,48 @@ async function storedTheme(page: Page, worldId: string) {
   const res = await page.request.get(`/api/worlds/${worldId}`);
   expect(res.ok()).toBeTruthy();
   return (await res.json()).theme;
+}
+
+/** Clear a World's Theme, so a themed World does not outlive the test that themed it. */
+async function clearTheme(request: APIRequestContext, worldId: string): Promise<void> {
+  expect((await request.patch(`/api/worlds/${worldId}`, { data: { theme: null } })).ok()).toBeTruthy();
+}
+
+/** What the engine resolves `property` to on the first element matching `selector` — what renders. */
+function computedOn(page: Page, selector: string, property: string): Promise<string> {
+  return page.evaluate(
+    ([sel, prop]) => {
+      const element = document.querySelector(sel);
+      return element ? getComputedStyle(element).getPropertyValue(prop).trim() : '';
+    },
+    [selector, property] as const,
+  );
+}
+
+/** The five values the radius ladder currently renders as, read off the root in manifest order. */
+function radiusLadder(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    return ['--radius-sm', '--radius-md', '--radius-lg', '--radius-xl', '--radius-full'].map((token) =>
+      root.getPropertyValue(token).trim(),
+    );
+  });
+}
+
+/**
+ * Every element rendering a corner from `ladder`. The claim a radius set makes is "throughout", which
+ * no list of selectors states — every `rounded-*` utility resolves through the same five tokens
+ * (ADR-0075). The picker's own swatches are excluded: each shows the set it offers, not the one in force.
+ */
+function elementsRoundedBy(page: Page, ladder: readonly string[]): Promise<string[]> {
+  return page.evaluate(
+    (values) =>
+      [...document.querySelectorAll('*')]
+        .filter((element) => !element.closest('app-theme-radii'))
+        .filter((element) => values.includes(getComputedStyle(element).borderTopLeftRadius))
+        .map((element) => `${element.tagName.toLowerCase()}.${element.className}`),
+    [...ladder],
+  );
 }
 
 test('the editor renders a control per declared tier-1 token, for both ColorSchemes at once', async ({ page }) => {
@@ -156,6 +198,97 @@ test('cancelling puts the saved Theme back, and reset then saved returns the Wor
 
   await page.reload();
   expect(await inlineOnRoot(page, '--palette-accent')).toBe('');
+});
+
+/** The four faces a pairing writes, each named by an element that actually renders in it. */
+const PAIRING_FACES = [
+  { token: '--font-display', selector: '.font-display' },
+  { token: '--font-body', selector: 'body' },
+  { token: '--font-cartouche', selector: '.font-cartouche' },
+  { token: '--font-mono', selector: 'app-theme-control .readout' },
+] as const;
+
+/** A stack's first family — what a computed `font-family` is compared on, quoting being the engine's. */
+const firstFamily = (stack: string) => stack.split(',')[0].replaceAll("'", '').trim();
+
+test('an Owner picks a corner set and a font pairing, and the interface takes both through a save and a reload', async ({
+  page,
+}) => {
+  const worldSeg = await enterLibrary(page);
+  const worldId = idFromSegment(worldSeg);
+  await openThemeEditor(page, worldSeg);
+
+  // The ladder as the Hexly default renders it, so what follows is measured against real corners.
+  const ladder = await radiusLadder(page);
+  expect((await elementsRoundedBy(page, ladder)).length, 'the default rounds a great many corners').toBeGreaterThan(5);
+
+  // A set, not five lengths: one pick squares the whole document — buttons, cards, chips and all.
+  await page.getByTestId('theme-radii-sharp').check();
+  await expect.poll(() => inlineOnRoot(page, '--radius-md')).toBe('0px');
+  await expect.poll(() => elementsRoundedBy(page, ladder)).toEqual([]);
+
+  // A pairing writes all four faces at once (spec §5.4), and each one is what renders.
+  await page.getByTestId('theme-font-codex').check();
+  for (const { token, selector } of PAIRING_FACES) {
+    const stack = FONT_PAIRINGS.codex[token] ?? '';
+    await expect.poll(() => inlineOnRoot(page, token)).toBe(stack);
+    expect(await computedOn(page, selector, 'font-family'), `${token} on ${selector}`).toContain(firstFamily(stack));
+  }
+
+  await saveTheme(page);
+
+  const stored = await storedTheme(page, worldId);
+  expect(stored.radii['--radius-md']).toBe('0px');
+  expect(stored.fontPairing).toBe('codex');
+
+  await page.reload();
+  await expect.poll(() => inlineOnRoot(page, '--radius-full')).toBe('0px');
+  expect(await elementsRoundedBy(page, ladder)).toEqual([]);
+
+  // And the editor reopens on what stored, rather than on the offered default.
+  await openThemeEditor(page, worldSeg);
+  await expect(page.getByTestId('theme-radii-sharp')).toBeChecked();
+  await expect(page.getByTestId('theme-font-codex')).toBeChecked();
+
+  await clearTheme(page.request, worldId);
+});
+
+test('an anonymous Public Link visitor gets the corner set and the pairing too', async ({ page, browser }) => {
+  const worldSeg = await enterLibrary(page);
+  const worldId = idFromSegment(worldSeg);
+  await openThemeEditor(page, worldSeg);
+
+  // Read before picking: the corners the visitor's page would have rendered had nothing been stored.
+  const ladder = await radiusLadder(page);
+  await page.getByTestId('theme-radii-sharp').check();
+  await page.getByTestId('theme-font-codex').check();
+  await saveTheme(page);
+
+  await page.getByTestId('settings-nav-sharing').click();
+  const minted = page.waitForResponse(
+    (r) => /\/api\/worlds\/[\w-]+\/link$/.test(r.url()) && r.request().method() === 'POST' && r.ok(),
+  );
+  await page.getByTestId('public-link-create').click();
+  await minted;
+  const url = await page.getByTestId('public-link-url').inputValue();
+
+  const anonContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const visitor = await anonContext.newPage();
+  await visitor.goto(url);
+  await expect(visitor.getByTestId('public-banner')).toBeVisible();
+
+  // Both ride the unauthenticated World read, as the Palette does (ADR-0076): a visitor with no
+  // account sees the World the Owner authored rather than half of it.
+  await expect.poll(() => inlineOnRoot(visitor, '--radius-md')).toBe('0px');
+  await expect.poll(() => inlineOnRoot(visitor, '--font-display')).toBe(FONT_PAIRINGS.codex['--font-display']);
+  expect(await elementsRoundedBy(visitor, ladder)).toEqual([]);
+  expect(await computedOn(visitor, 'body', 'font-family')).toContain(
+    firstFamily(FONT_PAIRINGS.codex['--font-body'] ?? ''),
+  );
+
+  await anonContext.close();
+  await clearTheme(page.request, worldId);
+  expect((await page.request.delete(`/api/worlds/${worldId}/link`)).ok()).toBeTruthy();
 });
 
 test('a Theme edit changes nothing about what Entities contain or who can read them', async ({ page, request }) => {
