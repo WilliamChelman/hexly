@@ -106,9 +106,7 @@ export class PublicWorldPage {
         } else {
           this.notFound.set(true);
         }
-        // A visitor with no account is themed exactly as a member is: the Theme rides the
-        // unauthenticated read, and the token is the only World identity they ever hold (ADR-0076).
-        this.theme.scope({ publicToken: this.token() }, w?.theme ?? null);
+        this.applyTheme(w);
       });
 
     // EVICTED (link revoked, World deleted, a 403/404 refetch) → the dead-link panel, without a
@@ -122,10 +120,17 @@ export class PublicWorldPage {
       .subscribe((result) => {
         if (result === EVICTED) return this.evict();
         this.view.set(result);
-        // A Theme edit rides the same World nudge as a rename (ADR-0044), so an anonymous reader
-        // re-paints without a refresh too.
-        this.theme.scope({ publicToken: this.token() }, result.theme ?? null);
+        this.applyTheme(result);
       });
+  }
+
+  /**
+   * Paint this World's Theme for a reader with no account (ADR-0076): it rides the unauthenticated
+   * read, keyed by the token because that is the only World identity such a visitor ever holds. Called
+   * off the live-follow too, so an Owner's edit reaches them without a refresh.
+   */
+  private applyTheme(view: PublicWorldView | null): void {
+    this.theme.scope({ publicToken: this.token() }, view?.theme ?? null);
   }
 
   /** Blank the World and show the dead-link panel — access ended on the open screen. */

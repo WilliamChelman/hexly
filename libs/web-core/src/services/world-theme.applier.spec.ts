@@ -211,6 +211,26 @@ describe('WorldThemeApplier (ADR-0076)', () => {
     expect(JSON.parse(localStorage.getItem(WORLD_THEME_CACHE_KEY) ?? '[]')).toEqual([]);
   });
 
+  it('keeps a World Theme out of the Instance layer in the cache, so an operator can change theirs', () => {
+    TestBed.configureTestingModule({
+      providers: [{ provide: INSTANCE_THEME, useValue: { solar: { canvas: 'oklch(0.6 0.2 300)' } } }],
+    });
+    TestBed.inject(WorldThemeApplier).scope({ worldId: WORLD_ID }, theme());
+
+    const cached = JSON.parse(localStorage.getItem(WORLD_THEME_CACHE_KEY) ?? '[]');
+    expect(cached[0].solar['--palette-canvas']).toBe('oklch(0.88 0.05 90)');
+    expect(cached[0].solar['--palette-accent']).toBe('oklch(0.55 0.14 40)');
+  });
+
+  it('bumps a revision on every write — the cue a Canvas renderer re-reads its colours on', () => {
+    const applier = TestBed.inject(WorldThemeApplier);
+    const before = applier.revision();
+
+    applier.scope({ worldId: WORLD_ID }, theme());
+
+    expect(applier.revision()).toBeGreaterThan(before);
+  });
+
   it('applies the Instance default outside every World, and under a World that has none', () => {
     TestBed.configureTestingModule({
       providers: [{ provide: INSTANCE_THEME, useValue: { solar: { accent: 'oklch(0.6 0.2 300)' } } }],

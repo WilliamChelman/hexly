@@ -29,6 +29,7 @@ import {
   ColorSchemeService,
   ShortcutService,
   ToasterService,
+  WorldThemeApplier,
   isInteractiveTarget,
   isTrackpadWheel,
   wheelDeltaPixels,
@@ -216,6 +217,7 @@ export class MapCanvasComponent {
   private gestureButton: number | null = null;
 
   private readonly colorScheme = inject(ColorSchemeService);
+  private readonly worldTheme = inject(WorldThemeApplier);
   private readonly store = inject(HexMapStore);
   private readonly shortcuts = inject(ShortcutService);
   /** The route-scoped session; `writable()` gates every keyboard mutation (ADR-0037/0062). */
@@ -251,10 +253,12 @@ export class MapCanvasComponent {
     // Reading the signals inside renderFrame() registers them as dependencies.
     effect(() => this.renderFrame());
 
-    // Render inputs are read untracked: only a ColorScheme switch may drive this path,
-    // which re-reads the palette via `getComputedStyle`.
+    // Render inputs are read untracked: only a repaint of the root's colours may drive this path,
+    // which re-reads the palette via `getComputedStyle` — a ColorScheme switch, or an Owner's live
+    // World Theme edit (ADR-0076), which no signal on the palette itself would catch.
     effect(() => {
       this.colorScheme.colorScheme();
+      this.worldTheme.revision();
       if (!this.renderer) return;
       this.renderer.refreshTheme();
       untracked(() => this.renderFrame());

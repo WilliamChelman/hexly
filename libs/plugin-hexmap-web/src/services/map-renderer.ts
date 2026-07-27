@@ -18,7 +18,7 @@ import {
   terrainPalette,
   TerrainId,
 } from '@hexly/plugin-hexmap';
-import { DesignToken, readDesignToken } from '@hexly/web-styles';
+import { DesignToken, designTokenStyle, readDesignToken } from '@hexly/web-styles';
 import { Camera } from '../utils/camera';
 import { terrainFill } from '../utils/catalog-keys';
 import type { Selection } from './hexmap-store';
@@ -209,7 +209,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
 
   /** Resolve the themed colours from CSS in a single style read. */
   private readPalette(): Palette {
-    const style = getComputedStyle(this.canvas);
+    const style = designTokenStyle();
     // Falls back to the manifest's declared value rather than a second copy of the palette (ADR-0075).
     const read = (name: DesignToken): string => readDesignToken(style, name);
     const terrain = Object.fromEntries(terrainPalette.map((t) => [t.id, read(terrainFill(t.id))])) as Record<

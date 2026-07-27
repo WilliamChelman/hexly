@@ -1,5 +1,5 @@
 import { LinkedEntity } from '@hexly/domain';
-import { readDesignToken } from '@hexly/web-styles';
+import { designTokenStyle, readDesignToken } from '@hexly/web-styles';
 import { GENERIC_TYPE_DEFINITION, TypeDefinition } from '../models/type-definition';
 
 /** The border ring's share of the ink colour's alpha — a hairline, not a second halo. */
@@ -20,7 +20,7 @@ export interface Palette {
 }
 
 export function palette(defs: readonly TypeDefinition[]): Palette {
-  const style = getComputedStyle(document.documentElement);
+  const style = designTokenStyle();
   const byType = new Map<string, [number, number, number, number]>();
   for (const def of defs) {
     byType.set(def.id, toRgba(readDesignToken(style, def.graphColorToken)));

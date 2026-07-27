@@ -27,11 +27,9 @@
       })();
     </script>
     <!--
-      Replay the World Theme (ADR-0076) this reader was last served for the World this URL names, so a
-      reload back into it paints themed instead of flashing Hexly's own Palette. Dumb by design: the
-      cache holds already-resolved custom properties, and WorldThemeApplier — whose scope regex this
-      mirrors — owns them from bootstrap on. A World never visited has no entry, and that first flash
-      is inherent.
+      Replay the World Theme (ADR-0076) last served for the World this URL names, so a reload back into
+      it paints themed. Mirrors WorldThemeApplier's scope regex; the cache holds already-resolved
+      custom properties, so this carries no logic of its own.
     -->
     <script>
       (function () {

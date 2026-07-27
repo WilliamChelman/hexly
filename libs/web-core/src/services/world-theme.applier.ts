@@ -1,6 +1,15 @@
-import { EnvironmentProviders, Injectable, InjectionToken, effect, inject, provideAppInitializer } from '@angular/core';
-import { FONT_PAIRING_IDS, PALETTE_TOKENS, WorldTheme, WorldThemePalette } from '@hexly/domain';
-import { DESIGN_TOKENS, DesignToken, isDesignToken } from '@hexly/web-styles';
+import {
+  EnvironmentProviders,
+  Injectable,
+  InjectionToken,
+  Signal,
+  effect,
+  inject,
+  provideAppInitializer,
+  signal,
+} from '@angular/core';
+import { FONT_PAIRINGS, PALETTE_TOKENS, WorldTheme, WorldThemePalette } from '@hexly/domain';
+import { DesignToken, isDesignToken } from '@hexly/web-styles';
 import { ColorScheme, ColorSchemeService } from './color-scheme.service';
 import { safeJsonParse, safeStorageGet, safeStorageSet } from '../utils/safe';
 import { segment } from '../utils/pretty-id';
@@ -14,9 +23,8 @@ import { segment } from '../utils/pretty-id';
 export type WorldScope = { readonly worldId: string } | { readonly publicToken: string };
 
 /**
- * One layer of the resolution chain: any subset of a Theme's fields. A stored {@link WorldTheme} is
- * one; so is the Instance default, which may brand a deployment with far fewer values than an Owner
- * authors — hence the partial Palettes.
+ * One layer of the chain: any subset of a Theme's fields. Partial Palettes, because the Instance
+ * default may brand a deployment with far fewer values than an Owner authors.
  */
 export interface WorldThemeLayer {
   readonly solar?: Partial<WorldThemePalette>;
@@ -26,52 +34,34 @@ export interface WorldThemeLayer {
   readonly overrides?: WorldTheme['overrides'];
 }
 
-/**
- * The chain's first layer — an operator branding their deployment (ADR-0036 config YAML). Ships empty;
- * #372 provides it from the client config. Everything below it resolves the same either way, which is
- * the point of wiring it now rather than when it has a value.
- */
+/** The chain's first layer — an operator's own branding (ADR-0036 config YAML). Ships empty until #372. */
 export const INSTANCE_THEME = new InjectionToken<WorldThemeLayer | null>('hexly.instanceTheme', {
   providedIn: 'root',
   factory: () => null,
 });
 
-/** The custom properties a chain resolves to, for one ColorScheme: token name → value. */
+/** What one ColorScheme resolves to: token name → value, exactly as the applier writes it. */
 export type ThemeDeclarations = Readonly<Partial<Record<DesignToken, string>>>;
 
-/** Both Palettes' declarations. Held together so a ColorScheme toggle needs no re-resolution. */
+/** Both Palettes at once, so a ColorScheme toggle re-writes rather than re-resolves. */
 export type ThemeDeclarationSet = Readonly<Record<ColorScheme, ThemeDeclarations>>;
 
-/** The cache the pre-paint bootstrap in `index.html` replays. Pinned: that script reads it by hand. */
+/** Pinned: `index.html`'s pre-paint replay reads this key by hand. */
 export const WORLD_THEME_CACHE_KEY = 'hexly-world-theme';
 
 /** How many Worlds' Themes the cache keeps, most recently applied first. */
 const CACHE_MAX = 8;
 
-const EMPTY: ThemeDeclarationSet = { solar: {}, astral: {} };
+const NOTHING: ThemeDeclarationSet = { solar: {}, astral: {} };
 
-/**
- * The curated font pairings (spec §5.4). A pairing writes all four `--font-*` tokens at once, which is
- * why a Theme names one rather than setting the stacks one by one. `codex` is Hexly's own, read off the
- * manifest so the pairing and the default it restates cannot drift apart.
- */
-const FONT_PAIRINGS: Readonly<Record<(typeof FONT_PAIRING_IDS)[number], ThemeDeclarations>> = {
-  codex: Object.fromEntries(
-    DESIGN_TOKENS.filter((decl) => decl.type === 'font-pairing').map((decl) => [decl.name, decl.initial]),
-  ),
-};
-
-/**
- * The route families a World scope can be reached through. A World Public Link is keyed by its token
- * because the visitor never learns a World id, and both shapes have to be recoverable from the URL
- * alone — that is what lets the cache be found before anything is fetched.
- */
+/** The two route families a World is reached through; a Public Link visitor never learns a World id. */
 const SCOPE_PATH = /^\/(public\/w|w)\/([^/]+)/;
 
 /**
- * The World scope a URL names, or `null` outside one. The decorative slug is dropped and the base62
- * code kept (ADR-0042), so a rename still hits the cache. `index.html`'s pre-paint bootstrap mirrors
- * this — it is the one place that cannot import it.
+ * The World scope a URL names, or `null` outside one — the base62 code alone (ADR-0042), so a rename
+ * still hits the cache. `index.html`'s pre-paint replay mirrors this; it is the one caller that cannot
+ * import it, which is also why the code is taken by hand rather than decoded: a legacy bare-UUID URL
+ * therefore misses, and flashes once before the guard's self-heal rewrites it to the canonical form.
  */
 export function worldThemeScope(pathname: string): string | null {
   const match = SCOPE_PATH.exec(pathname);
@@ -119,15 +109,15 @@ export function resolveWorldTheme(layers: readonly (WorldThemeLayer | null | und
   };
 }
 
-/** One World's last-applied Theme, as the cache holds it: already resolved, so the replay is dumb. */
+/** One World's own last-applied Theme, cached resolved so the pre-paint replay carries no logic. */
 interface CachedScope {
   readonly scope: string;
   readonly solar: ThemeDeclarations;
   readonly astral: ThemeDeclarations;
 }
 
-/** Keep only what the manifest declares — the cache is replayed by a script that cannot check. */
-function declared(value: unknown): ThemeDeclarations {
+/** Keep only what the manifest declares: the pre-paint replay writes the cache back unchecked. */
+function declaredOnly(value: unknown): ThemeDeclarations {
   if (typeof value !== 'object' || value === null) return {};
   return Object.fromEntries(
     Object.entries(value).filter(([name, raw]) => isDesignToken(name) && typeof raw === 'string'),
@@ -143,8 +133,8 @@ function readCache(): CachedScope[] {
     .filter((entry): entry is { scope: string } => typeof (entry as CachedScope)?.scope === 'string')
     .map((entry) => ({
       scope: entry.scope,
-      solar: declared((entry as Partial<CachedScope>).solar),
-      astral: declared((entry as Partial<CachedScope>).astral),
+      solar: declaredOnly((entry as Partial<CachedScope>).solar),
+      astral: declaredOnly((entry as Partial<CachedScope>).astral),
     }));
 }
 
@@ -158,19 +148,24 @@ export class WorldThemeApplier {
    * first paint — a sentinel, so the Instance default lands even when the first scope is no World.
    */
   private current: string | null | undefined;
-  private declarations: ThemeDeclarationSet = EMPTY;
+  private declarations: ThemeDeclarationSet = NOTHING;
   /** What the last write put on the root, so the next one takes back what it no longer sets. */
   private written: readonly string[] = [];
+  private readonly _revision = signal(0);
+
+  /**
+   * Bumped on every write. A Canvas renderer reads its colours through `getComputedStyle` (ADR-0003),
+   * which no signal tracks, so this is the cue to re-read them — a live Theme edit repaints the map.
+   */
+  readonly revision: Signal<number> = this._revision.asReadonly();
 
   constructor() {
-    // The World is a URL fact (ADR-0028), so the scope is known before routing resolves — which is
-    // what lets a reload into a known World land its cached Theme ahead of the first paint. The
-    // pre-paint script in `index.html` has already replayed the same entry; this makes the applier the
-    // owner of what is on the root, so a later scope change can take it back.
+    // The World is a URL fact (ADR-0028), so the scope resolves before routing does. `index.html` has
+    // already replayed this entry; repeating it makes the applier the owner of what sits on the root,
+    // so a later scope change can take it back.
     this.restore(worldThemeScope(location.pathname));
 
-    // The reader's day/night choice is theirs, and orthogonal to the Theme (ADR-0006): a toggle
-    // rewrites the anchors to the other Palette and changes nothing else.
+    // A Theme and the reader's ColorScheme are orthogonal (ADR-0006): a toggle swaps Palette, no more.
     effect(() => {
       this.colorScheme.colorScheme();
       this.write();
@@ -178,41 +173,41 @@ export class WorldThemeApplier {
   }
 
   /**
-   * Point the document at a World scope.
+   * Point the document at a World scope; `null` leaves the World scope for the Instance default alone.
    *
-   * `theme` left out means the World has not been read yet: the last Theme cached for this scope
-   * applies, so a reload — or a hop back to a World already visited — never flashes the Hexly default
-   * on the way in. A given `theme` (or an explicit `null`) is authoritative: it applies and it caches.
-   * `scope` of `null` leaves the World scope entirely, back to the Instance default alone.
+   * An omitted `theme` means the World has not been read yet, so the cached one applies — that is what
+   * makes a reload, or a hop back into a World already seen, flash-free. A `theme` given (`null`
+   * included) is authoritative: it applies, and it replaces what was cached.
    */
-  scope(scope: WorldScope | null, theme?: WorldTheme | null): void {
-    if (scope === null) {
-      this.current = null;
-      this.declarations = resolveWorldTheme([this.instance]);
-      this.write();
-      return;
-    }
+  scope(worldScope: WorldScope | null, theme?: WorldTheme | null): void {
+    const key = worldScope === null ? null : scopeOf(worldScope);
+    if (theme === undefined) return this.restore(key);
 
-    const key = scopeOf(scope);
-    if (theme === undefined) {
-      this.restore(key);
-      return;
-    }
-
-    this.current = key;
-    this.declarations = resolveWorldTheme([this.instance, theme]);
-    this.write();
-    this.cache(key, theme ? this.declarations : null);
+    this.paint(key, resolveWorldTheme([this.instance, theme]));
+    // Cached without the Instance layer, which is this build's and not this World's: folding it in
+    // would have the pre-paint replay serve an operator's *previous* branding after they changed it.
+    if (key !== null) this.cache(key, theme ? resolveWorldTheme([theme]) : null);
   }
 
   /**
-   * Paint `scope` from the cache — everything known about it before its World read resolves. A cache
-   * entry is a resolved chain, Instance layer included, so it replaces rather than merges.
+   * Paint `scope` from the cache — all that is known of it before its World read resolves. Re-entering
+   * a scope already painted is skipped: it would roll an authoritative Theme back to a cached one.
    */
   private restore(scope: string | null): void {
-    this.current = scope;
+    if (scope === this.current) return;
+    const instance = resolveWorldTheme([this.instance]);
     const cached = scope === null ? undefined : readCache().find((entry) => entry.scope === scope);
-    this.declarations = cached ? { solar: cached.solar, astral: cached.astral } : resolveWorldTheme([this.instance]);
+    this.paint(
+      scope,
+      cached
+        ? { solar: { ...instance.solar, ...cached.solar }, astral: { ...instance.astral, ...cached.astral } }
+        : instance,
+    );
+  }
+
+  private paint(scope: string | null, declarations: ThemeDeclarationSet): void {
+    this.current = scope;
+    this.declarations = declarations;
     this.write();
   }
 
@@ -223,13 +218,13 @@ export class WorldThemeApplier {
     for (const name of this.written) if (!(name in next)) style.removeProperty(name);
     for (const [name, value] of Object.entries(next)) style.setProperty(name, value);
     this.written = Object.keys(next);
+    this._revision.update((n) => n + 1);
   }
 
   /**
-   * Remember this scope's resolved Theme, most recent first, so the pre-paint bootstrap can replay it.
-   * Unscoped by account, like the ColorScheme and for the same reason: the script that reads it cannot
-   * know the user hash. A Theme is served to anonymous Public Link holders anyway, so it is not the
-   * kind of thing an auth-scoped key protects.
+   * Remember this World's own resolved Theme, most recent first. Unscoped by account like the
+   * ColorScheme and for its reason — the script that replays it cannot know the user hash — and a Theme
+   * is served to anonymous Public Link holders anyway.
    */
   private cache(scope: string, declarations: ThemeDeclarationSet | null): void {
     const others = readCache().filter((entry) => entry.scope !== scope);
@@ -238,10 +233,7 @@ export class WorldThemeApplier {
   }
 }
 
-/**
- * Instantiate {@link WorldThemeApplier} during bootstrap, so a reload into a known World has its Theme
- * on the root before the app renders — and so the applier owns what the pre-paint script wrote.
- */
+/** Instantiate {@link WorldThemeApplier} during bootstrap, before the app renders anything. */
 export function provideWorldTheme(): EnvironmentProviders {
   return provideAppInitializer(() => void inject(WorldThemeApplier));
 }
