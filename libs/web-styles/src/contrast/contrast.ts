@@ -1,13 +1,10 @@
 /**
  * Whether a Palette is readable (ADR-0076): the ratio and the verdict, over colours somebody else
- * measured.
+ * measured. Warn, never block.
  *
- * Nothing here derives a colour. The tier-2 roles are one CSS expression each off the tier-1 anchors
- * (ADR-0075) and are read back out of the engine that painted them — this file only judges what came
- * back, so the report matches what renders by construction rather than by agreeing with it by luck.
- *
- * Warn, never block. A deliberately oppressive Palette in a horror World is a legitimate choice, and a
- * block just gets routed around by overriding a different token (ADR-0076).
+ * Nothing here derives a colour. The tier-2 roles are one CSS expression each off the anchors
+ * (ADR-0075) and are read back out of the engine that painted them, so the report matches what renders
+ * by construction rather than by agreeing with it by luck.
  */
 
 import { DESIGN_TOKENS, DesignToken } from '../tokens/manifest';
@@ -22,14 +19,9 @@ export type MeasuredScheme = Readonly<Partial<Record<DesignToken, Rgb>>>;
 export const BODY_CONTRAST_MIN = 4.5;
 
 /**
- * The ΔE00 below which a category tone reads as a status colour. Calibrated in-repo rather than taken
- * from the literature: the tightest categorical-vs-status pair Hexly shipped before the derivation was
- * 21.5, so the design is on record tolerating 20 (`docs/design/spike-tone-rotation.md` §2).
- *
- * Hexly's own eight clear it by 0.6 at the tightest (Astral tone-8 against danger, Solar tone-1 against
- * success), which is thin on purpose: the exclusion arc was *placed* at this threshold, so the shipped
- * set sits against it by construction. An Owner re-anchoring the accent rotates all eight together and
- * has no such guarantee, which is the whole reason this check exists.
+ * The ΔE00 below which a category tone reads as a status colour — the design's own revealed tolerance,
+ * not a literature number (`docs/design/spike-tone-rotation.md` §2). Hexly's eight clear it by 0.6 at
+ * the tightest, thin because the exclusion arc was placed at this very threshold.
  */
 export const TONE_CONFUSION_MAX = 20;
 

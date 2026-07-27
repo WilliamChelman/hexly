@@ -1,28 +1,24 @@
 /**
- * Reading tokens as a ColorScheme other than the reader's own would resolve them (ADR-0076) — what a
- * contrast report for the half of a Theme nobody is looking at is made of.
+ * Reading tokens as a ColorScheme other than the reader's own resolves them (ADR-0076).
  *
- * **Measured on the document root, never on an offscreen probe.** ADR-0076 widened the tier-1
- * declarations to `[data-color-scheme]` on any element so a probe could carry the opposite scheme, and
- * that much works — but only for tier 1. The tier-2 roles are declared once at `:root` by `@theme
- * static`, and a registered custom property computes *where it is declared*, so a probe re-declares
- * `--palette-*` and then inherits the root's already-derived `--color-*`: half a measurement, in
- * silence. `world-theme.spec.ts` pins that. The root is the one element the whole cascade reaches.
+ * Measured on the document root, not on the offscreen probe ADR-0076's widened selector allows: that
+ * carries tier 1 and not tier 2, because the roles are declared once at `:root` and a registered custom
+ * property computes where it is declared. `world-theme.spec.ts` pins it. Swapping the root and putting
+ * it back inside one task is flash-free — a paint happens between tasks, never inside one.
  *
- * Swapping the root and putting it back inside a single task is flash-free rather than merely fast: a
- * paint happens between tasks, never inside one, and `getComputedStyle` forces the style recalculation
- * synchronously — so the values come back resolved and the reader never sees the scheme they are not in.
- *
- * {@link measureScheme} and {@link rasteriseColors} are self-contained by rule, referencing nothing but
- * their arguments and the DOM, so `apps/web-e2e` can hand them straight to `page.evaluate` and test the
- * mechanism itself rather than a copy of it.
+ * {@link measureScheme} and {@link rasteriseColors} reference nothing but their arguments and the DOM,
+ * so `apps/web-e2e` hands them to `page.evaluate` rather than testing a copy of them.
  */
 
 import { CONTRAST_TOKENS, MeasuredScheme, ThemeWarning, themeWarnings } from './contrast';
 
 /** What a measurement asks for: which ColorScheme, which candidate declarations, which tokens. */
 export interface SchemeMeasurement {
-  /** The value of `data-color-scheme` to measure under — the scheme the reader may not be in. */
+  /**
+   * The `data-color-scheme` to measure under — the scheme the reader may not be in. Spelled as a
+   * string rather than `ColorScheme`, which lives in `@hexly/web-core`: this is a leaf lib, and the
+   * Playwright process that hands this function to `page.evaluate` must not pull Angular in.
+   */
   readonly scheme: string;
   /** Custom properties to apply first, inline on the root: an editor's unsaved Palette, typically. */
   readonly declarations: Readonly<Partial<Record<string, string>>>;
@@ -30,8 +26,9 @@ export interface SchemeMeasurement {
 }
 
 /**
- * Every token in `tokens`, resolved as `scheme` and `declarations` would render it. The root is left
- * exactly as it was found, including on the throwing path.
+ * Every token in `tokens`, resolved as `scheme` and `declarations` alone would render it — `declarations`
+ * replaces whatever is inline rather than layering over it. The root is left exactly as it was found,
+ * including on the throwing path.
  */
 export function measureScheme(measurement: SchemeMeasurement): Record<string, string> {
   const root = document.documentElement;
@@ -39,7 +36,11 @@ export function measureScheme(measurement: SchemeMeasurement): Record<string, st
   const scheme = root.getAttribute('data-color-scheme');
   try {
     root.setAttribute('data-color-scheme', measurement.scheme);
-    // A layer may be silent on a token (an operator branding one anchor, say), and silence means "let
+    // Cleared first, and this is load-bearing: what is already inline is the *active* scheme's Theme,
+    // written there by the applier, and it beats both schemes' stylesheet rules. Left in place, the
+    // scheme nobody is looking at would be measured wearing the other one's overrides (ADR-0076).
+    root.removeAttribute('style');
+    // A layer may be silent on a token — an operator branding one anchor, say — and silence means "let
     // the stylesheet answer" rather than "declare nothing".
     for (const [name, value] of Object.entries(measurement.declarations)) {
       if (value !== undefined) root.style.setProperty(name, value);
@@ -57,10 +58,9 @@ export function measureScheme(measurement: SchemeMeasurement): Record<string, st
 }
 
 /**
- * Each CSS colour as a 2D drawing context rasterises it — 8-bit sRGB, whatever syntax it was written
- * in, and gamut-mapped exactly as the display will get it. That is what makes a ratio computed over
- * these the ratio a reader experiences, and it is the one parse an `oklch()`, a `color(srgb …)` and a
- * hex can share. Alpha is dropped: the anchors a Palette carries are opaque.
+ * Each CSS colour as a 2D drawing context rasterises it: 8-bit sRGB, gamut-mapped exactly as a display
+ * will get it, which is what makes a ratio over these the one a reader experiences. It is also the only
+ * parse an `oklch()`, a `color(srgb …)` and a hex share. Alpha is dropped — a Palette's anchors are opaque.
  */
 export function rasteriseColors(values: readonly string[]): [number, number, number][] {
   const canvas = document.createElement('canvas');
@@ -79,22 +79,18 @@ export function rasteriseColors(values: readonly string[]): [number, number, num
 }
 
 /**
- * Whether one candidate Palette is readable in one ColorScheme: measure, rasterise, judge. The whole
- * face of the report — a caller names a scheme and the anchors it is considering, and gets back what an
- * Owner should look at before shipping.
+ * Whether one candidate Palette is readable in one ColorScheme: measure, rasterise, judge — the whole
+ * face of the report. `null` where the engine resolved nothing, which is a third answer and not a clean
+ * bill of health: readability can only be checked in a browser (ADR-0076).
  *
- * Unlike the two above this is not `page.evaluate`-safe, and does not need to be: what a browser has to
- * answer is the measurement, and the judging is unit-covered in `contrast.spec.ts`.
+ * `scheme` is a string because `ColorScheme` lives in `@hexly/web-core` and this is a leaf lib.
  */
 export function contrastReport(
   scheme: string,
   declarations: Readonly<Partial<Record<string, string>>>,
-): readonly ThemeWarning[] {
+): readonly ThemeWarning[] | null {
   const resolved = measureScheme({ scheme, declarations, tokens: CONTRAST_TOKENS });
-  // Readability can only be checked in a browser (ADR-0076): the derivation is CSS-side, so under an
-  // engine that does not resolve registered custom properties there is nothing measured to judge, and
-  // an empty report is the honest answer rather than one over a document full of unresolved black.
-  if (CONTRAST_TOKENS.some((token) => !resolved[token])) return [];
+  if (CONTRAST_TOKENS.some((token) => !resolved[token])) return null;
 
   const rasterised = rasteriseColors(CONTRAST_TOKENS.map((token) => resolved[token]));
   const measured: MeasuredScheme = Object.fromEntries(CONTRAST_TOKENS.map((token, i) => [token, rasterised[i]]));

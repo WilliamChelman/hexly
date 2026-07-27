@@ -15,9 +15,11 @@ import {
   ActiveWorld,
   ColorScheme,
   INSTANCE_THEME,
+  ThemeDeclarationSet,
   ToasterService,
   WorldThemeApplier,
   WorldsClient,
+  resolveWorldTheme,
 } from '@hexly/web-core';
 import { ButtonComponent, EyebrowComponent } from '@hexly/web-ui';
 import {
@@ -47,7 +49,7 @@ import { PaletteEdit, ThemePaletteComponent } from './theme-palette.component';
       <!-- One section per part of the contract; the radius set and font pairing take their own. -->
       <section class="group">
         <h2 appEyebrow>{{ 'worldTheme.paletteHeading' | transloco }}</h2>
-        <app-theme-palette [palettes]="palettes()" (changed)="apply($event)" />
+        <app-theme-palette [palettes]="palettes()" [declarations]="declarations()" (changed)="apply($event)" />
       </section>
 
       <div class="actions">
@@ -111,7 +113,8 @@ export class WorldThemePanelComponent {
    * *from* — a stored Theme carries both Palettes entire, and seeding from the stylesheet would have
    * the first edit overwrite that branding on the ten anchors nobody touched.
    */
-  private readonly defaults: Readonly<Record<ColorScheme, WorldThemePalette>> = defaultPalettes(inject(INSTANCE_THEME));
+  private readonly instance = inject(INSTANCE_THEME);
+  private readonly defaults: Readonly<Record<ColorScheme, WorldThemePalette>> = defaultPalettes(this.instance);
 
   /**
    * The Theme as stored, off the World the resolver already pinned (ADR-0028) — no second read. Keyed
@@ -133,6 +136,16 @@ export class WorldThemePanelComponent {
     const draft = this.draft();
     return draft ?? this.defaults;
   });
+
+  /**
+   * The chain resolved to what would land on the root — the same layers {@link WorldThemeApplier.preview}
+   * paints by, so the contrast report (#373) is over the declarations that render rather than over the
+   * anchors alone. A draft's tier-2 overrides ride here, and they are what an Owner reaches for when a
+   * derived role is not what they wanted.
+   */
+  protected readonly declarations = computed<ThemeDeclarationSet>(() =>
+    resolveWorldTheme([this.instance, { ...this.draft(), ...this.palettes() }]),
+  );
 
   constructor() {
     effect(() => this.applier.preview(this.draft()));

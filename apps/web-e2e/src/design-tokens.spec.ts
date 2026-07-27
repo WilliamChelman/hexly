@@ -192,6 +192,12 @@ test('the contrast report measures the ColorScheme the reader is not in, roles i
   const names = DESIGN_TOKENS.map((decl) => decl.name);
   const active = (await page.locator('html').getAttribute('data-color-scheme')) as ColorScheme;
   const inactive = active === 'solar' ? 'astral' : 'solar';
+
+  // A tier-2 override, inline on the root, standing in for the one the applier writes there for the
+  // *active* scheme. Left in place it would be inherited by the scheme being measured, so the report
+  // for one Palette would carry the other's opt-outs — which is why `declarations` replaces what is
+  // inline rather than layering over it (ADR-0076).
+  await page.evaluate(() => document.documentElement.style.setProperty('--color-bg', 'rgb(1, 2, 3)'));
   const inlineBefore = await page.evaluate(() => document.documentElement.getAttribute('style'));
 
   // The editor's own measurement, handed to the browser rather than restated here: what only an engine
@@ -203,11 +209,12 @@ test('the contrast report measures the ColorScheme the reader is not in, roles i
   // would otherwise ship unchecked, with a report that looked like it had checked it.
   expect(measured).toEqual(Object.fromEntries(names.map((name) => [name, table[name][inactive]])));
 
-  // Non-vacuous by construction: what the document is still painting is the *active* scheme's answer,
-  // and the two differ. Without this the assertion above would be satisfied by a measurement that had
-  // quietly read the reader's own scheme all along, in a run where both columns happened to agree.
+  // Non-vacuous by construction: what the document is still painting is the *active* scheme's answer —
+  // the override included, since that is what an inline property does. Without this, the assertion
+  // above would be satisfied by a measurement that had quietly read the reader's own scheme all along,
+  // in a run where both columns happened to agree.
   expect(await resolve(page, ['--color-bg', '--color-ink'])).toEqual({
-    '--color-bg': table['--color-bg'][active],
+    '--color-bg': 'rgb(1, 2, 3)',
     '--color-ink': table['--color-ink'][active],
   });
   expect(measured['--color-bg']).not.toBe(table['--color-bg'][active]);
@@ -216,4 +223,6 @@ test('the contrast report measures the ColorScheme the reader is not in, roles i
   // the reader never glimpses the ColorScheme they are not in, and nothing outlives the reading.
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', active);
   expect(await page.evaluate(() => document.documentElement.getAttribute('style'))).toBe(inlineBefore);
+
+  await page.evaluate(() => document.documentElement.style.removeProperty('--color-bg'));
 });

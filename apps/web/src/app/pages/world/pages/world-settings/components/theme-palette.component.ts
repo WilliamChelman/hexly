@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ColorScheme, resolveWorldTheme } from '@hexly/web-core';
+import { ColorScheme, ThemeDeclarationSet } from '@hexly/web-core';
 import { WorldThemePalette } from '@hexly/domain';
 import { ThemeWarning, contrastReport } from '@hexly/web-styles';
 import { COLOR_SCHEMES, PALETTE_CONTROLS, PaletteControl, controlValue } from '../utils/theme-draft';
@@ -82,6 +82,9 @@ export class ThemePaletteComponent {
   /** What each ColorScheme's controls show — the draft where there is one, the Hexly default where not. */
   readonly palettes = input.required<Readonly<Record<ColorScheme, WorldThemePalette>>>();
 
+  /** The whole chain the preview paints by, which is what the report has to be measured over. */
+  readonly declarations = input.required<ThemeDeclarationSet>();
+
   readonly changed = output<PaletteEdit>();
 
   protected readonly controls = PALETTE_CONTROLS;
@@ -91,14 +94,13 @@ export class ThemePaletteComponent {
    * What each Palette costs a reader, measured rather than predicted — including for the ColorScheme
    * nobody is currently in (ADR-0076).
    *
-   * The anchors go through `resolveWorldTheme`, the same seam the preview paints by, so the report is
-   * over exactly the declarations that would render. Measuring re-dresses the document root and puts it
-   * straight back inside this one call: a paint happens between tasks and never inside one, so nothing
-   * flickers, and no CSS had to be duplicated per `[data-color-scheme]` to make it true.
+   * Over {@link declarations} and never over {@link palettes}: an anchor is not the only thing a Theme
+   * can move, and a tier-2 override is precisely the thing an Owner reaches for when a derived role is
+   * not what they wanted. Measuring re-dresses the document root and puts it straight back inside this
+   * one call, so nothing flickers and no CSS had to be duplicated per `[data-color-scheme]`.
    */
-  protected readonly reports = computed<Readonly<Record<ColorScheme, readonly ThemeWarning[]>>>(() => {
-    const { solar, astral } = this.palettes();
-    const declarations = resolveWorldTheme([{ solar, astral }]);
+  protected readonly reports = computed<Readonly<Record<ColorScheme, readonly ThemeWarning[] | null>>>(() => {
+    const declarations = this.declarations();
     return {
       solar: contrastReport('solar', declarations.solar),
       astral: contrastReport('astral', declarations.astral),
