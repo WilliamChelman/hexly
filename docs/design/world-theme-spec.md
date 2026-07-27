@@ -247,6 +247,14 @@ The tone check uses the spike's own ΔE00 20 (§2 of `spike-tone-rotation.md`) b
 
 A curated pairing set: `{ id, display, body, cartouche, mono }`, chosen from bundled `@fontsource` families. Today's set is one entry (`codex`). Additional pairings are a design task, not specified here. Uploaded fonts are out of scope; the token shape (`--font-display`, `--font-body`) is unchanged either way, so opening it later is additive.
 
+### 5.5 Copying from another World
+
+**Built in #376.** ADR-0076's reuse story — "a duplicate, not a link" — as three decisions the ADR did not have to make.
+
+- **Which Worlds are on offer is an authorisation answer, not a filter.** `GET /worlds/:id/theme-sources` is Owner-gated on `:id` like every other theming route, and its rows come from `worldOwnerFilter` — the caller's _personal_ ownership, no Superadmin bypass — with `:id` itself excluded. A World the caller merely reads is **withheld**, so a client that skips the picker and reads the endpoint raw learns nothing more than the picker showed. The alternative, putting `theme` on `WorldSummary` and letting the picker keep the rows whose `rights` carry `manage`, ships every reachable World's Theme to a client that must then be trusted to drop most of them.
+- **A World carrying no Theme is not offered.** It has nothing to copy, so the row would be a no-op with a name on it; the empty offer reads as its own state ("none of your other worlds carries a theme yet") rather than as an empty dropdown. This also means "nothing to copy from" is one shape whether the Owner has no other Worlds or no other _themed_ ones.
+- **A copy stages as the draft; it does not apply.** `draft.set(draftFrom(source))`, which is the whole behaviour: it previews through the applier like any moved anchor, `dirty()` offers the save, cancel puts the saved Theme back, and the save is the same `PATCH /worlds/:id` — so the copy has no write path of its own. The values land as this World's own and are editable from there; the `version` is re-stamped on the way out (`draftToTheme`), so a copy carries the contract this build knows rather than the one the source was authored against.
+
 ---
 
 ## 6. Out of the contract

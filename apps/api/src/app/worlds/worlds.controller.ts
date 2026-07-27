@@ -44,6 +44,7 @@ import {
   WorldGraph,
   WorldMember,
   WorldSummary,
+  WorldThemeSource,
 } from '@hexly/domain';
 import type { Response } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -166,6 +167,14 @@ export class WorldsController {
     const graph = this.graphs.graph(user.id, id);
     if (!graph) throw new NotFoundException();
     return graph;
+  }
+
+  // The Worlds whose Theme this one may copy in (#376). Owner-gated in the service like every other
+  // theming route — asking what may be copied in is part of theming — and which Worlds qualify is
+  // decided there too.
+  @Get(':id/theme-sources')
+  themeSources(@CurrentUser() user: AuthUser, @Param('id') id: string): WorldThemeSource[] {
+    return aclSetResponse(this.worlds.themeSources(user.id, id), 'world');
   }
 
   /**

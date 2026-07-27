@@ -19,6 +19,7 @@ import {
   WorldMember,
   WorldSummary,
   WorldThemeInput,
+  WorldThemeSource,
 } from '@hexly/domain';
 import { Watched } from '../services/live-follow';
 
@@ -36,6 +37,9 @@ export class MockWorldsClient {
   rename = vi.fn<(id: string, name: string) => Observable<WorldDetail>>();
   setPins = vi.fn<(id: string, pinnedEntityIds: string[]) => Observable<WorldDetail>>();
   setTheme = vi.fn<(id: string, theme: WorldThemeInput | null) => Observable<WorldDetail>>();
+  // Defaults to nothing to copy from, so a spec mounting the Theme editor (#376) without caring
+  // about it still renders; override per test as needed.
+  themeSources = vi.fn<(id: string) => Observable<WorldThemeSource[]>>(() => of<WorldThemeSource[]>([]));
   delete = vi.fn<(id: string) => Observable<void>>();
   // Defaults to an empty set so a spec that mounts the owner-set panel without
   // caring about it still renders; override per test as needed.

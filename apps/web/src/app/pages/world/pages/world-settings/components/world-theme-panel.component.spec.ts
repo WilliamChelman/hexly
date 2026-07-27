@@ -1,6 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
-import { WORLD_THEME_VERSION, WorldDetail, WorldTheme, WorldThemeInput, colorTokenHex } from '@hexly/domain';
+import {
+  WORLD_THEME_VERSION,
+  WorldDetail,
+  WorldTheme,
+  WorldThemeInput,
+  WorldThemeSource,
+  colorTokenHex,
+} from '@hexly/domain';
 import { ActiveWorld, INSTANCE_THEME, WorldThemeLayer, WorldsClient } from '@hexly/web-core';
 import { MockWorldsClient } from '@hexly/web-core/testing';
 import { provideTranslocoTesting } from '../../../../../../testing/transloco-testing';
@@ -264,6 +271,87 @@ describe('WorldThemePanel', () => {
       const sent = save(fixture);
       expect(sent?.fontPairing).toBe('codex');
       expect(sent?.radii).toEqual(sharp);
+    });
+  });
+
+  /**
+   * Copying another World's Theme in (#376). The offer itself is the server's; what this asserts is
+   * what the editor does with it — a copy **stages**, so it previews, it cancels, and it commits
+   * through the one save every other edit rides.
+   */
+  describe('copying from another World', () => {
+    /** A source World's whole Theme, told apart from {@link stored} in every part the copy must carry. */
+    function sourceTheme(): WorldTheme {
+      const from = stored();
+      return {
+        ...from,
+        solar: { ...from.solar, accent: 'oklch(0.7 0.2 300)' },
+        radii: RADIUS_PRESETS[0].radii,
+        fontPairing: 'codex',
+        overrides: { solar: { '--color-ink-muted': 'oklch(0.5 0.02 90)' } },
+      };
+    }
+
+    const offer = (theme: WorldTheme): WorldThemeSource[] => [{ id: 'w2', name: 'Whisperwood', theme }];
+
+    it('stages the source World’s values whole, so they preview and can still be cancelled', () => {
+      worlds.themeSources.mockReturnValue(of(offer(sourceTheme())));
+      const fixture = mount(null, stored());
+
+      at(fixture, 'theme-copy').click();
+      fixture.detectChanges();
+
+      // Staged, not applied: nothing was written, and the panel reads as carrying unsaved work.
+      expect(worlds.setTheme).not.toHaveBeenCalled();
+      expect(at(fixture, 'theme-unsaved')).toBeTruthy();
+      expect((at(fixture, 'theme-control-solar-accent') as HTMLInputElement).value).toBe(
+        colorTokenHex('oklch(0.7 0.2 300)'),
+      );
+
+      // And cancel is still cancel — a copy an Owner previews and thinks better of costs nothing.
+      at(fixture, 'theme-discard').click();
+      fixture.detectChanges();
+      expect((at(fixture, 'theme-control-solar-accent') as HTMLInputElement).value).toBe(
+        colorTokenHex(stored().solar.accent),
+      );
+    });
+
+    it('sends the copy through the one save, as this World’s own values', () => {
+      worlds.themeSources.mockReturnValue(of(offer(sourceTheme())));
+      const fixture = mount(null, stored());
+
+      at(fixture, 'theme-copy').click();
+      fixture.detectChanges();
+      const sent = save(fixture);
+
+      // Every part of the contract comes over, not the anchors alone — a copy that dropped the
+      // pairing or the opt-outs would hand the Owner a Theme that is not the one they picked.
+      expect(sent).toEqual({ ...sourceTheme(), version: WORLD_THEME_VERSION });
+      // And it goes out stamped with the version this build knows, through the one PATCH.
+      expect(worlds.setTheme).toHaveBeenCalledWith('w1', sent);
+    });
+
+    it('leaves the copy editable, and an edit disturbs nothing else in it', () => {
+      worlds.themeSources.mockReturnValue(of(offer(sourceTheme())));
+      const fixture = mount(null);
+
+      at(fixture, 'theme-copy').click();
+      fixture.detectChanges();
+      move(fixture, 'ink', '#112233');
+
+      const sent = save(fixture);
+      expect(sent?.solar.ink).toBe('#112233');
+      expect(sent?.solar.accent).toBe('oklch(0.7 0.2 300)');
+    });
+
+    it('offers only what the server handed over, and says so plainly when that is nothing', () => {
+      // The picker never filters: an empty offer is the server's answer that this Owner has no other
+      // themed World, which is why it reads as an empty state rather than an empty dropdown (#376).
+      const fixture = mount(null);
+
+      expect(at(fixture, 'theme-copy-empty')).toBeTruthy();
+      expect(at(fixture, 'theme-copy')).toBeNull();
+      expect(worlds.themeSources).toHaveBeenCalledWith('w1');
     });
   });
 });

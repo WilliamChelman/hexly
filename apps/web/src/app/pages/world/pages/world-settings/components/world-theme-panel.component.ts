@@ -7,10 +7,11 @@ import {
   inject,
   input,
   linkedSignal,
+  OnInit,
   signal,
 } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { FontPairingId, WorldThemePalette } from '@hexly/domain';
+import { FontPairingId, WorldTheme, WorldThemePalette, WorldThemeSource } from '@hexly/domain';
 import {
   ActiveWorld,
   ColorScheme,
@@ -36,6 +37,7 @@ import { PaletteEdit, ThemePaletteComponent } from './theme-palette.component';
 import { OverrideEdit, ThemeOverridesComponent } from './theme-overrides.component';
 import { ThemeFontsComponent } from './theme-fonts.component';
 import { ThemeRadiiComponent } from './theme-radii.component';
+import { ThemeCopyComponent } from './theme-copy.component';
 
 /**
  * The World Theme editor (ADR-0076): a World Owner authors both ColorSchemes' anchors and knobs and
@@ -56,9 +58,18 @@ import { ThemeRadiiComponent } from './theme-radii.component';
     ThemeOverridesComponent,
     ThemeRadiiComponent,
     ThemeFontsComponent,
+    ThemeCopyComponent,
   ],
   template: `
     <div class="theme-editor">
+      <!-- First: a copy is where an Owner reusing a Theme starts, not something they reach for
+           after authoring one. -->
+      <section class="group">
+        <h2 appEyebrow>{{ 'worldTheme.copyHeading' | transloco }}</h2>
+        <p class="lede">{{ 'worldTheme.copyLede' | transloco }}</p>
+        <app-theme-copy [sources]="copySources()" (copied)="copyFrom($event)" />
+      </section>
+
       <!-- One section per part of the contract; the radius set and font pairing take their own. -->
       <section class="group">
         <h2 appEyebrow>{{ 'worldTheme.paletteHeading' | transloco }}</h2>
@@ -134,7 +145,7 @@ import { ThemeRadiiComponent } from './theme-radii.component';
     }
   `,
 })
-export class WorldThemePanelComponent {
+export class WorldThemePanelComponent implements OnInit {
   readonly id = input.required<string>();
 
   private readonly worlds = inject(WorldsClient);
@@ -184,10 +195,32 @@ export class WorldThemePanelComponent {
     resolveWorldTheme([this.instance, { ...this.draft(), ...this.palettes() }]),
   );
 
+  /** The Worlds this Owner may copy a Theme from (#376); `null` until the server has answered. */
+  protected readonly copySources = signal<readonly WorldThemeSource[] | null>(null);
+
   constructor() {
     effect(() => this.applier.preview(this.draft()));
     // Leaving the editor is a cancel: the saved Theme comes back, whatever the draft still held.
     inject(DestroyRef).onDestroy(() => this.applier.preview(undefined));
+  }
+
+  ngOnInit(): void {
+    // Read once: the offer is other Worlds' stored Themes, which this World's own nudges say nothing
+    // about. A failure leaves it unanswered rather than taking the editor down with it.
+    this.worlds.themeSources(this.id()).subscribe({
+      next: (sources) => this.copySources.set(sources),
+      error: () => this.toaster.show(this.transloco.translate('worldTheme.copyLoadError'), 'error'),
+    });
+  }
+
+  /**
+   * Stage another World's Theme as this one's draft (#376) — staged, not applied, so the copy previews
+   * and cancels like any other edit and commits through the one {@link save}.
+   */
+  protected copyFrom(theme: WorldTheme): void {
+    // `draftFrom` drops the source's `version`, which `save` re-stamps: a copy carries the contract
+    // this build knows, not the one it was authored against.
+    this.draft.set(draftFrom(theme));
   }
 
   /** Fold one moved control into the draft. */

@@ -23,6 +23,7 @@ import {
   WorldNudge,
   WorldSummary,
   WorldThemeInput,
+  WorldThemeSource,
 } from '@hexly/domain';
 import { NudgeBusClient } from './nudge-bus.client';
 import { FollowStore } from './follow-store';
@@ -152,6 +153,16 @@ export class WorldsClient {
   setTheme(id: string, theme: WorldThemeInput | null): Observable<WorldDetail> {
     // Write-through, as {@link rename} — the saved Theme fans out and this tab's own echo dedups.
     return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { theme }).pipe(tap((d) => this.store.merge(d)));
+  }
+
+  /**
+   * The Worlds whose Theme may be copied into this one (#376), Themes and all. Owner-gated
+   * server-side, which is also where *which* Worlds qualify is decided.
+   *
+   * Outside the live-follow store: other Worlds' Themes answer to no `world` nudge for this one.
+   */
+  themeSources(id: string): Observable<WorldThemeSource[]> {
+    return this.http.get<WorldThemeSource[]>(`/api/worlds/${id}/theme-sources`);
   }
 
   delete(id: string): Observable<void> {
