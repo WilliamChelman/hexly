@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { DESIGN_TOKENS } from '@hexly/web-styles';
 import { PALETTE_TOKENS, WORLD_THEME_VERSION, WorldTheme, WorldThemePalette } from '@hexly/domain';
+import { WorldThemeLayer } from '@hexly/web-core';
 import {
   COLOR_SCHEMES,
   PALETTE_CONTROLS,
   ThemeDraft,
   controlValue,
+  defaultPalettes,
   draftFrom,
   draftToTheme,
   hexlyPalette,
@@ -187,5 +189,66 @@ describe('the Hexly default each ColorScheme opens at', () => {
     hexlyPalette('astral');
 
     expect(document.body.childElementCount).toBe(before);
+  });
+});
+
+/**
+ * What an unthemed World's controls open at (#371 × #372). The Instance default is a *starting point*
+ * an Owner departs from, so the editor has to seed from the resolved chain — Instance layer where it
+ * has a value, Hexly's own where it does not. The probe cannot see the operator's layer: it is written
+ * inline on the root, and a `[data-color-scheme]` rule declaring the anchors beats inheritance.
+ */
+describe('the default an unthemed World opens at, under an Instance default', () => {
+  const OPERATOR_ACCENT = 'oklch(0.6 0.2 300)';
+  const OPERATOR_ASTRAL_PAGE = 'oklch(0.15 0.03 300)';
+
+  /** An operator branding two anchors and nothing else — the layer is partial by design. */
+  const instance: WorldThemeLayer = {
+    solar: { accent: OPERATOR_ACCENT },
+    astral: { page: OPERATOR_ASTRAL_PAGE },
+  };
+
+  it('seeds the anchors the operator branded from the operator', () => {
+    const defaults = defaultPalettes(instance);
+
+    expect(defaults.solar.accent).toBe(OPERATOR_ACCENT);
+    expect(defaults.astral.page).toBe(OPERATOR_ASTRAL_PAGE);
+  });
+
+  it('seeds every anchor the operator left alone from Hexly’s own, per ColorScheme', () => {
+    const defaults = defaultPalettes(instance);
+    const hexly = { solar: hexlyPalette('solar'), astral: hexlyPalette('astral') };
+
+    expect(defaults.solar.page).toBe(hexly.solar.page);
+    expect(defaults.solar.ink).toBe(hexly.solar.ink);
+    // A layer that brands Solar's accent has said nothing about Astral's: the merge is per anchor,
+    // per ColorScheme, not per Palette.
+    expect(defaults.astral.accent).toBe(hexly.astral.accent);
+    expect(defaults.astral.accent).not.toBe(OPERATOR_ACCENT);
+    expect(defaults.solar.page).not.toBe(OPERATOR_ASTRAL_PAGE);
+  });
+
+  it('keeps the knobs numbers, whichever layer supplied them', () => {
+    const defaults = defaultPalettes({ solar: { veil: 0.4 } });
+
+    expect(defaults.solar.veil).toBe(0.4);
+    expect(typeof defaults.astral.veil).toBe('number');
+  });
+
+  it('falls back to Hexly’s own with no Instance layer at all', () => {
+    expect(defaultPalettes(null).solar.accent).toBe(hexlyPalette('solar').accent);
+  });
+
+  it('saves the operator’s branding untouched when an Owner moves one other anchor', () => {
+    // The regression guard. A stored Theme carries both Palettes entire, so a first edit materialises
+    // all eleven anchors — seeded from the stylesheet they would silently overwrite the operator's.
+    const defaults = defaultPalettes(instance);
+    const ink = PALETTE_CONTROLS.find((control) => control.field === 'ink')!;
+
+    const sent = draftToTheme({ ...defaults, solar: withControlValue(defaults.solar, ink, '#112233') });
+
+    expect(sent.solar.ink).toBe('#112233');
+    expect(sent.solar.accent).toBe(OPERATOR_ACCENT);
+    expect(sent.astral.page).toBe(OPERATOR_ASTRAL_PAGE);
   });
 });

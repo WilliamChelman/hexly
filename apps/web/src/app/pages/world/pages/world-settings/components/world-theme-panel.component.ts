@@ -11,9 +11,23 @@ import {
 } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { WorldThemePalette } from '@hexly/domain';
-import { ActiveWorld, ColorScheme, ToasterService, WorldThemeApplier, WorldsClient } from '@hexly/web-core';
+import {
+  ActiveWorld,
+  ColorScheme,
+  INSTANCE_THEME,
+  ToasterService,
+  WorldThemeApplier,
+  WorldsClient,
+} from '@hexly/web-core';
 import { ButtonComponent, EyebrowComponent } from '@hexly/web-ui';
-import { ThemeDraft, draftFrom, draftToTheme, hexlyPalette, sameDraft, withControlValue } from '../utils/theme-draft';
+import {
+  ThemeDraft,
+  defaultPalettes,
+  draftFrom,
+  draftToTheme,
+  sameDraft,
+  withControlValue,
+} from '../utils/theme-draft';
 import { PaletteEdit, ThemePaletteComponent } from './theme-palette.component';
 
 /**
@@ -90,12 +104,14 @@ export class WorldThemePanelComponent {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
 
-  /** Hexly's own two Palettes: what the controls show for an unthemed World, and what a first edit
-   * materialises a draft from. */
-  private readonly defaults: Readonly<Record<ColorScheme, WorldThemePalette>> = {
-    solar: hexlyPalette('solar'),
-    astral: hexlyPalette('astral'),
-  };
+  /**
+   * What the controls show for a World with no Theme, and what a first edit materialises a draft from:
+   * the chain's first two layers, Instance default over Hexly's own, anchor by anchor (ADR-0076). An
+   * operator's branding is a starting point an Owner departs from, so it has to be what they depart
+   * *from* — a stored Theme carries both Palettes entire, and seeding from the stylesheet would have
+   * the first edit overwrite that branding on the ten anchors nobody touched.
+   */
+  private readonly defaults: Readonly<Record<ColorScheme, WorldThemePalette>> = defaultPalettes(inject(INSTANCE_THEME));
 
   /**
    * The Theme as stored, off the World the resolver already pinned (ADR-0028) — no second read. Keyed

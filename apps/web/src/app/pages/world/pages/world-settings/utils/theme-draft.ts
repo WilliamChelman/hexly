@@ -16,7 +16,7 @@ import {
   WorldThemePalette,
   colorTokenHex,
 } from '@hexly/domain';
-import { ColorScheme } from '@hexly/web-core';
+import { ColorScheme, ThemeDeclarations, WorldThemeLayer, resolveWorldTheme } from '@hexly/web-core';
 
 /**
  * The two halves an Owner authors in one sitting — a World Theme and a reader's ColorScheme are
@@ -148,13 +148,41 @@ export function hexlyPalette(scheme: ColorScheme): WorldThemePalette {
   document.body.append(probe);
   try {
     const style = getComputedStyle(probe);
-    const palette: Record<string, string | number> = {};
-    for (const control of PALETTE_CONTROLS) {
-      const resolved = readDesignToken(style, control.token);
-      palette[control.field] = control.type === 'number' ? Number(resolved) : resolved;
-    }
-    return palette as unknown as WorldThemePalette;
+    return paletteOf((token) => readDesignToken(style, token));
   } finally {
     probe.remove();
   }
+}
+
+/**
+ * What an unthemed World's controls open at: the resolution chain's first two layers, **Instance
+ * default over Hexly's own, anchor by anchor** (ADR-0076).
+ *
+ * The probe cannot answer this and must not be made to. An operator's layer is applied inline on the
+ * root, and the `[data-color-scheme]` rule that lets {@link hexlyPalette} see past a World Theme sees
+ * past that too — so the layer is read from where it is held rather than from the document.
+ *
+ * Composed through `resolveWorldTheme`, not a merge of its own: the layer is partial by design, an
+ * operator may brand one anchor of one ColorScheme, and a `??` at the Palette level would take the
+ * other ten from whichever layer supplied the first. This matters because a stored Theme carries both
+ * Palettes entire — an Owner who moves one anchor saves all eleven, so seeding the other ten from the
+ * stylesheet would silently overwrite the operator's branding on anchors nobody touched.
+ */
+export function defaultPalettes(
+  instance: WorldThemeLayer | null | undefined,
+): Readonly<Record<ColorScheme, WorldThemePalette>> {
+  const hexly: WorldThemeLayer = { solar: hexlyPalette('solar'), astral: hexlyPalette('astral') };
+  const resolved = resolveWorldTheme([hexly, instance]);
+  const readFrom = (declarations: ThemeDeclarations) => paletteOf((token) => declarations[token] ?? '');
+  return { solar: readFrom(resolved.solar), astral: readFrom(resolved.astral) };
+}
+
+/** One Palette, read token by token through `value` and typed by what the manifest declared. */
+function paletteOf(value: (token: DesignToken) => string): WorldThemePalette {
+  const palette: Record<string, string | number> = {};
+  for (const control of PALETTE_CONTROLS) {
+    const raw = value(control.token);
+    palette[control.field] = control.type === 'number' ? Number(raw) : raw;
+  }
+  return palette as unknown as WorldThemePalette;
 }
