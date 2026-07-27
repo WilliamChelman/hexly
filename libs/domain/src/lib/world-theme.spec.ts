@@ -2,6 +2,7 @@ import { DESIGN_TOKENS } from '@hexly/web-styles';
 import { canonicalTokenValue, colorTokenHex } from './design-token-value';
 import {
   instanceThemeSchema,
+  OVERRIDABLE_TOKENS,
   PALETTE_TOKENS,
   WORLD_THEME_VERSION,
   WorldThemeInput,
@@ -103,6 +104,10 @@ describe('worldThemeSchema', () => {
       ['an undeclared token', '--color-nope', '#fff'],
       ['a token out of the contract', '--text-base', '2rem'],
       ["another plugin's vocabulary", '--color-terrain-grass', '#fff'],
+      // The tier boundary (ADR-0075): the anchors are authored as `solar`/`astral`, and reaching one
+      // through `overrides` would be a second way in, past the domains those fields hold them to.
+      ['a private Palette anchor', '--palette-accent', '#fff'],
+      ['a private Palette knob', '--palette-veil', '0.4'],
       [
         'a gradient — the one place a `url()` could reach the page',
         '--gradient-accent-sheen',
@@ -124,6 +129,20 @@ describe('worldThemeSchema', () => {
       expect(
         withOverride('--shadow-2', 'inset 0 1px 2px rgba(60, 44, 22, 0.12)')?.overrides?.solar?.['--shadow-2'],
       ).toMatch(/^inset 0 1px 2px oklch\(/);
+    });
+
+    it('keys on the tier-2 roles alone, whatever a plugin marks public', () => {
+      // Tier 3 is a plugin's own concept, not the design system's (ADR-0075). Every tier-3 token is
+      // private today, so a `tier !== 'palette'` slice would exclude them by accident rather than say so.
+      expect(OVERRIDABLE_TOKENS.every((decl) => decl.tier === 'role')).toBe(true);
+    });
+
+    it('accepts every token it publishes as overridable, at the value the manifest declares for it', () => {
+      // The editor renders a control per entry and seeds a new override from `initial` (#374). A token
+      // the schema advertises but refuses at its own declared value would be a control that cannot save.
+      for (const decl of OVERRIDABLE_TOKENS) {
+        expect([decl.name, withOverride(decl.name, decl.initial) !== undefined]).toEqual([decl.name, true]);
+      }
     });
 
     it('keeps the two ColorSchemes apart', () => {

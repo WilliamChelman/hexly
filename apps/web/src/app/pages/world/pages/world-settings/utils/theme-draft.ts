@@ -7,8 +7,17 @@
  * beside it, held to the manifest's own tier-1 slice by this file's spec.
  */
 
-import { DESIGN_TOKENS, DesignToken, TokenType, readDesignToken } from '@hexly/web-styles';
 import {
+  DESIGN_TOKENS,
+  DesignToken,
+  PublicDesignToken,
+  TokenType,
+  designTokenInitial,
+  designTokenStyle,
+  readDesignToken,
+} from '@hexly/web-styles';
+import {
+  OVERRIDABLE_TOKENS,
   PALETTE_TOKENS,
   WORLD_THEME_VERSION,
   WorldTheme,
@@ -72,6 +81,119 @@ export const PALETTE_CONTROLS: readonly PaletteControl[] = DESIGN_TOKENS.filter(
     ...(KNOB_RANGES[decl.name] ? { range: KNOB_RANGES[decl.name] } : {}),
   }),
 );
+
+/** A tier-2 opt-out's control, which also names the token it writes (#374). */
+export interface OverrideControl extends TokenControl {
+  readonly token: PublicDesignToken;
+  /** The token name without its `--`, for a test id. */
+  readonly slug: string;
+}
+
+/** A named run of override controls — what one collapsible block of the editor holds. */
+export interface OverrideGroup {
+  readonly id: string;
+  readonly controls: readonly OverrideControl[];
+}
+
+/**
+ * How the overridable tokens are divided, in order; the first rule that claims a name wins.
+ *
+ * By **role family**, because that is the question an Owner arrives with — "the muted ink is too
+ * pale", "the shadows are too heavy" — and the slice is ~50 tokens, which in declaration order is a
+ * wall of colour wells rather than a list. Grouping by *type* would be no help: all but five are
+ * colours.
+ */
+const OVERRIDE_GROUP_RULES: readonly { readonly id: string; readonly match: RegExp }[] = [
+  { id: 'surfaces', match: /^--color-(bg|surface|overlay)/ },
+  // A foreground is an ink, whatever fill it happens to sit on — `--color-on-*` belongs here.
+  { id: 'ink', match: /^--color-(ink|on-)/ },
+  { id: 'lines', match: /^--color-line/ },
+  { id: 'accent', match: /^--color-accent/ },
+  { id: 'tones', match: /^--color-tone-/ },
+  { id: 'status', match: /^--color-(danger|success)/ },
+  { id: 'canvas', match: /^--color-canvas/ },
+  { id: 'elevation', match: /^--shadow-/ },
+];
+
+/** Where a token no rule claims lands, so a newly declared one is authorable without a change here. */
+const OTHER_GROUP = 'other';
+
+/**
+ * The override controls, grouped. Read off `OVERRIDABLE_TOKENS` — the very list the write choke point
+ * keys its schema on (ADR-0075/0076) — so the editor cannot offer a token the server would refuse, nor
+ * withhold one it would accept.
+ */
+export const OVERRIDE_GROUPS: readonly OverrideGroup[] = (() => {
+  const ids = [...OVERRIDE_GROUP_RULES.map((rule) => rule.id), OTHER_GROUP];
+  const byId = new Map<string, OverrideControl[]>(ids.map((id) => [id, []]));
+  for (const decl of OVERRIDABLE_TOKENS) {
+    const id = OVERRIDE_GROUP_RULES.find((rule) => rule.match.test(decl.name))?.id ?? OTHER_GROUP;
+    byId.get(id)?.push({ token: decl.name, type: decl.type, slug: decl.name.slice(2) });
+  }
+  return [...byId].map(([id, controls]) => ({ id, controls })).filter((group) => group.controls.length > 0);
+})();
+
+/** Both ColorSchemes' opt-outs, as a draft carries them. */
+export type ThemeOverrides = WorldTheme['overrides'];
+
+/**
+ * What a new override starts at. For the ColorScheme the reader is `live` in, the value the document
+ * resolved — so opting a token out changes nothing on screen, which is what makes the derivation a
+ * starting point rather than a jump to somewhere the Owner never asked for.
+ *
+ * The other ColorScheme falls back to what the manifest declares, and cannot do better: the tier-2
+ * roles are declared once at `:root`, so a `[data-color-scheme]` probe carries the other scheme's
+ * anchors but still inherits the root's already-derived roles. So does a `shadow`, which is
+ * `unregistered` (ADR-0075) and therefore resolves to an unsubstituted `oklch(from …)` expression — a
+ * string the write choke point would rightly refuse. Only a registered colour answers with a value.
+ *
+ * Taken verbatim rather than through {@link colorTokenHex}: the control speaks hex, but a translucent
+ * role would lose its alpha the moment it was opted out rather than when the Owner moved the well.
+ */
+export function overrideSeed(control: OverrideControl, live: boolean): string {
+  const declared = designTokenInitial(control.token);
+  if (!live || control.type !== 'color') return declared;
+  const resolved = readDesignToken(designTokenStyle(), control.token);
+  return colorTokenHex(resolved) === undefined ? declared : resolved;
+}
+
+/** What `control` shows for `scheme`, or `undefined` where nothing overrides it — that token is derived. */
+export function overrideValue(
+  overrides: ThemeOverrides,
+  scheme: ColorScheme,
+  control: OverrideControl,
+): string | undefined {
+  const stored = overrides?.[scheme]?.[control.token];
+  if (stored === undefined) return undefined;
+  // A colour control speaks hex, as in `controlValue`; every other type shows the value as authored.
+  return control.type === 'color' ? (colorTokenHex(stored) ?? stored) : stored;
+}
+
+/**
+ * `overrides` with one token set for one ColorScheme, or — for `raw` of `null` — cleared.
+ *
+ * Clearing **removes the key**. The applier takes back whatever a previous write set and this one does
+ * not (ADR-0076), so an absent key is what returns a token to its derived value; writing the derived
+ * value as a literal would freeze it against the next anchor move instead. A ColorScheme left with
+ * nothing, and the block itself when both are, go the same way — so clearing the last override leaves
+ * the draft byte-identical to the one before the first, and "unsaved changes" says so.
+ */
+export function withOverride(
+  overrides: ThemeOverrides,
+  scheme: ColorScheme,
+  token: PublicDesignToken,
+  raw: string | null,
+): ThemeOverrides {
+  const scoped: Partial<Record<PublicDesignToken, string>> = { ...overrides?.[scheme] };
+  if (raw === null) delete scoped[token];
+  else scoped[token] = raw;
+
+  const next: NonNullable<ThemeOverrides> = { ...overrides, [scheme]: scoped };
+  for (const one of COLOR_SCHEMES) {
+    if (Object.keys(next[one] ?? {}).length === 0) delete next[one];
+  }
+  return Object.keys(next).length === 0 ? undefined : next;
+}
 
 /**
  * A World Theme as it is being edited. `null` is its own state and not an empty one: the World carries

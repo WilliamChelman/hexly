@@ -107,4 +107,94 @@ describe('WorldThemePanel', () => {
     expect((at(fixture, 'theme-reset') as HTMLButtonElement).disabled).toBe(true);
     expect((at(fixture, 'theme-save') as HTMLButtonElement).disabled).toBe(true);
   });
+
+  /**
+   * The tier-2 opt-outs (#374). The pure helpers own the folding; what this asserts is the round trip
+   * through the DOM an Owner actually drives — and that clearing sends an *absence*.
+   */
+  describe('overriding an individual token', () => {
+    /** Turn a derived row into an override, then move the control it put there. */
+    function override(fixture: ComponentFixture<WorldThemePanelComponent>, key: string, value: string): void {
+      at(fixture, `theme-override-set-solar-${key}`).click();
+      fixture.detectChanges();
+      const control = at(fixture, `theme-override-solar-${key}`) as HTMLInputElement;
+      control.value = value;
+      control.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+
+    it('offers a control per public role, and none for a private anchor or a plugin’s vocabulary', () => {
+      const fixture = mount(null);
+
+      expect(at(fixture, 'theme-override-set-solar-color-ink-muted')).toBeTruthy();
+      expect(at(fixture, 'theme-override-set-astral-color-ink-muted')).toBeTruthy();
+      expect(at(fixture, 'theme-override-set-solar-shadow-2')).toBeTruthy();
+      // ADR-0075's tier boundary: the anchors are authored as the Palette, and tier 3 is not ours.
+      expect(at(fixture, 'theme-override-set-solar-palette-accent')).toBeNull();
+      expect(at(fixture, 'theme-override-set-solar-color-terrain-grass')).toBeNull();
+    });
+
+    it('sends the override per ColorScheme, alongside a Palette it materialised whole', () => {
+      const fixture = mount(instance);
+      override(fixture, 'color-ink-muted', '#112233');
+
+      const sent = save(fixture);
+
+      expect(sent?.overrides).toEqual({ solar: { '--color-ink-muted': '#112233' } });
+      // A first edit is still a whole Theme, and the operator's branding survives it (#371 × #372).
+      expect(sent?.solar.accent).toBe(OPERATOR_ACCENT);
+    });
+
+    it('clears by sending no key at all, so the token goes back to what the anchors derive', () => {
+      const fixture = mount(null);
+      override(fixture, 'color-ink-muted', '#112233');
+
+      at(fixture, 'theme-override-clear-solar-color-ink-muted').click();
+      fixture.detectChanges();
+
+      // Not an empty string and not the derived value written down: the applier takes back what a
+      // previous write set and this one does not (ADR-0076), so an absent key *is* the derivation.
+      expect(save(fixture)?.overrides).toBeUndefined();
+      expect(at(fixture, 'theme-override-set-solar-color-ink-muted')).toBeTruthy();
+    });
+
+    it('leaves an emptied field alone, so retyping a shadow does not take the field away', () => {
+      const fixture = mount(null);
+      override(fixture, 'shadow-2', '0 8px 20px rgba(0, 0, 0, 0.5)');
+
+      const field = at(fixture, 'theme-override-solar-shadow-2') as HTMLInputElement;
+      field.value = '';
+      field.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      // Still an override, still a field: an empty string is no value of any token's type, and clearing
+      // is the ✕ — as `withControlValue` leaves an emptied knob at what it held.
+      expect(at(fixture, 'theme-override-solar-shadow-2')).toBeTruthy();
+      expect(save(fixture)?.overrides?.solar?.['--shadow-2']).toBe('0 8px 20px rgba(0, 0, 0, 0.5)');
+    });
+
+    it('reads an override set then cleared as no change at all', () => {
+      const fixture = mount(null, stored());
+      override(fixture, 'color-ink-muted', '#112233');
+      expect((at(fixture, 'theme-save') as HTMLButtonElement).disabled).toBe(false);
+
+      at(fixture, 'theme-override-clear-solar-color-ink-muted').click();
+      fixture.detectChanges();
+
+      expect((at(fixture, 'theme-save') as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('leaves an overridden token at its override when the Palette is re-anchored', () => {
+      // The criterion that proves an override sits *after* the derivation rather than beside it: the
+      // anchor moves, every derived role moves with it, and the opt-out does not.
+      const fixture = mount(null);
+      override(fixture, 'color-ink-muted', '#112233');
+
+      move(fixture, 'accent', '#6a2ab0');
+      const sent = save(fixture);
+
+      expect(sent?.solar.accent).toBe('#6a2ab0');
+      expect(sent?.overrides).toEqual({ solar: { '--color-ink-muted': '#112233' } });
+    });
+  });
 });

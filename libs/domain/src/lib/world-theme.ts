@@ -113,13 +113,23 @@ const RADIUS_TOKENS = DESIGN_TOKENS.filter((decl) => decl.public && decl.type ==
 const radiiSchema = z.partialRecord(tokenEnum(RADIUS_TOKENS), tokenValue('length'));
 
 /**
- * The tokens an override may key: the public contract, less the tier-1 anchors (those are the
- * `solar`/`astral` sets), less the radii (scheme-independent, so `radii` owns them and there is one
- * place to set each token), and less the types no value may be authored for.
+ * The tokens an override may key: the **tier-2 roles** alone — not the tier-1 anchors (those are the
+ * `solar`/`astral` sets) and not a plugin's tier-3 vocabulary — less the radii (scheme-independent, so
+ * `radii` owns them and there is one place to set each token), and less the types no value may be
+ * authored for.
+ *
+ * `tier === 'role'` rather than `tier !== 'palette'`: tier 3 is out because it is a plugin's own
+ * concept and not the design system's (ADR-0075), which has to hold whether or not a plugin ever marks
+ * one of its tokens public. Excluded by the `public` flag alone, it would be excluded by accident.
+ *
+ * Exported because the editor renders a control per entry (#374). The schema's key set *is* the
+ * editor's control set, rather than the same filter written twice — which is what ADR-0075 means by
+ * one manifest generating both, and what stops an Owner being offered a token the choke point refuses.
  */
-const OVERRIDABLE_TOKENS = DESIGN_TOKENS.filter(
-  (decl) => decl.public && decl.tier !== 'palette' && decl.type !== 'length' && isSettableTokenType(decl.type),
-);
+export const OVERRIDABLE_TOKENS = DESIGN_TOKENS.filter(
+  (decl) => decl.public && decl.tier === 'role' && decl.type !== 'length' && isSettableTokenType(decl.type),
+  // Narrowed here rather than at each reader: the `public` filter one line up is what makes it true.
+) as readonly (DesignTokenDecl & { readonly name: PublicDesignToken })[];
 
 /**
  * A ColorScheme's tier-2 opt-outs. The value's type comes from the token it keys, so one record
