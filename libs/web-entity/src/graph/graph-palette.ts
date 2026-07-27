@@ -8,7 +8,11 @@ const NODE_RING_ALPHA = 0.5;
 
 /** The graph's colours, resolved from the live theme's tokens — cosmos.gl wants 0..1 RGBA floats. */
 export interface Palette {
-  readonly background: string;
+  /**
+   * What the graph is drawn on — RGBA, not the token's own string: cosmos.gl parses a colour string
+   * itself and answers black to the `oklch()` a derived token resolves to (ADR-0075).
+   */
+  readonly background: [number, number, number, number];
   /** RGBA node colour per Entity type, keyed by type id — the type's tone or its declared token, resolved (ADR-0048). */
   readonly byType: ReadonlyMap<string, [number, number, number, number]>;
   /** Fallback node colour for an unregistered type — the generic type's hue, as every other chrome resolves it. */
@@ -28,7 +32,7 @@ export function palette(defs: readonly TypeDefinition[]): Palette {
   }
   const ink = toRgba(readDesignToken(style, '--color-ink'));
   return {
-    background: readDesignToken(style, '--color-surface-sunken'),
+    background: toRgba(readDesignToken(style, '--color-surface-sunken')),
     byType,
     // An unregistered, absent, or disabled type paints with the generic definition's hue — the same
     // fallback `TypeRegistry.resolve` gives every other surface, so the graph needs no plugin of its own.
@@ -57,9 +61,9 @@ export function linkColors(count: number, palette: Palette): Float32Array {
 }
 
 /**
- * Any CSS colour — hex, `rgb()`, `rgba()` — as cosmos.gl's 0..1 RGBA floats. A 1×1 canvas is the
- * browser's own parser, so a token that resolves to `rgba()` works as well as one that resolves to
- * a hex triple; parsing `#rrggbb` by hand would silently drop the alpha ones.
+ * Any CSS colour — hex, `rgb()`, `oklch()` — as cosmos.gl's 0..1 RGBA floats. A 1×1 canvas is the
+ * browser's own parser, which is the only parser guaranteed to accept whatever notation a derived
+ * token resolves to (ADR-0075); every colour a renderer is handed goes through here first.
  */
 function toRgba(css: string): [number, number, number, number] {
   const canvas = document.createElement('canvas');
