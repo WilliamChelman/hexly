@@ -137,7 +137,7 @@
   },
   "styleguide": {
     "tabTitle": "Hexly — Design system",
-    "backToMap": "Back to map",
+    "backToWorlds": "Back to worlds",
     "eyebrow": "Hexly design system",
     "heroTitle": "The cartographer’s table,<br />by starlight.",
     "heroLede": "One identity told at two hours of the day. <strong>Solar</strong> is the sunlit almanac on the cartographer’s table; <strong>Astral</strong> is the same chart under the night sky. Gold is the through-line — heliograph ink by day, constellation lines by night — and the text stays a warm ivory-cream in both. Everything below is driven by the same CSS custom-property layer that <code>apps/web</code> ships.",
@@ -159,11 +159,11 @@
       "desert": "Desert",
       "sky": "Sky"
     },
-    "fontDisplay": "Cinzel · display",
-    "fontBody": "Spectral · body",
+    "fontDisplay": "Marcellus · display",
+    "fontBody": "Source Serif 4 · body",
     "fontCoord": "JetBrains Mono · coordinates",
     "paletteSemantic": "Palette · semantic roles",
-    "paletteNote": "Slices request a role, never a raw colour. Showing the active theme.",
+    "paletteNote": "Slices request a role, never a raw colour. Showing the active colour scheme.",
     "paletteTerrain": "Palette · terrain fills",
     "typeScale": "Type scale",
     "spacing": "Spacing",
