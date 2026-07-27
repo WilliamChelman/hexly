@@ -23,6 +23,7 @@ export * from './services/client-config.store';
 export * from './services/color-scheme.service';
 export * from './services/desktop-bridge';
 export * from './services/entities.client';
+export * from './services/instance-theme.provider';
 export * from './services/live-follow';
 export * from './services/logger';
 export * from './services/nudge-bus.client';

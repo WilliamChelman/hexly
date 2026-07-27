@@ -1,6 +1,12 @@
 import { DESIGN_TOKENS } from '@hexly/web-styles';
 import { canonicalTokenValue } from './design-token-value';
-import { PALETTE_TOKENS, WORLD_THEME_VERSION, WorldThemeInput, worldThemeSchema } from './world-theme';
+import {
+  instanceThemeSchema,
+  PALETTE_TOKENS,
+  WORLD_THEME_VERSION,
+  WorldThemeInput,
+  worldThemeSchema,
+} from './world-theme';
 
 /** The World Theme write choke point (ADR-0076): as much about what cannot round-trip as what can. */
 describe('worldThemeSchema', () => {
@@ -174,5 +180,75 @@ describe('worldThemeSchema', () => {
       expect([decl.name, once]).not.toEqual([decl.name, undefined]);
       expect([decl.name, canonicalTokenValue(decl.type, once as string)]).toEqual([decl.name, once]);
     }
+  });
+});
+
+/**
+ * The Instance operator's default (#372): the same anchors and the same choke point, from `hexly.yml`
+ * instead of a World, and partial because branding a deployment is rarely a whole Theme.
+ */
+describe('instanceThemeSchema', () => {
+  /** The parsed default, or `undefined` when the boot-time check refused it. */
+  function parse(input: unknown) {
+    const result = instanceThemeSchema.safeParse(input);
+    return result.success ? result.data : undefined;
+  }
+
+  /** Why the boot-time check refused it, joined — what an operator reads in their terminal. */
+  function refusal(input: unknown): string {
+    const result = instanceThemeSchema.safeParse(input);
+    if (result.success) throw new Error('expected a refusal');
+    return result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('\n');
+  }
+
+  it('accepts a single anchor per ColorScheme — an operator branding only their accent', () => {
+    const parsed = parse({ version: 1, solar: { accent: '#2f6f4f' }, astral: { accent: '#7fd0a8' } });
+
+    expect(parsed?.solar?.accent).toMatch(/^oklch\(/);
+    expect(parsed?.astral?.accent).toMatch(/^oklch\(/);
+    // Everything it is silent about falls through to the stylesheet, so it must not materialise here.
+    expect(parsed?.solar?.page).toBeUndefined();
+  });
+
+  it('accepts the version alone — a block that brands nothing is the shipped default spelled out', () => {
+    expect(parse({ version: 1 })).toEqual({ version: 1 });
+  });
+
+  it('refuses a value that is not of its token’s type, rather than dropping it', () => {
+    // The half-applied default #372 forbids: seven anchors landing and the eighth silently absent.
+    expect(refusal({ version: 1, solar: { accent: 'url(https://evil.example/p.png)', page: '#f1e5c7' } })).toMatch(
+      /solar\.accent/,
+    );
+    expect(parse({ version: 1, solar: { accent: 'not-a-colour' } })).toBeUndefined();
+    expect(parse({ version: 1, solar: { polarity: 'sideways' } })).toBeUndefined();
+  });
+
+  it('refuses a misspelled anchor by name, because a dropped one is a default applied half-way', () => {
+    expect(refusal({ version: 1, solar: { acccent: '#2f6f4f' } })).toMatch(/acccent/);
+    expect(refusal({ version: 1, palette: { accent: '#2f6f4f' } })).toMatch(/palette/);
+  });
+
+  it('refuses a version it does not know, rather than applying the fields it recognises', () => {
+    expect(parse({ version: 2, solar: { accent: '#2f6f4f' } })).toBeUndefined();
+    expect(refusal({ solar: { accent: '#2f6f4f' } })).toMatch(/version/);
+  });
+
+  it('carries the radii, the pairing, and the tier-2 opt-outs an Owner may also author', () => {
+    const parsed = parse({
+      version: 1,
+      radii: { '--radius-md': '0px' },
+      fontPairing: 'codex',
+      overrides: { solar: { '--color-ink': '#101010' } },
+    });
+
+    expect(parsed?.radii?.['--radius-md']).toBe('0px');
+    expect(parsed?.fontPairing).toBe('codex');
+    expect(parsed?.overrides?.solar?.['--color-ink']).toMatch(/^oklch\(/);
+  });
+
+  it('holds an operator to the same contract as an Owner — a token outside it is refused', () => {
+    expect(parse({ version: 1, radii: { '--text-base': '1rem' } })).toBeUndefined();
+    expect(parse({ version: 1, overrides: { solar: { '--rail-inspector': '900px' } } })).toBeUndefined();
+    expect(parse({ version: 1, fontPairing: 'comic-sans' })).toBeUndefined();
   });
 });

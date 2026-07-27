@@ -140,6 +140,9 @@ const overridesSchema = z.partialRecord(tokenEnum(OVERRIDABLE_TOKENS), z.string(
   return canonical;
 });
 
+/** Both Themes' opt-out block, shared so the operator's and the Owner's cannot drift apart. */
+const overridesByScheme = { solar: overridesSchema.optional(), astral: overridesSchema.optional() };
+
 /**
  * A World Theme as stored. Unknown keys are dropped rather than refused — an older client's extra
  * field must not cost an Owner their save — but an unknown `version` is refused, which is the whole
@@ -151,7 +154,7 @@ export const worldThemeSchema = z.object({
   astral: paletteSchema,
   radii: radiiSchema.optional(),
   fontPairing: z.enum(FONT_PAIRING_IDS).optional(),
-  overrides: z.object({ solar: overridesSchema.optional(), astral: overridesSchema.optional() }).optional(),
+  overrides: z.object(overridesByScheme).optional(),
 });
 
 /** A World Theme as stored and read back — every value canonical. */
@@ -162,3 +165,29 @@ export type WorldThemeInput = z.input<typeof worldThemeSchema>;
 
 /** One ColorScheme's stored Palette — the anchors and knobs {@link PALETTE_TOKENS} names. */
 export type WorldThemePalette = WorldTheme['solar'];
+
+/** One ColorScheme's Palette as an operator authors it: the same fields, none of them required. */
+const partialPaletteSchema = z.strictObject(paletteSchema.partial().shape);
+
+/**
+ * An Instance operator's default Theme (#372): the chain's first layer, sourced from `hexly.yml`
+ * (ADR-0036) rather than from a World. Every field is optional, because branding a deployment is
+ * rarely a whole Theme — an operator setting only their accent supplies two anchors and lets
+ * everything else fall through to the stylesheet — but each value goes through the same
+ * canonicaliser an Owner's does, since operator-supplied is still input.
+ *
+ * Strict where the rest of `hexly.yml` strips an unknown key (ADR-0052): a misspelled anchor that
+ * silently vanished would be exactly the default-applied-half-way this feature must not do, and
+ * `version` already carries the cross-build compatibility the strip rule was there to protect.
+ */
+export const instanceThemeSchema = z.strictObject({
+  version: z.literal(WORLD_THEME_VERSION),
+  solar: partialPaletteSchema.optional(),
+  astral: partialPaletteSchema.optional(),
+  radii: radiiSchema.optional(),
+  fontPairing: z.enum(FONT_PAIRING_IDS).optional(),
+  overrides: z.strictObject(overridesByScheme).optional(),
+});
+
+/** An Instance default as loaded — every value canonical, and a layer the applier can resolve. */
+export type InstanceTheme = z.infer<typeof instanceThemeSchema>;
