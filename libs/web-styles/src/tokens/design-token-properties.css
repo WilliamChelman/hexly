@@ -222,25 +222,85 @@
   inherits: true;
   initial-value: rgba(211, 149, 39, 0.5);
 }
-@property --color-sea {
+@property --color-tone-1 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #2f6f7a;
+  initial-value: #006761;
 }
-@property --color-sea-soft {
+@property --color-tone-1-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(47, 111, 122, 0.14);
+  initial-value: rgba(0, 99, 99, 0.14);
 }
-@property --color-astra {
+@property --color-tone-2 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #5a4aa6;
+  initial-value: #006478;
 }
-@property --color-astra-soft {
+@property --color-tone-2-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(90, 74, 166, 0.14);
+  initial-value: rgba(0, 99, 120, 0.14);
+}
+@property --color-tone-3 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #005c8a;
+}
+@property --color-tone-3-soft {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(0, 92, 135, 0.14);
+}
+@property --color-tone-4 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #5169ad;
+}
+@property --color-tone-4-soft {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(78, 106, 170, 0.14);
+}
+@property --color-tone-5 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #4d4b90;
+}
+@property --color-tone-5-soft {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(78, 78, 142, 0.14);
+}
+@property --color-tone-6 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #7c5aa0;
+}
+@property --color-tone-6-soft {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(128, 92, 163, 0.14);
+}
+@property --color-tone-7 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #733c76;
+}
+@property --color-tone-7-soft {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(113, 57, 120, 0.14);
+}
+@property --color-tone-8 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #99507b;
+}
+@property --color-tone-8-soft {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(156, 78, 120, 0.14);
 }
 @property --color-danger {
   syntax: '<color>';

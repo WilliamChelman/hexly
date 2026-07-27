@@ -114,7 +114,7 @@ export interface EntityLinkRepairHost extends Pick<EntityLinkRepair, 'writable' 
         data-testid="link-descriptor"
         class="pointer-events-none absolute -top-1.5 right-0 whitespace-nowrap rounded-full px-0.5 text-[0.6em] font-semibold leading-none text-ink-stroke shadow-1"
         [class.bg-accent]="tone() === 'live'"
-        [class.bg-astra]="tone() === 'unresolved'"
+        [class.bg-tone-5]="tone() === 'unresolved'"
         [class.bg-ink-muted]="tone() === 'dangling'"
         >{{ descriptor() }}</span
       >
@@ -226,7 +226,7 @@ export class EntityLinkViewComponent {
    */
   protected readonly brokenTone = computed(() =>
     this.tone() === 'unresolved'
-      ? 'bg-astra-soft text-astra underline decoration-dashed underline-offset-2'
+      ? 'bg-tone-5-soft text-tone-5 underline decoration-dashed underline-offset-2'
       : 'bg-ink-faint/15 italic text-ink-muted',
   );
 

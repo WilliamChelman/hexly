@@ -6,6 +6,7 @@ import {
   ButtonGroupComponent,
   CartoucheComponent,
   ChipComponent,
+  ChipTone,
   CoordComponent,
   DialogComponent,
   DotComponent,
@@ -13,6 +14,7 @@ import {
   FieldComponent,
   IconButtonComponent,
   IconComponent,
+  IconName,
   InputComponent,
   KbdComponent,
   ListboxOptionComponent,
@@ -77,8 +79,8 @@ interface TypeRow {
         <p class="hero-lede" [innerHTML]="'styleguide.heroLede' | transloco"></p>
         <div class="flex flex-wrap gap-2 mt-2">
           <app-chip tone="accent">{{ 'styleguide.fontDisplay' | transloco }}</app-chip>
-          <app-chip tone="sea">{{ 'styleguide.fontBody' | transloco }}</app-chip>
-          <app-chip tone="astra">{{ 'styleguide.fontCoord' | transloco }}</app-chip>
+          <app-chip tone="tone-3">{{ 'styleguide.fontBody' | transloco }}</app-chip>
+          <app-chip tone="tone-7">{{ 'styleguide.fontCoord' | transloco }}</app-chip>
         </div>
       </section>
 
@@ -250,10 +252,18 @@ interface TypeRow {
             <div class="specimen-row">
               <app-chip>{{ 'styleguide.chipDefault' | transloco }}</app-chip>
               <app-chip tone="accent">{{ 'styleguide.chipSettlement' | transloco }}</app-chip>
-              <app-chip tone="sea">{{ 'styleguide.chipEditing' | transloco }}</app-chip>
-              <app-chip tone="astra">{{ 'styleguide.chipRegion' | transloco }}</app-chip>
               <app-coord>q 12 · r −4</app-coord>
               <kbd appKbd>⌘ Z</kbd>
+            </div>
+            <!-- Side by side, with glyphs: mutual distinguishability is all the set claims, so a row is
+                 the only honest way to read it (ADR-0075). -->
+            <div class="specimen-row">
+              @for (row of tones; track row.tone) {
+                <app-chip [tone]="row.tone">
+                  <app-icon [name]="row.icon" [size]="12" />
+                  {{ row.tone }}
+                </app-chip>
+              }
             </div>
           </figure>
 
@@ -598,11 +608,21 @@ export class StyleguidePage {
     { token: '--color-ink', nameKey: 'styleguide.swatch.ink' },
     { token: '--color-ink-muted', nameKey: 'styleguide.swatch.inkMuted' },
     { token: '--color-accent', nameKey: 'styleguide.swatch.compassGold' },
-    { token: '--color-sea', nameKey: 'styleguide.swatch.seaAurora' },
-    { token: '--color-astra', nameKey: 'styleguide.swatch.nebula' },
     { token: '--color-danger', nameKey: 'styleguide.swatch.marginalia' },
     { token: '--color-success', nameKey: 'styleguide.swatch.moss' },
     { token: '--color-line-strong', nameKey: 'styleguide.swatch.drawnRule' },
+  ];
+
+  /** The categorical set, each with a glyph — the channel that survives where the hue does not. */
+  protected readonly tones: readonly { tone: ChipTone; icon: IconName }[] = [
+    { tone: 'tone-1', icon: 'region' },
+    { tone: 'tone-2', icon: 'label' },
+    { tone: 'tone-3', icon: 'library' },
+    { tone: 'tone-4', icon: 'graph' },
+    { tone: 'tone-5', icon: 'terrain' },
+    { tone: 'tone-6', icon: 'user' },
+    { tone: 'tone-7', icon: 'globe' },
+    { tone: 'tone-8', icon: 'link' },
   ];
 
   /**

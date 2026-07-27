@@ -47,7 +47,7 @@ interface Slot {
   imports: [TranslocoPipe, StatSlotComponent],
   template: `
     <article
-      class="max-w-[42rem] mx-auto my-6 rounded-md border border-line border-t-4 border-t-astra bg-surface px-6 py-5 shadow-1"
+      class="max-w-[42rem] mx-auto my-6 rounded-md border border-line border-t-4 border-t-tone-5 bg-surface px-6 py-5 shadow-1"
     >
       <!-- The name line is the page header directly above, so the card opens on the flavour line,
            derived from the identity stats below. -->
@@ -58,7 +58,7 @@ interface Slot {
       <!-- Identity (size, creature type, alignment) and defences (AC, HP, speed): one labelled row each. -->
       <dl class="grid grid-cols-[minmax(6rem,9rem)_1fr] items-center gap-x-4 gap-y-2 m-0 py-3">
         @for (slot of rows(); track slot.field.id) {
-          <dt class="text-sm font-semibold text-astra">{{ slot.field.label }}</dt>
+          <dt class="text-sm font-semibold text-tone-5">{{ slot.field.label }}</dt>
           <dd class="m-0 text-sm text-ink" [attr.data-testid]="'stat-' + slot.field.id">
             <dnd-stat-slot
               [field]="slot.field"
@@ -75,7 +75,7 @@ interface Slot {
       <div class="grid grid-cols-6 gap-2 border-y border-line py-3 text-center">
         @for (slot of abilities(); track slot.field.id) {
           <div class="flex flex-col items-center gap-1">
-            <span class="text-2xs font-semibold uppercase tracking-wider text-astra">{{ slot.field.label }}</span>
+            <span class="text-2xs font-semibold uppercase tracking-wider text-tone-5">{{ slot.field.label }}</span>
             <span class="text-sm text-ink" [attr.data-testid]="'stat-' + slot.field.id">
               <dnd-stat-slot
                 [field]="slot.field"
@@ -95,7 +95,7 @@ interface Slot {
       <!-- Challenge Rating: the number the Browser ranges on, harvested with its numeric num (ADR-0055). -->
       @if (challenge(); as cr) {
         <dl class="grid grid-cols-[minmax(6rem,9rem)_1fr] items-center gap-x-4 gap-y-2 m-0 pt-3">
-          <dt class="text-sm font-semibold text-astra">{{ cr.field.label }}</dt>
+          <dt class="text-sm font-semibold text-tone-5">{{ cr.field.label }}</dt>
           <dd class="m-0 text-sm text-ink" [attr.data-testid]="'stat-' + cr.field.id">
             <dnd-stat-slot
               [field]="cr.field"

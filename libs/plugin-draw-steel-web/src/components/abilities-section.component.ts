@@ -236,7 +236,7 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
                   </div>
                   @for (tier of tierKeys; track tier.key) {
                     <div class="mt-1.5 flex items-center gap-2">
-                      <span class="w-14 shrink-0 text-xs font-semibold text-sea">{{ tier.band }}</span>
+                      <span class="w-14 shrink-0 text-xs font-semibold text-tone-1">{{ tier.band }}</span>
                       <input
                         appInput
                         class="flex-1"
@@ -322,18 +322,18 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
                 <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
                   <span class="inline-flex items-center gap-1">
                     @if (distanceGlyph(ability); as g) {
-                      <app-icon [name]="g" class="text-sm text-sea" />
+                      <app-icon [name]="g" class="text-sm text-tone-1" />
                     }
                     {{ ability.distance || '—' }}
                   </span>
                   <span class="inline-flex items-center gap-1">
-                    <app-icon name="ds-targets" class="text-sm text-sea" />
+                    <app-icon name="ds-targets" class="text-sm text-tone-1" />
                     {{ ability.target || '—' }}
                   </span>
                   @for (kw of ability.keywords; track kw) {
                     <span class="inline-flex items-center gap-1 rounded bg-surface-sunken px-1.5 py-0.5 text-2xs">
                       @if (keywordGlyph(kw); as g) {
-                        <app-icon [name]="g" class="text-sm text-sea" />
+                        <app-icon [name]="g" class="text-sm text-tone-1" />
                       }
                       {{ kw }}
                     </span>
@@ -342,7 +342,7 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
 
                 @if (ability.trigger) {
                   <p class="m-0 mt-0.5 flex items-baseline gap-1 text-sm italic text-ink-muted">
-                    <app-icon name="ds-triggeredAction" class="not-italic text-sea" />{{ ability.trigger }}
+                    <app-icon name="ds-triggeredAction" class="not-italic text-tone-1" />{{ ability.trigger }}
                   </p>
                 }
 
@@ -365,7 +365,7 @@ import { DsGlyphName, DsIconName, dsIcon } from '../ds-glyphs';
                       @for (tier of tierKeys; track tier.key; let i = $index) {
                         <div
                           class="flex items-center gap-2 px-2 py-1 text-sm"
-                          [class.bg-sea-soft]="activeTier(abilityIndex) === tier.key"
+                          [class.bg-tone-1-soft]="activeTier(abilityIndex) === tier.key"
                           [class.bg-surface-sunken]="activeTier(abilityIndex) !== tier.key && i % 2 === 1"
                           [attr.data-testid]="'ability-tier-' + tier.key"
                           [attr.data-active]="activeTier(abilityIndex) === tier.key ? 'true' : null"
@@ -640,19 +640,19 @@ function strArray(value: unknown): string[] {
 
 /** The left-accent hue per action type (signature/main are handled apart, in the accent). */
 const ACCENT: Record<string, string> = {
-  maneuver: 'border-sea',
-  freeManeuver: 'border-sea',
-  triggered: 'border-astra',
-  freeTriggered: 'border-astra',
+  maneuver: 'border-tone-1',
+  freeManeuver: 'border-tone-1',
+  triggered: 'border-tone-5',
+  freeTriggered: 'border-tone-5',
   villain: 'border-danger',
 };
 
 /** The type pill's colour pair per action type (signature/main are handled apart, in the accent). */
 const PILL: Record<string, string> = {
-  maneuver: 'bg-sea-soft text-sea',
-  freeManeuver: 'bg-sea-soft text-sea',
-  triggered: 'bg-astra-soft text-astra',
-  freeTriggered: 'bg-astra-soft text-astra',
+  maneuver: 'bg-tone-1-soft text-tone-1',
+  freeManeuver: 'bg-tone-1-soft text-tone-1',
+  triggered: 'bg-tone-5-soft text-tone-5',
+  freeTriggered: 'bg-tone-5-soft text-tone-5',
   villain: 'bg-danger-soft text-danger',
 };
 

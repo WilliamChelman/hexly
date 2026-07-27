@@ -53,7 +53,7 @@ import { DICE_RNG, evaluate, formatRoll, parse } from '@hexly/dice-web';
         </div>
         <div class="mt-0.5 flex items-baseline gap-2">
           <span class="text-lg font-bold text-ink-strong" data-testid="ability-roll-total">{{ state.total }}</span>
-          <span class="text-xs font-semibold text-sea" data-testid="ability-roll-tier">
+          <span class="text-xs font-semibold text-tone-1" data-testid="ability-roll-tier">
             {{ 'drawSteel.statBlock.tier.' + state.tier | transloco }}
           </span>
         </div>

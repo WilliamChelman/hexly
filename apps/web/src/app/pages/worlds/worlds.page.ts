@@ -25,8 +25,8 @@ import {
   InputComponent,
   DialogComponent,
   SelectComponent,
-  ACCENT_SIGIL,
-  accentFor,
+  TONE_SIGIL,
+  toneFor,
   monogram,
 } from '@hexly/web-ui';
 
@@ -521,7 +521,7 @@ export class WorldsPage {
   protected readonly settingsRoute = worldSettingsRoute;
 
   protected sigil(id: string): string {
-    return ACCENT_SIGIL[accentFor(id)];
+    return TONE_SIGIL[toneFor(id)];
   }
   protected readonly mono = monogram;
   protected readonly creating = signal(false);
