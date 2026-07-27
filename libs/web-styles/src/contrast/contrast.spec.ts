@@ -2,14 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { DesignToken } from '../tokens/manifest';
 import {
   BODY_CONTRAST_MIN,
+  CHIP_GROUNDS,
   CONTRAST_TOKENS,
+  ChipFills,
   MeasuredScheme,
   Rgb,
   TONE_CONFUSION_MAX,
+  TONE_FILLS,
   contrastRatio,
   deltaE00,
   themeWarnings,
 } from './contrast';
+import * as contrastModule from './contrast';
+import * as measureModule from './measure';
+import { measureScheme, rasteriseColors } from './measure';
 
 const BLACK: Rgb = [0, 0, 0];
 const WHITE: Rgb = [255, 255, 255];
@@ -28,6 +34,36 @@ function measured(over: Partial<Record<DesignToken, Rgb>> = {}): MeasuredScheme 
     ...over,
   };
 }
+
+/** Composited chip fills, black by default — the tones are white in {@link measured}, so nothing warns. */
+function fills(over: ChipFills = {}): ChipFills {
+  const base = Object.fromEntries(
+    TONE_FILLS.map(([tone]) => [tone, Object.fromEntries(CHIP_GROUNDS.map((ground) => [ground, BLACK]))]),
+  );
+  return { ...base, ...over };
+}
+
+/** The two together, so the existing cases keep naming only what they are about. */
+function report(over: Partial<Record<DesignToken, Rgb>> = {}, chipFills: ChipFills = fills()) {
+  return themeWarnings(measured(over), chipFills);
+}
+
+describe('the functions apps/web-e2e hands to page.evaluate', () => {
+  // Serialised by `Function.prototype.toString` and re-parsed in the browser, so anything they close
+  // over is a `ReferenceError` there and nowhere here. Extracting a shared helper out of one of them is
+  // how that happens: it reads fine, every unit test passes, and only the e2e run fails.
+  it.each([
+    ['measureScheme', measureScheme],
+    ['rasteriseColors', rasteriseColors],
+  ])('%s references nothing but its arguments and the DOM', (own, fn) => {
+    const source = fn.toString();
+    // Every name either module exports, rather than a list to keep up to date.
+    const siblings = [...Object.keys(measureModule), ...Object.keys(contrastModule)].filter((name) => name !== own);
+    for (const name of siblings) {
+      expect(source, `${name} would not exist inside page.evaluate`).not.toMatch(new RegExp(`\\b${name}\\b`));
+    }
+  });
+});
 
 describe('contrastRatio', () => {
   it('spans 1:1 for a colour on itself to 21:1 for black on white', () => {
@@ -65,11 +101,11 @@ describe('deltaE00', () => {
 
 describe('themeWarnings', () => {
   it('says nothing about a Palette whose every pair is legible', () => {
-    expect(themeWarnings(measured())).toEqual([]);
+    expect(report()).toEqual([]);
   });
 
   it('warns on a body pair below 4.5:1, and carries the ratio it computed', () => {
-    const warnings = themeWarnings(measured({ '--color-ink-muted': [0xaa, 0xaa, 0xaa] }));
+    const warnings = report({ '--color-ink-muted': [0xaa, 0xaa, 0xaa] });
 
     expect(warnings).toEqual([
       { kind: 'contrast', ink: '--color-ink-muted', ground: '--color-surface', ratio: expect.any(Number) },
@@ -81,7 +117,7 @@ describe('themeWarnings', () => {
   it('checks both inks against both grounds, and the accent against the page alone', () => {
     // Not a cross product: the accent is not body ink, so it is checked where a link sits on the page
     // and nowhere else (ADR-0076). A sixth pair here would be a policy change, not a tightening.
-    const warnings = themeWarnings(measured({ '--color-surface': BLACK, '--color-bg': BLACK }));
+    const warnings = report({ '--color-surface': BLACK, '--color-bg': BLACK });
 
     expect(
       warnings.filter((warning) => warning.kind === 'contrast').map((warning) => [warning.ink, warning.ground]),
@@ -98,14 +134,14 @@ describe('themeWarnings', () => {
     // A crimson at the worst lightness there is, with the `--color-on-fill` the engine resolves for it.
     const accent: Rgb = [234, 0, 66];
     const onFill: Rgb = [253, 230, 236];
-    const warnings = themeWarnings(measured({ '--color-accent': accent, '--color-on-fill': onFill }));
+    const warnings = report({ '--color-accent': accent, '--color-on-fill': onFill });
 
     expect(warnings).toContainEqual({ kind: 'midToneAccent', ratio: contrastRatio(onFill, accent) });
     expect(contrastRatio(onFill, accent)).toBeLessThan(BODY_CONTRAST_MIN);
   });
 
   it('stays quiet where the automatic foreground reaches 4.5:1 on the accent', () => {
-    const warnings = themeWarnings(measured({ '--color-accent': [0xf0, 0xd0, 0x60], '--color-on-fill': [26, 23, 15] }));
+    const warnings = report({ '--color-accent': [0xf0, 0xd0, 0x60], '--color-on-fill': [26, 23, 15] });
 
     expect(warnings.filter((warning) => warning.kind === 'midToneAccent')).toEqual([]);
   });
@@ -120,7 +156,7 @@ describe('themeWarnings', () => {
   });
 
   it('flags a category tone that has rotated into confusion with danger or success', () => {
-    const warnings = themeWarnings(measured({ '--color-tone-3': [200, 0, 0], '--color-tone-5': [0, 120, 0] }));
+    const warnings = report({ '--color-tone-3': [200, 0, 0], '--color-tone-5': [0, 120, 0] });
 
     expect(warnings).toContainEqual({
       kind: 'toneCollision',
@@ -138,9 +174,7 @@ describe('themeWarnings', () => {
 
   it('reports the nearer status colour only, so one tone yields one warning', () => {
     // A tone equal to danger is also some distance from success; a chip reads as the nearer one.
-    const collisions = themeWarnings(measured({ '--color-tone-1': [200, 0, 0] })).filter(
-      (warning) => warning.kind === 'toneCollision',
-    );
+    const collisions = report({ '--color-tone-1': [200, 0, 0] }).filter((warning) => warning.kind === 'toneCollision');
 
     expect(collisions).toHaveLength(1);
     expect(collisions[0].against).toBe('--color-danger');
@@ -148,22 +182,74 @@ describe('themeWarnings', () => {
   });
 
   it('leaves the eight tones alone when the accent has kept them out of the exclusion arc', () => {
-    // The tightest two pairs Hexly's own Palette ships, measured off the resolved tokens: Astral
+    // The tightest two pairs Hexly's own Palette ships, read off `design-tokens.table.json`: Astral
     // tone-8 against danger and Solar tone-1 against success. The threshold is calibrated on the
     // design's own revealed tolerance (spike-tone-rotation.md §2), so it must not condemn it.
-    const astralToneEight: Rgb = [229, 140, 174];
+    const astralToneEight: Rgb = [242, 151, 186];
     const astralDanger: Rgb = [232, 138, 111];
-    const solarToneOne: Rgb = [0, 93, 87];
+    const solarToneOne: Rgb = [0, 85, 80];
     const solarSuccess: Rgb = [74, 111, 47];
 
     expect(deltaE00(astralToneEight, astralDanger)).toBeGreaterThan(TONE_CONFUSION_MAX);
     expect(deltaE00(solarToneOne, solarSuccess)).toBeGreaterThan(TONE_CONFUSION_MAX);
   });
 
+  it("warns when a chip's own text does not clear its own fill, naming the worse of the two grounds", () => {
+    // A chip carries its category in its text (ADR-0075), so this pair failing is the category going
+    // unread — and the fill is translucent, so which ground it sits over decides it.
+    const warnings = report(
+      { '--color-tone-2': [0x99, 0x99, 0x99] },
+      fills({
+        '--color-tone-2': {
+          '--color-surface': WHITE,
+          '--color-bg': [0xcc, 0xcc, 0xcc],
+        },
+      }),
+    );
+
+    expect(warnings).toContainEqual({
+      kind: 'chipContrast',
+      tone: '--color-tone-2',
+      ground: '--color-bg',
+      ratio: expect.any(Number),
+    });
+  });
+
+  it('clears Hexly’s own tightest Solar chip, and by less on the page than on a panel', () => {
+    // Solar tone-4 off `design-tokens.table.json`, composited at the fill's 14%: 5.52:1 over `surface`
+    // and 4.86:1 over the page. Before the polarity term went on the tone rows the page read 4.19:1 —
+    // this pair is why that term is there, and the page staying the tighter of the two is why the
+    // check reports the worse ground rather than picking one.
+    const toneFour: Rgb = [62, 82, 147];
+    const overSurface: Rgb = [225, 222, 217];
+    const overPage: Rgb = [216, 208, 192];
+
+    expect(contrastRatio(toneFour, overPage)).toBeGreaterThan(BODY_CONTRAST_MIN);
+    expect(contrastRatio(toneFour, overPage)).toBeLessThan(contrastRatio(toneFour, overSurface));
+
+    const warnings = report(
+      { '--color-tone-4': toneFour },
+      fills({
+        '--color-tone-4': {
+          '--color-surface': overSurface,
+          '--color-bg': overPage,
+        },
+      }),
+    );
+    expect(warnings.filter((warning) => warning.kind === 'chipContrast')).toEqual([]);
+  });
+
+  it('refuses to report on a tone nobody composited, rather than passing it silently', () => {
+    const short = fills();
+    delete (short as Record<string, unknown>)['--color-tone-6'];
+
+    expect(() => themeWarnings(measured(), short)).toThrow(/--color-tone-6/);
+  });
+
   it('refuses to report on a token nobody measured, rather than passing it silently', () => {
     const short = { ...measured() };
     delete (short as Record<string, Rgb>)['--color-tone-4'];
 
-    expect(() => themeWarnings(short)).toThrow(/--color-tone-4/);
+    expect(() => themeWarnings(short, fills())).toThrow(/--color-tone-4/);
   });
 });

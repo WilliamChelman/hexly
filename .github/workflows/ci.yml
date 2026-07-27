@@ -174,10 +174,7 @@ jobs:
           path: |
             apps/web-e2e/playwright-report/
             apps/web-e2e/test-results/
-          # `error`, not `ignore`: an empty upload is the defect this step exists to prevent, and only
-          # a tripwire catches it. Playwright writes a report even when the servers never boot, so the
-          # false positive left is `nx e2e` dying in its `web:build` dependency — which the build job
-          # reports anyway.
+          # An empty upload is the defect this step exists to prevent, so it fails rather than warns.
           if-no-files-found: error
           retention-days: 7
 

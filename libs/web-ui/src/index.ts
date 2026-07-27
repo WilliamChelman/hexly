@@ -2,6 +2,7 @@ export * from './directives/autofocus.directive';
 export * from './directives/body-portal.directive';
 export * from './components/button.component';
 export * from './components/button-group.component';
+export * from './components/card-radio.component';
 export * from './components/cartouche.component';
 export * from './components/chip.component';
 export * from './components/coord.component';

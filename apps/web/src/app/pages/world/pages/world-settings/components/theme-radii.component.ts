@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { CardRadioComponent, CardRadioGroupComponent } from '@hexly/web-ui';
 import { designTokenInitial } from '@hexly/web-styles';
 import { WorldTheme } from '@hexly/domain';
 import { RADIUS_PRESETS, RadiusPreset, radiusPresetOf } from '../utils/theme-draft';
@@ -14,24 +15,21 @@ import { RADIUS_PRESETS, RadiusPreset, radiusPresetOf } from '../utils/theme-dra
 @Component({
   selector: 'app-theme-radii',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe],
+  imports: [TranslocoPipe, CardRadioComponent, CardRadioGroupComponent],
   template: `
-    <div class="sets" role="radiogroup" [attr.aria-label]="'worldTheme.radiiHeading' | transloco">
+    <div appCardRadioGroup [attr.aria-label]="'worldTheme.radiiHeading' | transloco">
       @for (preset of presets; track preset.id) {
-        <label class="set">
-          <input
-            type="radio"
-            name="theme-radii"
-            [attr.data-testid]="'theme-radii-' + preset.id"
-            [checked]="preset.id === selected()"
-            (change)="picked.emit(preset)"
-          />
-          <span class="swatch" aria-hidden="true" [style.borderRadius]="swatchRadius(preset)"></span>
-          <span class="labels">
-            <span class="name">{{ 'worldTheme.radii.' + preset.id | transloco }}</span>
-            <span class="hint">{{ 'worldTheme.radiiHint.' + preset.id | transloco }}</span>
-          </span>
-        </label>
+        <app-card-radio
+          name="theme-radii"
+          basis="12rem"
+          [testId]="'theme-radii-' + preset.id"
+          [checked]="preset.id === selected()"
+          [label]="'worldTheme.radii.' + preset.id | transloco"
+          [hint]="'worldTheme.radiiHint.' + preset.id | transloco"
+          (picked)="picked.emit(preset)"
+        >
+          <span cardLead class="swatch" aria-hidden="true" [style.borderRadius]="swatchRadius(preset)"></span>
+        </app-card-radio>
       }
     </div>
     @if (!selected()) {
@@ -41,26 +39,8 @@ import { RADIUS_PRESETS, RadiusPreset, radiusPresetOf } from '../utils/theme-dra
   `,
   styles: `
     @reference '#app-styles.css';
-    .sets {
-      @apply flex flex-wrap gap-3;
-    }
-    .set {
-      @apply flex flex-1 basis-48 cursor-pointer items-center gap-3 rounded-lg border border-line bg-surface-sunken px-3 py-2;
-    }
-    .set:has(input:checked) {
-      @apply border-line-strong bg-surface-raised;
-    }
     .swatch {
       @apply h-9 w-9 flex-none border border-line-strong bg-surface shadow-inset;
-    }
-    .labels {
-      @apply flex min-w-0 flex-col;
-    }
-    .name {
-      @apply text-sm text-ink-strong;
-    }
-    .hint {
-      @apply text-2xs text-ink-faint;
     }
     .custom {
       @apply text-2xs text-ink-muted;

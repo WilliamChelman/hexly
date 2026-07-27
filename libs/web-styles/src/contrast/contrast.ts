@@ -49,6 +49,19 @@ const TONES: readonly DesignToken[] = DESIGN_TOKENS.filter((decl) => /^--color-t
   (decl) => decl.name,
 );
 
+/** Each tone's soft fill, paired with its tone — what a chip puts its own text on. */
+export const TONE_FILLS: readonly (readonly [DesignToken, DesignToken])[] = TONES.map((tone) => [
+  tone,
+  `${tone}-soft` as DesignToken,
+]);
+
+/**
+ * The grounds a chip may sit on. Its fill is translucent (α 0.14, ADR-0075), so what its text is really
+ * read against is that fill *composited* over whatever is behind — and the two differ by enough to
+ * decide AA: Hexly's own tone-4 is 4.74:1 over `surface` and 4.18:1 over the page.
+ */
+export const CHIP_GROUNDS = ['--color-surface', '--color-bg'] as const satisfies readonly DesignToken[];
+
 /** Every token a report reads, so a caller measures exactly what {@link themeWarnings} will ask for. */
 export const CONTRAST_TOKENS: readonly DesignToken[] = [
   ...new Set<DesignToken>([...BODY_PAIRS.flat(), ...STATUS_ROLES, ...ON_FILL, ...TONES]),
@@ -66,13 +79,26 @@ export type ThemeWarning =
       readonly tone: DesignToken;
       readonly against: DesignToken;
       readonly distance: number;
+    }
+  /** A chip's own text on its own fill, over the ground that reads worst of the two it may sit on. */
+  | {
+      readonly kind: 'chipContrast';
+      readonly tone: DesignToken;
+      readonly ground: DesignToken;
+      readonly ratio: number;
     };
+
+/**
+ * Each tone's soft fill as it actually composites, per ground — `contrastReport` rasterises it over
+ * each, because alpha is gone by the time a colour is an {@link Rgb} and the fill is 14% opaque.
+ */
+export type ChipFills = Readonly<Partial<Record<DesignToken, Readonly<Partial<Record<DesignToken, Rgb>>>>>>;
 
 /**
  * What an Owner should look at in one ColorScheme's Palette, in reading order: the body pairs, then
  * the accent's own foreground, then the categorical set.
  */
-export function themeWarnings(measured: MeasuredScheme): readonly ThemeWarning[] {
+export function themeWarnings(measured: MeasuredScheme, fills: ChipFills): readonly ThemeWarning[] {
   const color = (token: DesignToken): Rgb => {
     const value = measured[token];
     // A token nobody measured would otherwise pass as "no warning", which is the one wrong answer a
@@ -81,7 +107,24 @@ export function themeWarnings(measured: MeasuredScheme): readonly ThemeWarning[]
     return value;
   };
 
-  return [...bodyWarnings(color), ...midToneWarning(color), ...toneWarnings(color)];
+  return [...bodyWarnings(color), ...midToneWarning(color), ...toneWarnings(color), ...chipWarnings(color, fills)];
+}
+
+/**
+ * A chip carries its category in its *text*, on its own tone at 14% (ADR-0075) — so the pair that has
+ * to clear AA is the tone against that fill composited over the ground, not against the ground itself.
+ * Only the worse ground is reported: a chip is one component, and the Owner fixes it once.
+ */
+function* chipWarnings(color: (token: DesignToken) => Rgb, fills: ChipFills): Generator<ThemeWarning> {
+  for (const [tone] of TONE_FILLS) {
+    const overGround = CHIP_GROUNDS.map((ground) => {
+      const fill = fills[tone]?.[ground];
+      if (!fill) throw new Error(`contrast report: ${tone} was not composited over ${ground}`);
+      return { ground, ratio: contrastRatio(color(tone), fill) };
+    });
+    const worst = overGround.reduce((one, two) => (two.ratio < one.ratio ? two : one));
+    if (worst.ratio < BODY_CONTRAST_MIN) yield { kind: 'chipContrast', tone, ...worst };
+  }
 }
 
 function* bodyWarnings(color: (token: DesignToken) => Rgb): Generator<ThemeWarning> {
@@ -92,16 +135,12 @@ function* bodyWarnings(color: (token: DesignToken) => Rgb): Generator<ThemeWarni
 }
 
 /**
- * `contrast-color()` answers black or white and nothing between, so an accent whose lightness is midway
- * is one no automatic foreground rescues — MDN's own example, `#2277d3`, yields black text that is not
- * readable at small sizes. CSS cannot resolve it; the probe makes it detectable (ADR-0076).
+ * `contrast-color()` answers black or white and nothing between, so a mid-lightness accent is one no
+ * automatic foreground rescues (ADR-0076).
  *
- * Measured, not recomputed, and that turns out to be the only way it works at all: *pure* black or
- * white on the worst possible ground still reaches 4.58:1, so "both black and white fail 4.5:1" is a
- * condition no colour can meet. What renders is `--color-on-fill` — the better of the two pulled 10%
- * back toward the ground, so an on-colour is never flat black or white (ADR-0006's warm through-line)
- * — and *that* bottoms out at 3.86:1. Reading the token the engine resolved is what gives the check
- * something to see.
+ * Read off the resolved `--color-on-fill`, not recomputed: pure black or white always reaches 4.58:1,
+ * so the naive condition can never fire, while the retinted on-colour that actually renders bottoms
+ * out at 3.86:1.
  */
 function* midToneWarning(color: (token: DesignToken) => Rgb): Generator<ThemeWarning> {
   const ratio = contrastRatio(color('--color-on-fill'), color('--color-accent'));

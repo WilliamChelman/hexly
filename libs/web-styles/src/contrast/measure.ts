@@ -1,16 +1,24 @@
 /**
  * Reading tokens as a ColorScheme other than the reader's own resolves them (ADR-0076).
  *
- * Measured on the document root, not on the offscreen probe ADR-0076's widened selector allows: that
- * carries tier 1 and not tier 2, because the roles are declared once at `:root` and a registered custom
- * property computes where it is declared. `world-theme.spec.ts` pins it. Swapping the root and putting
- * it back inside one task is flash-free — a paint happens between tasks, never inside one.
+ * Measured on the document root, not on an offscreen probe: the widened `[data-color-scheme]` selector
+ * reaches only what `tokens.css` declares, and the *derived* roles are declared once at `:root` by
+ * `@theme static`, so a probe would inherit the reader's own. `world-theme.spec.ts` pins it. Swapping
+ * the root and putting it back inside one task is flash-free — a paint happens between tasks.
  *
  * {@link measureScheme} and {@link rasteriseColors} reference nothing but their arguments and the DOM,
  * so `apps/web-e2e` hands them to `page.evaluate` rather than testing a copy of them.
  */
 
-import { CONTRAST_TOKENS, MeasuredScheme, ThemeWarning, themeWarnings } from './contrast';
+import {
+  CHIP_GROUNDS,
+  CONTRAST_TOKENS,
+  MeasuredScheme,
+  Rgb,
+  TONE_FILLS,
+  ThemeWarning,
+  themeWarnings,
+} from './contrast';
 
 /** What a measurement asks for: which ColorScheme, which candidate declarations, which tokens. */
 export interface SchemeMeasurement {
@@ -62,7 +70,7 @@ export function measureScheme(measurement: SchemeMeasurement): Record<string, st
  * will get it, which is what makes a ratio over these the one a reader experiences. It is also the only
  * parse an `oklch()`, a `color(srgb …)` and a hex share. Alpha is dropped — a Palette's anchors are opaque.
  */
-export function rasteriseColors(values: readonly string[]): [number, number, number][] {
+export function rasteriseColors(values: readonly string[], ground?: string): [number, number, number][] {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 1;
   const context = canvas.getContext('2d', { willReadFrequently: true });
@@ -71,6 +79,13 @@ export function rasteriseColors(values: readonly string[]): [number, number, num
     context.clearRect(0, 0, 1, 1);
     // Seeded, so a value the context refuses to parse leaves black rather than the previous colour.
     context.fillStyle = '#000000';
+    // `ground` painted under first composites a translucent value the way the page does, rather than
+    // handing back its own channels with the alpha thrown away — `page.evaluate` never passes it.
+    if (ground !== undefined) {
+      context.fillStyle = ground;
+      context.fillRect(0, 0, 1, 1);
+      context.fillStyle = '#000000';
+    }
     context.fillStyle = value;
     context.fillRect(0, 0, 1, 1);
     const [red, green, blue] = context.getImageData(0, 0, 1, 1).data;
@@ -89,10 +104,23 @@ export function contrastReport(
   scheme: string,
   declarations: Readonly<Partial<Record<string, string>>>,
 ): readonly ThemeWarning[] | null {
-  const resolved = measureScheme({ scheme, declarations, tokens: CONTRAST_TOKENS });
-  if (CONTRAST_TOKENS.some((token) => !resolved[token])) return null;
+  // The soft fills are measured too, and only here: they are 14% opaque, so they have to be composited
+  // before the alpha is gone (`chipWarnings`).
+  const fillTokens = TONE_FILLS.map(([, fill]) => fill);
+  const wanted = [...CONTRAST_TOKENS, ...fillTokens];
+  const resolved = measureScheme({ scheme, declarations, tokens: wanted });
+  if (wanted.some((token) => !resolved[token])) return null;
 
   const rasterised = rasteriseColors(CONTRAST_TOKENS.map((token) => resolved[token]));
   const measured: MeasuredScheme = Object.fromEntries(CONTRAST_TOKENS.map((token, i) => [token, rasterised[i]]));
-  return themeWarnings(measured);
+
+  const fills: Record<string, Record<string, Rgb>> = {};
+  for (const ground of CHIP_GROUNDS) {
+    const over = rasteriseColors(
+      fillTokens.map((fill) => resolved[fill]),
+      resolved[ground],
+    );
+    TONE_FILLS.forEach(([tone], i) => ((fills[tone] ??= {})[ground] = over[i]));
+  }
+  return themeWarnings(measured, fills);
 }

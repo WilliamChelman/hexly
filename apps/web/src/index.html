@@ -29,10 +29,17 @@
     <!--
       Replay the World Theme (ADR-0076) last served for the World this URL names, so a reload back into
       it paints themed. Mirrors WorldThemeApplier's scope regex; the cache holds already-resolved
-      custom properties, so this carries no logic of its own.
+      custom properties, so this carries no logic of its own beyond the manifest fence — which runs here
+      because `declaredOnly` cannot: it is Angular-side, and this is what paints first.
     -->
     <script>
       (function () {
+        /* GENERATED — design-token allowlist */
+        var ALLOWED =
+          '--font-cartouche,--font-display,--font-body,--font-mono,--text-2xs,--text-xs,--text-sm,--text-base,--text-md,--text-lg,--text-xl,--text-2xl,--text-3xl,--leading-tight,--leading-snug,--leading-normal,--tracking-tight,--tracking-normal,--tracking-wide,--tracking-wider,--font-weight-regular,--font-weight-medium,--font-weight-semibold,--font-weight-bold,--radius-sm,--radius-md,--radius-lg,--radius-xl,--radius-full,--palette-page,--palette-ink,--palette-ink-quiet,--palette-accent,--palette-danger,--palette-success,--palette-canvas,--palette-soot,--palette-polarity,--palette-line-alpha,--palette-veil,--color-bg,--color-bg-deep,--color-surface,--color-surface-raised,--color-surface-sunken,--color-overlay,--color-ink,--color-ink-strong,--color-ink-muted,--color-ink-faint,--line-alpha,--color-line,--color-line-strong,--color-line-faint,--color-accent,--color-accent-strong,--color-accent-soft,--color-accent-sheen-bright,--color-accent-sheen-deep,--color-on-fill,--color-on-accent-sheen,--color-accent-glow,--color-tone-1,--color-tone-1-soft,--color-tone-2,--color-tone-2-soft,--color-tone-3,--color-tone-3-soft,--color-tone-4,--color-tone-4-soft,--color-tone-5,--color-tone-5-soft,--color-tone-6,--color-tone-6-soft,--color-tone-7,--color-tone-7-soft,--color-tone-8,--color-tone-8-soft,--color-danger,--color-danger-soft,--color-success,--color-success-soft,--color-canvas-bg,--color-canvas-mat,--color-canvas-glow,--color-canvas-edge,--color-ink-stroke,--color-hex-line,--color-feature-ink,--color-label-ink,--color-name-ink,--color-terrain-grass,--color-terrain-forest,--color-terrain-ocean,--color-terrain-mountain,--color-terrain-desert,--color-terrain-sky,--dur-instant,--dur-fast,--dur-base,--dur-slow,--ease-out,--ease-in-out,--ease-spring,--rail-header,--container-reading,--shadow-1,--shadow-2,--shadow-3,--shadow-inset,--shadow-focus,--gradient-accent-sheen,--gradient-accent-sheen-radial'.split(
+            ',',
+          );
+        /* END GENERATED */
         try {
           var route = /^\/(public\/w|w)\/([^/]+)/.exec(location.pathname);
           if (!route) return;
@@ -42,8 +49,13 @@
           for (var i = 0; i < cached.length; i++) {
             if (cached[i].scope !== scope) continue;
             var declarations = cached[i][document.documentElement.dataset.colorScheme] || {};
-            for (var name in declarations) {
-              document.documentElement.style.setProperty(name, declarations[name]);
+            for (var n = 0; n < ALLOWED.length; n++) {
+              var value = declarations[ALLOWED[n]];
+              /* Own string properties only: the cache is untrusted JSON, and `for…in` would walk a
+                 prototype a crafted payload could have put there. */
+              if (typeof value !== 'string' || !Object.prototype.hasOwnProperty.call(declarations, ALLOWED[n]))
+                continue;
+              document.documentElement.style.setProperty(ALLOWED[n], value);
             }
             return;
           }

@@ -413,6 +413,18 @@ The exclusion is doing exactly the job it was specified for; it is simply expens
 /* … */
 ```
 
+**Amended in implementation.** The ladder above is what shipped first; it does not clear AA once the
+`-soft` fill is accounted for. A chip's text sits on _its own tone_ at 14%, so the fill drags the
+effective background toward the text, and the two rows push opposite ways per ColorScheme — the low row
+fails in Astral, the high row in Solar. Seven of the sixteen tone/ground pairs landed under 4.5:1
+(Solar tone-4 4.19, tone-6 4.31, tone-8 4.35 on the page; Astral tone-2 4.39, tone-3 4.24, tone-5 4.06,
+tone-7 4.02 on `surface`). No pair of plain multipliers fixes it: the best reachable worst-case is
+4.54:1, and only by collapsing the two rows into one, which gives up the separation this spike exists
+to establish. Stepping each row away from the page by a polarity-carried offset does, and keeps the
+rows — `calc(l * 0.82 - 0.0375 * var(--palette-polarity))` and `calc(l * 0.95 - 0.0375 * …)`, worst
+case 4.81:1 across all sixteen. Minimum pairwise ΔE00 against danger/success improves too, 20.7 → 21.2.
+`contrast.ts` measures the pair, so the next accent that breaks it says so.
+
 Resulting values (min pairwise ΔE00 10.9 Solar / 10.8 Astral; min angular gap 14°):
 
 | Token            | rotation | L        | Solar h | Solar     | Solar `-soft` | Astral h | Astral    | Astral `-soft` |

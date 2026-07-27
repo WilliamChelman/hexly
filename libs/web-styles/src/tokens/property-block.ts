@@ -4,15 +4,22 @@ import { DesignTokenDecl, DESIGN_TOKENS } from './manifest';
 /** Where the generated block is written, relative to the repo root. */
 export const DESIGN_TOKEN_PROPERTIES_PATH = 'libs/web-styles/src/tokens/design-token-properties.css';
 
-/** The command that rewrites it, quoted back at whoever let the two drift apart. */
+/** The pre-paint replay's allowlist is generated into this file too (ADR-0076). */
+export const PRE_PAINT_REPLAY_PATH = 'apps/web/src/index.html';
+
+/** The command that rewrites them, quoted back at whoever let them drift apart. */
 export const GENERATE_COMMAND = 'pnpm tokens:generate';
+
+/** Fences the generated allowlist inside {@link PRE_PAINT_REPLAY_PATH}. */
+const ALLOWLIST_OPEN = '/* GENERATED — design-token allowlist */';
+const ALLOWLIST_CLOSE = '/* END GENERATED */';
 
 /**
  * The `@property` syntax each token type registers under, or `null` for a type CSS cannot describe:
  * Properties & Values offers no shadow or font-stack component, and an `<image>` `initial-value` must
  * be computationally independent, which a gradient built from `var()` stops cannot be.
  */
-const SYNTAX: Readonly<Record<TokenType, string | null>> = {
+export const SYNTAX: Readonly<Record<TokenType, string | null>> = {
   color: '<color>',
   number: '<number>',
   length: '<length>',
@@ -23,9 +30,15 @@ const SYNTAX: Readonly<Record<TokenType, string | null>> = {
   'font-pairing': null,
 };
 
-/** The tokens the `@property` block registers — a type CSS can describe, and no opt-out. */
+/**
+ * The tokens the `@property` block registers — the manifest's `unregistered` flag decides, alone.
+ *
+ * A type with no syntax cannot be registered either, but reading both here would leave two mechanisms
+ * disagreeing about who owns the exception; ADR-0075 wants it declared. `property-block.spec.ts` holds
+ * the flag and {@link SYNTAX} to each other so an unflagged shadow fails rather than registering.
+ */
 export function registeredTokens(): readonly DesignTokenDecl[] {
-  return DESIGN_TOKENS.filter((decl) => !decl.unregistered && SYNTAX[decl.type] !== null);
+  return DESIGN_TOKENS.filter((decl) => !decl.unregistered);
 }
 
 /**
@@ -52,4 +65,44 @@ export function designTokenPropertyBlock(): string {
     ...rules,
     '',
   ].join('\n');
+}
+
+/**
+ * The pre-paint replay's name fence (ADR-0076), spliced into `index.html` by the same generator.
+ *
+ * The replay runs before Angular, so `declaredOnly` cannot reach it: without this the cache decides
+ * which custom properties land on the root, and a `url()` on an unregistered name has nothing to
+ * discard it. Split from one string because 112 names as an array literal is mostly punctuation.
+ */
+export function designTokenAllowlistScript(indent = '        '): string {
+  const names = DESIGN_TOKENS.map((decl) => decl.name).join(',');
+  return [
+    `${indent}${ALLOWLIST_OPEN}`,
+    `${indent}var ALLOWED = '${names}'.split(',');`,
+    `${indent}${ALLOWLIST_CLOSE}`,
+  ].join('\n');
+}
+
+/** {@link PRE_PAINT_REPLAY_PATH}'s contents with the allowlist re-spliced between its fences. */
+export function withDesignTokenAllowlist(html: string): string {
+  const open = html.indexOf(ALLOWLIST_OPEN);
+  const close = html.indexOf(ALLOWLIST_CLOSE);
+  if (open === -1 || close === -1) {
+    throw new Error(`${PRE_PAINT_REPLAY_PATH} is missing the ${ALLOWLIST_OPEN} fence`);
+  }
+  const indent = html.slice(html.lastIndexOf('\n', open) + 1, open);
+  return (
+    html.slice(0, open - indent.length) +
+    designTokenAllowlistScript(indent) +
+    html.slice(close + ALLOWLIST_CLOSE.length)
+  );
+}
+
+/**
+ * The names the committed replay actually fences on — read back rather than re-rendered, because the
+ * generator writes through Prettier and its wrapping is not this module's to predict.
+ */
+export function allowlistIn(html: string): readonly string[] {
+  const fenced = html.slice(html.indexOf(ALLOWLIST_OPEN), html.indexOf(ALLOWLIST_CLOSE));
+  return [...fenced.matchAll(/'([^']*)'/g)].flatMap((quoted) => quoted[1].split(',')).filter((name) => name !== '');
 }

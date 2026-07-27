@@ -7,11 +7,7 @@
 import { clampGamut, converter, formatHex, parse as parseColor } from 'culori';
 import { TokenType } from '@hexly/web-styles';
 
-/**
- * The longest raw value offered to a parser. The longest value the manifest ships is a 44-character
- * shadow, so this leaves room for a multi-layer one while keeping a pathological string away from the
- * parsers entirely.
- */
+/** Room for a multi-layer shadow — the manifest's longest is 44 — and none for a pathological string. */
 const MAX_RAW_LENGTH = 240;
 
 /** How many `box-shadow` layers a value may carry, and how many words one layer may hold. */

@@ -4,9 +4,7 @@
  * the manifest in core, a registration being document-wide.
  *
  * Every colour here derives from a tier-2 role rather than from a `--palette-*` anchor, so a World
- * Theme that re-themes the field or the ink re-tints the map with it. The exception is the alpha of
- * `--color-hex-line`: no role spells that knob, and a relative colour function destructures a single
- * colour, so quiet ink's channels and the drawn rule's alpha cannot come from one expression.
+ * Theme that re-themes the field or the ink re-tints the map with it.
  *
  * Against the ten hand-tuned values these replace, the repaint costs ΔE00 ≤ 3.1 on eight of them and
  * 4.4 on forest; the per-token table is in `docs/design/world-theme-spec.md` §3.
@@ -22,7 +20,7 @@
   --color-name-ink: color-mix(in oklab, var(--color-canvas-bg) 9%, var(--color-label-ink));
 
   /* The grid is a drawn rule in quiet ink, at the drawn-rule opacity — no coefficient of its own. */
-  --color-hex-line: oklch(from var(--color-ink-muted) l c h / var(--palette-line-alpha));
+  --color-hex-line: oklch(from var(--color-ink-muted) l c h / var(--line-alpha));
 
   /* Each terrain is a pigment of its own — no anchor set holds grass-green, so the hue is a named
      literal in the sense ADR-0075 allows — half-washed into the World's field. The single shared

@@ -8,7 +8,7 @@
  */
 
 import * as z from 'zod';
-import { DESIGN_TOKENS, DesignTokenDecl, PublicDesignToken, designToken } from '@hexly/web-styles';
+import { DESIGN_TOKENS, DesignToken, DesignTokenDecl, PublicDesignToken, designToken } from '@hexly/web-styles';
 import { canonicalTokenValue, isSettableTokenType } from './design-token-value';
 
 /**
@@ -37,26 +37,27 @@ export const FONT_PAIRINGS: Readonly<Record<FontPairingId, Readonly<Partial<Reco
   ),
 };
 
+const PALETTE_PREFIX = '--palette-';
+
+/** A tier-1 anchor or knob, as the manifest spells it. */
+export type PaletteToken = Extract<DesignToken, `${typeof PALETTE_PREFIX}${string}`>;
+
+type Camel<S extends string> = S extends `${infer Head}-${infer Tail}` ? `${Head}${Capitalize<Camel<Tail>>}` : S;
+
+/** The stored field a tier-1 token is written under: its suffix, camel-cased. */
+export type PaletteField = PaletteToken extends `${typeof PALETTE_PREFIX}${infer Suffix}` ? Camel<Suffix> : never;
+
 /**
  * Each stored Palette field and the tier-1 token it writes (spec §1): eight anchors carrying the
- * identity, three knobs the derivation reads. Spelled out rather than derived from the manifest's
- * `tier === 'palette'` slice, because a derived table types as `Record<string, string>` and the
- * applier keys a `DesignToken` record with it; the spec holds both ends of the mapping to their
- * sources instead, so drift is a red test rather than a wider type.
+ * identity, three knobs the derivation reads. Derived from the manifest's `tier === 'palette'` slice,
+ * so a new anchor cannot ship with the mapping still eleven entries long (ADR-0075).
  */
-export const PALETTE_TOKENS = {
-  page: '--palette-page',
-  ink: '--palette-ink',
-  inkQuiet: '--palette-ink-quiet',
-  accent: '--palette-accent',
-  danger: '--palette-danger',
-  success: '--palette-success',
-  canvas: '--palette-canvas',
-  soot: '--palette-soot',
-  polarity: '--palette-polarity',
-  lineAlpha: '--palette-line-alpha',
-  veil: '--palette-veil',
-} as const satisfies Readonly<Record<string, `--palette-${string}`>>;
+export const PALETTE_TOKENS = Object.fromEntries(
+  DESIGN_TOKENS.filter((decl) => decl.tier === 'palette').map((decl) => [
+    decl.name.slice(PALETTE_PREFIX.length).replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase()),
+    decl.name,
+  ]),
+) as Readonly<Record<PaletteField, PaletteToken>>;
 
 /** A value of the given token type, refused unless it re-serialises from its own parse (ADR-0076). */
 function tokenValue(type: DesignTokenDecl['type']) {
@@ -87,6 +88,10 @@ const alphaKnob = z.number().min(0).max(1);
  * One ColorScheme's Palette. A World Theme carries two, because a Theme and a reader's ColorScheme are
  * orthogonal — the Owner supplies identity, the reader still chooses Solar or Astral within it
  * (ADR-0006, ADR-0076).
+ *
+ * The `satisfies` is the fence: a field per tier-1 token and no others, checked by the compiler. The
+ * shapes stay written out because the manifest types both alphas and polarity as `number`, and only
+ * this file knows an alpha is bounded.
  */
 const paletteSchema = z.object({
   page: colorValue,
@@ -101,7 +106,7 @@ const paletteSchema = z.object({
   polarity: z.number(),
   lineAlpha: alphaKnob,
   veil: alphaKnob,
-});
+} satisfies Record<PaletteField, z.ZodType>);
 
 /**
  * The radius set (spec §5.1): the manifest's public `<length>` tokens, which is exactly the

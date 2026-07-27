@@ -167,6 +167,11 @@
   inherits: true;
   initial-value: #a08b60;
 }
+@property --line-alpha {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0.371;
+}
 @property --color-line {
   syntax: '<color>';
   inherits: true;
@@ -225,82 +230,82 @@
 @property --color-tone-1 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #005d57;
+  initial-value: #005550;
 }
 @property --color-tone-1-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(0, 94, 87, 0.14);
+  initial-value: oklch(0.387633 0.109056 188.68 / 0.14);
 }
 @property --color-tone-2 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #00596d;
+  initial-value: #005266;
 }
 @property --color-tone-2-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(0, 90, 109, 0.14);
+  initial-value: oklch(0.387633 0.109056 211.68 / 0.14);
 }
 @property --color-tone-3 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #00527f;
+  initial-value: #004b76;
 }
 @property --color-tone-3-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(0, 83, 127, 0.14);
+  initial-value: oklch(0.387633 0.109056 236.68 / 0.14);
 }
 @property --color-tone-4 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #475d9f;
+  initial-value: #3e5293;
 }
 @property --color-tone-4-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(71, 93, 159, 0.14);
+  initial-value: oklch(0.455032 0.109056 268.68 / 0.14);
 }
 @property --color-tone-5 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #444184;
+  initial-value: #3e3a7c;
 }
 @property --color-tone-5-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(68, 66, 133, 0.14);
+  initial-value: oklch(0.387633 0.109056 282.68 / 0.14);
 }
 @property --color-tone-6 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #704f92;
+  initial-value: #664486;
 }
 @property --color-tone-6-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(112, 80, 147, 0.14);
+  initial-value: oklch(0.455032 0.109056 305.68 / 0.14);
 }
 @property --color-tone-7 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #69336b;
+  initial-value: #612c63;
 }
 @property --color-tone-7-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(105, 52, 108, 0.14);
+  initial-value: oklch(0.387633 0.109056 325.68 / 0.14);
 }
 @property --color-tone-8 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #8c456e;
+  initial-value: #803a64;
 }
 @property --color-tone-8-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(140, 69, 112, 0.14);
+  initial-value: oklch(0.455032 0.109056 345.68 / 0.14);
 }
 @property --color-danger {
   syntax: '<color>';

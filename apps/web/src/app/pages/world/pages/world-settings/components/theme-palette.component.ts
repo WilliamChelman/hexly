@@ -3,16 +3,12 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { ColorScheme, ThemeDeclarationSet } from '@hexly/web-core';
 import { WorldThemePalette } from '@hexly/domain';
 import { ThemeWarning, contrastReport } from '@hexly/web-styles';
-import { COLOR_SCHEMES, PALETTE_CONTROLS, PaletteControl, controlValue } from '../utils/theme-draft';
+import { COLOR_SCHEMES, PALETTE_CONTROLS, PaletteControl, SchemeEdit, controlValue } from '../utils/theme-draft';
 import { ThemeContrastComponent } from './theme-contrast.component';
 import { ThemeControlComponent } from './theme-control.component';
 
 /** One control moved: which ColorScheme's Palette, which tier-1 token, and what the control emitted. */
-export interface PaletteEdit {
-  readonly scheme: ColorScheme;
-  readonly control: PaletteControl;
-  readonly raw: string;
-}
+export type PaletteEdit = SchemeEdit<PaletteControl>;
 
 /**
  * The Palettes an Owner authors: a row per tier-1 token, a column per ColorScheme (ADR-0075).
@@ -31,7 +27,8 @@ export interface PaletteEdit {
   imports: [TranslocoPipe, ThemeContrastComponent, ThemeControlComponent],
   template: `
     <div class="grid">
-      <span class="corner" aria-hidden="true"></span>
+      <!-- The header row's empty first cell: the row-label column has no heading of its own. -->
+      <span aria-hidden="true"></span>
       @for (scheme of schemes; track scheme) {
         <div class="scheme-head" [attr.data-testid]="'theme-scheme-' + scheme">
           {{ 'common.colorScheme.' + scheme | transloco }}
@@ -92,12 +89,12 @@ export class ThemePaletteComponent {
 
   /**
    * What each Palette costs a reader, measured rather than predicted — including for the ColorScheme
-   * nobody is currently in (ADR-0076).
+   * nobody is currently in (ADR-0076). Over {@link declarations}, not {@link palettes}: a tier-2
+   * override moves a role no anchor names.
    *
-   * Over {@link declarations} and never over {@link palettes}: an anchor is not the only thing a Theme
-   * can move, and a tier-2 override is precisely the thing an Owner reaches for when a derived role is
-   * not what they wanted. Measuring re-dresses the document root and puts it straight back inside this
-   * one call, so nothing flickers and no CSS had to be duplicated per `[data-color-scheme]`.
+   * A `computed` may do this only because `measureScheme` is observationally pure: it clears what is
+   * inline, reads, and restores the root in a `finally`, all inside one task. So the report is a
+   * function of its declarations and the stylesheets alone, which is what makes memoising it sound.
    */
   protected readonly reports = computed<Readonly<Record<ColorScheme, readonly ThemeWarning[] | null>>>(() => {
     const declarations = this.declarations();

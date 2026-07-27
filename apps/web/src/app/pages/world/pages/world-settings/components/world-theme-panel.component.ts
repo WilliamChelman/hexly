@@ -154,13 +154,7 @@ export class WorldThemePanelComponent implements OnInit {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
 
-  /**
-   * What the controls show for a World with no Theme, and what a first edit materialises a draft from:
-   * the chain's first two layers, Instance default over Hexly's own, anchor by anchor (ADR-0076). An
-   * operator's branding is a starting point an Owner departs from, so it has to be what they depart
-   * *from* — a stored Theme carries both Palettes entire, and seeding from the stylesheet would have
-   * the first edit overwrite that branding on the ten anchors nobody touched.
-   */
+  /** Instance default over Hexly's own, anchor by anchor — what a first edit materialises from (ADR-0076). */
   private readonly instance = inject(INSTANCE_THEME);
   private readonly defaults: Readonly<Record<ColorScheme, WorldThemePalette>> = defaultPalettes(this.instance);
 
@@ -179,11 +173,14 @@ export class WorldThemePanelComponent implements OnInit {
   protected readonly saving = signal(false);
   protected readonly dirty = computed(() => !sameDraft(this.draft(), this.stored()));
 
-  /** What the controls show: the draft where there is one, the Hexly default where there is not. */
-  protected readonly palettes = computed<Readonly<Record<ColorScheme, WorldThemePalette>>>(() => {
-    const draft = this.draft();
-    return draft ?? this.defaults;
-  });
+  /**
+   * What the controls show: the draft where there is one, the Hexly default where there is not.
+   *
+   * Typed as the whole draft, not just its two Palettes — the tier-2 overrides ride in the same object,
+   * and narrowing the return to `Record<ColorScheme, WorldThemePalette>` denied three fields that are
+   * present and made {@link declarations} spread the same object twice to get them back.
+   */
+  protected readonly palettes = computed<ThemeDraft>(() => this.draft() ?? this.defaults);
 
   /**
    * The chain resolved to what would land on the root — the same layers {@link WorldThemeApplier.preview}
@@ -192,7 +189,7 @@ export class WorldThemePanelComponent implements OnInit {
    * derived role is not what they wanted.
    */
   protected readonly declarations = computed<ThemeDeclarationSet>(() =>
-    resolveWorldTheme([this.instance, { ...this.draft(), ...this.palettes() }]),
+    resolveWorldTheme([this.instance, this.palettes()]),
   );
 
   /** The Worlds this Owner may copy a Theme from (#376); `null` until the server has answered. */
@@ -257,9 +254,8 @@ export class WorldThemePanelComponent implements OnInit {
   }
 
   /**
-   * The draft a pick lands on. Picking the default on a World that carries no Theme leaves it carrying
-   * none: it is what that World already wears, and materialising a whole Theme to say so would offer a
-   * save that stores twenty-two anchors and changes nothing.
+   * The draft a pick lands on. Picking the default on an unthemed World leaves it unthemed — otherwise
+   * the save would store twenty-two anchors and change nothing.
    */
   private picked(part: Partial<ThemeDraft>): ThemeDraft | null {
     const draft = this.draft();

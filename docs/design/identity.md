@@ -53,17 +53,17 @@ controls (ADR-0075).
 
 ## Where it lives
 
-| File                                                     | Role                                                                                                                                             |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `libs/web-styles/src/index.css`                          | The `@theme static` block — tier 2, one derivation per role — plus type, radii and fonts, and the elevation `@utility` wrappers.                 |
-| `libs/web-styles/src/tokens.css`                         | The two **Palettes** (tier 1), and what `@theme` can't hold: motion, layout rails, elevation, the sheen gradients.                               |
-| `libs/web-styles/src/base.css`                           | Reset, document typography, the flat table background (`@layer base`).                                                                           |
-| `libs/web-styles/src/tokens/manifest.ts`                 | The token contract (above).                                                                                                                      |
-| `libs/web-styles/src/tokens/design-token-properties.css` | The `@property` registrations, generated from the manifest by `pnpm tokens:generate`.                                                            |
-| `libs/plugin-hexmap-web/src/hexmap-tokens.css`           | Tier 3 — the hex map's own vocabulary, derived from tier-2 roles so an Owner's field or ink carries into the map.                                |
-| `apps/web/src/styles.css`                                | Build entry point: self-hosted fonts, then `web-styles`, then each plugin's tier-3 sheet — plus the `@source` scan set, automatic detection off. |
-| `apps/web/src/app/pages/styleguide/`                     | The living `/styleguide` reference page — the one exemption from the tier gates, because rendering every token is what it is for.                |
-| `apps/web-e2e/src/design-tokens.spec.ts`                 | Reads every declared token back out of a real engine, in both ColorSchemes, and holds each colour's manifest initial to what it resolves to.     |
+| File                                                     | Role                                                                                                                                               |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `libs/web-styles/src/index.css`                          | The `@theme static` block — tier 2, one derivation per role — plus type, radii and fonts, and the elevation `@utility` wrappers.                   |
+| `libs/web-styles/src/tokens.css`                         | The two **Palettes** (tier 1), and what `@theme` can't hold: motion, layout rails, elevation, the sheen gradients.                                 |
+| `libs/web-styles/src/base.css`                           | Reset, document typography, the flat table background (`@layer base`).                                                                             |
+| `libs/web-styles/src/tokens/manifest.ts`                 | The token contract (above).                                                                                                                        |
+| `libs/web-styles/src/tokens/design-token-properties.css` | The `@property` registrations, generated from the manifest by `pnpm tokens:generate`.                                                              |
+| `libs/plugin-hexmap-web/src/hexmap-tokens.css`           | Tier 3 — the hex map's own vocabulary, derived from tier-2 roles so an Owner's field or ink carries into the map.                                  |
+| `apps/web/src/styles.css`                                | Build entry point: self-hosted fonts, then `web-styles`, then each plugin's tier-3 sheet — plus the `@source` scan set, automatic detection off.   |
+| `apps/web/src/app/pages/styleguide/`                     | The living `/styleguide` reference page — the one exemption from the tier gates, because rendering every token is what it is for.                  |
+| `apps/web-e2e/src/design-tokens.table.json`              | Every declared token's **resolved** value in both ColorSchemes, asserted in a real engine by `design-tokens.spec.ts`. The ground truth for values. |
 
 Primitives (`Button`, `Panel`, `Chip`, `Coord`, …) own their **scoped** styles and
 consume the tokens directly (ADR-0007); there is no global component sheet, bar the
@@ -155,8 +155,8 @@ value. Which is why this section does not tabulate hexes: 46 roles × 2
 ColorSchemes would be a second source of truth that goes stale the moment an anchor
 moves, and it would invite the reader to copy a colour rather than ask for a role. What
 each role _means_ and how it derives survives a re-anchor; its current hex does not.
-To read a role's current value, measure it in the running app: `/styleguide` swatches
-the principal ones, and `design-tokens.spec.ts` reads every one of them off the root.
+The resolved values live in `apps/web-e2e/src/design-tokens.table.json`, measured in a
+real browser rather than recomputed.
 
 | Family       | Roles                                                                    | How they derive                                                                                                                                                                                                                                                   |
 | ------------ | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

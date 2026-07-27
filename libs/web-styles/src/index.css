@@ -127,9 +127,14 @@
   /* Drawn rules — the accent at the line-alpha ramp {1, 1.85, 0.44}. Translucent
      in both schemes now, so Solar's rules take their colour from what they are
      drawn over; they match their old values over `surface` (ADR-0075). */
-  --color-line: oklch(from var(--palette-accent) l c h / var(--palette-line-alpha));
-  --color-line-strong: oklch(from var(--palette-accent) l c h / calc(var(--palette-line-alpha) * 1.85));
-  --color-line-faint: oklch(from var(--palette-accent) l c h / calc(var(--palette-line-alpha) * 0.44));
+  /* The ramp's own unit, as a role: a relative colour function destructures one
+     colour, so a tier-3 rule wanting other channels at this alpha has no way to
+     reach it through `--color-line` — and reaching past it to the knob is the
+     tier breach ADR-0075 forbids. */
+  --line-alpha: var(--palette-line-alpha);
+  --color-line: oklch(from var(--palette-accent) l c h / var(--line-alpha));
+  --color-line-strong: oklch(from var(--palette-accent) l c h / calc(var(--line-alpha) * 1.85));
+  --color-line-faint: oklch(from var(--palette-accent) l c h / calc(var(--line-alpha) * 0.44));
 
   --color-accent: var(--palette-accent); /* the through-line accent */
   --color-accent-strong: oklch(
@@ -168,15 +173,21 @@
   /* The categorical tones (ADR-0075). Eight, because the accent sits *between*
      danger and success, so excluding both leaves one ~161° arc, not two pockets.
      The two lightness rows are load-bearing: at the accent's own `l` most of that
-     arc misses 4.5:1 in Solar (spike-tone-rotation.md §5). */
-  --color-tone-1: oklch(from var(--color-accent) calc(l * 0.8) c calc(h + 113));
-  --color-tone-2: oklch(from var(--color-accent) calc(l * 0.8) c calc(h + 136));
-  --color-tone-3: oklch(from var(--color-accent) calc(l * 0.8) c calc(h + 161));
-  --color-tone-4: oklch(from var(--color-accent) calc(l * 0.95) c calc(h + 193));
-  --color-tone-5: oklch(from var(--color-accent) calc(l * 0.8) c calc(h + 207));
-  --color-tone-6: oklch(from var(--color-accent) calc(l * 0.95) c calc(h + 230));
-  --color-tone-7: oklch(from var(--color-accent) calc(l * 0.8) c calc(h + 250));
-  --color-tone-8: oklch(from var(--color-accent) calc(l * 0.95) c calc(h + 270));
+     arc misses 4.5:1 in Solar (spike-tone-rotation.md §5).
+     The polarity term is what carries a chip over AA. A chip's text sits on its own
+     tone at 14%, so the fill drags the ground toward the text and the two rows push
+     opposite ways per ColorScheme — no pair of plain multipliers clears 4.5:1 in
+     both (best is 4.54, and only by collapsing the rows into one). Stepping each
+     row away from the page by a polarity-carried offset does, at 4.81 worst across
+     all sixteen tone/ground pairs; `contrast.ts` measures it. */
+  --color-tone-1: oklch(from var(--color-accent) calc(l * 0.82 - 0.0375 * var(--palette-polarity)) c calc(h + 113));
+  --color-tone-2: oklch(from var(--color-accent) calc(l * 0.82 - 0.0375 * var(--palette-polarity)) c calc(h + 136));
+  --color-tone-3: oklch(from var(--color-accent) calc(l * 0.82 - 0.0375 * var(--palette-polarity)) c calc(h + 161));
+  --color-tone-4: oklch(from var(--color-accent) calc(l * 0.95 - 0.0375 * var(--palette-polarity)) c calc(h + 193));
+  --color-tone-5: oklch(from var(--color-accent) calc(l * 0.82 - 0.0375 * var(--palette-polarity)) c calc(h + 207));
+  --color-tone-6: oklch(from var(--color-accent) calc(l * 0.95 - 0.0375 * var(--palette-polarity)) c calc(h + 230));
+  --color-tone-7: oklch(from var(--color-accent) calc(l * 0.82 - 0.0375 * var(--palette-polarity)) c calc(h + 250));
+  --color-tone-8: oklch(from var(--color-accent) calc(l * 0.95 - 0.0375 * var(--palette-polarity)) c calc(h + 270));
   /* Emphasis, not identity: at α 0.14 the eight fills sit under a JND apart, so a
      chip's category rides its text and border instead (ADR-0075). */
   --color-tone-1-soft: oklch(from var(--color-tone-1) l c h / 0.14);

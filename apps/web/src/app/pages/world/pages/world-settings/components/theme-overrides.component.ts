@@ -7,6 +7,7 @@ import {
   OVERRIDE_GROUPS,
   OverrideControl,
   OverrideGroup,
+  SchemeEdit,
   ThemeOverrides,
   overrideSeed,
   overrideValue,
@@ -14,11 +15,7 @@ import {
 import { ThemeControlComponent } from './theme-control.component';
 
 /** One override moved: which ColorScheme, which public token, and what it now holds — `null` to clear. */
-export interface OverrideEdit {
-  readonly scheme: ColorScheme;
-  readonly control: OverrideControl;
-  readonly raw: string | null;
-}
+export type OverrideEdit = SchemeEdit<OverrideControl, string | null>;
 
 /**
  * The tier-2 opt-outs an Owner may author (ADR-0076, #374): a row per public role, a column per
@@ -49,7 +46,8 @@ export interface OverrideEdit {
         </summary>
 
         <div class="grid">
-          <span class="corner" aria-hidden="true"></span>
+          <!-- The header row's empty first cell: the token-name column has no heading of its own. -->
+          <span aria-hidden="true"></span>
           @for (scheme of schemes; track scheme) {
             <div class="scheme-head">{{ 'common.colorScheme.' + scheme | transloco }}</div>
           }

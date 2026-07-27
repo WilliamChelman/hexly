@@ -4,10 +4,13 @@
  * Utility-shaped tokens (colours, fonts, type, spacing, radii) live in the
  * `@theme` block in index.css (ADR-0020). This file carries what `@theme` can't:
  *   1. The two **Palettes** — tier 1 (ADR-0075). Eight anchors and three knobs per
- *      ColorScheme, and the only thing [data-color-scheme='astral'] reassigns: the
- *      semantic roles are one expression each and do not repeat per scheme.
+ *      ColorScheme. The derived roles are one expression each and do not repeat per
+ *      scheme, so astral reassigns these and `--color-canvas-glow` — the one role
+ *      whose two schemes no single expression fits (index.css).
  *   2. Raw non-utility tokens — motion (`--dur-*`/`--ease-*`), elevation
- *      (`--shadow-*`, see ADR-0021), layout rails (`--rail-*`, `--container-reading`).
+ *      (`--shadow-*`, see ADR-0021), layout rails (`--rail-*`, `--container-reading`),
+ *      and the sheen gradients. These are tier 2 by role but live here because
+ *      `@theme` cannot hold them, so the widened selector below carries them too.
  *
  * Concept: the Celestial Codex — the cartographer's table across the sky.
  *   - Light "Solar"  — a sunlit almanac: warm ivory paper, heliograph gold.
@@ -17,9 +20,9 @@
  * other, and the polarity knob is what asserts that in the derivation.
  */
 
-/* A Palette is declared wherever a ColorScheme is, not only at the root (ADR-0076): an
-   offscreen probe carrying the scheme the author is *not* looking at is how the editor
-   reports contrast for it, and `:root[…]` would leave that probe on the reader's anchors. */
+/* A Palette is declared wherever a ColorScheme is, not only at the root (ADR-0076), so a
+   scoped subtree re-resolves under its own scheme. The contrast report does not use it:
+   the derived roles sit at `:root`, so it re-dresses the root instead (`measure.ts`). */
 :root,
 [data-color-scheme='solar'] {
   /* ---- Tier 1 — the Solar Palette. Private: `--palette-*` is referenced only by

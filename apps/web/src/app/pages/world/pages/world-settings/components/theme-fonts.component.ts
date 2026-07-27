@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { CardRadioComponent, CardRadioGroupComponent } from '@hexly/web-ui';
 import { PublicDesignToken, designTokenInitial } from '@hexly/web-styles';
 import { FontPairingId } from '@hexly/domain';
 import { FONT_PAIRING_CHOICES, FontPairingChoice } from '../utils/theme-draft';
@@ -27,25 +28,20 @@ interface PairingOption {
 @Component({
   selector: 'app-theme-fonts',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe],
+  imports: [TranslocoPipe, CardRadioComponent, CardRadioGroupComponent],
   template: `
-    <div class="pairings" role="radiogroup" [attr.aria-label]="'worldTheme.fontsHeading' | transloco">
+    <div appCardRadioGroup [attr.aria-label]="'worldTheme.fontsHeading' | transloco">
       @for (option of options; track option.key) {
-        <label class="pairing">
-          <span class="head">
-            <input
-              type="radio"
-              name="theme-font-pairing"
-              [attr.data-testid]="'theme-font-' + option.key"
-              [checked]="option.key === selected()"
-              (change)="picked.emit(option.id)"
-            />
-            <span class="labels">
-              <span class="name">{{ 'worldTheme.fonts.' + option.key | transloco }}</span>
-              <span class="hint">{{ 'worldTheme.fontsHint.' + option.key | transloco }}</span>
-            </span>
-          </span>
-          <span class="specimen" aria-hidden="true">
+        <app-card-radio
+          name="theme-font-pairing"
+          basis="16rem"
+          [testId]="'theme-font-' + option.key"
+          [checked]="option.key === selected()"
+          [label]="'worldTheme.fonts.' + option.key | transloco"
+          [hint]="'worldTheme.fontsHint.' + option.key | transloco"
+          (picked)="picked.emit(option.id)"
+        >
+          <span cardBelow class="specimen" aria-hidden="true">
             <span class="cartouche" [style.fontFamily]="stack(option, '--font-cartouche')">Hexly</span>
             <span class="display" [style.fontFamily]="stack(option, '--font-display')">
               {{ 'worldTheme.fontsSpecimen.display' | transloco }}
@@ -55,33 +51,12 @@ interface PairingOption {
             </span>
             <span class="mono" [style.fontFamily]="stack(option, '--font-mono')">04.12 · 08N</span>
           </span>
-        </label>
+        </app-card-radio>
       }
     </div>
   `,
   styles: `
     @reference '#app-styles.css';
-    .pairings {
-      @apply flex flex-wrap gap-3;
-    }
-    .pairing {
-      @apply flex flex-1 basis-64 cursor-pointer flex-col gap-2 rounded-lg border border-line bg-surface-sunken px-3 py-2;
-    }
-    .pairing:has(input:checked) {
-      @apply border-line-strong bg-surface-raised;
-    }
-    .head {
-      @apply flex items-center gap-3;
-    }
-    .labels {
-      @apply flex min-w-0 flex-col;
-    }
-    .name {
-      @apply text-sm text-ink-strong;
-    }
-    .hint {
-      @apply text-2xs text-ink-faint;
-    }
     .specimen {
       @apply flex flex-col gap-0.5 border-t border-line-faint pt-2;
     }

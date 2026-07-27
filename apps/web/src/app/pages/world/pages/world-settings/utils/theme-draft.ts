@@ -92,6 +92,16 @@ export interface OverrideControl extends TokenControl {
   readonly slug: string;
 }
 
+/**
+ * One control moved in a two-ColorScheme grid: which scheme, which row, and what it emitted. Both
+ * editors below emit this shape; `TRaw` is where they differ, an override having `null` for "cleared".
+ */
+export interface SchemeEdit<TControl extends TokenControl, TRaw = string> {
+  readonly scheme: ColorScheme;
+  readonly control: TControl;
+  readonly raw: TRaw;
+}
+
 /** A named run of override controls — what one collapsible block of the editor holds. */
 export interface OverrideGroup {
   readonly id: string;
@@ -140,18 +150,10 @@ export const OVERRIDE_GROUPS: readonly OverrideGroup[] = (() => {
 export type ThemeOverrides = WorldTheme['overrides'];
 
 /**
- * What a new override starts at. For the ColorScheme the reader is `live` in, the value the document
- * resolved — so opting a token out changes nothing on screen, which is what makes the derivation a
- * starting point rather than a jump to somewhere the Owner never asked for.
- *
- * The other ColorScheme falls back to what the manifest declares, and cannot do better: the tier-2
- * roles are declared once at `:root`, so a `[data-color-scheme]` probe carries the other scheme's
- * anchors but still inherits the root's already-derived roles. So does a `shadow`, which is
- * `unregistered` (ADR-0075) and therefore resolves to an unsubstituted `oklch(from …)` expression — a
- * string the write choke point would rightly refuse. Only a registered colour answers with a value.
- *
- * Taken verbatim rather than through {@link colorTokenHex}: the control speaks hex, but a translucent
- * role would lose its alpha the moment it was opted out rather than when the Owner moved the well.
+ * What a new override starts at: the resolved value for the ColorScheme the reader is `live` in, so
+ * opting a token out changes nothing on screen. The other falls back to the manifest and cannot do
+ * better — a probe inherits the root's already-derived roles (ADR-0075). Taken verbatim rather than
+ * through {@link colorTokenHex}, which would drop a translucent role's alpha.
  */
 export function overrideSeed(control: OverrideControl, live: boolean): string {
   const declared = designTokenInitial(control.token);
@@ -325,10 +327,9 @@ export function withControlValue(palette: WorldThemePalette, control: PaletteCon
 }
 
 /**
- * Hexly's own Palette for a ColorScheme, read off the document rather than restated here. Tier-1
- * declarations key off `[data-color-scheme]` on *any* element (ADR-0076), so the rule declares the
- * anchors on the probe and beats the World Theme inherited from the root — the default answers
- * whichever Theme is painted, and for the ColorScheme the reader is not in. Only jsdom falls back.
+ * Hexly's own Palette for a ColorScheme, read off the document rather than restated here: tier-1
+ * declarations key off `[data-color-scheme]` on any element (ADR-0076), so the probe's own anchors beat
+ * the World Theme inherited from the root. Only jsdom falls back.
  */
 export function hexlyPalette(scheme: ColorScheme): WorldThemePalette {
   const probe = document.createElement('div');
@@ -344,18 +345,10 @@ export function hexlyPalette(scheme: ColorScheme): WorldThemePalette {
 }
 
 /**
- * What an unthemed World's controls open at: the resolution chain's first two layers, **Instance
- * default over Hexly's own, anchor by anchor** (ADR-0076).
- *
- * The probe cannot answer this and must not be made to. An operator's layer is applied inline on the
- * root, and the `[data-color-scheme]` rule that lets {@link hexlyPalette} see past a World Theme sees
- * past that too — so the layer is read from where it is held rather than from the document.
- *
- * Composed through `resolveWorldTheme`, not a merge of its own: the layer is partial by design, an
- * operator may brand one anchor of one ColorScheme, and a `??` at the Palette level would take the
- * other ten from whichever layer supplied the first. This matters because a stored Theme carries both
- * Palettes entire — an Owner who moves one anchor saves all eleven, so seeding the other ten from the
- * stylesheet would silently overwrite the operator's branding on anchors nobody touched.
+ * What an unthemed World's controls open at: Instance default over Hexly's own, anchor by anchor
+ * (ADR-0076). Composed through `resolveWorldTheme` rather than a `??` per Palette, because a stored
+ * Theme carries both Palettes entire — merging at Palette level would overwrite an operator's branding
+ * on the ten anchors the Owner never touched.
  */
 export function defaultPalettes(
   instance: WorldThemeLayer | null | undefined,

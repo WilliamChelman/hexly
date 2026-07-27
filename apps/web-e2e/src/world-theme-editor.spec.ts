@@ -228,9 +228,19 @@ test('an Owner picks a corner set and a font pairing, and the interface takes bo
   await expect.poll(() => elementsRoundedBy(page, ladder)).toEqual([]);
 
   // A pairing writes all four faces at once (spec §5.4), and each one is what renders.
+  //
+  // `codex` restates the manifest's own stacks, so the rendered face agrees with the default whether or
+  // not the pick did anything: the before-state is what makes this bite. Until it is picked no face is
+  // inline, and after it every one is — that transition is the pairing path, and it is the assertion a
+  // second pairing would otherwise be needed to make.
+  for (const { token } of PAIRING_FACES) {
+    expect(await inlineOnRoot(page, token), `${token} is not inline before a pairing is picked`).toBe('');
+  }
+
   await page.getByTestId('theme-font-codex').check();
   for (const { token, selector } of PAIRING_FACES) {
     const stack = FONT_PAIRINGS.codex[token] ?? '';
+    expect(stack, `the curated pairing declares ${token}`).not.toBe('');
     await expect.poll(() => inlineOnRoot(page, token)).toBe(stack);
     expect(await computedOn(page, selector, 'font-family'), `${token} on ${selector}`).toContain(firstFamily(stack));
   }
@@ -305,32 +315,36 @@ test('a Theme edit changes nothing about what Entities contain or who can read t
   expect(after.edges).toEqual(before.edges);
 });
 
-test('a Contributor does not reach the Theme editor', async ({ page, request, browser }) => {
-  const worldSeg = await enterLibrary(page);
-  // Over the API rather than the Access pane: the reset keeps Worlds *and* their members, so by the
-  // time this spec runs the second user may already hold a role here — and the add picker, which
-  // offers only non-members, would then have nothing to select. The POST is an upsert either way.
-  const directory: { id: string; displayName: string }[] = await (await request.get('/api/users/directory')).json();
-  const grantee = directory.find((user) => user.displayName === TEST_GRANTEE.displayName);
-  expect(grantee, 'the second seeded user is in the Instance directory').toBeTruthy();
-  const added = await request.post(`/api/worlds/${idFromSegment(worldSeg)}/members`, {
-    data: { userId: grantee!.id, role: 'contributor' },
+// Both non-manage roles, because #371 gates on the right and not on the role: a Viewer reaching the
+// editor and a Contributor reaching it are the same defect, and only one of them was covered.
+for (const role of ['contributor', 'viewer'] as const) {
+  test(`a ${role} does not reach the Theme editor`, async ({ page, request, browser }) => {
+    const worldSeg = await enterLibrary(page);
+    // Over the API rather than the Access pane: the reset keeps Worlds *and* their members, so by the
+    // time this spec runs the second user may already hold a role here — and the add picker, which
+    // offers only non-members, would then have nothing to select. The POST is an upsert either way.
+    const directory: { id: string; displayName: string }[] = await (await request.get('/api/users/directory')).json();
+    const grantee = directory.find((user) => user.displayName === TEST_GRANTEE.displayName);
+    expect(grantee, 'the second seeded user is in the Instance directory').toBeTruthy();
+    const added = await request.post(`/api/worlds/${idFromSegment(worldSeg)}/members`, {
+      data: { userId: grantee!.id, role },
+    });
+    expect(added.ok(), await added.text()).toBeTruthy();
+
+    const member = await signInGrantee(browser);
+    await member.goto(`/w/${worldSeg}/settings`);
+
+    // The Settings shell renders for any reader, so anchor on a section that is *there* first — an
+    // absence asserted before the rail renders is an absence of everything, and proves nothing.
+    await expect(member.getByTestId('settings-nav-schema')).toBeVisible();
+
+    // Authoring identity is a manage right (ADR-0039); neither role holds one.
+    await expect(member.getByTestId('settings-nav-theme')).toHaveCount(0);
+    await expect(member.getByTestId('theme-save')).toHaveCount(0);
+
+    await member.context().close();
   });
-  expect(added.ok(), await added.text()).toBeTruthy();
-
-  const contributor = await signInGrantee(browser);
-  await contributor.goto(`/w/${worldSeg}/settings`);
-
-  // The Settings shell renders for any reader, so anchor on a section that is *there* first — an
-  // absence asserted before the rail renders is an absence of everything, and proves nothing.
-  await expect(contributor.getByTestId('settings-nav-schema')).toBeVisible();
-
-  // Authoring identity is a manage right (ADR-0039); a Contributor writes Entities, not the World.
-  await expect(contributor.getByTestId('settings-nav-theme')).toHaveCount(0);
-  await expect(contributor.getByTestId('theme-save')).toHaveCount(0);
-
-  await contributor.context().close();
-});
+}
 
 test('the readability report covers the ColorScheme the author is not looking at, and a failing Theme still saves', async ({
   page,

@@ -17,14 +17,23 @@ const DECLARATIONS = [
     tier: 'role',
     type: 'font-pairing',
     public: true,
+    unregistered: true,
     initial: "'Cinzel Decorative', 'Marcellus', Georgia, serif",
   },
-  { name: '--font-display', tier: 'role', type: 'font-pairing', public: true, initial: "'Marcellus', Georgia, serif" },
+  {
+    name: '--font-display',
+    tier: 'role',
+    type: 'font-pairing',
+    public: true,
+    unregistered: true,
+    initial: "'Marcellus', Georgia, serif",
+  },
   {
     name: '--font-body',
     tier: 'role',
     type: 'font-pairing',
     public: true,
+    unregistered: true,
     initial: "'Source Serif 4 Variable', Georgia, 'Times New Roman', serif",
   },
   {
@@ -32,6 +41,7 @@ const DECLARATIONS = [
     tier: 'role',
     type: 'font-pairing',
     public: true,
+    unregistered: true,
     initial: "'JetBrains Mono Variable', 'SFMono-Regular', Menlo, monospace",
   },
 
@@ -98,6 +108,8 @@ const DECLARATIONS = [
   { name: '--color-ink-muted', tier: 'role', type: 'color', public: true, initial: '#6f5a36' },
   { name: '--color-ink-faint', tier: 'role', type: 'color', public: true, initial: '#a08b60' },
 
+  // The drawn-rule alpha as a role, so tier 3 can draw at it without reaching for the knob (ADR-0075).
+  { name: '--line-alpha', tier: 'role', type: 'number', public: false, initial: '0.371' },
   { name: '--color-line', tier: 'role', type: 'color', public: true, initial: 'rgba(140, 94, 0, 0.371)' },
   { name: '--color-line-strong', tier: 'role', type: 'color', public: true, initial: 'rgba(140, 94, 0, 0.686)' },
   { name: '--color-line-faint', tier: 'role', type: 'color', public: true, initial: 'rgba(141, 94, 0, 0.163)' },
@@ -113,22 +125,70 @@ const DECLARATIONS = [
 
   // The categorical set — eight tones rotated off the accent (ADR-0075). Public because a World Theme
   // that moves the accent moves these with it, which is why they are derived rather than authored.
-  { name: '--color-tone-1', tier: 'role', type: 'color', public: true, initial: '#005d57' },
-  { name: '--color-tone-1-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(0, 94, 87, 0.14)' },
-  { name: '--color-tone-2', tier: 'role', type: 'color', public: true, initial: '#00596d' },
-  { name: '--color-tone-2-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(0, 90, 109, 0.14)' },
-  { name: '--color-tone-3', tier: 'role', type: 'color', public: true, initial: '#00527f' },
-  { name: '--color-tone-3-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(0, 83, 127, 0.14)' },
-  { name: '--color-tone-4', tier: 'role', type: 'color', public: true, initial: '#475d9f' },
-  { name: '--color-tone-4-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(71, 93, 159, 0.14)' },
-  { name: '--color-tone-5', tier: 'role', type: 'color', public: true, initial: '#444184' },
-  { name: '--color-tone-5-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(68, 66, 133, 0.14)' },
-  { name: '--color-tone-6', tier: 'role', type: 'color', public: true, initial: '#704f92' },
-  { name: '--color-tone-6-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(112, 80, 147, 0.14)' },
-  { name: '--color-tone-7', tier: 'role', type: 'color', public: true, initial: '#69336b' },
-  { name: '--color-tone-7-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(105, 52, 108, 0.14)' },
-  { name: '--color-tone-8', tier: 'role', type: 'color', public: true, initial: '#8c456e' },
-  { name: '--color-tone-8-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(140, 69, 112, 0.14)' },
+  { name: '--color-tone-1', tier: 'role', type: 'color', public: true, initial: '#005550' },
+  {
+    name: '--color-tone-1-soft',
+    tier: 'role',
+    type: 'color',
+    public: true,
+    initial: 'oklch(0.387633 0.109056 188.68 / 0.14)',
+  },
+  { name: '--color-tone-2', tier: 'role', type: 'color', public: true, initial: '#005266' },
+  {
+    name: '--color-tone-2-soft',
+    tier: 'role',
+    type: 'color',
+    public: true,
+    initial: 'oklch(0.387633 0.109056 211.68 / 0.14)',
+  },
+  { name: '--color-tone-3', tier: 'role', type: 'color', public: true, initial: '#004b76' },
+  {
+    name: '--color-tone-3-soft',
+    tier: 'role',
+    type: 'color',
+    public: true,
+    initial: 'oklch(0.387633 0.109056 236.68 / 0.14)',
+  },
+  { name: '--color-tone-4', tier: 'role', type: 'color', public: true, initial: '#3e5293' },
+  {
+    name: '--color-tone-4-soft',
+    tier: 'role',
+    type: 'color',
+    public: true,
+    initial: 'oklch(0.455032 0.109056 268.68 / 0.14)',
+  },
+  { name: '--color-tone-5', tier: 'role', type: 'color', public: true, initial: '#3e3a7c' },
+  {
+    name: '--color-tone-5-soft',
+    tier: 'role',
+    type: 'color',
+    public: true,
+    initial: 'oklch(0.387633 0.109056 282.68 / 0.14)',
+  },
+  { name: '--color-tone-6', tier: 'role', type: 'color', public: true, initial: '#664486' },
+  {
+    name: '--color-tone-6-soft',
+    tier: 'role',
+    type: 'color',
+    public: true,
+    initial: 'oklch(0.455032 0.109056 305.68 / 0.14)',
+  },
+  { name: '--color-tone-7', tier: 'role', type: 'color', public: true, initial: '#612c63' },
+  {
+    name: '--color-tone-7-soft',
+    tier: 'role',
+    type: 'color',
+    public: true,
+    initial: 'oklch(0.387633 0.109056 325.68 / 0.14)',
+  },
+  { name: '--color-tone-8', tier: 'role', type: 'color', public: true, initial: '#803a64' },
+  {
+    name: '--color-tone-8-soft',
+    tier: 'role',
+    type: 'color',
+    public: true,
+    initial: 'oklch(0.455032 0.109056 345.68 / 0.14)',
+  },
 
   { name: '--color-danger', tier: 'role', type: 'color', public: true, initial: '#a4402e' },
   { name: '--color-danger-soft', tier: 'role', type: 'color', public: true, initial: 'rgba(164, 64, 46, 0.15)' },
@@ -181,9 +241,30 @@ const DECLARATIONS = [
   { name: '--dur-fast', tier: 'role', type: 'time', public: false, initial: '150ms' },
   { name: '--dur-base', tier: 'role', type: 'time', public: false, initial: '240ms' },
   { name: '--dur-slow', tier: 'role', type: 'time', public: false, initial: '420ms' },
-  { name: '--ease-out', tier: 'role', type: 'easing', public: false, initial: 'cubic-bezier(0.22, 1, 0.36, 1)' },
-  { name: '--ease-in-out', tier: 'role', type: 'easing', public: false, initial: 'cubic-bezier(0.65, 0, 0.35, 1)' },
-  { name: '--ease-spring', tier: 'role', type: 'easing', public: false, initial: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+  {
+    name: '--ease-out',
+    tier: 'role',
+    type: 'easing',
+    public: false,
+    unregistered: true,
+    initial: 'cubic-bezier(0.22, 1, 0.36, 1)',
+  },
+  {
+    name: '--ease-in-out',
+    tier: 'role',
+    type: 'easing',
+    public: false,
+    unregistered: true,
+    initial: 'cubic-bezier(0.65, 0, 0.35, 1)',
+  },
+  {
+    name: '--ease-spring',
+    tier: 'role',
+    type: 'easing',
+    public: false,
+    unregistered: true,
+    initial: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+  },
 
   // ---- Layout rails. Out of the contract (spec §6).
   { name: '--rail-header', tier: 'role', type: 'length', public: false, initial: '56px' },
@@ -192,12 +273,20 @@ const DECLARATIONS = [
 
   // ---- Elevation (ADR-0021). Public — the geometry is one set for both ColorSchemes, and only the
   //      shadow's colour and alpha re-theme (ADR-0075).
-  { name: '--shadow-1', tier: 'role', type: 'shadow', public: true, initial: '0 1px 2px rgba(60, 44, 22, 0.12)' },
+  {
+    name: '--shadow-1',
+    tier: 'role',
+    type: 'shadow',
+    public: true,
+    unregistered: true,
+    initial: '0 1px 2px rgba(60, 44, 22, 0.12)',
+  },
   {
     name: '--shadow-2',
     tier: 'role',
     type: 'shadow',
     public: true,
+    unregistered: true,
     initial: '0 4px 12px -2px rgba(60, 44, 22, 0.204)',
   },
   {
@@ -205,6 +294,7 @@ const DECLARATIONS = [
     tier: 'role',
     type: 'shadow',
     public: true,
+    unregistered: true,
     initial: '0 16px 36px -8px rgba(60, 44, 22, 0.346)',
   },
   {
@@ -212,6 +302,7 @@ const DECLARATIONS = [
     tier: 'role',
     type: 'shadow',
     public: true,
+    unregistered: true,
     initial: 'inset 0 1px 2px rgba(60, 44, 22, 0.12)',
   },
   {
@@ -219,6 +310,7 @@ const DECLARATIONS = [
     tier: 'role',
     type: 'shadow',
     public: true,
+    unregistered: true,
     initial: '0 0 0 3px rgba(140, 94, 0, 0.345)',
   },
 
@@ -229,6 +321,7 @@ const DECLARATIONS = [
     tier: 'role',
     type: 'gradient',
     public: false,
+    unregistered: true,
     initial: 'linear-gradient(180deg, var(--color-accent-sheen-bright), var(--color-accent-sheen-deep))',
   },
   {
@@ -236,6 +329,7 @@ const DECLARATIONS = [
     tier: 'role',
     type: 'gradient',
     public: false,
+    unregistered: true,
     initial: 'radial-gradient(circle at 50% 35%, var(--color-accent-sheen-bright), var(--color-accent-sheen-deep))',
   },
 ] as const satisfies readonly TokenDecl[];

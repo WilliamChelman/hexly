@@ -6,14 +6,11 @@ export function designTokenInitial(name: DesignToken): string {
 }
 
 /**
- * A token's value as the document resolved it, falling back to {@link designTokenInitial}. The three
- * Canvas renderers ADR-0075 names each carried their own hex for the unresolved case — a second copy of
- * the palette with nothing holding it to the first. Only jsdom takes the fallback: a registered property
- * always resolves in a browser.
+ * A token's value as the document resolved it, falling back to {@link designTokenInitial} — one
+ * fallback rather than a hex per Canvas renderer (ADR-0075). Only jsdom takes it.
  *
- * A derived token resolves to `oklch()`, so the value is only a colour to a **CSS** parser. A 2D context
- * and culori qualify; a renderer that brings its own — cosmos.gl did, and drew on black for it — must be
- * handed the pixel a `fillStyle` round-trip reads back, never this string.
+ * A derived token resolves to `oklch()`, so this string is a colour only to a CSS parser: a renderer
+ * that brings its own needs the pixel a `fillStyle` round-trip reads back.
  */
 export function readDesignToken(style: CSSStyleDeclaration, name: DesignToken): string {
   return style.getPropertyValue(name).trim() || designTokenInitial(name);
