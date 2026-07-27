@@ -60,8 +60,8 @@
 
   --tracking-tight: -0.01em;
   --tracking-normal: 0;
-  --tracking-wide: 0.04em;
-  --tracking-wider: 0.14em; /* Cinzel small-caps cartouche lettering        */
+  --tracking-wide: 0.04em; /* the Cinzel Decorative cartouche wordmark      */
+  --tracking-wider: 0.14em; /* uppercase section eyebrows, on Marcellus     */
 
   --font-weight-regular: 400;
   --font-weight-medium: 500;
