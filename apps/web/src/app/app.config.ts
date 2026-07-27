@@ -13,6 +13,7 @@ import {
   provideEagerTranslations,
   provideLocale,
   provideColorScheme,
+  provideWorldTheme,
   providePreferencesSync,
   provideClientConfig,
   CORE_TRANSLATIONS,
@@ -79,6 +80,9 @@ export const appConfig: ApplicationConfig = {
     // Apply the persisted/OS ColorScheme and load the active language's catalog
     // during bootstrap, before the first paint and initial navigation.
     provideColorScheme(),
+    // After the ColorScheme, whose Palette a World Theme replaces (ADR-0076): the applier adopts what
+    // `index.html`'s pre-paint replay put on the root, so leaving the World can take it back.
+    provideWorldTheme(),
     provideLocale(),
     // Roam Preferences with the account (ADR-0038): hydrate from /auth/me,
     // push signal changes back as PATCHes.

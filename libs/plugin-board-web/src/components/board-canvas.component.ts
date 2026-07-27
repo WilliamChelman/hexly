@@ -13,8 +13,8 @@ import {
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Point } from '@hexly/plugin-board';
-import { ColorSchemeService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
-import { DesignToken, designTokenInitial, readDesignToken } from '@hexly/web-styles';
+import { ColorSchemeService, WorldThemeApplier, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
+import { DesignToken, designTokenInitial, designTokenStyle, readDesignToken } from '@hexly/web-styles';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { Camera, fitCamera } from '../utils/camera';
 import { DRAG_THRESHOLD } from '../utils/gesture';
@@ -146,6 +146,7 @@ export class BoardCanvasComponent {
   protected readonly zoomPercent = computed(() => Math.round(this.cam.zoom() * 100));
 
   private readonly colorScheme = inject(ColorSchemeService);
+  private readonly worldTheme = inject(WorldThemeApplier);
   private readonly destroyRef = inject(DestroyRef);
 
   private ctx: CanvasRenderingContext2D | null = null;
@@ -169,9 +170,11 @@ export class BoardCanvasComponent {
     // Reading the camera inside renderFrame() registers it as a dependency, so a pan/zoom repaints.
     effect(() => this.renderFrame());
 
-    // A ColorScheme switch re-reads the dot colour via getComputedStyle, then repaints untracked.
+    // A ColorScheme switch — or an Owner's live World Theme edit (ADR-0076) — re-reads the dot colour
+    // via getComputedStyle, then repaints untracked.
     effect(() => {
       this.colorScheme.colorScheme();
+      this.worldTheme.revision();
       if (!this.ctx) return;
       this.refreshTheme();
       untracked(() => this.renderFrame());
@@ -338,11 +341,9 @@ export class BoardCanvasComponent {
     return this.cam.screenToWorld(this.localPoint(event.currentTarget as HTMLElement, event));
   }
 
-  /** Re-read the themed dot colour from the canvas's resolved styles (ADR-0007/0020). */
+  /** Re-read the themed dot colour off the root's resolved styles (ADR-0007/0020). */
   private refreshTheme(): void {
-    const canvas = this.canvasRef()?.nativeElement;
-    if (!canvas) return;
-    this.dotColor = readDesignToken(getComputedStyle(canvas), DOT_TOKEN);
+    this.dotColor = readDesignToken(designTokenStyle(), DOT_TOKEN);
   }
 
   /**

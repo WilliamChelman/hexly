@@ -26,6 +26,32 @@
         }
       })();
     </script>
+    <!--
+      Replay the World Theme (ADR-0076) last served for the World this URL names, so a reload back into
+      it paints themed. Mirrors WorldThemeApplier's scope regex; the cache holds already-resolved
+      custom properties, so this carries no logic of its own.
+    -->
+    <script>
+      (function () {
+        try {
+          var route = /^\/(public\/w|w)\/([^/]+)/.exec(location.pathname);
+          if (!route) return;
+          var seg = route[2];
+          var scope = route[1] + '/' + (route[1] === 'w' ? seg.slice(seg.lastIndexOf('-') + 1) : seg);
+          var cached = JSON.parse(localStorage.getItem('hexly-world-theme') || '[]');
+          for (var i = 0; i < cached.length; i++) {
+            if (cached[i].scope !== scope) continue;
+            var declarations = cached[i][document.documentElement.dataset.colorScheme] || {};
+            for (var name in declarations) {
+              document.documentElement.style.setProperty(name, declarations[name]);
+            }
+            return;
+          }
+        } catch (e) {
+          /* No storage, no replay — the World read settles the Theme a moment later either way. */
+        }
+      })();
+    </script>
   </head>
   <body>
     <app-root></app-root>

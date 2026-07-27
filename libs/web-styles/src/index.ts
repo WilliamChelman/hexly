@@ -5,4 +5,4 @@ export type { DesignToken, DesignTokenDecl, PublicDesignToken } from './tokens/m
 export { DESIGN_TOKENS, designToken, isDesignToken } from './tokens/manifest';
 export type { Tier, TokenDecl, TokenType } from './tokens/design-token';
 export { designTokenPropertyBlock, registeredTokens } from './tokens/property-block';
-export { designTokenInitial, readDesignToken } from './tokens/read-token';
+export { designTokenInitial, designTokenStyle, readDesignToken } from './tokens/read-token';

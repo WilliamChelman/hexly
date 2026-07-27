@@ -33,6 +33,7 @@ export * from './services/shortcut.service';
 export * from './services/toaster.service';
 export * from './services/user-directory.client';
 export * from './services/users.client';
+export * from './services/world-theme.applier';
 export * from './services/world.store';
 export * from './services/worlds.client';
 export * from './utils/pretty-id';

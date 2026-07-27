@@ -24,10 +24,25 @@ export const WORLD_THEME_VERSION = 1;
  */
 export const FONT_PAIRING_IDS = ['codex'] as const;
 
+export type FontPairingId = (typeof FONT_PAIRING_IDS)[number];
+
+/**
+ * What each pairing writes. Keyed by {@link FONT_PAIRING_IDS}, so a new id cannot ship without its
+ * stacks; `codex` reads off the manifest, so Hexly's own pairing cannot drift from the default it
+ * restates. Adding a pairing is an entry here and nothing in the applier.
+ */
+export const FONT_PAIRINGS: Readonly<Record<FontPairingId, Readonly<Partial<Record<PublicDesignToken, string>>>>> = {
+  codex: Object.fromEntries(
+    DESIGN_TOKENS.filter((decl) => decl.type === 'font-pairing').map((decl) => [decl.name, decl.initial]),
+  ),
+};
+
 /**
  * Each stored Palette field and the tier-1 token it writes (spec §1): eight anchors carrying the
- * identity, three knobs the derivation reads. #366 declares these in the manifest, collapsing this
- * table into a `tier === 'palette'` filter; until then it is the mapping the applier reads.
+ * identity, three knobs the derivation reads. Spelled out rather than derived from the manifest's
+ * `tier === 'palette'` slice, because a derived table types as `Record<string, string>` and the
+ * applier keys a `DesignToken` record with it; the spec holds both ends of the mapping to their
+ * sources instead, so drift is a red test rather than a wider type.
  */
 export const PALETTE_TOKENS = {
   page: '--palette-page',

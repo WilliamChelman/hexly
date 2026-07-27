@@ -17,7 +17,11 @@
  * other, and the polarity knob is what asserts that in the derivation.
  */
 
-:root {
+/* A Palette is declared wherever a ColorScheme is, not only at the root (ADR-0076): an
+   offscreen probe carrying the scheme the author is *not* looking at is how the editor
+   reports contrast for it, and `:root[…]` would leave that probe on the reader's anchors. */
+:root,
+[data-color-scheme='solar'] {
   /* ---- Tier 1 — the Solar Palette. Private: `--palette-*` is referenced only by
      the derivation in index.css, and `no-unknown-design-token` enforces it. ---- */
   --palette-page: #f1e5c7; /* the table / outer ivory paper                 */
@@ -86,7 +90,7 @@
  * What remains beside it is what the derivation does not reach — the one named
  * literal and the categorical pair awaiting the `--color-tone-*` rotation.
  * ======================================================================= */
-:root[data-color-scheme='astral'] {
+[data-color-scheme='astral'] {
   /* ---- Tier 1 — the Astral Palette. */
   --palette-page: #0b0c1a; /* the night table                               */
   --palette-ink: #ece3cf; /* starlit parchment text                         */

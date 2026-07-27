@@ -155,10 +155,14 @@ describe('worldThemeSchema', () => {
     });
   });
 
-  it('names one `--palette-*` token per stored Palette field', () => {
-    // #366 declares these as tier-1 tokens; until then this table is the mapping the applier reads.
+  it('maps every stored Palette field onto exactly the manifest’s tier-1 tokens', () => {
+    // The applier reads this table, so both of its ends answer to their own source: the field names to
+    // the stored schema, the token names to the manifest's Palette tier (ADR-0075).
     const stored = Object.keys(worldThemeSchema.shape.solar.shape);
     expect(Object.keys(PALETTE_TOKENS).sort()).toEqual(stored.sort());
+
+    const tier1 = DESIGN_TOKENS.filter((decl) => decl.tier === 'palette').map((decl) => decl.name);
+    expect(Object.values(PALETTE_TOKENS).sort()).toEqual(tier1.sort());
   });
 
   it('accepts every settable public token’s own shipped value, and settles after one pass', () => {

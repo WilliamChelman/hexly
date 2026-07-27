@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { EMPTY, catchError, of, switchMap } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { PublicWorldView } from '@hexly/domain';
-import { PublicClient, AppShellStore, EVICTED } from '@hexly/web-core';
+import { PublicClient, AppShellStore, EVICTED, WorldThemeApplier } from '@hexly/web-core';
 import { EyebrowComponent } from '@hexly/web-ui';
 
 /**
@@ -75,6 +75,7 @@ export class PublicWorldPage {
   private readonly route = inject(ActivatedRoute);
   private readonly client = inject(PublicClient);
   private readonly shell = inject(AppShellStore);
+  private readonly theme = inject(WorldThemeApplier);
 
   readonly view = signal<PublicWorldView | null>(null);
   readonly notFound = signal(false);
@@ -105,6 +106,7 @@ export class PublicWorldPage {
         } else {
           this.notFound.set(true);
         }
+        this.applyTheme(w);
       });
 
     // EVICTED (link revoked, World deleted, a 403/404 refetch) → the dead-link panel, without a
@@ -115,7 +117,20 @@ export class PublicWorldPage {
         switchMap((f) => (f === null ? EMPTY : this.client.watchWorld(f.token, f.id))),
         takeUntilDestroyed(),
       )
-      .subscribe((result) => (result === EVICTED ? this.evict() : this.view.set(result)));
+      .subscribe((result) => {
+        if (result === EVICTED) return this.evict();
+        this.view.set(result);
+        this.applyTheme(result);
+      });
+  }
+
+  /**
+   * Paint this World's Theme for a reader with no account (ADR-0076): it rides the unauthenticated
+   * read, keyed by the token because that is the only World identity such a visitor ever holds. Called
+   * off the live-follow too, so an Owner's edit reaches them without a refresh.
+   */
+  private applyTheme(view: PublicWorldView | null): void {
+    this.theme.scope({ publicToken: this.token() }, view?.theme ?? null);
   }
 
   /** Blank the World and show the dead-link panel — access ended on the open screen. */
