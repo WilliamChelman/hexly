@@ -234,13 +234,24 @@ export class WorldsController {
     return result;
   }
 
-  // A partial update of the Owner-curated fields: `name` (rename), `pinnedEntityIds` (Dashboard pins,
-  // #168) and/or the World Theme (ADR-0076). Owner-gated in the service; reachable-but-not-Owner is a
-  // 403. The schema is the Theme's write choke point, so a value that is not one is a 400 here.
+  /**
+   * A partial update of the Owner-curated fields: `name` (rename), `pinnedEntityIds` (Dashboard pins,
+   * #168) and/or the World Theme (ADR-0076). Owner-gated in the service; not an Owner is a 403, no such
+   * World a 404. The schema is the Theme's write choke point, so a value that is not one is a 400 here.
+   *
+   * Ownership is established *before* the parse, inverting this controller's usual order: the Theme
+   * schema is a colour parser over untrusted input (ADR-0076), so parsing first sells that work to any
+   * signed-in user for any World id. The whole body waits on the gate, non-Theme fields included —
+   * they share the one request schema, and a 400 an unauthorised caller never sees costs nothing.
+   */
   @Patch(':id')
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): WorldDetail {
+    const gate = this.worlds.gateUpdate(user.id, id);
+    if (gate === null) throw new NotFoundException();
+    if (gate === 'forbidden') throw new ForbiddenException();
     const parsed = updateWorldRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
+    // The service gates again; this is the ordering, not the authorisation.
     const result = this.worlds.update(user.id, id, parsed.data);
     if (result === null) throw new NotFoundException();
     if (result === 'forbidden') throw new ForbiddenException();

@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import sharp from 'sharp';
 import request from 'supertest';
 import { CONTENT_FIELD_ID, tiptapContent } from '@hexly/plugin-content';
+import { updateWorldRequestSchema } from '@hexly/domain';
 import { DB, Db, createDb } from '../db/db';
 import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthService } from '../auth/auth.service';
@@ -542,6 +543,36 @@ describe('Worlds endpoints', () => {
       const read = await cass.get(`/entities/${note.body.id}`).expect(200);
       expect(read.body.name).toBe('Shared lore');
       expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.entityCount).toBe(1);
+    });
+
+    /**
+     * The Theme parser is untrusted-input work (ADR-0076), so it sits *behind* the Owner check rather
+     * than in front of it: reached first, it is CPU any signed-in user could spend against any World id.
+     * Refusing on authorisation grounds is the observable form of that ordering — parsed first, this
+     * same body answers 400, because the parse fails before the gate is ever consulted.
+     */
+    it('refuses a non-Owner’s hostile Theme without parsing it', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      await app.get(AuthService).seedUser('mal@hexly.test', 'no relation here', 'Mal');
+      const mal = await signIn('mal@hexly.test', 'no relation here');
+      // Thousands of unknown override keys, inside express's 100 kB body limit: every one is schema
+      // work, and every one is invalid — so a 403 here cannot be the parser's answer.
+      const overrides = Object.fromEntries(Array.from({ length: 3000 }, (_, i) => [`--color-x${i}`, 'zz']));
+      const hostile = { theme: { ...THEME, overrides: { solar: overrides } } };
+      const safeParse = vi.spyOn(updateWorldRequestSchema, 'safeParse');
+
+      try {
+        await mal.patch(`/worlds/${world.body.id}`).send(hostile).expect(403);
+
+        expect(safeParse).not.toHaveBeenCalled();
+        // An Owner sending the same nonsense still gets the validation answer, not a 403 or a 500.
+        await ada.patch(`/worlds/${world.body.id}`).send(hostile).expect(400);
+        expect(safeParse).toHaveBeenCalled();
+      } finally {
+        safeParse.mockRestore();
+      }
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body).not.toHaveProperty('theme');
     });
 
     /**

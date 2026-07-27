@@ -151,6 +151,19 @@ export class WorldsService {
   }
 
   /**
+   * Whether `userId` may update World `id` — split out of {@link update} so the route can gate
+   * before it parses a body carrying a World Theme, which is a colour parser over untrusted input
+   * (ADR-0076). The split is `delete`'s, unchanged: no such World → null, not an Owner →
+   * 'forbidden'.
+   */
+  gateUpdate(userId: string, id: string): 'ok' | 'forbidden' | null {
+    // One query resolves existence + ownership (undefined ≡ no such World → 404).
+    const meta = worldAccess(this.db, userId).decideMeta(id);
+    if (!meta) return null;
+    return meta.isOwner ? 'ok' : 'forbidden';
+  }
+
+  /**
    * Update a World's Owner-curated fields (Owner only): `name`, the ordered
    * `pinnedEntityIds`, and/or the World Theme. Forbidden if not an Owner, null if
    * not found; an absent field is left untouched, and a `null` Theme clears it.
@@ -159,9 +172,10 @@ export class WorldsService {
    * ponytail: stale pin ids filtered on read, not pruned on delete.
    */
   update(userId: string, id: string, patch: UpdateWorldRequest): WorldDetail | 'forbidden' | null {
+    const gate = this.gateUpdate(userId, id);
+    if (gate !== 'ok') return gate;
     const world = this.db.select().from(worlds).where(eq(worlds.id, id)).get();
     if (!world) return null;
-    if (!worldAccess(this.db, userId).decideMeta(id)?.isOwner) return 'forbidden';
     // The write handle bumps `seq`/`updatedAt` and nudges; the response carries the post-write row,
     // so the caller's own write-through advances its held freshness and the server's echo nudge for
     // this very write dedups to nothing.
