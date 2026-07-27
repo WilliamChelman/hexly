@@ -27,11 +27,12 @@ describe('typeTone', () => {
   });
 
   /**
-   * The tones are pinned rather than merely self-consistent: "the same type gets the same tone across
-   * runs and across plugins" is only true if changing the hash is a failing test rather than a silent
-   * recolouring of every World's chips.
+   * The *derived* tone of each shipped id, pinned rather than merely self-consistent: "the same type
+   * gets the same tone across runs and across plugins" is only true if changing the hash is a failing
+   * test rather than a silent recolouring of every World's chips. Two of these ids ship with a `tone:`
+   * that overrides what they derive here — `apps/web`'s `type-tones.spec` asserts the shipped set.
    */
-  it('pins the tone of each shipped type id, so the hash cannot change unnoticed', () => {
+  it('derives a fixed tone per id, so the hash cannot change unnoticed', () => {
     expect({
       'core.type.note': typeTone({ id: 'core.type.note' }),
       'core.type.hex-map': typeTone({ id: 'core.type.hex-map' }),

@@ -27,7 +27,10 @@ export const DS_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     // The stat block placed by its `{ field }` — the `draw-steel.datatype.stat-block` data-type's View, labelled by
     // the Field (ADR-0055) — then the content View by id, so a monster opens on its stats with a Note toggle.
     views: [{ field: DS_STAT_BLOCK_KEY }, CORE_VIEW_RICH_CONTENT],
-    // Categorical, so it names no colour: chip and node both take its derived tone (ADR-0075).
+    // Pinned off its derived tone-1, which `core.type.board` holds (ADR-0075). Neither teal is free, so
+    // tone-4 is the nearest cool tone left to the water this type shipped as; `type-tones.spec` holds
+    // the set distinct. No `graphColorToken`: the node takes this same tone.
+    tone: 'tone-4',
     // A plugin ships translated copy, so its chrome is transloco keys — unlike a user-defined type,
     // whose every label is its one authored name (#191).
     // Chrome copy under the `drawSteel` scope (see `draw-steel-translations.ts` for the camel-cased name).
