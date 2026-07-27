@@ -104,6 +104,12 @@ describe('GraphCanvasComponent', () => {
     return calls[calls.length - 1]?.[0] ?? null;
   };
 
+  /** The element the graph is mounted into — where the canvas hangs its marks. */
+  const canvasHost = () => fixture.nativeElement.querySelector('[data-testid=graph-canvas]') as HTMLElement;
+
+  /** The config the adoption handed cosmos.gl, so a spec can fire the callbacks bound in it. */
+  const mountConfig = () => cosmos.setConfig.mock.calls[0][0];
+
   beforeEach(async () => {
     cosmos = fakeCosmos();
     warm = {
@@ -146,7 +152,7 @@ describe('GraphCanvasComponent', () => {
 
   /** The headline: a depth flip re-seeds the live graph, and nothing is torn down. */
   it('re-seeds the live graph when the data changes, without tearing the mount down', () => {
-    const canvasEl = fixture.nativeElement.querySelector('[data-testid=graph-canvas]');
+    const canvasEl = canvasHost();
 
     host.graph.set(world(['Ealdred', 'Mira', 'Thornwood'], ['ealdred>mira', 'mira>thornwood']));
     fixture.detectChanges();
@@ -158,7 +164,7 @@ describe('GraphCanvasComponent', () => {
     expect(cosmos.setConfig).toHaveBeenCalledTimes(1);
     expect(seededPoints()).toBe(3);
     expect(cosmos.setLinks).toHaveBeenCalledTimes(2);
-    expect(fixture.nativeElement.querySelector('[data-testid=graph-canvas]')).toBe(canvasEl);
+    expect(canvasHost()).toBe(canvasEl);
   });
 
   /** The centre keeps its id across a swap but not its point index — `graphPayload` orders by degree. */
@@ -177,13 +183,34 @@ describe('GraphCanvasComponent', () => {
    * until the new layout has cooled.
    */
   it('stands the settle mark down for the new payload', () => {
-    const canvas = fixture.nativeElement.querySelector('[data-testid=graph-canvas]') as HTMLElement;
+    const canvas = canvasHost();
     canvas.dataset['settled'] = 'true';
 
     host.graph.set(world(['Ealdred', 'Mira', 'Thornwood'], ['ealdred>mira', 'mira>thornwood']));
     fixture.detectChanges();
 
     expect(canvas.dataset['settled']).toBeUndefined();
+  });
+
+  /**
+   * The drawn mark is what a test reading the canvas back waits on (`world-graph.spec.ts`'s background
+   * guard). It trails the first tick by two frames because cosmos.gl ticks *inside* the render pass it
+   * is about to submit — the mark must not stand for a frame that has yet to reach the screen.
+   */
+  it('marks the host drawn two frames after cosmos.gl paints its first', () => {
+    const canvas = canvasHost();
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => frames.push(cb));
+    const flush = () => frames.splice(0).forEach((cb) => cb(0));
+
+    mountConfig().onSimulationTick(1);
+    expect(canvas.dataset['drawn']).toBeUndefined();
+
+    flush();
+    expect(canvas.dataset['drawn']).toBeUndefined();
+
+    flush();
+    expect(canvas.dataset['drawn']).toBe('true');
   });
 
   /**

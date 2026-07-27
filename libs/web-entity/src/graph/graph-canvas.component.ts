@@ -253,6 +253,9 @@ export class GraphCanvasComponent {
     // The settle mark describes the payload on screen (a hook for tests waiting on the layout), so a
     // previous mount's must not stand for this one's.
     delete host.dataset['settled'];
+    // The drawn mark describes the canvas, so only a new *mount* stands it down — a swap draws on
+    // through the one already painted. Taking the marker is what stands it down.
+    const markDrawn = firstFrameMark(host);
 
     // Adopt the pool's pre-warmed graph when one is free: its context creation and shader compile
     // then happened at browser idle, not on this click (see {@link GraphWarmPool}).
@@ -303,6 +306,7 @@ export class GraphCanvasComponent {
       onDragEnd: () => (this.interacting = false),
       onSimulationTick: (alpha) => {
         camera.keepFramed();
+        markDrawn();
         // The settled mark says the layout is *readable*, not finished: the simulation runs on until alpha
         // crosses 1e-3 (`onSimulationEnd`), so it is set here, at a legible threshold, rather than tens of
         // seconds later. The label loop tracks the points until that real end.
@@ -597,6 +601,35 @@ export class GraphCanvasComponent {
     if (this.mounted) this.destroyMount(this.mounted);
     this.mounted = null;
   }
+}
+
+/** Which mount owns a host's drawn mark — a frame callback from an earlier one must not stamp. */
+const drawnMarkOwner = new WeakMap<HTMLDivElement, object>();
+
+/**
+ * Takes the host's drawn mark for a new mount and returns the marker that stamps it, once cosmos.gl has
+ * painted. This is the hook for a test that reads the canvas back, which {@link SETTLED_ALPHA} cannot
+ * be: alpha decays once per *rendered frame*, so the settle mark is a frame count (~650 at
+ * {@link SIMULATION_DECAY}), and a renderer without a GPU crosses it on no clock a test can name.
+ *
+ * Two frames, because the caller is `onSimulationTick`, which cosmos.gl invokes *inside* the render
+ * pass it is about to submit. Those frames can outlive the mount that asked for them, so the stamp is
+ * withheld unless this mount still owns the mark.
+ */
+function firstFrameMark(host: HTMLDivElement): () => void {
+  const owner = {};
+  drawnMarkOwner.set(host, owner);
+  delete host.dataset['drawn'];
+  let marked = false;
+  return () => {
+    if (marked) return;
+    marked = true;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (drawnMarkOwner.get(host) === owner) host.dataset['drawn'] = 'true';
+      }),
+    );
+  };
 }
 
 /** Flip an edge label that would otherwise read upside-down. */

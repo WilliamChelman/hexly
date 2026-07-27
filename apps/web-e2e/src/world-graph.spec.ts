@@ -102,10 +102,12 @@ test('draws on the sunken surface rather than on black', async ({ page }) => {
   await page.getByTestId('graph-filters').click();
   await page.getByTestId('graph-orphans-toggle').click();
 
-  // The layout's own hook: it marks a graph that has ticked, so the reading is of a drawn frame rather
-  // than of whatever the canvas held before cosmos.gl's first.
+  // The layout's own hook for a painted frame, so the reading is of what cosmos.gl drew rather than of
+  // whatever the canvas held before its first pass. Not the *settle* mark: settling costs a fixed count
+  // of frames rather than a span of time (see `firstFrameMark`), which a runner rendering in software
+  // does not pay inside any timeout, and the background is the clear colour of every frame anyway.
   const drawing = page.getByTestId('graph-canvas');
-  await expect(drawing).toHaveAttribute('data-settled', 'true', { timeout: 20_000 });
+  await expect(drawing).toHaveAttribute('data-drawn', 'true', { timeout: 20_000 });
 
   const sunken = await page.evaluate(() =>
     getComputedStyle(document.documentElement).getPropertyValue('--color-surface-sunken').trim(),
