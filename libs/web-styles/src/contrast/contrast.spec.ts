@@ -153,7 +153,7 @@ describe('themeWarnings', () => {
     // design's own revealed tolerance (spike-tone-rotation.md §2), so it must not condemn it.
     const astralToneEight: Rgb = [229, 140, 174];
     const astralDanger: Rgb = [232, 138, 111];
-    const solarToneOne: Rgb = [0, 103, 97];
+    const solarToneOne: Rgb = [0, 93, 87];
     const solarSuccess: Rgb = [74, 111, 47];
 
     expect(deltaE00(astralToneEight, astralDanger)).toBeGreaterThan(TONE_CONFUSION_MAX);

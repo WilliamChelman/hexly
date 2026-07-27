@@ -134,12 +134,11 @@
     from var(--palette-accent) calc(l - 0.0858 * var(--palette-polarity)) calc(c - 0.016) calc(h + 3)
   );
   --color-accent-soft: oklch(from var(--palette-accent) l c h / 0.14);
-  /* The bright stop is a theme-invariant constant in disguise, and knowingly so
-     (spike §5): `max(l, 0.876)` clamps for any accent short of a near-white one,
-     and the chroma and hue are fixed, so a World's accent moves this only by
-     being lighter than the clamp. Taking the accent's own hue instead costs
-     ΔE00 7.2 against the highlight Solar ships. */
-  --color-accent-sheen-bright: oklch(from var(--palette-accent) max(l, 0.876) 0.1 90);
+  /* The stop rides the accent's own hue, so a World anchored to violet does not keep a
+     gold sheen; a literal hue made this a constant, not the derivation ADR-0075 asks
+     for. Lightness and chroma stay clamped — only the hue re-themes. The +9.5° is a
+     balance, not a fit: see world-theme-spec.md §2.2. */
+  --color-accent-sheen-bright: oklch(from var(--palette-accent) max(l, 0.876) 0.1 calc(h + 9.5));
   --color-accent-sheen-deep: oklch(
     from var(--palette-accent) calc(l + 0.087 * var(--palette-polarity)) calc(c + 0.011) calc(h - 2.5)
   );
@@ -149,9 +148,13 @@
      `on-fill` is the foreground on any saturated flat fill, not just the
      accent's — its one consumer is the danger button's hover (ADR-0075). */
   --color-on-fill: color-mix(in srgb, contrast-color(var(--palette-accent)) 90%, var(--palette-accent));
+  /* Flipped off the *bright* stop because that is the one whose lightness is clamped,
+     so the flip is stable for any accent — but the ink has to survive the **deep** end
+     of the same gradient, which is where it is nearest its ground. 86% left that pair
+     at 4.26:1; 90% carries it over AA at both ends without making the ink black. */
   --color-on-accent-sheen: color-mix(
     in srgb,
-    contrast-color(var(--color-accent-sheen-bright)) 86%,
+    contrast-color(var(--color-accent-sheen-bright)) 90%,
     var(--color-accent-sheen-bright)
   );
   /* The accent lifted to a light-source lightness — it glows in Solar, where the

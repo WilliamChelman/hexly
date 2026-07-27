@@ -125,7 +125,7 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
             <a
               [routerLink]="entry.link"
               [attr.data-testid]="entry.testid"
-              routerLinkActive="text-accent bg-accent-soft"
+              routerLinkActive="text-accent-strong bg-accent-soft"
               [routerLinkActiveOptions]="{ exact: !!entry.exact }"
               ariaCurrentWhenActive="page"
               class="flex items-center gap-3 px-2 py-2 rounded-sm no-underline text-ink hover:bg-accent-soft"

@@ -10,7 +10,7 @@ import { ChipTone } from '../components/chip.component';
 
 /** Sigil chip colours (text + soft fill) per tone. */
 export const TONE_SIGIL: Record<ChipTone, string> = {
-  accent: 'text-accent bg-accent-soft',
+  accent: 'text-accent-strong bg-accent-soft',
   'tone-1': 'text-tone-1 bg-tone-1-soft',
   'tone-2': 'text-tone-2 bg-tone-2-soft',
   'tone-3': 'text-tone-3 bg-tone-3-soft',

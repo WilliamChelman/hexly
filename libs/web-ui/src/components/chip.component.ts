@@ -42,7 +42,7 @@ export type ChipTone = 'accent' | 'tone-1' | 'tone-2' | 'tone-3' | 'tone-4' | 't
     }
     /* Tone variants: token color/bg convert; only color-mix stays raw (ADR-0021). */
     :host(.is-accent) {
-      @apply text-accent border-line-strong;
+      @apply text-accent-strong border-line-strong;
       background: color-mix(in oklab, var(--color-accent) 12%, transparent);
     }
     :host(.is-tone-1) {

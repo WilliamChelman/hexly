@@ -135,7 +135,7 @@ const NO_FACETS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] 
     }
     .facet-chip {
       @apply flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs text-ink-strong;
-      @apply cursor-pointer transition-colors hover:border-accent aria-pressed:border-accent aria-pressed:bg-accent/15 aria-pressed:text-accent;
+      @apply cursor-pointer transition-colors hover:border-accent aria-pressed:border-accent aria-pressed:bg-accent/15 aria-pressed:text-accent-strong;
     }
   `,
 })

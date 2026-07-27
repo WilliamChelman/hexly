@@ -94,7 +94,7 @@ import {
       <header class="bg-linear-[180deg] from-surface to-bg-deep border-b border-line">
         <div class="max-w-[64rem] mx-auto px-8 py-16 flex items-end justify-between gap-8">
           <div>
-            <span appEyebrow class="text-accent! tracking-[0.28em]">{{ 'worldIndex.eyebrow' | transloco }}</span>
+            <span appEyebrow class="text-accent-strong! tracking-[0.28em]">{{ 'worldIndex.eyebrow' | transloco }}</span>
             <h1 class="font-display text-3xl text-ink-strong m-0 leading-tight">
               {{ 'worldIndex.greeting' | transloco: { name: who() } }}
             </h1>
@@ -151,7 +151,7 @@ import {
                 <div class="flex items-center gap-1 px-3 pb-2">
                   <span
                     class="text-2xs uppercase tracking-wider"
-                    [class.text-accent]="card.owned"
+                    [class.text-accent-strong]="card.owned"
                     [class.text-ink-faint]="!card.owned"
                     [attr.data-testid]="(card.owned ? 'owned-' : 'member-') + card.id"
                     >{{ (card.owned ? 'worldIndex.owned' : 'worldIndex.member') | transloco }}</span
@@ -240,7 +240,7 @@ import {
             <li class="snap-start shrink-0 w-56">
               <button
                 type="button"
-                class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-accent hover:border-accent bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:[outline-offset:-2px]"
+                class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-accent-strong hover:border-accent bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:[outline-offset:-2px]"
                 [disabled]="creating()"
                 (click)="promptCreate()"
               >

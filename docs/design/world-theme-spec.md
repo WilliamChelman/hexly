@@ -15,13 +15,17 @@ Eight anchors and three knobs per ColorScheme. Private: `--palette-*` is never r
 | `--palette-page`      | The table / outer paper                 | `#f1e5c7` | `#0b0c1a` |
 | `--palette-ink`       | Primary text ink                        | `#2e2412` | `#ece3cf` |
 | `--palette-ink-quiet` | Secondary ink — **carries its own hue** | `#6f5a36` | `#9aa0c8` |
-| `--palette-accent`    | The through-line accent                 | `#9a6a16` | `#d9b25a` |
+| `--palette-accent`    | The through-line accent                 | `#8c5e00` | `#d9b25a` |
 | `--palette-danger`    | Danger                                  | `#a4402e` | `#e88a6f` |
 | `--palette-success`   | Confirmation                            | `#4a6f2f` | `#86c46a` |
 | `--palette-canvas`    | The map field                           | `#efe2bf` | `#12152e` |
 | `--palette-soot`      | Shadow / scrim ink                      | `#3c2c16` | `#02020a` |
 
 `--palette-ink-quiet` is a separate anchor and not derivable: `ink-muted` rotates hue between schemes, and derived off `--palette-ink` with any fixed offset it collapses to grey (ΔE00 15.8/15.3). `--palette-soot` is the one anchor that is not already a shipped token — Solar's scrim ink sits _lighter_ than `--palette-ink`, so neither existing anchor reaches it.
+
+**Amended after the epic.** Solar's accent was `#9a6a16` (OKLCH L 0.5610) through #359–#376 and is now `#8c5e00` (L 0.5185) — only lightness moves, the hue and chroma are the heliograph gold's own. §5.3's report warned on Hexly's _own_ Palette, which is the one Palette a World Owner never chose and cannot be blamed for: 3.77:1 against the page and a mid-tone warning at 4.16:1. It clears both: the page pair reaches **4.51:1** and the automatic foreground on it **4.93:1**. The anchor moves ΔE00 4.77 and carries every role derived from it, the eight tones included (§2.3). Astral is untouched; it passes at 9.68:1.
+
+The value is quantised on purpose. `#8d5e00` is what the unquantised OKLCH target rounds to and it measures **4.4923:1** — 0.008 under the floor, close enough to read as a pass on paper and warn in the app. A colour ships as an 8-bit hex, so the hex is what has to clear it.
 
 | Knob                   | Controls                                                              | Solar   | Astral |
 | ---------------------- | --------------------------------------------------------------------- | ------- | ------ |
@@ -91,6 +95,10 @@ Policy, from ADR-0075:
 - **The veil ladder is a power of the knob, not a multiple of it.** `shadow-1/2/3` take exponents 1, 0.75 and 0.5, which the two ColorSchemes agree on to within 3% — a mirror symmetry of the same species as the polarity finding, and the reason the ladder needs no offset. A multiple cannot do it: it would have to be 1.67 in Solar and 1.2 in Astral, and Astral's `shadow-3` would land at α 0.98. `shadow-inset` is not on the ladder and takes `shadow-1`'s own alpha. This adds `pow()` to the three colour primitives named above; it is Baseline widely available (Chrome 111, Safari 15.4, Firefox 118).
 - **`on-accent-sheen` resists.** Its two shipped values are ~ΔE00 10 apart and no shared expression reaches within 3 of both — the best balance is 5.71/5.00. It is derived anyway rather than made a named literal, because the sheen it sits on follows the accent and a frozen ink would not.
 
+**Amended after the epic.** `accent-sheen-bright` was shipped with a literal chroma _and_ a literal hue, which the derivation spike had already called what it was — a theme-invariant constant, §5 there — and which the editor nonetheless listed as "Derived". Three passes of the epic put a **gold** sheen on the primary button of a World anchored to violet. The hue now rotates off the accent's own, `calc(h + 9.5)`; lightness and chroma stay clamped, so the stop still resists a dark accent, which is what the clamp is for. No one rotation reproduces both stops — Solar's accent hue is 75.0° and Astral's 85.6°, while both shipped stops sit at hue 90 — so +9.5° is a balance, not a fit: it repaints Solar `#f0d488 → #f4d288` (ΔE00 1.92) and Astral `#f0d488 → #ebd688` (2.17), both inside the ΔE00 2.91 the tier-2 fit accepted. The two stops are no longer the same colour in both ColorSchemes, which was the tell that the token was not deriving.
+
+**`--color-on-accent-sheen`'s mix goes 86% → 90%, and that is this change's own doing.** The ink is one token serving both ends of the gradient, and the deep stop moves down with the anchor while the bright stop is clamped and does not — so the pair that binds is the ink against the **deep** stop, which no check in §5.3 reads. It shipped at 4.98:1, fell to **4.26** under the darker anchor, and reaches **4.63** at 90%; Astral goes 5.99 → **6.58**, and against the bright stop both rise to ~12.5. The flip stays on the bright stop deliberately: `max(l, 0.876)` is the only clamp in the material, so it is the only place `contrast-color()` answers the same way for every accent. Parented to the deep stop the ink would flip white for a dark enough accent and then be unreadable at the bright end. The ink is `#18150e` — darker than the `#221e13` that ships, ΔE00 4.06 / 4.22, and still a warm brown rather than the black ADR-0006 forbids.
+
 ### 2.3 The categorical tones
 
 Eight tones, derived by hue rotation off `--color-accent`, in the ~161° arc left by excluding the danger and success hues.
@@ -107,7 +115,7 @@ Eight tones, derived by hue rotation off `--color-accent`, in the ~161° arc lef
 --color-tone-N-soft: oklch(from var(--color-tone-N) l c h / 0.14);
 ```
 
-Min pairwise ΔE00 10.9 (Solar) / 10.8 (Astral); all ≥ 4.5:1 on `--color-surface`. The `l` multiplier is **not** optional — at the accent's own lightness, 9 of 12 candidate tones fall under 4.5:1 in Solar, and `--color-gold` itself ships at 4.37:1 today.
+Min pairwise ΔE00 10.9 (Solar) / 10.8 (Astral); all ≥ 4.5:1 on `--color-surface`. The `l` multiplier is **not** optional — at the accent's own lightness, 9 of 12 candidate tones fall under 4.5:1 in Solar, and `--color-gold` shipped at 4.37:1 when this was written (see the amendment below).
 
 Consequences that are part of this spec, not optional polish:
 
@@ -121,6 +129,8 @@ Consequences that are part of this spec, not optional polish:
 - **`typeTone(def)`** (`libs/web-entity/src/models/type-tone.ts`) is the assignment. Its digest is FNV-1a plus murmur3's finaliser: eight tones means a `% 8` bucket that reads only the low three bits, and unmixed those bits follow the id's last characters — which is exactly where two plugins' type ids agree (`dnd.type.monster` / `draw-steel.type.monster`). A type pins its tone with `tone: 'tone-6'` on its `TypeDefinition`, and a type naming no `graphColorToken` paints its graph node that same tone, so a chip and a node cannot disagree.
 - **A collision is never forced, so it is never shipped.** Eight tones against six registered types means two chips rendering alike is a defect a reader sees, not an unavoidable one. `dnd.type.monster` pins off the tone `core.type.asset` derives and `draw-steel.type.monster` off `core.type.board`'s; the other four take their derived tone. `apps/web/src/app/entity-types/type-tones.spec.ts` asserts the whole registered set is mutually distinct — that spec, not the pins, is what makes the next colliding id loud rather than silent, and it names both offenders when it fails.
 - **`accent` is declarable but never derived.** A type that hashed onto the through-line accent would read as the primary one.
+
+**Amended after the epic.** §1's darker Solar anchor moves all eight Solar tones, and the trade runs the way the two lightness rows predict: contrast up, separation down. Solar's min pairwise ΔE00 on the text colour holds at **10.6 → 10.0** (the tightest pair moves from tone-2 ↔ tone-3 to tone-5 ↔ tone-6), still over the spike's own acceptance bar of 10; the border at 36% goes 3.7 → 3.6 and the `-soft` fills 1.3 → 1.2, both already below a JND and neither carrying identity. Bought with it: every Solar tone rises to **5.8–8.4** on `--color-surface` (was 4.8–7.3), and chip text on its own `-soft` fill clears AA at **4.7–6.6** where it sat at 4.02 — the pre-existing 11px debt §5 of the tone spike flagged and could not pay. Status separation holds at ΔE00 21.0, so no tone trips the collision check. Astral is unmoved on every one of these. The assignment is a hash of the type id, so which type wears which tone is untouched.
 
 ### 2.4 Two deliberate behavioural changes
 
@@ -241,7 +251,9 @@ No maths is reimplemented in TS. The reporter renders an offscreen probe carryin
 - **"If both black and white fail" cannot fire.** Pure black or white on the worst possible ground still reaches 4.58:1. What renders is `--color-on-fill` — the better of the two pulled 10% back toward the ground (§2.2) — and that bottoms out at 3.86:1, so the check reads the resolved on-colour against the accent. Hexly's own Solar accent trips it at 4.16:1, and its 3.77:1 against the page: both true, and consistent with ADR-0075's note that the accent ships at 4.37:1.
 - **The body pairs are five, not six.** Both inks against both grounds, and the accent against `bg` alone — ADR-0076's Decision bullet and #373 both name the accent only where a link sits on the page. `accent`×`surface` would be a policy change rather than a tightening.
 
-The tone check uses the spike's own ΔE00 20 (§2 of `spike-tone-rotation.md`) between the rendered tone and the rendered status colour. Hexly's eight clear it by 0.6 at the tightest, which is thin by construction — the exclusion arc was placed at that threshold. CIEDE2000 is the one piece of colour maths written in TS; CSS cannot express it, and it is unit-covered.
+**Amended after the epic.** The report finding Hexly's own Palette wanting is the report working, and both halves of what it found are answered in §1 — the anchor moved, and the 40 `text-accent` call sites were sorted into ink — 27 to `text-accent-strong`, which already cleared AA — and decoration, the 13 icons, checkmarks, wordmarks, fills and borders that keep `text-accent` — the sharpest of them the accent chip's own 11px label, which reads 4.35:1 on its 12% fill at `text-accent` and 6.24 at `-strong`. Both warnings clear: the accent reaches **4.51:1** against the page from 3.77, and `--color-on-fill` on it **4.93:1** from 4.16. **The report is silent on an untouched World in both ColorSchemes**, which is the first time it has been.
+
+The tone check uses the spike's own ΔE00 20 (§2 of `spike-tone-rotation.md`) between the rendered tone and the rendered status colour. Hexly's eight clear it by 0.58 at the tightest, which is thin by construction — the exclusion arc was placed at that threshold. CIEDE2000 is the one piece of colour maths written in TS; CSS cannot express it, and it is unit-covered.
 
 ### 5.4 Fonts
 

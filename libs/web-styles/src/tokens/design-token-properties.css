@@ -80,7 +80,7 @@
 @property --palette-accent {
   syntax: '<color>';
   inherits: true;
-  initial-value: #9a6a16;
+  initial-value: #8c5e00;
 }
 @property --palette-danger {
   syntax: '<color>';
@@ -170,137 +170,137 @@
 @property --color-line {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(154, 106, 22, 0.371);
+  initial-value: rgba(140, 94, 0, 0.371);
 }
 @property --color-line-strong {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(154, 106, 22, 0.686);
+  initial-value: rgba(140, 94, 0, 0.686);
 }
 @property --color-line-faint {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(154, 106, 22, 0.163);
+  initial-value: rgba(141, 94, 0, 0.163);
 }
 @property --color-accent {
   syntax: '<color>';
   inherits: true;
-  initial-value: #9a6a16;
+  initial-value: #8c5e00;
 }
 @property --color-accent-strong {
   syntax: '<color>';
   inherits: true;
-  initial-value: #79550b;
+  initial-value: #6c4900;
 }
 @property --color-accent-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(154, 106, 22, 0.14);
+  initial-value: rgba(141, 94, 0, 0.14);
 }
 @property --color-accent-sheen-bright {
   syntax: '<color>';
   inherits: true;
-  initial-value: #f0d488;
+  initial-value: #f4d288;
 }
 @property --color-accent-sheen-deep {
   syntax: '<color>';
   inherits: true;
-  initial-value: #bb812b;
+  initial-value: #ad751b;
 }
 @property --color-on-fill {
   syntax: '<color>';
   inherits: true;
-  initial-value: #f5f0e8;
+  initial-value: #f4efe6;
 }
 @property --color-on-accent-sheen {
   syntax: '<color>';
   inherits: true;
-  initial-value: #221e13;
+  initial-value: #18150e;
 }
 @property --color-accent-glow {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(211, 149, 39, 0.5);
+  initial-value: rgba(212, 148, 24, 0.5);
 }
 @property --color-tone-1 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #006761;
+  initial-value: #005d57;
 }
 @property --color-tone-1-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(0, 99, 99, 0.14);
+  initial-value: rgba(0, 94, 87, 0.14);
 }
 @property --color-tone-2 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #006478;
+  initial-value: #00596d;
 }
 @property --color-tone-2-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(0, 99, 120, 0.14);
+  initial-value: rgba(0, 90, 109, 0.14);
 }
 @property --color-tone-3 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #005c8a;
+  initial-value: #00527f;
 }
 @property --color-tone-3-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(0, 92, 135, 0.14);
+  initial-value: rgba(0, 83, 127, 0.14);
 }
 @property --color-tone-4 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #5169ad;
+  initial-value: #475d9f;
 }
 @property --color-tone-4-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(78, 106, 170, 0.14);
+  initial-value: rgba(71, 93, 159, 0.14);
 }
 @property --color-tone-5 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #4d4b90;
+  initial-value: #444184;
 }
 @property --color-tone-5-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(78, 78, 142, 0.14);
+  initial-value: rgba(68, 66, 133, 0.14);
 }
 @property --color-tone-6 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #7c5aa0;
+  initial-value: #704f92;
 }
 @property --color-tone-6-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(128, 92, 163, 0.14);
+  initial-value: rgba(112, 80, 147, 0.14);
 }
 @property --color-tone-7 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #733c76;
+  initial-value: #69336b;
 }
 @property --color-tone-7-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(113, 57, 120, 0.14);
+  initial-value: rgba(105, 52, 108, 0.14);
 }
 @property --color-tone-8 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #99507b;
+  initial-value: #8c456e;
 }
 @property --color-tone-8-soft {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(156, 78, 120, 0.14);
+  initial-value: rgba(140, 69, 112, 0.14);
 }
 @property --color-danger {
   syntax: '<color>';
@@ -355,17 +355,17 @@
 @property --color-feature-ink {
   syntax: '<color>';
   inherits: true;
-  initial-value: #5f4418;
+  initial-value: #593f12;
 }
 @property --color-label-ink {
   syntax: '<color>';
   inherits: true;
-  initial-value: #523c17;
+  initial-value: #4e3813;
 }
 @property --color-name-ink {
   syntax: '<color>';
   inherits: true;
-  initial-value: #5f4925;
+  initial-value: #5b4622;
 }
 @property --color-terrain-grass {
   syntax: '<color>';

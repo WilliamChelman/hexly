@@ -185,7 +185,7 @@ const COMMIT_DEBOUNCE_MS = 250;
       font-size: 0.85em;
     }
     :host ::ng-deep .ProseMirror a {
-      @apply text-accent underline;
+      @apply text-accent-strong underline;
     }
     /* Callout (ADR-0033): a bordered box; the header carries its type + title, the
        body holds live block content (contentDOM). Colour-by-type is deferred. */

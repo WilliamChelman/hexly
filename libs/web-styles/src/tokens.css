@@ -27,7 +27,9 @@
   --palette-page: #f1e5c7; /* the table / outer ivory paper                 */
   --palette-ink: #2e2412; /* primary sepia-ink text                         */
   --palette-ink-quiet: #6f5a36; /* secondary ink — carries its own hue      */
-  --palette-accent: #9a6a16; /* heliograph gold — the through-line accent   */
+  /* Darkened, and only in L, because ADR-0076's report warned on Hexly's own
+     untouched Palette — world-theme-spec.md §1. */
+  --palette-accent: #8c5e00; /* heliograph gold — the through-line accent   */
   --palette-danger: #a4402e; /* burnt-sienna marginalia                     */
   --palette-success: #4a6f2f; /* moss                                       */
   --palette-canvas: #efe2bf; /* the map field                               */
@@ -107,7 +109,6 @@
   /* The named literal (ADR-0075): indigo starlight over indigo paper is a
      different design idea from Solar's warm highlight of its own paper. */
   --color-canvas-glow: rgba(58, 70, 140, 0.26);
-
 
   color-scheme: dark;
 }
