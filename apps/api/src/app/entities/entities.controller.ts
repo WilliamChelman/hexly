@@ -17,6 +17,7 @@ import {
 import {
   addGrantRequestSchema,
   addOwnerRequestSchema,
+  adoptEntityRequestSchema,
   AuthUser,
   createEntityRequestSchema,
   EntityDetail,
@@ -115,6 +116,24 @@ export class EntitiesController {
     const parsed = createEntityRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     return this.entities.create(user.id, parsed.data);
+  }
+
+  /**
+   * **Adoption** (ADR-0079): copy the **Compendium Entry** `:id` into the World the body names — the
+   * `:worldId` the Compendium browse was read under, which is the adoption target rather than the
+   * content's home. Creates an Entity, so a 201 carrying the copy.
+   *
+   * Unreachable entry → 404 (existence never leaks); an Entity that is not a Compendium Entry → 400,
+   * since adoption is defined on the shelf alone. The right to create Entities in the target World is
+   * the only standing it asks for, and the create seam is what checks it.
+   */
+  @Post(':id/adopt')
+  adopt(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): EntityDetail {
+    const parsed = adoptEntityRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    const adopted = this.entities.adopt(user.id, id, parsed.data);
+    if (!adopted) throw new NotFoundException();
+    return adopted;
   }
 
   // Before `:id` so literal path isn't captured. Owner's `::` Link Descriptor vocabulary (#96).

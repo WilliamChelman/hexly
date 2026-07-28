@@ -91,7 +91,7 @@ const SEARCH_DEBOUNCE_MS = 150;
             <ul class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 m-0 p-0 list-none">
               @for (card of cards(); track card.id) {
                 <li class="contents">
-                  <app-entity-card [card]="card" [worldId]="worldId()" />
+                  <app-entity-card [card]="card" [worldId]="worldId()" (adopt)="adopt(card)" />
                 </li>
               }
             </ul>
@@ -190,6 +190,8 @@ export class CompendiumBrowserPage {
       // Carried through untouched: `read` alone is what makes the card offer no rename and no delete,
       // so the read-only rendering is the seal's own doing rather than this page's (ADR-0079).
       rights: entry.rights,
+      // What the **Adopt** action hangs off (#403) — location, derived by the server and never stored.
+      sealed: entry.sealed,
       ...(entry.thumbnailUrl ? { thumbnailUrl: entry.thumbnailUrl } : {}),
     })),
   );
@@ -255,6 +257,27 @@ export class CompendiumBrowserPage {
 
   protected onSearch(value: string): void {
     this.typed.next(value);
+  }
+
+  /**
+   * **Adopt** an entry into the World this browse is read under (ADR-0079) — the `:worldId` names the
+   * adoption target, not the content's home.
+   *
+   * The browse deliberately stays put and reports in a toast: adopting is shopping, several entries at a
+   * time, and asking twice adopts twice with nothing on screen claiming otherwise — there is no "already
+   * adopted" indicator, knowingly. So no button is disabled and no card changes.
+   */
+  protected adopt(card: EntityCardVm): void {
+    const worldId = this.worldId();
+    if (!worldId) return;
+    this.entitiesClient
+      .adopt(card.id, worldId)
+      .pipe(this.shell.withLoading('subtle'))
+      .subscribe({
+        next: (copy) =>
+          this.toaster.show(this.transloco.translate('compendium.adopted', { name: copy.name }), 'success'),
+        error: () => this.toaster.show(this.transloco.translate('compendium.adoptError'), 'error'),
+      });
   }
 
   protected toggleFacet({ category, value }: FacetToggle): void {

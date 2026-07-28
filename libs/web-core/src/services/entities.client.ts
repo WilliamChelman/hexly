@@ -163,6 +163,18 @@ export class EntitiesClient {
     });
   }
 
+  /**
+   * **Adopt** a **Compendium Entry** into `worldId` (CONTEXT.md → Adoption): the one way compendium
+   * content enters a world, as an ordinary editable copy carrying no record of origin. The World is the
+   * one the calling surface is read under — the adoption target, never the entry's own Container.
+   *
+   * Not written through the follow store: the copy is a brand-new Entity nothing can be watching yet,
+   * and the entry it was taken from is untouched.
+   */
+  adopt(id: string, worldId: string): Observable<EntityDetail> {
+    return this.http.post<EntityDetail>(`/api/entities/${id}/adopt`, { worldId });
+  }
+
   /** Raw read — the store's own refetch source (the store seeds its held from it directly). */
   private read(id: string): Observable<EntityDetail> {
     return this.http.get<EntityDetail>(`/api/entities/${id}`);

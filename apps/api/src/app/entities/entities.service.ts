@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  AdoptEntityRequest,
   ApiError,
   assetThumbnailUrl,
   CreateEntityRequest,
@@ -762,6 +763,48 @@ export class EntitiesService {
       document: doc,
     });
     return detailOf(row, doc);
+  }
+
+  /**
+   * **Adoption** (CONTEXT.md → Adoption, ADR-0079): copy a **Compendium Entry** into a World as an
+   * ordinary, editable Entity — the one way compendium content enters a world. `null` when the entry is
+   * unreachable, so a bad id never leaks existence.
+   *
+   * Everything the copy must be, the ordinary {@link create} seam already is, so adoption routes through
+   * it rather than reaching for `writes.insert`:
+   *
+   * - it resolves its target from `worlds`, and a **Compendium** has no World satellite — so a
+   *   Compendium can never *be* an adoption target, and the copy's Container is a World forever;
+   * - it authorizes on the right to create Entities there, which a **Contributor** holds — World
+   *   Ownership is not required;
+   * - it lands `private` and grants the adopter `owner`;
+   * - it strips the reserved `hexly.*` namespace from the seeded document, which is how the copy carries
+   *   **no `hexly.source`**. That is the correctness condition, not cosmetics: a copy keeping the stamp
+   *   would read as **Sealed** *and* be a delete candidate on the next reconcile through its colliding
+   *   `sourceId`. Hand-rolling the insert is what would break it.
+   *
+   * The name rides across verbatim — no `(copy)` suffix — with the Types and the field values, so
+   * adopting is a starting point and not a form to refill. Nothing records the origin, so there is no
+   * staleness warning and no re-sync path: the copy is frozen at the revision adopted (ADR-0079).
+   * Inbound links to the entry are deliberately left pointing at it, and asking twice adopts twice.
+   */
+  adopt(userId: string, id: string, req: AdoptEntityRequest): EntityDetail | null {
+    // The ordinary reader-scoped path: an entry's own read is a navigation read, and a Compendium is
+    // Instance-wide with no members, so being signed in is the standing (ADR-0078). No bypass needed.
+    const decision = entityAccess(this.db, userId).decide(id);
+    if (!decision?.canRead) return null;
+    // Adoption is defined on a Compendium Entry alone. `sealed` is that same location fact — resolved in
+    // the decision's own round trip — so no second predicate is minted for it.
+    if (!decision.sealed) throw new BadRequestException();
+    const source = toDetail(decision.row);
+    return this.create(userId, {
+      worldId: req.worldId,
+      name: source.name,
+      types: [...source.types],
+      // Copied like the rest of the entry: what is adopted is the Entity, not a subset of it.
+      tags: [...source.tags],
+      document: source.document,
+    });
   }
 
   /**
