@@ -25,7 +25,6 @@ import {
   FontPairingId,
   OVERRIDABLE_TOKENS,
   PALETTE_PRESETS,
-  PALETTE_PRESET_IDS,
   PALETTE_TOKENS,
   PalettePreset,
   PalettePresetId,
@@ -34,6 +33,7 @@ import {
   WorldThemeInput,
   WorldThemePalette,
   colorTokenHex,
+  palettePresetsFor,
 } from '@hexly/domain';
 import {
   ColorScheme,
@@ -402,13 +402,9 @@ export function withControlValue(palette: WorldThemePalette, control: PaletteCon
  * description are copy, and are not.
  */
 export const PALETTE_PRESET_CHOICES: Readonly<Record<ColorScheme, readonly PalettePreset[]>> = {
-  light: presetsFor('light'),
-  dark: presetsFor('dark'),
+  light: palettePresetsFor('light'),
+  dark: palettePresetsFor('dark'),
 };
-
-function presetsFor(scheme: ColorScheme): readonly PalettePreset[] {
-  return PALETTE_PRESET_IDS.map((id) => PALETTE_PRESETS[id]).filter((preset) => preset.scheme === scheme);
-}
 
 /**
  * The eleven values as their own controls speak them — a hex per anchor, the number itself per knob.
