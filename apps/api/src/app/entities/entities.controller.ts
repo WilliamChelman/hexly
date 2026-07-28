@@ -58,7 +58,7 @@ export class EntitiesController {
   list(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityPage {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { cursor, limit, ids, q, type, tag, visibility, field, worldId, rights, thumbnails, includeHidden } =
+    const { cursor, limit, ids, q, type, tag, visibility, field, worldId, read, rights, thumbnails, includeHidden } =
       parsed.data;
 
     // Absent cursor is page one; undecodable is a 400 (ADR-0001).
@@ -76,6 +76,8 @@ export class EntitiesController {
       // A malformed `field` token is dropped, not 400'd, so a stale URL degrades to no-filter.
       fields: parseFieldFilters(field),
       worldId,
+      // Which read this is (ADR-0079); the pickers that need a link target are the ones that say so.
+      read,
       withRights: rights,
       withThumbnails: thumbnails,
       includeHidden,
@@ -108,7 +110,7 @@ export class EntitiesController {
   facets(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityFacets {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { q, type, tag, visibility, field, worldId, includeHidden } = parsed.data;
+    const { q, type, tag, visibility, field, worldId, read, includeHidden } = parsed.data;
     return this.entities.facets(user.id, {
       q,
       type,
@@ -116,6 +118,8 @@ export class EntitiesController {
       visibility,
       fields: parseFieldFilters(field),
       worldId,
+      // Threaded for the same reason `includeHidden` is: a rail must never count what its list excludes.
+      read,
       // Threaded so a rail can never annotate a list it disagrees with about hidden types (ADR-0065).
       includeHidden,
     });

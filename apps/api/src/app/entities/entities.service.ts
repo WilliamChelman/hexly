@@ -9,6 +9,7 @@ import {
   EntityDocument,
   EntityErrorCode,
   EntityFacets,
+  EntityRead,
   EntityReferences,
   EntitySaveOutcome,
   EntitySummary,
@@ -43,6 +44,7 @@ import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } fro
 import { DB, Db } from '../db/db';
 import {
   assetIndex,
+  compendiums,
   containers,
   entities,
   entityDescriptors,
@@ -86,6 +88,8 @@ export interface ListOptions {
   readonly fields?: readonly FieldFilter[];
   /** Restrict to one World. */
   readonly worldId?: string;
+  /** Which kind of read this is (ADR-0079): a link-target read drops every Compendium Entry. */
+  readonly read?: EntityRead;
   /** Attach the caller's Rights to each summary — opt-in, the Entity Browser sets it. */
   readonly withRights?: boolean;
   /**
@@ -110,7 +114,7 @@ export interface ListOptions {
 /** The filter state a facet-count read narrows against — the list filters minus paging/ids. */
 export type FacetOptions = Pick<
   ListOptions,
-  'worldId' | 'q' | 'type' | 'tags' | 'visibility' | 'fields' | 'excludedTypes' | 'includeHidden'
+  'worldId' | 'read' | 'q' | 'type' | 'tags' | 'visibility' | 'fields' | 'excludedTypes' | 'includeHidden'
 >;
 
 /** Everything {@link filters} reads — shared by the paged list and the facet-count reads. */
@@ -218,11 +222,18 @@ export class EntitiesService {
       .where(and(access.filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined))
       // With a query: best match first (bm25 ascending), id for a stable page boundary;
       // otherwise newest first. Weight order must match the FTS DDL: name, tags, content_text.
-      // Hidden types (ADR-0065) sort last, ahead of relevance: an Asset must not outrank the Entity whose
-      // name it shares. A tier, not a bm25 penalty, so the order is explainable rather than tuned.
+      // Two tiers ride ahead of relevance, tiers rather than bm25 penalties so the order is explainable
+      // rather than tuned. Compendium Entries last (ADR-0079), outermost since authored-before-published
+      // outranks the Asset rule beneath it; then hidden types (ADR-0065). Only where a query ranks at
+      // all — an unqueried list is `updatedAt` order, which no tier is asked to interrupt.
       .orderBy(
         ...(match
-          ? [...this.hiddenLast(), sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`, asc(entities.id)]
+          ? [
+              inACompendium(),
+              ...this.hiddenLast(),
+              sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`,
+              asc(entities.id),
+            ]
           : [desc(entities.updatedAt), asc(entities.id)]),
       )
       .limit(opts.limit + 1)
@@ -1164,7 +1175,18 @@ function filters(opts: FilterOptions) {
   if (opts.tags?.length) predicates.push(hasAny(entities.tags, opts.tags));
   if (opts.fields?.length) predicates.push(...fieldFilters(opts.fields));
   if (opts.worldId) predicates.push(eq(entities.containerId, opts.worldId));
+  // The only narrowing the Compendium adds to any read (ADR-0079); it sits here so `list` and `facets`
+  // share it and a picker's rail cannot count what its options exclude.
+  if (opts.read === 'link-target') predicates.push(sql`NOT ${inACompendium()}`);
   return predicates;
+}
+
+/**
+ * Whether the row's Container is a Compendium. Reads the `compendiums` satellite, which *is* the
+ * discriminator (ADR-0078), so the predicate names no pack, no flag and no Entity Type.
+ */
+function inACompendium(): SQL {
+  return sql`EXISTS (SELECT 1 FROM ${compendiums} WHERE ${compendiums.id} = ${entities.containerId})`;
 }
 
 /**

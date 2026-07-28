@@ -311,6 +311,12 @@ export class ContentEditorComponent {
     return !!world && world.id === this.session.current()?.worldId && world.rights.includes('create-entity');
   });
 
+  /**
+   * The World every link-target read here is confined to: the open Entity's, not the route's, matching
+   * the one {@link mintThrough} writes to (ADR-0073).
+   */
+  private readonly hostWorldId = computed(() => this.session.current()?.worldId);
+
   private readonly slashMenu = viewChild(SlashMenuComponent);
   private readonly entityPicker = viewChild(EntityPickerComponent);
   private readonly descriptorPicker = viewChild(DescriptorPickerComponent);
@@ -451,10 +457,13 @@ export class ContentEditorComponent {
    * The Entities an `@` mention may link — never the one being written in. `q` is full-text over prose
    * (ADR-0035), so an autosave landing mid-mention indexes the name being typed and the host starts
    * matching itself; offered, that row costs Enter the mint it promises (ADR-0073).
+   *
+   * Scoped to the host Entity's World, so what a mention may point at and what it may create are one
+   * answer (ADR-0073) — and never a Compendium Entry (ADR-0079).
    */
   private async searchLinkTargets(name: string): Promise<EntitySummary[]> {
     const hostId = this.session.current()?.id;
-    return (await this.resolver.search(name)).filter((entity) => entity.id !== hostId);
+    return (await this.resolver.search(name, this.hostWorldId())).filter((entity) => entity.id !== hostId);
   }
 
   /**
@@ -544,6 +553,7 @@ export class ContentEditorComponent {
     const repairHost: EntityLinkRepairHost = {
       writable: this.canRepairLinks,
       creatable: this.canCreate,
+      worldId: this.hostWorldId,
       mint: (name) => this.mint(name),
     };
     const entityLinkWithView = entityLinkNode.extend({

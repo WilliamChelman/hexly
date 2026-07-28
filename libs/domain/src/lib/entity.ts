@@ -210,6 +210,15 @@ export const ENTITY_LIST_DEFAULT_LIMIT = 50;
 export const ENTITY_LIST_MAX_LIMIT = 200;
 
 /**
+ * CONTEXT.md → Link-target read. `link-target` returns no **Compendium Entry**; `navigation` does,
+ * ranked below authored Entities. Declared by the surface, so one rule serves all four link-target
+ * ones. Defaults to `navigation` — the seal is held by discovery, not by an invariant (ADR-0079).
+ */
+export const entityReadSchema = z.enum(['navigation', 'link-target']);
+
+export type EntityRead = z.infer<typeof entityReadSchema>;
+
+/**
  * `GET /entities` query params, all optional and composable. Facet params
  * (`type`/`tag`/`visibility`) repeat in the query string (`?tag=a&tag=b`) and
  * combine OR within a category, AND across categories, all AND-ed with `q`.
@@ -243,6 +252,9 @@ export const entityListQuerySchema = z.object({
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
   worldId: z.string().min(1).optional(),
+  // Defaulted rather than optional, so an unknown value is a 400: a typo'd `read=linktarget` must not
+  // silently navigate.
+  read: entityReadSchema.default('navigation'),
   cursor: z.string().optional(),
   // Opt-in per-row Rights; paths that omit it keep `list` a pure read-filter.
   rights: z

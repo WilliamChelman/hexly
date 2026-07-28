@@ -90,11 +90,19 @@ describe('EntityNameResolver', () => {
     };
     vi.spyOn(client, 'list').mockReturnValue(of({ items: [summary('n1', 'Avalon')], nextCursor: null }));
 
-    const items = await resolver.search('aval');
+    const items = await resolver.search('aval', 'w1');
 
     // includeHidden: the `@`-mention picker matches every Entity by name, Assets included (ADR-0065) —
     // the hidden-from-default-listing exclusion governs a browse, and this is not one.
-    expect(client.list).toHaveBeenCalledWith({ q: 'aval', limit: 20, includeHidden: true });
+    // read + worldId: a mention may point only at a link target in the host Entity's World, so typing a
+    // name binds neither across Worlds (ADR-0073) nor onto a Compendium Entry (ADR-0079).
+    expect(client.list).toHaveBeenCalledWith({
+      q: 'aval',
+      limit: 20,
+      includeHidden: true,
+      read: 'link-target',
+      worldId: 'w1',
+    });
     expect(items.map((e) => e.id)).toEqual(['n1']);
   });
 
