@@ -170,9 +170,14 @@ real browser rather than recomputed.
 | Categorical  | `tone-1…8` (+ `-soft`)                                                   | Hue rotations off `--color-accent`, on two lightness rows — see below.                                                                                                                                                                                            |
 | Field        | `canvas-bg`, `canvas-mat`, `canvas-edge`, `canvas-glow`, `ink-stroke`    | The canvas anchor and its gradient's deep stop, the vignette off soot at the veil, and the legibility halo as the page pushed one step away from the ink. `canvas-glow` is the exception — see _Named literals_.                                                  |
 
-Elevation is on the same footing: **one geometry for both ColorSchemes**, only the
-shadow's colour and alpha re-theme, and the 1/2/3 ladder is a _power_ of the veil rather
-than a multiple of it (`--shadow-*`, raw vars wrapped as `@utility`, ADR-0021).
+Elevation is on the same footing: **one geometry for both ColorSchemes**, scaled by
+`--shadow-lift` — the shape is shared, the travel re-themes. The alpha ladder is a _power_
+of the veil rather than a multiple of it, and at Astral's veil that power is nearly flat
+(α 0.50 → 0.71 across three levels), so the lift is what actually separates them at night:
+a near-black shadow on near-black paper reads as offset and blur long before it reads as
+darkness. The lift rides the polarity knob — 1 by day, 1.4 by night — and touches levels 2
+and 3 only, a 1px shadow having no travel to scale (`--shadow-*`, raw vars wrapped as
+`@utility`, ADR-0021).
 
 **The categorical set** (`--color-tone-1…8`, plus `-soft`) is not a secondary and
 tertiary accent — it is eight hue rotations off `--color-accent`, whose only job is

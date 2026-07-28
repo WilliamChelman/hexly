@@ -57,13 +57,19 @@
 
   /* ---- Elevation — warm, paper-soft drop shadows. Raw re-themable vars
      (ADR-0021); index.css wraps 1/2/3/inset as `@utility shadow-*`. One geometry
-     for both ColorSchemes (ADR-0075) — only the colour and its alpha re-theme.
-     The 1/2/3 ladder is a *power* of the veil rather than a multiple of it,
-     which is the only form both ColorSchemes fit (world-theme-spec.md §2). The
-     inset well is off that ladder and takes `shadow-1`'s own alpha. */
+     for both ColorSchemes (ADR-0075), scaled by `--shadow-lift` — the shape is
+     shared, the travel re-themes, which is what §2.4 asked for and three
+     unrelated offset ratios were not. The 1/2/3 alpha ladder is a *power* of the
+     veil rather than a multiple of it, which is the only form both ColorSchemes
+     fit (world-theme-spec.md §2); at Astral's veil that power is nearly flat
+     (α 0.50 → 0.71 across three levels), so the lift is what actually separates
+     them there. Level 1 and the inset well are off both scales: at 1px there is
+     no travel to give, and the well takes `shadow-1`'s own alpha. */
   --shadow-1: 0 1px 2px oklch(from var(--palette-soot) l c h / var(--palette-veil));
-  --shadow-2: 0 4px 12px -2px oklch(from var(--palette-soot) l c h / calc(pow(var(--palette-veil), 0.75)));
-  --shadow-3: 0 16px 36px -8px oklch(from var(--palette-soot) l c h / calc(pow(var(--palette-veil), 0.5)));
+  --shadow-2: 0 calc(4px * var(--shadow-lift)) calc(12px * var(--shadow-lift)) calc(-2px * var(--shadow-lift))
+    oklch(from var(--palette-soot) l c h / calc(pow(var(--palette-veil), 0.75)));
+  --shadow-3: 0 calc(16px * var(--shadow-lift)) calc(36px * var(--shadow-lift)) calc(-8px * var(--shadow-lift))
+    oklch(from var(--palette-soot) l c h / calc(pow(var(--palette-veil), 0.5)));
   --shadow-inset: inset 0 1px 2px oklch(from var(--palette-soot) l c h / var(--palette-veil));
   /* The focus ring is off the ladder too: a fixed alpha both ColorSchemes fit. */
   --shadow-focus: 0 0 0 3px oklch(from var(--palette-accent) l c h / 0.345);

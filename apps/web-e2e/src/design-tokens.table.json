@@ -203,6 +203,10 @@
     "solar": "0.371",
     "astral": "0.16"
   },
+  "--shadow-lift": {
+    "solar": "1",
+    "astral": "1.4"
+  },
   "--color-line": {
     "solar": "oklch(0.518455 0.109056 75.6796 / 0.371)",
     "astral": "oklch(0.780853 0.115859 85.5826 / 0.16)"
@@ -428,12 +432,12 @@
     "astral": "0 1px 2px oklch(from rgb(2, 2, 10) l c h / 0.5)"
   },
   "--shadow-2": {
-    "solar": "0 4px 12px -2px oklch(from rgb(60, 44, 22) l c h / pow(0.12, .75) )",
-    "astral": "0 4px 12px -2px oklch(from rgb(2, 2, 10) l c h / pow(0.5, .75) )"
+    "solar": "0 calc(4px * 1) calc(12px * 1) calc(-2px * 1) oklch(from rgb(60, 44, 22) l c h / pow(0.12, .75) )",
+    "astral": "0 calc(4px * 1.4) calc(12px * 1.4) calc(-2px * 1.4) oklch(from rgb(2, 2, 10) l c h / pow(0.5, .75) )"
   },
   "--shadow-3": {
-    "solar": "0 16px 36px -8px oklch(from rgb(60, 44, 22) l c h / pow(0.12, .5) )",
-    "astral": "0 16px 36px -8px oklch(from rgb(2, 2, 10) l c h / pow(0.5, .5) )"
+    "solar": "0 calc(16px * 1) calc(36px * 1) calc(-8px * 1) oklch(from rgb(60, 44, 22) l c h / pow(0.12, .5) )",
+    "astral": "0 calc(16px * 1.4) calc(36px * 1.4) calc(-8px * 1.4) oklch(from rgb(2, 2, 10) l c h / pow(0.5, .5) )"
   },
   "--shadow-inset": {
     "solar": "inset 0 1px 2px oklch(from rgb(60, 44, 22) l c h / 0.12)",

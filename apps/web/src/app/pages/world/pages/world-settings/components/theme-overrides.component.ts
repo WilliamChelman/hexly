@@ -104,7 +104,17 @@ export type OverrideEdit = SchemeEdit<OverrideControl, string | null>;
                         <span class="readout">{{ hex(current) }}</span>
                       }
                       @case ('elevation') {
-                        <span class="elevation-chip" [style.boxShadow]="current"></span>
+                        <!-- On its own ColorScheme's paper, not the panel's. An elevation is only
+                             ever the contrast it makes with what it falls on, and Astral's is
+                             near-black soot at four times Solar's alpha: over this panel's ivory it
+                             reads as a bruise, and over the indigo it will sit on, as depth. -->
+                        <span class="elevation-plate" [style.background]="ground(scheme)">
+                          <span
+                            class="elevation-chip"
+                            [style.background]="raised(scheme)"
+                            [style.boxShadow]="current"
+                          ></span>
+                        </span>
                       }
                       @default {
                         <span class="readout">{{ current }}</span>
@@ -169,7 +179,8 @@ export type OverrideEdit = SchemeEdit<OverrideControl, string | null>;
     }
     .grid {
       @apply grid items-center gap-x-4 gap-y-2 py-2 pl-4;
-      grid-template-columns: minmax(20rem, 2.4fr) minmax(7.5rem, 1fr) minmax(7.5rem, 1fr);
+      /* The scheme columns hold an elevation plate at its widest — 9rem, so it is never squeezed. */
+      grid-template-columns: minmax(20rem, 2.4fr) minmax(9rem, 1fr) minmax(9rem, 1fr);
     }
     .scheme-head {
       @apply pb-1 font-display text-sm text-ink-strong;
@@ -221,8 +232,21 @@ export type OverrideEdit = SchemeEdit<OverrideControl, string | null>;
     .swatch-fill {
       @apply block h-full w-full;
     }
+    /* Room for the whole fall. Astral's shadow-3 travels 22px down, blurs 50px and pulls 11px back, so
+       it reaches ~36px below the chip and ~14px to each side; a plate cropped tighter than that spills
+       the tail onto the panel's own paper, which is the comparison this plate exists to end. Asymmetric
+       for the same reason the shadow is: nothing reaches above. */
+    .elevation-plate {
+      @apply flex flex-none items-center justify-center rounded-sm px-5 pt-4 pb-10;
+    }
+    /* Card-sized, because below ~80×48 the ladder *inverts*: shadow-3 pulls its spread 8px in and then
+       blurs 36px, so on a chip whose short side is 24px there is almost nothing left to blur and it
+       lands fainter than shadow-1 (measured peak darkening 16 → 23 → 8 of 255 in Solar, 3 → 5 → 1 in
+       Astral). At 96×60 it is at the plateau — 16 → 23 → 42 and 3 → 5 → 10, the same reading a
+       320×180 card gives. The elevation ladder is scaled for the cards that wear it, and a swatch
+       small enough to misreport it is a swatch that misreports it. */
     .elevation-chip {
-      @apply h-5 w-8 flex-none rounded-sm bg-surface-raised;
+      @apply h-15 w-24 flex-none rounded-md;
     }
     .readout {
       @apply truncate font-mono text-2xs tabular-nums text-ink-muted;
@@ -253,6 +277,20 @@ export class ThemeOverridesComponent {
 
   protected resolvedFor(scheme: ColorScheme, control: OverrideControl): string {
     return this.resolved()[scheme][control.token] ?? '';
+  }
+
+  /**
+   * The paper an elevation preview falls on, and the card it lifts — that ColorScheme's own, measured
+   * with every other row (see {@link resolvedRoles}) rather than by re-dressing a subtree: the tier-2
+   * roles are declared once at `:root`, so a nested `[data-color-scheme]` re-resolves the *Palette* and
+   * inherits the reader's roles regardless (ADR-0076).
+   */
+  protected ground(scheme: ColorScheme): string {
+    return this.resolved()[scheme]['--color-bg'] ?? '';
+  }
+
+  protected raised(scheme: ColorScheme): string {
+    return this.resolved()[scheme]['--color-surface-raised'] ?? '';
   }
 
   protected derivationOf(control: OverrideControl): TokenDerivation | undefined {

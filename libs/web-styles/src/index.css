@@ -253,7 +253,16 @@
      plugin's own vocabulary and live in libs/plugin-hexmap-web/src/hexmap-tokens.css (ADR-0075). */
 
   /* Elevation (`--shadow-*`) lives in tokens.css as raw re-themable vars and is
-     wrapped as a custom `@utility` below — not here; see the header note. */
+     wrapped as a custom `@utility` below — not here; see the header note. Its one
+     scalar is a role, for the reason `--line-alpha` is: a `box-shadow`'s geometry
+     is not a colour, so nothing in the elevation family spells it, and reaching
+     past them to the knob is the tier breach ADR-0075 forbids.
+
+     How far levels 2 and 3 lift off the page, as a multiple of the Solar geometry
+     — 1 by day, 1.4 by night. Astral needs more travel because a near-black shadow
+     on near-black paper carries almost no signal: it reads as offset and blur long
+     before it reads as darkness, which is why alpha alone cannot do it (§2.4). */
+  --shadow-lift: calc(1.2 - 0.2 * var(--palette-polarity));
 }
 
 /*

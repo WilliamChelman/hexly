@@ -110,6 +110,9 @@ const DECLARATIONS = [
 
   // The drawn-rule alpha as a role, so tier 3 can draw at it without reaching for the knob (ADR-0075).
   { name: '--line-alpha', tier: 'role', type: 'number', public: false, initial: '0.371' },
+  // The elevation ladder's geometry scale, on the same footing and for the same reason. Private: a
+  // World Theme authors the shadows themselves, and a second way to move them is a second answer.
+  { name: '--shadow-lift', tier: 'role', type: 'number', public: false, initial: '1' },
   { name: '--color-line', tier: 'role', type: 'color', public: true, initial: 'rgba(140, 94, 0, 0.371)' },
   { name: '--color-line-strong', tier: 'role', type: 'color', public: true, initial: 'rgba(140, 94, 0, 0.686)' },
   { name: '--color-line-faint', tier: 'role', type: 'color', public: true, initial: 'rgba(141, 94, 0, 0.163)' },

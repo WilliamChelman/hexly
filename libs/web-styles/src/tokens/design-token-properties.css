@@ -172,6 +172,11 @@
   inherits: true;
   initial-value: 0.371;
 }
+@property --shadow-lift {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
 @property --color-line {
   syntax: '<color>';
   inherits: true;
