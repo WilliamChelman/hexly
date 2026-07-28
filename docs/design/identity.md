@@ -57,7 +57,7 @@ controls (ADR-0075).
 | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `libs/web-styles/src/index.css`                          | The `@theme static` block — tier 2, one derivation per role — plus type, radii and fonts, and the elevation `@utility` wrappers.                    |
 | `libs/web-styles/src/tokens.css`                         | The two **Palettes** (tier 1), generated from the Preset table, and what `@theme` can't hold: motion, layout rails, elevation, the sheen gradients. |
-| `libs/domain/src/lib/palette-preset.ts`                  | The **Palette Preset** table — where Hexly's own two Palettes are authored (ADR-0077).                                                              |
+| `libs/domain/src/lib/palette-preset.ts`                  | The **Palette Preset** table — all six ready-made Palettes, Hexly's own two included (ADR-0077).                                                    |
 | `libs/web-styles/src/base.css`                           | Reset, document typography, the flat table background (`@layer base`).                                                                              |
 | `libs/web-styles/src/tokens/manifest.ts`                 | The token contract (above).                                                                                                                         |
 | `libs/web-styles/src/tokens/design-token-properties.css` | The `@property` registrations, generated from the manifest by `pnpm tokens:generate`.                                                               |
