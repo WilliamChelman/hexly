@@ -26,8 +26,7 @@ import { VocabItem } from '@hexly/plugin-content';
         testid="descriptor-picker"
         [ariaLabel]="'editor.descriptorPicker.label' | transloco"
         [activeItemId]="activeItemId()"
-        [x]="position()!.x"
-        [y]="position()!.y"
+        [anchor]="anchor()!"
       >
         @for (item of items(); track item.id; let i = $index) {
           <li

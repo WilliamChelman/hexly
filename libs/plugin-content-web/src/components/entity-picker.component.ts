@@ -31,8 +31,7 @@ export type EntityPickerProps = ListboxProps<MentionItem>;
         testid="entity-picker"
         [ariaLabel]="'editor.entityPicker.label' | transloco"
         [activeItemId]="activeItemId()"
-        [x]="position()!.x"
-        [y]="position()!.y"
+        [anchor]="anchor()!"
       >
         @for (item of items(); track item.id; let i = $index) {
           @if (item.kind === 'entity') {

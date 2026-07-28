@@ -1,4 +1,5 @@
 import { signal } from '@angular/core';
+import { ListboxAnchor } from './listbox-placement';
 
 /** What each open/update cycle hands the listbox: current items, a pick callback, and where to anchor. */
 export interface ListboxProps<T> {
@@ -22,7 +23,8 @@ export abstract class ListboxController<T extends { id: string }> {
   protected readonly visible = signal(false);
   protected readonly items = signal<T[]>([]);
   protected readonly activeIndex = signal(0);
-  protected readonly position = signal<{ x: number; y: number } | null>(null);
+  /** The caret/field rect the box hangs off; {@link ListboxComponent} turns it into a position. */
+  protected readonly anchor = signal<ListboxAnchor | null>(null);
   private command: ((item: T) => void) | null = null;
 
   /** Prefix for each option's stable DOM id (the aria-activedescendant target). */
@@ -32,9 +34,9 @@ export abstract class ListboxController<T extends { id: string }> {
     this.command = props.command;
     this.items.set(props.items);
     this.activeIndex.set(0);
-    // ponytail: fallback {x:0,y:0} when DOMRect is null (programmatic insertion before
-    // layout flush); the first update() call corrects it once TipTap has a real rect.
-    this.position.set(toPosition(props.clientRect) ?? { x: 0, y: 0 });
+    // ponytail: fallback to the viewport origin when DOMRect is null (programmatic insertion
+    // before layout flush); the first update() call corrects it once TipTap has a real rect.
+    this.anchor.set(toAnchor(props.clientRect) ?? { left: 0, top: 0, bottom: 0 });
     this.visible.set(true);
   }
 
@@ -47,8 +49,8 @@ export abstract class ListboxController<T extends { id: string }> {
       this.items.set(props.items);
       this.activeIndex.set(0);
     }
-    const pos = toPosition(props.clientRect);
-    if (pos) this.position.set(pos);
+    const anchor = toAnchor(props.clientRect);
+    if (anchor) this.anchor.set(anchor);
   }
 
   close(): void {
@@ -95,7 +97,7 @@ export abstract class ListboxController<T extends { id: string }> {
   }
 }
 
-function toPosition(clientRect?: (() => DOMRect | null) | null): { x: number; y: number } | null {
+function toAnchor(clientRect?: (() => DOMRect | null) | null): ListboxAnchor | null {
   const rect = clientRect?.();
-  return rect ? { x: rect.left, y: rect.bottom } : null;
+  return rect ? { left: rect.left, top: rect.top, bottom: rect.bottom } : null;
 }
