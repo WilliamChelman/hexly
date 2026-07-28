@@ -1,6 +1,6 @@
 import type { APIRequestContext, Page } from '@playwright/test';
 import { designToken, rasteriseColors } from '@hexly/web-styles';
-import { FONT_PAIRINGS, PALETTE_TOKENS } from '@hexly/domain';
+import { FONT_PAIRINGS, PALETTE_PRESETS, PALETTE_TOKENS, WorldThemeSchemeKey, colorTokenHex } from '@hexly/domain';
 import { enterLibrary, expect, signInGrantee, test } from './fixtures';
 import { TEST_GRANTEE } from './test-user';
 // The app's own pretty-URL codec (ADR-0042), imported by file path for the reason `fixtures.ts` gives.
@@ -168,6 +168,114 @@ test('editing a value re-themes the interface immediately, and saving it survive
   // And the editor reopens on what stored, not on the Hexly default.
   await openThemeEditor(page, worldSeg);
   await expect(page.getByTestId('theme-control-light-veil')).toHaveValue('0.4');
+});
+
+/**
+ * The Presets one ColorScheme column offers, read off the domain's own table (ADR-0077) — so a Preset
+ * added there is picked here with no edit, and nothing below is a list kept in step by hand.
+ */
+const presetsOf = (scheme: WorldThemeSchemeKey) =>
+  Object.values(PALETTE_PRESETS).filter((preset) => preset.scheme === scheme);
+
+test('an Owner picks a Palette Preset, the interface repaints, and the mark follows the Palette', async ({ page }) => {
+  const worldSeg = await enterLibrary(page);
+  const worldId = idFromSegment(worldSeg);
+  // The suite's reset keeps Worlds *and* their Themes, so an earlier spec may have left this one themed.
+  await clearTheme(page.request, worldId);
+  await openThemeEditor(page, worldSeg);
+
+  // An unthemed World already wears Hexly's own pair, so each column opens marked — derived by
+  // comparison, since nothing stored says which Preset it is (ADR-0077).
+  await expect(page.getByTestId('theme-preset-light-solar')).toBeChecked();
+  await expect(page.getByTestId('theme-preset-dark-astral')).toBeChecked();
+
+  // The unrelated halves of the contract first, so what a pick leaves alone is measured and not assumed.
+  await page.getByTestId('theme-radii-sharp').check();
+  await page.getByTestId('theme-font-codex').check();
+  const darkPage = await page.getByTestId('theme-control-dark-page').inputValue();
+
+  // Off the offer, so the first pick below is a pick rather than a click on an already-checked radio.
+  await page.getByTestId('theme-control-light-accent').fill('#6a2ab0');
+  await expect(page.getByTestId('theme-preset-light-solar')).not.toBeChecked();
+
+  for (const preset of presetsOf('light')) {
+    await page.getByTestId(`theme-preset-light-${preset.id}`).check();
+
+    // One click for eleven, repainted on the click and stored nowhere — an Owner clicks through them.
+    await expect.poll(() => inlineOnRoot(page, '--palette-page')).toBe(preset.values.page);
+    await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(preset.values.accent);
+    await expect.poll(() => inlineOnRoot(page, '--palette-veil')).toBe(String(preset.values.veil));
+
+    // And the mark lands on that Preset alone: with a second Preset in the column it has *moved*.
+    for (const other of presetsOf('light')) {
+      await expect(page.getByTestId(`theme-preset-light-${other.id}`)).toBeChecked({
+        checked: other.id === preset.id,
+      });
+    }
+  }
+
+  // Colours are not corners and not faces: choosing a Palette must not undo unrelated choices.
+  expect(await inlineOnRoot(page, '--radius-md')).toBe('0px');
+  expect(await inlineOnRoot(page, '--font-display')).toBe(FONT_PAIRINGS.codex['--font-display']);
+  // Nor the other column — the two ColorSchemes are picked independently, with no pairing forced.
+  expect(await page.getByTestId('theme-control-dark-page').inputValue()).toBe(darkPage);
+  await expect(page.getByTestId('theme-preset-dark-astral')).toBeChecked();
+
+  // Editing an anchor clears the mark: the Owner has moved away, and the editor must not say otherwise.
+  await page.getByTestId('theme-control-light-ink').fill('#112233');
+  for (const preset of presetsOf('light')) {
+    await expect(page.getByTestId(`theme-preset-light-${preset.id}`)).not.toBeChecked();
+  }
+
+  // Trying Presets out is free: nothing was stored, and discard hands the World back unthemed.
+  expect(await storedTheme(page, worldId)).toBeFalsy();
+  await page.getByTestId('theme-discard').click();
+  await expect.poll(() => inlineOnRoot(page, '--palette-page')).toBe('');
+  expect(await storedTheme(page, worldId)).toBeFalsy();
+});
+
+test('a dark Palette Preset states its own field glow, as an override the Owner can hand back', async ({ page }) => {
+  const worldSeg = await enterLibrary(page);
+  const worldId = idFromSegment(worldSeg);
+  await clearTheme(page.request, worldId);
+  await openThemeEditor(page, worldSeg);
+
+  const [preset] = presetsOf('dark');
+  // Off the offer first, for the reason the light column was moved off it above.
+  await page.getByTestId('theme-control-dark-canvas').fill('#101020');
+  await expect(page.getByTestId(`theme-preset-dark-${preset.id}`)).not.toBeChecked();
+
+  await page.getByTestId(`theme-preset-dark-${preset.id}`).check();
+
+  // The stylesheet keys off `[data-color-scheme]` and a stored Theme carries no Preset id, so a
+  // per-Preset field glow can only be an override (ADR-0077) — and it genuinely is one, which the
+  // editor shows rather than hides.
+  await page.getByTestId('theme-override-group-canvas').locator('summary').click();
+  const glow = page.getByTestId('theme-override-dark-color-canvas-glow');
+  await expect(glow).toBeVisible();
+  // In *this* Preset's own colours: the row carries the literal the table gave it, so a warm-charcoal
+  // World does not glow with the indigo the default dark Preset happens to state.
+  await expect(glow).toHaveValue(colorTokenHex(preset.overrides?.['--color-canvas-glow'] ?? '') ?? '');
+
+  await saveTheme(page);
+  const stored = await storedTheme(page, worldId);
+  expect(stored.overrides.dark['--color-canvas-glow']).toBeTruthy();
+  // Values and no name: no Preset id reaches stored data, which is what makes renaming one free.
+  for (const id of Object.keys(PALETTE_PRESETS)) expect(JSON.stringify(stored)).not.toContain(id);
+
+  // Reopened on the canonicalised Theme the server stored, the mark still derives to the same Preset —
+  // the comparison is over what a control shows, not over the notation the table happens to author in.
+  await openThemeEditor(page, worldSeg);
+  await expect(page.getByTestId(`theme-preset-dark-${preset.id}`)).toBeChecked();
+
+  // Nothing a Preset wrote is permanent: the row goes back to derived and the Theme back to none.
+  await page.getByTestId('theme-override-group-canvas').locator('summary').click();
+  await page.getByTestId('theme-override-clear-dark-color-canvas-glow').click();
+  await expect(page.getByTestId('theme-override-set-dark-color-canvas-glow')).toBeVisible();
+  await saveTheme(page);
+  expect((await storedTheme(page, worldId)).overrides).toBeUndefined();
+
+  await clearTheme(page.request, worldId);
 });
 
 test('cancelling puts the saved Theme back, and reset then saved returns the World to the Hexly default', async ({

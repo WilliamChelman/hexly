@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ColorScheme, ThemeDeclarationSet } from '@hexly/web-core';
-import { WorldThemePalette } from '@hexly/domain';
+import { PalettePreset, WorldThemePalette } from '@hexly/domain';
 import { ThemeWarning, contrastReport } from '@hexly/web-styles';
 import { COLOR_SCHEMES, PALETTE_CONTROLS, PaletteControl, SchemeEdit, controlValue } from '../utils/theme-draft';
 import { ThemeContrastComponent } from './theme-contrast.component';
 import { ThemeControlComponent } from './theme-control.component';
+import { ThemePresetsComponent } from './theme-presets.component';
 
 /** One control moved: which ColorScheme's Palette, which tier-1 token, and what the control emitted. */
 export type PaletteEdit = SchemeEdit<PaletteControl>;
@@ -20,11 +21,14 @@ export type PaletteEdit = SchemeEdit<PaletteControl>;
  *
  * Each column head carries its own readability report, so the ColorScheme an Owner is *not* sitting in
  * is checked too and no half a Theme ships unlooked-at (ADR-0076).
+ *
+ * A row of Palette Presets heads each column, directly above the eleven controls it seeds — and each
+ * column is picked on its own, since ADR-0077 does not pair them.
  */
 @Component({
   selector: 'app-theme-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, ThemeContrastComponent, ThemeControlComponent],
+  imports: [TranslocoPipe, ThemeContrastComponent, ThemeControlComponent, ThemePresetsComponent],
   template: `
     <div class="grid">
       <!-- The header row's empty first cell: the row-label column has no heading of its own. -->
@@ -34,6 +38,18 @@ export type PaletteEdit = SchemeEdit<PaletteControl>;
           {{ 'common.colorScheme.' + scheme | transloco }}
           <app-theme-contrast [scheme]="scheme" [warnings]="reports()[scheme]" />
         </div>
+      }
+
+      <div class="row-label">
+        <span class="row-name">{{ 'worldTheme.palettePresetsLabel' | transloco }}</span>
+      </div>
+      @for (scheme of schemes; track scheme) {
+        <app-theme-presets
+          class="presets"
+          [scheme]="scheme"
+          [palette]="palettes()[scheme]"
+          (picked)="presetPicked.emit($event)"
+        />
       }
 
       @for (control of controls; track control.token) {
@@ -59,7 +75,13 @@ export type PaletteEdit = SchemeEdit<PaletteControl>;
     @reference '#app-styles.css';
     .grid {
       @apply grid items-center gap-x-4 gap-y-2;
-      grid-template-columns: minmax(9rem, 1fr) minmax(8rem, 1fr) minmax(8rem, 1fr);
+      /* The scheme columns hold a Preset card — swatch, name and description — so they are sized for
+         that rather than for the colour well, which is the narrowest thing in them. */
+      grid-template-columns: minmax(9rem, 1fr) minmax(13rem, 1fr) minmax(13rem, 1fr);
+    }
+    /* Its own row, so the Presets sit between the column head and the controls they seed. */
+    .presets {
+      @apply self-start pb-2;
     }
     .scheme-head {
       @apply flex flex-col gap-1 self-start pb-1 font-display text-sm text-ink-strong;
@@ -83,6 +105,9 @@ export class ThemePaletteComponent {
   readonly declarations = input.required<ThemeDeclarationSet>();
 
   readonly changed = output<PaletteEdit>();
+
+  /** A ready-made Palette taken for one ColorScheme; the other column is untouched by it (ADR-0077). */
+  readonly presetPicked = output<PalettePreset>();
 
   protected readonly controls = PALETTE_CONTROLS;
   protected readonly schemes = COLOR_SCHEMES;

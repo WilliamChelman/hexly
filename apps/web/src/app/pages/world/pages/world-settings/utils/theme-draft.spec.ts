@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { DESIGN_TOKENS, designTokenInitial } from '@hexly/web-styles';
+import { DESIGN_TOKENS, PublicDesignToken, designTokenInitial } from '@hexly/web-styles';
 import {
   DEFAULT_PALETTE_PRESETS,
   FONT_PAIRINGS,
   FONT_PAIRING_IDS,
   OVERRIDABLE_TOKENS,
   PALETTE_PRESETS,
+  PALETTE_PRESET_IDS,
   PALETTE_TOKENS,
   WORLD_THEME_VERSION,
   WorldTheme,
@@ -18,6 +19,7 @@ import {
   OVERRIDE_GROUPS,
   FONT_PAIRING_CHOICES,
   PALETTE_CONTROLS,
+  PALETTE_PRESET_CHOICES,
   RADIUS_PRESETS,
   ThemeDraft,
   controlValue,
@@ -27,10 +29,12 @@ import {
   hexlyPalette,
   overrideSeed,
   overrideValue,
+  palettePresetOf,
   radiusPresetOf,
   sameDraft,
   withControlValue,
   withOverride,
+  withPalettePreset,
 } from './theme-draft';
 
 function palette(over: Partial<WorldThemePalette> = {}): WorldThemePalette {
@@ -149,6 +153,156 @@ describe('the font pairings an Owner picks between', () => {
     for (const choice of FONT_PAIRING_CHOICES) {
       expect(choice.tokens).toEqual(FONT_PAIRINGS[choice.id]);
     }
+  });
+});
+
+/** Every Preset the domain's table names, in its own order — the offer this editor reads (ADR-0077). */
+const every = PALETTE_PRESET_IDS.map((id) => PALETTE_PRESETS[id]);
+
+/**
+ * The ready-made Palettes an Owner starts from (#384). A Preset is a **starting point, not a binding**:
+ * picking copies values in, no id enters stored data, and which Preset a Palette is gets derived by
+ * comparison — `RADIUS_PRESETS`' own rule, for its own reason (ADR-0077).
+ */
+describe('the Palette Presets an Owner picks between', () => {
+  it('offers each ColorScheme the Presets the domain’s table names for it, and every entry somewhere', () => {
+    // Read off the table, so a Preset added there heads its column with no edit in the editor.
+    for (const scheme of COLOR_SCHEMES) {
+      expect(PALETTE_PRESET_CHOICES[scheme].map((preset) => preset.id)).toEqual(
+        PALETTE_PRESET_IDS.filter((id) => PALETTE_PRESETS[id].scheme === scheme),
+      );
+    }
+    expect(COLOR_SCHEMES.flatMap((scheme) => PALETTE_PRESET_CHOICES[scheme].map((p) => p.id)).sort()).toEqual(
+      [...PALETTE_PRESET_IDS].sort(),
+    );
+  });
+
+  it('carries exactly the fields the stored Palette carries, so one pick fills in all eleven', () => {
+    for (const preset of every) {
+      expect([preset.id, Object.keys(preset.values).sort()]).toEqual([preset.id, Object.keys(PALETTE_TOKENS).sort()]);
+    }
+  });
+
+  it('authors only values the write choke point accepts — its anchors and its named literals alike', () => {
+    for (const preset of every) {
+      const parsed = worldThemeSchema.safeParse({
+        ...theme(),
+        [preset.scheme]: preset.values,
+        overrides: { [preset.scheme]: preset.overrides ?? {} },
+      });
+      expect([preset.id, parsed.success]).toEqual([preset.id, true]);
+    }
+  });
+
+  it('states its literals as tokens the editor offers, so what a Preset wrote can be cleared back', () => {
+    const overridable = new Set<string>(OVERRIDABLE_TOKENS.map((decl) => decl.name));
+
+    for (const preset of every) {
+      for (const token of Object.keys(preset.overrides ?? {})) {
+        expect([preset.id, token, overridable.has(token)]).toEqual([preset.id, token, true]);
+      }
+    }
+  });
+});
+
+describe('applying a Palette Preset', () => {
+  const solar = PALETTE_PRESETS.solar;
+  const astral = PALETTE_PRESETS.astral;
+  const glow = OVERRIDE_GROUPS.flatMap((group) => group.controls).find((c) => c.token === '--color-canvas-glow')!;
+
+  it('replaces that ColorScheme’s Palette whole — one click for eleven values', () => {
+    expect(withPalettePreset(draft(), solar).light).toEqual(solar.values);
+  });
+
+  it('leaves the other ColorScheme, the radius set and the font pairing untouched', () => {
+    // Choosing a colour palette must not undo unrelated choices (ADR-0077).
+    const before = draft({ radii: { '--radius-md': '2px' }, fontPairing: 'codex' });
+
+    const next = withPalettePreset(before, astral);
+
+    expect(next.light).toEqual(before.light);
+    expect(next.radii).toEqual({ '--radius-md': '2px' });
+    expect(next.fontPairing).toBe('codex');
+  });
+
+  it('merges its literals into that ColorScheme’s overrides rather than replacing the map', () => {
+    const before = draft({
+      overrides: { dark: { '--color-ink-muted': '#112233' }, light: { '--color-ink': '#010203' } },
+    });
+
+    const next = withPalettePreset(before, astral);
+
+    expect(next.overrides?.dark).toEqual({ '--color-ink-muted': '#112233', ...astral.overrides });
+    expect(next.overrides?.light).toEqual({ '--color-ink': '#010203' });
+  });
+
+  it('writes a literal as an override like any other, so it reads as overridden and clears to derived', () => {
+    // The honest wrinkle (ADR-0077): a dark Preset states its own field glow, and it genuinely is an
+    // override — which means the Owner can hand it back.
+    const picked = withPalettePreset(draft(), astral);
+    const cleared = withOverride(picked.overrides, 'dark', glow.token, null);
+
+    expect(overrideValue(picked.overrides, 'dark', glow)).toBeDefined();
+    expect(overrideValue(cleared, 'dark', glow)).toBeUndefined();
+  });
+
+  it('writes each Preset’s own literals, so no Preset inherits the default one’s field glow', () => {
+    // The gap ADR-0077 built the overrides slot to close: the stylesheet keys off `[data-color-scheme]`
+    // and cannot know which Preset is active, so a Preset that did not state its own would wear the
+    // default's — indigo starlight over a warm-charcoal page.
+    for (const preset of every) {
+      const written = withPalettePreset(draft(), preset).overrides?.[preset.scheme] ?? {};
+
+      for (const [token, value] of Object.entries(preset.overrides ?? {})) {
+        expect([preset.id, token, written[token as PublicDesignToken]]).toEqual([preset.id, token, value]);
+      }
+    }
+  });
+
+  it('hands back a copy, so editing the draft cannot reach into the table every World starts from', () => {
+    expect(withPalettePreset(draft(), solar).light).not.toBe(solar.values);
+  });
+
+  it('sends values and no name at all — no Preset id ever enters stored data', () => {
+    const sent = draftToTheme(withPalettePreset(withPalettePreset(draft(), solar), astral));
+
+    for (const id of PALETTE_PRESET_IDS) expect(JSON.stringify(sent)).not.toContain(id);
+  });
+});
+
+describe('which Palette Preset the Palette on screen is', () => {
+  it('names the Preset a Palette matches, for its own ColorScheme', () => {
+    for (const preset of every) {
+      expect([preset.id, palettePresetOf(preset.values, preset.scheme)]).toEqual([preset.id, preset.id]);
+    }
+  });
+
+  it('answers nothing for a Palette offered under the other ColorScheme — the columns are picked apart', () => {
+    expect(palettePresetOf(PALETTE_PRESETS.astral.values, 'light')).toBeUndefined();
+  });
+
+  it('answers through the choke point’s canonical form, so a saved Preset is still that Preset', () => {
+    // The table authors hex and the server stores OKLCH (ADR-0076); a lookup comparing notations would
+    // lose the mark on the first reload, which is the one moment it is most needed. Every Preset, not
+    // one: the round trip is hex → OKLCH → gamut-clamped sRGB, and it has to be exact for each of them.
+    for (const preset of every) {
+      const canonical = worldThemeSchema.parse({ ...theme(), [preset.scheme]: preset.values });
+
+      expect(canonical[preset.scheme].page).toMatch(/^oklch\(/);
+      expect([preset.id, palettePresetOf(canonical[preset.scheme], preset.scheme)]).toEqual([preset.id, preset.id]);
+    }
+  });
+
+  it('answers nothing once an anchor moves, so the mark never claims a Preset an Owner has left', () => {
+    const ink = PALETTE_CONTROLS.find((control) => control.field === 'ink')!;
+
+    expect(palettePresetOf(withControlValue(PALETTE_PRESETS.solar.values, ink, '#112233'), 'light')).toBeUndefined();
+  });
+
+  it('answers nothing once a knob moves either — a Preset is its eleven values, not its eight anchors', () => {
+    const veil = PALETTE_CONTROLS.find((control) => control.field === 'veil')!;
+
+    expect(palettePresetOf(withControlValue(PALETTE_PRESETS.solar.values, veil, '0.4'), 'light')).toBeUndefined();
   });
 });
 

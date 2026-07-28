@@ -465,6 +465,16 @@
     "copyEmpty": "None of your other worlds carries a theme yet. Author one anywhere and it can be copied from here.",
     "copyLoadError": "Could not load the worlds you can copy a theme from.",
     "paletteHeading": "Palette",
+    "paletteLede": "A palette preset is a starting point, not a binding: picking one fills in that scheme's eleven values, and nothing records which one you took. A dark preset also sets the map field's glow outright — an individual token you can clear back to derived.",
+    "palettePresetsLabel": "Palette preset",
+    "palettePresets": {
+      "solar": "Solar",
+      "astral": "Astral"
+    },
+    "palettePresetsHint": {
+      "solar": "Hexly's own day: warm ivory paper, sepia ink, heliograph gold.",
+      "astral": "Hexly's own night: midnight indigo, parchment ink, constellation gold."
+    },
     "overridesHeading": "Individual tokens",
     "overridesHint": "Each token below follows the palette until you set it, and every cell shows what it currently renders as. Most are derived from the anchors; a few are an anchor under another name, and a few are fixed values no anchor reaches. Select one to set your own; clearing it hands the token back to the palette.",
     "derivation": {

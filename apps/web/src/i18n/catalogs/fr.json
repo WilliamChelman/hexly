@@ -465,6 +465,16 @@
     "copyEmpty": "Aucun de vos autres mondes ne porte encore de thème. Créez-en un n’importe où et il pourra être copié ici.",
     "copyLoadError": "Impossible de charger les mondes dont vous pouvez copier un thème.",
     "paletteHeading": "Palette",
+    "paletteLede": "Un préréglage de palette est un point de départ et non un engagement : en choisir un remplit les onze valeurs de ce schéma, et rien ne retient lequel vous avez pris. Un préréglage sombre fixe aussi d’emblée la lueur du champ de carte — un jeton individuel que vous pouvez rendre à la palette.",
+    "palettePresetsLabel": "Préréglage de palette",
+    "palettePresets": {
+      "solar": "Solar",
+      "astral": "Astral"
+    },
+    "palettePresetsHint": {
+      "solar": "Le jour d’Hexly : papier ivoire chaud, encre sépia, or d’héliographe.",
+      "astral": "La nuit d’Hexly : indigo de minuit, encre parchemin, or des constellations."
+    },
     "overridesHeading": "Jetons individuels",
     "overridesHint": "Chaque jeton ci-dessous suit la palette tant que vous ne le fixez pas, et chaque case montre ce qu’il rend actuellement. La plupart découlent des ancres ; quelques-uns sont une ancre sous un autre nom, et quelques-uns sont des valeurs fixes qu’aucune ancre n’atteint. Sélectionnez-en un pour fixer le vôtre ; l’effacer rend le jeton à la palette.",
     "derivation": {

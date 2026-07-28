@@ -25,7 +25,10 @@ import {
   FontPairingId,
   OVERRIDABLE_TOKENS,
   PALETTE_PRESETS,
+  PALETTE_PRESET_IDS,
   PALETTE_TOKENS,
+  PalettePreset,
+  PalettePresetId,
   WORLD_THEME_VERSION,
   WorldTheme,
   WorldThemeInput,
@@ -391,6 +394,62 @@ export function withControlValue(palette: WorldThemePalette, control: PaletteCon
   const value = Number(raw);
   if (raw.trim() === '' || !Number.isFinite(value)) return palette;
   return { ...palette, [control.field]: value };
+}
+
+/**
+ * The Palette Presets on offer, per ColorScheme (#384). Read off the domain's own table rather than
+ * restated, so a Preset added there heads its column with no edit here — its name and its one-line
+ * description are copy, and are not.
+ */
+export const PALETTE_PRESET_CHOICES: Readonly<Record<ColorScheme, readonly PalettePreset[]>> = {
+  light: presetsFor('light'),
+  dark: presetsFor('dark'),
+};
+
+function presetsFor(scheme: ColorScheme): readonly PalettePreset[] {
+  return PALETTE_PRESET_IDS.map((id) => PALETTE_PRESETS[id]).filter((preset) => preset.scheme === scheme);
+}
+
+/**
+ * The eleven values as their own controls speak them — a hex per anchor, the number itself per knob.
+ * What {@link palettePresetOf} compares on: a Preset's values are authored notations while a stored
+ * Palette comes back canonicalised from the write choke point (ADR-0076), and `#f1e5c7` and its OKLCH
+ * are the same Palette.
+ */
+function paletteFingerprint(palette: WorldThemePalette): string {
+  return PALETTE_CONTROLS.map((control) => controlValue(palette, control)).join('|');
+}
+
+/**
+ * Which offered Preset `palette` is, or `undefined` for one authored away from every offer.
+ *
+ * Derived by comparison rather than read off a stored id, as {@link radiusPresetOf} is and for its
+ * reason: a Preset is stored as its values and never as its name, so renaming one is no migration
+ * against stored Themes (ADR-0077). It also makes the mark honest for free — an Owner who moves one
+ * anchor has moved away from the Preset, and the lookup stops answering.
+ */
+export function palettePresetOf(palette: WorldThemePalette, scheme: ColorScheme): PalettePresetId | undefined {
+  const authored = paletteFingerprint(palette);
+  return PALETTE_PRESET_CHOICES[scheme].find((preset) => paletteFingerprint(preset.values) === authored)?.id;
+}
+
+/**
+ * `draft` with one ColorScheme taken from `preset`: its Palette replaced **whole**, and the Preset's
+ * own named literals **merged** into that ColorScheme's overrides. The other ColorScheme, the radii and
+ * the font pairing are untouched — a Preset is one ColorScheme's Palette and nothing else (ADR-0077),
+ * and picking colours must not undo unrelated choices.
+ *
+ * The literals go through {@link withOverride}, so what a dark Preset writes is an override like any
+ * other: it shows as overridden, and the Owner can clear it back to derived.
+ */
+export function withPalettePreset(draft: ThemeDraft, preset: PalettePreset): ThemeDraft {
+  const scheme: ColorScheme = preset.scheme;
+  let overrides = draft.overrides;
+  for (const [token, value] of Object.entries(preset.overrides ?? {})) {
+    overrides = withOverride(overrides, scheme, token as PublicDesignToken, value);
+  }
+  // Copied: the table's entry is one shared object, and a draft is edited field by field.
+  return { ...draft, [scheme]: { ...preset.values }, overrides };
 }
 
 /**
