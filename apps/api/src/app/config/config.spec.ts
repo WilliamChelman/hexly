@@ -377,9 +377,20 @@ describe('loadConfig: the Instance default Theme (ADR-0076, #372)', () => {
     expect(() => loadConfig(dataDir(yaml), PLUGINS)).toThrow(/theme\.light\.accent[\s\S]*theme\.dark\.ink/);
   });
 
-  it("loads the README's worked example — every field of the block, exactly as documented", () => {
-    // Documentation that would not boot is worse than none, so the README's example is a fixture.
-    // Ahead of it for the moment: the README still spells the pre-ADR-0077 keys and catches up in #387.
+  // Documentation that would not boot is worse than none, so each of the README's three worked
+  // examples is a fixture. They are the three forms `light:`/`dark:` accept (#387).
+  it("loads the README's Form 1 — a bare Palette Preset id under each ColorScheme", () => {
+    const readme = ['theme:', '  version: 2', '  light: solar', '  dark: astral', ''].join('\n');
+
+    // What resolving an id gets you is the describe block below; this asserts only that the two ids
+    // the README prints are ids that exist, under the ColorSchemes it prints them under.
+    const theme = loadConfig(dataDir(readme), PLUGINS).theme;
+
+    expect(Object.keys(theme?.light ?? {})).toHaveLength(Object.keys(PALETTE_PRESETS.solar.values).length);
+    expect(Object.keys(theme?.dark ?? {})).toHaveLength(Object.keys(PALETTE_PRESETS.astral.values).length);
+  });
+
+  it("loads the README's Form 2 — an anchor set, every tier-1 field written out", () => {
     const readme = [
       'theme:',
       '  version: 2',
@@ -397,6 +408,24 @@ describe('loadConfig: the Instance default Theme (ADR-0076, #372)', () => {
       '    veil: 0.12',
       '  dark:',
       "    accent: '#7ad3a4'",
+      '',
+    ].join('\n');
+
+    const theme = loadConfig(dataDir(readme), PLUGINS).theme;
+
+    expect(theme?.light?.polarity).toBe(1);
+    expect(theme?.dark?.accent).toMatch(/^oklch\(/);
+  });
+
+  it("loads the README's Form 3 — a Preset plus overriding anchors, and every remaining field", () => {
+    const readme = [
+      'theme:',
+      '  version: 2',
+      '  light:',
+      '    preset: solar',
+      "    accent: '#2f6f4f'",
+      '  dark:',
+      '    preset: astral',
       '  radii:',
       '    --radius-md: 0px',
       '  fontPairing: codex',
@@ -408,9 +437,13 @@ describe('loadConfig: the Instance default Theme (ADR-0076, #372)', () => {
 
     const theme = loadConfig(dataDir(readme), PLUGINS).theme;
 
-    expect(theme?.light?.polarity).toBe(1);
-    expect(theme?.dark?.accent).toMatch(/^oklch\(/);
+    expect(colorTokenHex(theme?.light?.accent ?? '')).toBe('#2f6f4f');
+    expect(colorTokenHex(theme?.light?.page ?? '')).toBe(PALETTE_PRESETS.solar.values.page);
     expect(theme?.fontPairing).toBe('codex');
+    // The dark Preset's own field glow rides along, beneath the light override the operator wrote.
+    expect(theme?.overrides?.dark).toEqual(
+      expect.objectContaining({ '--color-canvas-glow': expect.stringContaining('oklch') }),
+    );
   });
 
   it('carries the radii and the tier-2 opt-outs an Owner may also author', () => {

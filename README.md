@@ -301,11 +301,10 @@ entities:
   #     omit the key — the default — and nothing is tagged.
 theme: # your deployment's own branding (ADR-0076); omit the key — the default —
   #     and Hexly renders exactly as it always has. See below.
-  version: 1
-  solar:
-    accent: '#2f6f4f'
-  astral:
-    accent: '#7ad3a4'
+  version: 2
+  light: solar # a ready-made Palette Preset, by name...
+  dark:
+    accent: '#7ad3a4' # ...or your own anchors. See below for both.
 ```
 
 #### Branding your deployment (`theme`)
@@ -316,15 +315,48 @@ and it is a **starting point, not an imposition** — a World that has authored 
 own Theme is unaffected by it, field by field, so your radii survive under a World
 that only re-anchors its colours.
 
-Every field is optional; branding your accent alone is two anchors. The whole
-surface:
+A **ColorScheme** is `light` or `dark` — the day/night axis a reader toggles
+between, and the two keys the block carries colours under. You supply both; which
+one a reader sees stays their choice, not yours.
+
+Every field but one is optional. `version: 2` is required whenever the block is
+present: it is the contract these values were authored against, and a version this
+build does not know fails boot rather than being applied in part. Each of `light:`
+and `dark:` then accepts exactly three forms.
+
+##### Form 1 — name a Palette Preset
+
+Hexly ships six ready-made **Palettes**, three per ColorScheme, so branding a
+deployment is one word rather than eleven hex values (ADR-0077):
+
+| ColorScheme | Preset id   | What it is                                                             |
+| ----------- | ----------- | ---------------------------------------------------------------------- |
+| `light`     | `solar`     | Hexly's own day: warm ivory paper, sepia ink, heliograph gold.         |
+| `light`     | `vellum`    | Cool neutral paper, slate ink — the personality taken out.             |
+| `light`     | `herbarium` | Pale sage paper, deep forest ink, brass.                               |
+| `dark`      | `astral`    | Hexly's own night: midnight indigo, parchment ink, constellation gold. |
+| `dark`      | `obsidian`  | Neutral near-black, cool ink, cyan.                                    |
+| `dark`      | `ember`     | Warm charcoal, ash ink, forge-orange.                                  |
 
 ```yaml
 theme:
-  version: 1 # required whenever the block is present: the contract these values
-  #            were authored against. A version this build does not know fails
-  #            boot rather than being applied in part.
-  solar: # the day Palette: 8 anchors and 3 knobs, each optional (ADR-0075)
+  version: 2
+  light: solar
+  dark: astral
+```
+
+A bare id is shorthand for a `preset:` key — `light:` on one line and
+`preset: solar` indented under it says the same thing, and is what Form 3 builds on.
+
+##### Form 2 — write your own anchors
+
+Any subset of the eleven tier-1 values (ADR-0075) — eight colours and three
+numbers. Everything you leave out falls through to the stylesheet:
+
+```yaml
+theme:
+  version: 2
+  light:
     page: '#f4ece0' # the outer paper
     ink: '#20242e' # primary text ink
     inkQuiet: '#5c6472' # secondary ink; carries its own hue
@@ -336,13 +368,28 @@ theme:
     polarity: 1 # ±1, every ramp's direction: 1 for a light Palette, -1 for a dark one
     lineAlpha: 0.371 # opacity of the drawn-rule ramp
     veil: 0.12 # base opacity of shadows, scrims and the vignette
-  astral: # the night Palette, same fields. A reader still chooses Solar or Astral
-    accent: '#7ad3a4' #  within your identity — that choice is theirs, not yours.
+  dark:
+    accent: '#7ad3a4' # branding your accent alone is two anchors, one per ColorScheme
+```
+
+##### Form 3 — a Preset, then your own anchors over it
+
+Resolved field by field: the Preset seeds all eleven values and yours win over it,
+so you can take a ready-made Palette with your own accent.
+
+```yaml
+theme:
+  version: 2
+  light:
+    preset: solar
+    accent: '#2f6f4f' # wins over Solar's; the other ten stay Solar's
+  dark:
+    preset: astral
   radii: # the cheapest identity lever there is: sharp versus soft
     --radius-md: 0px
   fontPairing: codex # one of the curated pairings
   overrides: # per-ColorScheme opt-outs from a derived role, keyed by token
-    solar:
+    light:
       --color-ink: '#101010'
 ```
 
@@ -352,10 +399,22 @@ Worth knowing before you write one:
   notation is accepted (`#rgb`, `rgb()`, `oklch()`, a named colour); it is parsed
   and stored back as canonical `oklch(…)`, which is what the browser is then sent.
 - **A malformed value fails boot**, naming every offending key
-  (`theme.solar.accent: not a color value`). So does a key **misspelled inside**
+  (`theme.light.accent: not a color value`). So does a key **misspelled inside**
   the block — branding applied in part is worse than a refusal you can see. Alone
   in `hexly.yml`, this block does not quietly strip what it does not recognise;
   a misspelled `theme:` itself still does, as any top-level key does (ADR-0052).
+- **A Preset id belongs to its own ColorScheme.** `light: astral` is eleven values
+  authored for the other end of the day, so it is refused at `theme.light.preset`
+  with the ids that would have worked — as is an id that names no Preset at all.
+- **The id lives in this file and nowhere else.** It is resolved to values at boot,
+  so nothing downstream ever learns one was named, and no World's stored Theme ever
+  holds a Preset's name (ADR-0077). That is what makes an unknown id a startup
+  failure you can read rather than a silent one years later.
+- **A Preset's own fixed tokens come with it.** Each dark Preset states its own
+  `--color-canvas-glow`, and naming one folds that into `overrides.dark` for you —
+  under anything you write there yourself, which still wins.
+- **Silence falls through.** Whatever the block does not mention keeps Hexly's own
+  value, so a partial theme is a partial theme and not a half-painted one.
 - **The `--radius-*` family is the whole of `radii`**, and `overrides` keys only
   tokens in the public contract. The type scale, the layout rails and motion are
   structure and reader accessibility rather than identity, and are deliberately
