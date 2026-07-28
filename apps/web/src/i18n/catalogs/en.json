@@ -140,7 +140,7 @@
     "backToWorlds": "Back to worlds",
     "eyebrow": "Hexly design system",
     "heroTitle": "The cartographer’s table,<br />by starlight.",
-    "heroLede": "One identity told at two hours of the day. <strong>Solar</strong> is the sunlit almanac on the cartographer’s table; <strong>Astral</strong> is the same chart under the night sky. Gold is the through-line — heliograph ink by day, constellation lines by night — and the text stays a warm ivory-cream in both. Everything below is driven by the same CSS custom-property layer that <code>apps/web</code> ships.",
+    "heroLede": "One identity told at two hours of the day — the two palette presets Hexly wears, one per colour scheme. <strong>Solar</strong> is the sunlit almanac on the cartographer’s table; <strong>Astral</strong> is the same chart under the night sky. Gold is the through-line — heliograph ink by day, constellation lines by night — and the text stays a warm ivory-cream in both. Everything below is driven by the same CSS custom-property layer that <code>apps/web</code> ships.",
     "swatch": {
       "table": "Table",
       "paper": "Paper",
@@ -165,6 +165,8 @@
     "paletteSemantic": "Palette · semantic roles",
     "paletteNote": "Slices request a role, never a raw colour. Showing the active colour scheme.",
     "paletteTerrain": "Palette · terrain fills",
+    "palettePresets": "Palette · presets",
+    "palettePresetsNote": "Every palette Hexly ships ready to pick, drawn in its own anchors. A world theme takes one as a starting point and then holds values, never a name.",
     "typeScale": "Type scale",
     "spacing": "Spacing",
     "radii": "Radii",

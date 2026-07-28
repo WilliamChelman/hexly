@@ -26,6 +26,7 @@ import {
   TextareaComponent,
 } from '@hexly/web-ui';
 import { DesignToken } from '@hexly/web-styles';
+import { PaletteGalleryComponent } from './palette-gallery.component';
 
 // Each `token` reaches the template spliced into `var(…)`, which the lint rule cannot see (ADR-0075).
 interface SwatchRow {
@@ -60,6 +61,7 @@ interface TypeRow {
     IconComponent,
     ListboxOptionComponent,
     PageHeaderComponent,
+    PaletteGalleryComponent,
     RuleComponent,
     SwatchComponent,
     KbdComponent,
@@ -117,6 +119,14 @@ interface TypeRow {
             </figure>
           }
         </div>
+      </section>
+
+      <!-- Reachable without a World, and deliberately: this is where someone evaluating Hexly sees
+           the Palettes on offer before committing to creating one (ADR-0077). -->
+      <section class="section">
+        <h2 class="section-title">{{ 'styleguide.palettePresets' | transloco }}</h2>
+        <p class="section-note">{{ 'styleguide.palettePresetsNote' | transloco }}</p>
+        <app-palette-gallery />
       </section>
 
       <section class="section">

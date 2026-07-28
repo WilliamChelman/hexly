@@ -106,3 +106,11 @@ export const DEFAULT_PALETTE_PRESETS = {
   light: 'solar',
   dark: 'astral',
 } as const satisfies Readonly<Record<WorldThemeSchemeKey, PalettePresetId>>;
+
+/**
+ * What one ColorScheme offers, in table order. Beside the table rather than in each surface that lists
+ * it, so a Preset added above reaches the editor's swatch row and the styleguide's gallery at once.
+ */
+export function palettePresetsFor(scheme: WorldThemeSchemeKey): readonly PalettePreset[] {
+  return PALETTE_PRESET_IDS.map((id) => PALETTE_PRESETS[id]).filter((preset) => preset.scheme === scheme);
+}
