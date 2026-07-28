@@ -12,9 +12,8 @@ import { ButtonComponent, InputComponent } from '@hexly/web-ui';
  * consumer-specific actions like create-and-link.
  *
  * Every consumer asks the same question — *what may this point at?* — so the read is a **link-target
- * read** here rather than once per consumer, and no **Compendium Entry** is ever offered (ADR-0079).
- * That settles three of the four link-target surfaces in one place: the **Entity Link** Field picker,
- * the Board **Embed** picker, and a broken link's relink popover.
+ * read** here rather than once per consumer (ADR-0079), which covers the **Entity Link** Field picker,
+ * the Board **Embed** picker and a broken link's relink popover together.
  *
  * ponytail: no debounce — small owner lists, fine until list sizes force it.
  */
@@ -93,8 +92,6 @@ export class EntitySearchPickerComponent {
           q: this.query().trim(),
           worldId: this.worldId(),
           type: types?.length ? [...types] : undefined,
-          // What a pick means here is always "point at this", so the read says so — and a Compendium
-          // Entry, which nothing outside its Compendium may point at, is never among the rows (ADR-0079).
           read: 'link-target',
           // A picker is no browse: an Embed of an Asset and a pinned Asset stay pickable by name (ADR-0065).
           includeHidden: true,

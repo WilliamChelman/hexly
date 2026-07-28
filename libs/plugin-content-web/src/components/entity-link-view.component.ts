@@ -39,9 +39,8 @@ export interface EntityLinkRepair {
   readonly creatable: Signal<boolean>;
   /**
    * The host Entity's World, which retargeting searches within — the World a promotion mints into, never
-   * the URL's (ADR-0073), so what a repair may point at and what it may create are one answer. Unset
-   * before the surface has resolved one, which leaves the search unscoped but still sealed: a
-   * link-target read returns no **Compendium Entry** either way (ADR-0079).
+   * the URL's (ADR-0073). Unset until the surface resolves one, which widens the search but never
+   * unseals it: a link-target read returns no Compendium Entry either way (ADR-0079).
    */
   readonly worldId: Signal<string | undefined>;
   /** Rewrite this link's target in place: the prose, the `display` and the `heading` are untouched. */

@@ -587,10 +587,10 @@ describe('Vault import endpoint', () => {
     });
 
     /**
-     * The fourth link-target surface (#400, ADR-0079). Wikilink name-resolution runs over the vault's own
-     * notes and mints into the World the run creates, so a name a **Compendium Entry** happens to share
-     * resolves to neither — the seal holds here by where the resolution looks, with no exclusion rule to
-     * keep in step with the other three.
+     * The fourth link-target surface (#400, ADR-0079), pinned rather than fixed: wikilink resolution
+     * reads only the vault being imported and mints into the World the run creates, so it cannot reach a
+     * Compendium and needs no exclusion rule to keep in step with the other three. This holds that true
+     * against the day the resolution learns to consult the database.
      */
     it('never resolves a wikilink to a Compendium Entry, minting the author’s own instead', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');

@@ -312,9 +312,8 @@ export class ContentEditorComponent {
   });
 
   /**
-   * The host Entity's World — what a repair's picker searches within, the same one {@link mintThrough}
-   * writes to (ADR-0073). Read off the open Entity rather than the route, so a note opened outside its
-   * own World still offers targets from where it lives.
+   * The World every link-target read here is confined to: the open Entity's, not the route's, matching
+   * the one {@link mintThrough} writes to (ADR-0073).
    */
   private readonly hostWorldId = computed(() => this.session.current()?.worldId);
 
@@ -459,13 +458,12 @@ export class ContentEditorComponent {
    * (ADR-0035), so an autosave landing mid-mention indexes the name being typed and the host starts
    * matching itself; offered, that row costs Enter the mint it promises (ADR-0073).
    *
-   * The World is the **host Entity's**, matching the one a mention mints into rather than whichever the
-   * URL names (ADR-0073) — so what a mention may point at and what it may create agree, and neither
-   * crosses into another World or onto a Compendium's shelf (ADR-0079).
+   * Scoped to the host Entity's World, so what a mention may point at and what it may create are one
+   * answer (ADR-0073) — and never a Compendium Entry (ADR-0079).
    */
   private async searchLinkTargets(name: string): Promise<EntitySummary[]> {
-    const host = this.session.current();
-    return (await this.resolver.search(name, host?.worldId)).filter((entity) => entity.id !== host?.id);
+    const hostId = this.session.current()?.id;
+    return (await this.resolver.search(name, this.hostWorldId())).filter((entity) => entity.id !== hostId);
   }
 
   /**

@@ -133,7 +133,7 @@ The state of a **Compendium Entry**: read-only to everyone, the operator include
 _Avoid_: Locked, frozen, immutable, protected; read-only (one half of it), hidden (it is findable)
 
 **Link-target read**:
-An Entity list read asking _"what may this point at?"_ — the `@` mention picker, the **Entity Link** Field picker, the Board **Embed** picker, and the **Vault** import's wikilink name-resolution. It never returns a **Compendium Entry**, which is the whole of the **Sealed** state on the read side. Its opposite is a **navigation read** — the **Command Palette**, full-text search, an id resolution, an Entity's own page — which does return one, ranked below authored Entities. The surface declares which kind it is making, so the rule is one rule and not four (ADR-0079).
+A read asking _"what may this point at?"_ — the `@` mention picker, the **Entity Link** Field picker, the Board **Embed** picker, and the **Vault** import's wikilink name-resolution. It never returns a **Compendium Entry**, which is the whole of the **Sealed** state on the read side. Its opposite is a **navigation read** — the **Command Palette**, full-text search, an id resolution, an Entity's own page — which does return one, ranked below authored Entities. The three that query the Entity list declare which kind they are, so the rule is one rule and not four; the Vault import's resolution reads only the vault it is importing, so it satisfies the rule by never being able to reach a Compendium at all (ADR-0079).
 _Avoid_: Picker read, link read, mention search; filtered read (it is a kind of read, not a filter on one)
 
 **Compendium Importer**:

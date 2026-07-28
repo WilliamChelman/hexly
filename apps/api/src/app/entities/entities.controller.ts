@@ -76,8 +76,7 @@ export class EntitiesController {
       // A malformed `field` token is dropped, not 400'd, so a stale URL degrades to no-filter.
       fields: parseFieldFilters(field),
       worldId,
-      // Which read this is (ADR-0079): a link-target read returns no Compendium Entry, a navigation
-      // read does. The four link-target surfaces are the ones that say so.
+      // Which read this is (ADR-0079); the pickers that need a link target are the ones that say so.
       read,
       withRights: rights,
       withThumbnails: thumbnails,
@@ -119,8 +118,7 @@ export class EntitiesController {
       visibility,
       fields: parseFieldFilters(field),
       worldId,
-      // Threaded for the same reason `includeHidden` is: a rail must never count what its list excludes,
-      // so a link-target read's counts drop Compendium Entries too (ADR-0079).
+      // Threaded for the same reason `includeHidden` is: a rail must never count what its list excludes.
       read,
       // Threaded so a rail can never annotate a list it disagrees with about hidden types (ADR-0065).
       includeHidden,
