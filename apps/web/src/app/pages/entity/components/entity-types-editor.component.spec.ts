@@ -72,8 +72,8 @@ describe('EntityTypesEditor', () => {
   });
 
   /**
-   * The tone arc is the deuteranope confusion line, so the glyph is the channel that carries the
-   * category and the colour is decoration (ADR-0075) — a chip without its icon is a regression.
+   * Hue alone cannot separate eight categories for a dichromat, so the glyph is the channel that
+   * carries the category and the colour is decoration (ADR-0075) — a chip without its icon is a regression.
    */
   it('renders the type’s icon beside its label, and the tone its id derives', () => {
     render(['core.type.hex-map', 'core.type.note']);

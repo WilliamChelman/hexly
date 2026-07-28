@@ -121,40 +121,64 @@ export const CONTRAST_REPORT_TOKENS: readonly DesignToken[] = [
 ];
 
 /**
- * What an engine must rasterise for a report, given what it resolved: the opaque pairs first, then the
- * soft fills over each ground a chip may sit on. `null` where the engine resolved nothing, which is a
- * third answer and not a clean bill of health (ADR-0076).
+ * What an engine must rasterise for a report: the opaque pairs, and the soft fills over each ground a
+ * chip may sit on. Named rather than a positional list, because the caller between these two halves is
+ * a `page.evaluate` loop in another process — a batch it reorders or drops would otherwise be judged as
+ * whatever now sits at that index, silently and in the wrong colours.
  */
-export function contrastRasterisations(
-  resolved: Readonly<Record<string, string>>,
-): readonly ColorRasterisation[] | null {
-  if (CONTRAST_REPORT_TOKENS.some((token) => !resolved[token])) return null;
-  return [
-    { values: CONTRAST_TOKENS.map((token) => resolved[token]) },
-    ...CHIP_GROUNDS.map((ground) => ({
-      values: CHIP_FILLS.map(([, fill]) => resolved[fill]),
-      ground: resolved[ground],
-    })),
-  ];
+export interface ContrastRasterisations {
+  readonly pairs: ColorRasterisation;
+  /** Keyed by the ground token the fills composite over. */
+  readonly fills: Readonly<Record<string, ColorRasterisation>>;
+}
+
+/** What an engine answered, in the shape it was asked. */
+export interface ContrastRasterised {
+  readonly pairs: readonly RasterisedColor[];
+  readonly fills: Readonly<Record<string, readonly RasterisedColor[]>>;
 }
 
 /**
- * The report over what {@link contrastRasterisations} asked for, answered in that order.
+ * What to rasterise, given what the engine resolved. `null` where it resolved nothing, which is a third
+ * answer and not a clean bill of health (ADR-0076).
+ */
+export function contrastRasterisations(resolved: Readonly<Record<string, string>>): ContrastRasterisations | null {
+  if (CONTRAST_REPORT_TOKENS.some((token) => !resolved[token])) return null;
+  return {
+    pairs: { values: CONTRAST_TOKENS.map((token) => resolved[token]) },
+    fills: Object.fromEntries(
+      CHIP_GROUNDS.map((ground) => [
+        ground,
+        { values: CHIP_FILLS.map(([, fill]) => resolved[fill]), ground: resolved[ground] },
+      ]),
+    ),
+  };
+}
+
+/**
+ * The report over what {@link contrastRasterisations} asked for.
  *
  * Split from {@link contrastReport} so the Preset contrast gate judges through this rather than a
  * second copy of it (ADR-0077): the gate reaches the engine through `page.evaluate`, which it can only
  * await, and a gate composing its own measurement could pass while the editor's panel warned.
+ *
+ * Within a batch the order is this module's own — both sides read `CONTRAST_TOKENS` and `CHIP_FILLS`
+ * here — so it cannot drift the way the batches themselves could.
  */
-export function contrastVerdict(rasterised: readonly (readonly RasterisedColor[])[]): readonly ThemeWarning[] {
+export function contrastVerdict(rasterised: ContrastRasterised): readonly ThemeWarning[] {
   // Narrowed to the three channels a ratio is over: the pairs are opaque, and the fills have already
   // been composited through their ground.
   const opaque = ([red, green, blue]: RasterisedColor): Rgb => [red, green, blue];
-  const [pairs, ...composited] = rasterised;
-  const measured: MeasuredScheme = Object.fromEntries(CONTRAST_TOKENS.map((token, i) => [token, opaque(pairs[i])]));
-  const fills: Record<string, Record<string, Rgb>> = {};
-  CHIP_GROUNDS.forEach((ground, g) =>
-    CHIP_FILLS.forEach(([tone], i) => ((fills[tone] ??= {})[ground] = opaque(composited[g][i]))),
+  const measured: MeasuredScheme = Object.fromEntries(
+    CONTRAST_TOKENS.map((token, i) => [token, opaque(rasterised.pairs[i])]),
   );
+  const fills: Record<string, Record<string, Rgb>> = {};
+  for (const ground of CHIP_GROUNDS) {
+    const composited = rasterised.fills[ground];
+    // A missing ground is a report that was never taken over it, which must not read as no warnings.
+    if (!composited) throw new Error(`no rasterisation for chip ground ${ground}`);
+    CHIP_FILLS.forEach(([tone], i) => ((fills[tone] ??= {})[ground] = opaque(composited[i])));
+  }
   return themeWarnings(measured, fills);
 }
 
@@ -171,5 +195,11 @@ export function contrastReport(
 ): readonly ThemeWarning[] | null {
   const resolved = measureScheme({ scheme, declarations, tokens: CONTRAST_REPORT_TOKENS });
   const rasterisations = contrastRasterisations(resolved);
-  return rasterisations && contrastVerdict(rasterisations.map(rasteriseColors));
+  if (!rasterisations) return null;
+  return contrastVerdict({
+    pairs: rasteriseColors(rasterisations.pairs),
+    fills: Object.fromEntries(
+      Object.entries(rasterisations.fills).map(([ground, request]) => [ground, rasteriseColors(request)]),
+    ),
+  });
 }

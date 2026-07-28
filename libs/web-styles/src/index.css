@@ -176,14 +176,14 @@
     from var(--palette-accent) max(l, 0.713) calc(c + (0.713 - min(l, 0.713)) * 0.18) calc(h + 1) / 0.5
   );
 
-  /* The categorical tones (ADR-0075). Eight, because the accent sits *between* danger
-     and success, so excluding both leaves one ~161° arc, not two pockets. The two
-     lightness rows and the polarity offset are the fit that carries a chip's own text
-     over AA at 4.81 worst case (spike-tone-rotation.md §5; `contrast.ts` measures it).
+  /* The categorical tones (ADR-0075). Eight even 36° steps over 252°, the exclusion arc
+     having been retired once the status anchors were intensified (world-theme-spec.md
+     §2.3). The two lightness rows and the polarity offset are the fit that carries a
+     chip's own text over AA at 4.81 worst case (`contrast.ts` measures it).
      Off the *anchor*, like every sibling role, so an override of `--color-accent` is
      the leaf opt-out world-theme-spec.md §5.1 sells it as; clamped so an extreme accent
-     cannot push a row out of the band where a tone is still text and the arc still
-     holds the chroma that separates eight of them (§4). */
+     cannot push a row out of the band where a tone is still text and still holds the
+     chroma that separates eight of them. */
   --color-tone-1: oklch(
     from var(--palette-accent) clamp(0.25, l * 0.82 - 0.0375 * var(--palette-polarity), 0.85) c calc(h + 81)
   );

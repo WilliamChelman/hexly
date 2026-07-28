@@ -17,7 +17,12 @@ export { declaredTokenValues, tokenDerivation } from './tokens/declared';
 // Its two halves are exported beside it for the one caller that cannot take the whole — the Preset
 // contrast gate, which holds the engine behind `page.evaluate` and can only await it (ADR-0077).
 export type { ThemeWarning } from './contrast/contrast';
-export type { ColorRasterisation, RasterisedColor } from './contrast/measure';
+export type {
+  ColorRasterisation,
+  ContrastRasterisations,
+  ContrastRasterised,
+  RasterisedColor,
+} from './contrast/measure';
 export {
   CONTRAST_REPORT_TOKENS,
   contrastRasterisations,

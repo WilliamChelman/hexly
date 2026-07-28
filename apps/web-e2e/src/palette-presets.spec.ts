@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { PALETTE_PRESETS, PALETTE_PRESET_IDS, PALETTE_TOKENS, PalettePreset } from '@hexly/domain';
 import {
   CONTRAST_REPORT_TOKENS,
+  RasterisedColor,
   ThemeWarning,
   contrastRasterisations,
   contrastVerdict,
@@ -56,9 +57,11 @@ async function reportFor(page: Page, preset: PalettePreset): Promise<readonly Th
   // `null` is a report that could not be taken, and must never read as a clean bill of health.
   if (!rasterisations) throw new Error(`the ${preset.id} Palette left a token the report reads unresolved`);
 
-  const rasterised = [];
-  for (const request of rasterisations) rasterised.push(await page.evaluate(rasteriseColors, request));
-  return contrastVerdict(rasterised);
+  const fills: Record<string, RasterisedColor[]> = {};
+  for (const [ground, request] of Object.entries(rasterisations.fills)) {
+    fills[ground] = await page.evaluate(rasteriseColors, request);
+  }
+  return contrastVerdict({ pairs: await page.evaluate(rasteriseColors, rasterisations.pairs), fills });
 }
 
 /**

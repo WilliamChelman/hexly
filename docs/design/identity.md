@@ -212,13 +212,19 @@ and 3 only, a 1px shadow having no travel to scale (`--shadow-*`, raw vars wrapp
 `@utility`, ADR-0021).
 
 **The categorical set** (`--color-tone-1…8`, plus `-soft`) is not a secondary and
-tertiary accent — it is eight hue rotations off `--color-accent`, whose only job is
-mutual distinguishability (ADR-0075). It is eight rather than twelve because the accent
-sits _between_ danger and success on the hue circle, leaving one continuous ~161° arc:
-cyan → blue → violet → magenta. That arc is the deuteranope confusion line — measured,
-the eight collapse to ΔE00 0.2–1.3 under simulation — so **colour here is decoration**:
-a chip carries its category in its text, its border, and the Entity Type's icon, never
-in the `-soft` fill, whose eight variants sit under a just-noticeable difference apart.
+tertiary accent — it is eight hue rotations off the accent anchor, whose only job is
+mutual distinguishability (ADR-0075). They span **252°** of the wheel in even 36° steps
+(offsets +81 to +333), so the set runs green → teal → blue → indigo → violet → magenta →
+red → brown rather than reading as one blue-purple family; the measured separation, taken
+after gamut mapping, is in `world-theme-spec.md` §2.3. The count is what that separation
+will bear rather than a round number.
+
+**Colour here is decoration**, and not because of where the tones sit: hue alone cannot
+carry eight categories for a dichromat wherever it is spent. Simulated for a deuteranope
+(Viénot–Brettel–Mollon) the closest two collapse to ΔE00 **1.6** — a shade over a
+just-noticeable difference — with a second pair at 1.7. So a chip carries its category in
+its text, its border, and the Entity Type's icon, never in the `-soft` fill, whose eight
+variants sit under a just-noticeable difference apart.
 Which type wears which tone is derived from the type id rather than stored, so a chip
 and its World Graph node cannot disagree (`typeTone`, ADR-0075).
 

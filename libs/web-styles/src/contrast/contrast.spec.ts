@@ -15,7 +15,7 @@ import {
 } from './contrast';
 import * as contrastModule from './contrast';
 import * as measureModule from './measure';
-import { measureScheme, rasteriseColors } from './measure';
+import { RasterisedColor, contrastVerdict, measureScheme, rasteriseColors } from './measure';
 
 const BLACK: Rgb = [0, 0, 0];
 const WHITE: Rgb = [255, 255, 255];
@@ -69,6 +69,25 @@ describe('the functions apps/web-e2e hands to page.evaluate', () => {
     for (const name of siblings) {
       expect(source, `${name} would not exist inside page.evaluate`).not.toMatch(new RegExp(`\\b${name}\\b`));
     }
+  });
+});
+
+describe('contrastVerdict', () => {
+  const rasterised = (): { pairs: RasterisedColor[]; fills: Record<string, RasterisedColor[]> } => ({
+    pairs: CONTRAST_TOKENS.map(() => [255, 255, 255, 255]),
+    fills: Object.fromEntries(CHIP_GROUNDS.map((ground) => [ground, CHIP_FILLS.map(() => [255, 255, 255, 255])])),
+  });
+
+  it('refuses a ground it was never handed, rather than reading it as no warnings', () => {
+    const missing = rasterised();
+    delete missing.fills[CHIP_GROUNDS[0]];
+    expect(() => contrastVerdict(missing)).toThrow(CHIP_GROUNDS[0]);
+  });
+
+  it('judges by the ground each batch names, not by the order they arrive in', () => {
+    const forward = rasterised();
+    const reversed = { pairs: forward.pairs, fills: Object.fromEntries(Object.entries(forward.fills).reverse()) };
+    expect(contrastVerdict(reversed)).toEqual(contrastVerdict(forward));
   });
 });
 
@@ -188,7 +207,7 @@ describe('themeWarnings', () => {
     expect(collisions[0].distance).toBeLessThan(TONE_CONFUSION_MAX);
   });
 
-  it('leaves the eight tones alone when the accent has kept them out of the exclusion arc', () => {
+  it('leaves the eight tones alone when the accent has kept them clear of the status colours', () => {
     // The tightest two pairs Hexly's own Palette ships, read off `design-tokens.table.json`: the dark
     // Palette's tone-8 against danger and the light one's tone-1 against success. The threshold is calibrated on the
     // design's own revealed tolerance (spike-tone-rotation.md §2), so it must not condemn it.
