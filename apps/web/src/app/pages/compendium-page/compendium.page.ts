@@ -1,27 +1,31 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { CompendiumSummary } from '@hexly/domain';
-import { ActiveWorld, AppShellStore, CompendiumsClient, idFromSegment, worldCompendiumRoute } from '@hexly/web-core';
+import {
+  ActiveWorld,
+  AppShellStore,
+  CompendiumsClient,
+  TitleService,
+  idFromSegment,
+  worldCompendiumRoute,
+} from '@hexly/web-core';
 import { EyebrowComponent, PageHeaderComponent, PanelComponent } from '@hexly/web-ui';
 import { EmptyStateComponent } from '../entity-browser/components/empty-state.component';
 
+/** One recorded term as the page renders it — absent terms never become a row (CONTEXT.md → Compendium page). */
+interface TermRow {
+  readonly key: 'publisher' | 'license' | 'notice';
+  readonly value: string;
+}
+
 /**
- * A **Compendium page** (`/w/:worldId/compendium/:compendiumId`, ADR-0079, #402): one installed pack,
- * and the terms its content is published under.
- *
- * ADR-0061 satisfies the Draw Steel Creator License with a `NOTICE.md` in the plugin's source tree,
- * which the person reading the monsters never opens. This states publisher, license and notice where
- * that content is browsed — and gives a future user-published pack somewhere to state its own.
- *
- * Readable by anyone signed in, like the entries: Instance-wide with no members means being on this
- * Instance *is* the standing (ADR-0078), so there is no per-caller rule here and none to invent.
- *
- * Every term renders only if the pack recorded it, and a pack that recorded none renders no terms
- * section at all — attribution arrives with its absent parts absent, never as a row of nulls.
+ * The **Compendium page** (CONTEXT.md), `/w/:worldId/compendium/:compendiumId`: one installed
+ * Compendium and the terms its content is published under, where that content is read rather than in
+ * the plugin's source tree (ADR-0061).
  */
 @Component({
   selector: 'app-compendium-page',
@@ -33,7 +37,7 @@ import { EmptyStateComponent } from '../entity-browser/components/empty-state.co
       <div pageHeaderTitle class="flex flex-col min-w-0">
         <span appEyebrow class="text-accent-strong! tracking-[0.28em]">{{ 'compendium.eyebrow' | transloco }}</span>
         <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight truncate" data-testid="compendium-name">
-          {{ pack()?.name ?? ('compendium.page.heading' | transloco) }}
+          {{ compendium()?.name ?? ('compendium.page.heading' | transloco) }}
         </h1>
       </div>
       <a
@@ -46,46 +50,26 @@ import { EmptyStateComponent } from '../entity-browser/components/empty-state.co
     </app-page-header>
 
     <main class="max-w-[48rem] mx-auto py-8 px-6">
-      @if (pack(); as compendium) {
+      @if (compendium(); as installed) {
         <section appPanel class="p-6" data-testid="compendium-detail">
-          <!-- "Which version of the bestiary is this" — the pinned revision, always recorded. -->
+          <!-- The revision these terms attach to: the pin only moves in a code change (ADR-0061). -->
           <p class="font-sans text-xs text-ink-faint m-0" data-testid="compendium-rev">
-            {{ 'compendium.page.revision' | transloco: { rev: compendium.rev } }}
+            {{ 'compendium.page.revision' | transloco: { rev: installed.rev } }}
           </p>
 
-          @if (hasTerms()) {
+          @if (terms().length > 0) {
             <dl class="m-0 mt-6 flex flex-col gap-5" data-testid="compendium-attribution">
-              @if (compendium.attribution.publisher; as publisher) {
+              @for (term of terms(); track term.key) {
                 <div>
                   <dt class="font-sans text-xs uppercase tracking-[0.18em] text-ink-faint">
-                    {{ 'compendium.page.publisher' | transloco }}
-                  </dt>
-                  <dd class="m-0 mt-1 font-sans text-sm text-ink-strong" data-testid="compendium-publisher">
-                    {{ publisher }}
-                  </dd>
-                </div>
-              }
-              @if (compendium.attribution.license; as license) {
-                <div>
-                  <dt class="font-sans text-xs uppercase tracking-[0.18em] text-ink-faint">
-                    {{ 'compendium.page.license' | transloco }}
-                  </dt>
-                  <dd class="m-0 mt-1 font-sans text-sm text-ink-strong" data-testid="compendium-license">
-                    {{ license }}
-                  </dd>
-                </div>
-              }
-              @if (compendium.attribution.notice; as notice) {
-                <div>
-                  <dt class="font-sans text-xs uppercase tracking-[0.18em] text-ink-faint">
-                    {{ 'compendium.page.notice' | transloco }}
+                    {{ 'compendium.page.' + term.key | transloco }}
                   </dt>
                   <!-- Verbatim, line breaks kept: a notice is a legal string, not prose to reflow. -->
                   <dd
                     class="m-0 mt-1 font-sans text-sm text-ink-strong whitespace-pre-line"
-                    data-testid="compendium-notice"
+                    [attr.data-testid]="'compendium-' + term.key"
                   >
-                    {{ notice }}
+                    {{ term.value }}
                   </dd>
                 </div>
               }
@@ -114,16 +98,22 @@ export class CompendiumPage {
   private readonly route = inject(ActivatedRoute);
   private readonly shell = inject(AppShellStore);
 
-  private readonly _pack = signal<CompendiumSummary | null>(null);
-  protected readonly pack = this._pack.asReadonly();
+  private readonly _compendium = signal<CompendiumSummary | null>(null);
+  protected readonly compendium = this._compendium.asReadonly();
   protected readonly notFound = signal(false);
   protected readonly loadError = signal(false);
 
   /**
-   * Whether the pack stated any terms at all. False renders nothing rather than a heading with no
-   * value under it — the empty scaffold #402 exists to avoid.
+   * The terms actually recorded, in reading order. Derived rather than templated per key so "did it
+   * record anything" and "what is rendered" cannot disagree: a Compendium stating none yields no rows
+   * and so no section — the empty scaffold #402 exists to avoid.
    */
-  protected readonly hasTerms = computed(() => Object.keys(this._pack()?.attribution ?? {}).length > 0);
+  protected readonly terms = computed<TermRow[]>(() => {
+    const attribution = this._compendium()?.attribution ?? {};
+    return (['publisher', 'license', 'notice'] as const)
+      .map((key) => ({ key, value: attribution[key] }))
+      .filter((term): term is TermRow => !!term.value);
+  });
 
   /** Back to the browse this page hangs off, in the World it was browsed from. */
   protected readonly browseRoute = computed(() =>
@@ -131,6 +121,12 @@ export class CompendiumPage {
   );
 
   constructor() {
+    // The tab names the Compendium, not the destination — this page is meant to be sent to someone
+    // (ADR-0014); cleared on leave or a stale name shadows the next page's title.
+    const titles = inject(TitleService);
+    effect(() => titles.setDocumentName(this._compendium()?.name ?? null));
+    inject(DestroyRef).onDestroy(() => titles.setDocumentName(null));
+
     this.route.paramMap
       .pipe(
         map((params) => idFromSegment(params.get('compendiumId') ?? '')),
@@ -140,16 +136,16 @@ export class CompendiumPage {
   }
 
   private load(id: string): void {
-    this._pack.set(null);
+    this._compendium.set(null);
     this.notFound.set(false);
     this.loadError.set(false);
     this.compendiums
       .get(id)
       .pipe(this.shell.withLoading('subtle'))
       .subscribe({
-        next: (pack) => this._pack.set(pack),
-        // An id naming no installed pack is the ordinary case here — a link kept after an operator
-        // removed the pack — so it is said plainly rather than toasted as a failure.
+        next: (installed) => this._compendium.set(installed),
+        // An id naming no installed Compendium is ordinary here — a link kept after an operator removed
+        // it — so it is said plainly rather than toasted as a failure.
         error: (err: unknown) =>
           err instanceof HttpErrorResponse && err.status === 404 ? this.notFound.set(true) : this.loadError.set(true),
       });

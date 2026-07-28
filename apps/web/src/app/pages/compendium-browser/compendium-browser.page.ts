@@ -79,9 +79,9 @@ const SEARCH_DEBOUNCE_MS = 150;
            same copy, same behaviour — there is no second way to search. -->
       <app-entity-search [value]="query()" (queryChange)="onSearch($event)" />
 
-      <!-- The credit line (#402): each installed Compendium named, linking to its own page where the
-           terms its content is published under are stated. The shelf's attribution belongs beside the
-           shelf, not in a source-tree NOTICE.md the reader never opens (ADR-0061). -->
+      <!-- The credit line: every installed Compendium named, each linking to its **Compendium page**
+           and the terms it states (ADR-0061, #402). Names them all, whatever the Compendium facet
+           narrows to — the credit is the shelf's, not the result set's. -->
       @if (credits().length > 0) {
         <p class="font-sans text-xs text-ink-muted m-0 mb-6" data-testid="compendium-credits">
           {{ 'compendium.credits' | transloco }}
@@ -172,18 +172,8 @@ export class CompendiumBrowserPage {
    */
   private readonly installed = signal<CompendiumSummary[] | null>(null);
 
-  /** The installed Compendiums as the credit line names them — empty until they load. */
+  /** The credit line's rows: nothing to credit until the Compendiums load. */
   protected readonly credits = computed(() => this.installed() ?? []);
-
-  /** One Compendium's own page, under the World this browse was entered from. */
-  protected pageRoute(compendium: CompendiumSummary): string[] {
-    return worldCompendiumPageRoute(
-      this.worldId() ?? '',
-      compendium.id,
-      this.activeWorld.name() ?? undefined,
-      compendium.name,
-    );
-  }
 
   private readonly _entries = signal<EntitySummary[]>([]);
   protected readonly nextCursor = signal<string | null>(null);
@@ -288,6 +278,16 @@ export class CompendiumBrowserPage {
 
   protected onSearch(value: string): void {
     this.typed.next(value);
+  }
+
+  /** One Compendium's own page, under the World this browse was entered from. */
+  protected pageRoute(compendium: CompendiumSummary): string[] {
+    return worldCompendiumPageRoute(
+      this.worldId() ?? '',
+      compendium.id,
+      this.activeWorld.name() ?? undefined,
+      compendium.name,
+    );
   }
 
   protected toggleFacet({ category, value }: FacetToggle): void {

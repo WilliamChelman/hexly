@@ -12,15 +12,11 @@ import { CompendiumWrites } from './compendium-writes';
 import { WorldsModule } from './worlds.module';
 
 /**
- * A **Compendium**'s own page (#402, ADR-0079) at the HTTP seam. ADR-0061 satisfies the Draw Steel
- * Creator License with a `NOTICE.md` in the plugin's source tree — invisible to the person actually
- * reading the monsters; this read is what puts the terms where the content is.
- *
- * The interesting facts are all about *who* may read it and *what shape* absent terms take, and neither
- * survives a service-shaped test: the answer must be the same for every signed-in caller, and a pack
- * stating no terms must send back nothing rather than a row of nulls for a page to scaffold.
+ * The read behind the **Compendium page** (ADR-0061, #402), asserted at the HTTP seam: both facts that
+ * matter are about the wire rather than the service — who gets an answer, and what shape absent terms
+ * arrive in.
  */
-describe("A Compendium's own page", () => {
+describe('The Compendium page read', () => {
   let app: INestApplication;
   let db: Db;
 
@@ -66,10 +62,9 @@ describe("A Compendium's own page", () => {
     await app.close();
   });
 
-  it('states the pack’s terms to any signed-in caller', async () => {
-    // Bob authors nowhere, ran no import and is a member of no World: on this Instance *is* the standing
-    // a Compendium asks for (ADR-0078), which is the whole point — the terms belong to the reader, not
-    // to the operator who installed the pack.
+  it('states the terms to any signed-in caller', async () => {
+    // Bob authors nowhere, ran no import and is a member of no World — being on this Instance *is* the
+    // standing a Compendium asks for (ADR-0078).
     await seed('bob@hexly.test', 'Bob');
     const bob = await signIn('bob@hexly.test');
 
@@ -78,7 +73,7 @@ describe("A Compendium's own page", () => {
       id: monsters,
       name: 'Draw Steel: Monsters',
       importer: 'draw-steel.importer.monsters',
-      // "Which version of the bestiary is this" (ADR-0061: bumping the pin is a code change).
+      // The revision the terms attach to; the pin only moves in a code change (ADR-0061).
       rev: '1.4.0',
       attribution: {
         publisher: 'MCDM Productions',
@@ -88,7 +83,7 @@ describe("A Compendium's own page", () => {
     });
   });
 
-  it('sends nothing at all for a pack that recorded no terms', async () => {
+  it('sends nothing at all for a Compendium that recorded no terms', async () => {
     const ada = await signIn('ada@hexly.test');
 
     const pack = (await ada.get(`/compendiums/${treasures}`).expect(200)).body as CompendiumSummary;

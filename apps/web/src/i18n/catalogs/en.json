@@ -36,6 +36,7 @@
     "credits": "Reference material from",
     "page": {
       "tabTitle": "Hexly — Compendium",
+      "tabTitleNamed": "Hexly — {{name}}",
       "heading": "Compendium",
       "backToBrowse": "Back to the Compendium",
       "revision": "Revision {{rev}}",

@@ -28,9 +28,8 @@ export class CompendiumsController {
   }
 
   /**
-   * One pack, for its own page (#402): the terms its content is published under, stated where that
-   * content is read rather than in a `NOTICE.md` the reader never opens (ADR-0061). A World's id is a
-   * 404 here — the satellite is the discriminator, so no Collaboration rule is ever consulted.
+   * One installed pack, for the **Compendium page** (ADR-0061, #402). A World's id is a 404 here: the
+   * satellite is the discriminator (ADR-0078), so no Collaboration rule is ever consulted.
    */
   @Get(':id')
   get(@Param('id') id: string): CompendiumSummary {

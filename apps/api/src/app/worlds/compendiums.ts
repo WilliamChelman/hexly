@@ -36,10 +36,9 @@ export function listCompendiums(db: Db): CompendiumSummary[] {
 }
 
 /**
- * One installed Compendium by Container id, or undefined when that id names no pack — a World's id
- * included, since the read is driven off the satellite that discriminates (ADR-0078). Unguarded for
- * the same reason {@link listCompendiums} is, which is the whole of #402: a pack's terms belong to
- * whoever reads its content, not to the operator who installed it.
+ * One installed Compendium by Container id — undefined for a World's id too, since the read is driven
+ * off the satellite that discriminates (ADR-0078). Unguarded for the same reason {@link listCompendiums}
+ * is; it backs the **Compendium page** (#402).
  */
 export function compendiumById(db: Db, id: string): CompendiumSummary | undefined {
   const row = selectCompendium(db).where(eq(compendiums.id, id)).get();
