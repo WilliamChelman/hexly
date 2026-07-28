@@ -14,5 +14,15 @@ export type { DeclaredTokens, TokenDerivation } from './tokens/declared';
 export { declaredTokenValues, tokenDerivation } from './tokens/declared';
 // The judging (`themeWarnings`, `contrastRatio`, `deltaE00`, the thresholds) stays inside
 // `./contrast`, where its own spec reaches it: `contrastReport` is the whole face of it (ADR-0076).
+// Its two halves are exported beside it for the one caller that cannot take the whole — the Preset
+// contrast gate, which holds the engine behind `page.evaluate` and can only await it (ADR-0077).
 export type { ThemeWarning } from './contrast/contrast';
-export { contrastReport, measureScheme, rasteriseColors } from './contrast/measure';
+export type { ColorRasterisation, RasterisedColor } from './contrast/measure';
+export {
+  CONTRAST_REPORT_TOKENS,
+  contrastRasterisations,
+  contrastReport,
+  contrastVerdict,
+  measureScheme,
+  rasteriseColors,
+} from './contrast/measure';

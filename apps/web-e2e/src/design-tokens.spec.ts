@@ -149,14 +149,8 @@ test('every token reads back resolved and matches the committed table, in both C
   // eighteen of these are, and a drifted `/ 0.14` would otherwise pass on colour alone.
   const colors = registeredTokens().filter((decl) => decl.type === 'color');
   const [resolved, initials] = await Promise.all([
-    page.evaluate(
-      rasteriseColors,
-      colors.map((decl) => table[decl.name].light),
-    ),
-    page.evaluate(
-      rasteriseColors,
-      colors.map((decl) => decl.initial),
-    ),
+    page.evaluate(rasteriseColors, { values: colors.map((decl) => table[decl.name].light) }),
+    page.evaluate(rasteriseColors, { values: colors.map((decl) => decl.initial) }),
   ]);
   // One 8-bit step of slack: an `oklch()` rounds to the same channel a hand-written hex names, but
   // only to within the rounding itself.
