@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { createDb, Db } from '../db/db';
 import {
   assetIndex,
+  containers,
   entities,
   entityDescriptors,
   entityEdges,
@@ -14,6 +15,7 @@ import {
   users,
   worldMembers,
   worlds,
+  WORLD_CONTAINER_KIND,
 } from '../db/schema';
 import { NudgeBus } from '../events/nudge-bus';
 import { WriteOutbox } from '../events/write-outbox';
@@ -1559,7 +1561,8 @@ describe('EntityWrites', () => {
 
   function seedWorld(id: string, ownerId: string): void {
     const now = Date.now();
-    db.insert(worlds).values({ id, name: id, createdAt: now, updatedAt: now }).run();
+    db.insert(containers).values({ id, kind: WORLD_CONTAINER_KIND, name: id, createdAt: now, updatedAt: now }).run();
+    db.insert(worlds).values({ id }).run();
     db.insert(worldMembers).values({ worldId: id, userId: ownerId, role: 'owner' }).run();
   }
 

@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { EntityDetail, PublicWorldView } from '@hexly/domain';
 import { eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
-import { worldLinks, worlds } from '../db/schema';
+import { containers, worldLinks, worlds } from '../db/schema';
 import { EntitiesService } from '../entities/entities.service';
 
 /**
@@ -30,9 +30,10 @@ export class PublicLinksService {
    */
   readWorld(token: string): PublicWorldView | null {
     const world = this.db
-      .select({ id: worlds.id, name: worlds.name, theme: worlds.theme })
+      .select({ id: containers.id, name: containers.name, theme: worlds.theme })
       .from(worldLinks)
       .innerJoin(worlds, eq(worlds.id, worldLinks.worldId))
+      .innerJoin(containers, eq(containers.id, worlds.id))
       .where(eq(worldLinks.id, token))
       .get();
     if (!world) return null;

@@ -128,17 +128,44 @@ export const entityGrants = sqliteTable(
 );
 
 /**
- * A World: a lightweight container grouping Entities for one campaign. World
- * Owners are `world_members` rows with `role: 'owner'` — no owner column here.
- * The landing page is a derived Dashboard, so a World holds no FK back to entities.
+ * The kinds of Container (ADR-0078). One member today; ADR-0079's `compendium` is the second.
  */
-export const worlds = sqliteTable('worlds', {
+export type ContainerKind = 'world';
+
+/** The {@link containers} kind every World row carries. */
+export const WORLD_CONTAINER_KIND: ContainerKind = 'world';
+
+/**
+ * A **Container** (ADR-0078): the thing an Entity belongs to. It holds identity and the substance
+ * every kind shares — `name`, `seq`, the timestamps — while a satellite table keyed by this `id`
+ * holds what only one kind has. {@link worlds} is the first such satellite, and its `id` *is* the
+ * container id: the generalization was a backfill, so no World id ever moved.
+ *
+ * `kind` names which satellite completes the row; it is never the discriminator a read filters on —
+ * joining the satellite is (a World list joins `worlds`, so a Compendium cannot leak into it).
+ */
+export const containers = sqliteTable('containers', {
   id: text('id').primaryKey(),
+  kind: text('kind').$type<ContainerKind>().notNull(),
   name: text('name').notNull(),
-  // The live-follow freshness key (ADR-0045), the World peer of `entities.seq`: every
+  // The live-follow freshness key (ADR-0045), the Container peer of `entities.seq`: every
   // committed change bumps it, including the membership mutations that deliberately
   // leave `updatedAt` alone so adding a member never reorders the World Index.
   seq: integer('seq').notNull().default(INITIAL_SEQ),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+/**
+ * A World: the Container kind grouping Entities for one campaign. Identity — name, `seq`,
+ * timestamps — lives on the {@link containers} row this `id` names; only what a World alone has
+ * stays here. World Owners are `world_members` rows with `role: 'owner'` — no owner column here.
+ * The landing page is a derived Dashboard, so a World holds no FK back to entities.
+ */
+export const worlds = sqliteTable('worlds', {
+  id: text('id')
+    .primaryKey()
+    .references(() => containers.id, { onDelete: 'cascade' }),
   // Owner-curated Dashboard pins: an ordered JSON array of Entity ids, one shared
   // set per World. References, not enforced FKs — stale or inaccessible ids are
   // filtered per-viewer on read, never pruned on delete.
@@ -146,9 +173,13 @@ export const worlds = sqliteTable('worlds', {
   // The Owner-authored World Theme (ADR-0076), stored inline and patched wholesale like the pins.
   // Every value reached this column re-serialised from its own parse; NULL is no Theme.
   theme: text('theme', { mode: 'json' }).$type<WorldTheme>(),
-  createdAt: integer('created_at').notNull(),
-  updatedAt: integer('updated_at').notNull(),
 });
+
+/**
+ * A whole stored World: its {@link containers} identity row joined to its {@link worlds} satellite.
+ * The two are keyed by the same id, so the join reads as one flat row.
+ */
+export type WorldRow = typeof containers.$inferSelect & Omit<typeof worlds.$inferSelect, 'id'>;
 
 /**
  * World membership: a user is an `owner` (full control — the World's ownership

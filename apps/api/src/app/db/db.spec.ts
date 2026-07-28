@@ -365,11 +365,9 @@ describe('ColorScheme light/dark migration round-trip (0031)', () => {
         astral: { '--color-canvas-glow': 'rgba(1,2,3,0.4)' },
       },
     };
-    sqlite
-      .prepare(`INSERT INTO worlds (id, name, theme, created_at, updated_at) VALUES (?,?,?,0,0)`)
-      .run('w1', 'Aldermoor', JSON.stringify(theme));
+    seedWorld(sqlite, 'w1', 'Aldermoor', JSON.stringify(theme));
     // A World with no Theme at all, which is every World that never opened the editor.
-    sqlite.prepare(`INSERT INTO worlds (id, name, created_at, updated_at) VALUES ('w2','Whisperwood',0,0)`).run();
+    seedWorld(sqlite, 'w2', 'Whisperwood', null);
     // Two readers with a roaming choice, and one who never expressed any.
     for (const [id, prefs] of [
       ['u1', '{"locale":"fr","colorScheme":"astral"}'],
@@ -383,6 +381,14 @@ describe('ColorScheme light/dark migration round-trip (0031)', () => {
         .run(id, `${id}@hexly.test`, id, 'h', prefs);
     }
     return sqlite;
+  }
+
+  /** A World as the current schema stores it: its Container identity row plus its satellite (ADR-0078). */
+  function seedWorld(sqlite: Database.Database, id: string, name: string, theme: string | null): void {
+    sqlite
+      .prepare(`INSERT INTO containers (id, kind, name, created_at, updated_at) VALUES (?,'world',?,0,0)`)
+      .run(id, name);
+    sqlite.prepare(`INSERT INTO worlds (id, theme) VALUES (?,?)`).run(id, theme);
   }
 
   function themeOf(sqlite: Database.Database, id: string): Record<string, unknown> | null {

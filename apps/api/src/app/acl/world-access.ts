@@ -1,7 +1,7 @@
 import { WorldVerb } from '@hexly/domain';
 import { and, eq, inArray, sql, SQLWrapper } from 'drizzle-orm';
 import { Db } from '../db/db';
-import { entities, entityGrants, worldLinks, worldMembers, worlds } from '../db/schema';
+import { containers, entities, entityGrants, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
 import { isSuperadmin } from './owner-set';
 
 /** A Superadmin reaches and manages every World (ADR-0037, #163): predicates short-circuit here. */
@@ -111,8 +111,8 @@ export interface WorldAccess {
    * `canContribute`, in one caller-scoped read so a World list never fans out per World (ADR-0039).
    */
   contributingIn(ids: readonly string[]): Set<string>;
-  /** The World row if the caller can reach `id`, else undefined (unreachable ≡ missing). */
-  decide(id: string): typeof worlds.$inferSelect | undefined;
+  /** The whole World if the caller can reach `id`, else undefined (unreachable ≡ missing). */
+  decide(id: string): WorldRow | undefined;
   /**
    * Blob-free reachability + ownership + contribution in one query (no owner-set fetch), or
    * undefined if no such World. `canContribute` is the Entity-creation standing (owner ∨
@@ -144,9 +144,21 @@ export function worldAccess(db: Db, userId: string): WorldAccess {
       return new Set(rows.map((r) => r.id));
     },
     decide(id) {
+      // Driven off `worlds`, not `containers`: the satellite *is* the "this is a World" discriminator,
+      // so no `kind` exclusion is needed here or anywhere else (ADR-0078).
       return db
-        .select()
+        .select({
+          id: containers.id,
+          kind: containers.kind,
+          name: containers.name,
+          seq: containers.seq,
+          createdAt: containers.createdAt,
+          updatedAt: containers.updatedAt,
+          pinnedEntityIds: worlds.pinnedEntityIds,
+          theme: worlds.theme,
+        })
         .from(worlds)
+        .innerJoin(containers, eq(containers.id, worlds.id))
         .where(and(eq(worlds.id, id), reachFilter))
         .get();
     },

@@ -28,7 +28,10 @@ describe('AssetsService', () => {
     db = createDb(':memory:');
     dir = mkdtempSync(join(tmpdir(), 'hexly-assets-test-'));
     assets = new AssetsService(db, dir, new EntityDeletionRegistry());
-    db.$client.prepare('INSERT INTO worlds (id, name, created_at, updated_at) VALUES (?,?,0,0)').run('world-1', 'W');
+    db.$client
+      .prepare("INSERT INTO containers (id, kind, name, created_at, updated_at) VALUES (?,'world',?,0,0)")
+      .run('world-1', 'W');
+    db.$client.prepare('INSERT INTO worlds (id) VALUES (?)').run('world-1');
   });
 
   afterEach(() => {

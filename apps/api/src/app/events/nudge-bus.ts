@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { InterestRef, NudgeDelta, NudgeEntry } from '@hexly/domain';
 import { entityAccess, tokenReachesEntity } from '../acl/entity-access';
 import { worldAccess, tokenReachesWorld } from '../acl/world-access';
-import { entities, worlds } from '../db/schema';
+import { containers, entities, worlds } from '../db/schema';
 import { DB, Db } from '../db/db';
 import { HEXLY_CONFIG, HexlyConfig } from '../config';
 
@@ -199,7 +199,14 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   emitWorldChange(id: string): void {
     const matches = (ref: InterestRef) => ref.kind === 'world' && ref.id === id;
     if (!this.anyFollower(matches)) return;
-    const row = this.db.select({ seq: worlds.seq }).from(worlds).where(eq(worlds.id, id)).get();
+    // The freshness key lives on the Container (ADR-0078); joining `worlds` keeps a world ref
+    // answering for a World and nothing else.
+    const row = this.db
+      .select({ seq: containers.seq })
+      .from(worlds)
+      .innerJoin(containers, eq(containers.id, worlds.id))
+      .where(eq(worlds.id, id))
+      .get();
     this.fanOut(matches, (principal) =>
       row && this.canReadWorld(principal, id) ? { id, seq: row.seq } : { id, unavailable: true },
     );

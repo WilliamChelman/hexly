@@ -2,7 +2,7 @@
  * The write choke points, enforced (ADR-0045).
  *
  * `EntityWrites` is the single write handle for `entities` and `entity_grants`; `WorldWrites` is
- * its peer for `worlds` and `world_members`. Each owns the `seq` bump and the post-commit nudge,
+ * its peer for `containers`, `worlds` and `world_members`. Each owns the `seq` bump and the post-commit nudge,
  * so a write *cannot* land without telling the resource's live-followers to refetch — or evicting
  * them. `WorldWrites` additionally fans a membership change out to the World's `shared` Entities,
  * whose Rights derive from that membership set.
@@ -11,7 +11,8 @@
  *
  *   no-direct-entity-writes — `insert|update|delete` on `entities` / `entityGrants`, and raw SQL
  *                             writing those tables, outside EntityWrites itself.
- *   no-direct-world-writes  — the same for `worlds` / `worldMembers`, outside WorldWrites itself.
+ *   no-direct-world-writes  — the same for `containers` / `worlds` / `worldMembers`, outside
+ *                             WorldWrites itself.
  *
  * Scope is set by the consuming config (apps/api/eslint.config.mjs), which exempts specs — they
  * seed fixtures directly and follow nobody.
@@ -110,8 +111,9 @@ const noDirectEntityWrites = chokePoint({
 });
 
 const noDirectWorldWrites = chokePoint({
-  tables: ['worlds', 'worldMembers', 'worldTypes', 'worldFields'],
-  sqlTables: ['worlds', 'world_members', 'world_types', 'world_fields'],
+  // `containers` holds the World's `seq` since ADR-0078, so it is guarded first of all.
+  tables: ['containers', 'worlds', 'worldMembers', 'worldTypes', 'worldFields'],
+  sqlTables: ['containers', 'worlds', 'world_members', 'world_types', 'world_fields'],
   ownerFile: 'world-writes.ts',
   handle: 'WorldWrites',
   entryPoints:
