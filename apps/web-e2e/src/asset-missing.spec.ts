@@ -1,6 +1,6 @@
 import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { enterLibrary, expect, flushSave, instanceDir, openEntity, test } from './fixtures';
+import { enterEntities, expect, flushSave, instanceDir, openEntity, test } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 // A real 20×8 solid-color PNG — sharp parses it at mint, so the Asset gets Stats and a thumbnail.
@@ -17,7 +17,7 @@ const PNG_20x8 = Buffer.from(
 test('an Asset whose bytes are stranded says so on its page and in the Browser, and heals when restored', async ({
   page,
 }) => {
-  const worldId = idFromSegment(await enterLibrary(page)); // the raw id the API keys on
+  const worldId = idFromSegment(await enterEntities(page)); // the raw id the API keys on
 
   const uploaded = await page.request.post(`/api/worlds/${worldId}/assets`, {
     multipart: { file: { name: 'stranded.png', mimeType: 'image/png', buffer: PNG_20x8 } },

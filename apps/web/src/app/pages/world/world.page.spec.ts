@@ -35,7 +35,7 @@ describe('WorldLayout', () => {
     return TestBed.inject(NavRailStore).entries();
   }
 
-  it('fills the rail with the Dashboard, Library, Assets and Graph links from the active World (ADR-0041)', () => {
+  it('fills the rail with the Dashboard, Entities, Assets and Graph links from the active World (ADR-0041)', () => {
     expect(railFor(world(['read'])).map((e) => e.testid)).toEqual([
       'nav-dashboard',
       'nav-entities',

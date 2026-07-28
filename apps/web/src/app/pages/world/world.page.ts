@@ -52,7 +52,7 @@ export class WorldPage {
           link: worldRoute(worldId, name),
           testid: 'nav-entities',
           icon: 'library',
-          labelKey: 'nav.library',
+          labelKey: 'nav.entities',
         },
         // The Asset Browser (ADR-0065): a read of the World's media, so every reader gets it — the
         // reader-scoped list shows an owner their private uploads and a Viewer only what is shared.

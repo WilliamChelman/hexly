@@ -3,7 +3,7 @@ import {
   attachField,
   authorWorldField,
   createEntity,
-  enterLibrary,
+  enterEntities,
   expect,
   flushSave,
   mapViewToggle,
@@ -25,7 +25,7 @@ const BATTLEMAP_VIEW = mapViewToggle('world.field.battle-map');
  * over its own Field's slice of the one EntityDocument.
  */
 test('an attached grid Field affords its own map View, with its own paint and undo', async ({ page, request }) => {
-  const worldId = await enterLibrary(page);
+  const worldId = await enterEntities(page);
   // A reusable World Field of the grid Data Type — no type declares it; it exists to be attached.
   await authorWorldField(page, worldId, {
     segment: 'battle-map',
@@ -33,7 +33,7 @@ test('an attached grid Field affords its own map View, with its own paint and un
     kind: 'core.datatype.hex-grid',
   });
 
-  await enterLibrary(page);
+  await enterEntities(page);
   const entityId = await createEntity(page, 'core.type.hex-map');
   await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');
 

@@ -99,16 +99,16 @@ describe('NavRail', () => {
       link: '/w/w1/entities',
       testid: 'nav-entities',
       icon: 'library',
-      labelKey: 'nav.library',
+      labelKey: 'nav.entities',
     });
     const fixture = render();
 
     const brand = q(fixture, 'brand') as HTMLAnchorElement;
     expect(brand?.getAttribute('href')).toBe('/');
 
-    const library = q(fixture, 'nav-entities') as HTMLAnchorElement;
-    expect(library?.getAttribute('href')).toBe('/w/w1/entities');
-    expect(library?.textContent).toContain('Library');
+    const entities = q(fixture, 'nav-entities') as HTMLAnchorElement;
+    expect(entities?.getAttribute('href')).toBe('/w/w1/entities');
+    expect(entities?.textContent).toContain('Entities');
 
     // Styleguide and Admin are instance-scoped: hidden while inside a World.
     expect(q(fixture, 'nav-styleguide')).toBeNull();
@@ -124,7 +124,7 @@ describe('NavRail', () => {
     expect(styleguide?.getAttribute('href')).toBe('/styleguide');
     expect(styleguide?.textContent).toContain('Styleguide');
 
-    // Library and the World Switcher are World-scoped: absent on the Index.
+    // Entities and the World Switcher are World-scoped: absent on the Index.
     expect(q(fixture, 'nav-entities')).toBeNull();
     expect(q(fixture, 'nav-world-settings')).toBeNull();
     expect(fixture.nativeElement.querySelector('app-world-switcher')).toBeNull();
@@ -148,7 +148,7 @@ describe('NavRail', () => {
     expect((q(fixture, 'nav-admin') as HTMLAnchorElement)?.getAttribute('href')).toBe('/admin');
   });
 
-  // Manage-gated World Settings + Library building now live in WorldLayout (ADR-0041);
+  // Manage-gated World Settings + Entities building now live in WorldLayout (ADR-0041);
   // see world-layout.spec.ts. The rail only renders whatever entries it's handed.
 
   it('starts collapsed and expands when the toggle is pressed', () => {
@@ -175,7 +175,7 @@ describe('NavRail', () => {
       link: '/w/w1/entities',
       testid: 'nav-entities',
       icon: 'library',
-      labelKey: 'nav.library',
+      labelKey: 'nav.entities',
     });
     const fixture = render();
 

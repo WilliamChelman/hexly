@@ -2,7 +2,8 @@ import {
   addType,
   contentViewToggle,
   createEntity,
-  enterLibrary,
+  enterEntities,
+  entitiesRailLink,
   expect,
   flushSave,
   mapViewToggle,
@@ -18,7 +19,7 @@ const STAT_BLOCK_VIEW = statBlockViewToggle();
 const NOTE_VIEW = contentViewToggle();
 
 test('creates a dnd.type.monster, fills its stat block, and reads it back', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
 
   // The monster's stat block is structured (ADR-0055), so it is edited in place on its own View
   // rather than typed into a form row at create time.
@@ -64,7 +65,7 @@ test('creates a dnd.type.monster, fills its stat block, and reads it back', asyn
 test('a monster’s harvested dimensions surface in the browser rail by presence, no active Type filter (#231/#236)', async ({
   page,
 }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
 
   const id = await createEntity(page, 'dnd.type.monster');
   await page.getByTestId('title').waitFor();
@@ -72,9 +73,9 @@ test('a monster’s harvested dimensions surface in the browser rail by presence
   await page.getByTestId('stat-size').locator('select').selectOption('Huge');
   await flushSave(page);
 
-  // Back in the Library with no Type filter selected: the `size` facet surfaces because the result set
+  // Back in the Entity Browser with no Type filter selected: the `size` facet surfaces because the result set
   // carries a value for it — harvested off the stat block's Data Type (ADR-0055), not a scalar Field.
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await expect(page).toHaveURL(/\/entities$/);
   await expect(page.getByTestId('facet-field-size')).toBeVisible();
 
@@ -84,7 +85,7 @@ test('a monster’s harvested dimensions surface in the browser rail by presence
 });
 
 test('a dnd.type.monster carrying core.type.hex-map offers the stat block, Note, and Map views', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
 
   await createEntity(page, 'dnd.type.monster');
 

@@ -2,7 +2,8 @@ import {
   attachField,
   contentViewToggle,
   createEntity,
-  enterLibrary,
+  enterEntities,
+  entitiesRailLink,
   expect,
   flushSave,
   statBlockViewToggle,
@@ -25,7 +26,7 @@ test('attaches dnd.datatype.stat-block to a note, affords its View, and browses 
   page,
   request,
 }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   const id = await createEntity(page, 'core.type.note');
   await expect(page.getByTestId('title')).toBeVisible();
   // A plain note affords its Content View alone — no stat block yet.
@@ -58,9 +59,9 @@ test('attaches dnd.datatype.stat-block to a note, affords its View, and browses 
     challenge_rating: 10,
   });
 
-  // Back in the Library, no active Type filter: the stat block's harvested dimensions surface as Facets,
+  // Back in the Entity Browser, no active Type filter: the stat block's harvested dimensions surface as Facets,
   // even though this Entity is a plain note (ADR-0055) — faceting keys off the Data Type's harvest.
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await expect(page).toHaveURL(/\/entities$/);
   // Rendered with their *translated* labels (ADR-0055): a dimension's labelKey resolves through the
   // active locale, unlike a scalar Field's authored label.

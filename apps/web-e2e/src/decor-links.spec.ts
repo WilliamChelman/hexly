@@ -1,4 +1,4 @@
-import { enterLibrary, expect, test } from './fixtures';
+import { enterEntities, expect, test } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 // A real 20×8 solid-color PNG: the ordinary upload path mints an image Asset from it (ADR-0065).
@@ -28,7 +28,7 @@ function proseLinking(entityId: string, label: string) {
  * orphans toggle, independently, surfaces the Asset as an isolated node while its decor edge stays hidden.
  */
 test('hides Decor Links by default and reveals them behind the show-decor toggle', async ({ page }) => {
-  const prettyWorld = await enterLibrary(page);
+  const prettyWorld = await enterEntities(page);
   const worldId = idFromSegment(prettyWorld); // the raw id the asset upload keys on
 
   // The Thumbnail target: a real image Asset, minted through the ordinary upload path.
@@ -92,7 +92,7 @@ test('hides Decor Links by default and reveals them behind the show-decor toggle
  * image, which are decor. This is the asymmetry the "Embed of an Asset is semantic" rule buys.
  */
 test('keeps a Board-Embedded Asset on the graph by default (Embed is semantic)', async ({ page }) => {
-  const prettyWorld = await enterLibrary(page);
+  const prettyWorld = await enterEntities(page);
   const worldId = idFromSegment(prettyWorld);
 
   const uploaded = await page.request.post(`/api/worlds/${worldId}/assets`, {

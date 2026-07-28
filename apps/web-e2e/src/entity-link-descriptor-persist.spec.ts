@@ -1,16 +1,16 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
+import { enterEntities, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /** The Link Descriptor journey (issue #96, ADR-0023/0035). */
 test('characterises a Content Entity Link via :: , persists the descriptor, and reloads as Name (descriptor)', async ({
   page,
   request,
 }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const targetId = entityIdFromUrl(page);
 
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const sourceId = entityIdFromUrl(page);

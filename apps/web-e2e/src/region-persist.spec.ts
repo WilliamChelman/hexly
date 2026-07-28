@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
+import { createEntity, enterEntities, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
  * The Region journey (ADR-0012): a region created in the Regions panel and painted onto
@@ -9,7 +9,7 @@ test('creates a region in the panel, paints a hex, saves, and the region survive
   page,
   request,
 }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });

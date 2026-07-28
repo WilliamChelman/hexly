@@ -201,7 +201,7 @@ describe('EntityPage routing', () => {
     expect(el.querySelector('[data-testid="entity-unavailable"]')).not.toBeNull();
   });
 
-  it('returns to the World’s library when the Entity fails to load', async () => {
+  it('returns to the World’s Entity Browser when the Entity fails to load', async () => {
     await configure('gone');
     entities.load.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
     const fixture = mount();

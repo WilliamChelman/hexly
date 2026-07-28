@@ -70,7 +70,7 @@ describe('EntityBrowser', () => {
     TestBed.inject(ActiveWorld).set('w1');
   });
 
-  /** Create the library and resolve its first page; `nextCursor` defaults to null (single page). */
+  /** Create the browser and resolve its first page; `nextCursor` defaults to null (single page). */
   function renderWith(items: EntitySummary[], nextCursor: string | null = null) {
     client.list.mockReturnValueOnce(of({ items, nextCursor }));
     const fixture = TestBed.createComponent(EntityBrowserPage);
@@ -100,11 +100,11 @@ describe('EntityBrowser', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    expect(el.querySelector('h1')?.textContent).toContain('Votre bibliothèque');
+    expect(el.querySelector('h1')?.textContent).toContain('Vos entités');
     const newEntity = el.querySelector('[data-testid=new-default-entity]') as HTMLElement;
     expect(newEntity.textContent).toContain('Créer une note');
     expect(newEntity.textContent).not.toContain('Create Note');
-    expect(el.querySelector('[data-testid=empty]')?.textContent).toContain('Votre bibliothèque est vide.');
+    expect(el.querySelector('[data-testid=empty]')?.textContent).toContain('Aucune entité pour le moment.');
     expect(el.textContent).toContain('Créez votre première entité pour commencer.');
   });
 
@@ -114,7 +114,7 @@ describe('EntityBrowser', () => {
     // The heading now lives in the page's own header (ADR-0022), visible — no
     // longer chrome contributed to a shell header.
     const heading = fixture.nativeElement.querySelector('h1');
-    expect(heading?.textContent).toContain('Your library');
+    expect(heading?.textContent).toContain('Your entities');
   });
 
   it('scopes the entity list to the World in the URL (ADR-0028)', () => {
@@ -576,14 +576,14 @@ describe('EntityBrowser', () => {
     expect(titlesOf(el)).toEqual(['Breachwood']);
   });
 
-  it('shows a distinct no-matches state (not the empty-library state) when a query matches nothing (#154)', () => {
+  it('shows a distinct no-matches state (not the empty state) when a query matches nothing (#154)', () => {
     const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
     const el = fixture.nativeElement as HTMLElement;
 
     client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
     search(fixture, 'nothing matches this');
 
-    // A search that finds nothing reads as "no matches", never "your library is empty".
+    // A search that finds nothing reads as "no matches", never "no entities yet".
     expect(el.querySelector('[data-testid=no-matches]')).not.toBeNull();
     expect(el.querySelector('[data-testid=empty]')).toBeNull();
   });
@@ -603,7 +603,7 @@ describe('EntityBrowser', () => {
     fixture.detectChanges();
 
     const error = fixture.nativeElement.querySelector('[data-testid=load-error]') as HTMLElement;
-    expect(error.textContent).toContain('Impossible de charger votre bibliothèque.');
+    expect(error.textContent).toContain('Impossible de charger vos entités.');
     expect(error.textContent).toContain('Une erreur est survenue. Veuillez réessayer dans un instant.');
   });
 

@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, openEntityActions, test } from './fixtures';
+import { enterEntities, expect, flushSave, openEntityActions, test } from './fixtures';
 
 /**
  * An anonymous Public Link viewer is a first-class live-follow participant (ADR-0044): its
@@ -9,7 +9,7 @@ test('an anonymous Public Link viewer live-follows a GM edit, then evicts on rev
   page,
   browser,
 }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 

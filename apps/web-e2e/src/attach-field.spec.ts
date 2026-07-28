@@ -1,4 +1,4 @@
-import { authorWorldField, createEntity, enterLibrary, expect, flushSave, openDetails, test } from './fixtures';
+import { authorWorldField, createEntity, enterEntities, expect, flushSave, openDetails, test } from './fixtures';
 
 /**
  * Attach / detach a registered **Field** on a single Entity (ADR-0054, #229), now entirely through the
@@ -11,7 +11,7 @@ test('attaches a reused World Field to a note inline, persists its value, and de
   page,
   request,
 }) => {
-  const worldId = await enterLibrary(page);
+  const worldId = await enterEntities(page);
   // A reusable World enum Field — no type declares it; it exists to be attached.
   await authorWorldField(page, worldId, {
     segment: 'size',
@@ -20,7 +20,7 @@ test('attaches a reused World Field to a note inline, persists its value, and de
     options: 'Tiny, Small, Medium, Large, Huge, Gargantuan',
   });
 
-  await enterLibrary(page);
+  await enterEntities(page);
   const id = await createEntity(page, 'core.type.note');
   await expect(page.getByTestId('title')).toBeVisible();
   // A plain note affords its Content View alone — no view toggle for the attached Field (ADR-0067).

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { enterLibrary, expect, test } from './fixtures';
+import { enterEntities, expect, test } from './fixtures';
 // The app's own pretty-URL codec (ADR-0042), imported by file path for the reason `fixtures.ts` gives.
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
@@ -56,7 +56,7 @@ async function storedTheme(page: Page, worldId: string) {
 }
 
 test('an override beats the derivation, per ColorScheme, and clearing hands the token back to it', async ({ page }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   await openThemeEditor(page, worldSeg);
   await openGroup(page, 'tones');
@@ -116,7 +116,7 @@ test('an override beats the derivation, per ColorScheme, and clearing hands the 
 test('an untouched row shows the value its own ColorScheme renders, not a word for where it came from', async ({
   page,
 }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   await openThemeEditor(page, worldSeg);
   await openGroup(page, 'tones');
 
@@ -149,7 +149,7 @@ test('an untouched row shows the value its own ColorScheme renders, not a word f
 test('marks each untouched row with where its value comes from, off the stylesheet that declares it', async ({
   page,
 }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   await openThemeEditor(page, worldSeg);
   await openGroup(page, 'surfaces');
   await openGroup(page, 'canvas');
@@ -177,7 +177,7 @@ test('marks each untouched row with where its value comes from, off the styleshe
  * read as light, and this is what says that reading answers for dark too.
  */
 test('declares every public role once, so a ColorScheme only ever restates a literal', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
 
   const reassigned = await page.evaluate(() => {
     const found: { name: string; value: string }[] = [];
@@ -219,7 +219,7 @@ test('declares every public role once, so a ColorScheme only ever restates a lit
 });
 
 test('re-anchoring the Palette moves every derived token and leaves the overridden one alone', async ({ page }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   await openThemeEditor(page, worldSeg);
   await openGroup(page, 'tones');
 
@@ -243,7 +243,7 @@ test('re-anchoring the Palette moves every derived token and leaves the overridd
 });
 
 test('the editor offers only the public roles, and the choke point refuses the rest if sent', async ({ page }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   await openThemeEditor(page, worldSeg);
 

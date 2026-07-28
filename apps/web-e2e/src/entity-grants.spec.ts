@@ -1,4 +1,4 @@
-import { enterLibrary, expect, openEntityActions, test } from './fixtures';
+import { enterEntities, expect, openEntityActions, test } from './fixtures';
 import { TEST_GRANTEE } from './test-user';
 
 /**
@@ -7,7 +7,7 @@ import { TEST_GRANTEE } from './test-user';
  * is proven at the HTTP layer (supertests); this covers the Owner-facing UI.
  */
 test('an Owner shares an Entity with a named user, then revokes it', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 

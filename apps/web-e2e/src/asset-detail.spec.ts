@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, openEntity, test } from './fixtures';
+import { enterEntities, expect, flushSave, openEntity, test } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 // A real 20×8 solid-color PNG — small enough to inline, big enough for sharp to derive Asset Stats
@@ -16,7 +16,7 @@ const PNG_20x8 = Buffer.from(
  * prose authored on an Asset persists like any Entity's Content.
  */
 test('an image Asset detail page shows the rendered image, its stats, and editable prose', async ({ page }) => {
-  const worldId = idFromSegment(await enterLibrary(page)); // the raw id the API keys on, decoded from the pretty segment
+  const worldId = idFromSegment(await enterEntities(page)); // the raw id the API keys on, decoded from the pretty segment
 
   // Mint an Asset by uploading bytes through the ordinary upload path (ADR-0065); it returns the wrapper Entity.
   const uploaded = await page.request.post(`/api/worlds/${worldId}/assets`, {

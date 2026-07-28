@@ -1,5 +1,5 @@
 import type { APIRequestContext, Page } from '@playwright/test';
-import { enterLibrary, expect, preferencesPatched, segRe, test } from './fixtures';
+import { enterEntities, expect, preferencesPatched, segRe, test } from './fixtures';
 // The app's own pretty-URL codec (ADR-0042), imported by file path for the reason `fixtures.ts` gives.
 import { idFromSegment, segment } from '../../../libs/web-core/src/utils/pretty-id';
 
@@ -92,7 +92,7 @@ test('a Theme paints the World it belongs to, reaches what portals off the root,
   page,
   request,
 }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const theme = await storeTheme(request, idFromSegment(worldSeg), CRIMSON);
   const plain = await (await request.post('/api/worlds', { data: { name: 'Undyed' } })).json();
 
@@ -132,7 +132,7 @@ test('a Theme paints the World it belongs to, reaches what portals off the root,
 });
 
 test('a reload into a World already visited paints themed before anything is fetched', async ({ page, request }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const theme = await storeTheme(request, idFromSegment(worldSeg), CRIMSON);
   await page.reload();
   await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(theme.light.accent);
@@ -155,7 +155,7 @@ test('the reader keeps their own ColorScheme inside a themed World, and gets tha
   page,
   request,
 }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const theme = await storeTheme(request, idFromSegment(worldSeg), CRIMSON);
   await page.reload();
   await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(theme.light.accent);
@@ -185,7 +185,7 @@ test('a Theme edit reaches a live-following reader, and an anonymous Public Link
   request,
   browser,
 }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   const crimson = await storeTheme(request, worldId, CRIMSON);
   await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(crimson.light.accent);

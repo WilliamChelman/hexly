@@ -3,7 +3,7 @@ import {
   addType,
   authorWorldType,
   createEntity,
-  enterLibrary,
+  enterEntities,
   expect,
   flushSave,
   mapViewToggle,
@@ -22,14 +22,14 @@ const BATTLEMAP_VIEW = mapViewToggle('world.field.battle-map');
  * has its own store and its own undo stack, over its own Field's slice.
  */
 test('an Entity with two grids affords two map Views, each with its own paint and undo', async ({ page, request }) => {
-  const worldId = await enterLibrary(page);
+  const worldId = await enterEntities(page);
   await authorWorldType(page, worldId, {
     id: 'deity',
     name: 'Deity',
     fields: [{ segment: 'battle-map', label: 'Battlemap', kind: 'core.datatype.hex-grid' }],
   });
 
-  await enterLibrary(page);
+  await enterEntities(page);
   const entityId = await createEntity(page, 'core.type.hex-map');
   await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');
 

@@ -1,5 +1,5 @@
 import { strToU8, zipSync } from 'fflate';
-import { confirmImport, enterLibrary, expect, importUnresolvedVault, pickVault, test } from '../fixtures';
+import { confirmImport, enterEntities, expect, importUnresolvedVault, pickVault, test } from '../fixtures';
 
 /**
  * `entities.inlineType: core.type.hex-map` + `entities.inlineTag: untriaged`, with `defaultType` left on
@@ -16,7 +16,7 @@ test('a mention mints under entities.inlineType and entities.inlineTag, not the 
   expect(config.entities.inlineTag).toBe('untriaged');
   expect(config.entities.defaultType).toBe('core.type.note');
 
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
@@ -71,7 +71,7 @@ test('clearing the import dialog’s Tag mints untagged, on an Instance that con
 });
 
 test('the details dialog opens prefilled with the same inline Type and Tag (#344)', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 

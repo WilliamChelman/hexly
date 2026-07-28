@@ -1,11 +1,11 @@
-import { createEntity, enterLibrary, expect, flushSave, savedGrid, test } from './fixtures';
+import { createEntity, enterEntities, expect, flushSave, savedGrid, test } from './fixtures';
 
 /**
  * Map state lives as Canvas pixels (ADR-0003), so there is nothing in the DOM to assert on:
  * we go through the model-derived hex count, plus a direct API read of the persisted document.
  */
 test('paints a hex, saves, and the hex survives a reload', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   const mapId = await createEntity(page, 'core.type.hex-map');
 
   // A map opens armed with Select, so a stray click never paints (issue #27).

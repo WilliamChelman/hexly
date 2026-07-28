@@ -1,11 +1,11 @@
-import { createEntity, enterLibrary, expect, openEntityActions, test } from './fixtures';
+import { createEntity, enterEntities, entitiesRailLink, expect, openEntityActions, test } from './fixtures';
 
 /** The persistent nav rail and page-owned headers (ADR-0022), driven as a signed-in user. */
 test('the rail navigates, exposes account controls, and pages own their headers', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
 
   await expect(page.getByRole('button', { name: 'Expand navigation' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Your library' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your entities' })).toBeVisible();
 
   // Account + appearance live behind the avatar.
   await page.getByRole('button', { name: 'Open user menu' }).click();
@@ -25,13 +25,13 @@ test('the rail navigates, exposes account controls, and pages own their headers'
   await expect(page.getByRole('link', { name: 'All maps' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Design system' })).toHaveCount(0);
 
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await expect(page).toHaveURL(/\/entities$/);
 });
 
 test('on a wide viewport the expanded rail pushes the page and is remembered', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await enterLibrary(page);
+  await enterEntities(page);
 
   const rail = page.getByTestId('nav-rail');
   const collapsed = (await rail.boundingBox())!.width;
@@ -50,13 +50,13 @@ test('on a wide viewport the expanded rail pushes the page and is remembered', a
 
 test('on a narrow viewport the expanded rail overlays and dismisses on click-away', async ({ page }) => {
   await page.setViewportSize({ width: 600, height: 800 });
-  await enterLibrary(page);
+  await enterEntities(page);
 
   await page.getByRole('button', { name: 'Expand navigation' }).click();
   // Overlays with a backdrop to dismiss.
   await expect(page.getByTestId('rail-backdrop')).toBeVisible();
 
   // Choosing a destination collapses the overlay.
-  await page.getByTestId('nav-rail-overlay').getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page.getByTestId('nav-rail-overlay')).click();
   await expect(page.getByTestId('rail-backdrop')).toHaveCount(0);
 });
