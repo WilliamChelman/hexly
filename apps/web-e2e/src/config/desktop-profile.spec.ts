@@ -1,4 +1,4 @@
-import { enterLibrary, expect, openEntityActions, test } from '../fixtures';
+import { enterEntities, entitiesRailLink, expect, openEntityActions, test } from '../fixtures';
 
 /**
  * The `desktop` Deployment Profile end-to-end via its own server, whose profile the boot script pins —
@@ -94,7 +94,7 @@ test('a session that cannot be recovered ends on an unrecoverable error, not the
 });
 
 test('the Collaboration cut list is hidden here too, as the Desktop App pins it off', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
@@ -107,7 +107,7 @@ test('the Collaboration cut list is hidden here too, as the Desktop App pins it 
   await expect(page.locator('app-grant-set')).toHaveCount(0);
   await expect(page.locator('app-public-link')).toHaveCount(0);
 
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await expect(page.getByTestId('facet-heading-visibility')).toHaveCount(0);
 
   await page.goto('/worlds');

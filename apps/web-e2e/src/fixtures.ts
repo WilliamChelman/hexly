@@ -1,5 +1,13 @@
 import { join } from 'node:path';
-import { test as base, expect, type APIRequestContext, type Browser, type Page, type Response } from '@playwright/test';
+import {
+  test as base,
+  expect,
+  type APIRequestContext,
+  type Browser,
+  type Locator,
+  type Page,
+  type Response,
+} from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
 import { TEST_GRANTEE } from './test-user';
 // The app's own pretty-URL codec (ADR-0042). Imported by file path, not via the @hexly/web-core
@@ -214,25 +222,33 @@ export async function openEntity(page: Page, entityId: string): Promise<void> {
 }
 
 /**
+ * The rail's **Entities** destination (ADR-0041). Exact-matched: the accessible name is a substring
+ * of the World Dashboard's "Browse all entities" action, which shares the page with the rail.
+ */
+export function entitiesRailLink(within: Page | Locator): Locator {
+  return within.getByRole('link', { name: 'Entities', exact: true });
+}
+
+/**
  * Enter a reachable World's Entity browser via the World Index at `/` (ADR-0028), and return the
  * entered World's id. The reset clears Entities only, never Worlds, so the Index is never empty here.
  */
-export async function enterLibrary(page: Page): Promise<string> {
+export async function enterEntities(page: Page): Promise<string> {
   await page.goto('/');
   // The card lands on the World Dashboard — the World root (ADR-0043); the rail's
-  // Library link enters the Entity browser from there.
+  // Entities link enters the Entity browser from there.
   await page
     .getByTestId(/^world-/)
     .first()
     .click();
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await page.waitForURL(/\/w\/[\w-]+\/entities$/);
   return page.url().match(/\/w\/([\w-]+)\/entities/)![1];
 }
 
 /**
  * Create an Entity of `typeId` through the "New" split button's type menu, open it, and return its
- * canonical id. The caller must already be on a surface carrying the button — `enterLibrary`, or an
+ * canonical id. The caller must already be on a surface carrying the button — `enterEntities`, or an
  * empty World Dashboard. Every Type mints this way, `required` Fields and all (ADR-0074).
  */
 export async function createEntity(page: Page, typeId: string): Promise<string> {

@@ -1,16 +1,16 @@
-import { createEntity, enterLibrary, entityIdFromUrl, expect, flushSave, segRe, test, savedGrid } from './fixtures';
+import { createEntity, enterEntities, entityIdFromUrl, expect, flushSave, segRe, test, savedGrid } from './fixtures';
 
 /** The Entity Link journey (issue #76, CONTEXT.md → Entity Link). */
 test('links a Hex to an Entity in the Inspector; the link survives a reload and is followable', async ({
   page,
   request,
 }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const noteId = entityIdFromUrl(page);
 
-  await enterLibrary(page);
+  await enterEntities(page);
   const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });

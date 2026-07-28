@@ -1,4 +1,4 @@
-import { enterLibrary, expect, openEntity, test } from './fixtures';
+import { enterEntities, expect, openEntity, test } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 // A real 20×8 solid-color PNG: the ordinary upload path mints an image Asset from it (ADR-0065).
@@ -29,7 +29,7 @@ function proseLinking(entityId: string, label: string) {
 test('outbound References hides a Thumbnail decor link behind a reveal; the Asset’s usage lists it, marked', async ({
   page,
 }) => {
-  const prettyWorld = await enterLibrary(page);
+  const prettyWorld = await enterEntities(page);
   const worldId = idFromSegment(prettyWorld); // the raw id the asset upload keys on
 
   const uploaded = await page.request.post(`/api/worlds/${worldId}/assets`, {
@@ -102,7 +102,7 @@ test('outbound References hides a Thumbnail decor link behind a reveal; the Asse
  * break. The Asset Browser's delete affordance opens the same confirmation the browser card does.
  */
 test('deleting an Asset counts its decor references in the usage confirmation', async ({ page }) => {
-  const prettyWorld = await enterLibrary(page);
+  const prettyWorld = await enterEntities(page);
   const worldId = idFromSegment(prettyWorld);
 
   const uploaded = await page.request.post(`/api/worlds/${worldId}/assets`, {

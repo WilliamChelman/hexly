@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, expect, flushSave, savedGrid, test } from './fixtures';
+import { createEntity, enterEntities, expect, flushSave, savedGrid, test } from './fixtures';
 
 /**
  * Group moves for non-hex selections (ADR-0017): dragging one label of a multi-selection
@@ -17,7 +17,7 @@ async function flushAndReadGrid(
 }
 
 test('drags one label of a multi-label selection and the whole group moves', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -73,7 +73,7 @@ test('drags one label of a multi-label selection and the whole group moves', asy
 });
 
 test('drags a region on its own and its whole footprint moves', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });

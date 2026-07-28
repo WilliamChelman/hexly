@@ -1,4 +1,4 @@
-import { enterLibrary, expect, test } from './fixtures';
+import { enterEntities, expect, test } from './fixtures';
 
 /**
  * The enabled companion to `config/plugin-disabled.spec.ts` (ADR-0052, Seam 4): with no `hexly.yml`
@@ -12,7 +12,7 @@ test('`/api/config` reports dnd enabled and both create surfaces offer its Type'
   const config = await res.json();
   expect(config.plugins.dnd.enabled).toBe(true);
 
-  await enterLibrary(page);
+  await enterEntities(page);
 
   // The "New" split button's type menu offers the Plugin's Type.
   await page.getByTestId('new-entity-menu').click();

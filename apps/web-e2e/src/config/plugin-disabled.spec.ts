@@ -1,4 +1,4 @@
-import { enterLibrary, expect, openEntity, test } from '../fixtures';
+import { enterEntities, expect, openEntity, test } from '../fixtures';
 
 /**
  * dnd disabled end-to-end via its own server, booted against a `hexly.yml` with
@@ -15,7 +15,7 @@ test('`/api/config` reports dnd disabled and both create surfaces drop its Type'
   expect(config.plugins.content.enabled).toBe(true);
   expect(config.plugins.hexmap.enabled).toBe(true);
 
-  await enterLibrary(page);
+  await enterEntities(page);
 
   // The "New" split button's type menu: still offers the enabled Types, but not the disabled Plugin's.
   await page.getByTestId('new-entity-menu').click();

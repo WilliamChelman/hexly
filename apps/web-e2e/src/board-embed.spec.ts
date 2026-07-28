@@ -1,4 +1,4 @@
-import { contentViewToggle, enterLibrary, entityIdFromUrl, expect, flushSave, openEntity, test } from './fixtures';
+import { contentViewToggle, enterEntities, entityIdFromUrl, expect, flushSave, openEntity, test } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 // A real 20×8 solid-color PNG for minting an image Asset to embed (ADR-0065).
@@ -16,7 +16,7 @@ const PNG_20x8 = Buffer.from(
  * slot and seeded nothing, though the target's own page (no enclosing Board) rendered the prose fine.
  */
 test('a Board Embed of a Note renders the target’s prose, not an empty body', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
 
   // A real Note with prose, authored through the editor and saved (opaque snapshot, ADR-0019).
   await page.getByTestId('new-default-entity').click();
@@ -77,7 +77,7 @@ test('a Board Embed of a Note renders the target’s prose, not an empty body', 
  * the Note embed uses. Confirms the Asset's default View (`''` selects it) resolves and renders inside an Embed.
  */
 test('a Board Embed of an image Asset renders its image View by transclusion', async ({ page }) => {
-  const worldId = idFromSegment(await enterLibrary(page)); // the raw id the API keys on, decoded from the pretty segment
+  const worldId = idFromSegment(await enterEntities(page)); // the raw id the API keys on, decoded from the pretty segment
 
   // Mint the Asset through the ordinary upload path (ADR-0065); it returns the wrapper Entity to embed.
   const uploaded = await page.request.post(`/api/worlds/${worldId}/assets`, {

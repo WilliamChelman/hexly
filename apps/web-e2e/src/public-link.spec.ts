@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, openEntityActions, test } from './fixtures';
+import { enterEntities, expect, flushSave, openEntityActions, test } from './fixtures';
 
 /**
  * Public Links (ADR-0037). Only the UI loop is covered here; the token-route authorization
@@ -8,7 +8,7 @@ test('an Owner mints a public link; an anonymous visitor reads it, then loses it
   page,
   browser,
 }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 

@@ -3,7 +3,7 @@ import {
   authorWorldField,
   authorWorldType,
   createEntity,
-  enterLibrary,
+  enterEntities,
   expect,
   flushSave,
   openDetails,
@@ -22,7 +22,7 @@ test('authors world.field.element, attaches it to one deity but not another, and
   page,
   request,
 }) => {
-  const worldId = await enterLibrary(page);
+  const worldId = await enterEntities(page);
 
   // Author `world.field.element` (fire/ice/water) in the World Fields editor, and a `world.type.deity` type beside
   // it. The Fields list shows each Field's Data Type — a "Choice" for the enum.
@@ -41,7 +41,7 @@ test('authors world.field.element, attaches it to one deity but not another, and
 
   // Deity A: a scalar-only type affords no other View, so it opens full-width on the Details View. Attach
   // `world.field.element` — a Field its type never named — fill it in place, and persist.
-  await enterLibrary(page);
+  await enterEntities(page);
   const pelor = await createEntity(page, 'world.type.deity');
   await expect(page.getByTestId('title')).toBeVisible();
   await attachField(page, 'world.field.element');
@@ -61,7 +61,7 @@ test('authors world.field.element, attaches it to one deity but not another, and
 
   // Deity B: no attachment. One deity carries an element, its neighbour does not — and the Field is
   // still on offer, proving deity A's choice consumed nothing.
-  await enterLibrary(page);
+  await enterEntities(page);
   await createEntity(page, 'world.type.deity');
   await openDetails(page);
   await expect(page.getByTestId('detail-field-world.field.element')).toHaveCount(0);
@@ -69,7 +69,7 @@ test('authors world.field.element, attaches it to one deity but not another, and
 
   // Reuse across an unrelated type: the same `world.field.element` rides a plain `core.type.note`, whose
   // Content View means the Details management lives in the Dock Panel.
-  await enterLibrary(page);
+  await enterEntities(page);
   const note = await createEntity(page, 'core.type.note');
   await attachField(page, 'world.field.element');
   await page.getByTestId('detail-field-world.field.element').locator('select').selectOption('ice');
@@ -89,7 +89,7 @@ test('authors world.field.element, attaches it to one deity but not another, and
 test('a user Entity-Link Field flagged "presentation only" produces Decor Links; an un-flagged one stays semantic', async ({
   page,
 }) => {
-  const prettyWorld = await enterLibrary(page);
+  const prettyWorld = await enterEntities(page);
   const worldId = idFromSegment(prettyWorld); // the raw id the entities must be created under
 
   // Author two user Entity-Link Fields: "Portrait" flagged presentation-only (decor), "Ally" left semantic.

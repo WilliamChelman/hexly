@@ -1,5 +1,5 @@
 import type { APIRequestContext, Page } from '@playwright/test';
-import { contentViewToggle, createEntity, authorWorldType, enterLibrary, expect, flushSave, test } from './fixtures';
+import { contentViewToggle, createEntity, authorWorldType, enterEntities, expect, flushSave, test } from './fixtures';
 
 /** A prose View is bound to the Field it renders (ADR-0051), so each of the Saint's two afford their own. */
 const CONTENT_VIEW = contentViewToggle('world.field.content');
@@ -18,7 +18,7 @@ test('an Entity with two prose Fields affords two content Views, each with its o
   page,
   request,
 }) => {
-  const worldId = await enterLibrary(page);
+  const worldId = await enterEntities(page);
   // A distinct type id (`world.type.saint`, not `two-grids`' `world.type.deity`): the reset clears Entities but
   // not a World's authored types, so a type this spec shares with another would carry that one's Fields.
   // Prose is a Field of a Structured Data Type like the grid — added from the kind picker, at the key and under the
@@ -32,7 +32,7 @@ test('an Entity with two prose Fields affords two content Views, each with its o
     ],
   });
 
-  await enterLibrary(page);
+  await enterEntities(page);
   const entityId = await createEntity(page, 'world.type.saint');
 
   // Two prose toggles, each named for its Field — which is what tells the public lore from the secret.

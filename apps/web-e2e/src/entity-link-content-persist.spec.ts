@@ -1,4 +1,4 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, segRe, test } from './fixtures';
+import { enterEntities, entityIdFromUrl, expect, flushSave, segRe, test } from './fixtures';
 
 /** The Content Entity Link journey (issue #95, ADR-0023). */
 test('inserts a Content Entity Link via @, persists it, navigates it, and dangles when the target is gone', async ({
@@ -6,13 +6,13 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   request,
 }) => {
   // Seed the link target: a note the picker can list and a click can jump to.
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const targetId = entityIdFromUrl(page);
 
   // The source note that will carry the link in its prose.
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const sourceId = entityIdFromUrl(page);

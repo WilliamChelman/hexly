@@ -100,11 +100,11 @@ describe('EntityBrowser', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    expect(el.querySelector('h1')?.textContent).toContain('Votre bibliothèque');
+    expect(el.querySelector('h1')?.textContent).toContain('Vos entités');
     const newEntity = el.querySelector('[data-testid=new-default-entity]') as HTMLElement;
     expect(newEntity.textContent).toContain('Créer une note');
     expect(newEntity.textContent).not.toContain('Create Note');
-    expect(el.querySelector('[data-testid=empty]')?.textContent).toContain('Votre bibliothèque est vide.');
+    expect(el.querySelector('[data-testid=empty]')?.textContent).toContain('Aucune entité pour le moment.');
     expect(el.textContent).toContain('Créez votre première entité pour commencer.');
   });
 
@@ -114,7 +114,7 @@ describe('EntityBrowser', () => {
     // The heading now lives in the page's own header (ADR-0022), visible — no
     // longer chrome contributed to a shell header.
     const heading = fixture.nativeElement.querySelector('h1');
-    expect(heading?.textContent).toContain('Your library');
+    expect(heading?.textContent).toContain('Your entities');
   });
 
   it('scopes the entity list to the World in the URL (ADR-0028)', () => {
@@ -603,7 +603,7 @@ describe('EntityBrowser', () => {
     fixture.detectChanges();
 
     const error = fixture.nativeElement.querySelector('[data-testid=load-error]') as HTMLElement;
-    expect(error.textContent).toContain('Impossible de charger votre bibliothèque.');
+    expect(error.textContent).toContain('Impossible de charger vos entités.');
     expect(error.textContent).toContain('Une erreur est survenue. Veuillez réessayer dans un instant.');
   });
 

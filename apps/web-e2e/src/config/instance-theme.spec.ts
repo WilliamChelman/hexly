@@ -1,5 +1,5 @@
 import type { APIRequestContext, Page } from '@playwright/test';
-import { enterLibrary, expect, segRe, test } from '../fixtures';
+import { enterEntities, expect, segRe, test } from '../fixtures';
 // The app's own pretty-URL codec (ADR-0042), imported by file path for the reason `fixtures.ts` gives.
 import { idFromSegment, segment } from '../../../../libs/web-core/src/utils/pretty-id';
 
@@ -120,7 +120,7 @@ test('every World without a Theme of its own adopts the Instance default, and so
   expect(await resolvedOnRoot(page, '--color-accent')).toBe(await resolvedOnRoot(page, '--palette-accent'));
 
   // And inside a World that has authored none: the branding is the floor, not an Index-only fallback.
-  await enterLibrary(page);
+  await enterEntities(page);
   expect(await inlineOnRoot(page, '--palette-accent')).toBe(branded);
   expect(await inlineOnRoot(page, '--radius-md')).toBe('0px');
 });
@@ -131,7 +131,7 @@ test('a World with its own Theme overrides the Instance default field by field, 
 }) => {
   const config = await (await request.get('/api/config')).json();
   const branded = config.theme.light.accent;
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const theme = await storeTheme(request, idFromSegment(worldSeg), CRIMSON);
   const plain = await (await request.post('/api/worlds', { data: { name: 'Undyed' } })).json();
 

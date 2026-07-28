@@ -2,7 +2,7 @@ import {
   attachField,
   authorWorldField,
   createEntity,
-  enterLibrary,
+  enterEntities,
   expect,
   openDetails,
   openEntity,
@@ -24,11 +24,11 @@ const PNG_20x8 = Buffer.from(
  * These two specs pin that behavior at the highest seam (prior art: `attach-field.spec.ts`, `asset-detail.spec.ts`).
  */
 test('pickers never offer the System-managed asset type or asset-ref field', async ({ page }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   // A reusable World Field guarantees the attach picker renders, so its *absence* of the asset-ref is meaningful.
   await authorWorldField(page, worldSeg, { segment: 'origin', label: 'Origin' });
 
-  await enterLibrary(page);
+  await enterEntities(page);
   await createEntity(page, 'core.type.note');
   await openDetails(page);
 
@@ -51,7 +51,7 @@ test('pickers never offer the System-managed asset type or asset-ref field', asy
 test('the create menu never offers the System-managed asset type, and names types by their own copy', async ({
   page,
 }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-entity-menu').click();
 
   // The system alone mints an Asset (ADR-0068): offering it would only produce a doomed create (403).
@@ -64,7 +64,7 @@ test('the create menu never offers the System-managed asset type, and names type
 });
 
 test("an Asset's Details panel lists its System-managed type and field affordance-less", async ({ page }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg); // the raw id the API keys on
   // A reusable World Field to attach later — proving an ordinary Field keeps its detach × beside the affordance-less asset-ref.
   await authorWorldField(page, worldSeg, { segment: 'origin', label: 'Origin' });

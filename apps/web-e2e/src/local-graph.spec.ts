@@ -1,4 +1,4 @@
-import { enterLibrary, expect, openEntity, test, widenDockPanel } from './fixtures';
+import { enterEntities, expect, openEntity, test, widenDockPanel } from './fixtures';
 
 /** A tiptap doc whose one paragraph carries a prose Entity Link to `entityId` — a semantic edge. */
 function proseLinking(entityId: string, label: string) {
@@ -20,7 +20,7 @@ function proseLinking(entityId: string, label: string) {
  * different pictures.
  */
 test('the Local Graph panel opens one hop out and deepens on request', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
 
   const create = async (name: string, linkTo?: { id: string; name: string }): Promise<string> => {
     const created = await page.request.post('/api/entities', {
@@ -67,7 +67,7 @@ test('the Local Graph panel opens one hop out and deepens on request', async ({ 
  */
 test('the Local Graph drawing grows with the Panel it is drawn in', async ({ page }) => {
   await page.setViewportSize({ width: 1500, height: 1000 }); // tall enough that the 50vh cap can't bite
-  await enterLibrary(page);
+  await enterEntities(page);
 
   const created = await page.request.post('/api/entities', {
     data: { name: 'Emberhold', types: ['core.type.note'] },
@@ -99,7 +99,7 @@ test('the Local Graph drawing grows with the Panel it is drawn in', async ({ pag
 
 /** An Entity nothing links to and that links to nothing is a graph of one — a claim, not an empty canvas. */
 test('the Local Graph panel says so when the open Entity links to nothing', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
 
   const created = await page.request.post('/api/entities', {
     data: { name: 'Unvisited Isle', types: ['core.type.note'] },

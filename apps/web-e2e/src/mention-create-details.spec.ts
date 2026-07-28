@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { enterLibrary, entitiesNamed, entityIdFromUrl, expect, test } from './fixtures';
+import { enterEntities, entitiesNamed, entityIdFromUrl, expect, test } from './fixtures';
 
 /**
  * Inline Creation's details path (issue #344, ADR-0073): `Create "…" with details…` opens the ordinary
@@ -20,7 +20,7 @@ async function mention(page: Page, query: string): Promise<void> {
 
 /** Open a fresh note and put the caret in its prose. */
 async function openNote(page: Page): Promise<string> {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   await page.getByTestId('note-content').click();

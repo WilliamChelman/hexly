@@ -1,7 +1,7 @@
 import type { APIRequestContext, Page } from '@playwright/test';
 import { designToken, rasteriseColors } from '@hexly/web-styles';
 import { FONT_PAIRINGS, PALETTE_PRESETS, PALETTE_TOKENS, WorldThemeSchemeKey, colorTokenHex } from '@hexly/domain';
-import { enterLibrary, expect, signInGrantee, test } from './fixtures';
+import { enterEntities, expect, signInGrantee, test } from './fixtures';
 import { TEST_GRANTEE } from './test-user';
 // The app's own pretty-URL codec (ADR-0042), imported by file path for the reason `fixtures.ts` gives.
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
@@ -116,7 +116,7 @@ function elementsRoundedBy(page: Page, ladder: readonly string[]): Promise<strin
 }
 
 test('the editor renders a control per declared tier-1 token, for both ColorSchemes at once', async ({ page }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   await openThemeEditor(page, worldSeg);
 
   // Every anchor and knob the manifest declares is authorable, in *both* halves, from one seat: a
@@ -135,7 +135,7 @@ test('the editor renders a control per declared tier-1 token, for both ColorSche
 });
 
 test('editing a value re-themes the interface immediately, and saving it survives a reload', async ({ page }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   await openThemeEditor(page, worldSeg);
 
@@ -178,7 +178,7 @@ const presetsOf = (scheme: WorldThemeSchemeKey) =>
   Object.values(PALETTE_PRESETS).filter((preset) => preset.scheme === scheme);
 
 test('an Owner picks a Palette Preset, the interface repaints, and the mark follows the Palette', async ({ page }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   // The suite's reset keeps Worlds *and* their Themes, so an earlier spec may have left this one themed.
   await clearTheme(page.request, worldId);
@@ -235,7 +235,7 @@ test('an Owner picks a Palette Preset, the interface repaints, and the mark foll
 });
 
 test('a dark Palette Preset states its own field glow, as an override the Owner can hand back', async ({ page }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   await clearTheme(page.request, worldId);
   await openThemeEditor(page, worldSeg);
@@ -281,7 +281,7 @@ test('a dark Palette Preset states its own field glow, as an override the Owner 
 test('cancelling puts the saved Theme back, and reset then saved returns the World to the Hexly default', async ({
   page,
 }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   await openThemeEditor(page, worldSeg);
 
@@ -322,7 +322,7 @@ const firstFamily = (stack: string) => stack.split(',')[0].replaceAll("'", '').t
 test('an Owner picks a corner set and a font pairing, and the interface takes both through a save and a reload', async ({
   page,
 }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   await openThemeEditor(page, worldSeg);
 
@@ -372,7 +372,7 @@ test('an Owner picks a corner set and a font pairing, and the interface takes bo
 });
 
 test('an anonymous Public Link visitor gets the corner set and the pairing too', async ({ page, browser }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   await openThemeEditor(page, worldSeg);
 
@@ -410,7 +410,7 @@ test('an anonymous Public Link visitor gets the corner set and the pairing too',
 });
 
 test('a Theme edit changes nothing about what Entities contain or who can read them', async ({ page, request }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   const before = await (await request.get(`/api/worlds/${worldId}/graph`)).json();
 
@@ -427,7 +427,7 @@ test('a Theme edit changes nothing about what Entities contain or who can read t
 // editor and a Contributor reaching it are the same defect, and only one of them was covered.
 for (const role of ['contributor', 'viewer'] as const) {
   test(`a ${role} does not reach the Theme editor`, async ({ page, request, browser }) => {
-    const worldSeg = await enterLibrary(page);
+    const worldSeg = await enterEntities(page);
     // Over the API rather than the Access pane: the reset keeps Worlds *and* their members, so by the
     // time this spec runs the second user may already hold a role here — and the add picker, which
     // offers only non-members, would then have nothing to select. The POST is an upsert either way.
@@ -457,7 +457,7 @@ for (const role of ['contributor', 'viewer'] as const) {
 test('the readability report covers the ColorScheme the author is not looking at, and a failing Theme still saves', async ({
   page,
 }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   await openThemeEditor(page, worldSeg);
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
@@ -493,7 +493,7 @@ test('the readability report covers the ColorScheme the author is not looking at
 test('a mid-tone accent and a tone rotated into a status colour each get their own warning, and on-colours flip unasked', async ({
   page,
 }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   await openThemeEditor(page, worldSeg);
 
   // `contrast-color()` answers black or white and nothing between, so a mid-tone accent is one no
@@ -567,7 +567,7 @@ test('an Owner copies another World’s Theme in, keeps editing it, and the sour
   page,
   request,
 }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   // The suite's reset keeps Worlds *and* their Themes, so an earlier spec may have left this one
   // themed; the copy is judged against a World that carries none.

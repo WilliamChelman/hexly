@@ -1,6 +1,6 @@
-import { addWorldMember, enterLibrary, expect, signInGrantee, test } from './fixtures';
+import { addWorldMember, enterEntities, expect, signInGrantee, test } from './fixtures';
 // The pretty-URL codec (ADR-0042), imported by path like the other framework-free e2e utils in
-// fixtures.ts: `enterLibrary` yields the URL's `slug-base62` segment, but the API keys on the raw id.
+// fixtures.ts: `enterEntities` yields the URL's `slug-base62` segment, but the API keys on the raw id.
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 /**
@@ -15,7 +15,7 @@ const MONSTERS_RUN = 'importer-run-draw-steel.importer.monsters';
 const MONSTERS_STATUS = 'importer-status-draw-steel.importer.monsters';
 
 test('a World Owner runs the fixture-backed Draw Steel import and sees the run summary', async ({ page }) => {
-  const worldId = await enterLibrary(page);
+  const worldId = await enterEntities(page);
   await page.goto(`/w/${worldId}/settings`);
   await page.getByTestId('settings-nav-imports').click();
 
@@ -45,7 +45,7 @@ test('a reachable non-Owner cannot import: no run trigger in the UI, and the ser
   // The Owner's session yields a World, and grants the second user *reach* into it as a Viewer — the
   // interesting boundary is a reader who is still not an Owner (403), not a stranger who can't see the
   // World at all (404). The Access section is Settings' default pane.
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg); // the raw id the API keys on, decoded from the pretty segment
   await addWorldMember(page, worldSeg, 'viewer');
 

@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, expect, test } from './fixtures';
+import { createEntity, enterEntities, expect, test } from './fixtures';
 
 /**
  * Each lib's catalog is a Transloco scope, fetched separately from the app's root one (ADR-0049).
@@ -10,7 +10,7 @@ import { createEntity, enterLibrary, expect, test } from './fixtures';
  * the language, or the map renders raw keys for good (ADR-0049's amendment).
  */
 test('a plugin’s scoped copy follows a language switch: the map editor flips to French', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await createEntity(page, 'core.type.hex-map');
 
   // App copy read through `translateSignal`, which prefixes its key with any injected scope — so a

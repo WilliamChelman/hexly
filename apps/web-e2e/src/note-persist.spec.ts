@@ -1,8 +1,8 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
+import { enterEntities, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /** Full-stack note round-trip; the persisted snapshot is opaque (ADR-0009/0019). */
 test('types into a note, saves, and the Content survives a reload', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);

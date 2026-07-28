@@ -1,4 +1,4 @@
-import { enterLibrary, entityIdFromUrl, expect, openEntityActions, test } from '../fixtures';
+import { enterEntities, entitiesRailLink, entityIdFromUrl, expect, openEntityActions, test } from '../fixtures';
 // The pretty-URL codec (ADR-0042), imported by path like the other framework-free e2e utils.
 import { idFromSegment } from '../../../../libs/web-core/src/utils/pretty-id';
 
@@ -20,7 +20,7 @@ test('Collaboration off: an Entity carries no sharing affordance, and the routes
   // Two independent knobs (ADR-0071): Collaboration is off, but this is still a server.
   expect(config.profile).toBe('server');
 
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const id = entityIdFromUrl(page);
@@ -39,7 +39,7 @@ test('Collaboration off: an Entity carries no sharing affordance, and the routes
   await expect(page.locator('app-public-link')).toHaveCount(0);
   await expect(page.getByTestId('public-link-create')).toHaveCount(0);
 
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await expect(page.getByTestId('facet-heading-type')).toBeVisible();
   await expect(page.getByTestId('facet-heading-visibility')).toHaveCount(0);
   await expect(page.getByTestId('facet-visibility-private')).toHaveCount(0);
@@ -57,7 +57,7 @@ test('Collaboration off: World Settings keeps its schema and imports groups and 
   page,
   request,
 }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   await page.goto(`/w/${worldSeg}/settings`);
 
   await expect(page.getByTestId('settings-nav-schema')).toBeVisible();
