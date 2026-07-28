@@ -22,6 +22,7 @@ export * from './components/input.component';
 export * from './components/kbd.component';
 export * from './components/listbox.component';
 export * from './utils/listbox-controller';
+export * from './utils/listbox-placement';
 export * from './components/listbox-option.component';
 export * from './directives/menu.directive';
 export * from './components/page-header.component';

@@ -19,8 +19,7 @@ import { TagItem } from './tag-suggestions';
         testid="tag-picker"
         [ariaLabel]="'entityTags.picker.label' | transloco"
         [activeItemId]="activeItemId()"
-        [x]="position()!.x"
-        [y]="position()!.y"
+        [anchor]="anchor()!"
       >
         @for (item of items(); track item.id; let i = $index) {
           <li

@@ -30,8 +30,7 @@ export type LinkTextKind = 'display' | 'heading';
         [testid]="kind() + '-picker'"
         [ariaLabel]="labelKey() | transloco"
         [activeItemId]="activeItemId()"
-        [x]="position()!.x"
-        [y]="position()!.y"
+        [anchor]="anchor()!"
       >
         @for (item of items(); track item.id; let i = $index) {
           <li
