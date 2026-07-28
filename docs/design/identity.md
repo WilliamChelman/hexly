@@ -53,17 +53,18 @@ controls (ADR-0075).
 
 ## Where it lives
 
-| File                                                     | Role                                                                                                                                               |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `libs/web-styles/src/index.css`                          | The `@theme static` block — tier 2, one derivation per role — plus type, radii and fonts, and the elevation `@utility` wrappers.                   |
-| `libs/web-styles/src/tokens.css`                         | The two **Palettes** (tier 1), and what `@theme` can't hold: motion, layout rails, elevation, the sheen gradients.                                 |
-| `libs/web-styles/src/base.css`                           | Reset, document typography, the flat table background (`@layer base`).                                                                             |
-| `libs/web-styles/src/tokens/manifest.ts`                 | The token contract (above).                                                                                                                        |
-| `libs/web-styles/src/tokens/design-token-properties.css` | The `@property` registrations, generated from the manifest by `pnpm tokens:generate`.                                                              |
-| `libs/plugin-hexmap-web/src/hexmap-tokens.css`           | Tier 3 — the hex map's own vocabulary, derived from tier-2 roles so an Owner's field or ink carries into the map.                                  |
-| `apps/web/src/styles.css`                                | Build entry point: self-hosted fonts, then `web-styles`, then each plugin's tier-3 sheet — plus the `@source` scan set, automatic detection off.   |
-| `apps/web/src/app/pages/styleguide/`                     | The living `/styleguide` reference page — the one exemption from the tier gates, because rendering every token is what it is for.                  |
-| `apps/web-e2e/src/design-tokens.table.json`              | Every declared token's **resolved** value in both ColorSchemes, asserted in a real engine by `design-tokens.spec.ts`. The ground truth for values. |
+| File                                                     | Role                                                                                                                                                |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `libs/web-styles/src/index.css`                          | The `@theme static` block — tier 2, one derivation per role — plus type, radii and fonts, and the elevation `@utility` wrappers.                    |
+| `libs/web-styles/src/tokens.css`                         | The two **Palettes** (tier 1), generated from the Preset table, and what `@theme` can't hold: motion, layout rails, elevation, the sheen gradients. |
+| `libs/domain/src/lib/palette-preset.ts`                  | The **Palette Preset** table — where Hexly's own two Palettes are authored (ADR-0077).                                                              |
+| `libs/web-styles/src/base.css`                           | Reset, document typography, the flat table background (`@layer base`).                                                                              |
+| `libs/web-styles/src/tokens/manifest.ts`                 | The token contract (above).                                                                                                                         |
+| `libs/web-styles/src/tokens/design-token-properties.css` | The `@property` registrations, generated from the manifest by `pnpm tokens:generate`.                                                               |
+| `libs/plugin-hexmap-web/src/hexmap-tokens.css`           | Tier 3 — the hex map's own vocabulary, derived from tier-2 roles so an Owner's field or ink carries into the map.                                   |
+| `apps/web/src/styles.css`                                | Build entry point: self-hosted fonts, then `web-styles`, then each plugin's tier-3 sheet — plus the `@source` scan set, automatic detection off.    |
+| `apps/web/src/app/pages/styleguide/`                     | The living `/styleguide` reference page — the one exemption from the tier gates, because rendering every token is what it is for.                   |
+| `apps/web-e2e/src/design-tokens.table.json`              | Every declared token's **resolved** value in both ColorSchemes, asserted in a real engine by `design-tokens.spec.ts`. The ground truth for values.  |
 
 Primitives (`Button`, `Panel`, `Chip`, `Coord`, …) own their **scoped** styles and
 consume the tokens directly (ADR-0007); there is no global component sheet, bar the
@@ -117,10 +118,11 @@ gentler `--tracking-wide`.
 
 ## Colour — tier 1, the two Palettes
 
-Authored in `libs/web-styles/src/tokens.css`, and reproduced here because they are the
-only colour literals in the system and the only values a reader has to know. Hex,
-because that is how an anchor is authored and how it ships — an 8-bit hex is what a
-contrast floor has to clear — and the engine reads each one back as the identical
+Authored as **Palette Preset** entries in `libs/domain/src/lib/palette-preset.ts` and
+generated into `libs/web-styles/src/tokens.css` (ADR-0077), and reproduced here because
+they are the only colour literals in the system and the only values a reader has to
+know. Hex, because that is how an anchor is authored and how it ships — an 8-bit hex is
+what a contrast floor has to clear — and the engine reads each one back as the identical
 `rgb()` triple, so nothing is lost in the notation.
 
 | Anchor                | What it anchors                         | Solar     | Astral    |

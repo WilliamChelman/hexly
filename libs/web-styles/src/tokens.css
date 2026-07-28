@@ -6,7 +6,9 @@
  *   1. The two **Palettes** — tier 1 (ADR-0075). Eight anchors and three knobs per
  *      ColorScheme. The derived roles are one expression each and do not repeat per
  *      scheme, so astral reassigns these and `--color-canvas-glow` — the one role
- *      whose two schemes no single expression fits (index.css).
+ *      whose two schemes no single expression fits (index.css). Both regions are
+ *      generated from `PALETTE_PRESETS` in `libs/domain` (ADR-0077): Hexly's own
+ *      Palettes take the Preset table's code path rather than sitting beside it.
  *   2. Raw non-utility tokens — motion (`--dur-*`/`--ease-*`), elevation
  *      (`--shadow-*`, see ADR-0021), layout rails (`--rail-*`, `--container-reading`),
  *      and the sheen gradients. These are tier 2 by role but live here because
@@ -26,21 +28,22 @@
 :root,
 [data-color-scheme='solar'] {
   /* ---- Tier 1 — the Solar Palette. Private: `--palette-*` is referenced only by
-     the derivation in index.css, and `no-unknown-design-token` enforces it. ---- */
-  --palette-page: #f1e5c7; /* the table / outer ivory paper                 */
-  --palette-ink: #2e2412; /* primary sepia-ink text                         */
-  --palette-ink-quiet: #6f5a36; /* secondary ink — carries its own hue      */
-  /* Darkened, and only in L, because ADR-0076's report warned on Hexly's own
-     untouched Palette — world-theme-spec.md §1. */
-  --palette-accent: #8c5e00; /* heliograph gold — the through-line accent   */
-  --palette-danger: #a21b01; /* burnt-sienna marginalia                     */
-  --palette-success: #325e01; /* moss                                       */
-  --palette-canvas: #efe2bf; /* the map field                               */
-  --palette-soot: #3c2c16; /* shadow / scrim ink — warm sepia, and lighter
-     than `--palette-ink`, which is why it is its own anchor                 */
-  --palette-polarity: 1; /* +1 Solar / −1 Astral: every ramp direction      */
-  --palette-line-alpha: 0.371; /* opacity of the drawn-rule ramp            */
-  --palette-veil: 0.12; /* base opacity of shadows, scrims, the vignette    */
+     the derivation in index.css, and `no-unknown-design-token` enforces it. The
+     values are authored in the Preset table (ADR-0077), where the note on each
+     anchor lives beside it. ---- */
+  /* GENERATED — the solar Palette, from PALETTE_PRESETS in libs/domain. Run `pnpm tokens:generate`. */
+  --palette-page: #f1e5c7;
+  --palette-ink: #2e2412;
+  --palette-ink-quiet: #6f5a36;
+  --palette-accent: #8c5e00;
+  --palette-danger: #a21b01;
+  --palette-success: #325e01;
+  --palette-canvas: #efe2bf;
+  --palette-soot: #3c2c16;
+  --palette-polarity: 1;
+  --palette-line-alpha: 0.371;
+  --palette-veil: 0.12;
+  /* END GENERATED */
 
   /* ---- Motion (raw values, not a Tailwind named scale) ------------------ */
   --dur-instant: 80ms;
@@ -98,22 +101,23 @@
  * literal.
  * ======================================================================= */
 [data-color-scheme='astral'] {
-  /* ---- Tier 1 — the Astral Palette. */
-  --palette-page: #0b0c1a; /* the night table                               */
-  --palette-ink: #ece3cf; /* starlit parchment text                         */
-  --palette-ink-quiet: #9aa0c8; /* cool lavender-grey                       */
-  --palette-accent: #d9b25a; /* constellation gold leaf                     */
-  --palette-danger: #fe7a54; /* warm coral marginalia                       */
-  --palette-success: #71ca42; /* aurora green                               */
-  --palette-canvas: #12152e; /* the map field at night                      */
-  --palette-soot: #02020a; /* near-black scrim ink                          */
+  /* ---- Tier 1 — the Astral Palette, and the tier-2 literals its Preset states. ---- */
+  /* GENERATED — the astral Palette, from PALETTE_PRESETS in libs/domain. Run `pnpm tokens:generate`. */
+  --palette-page: #0b0c1a;
+  --palette-ink: #ece3cf;
+  --palette-ink-quiet: #9aa0c8;
+  --palette-accent: #d9b25a;
+  --palette-danger: #fe7a54;
+  --palette-success: #71ca42;
+  --palette-canvas: #12152e;
+  --palette-soot: #02020a;
   --palette-polarity: -1;
   --palette-line-alpha: 0.16;
   --palette-veil: 0.5;
 
-  /* The named literal (ADR-0075): indigo starlight over indigo paper is a
-     different design idea from Solar's warm highlight of its own paper. */
+  /* The Preset's own named literals — what no one expression over the anchors fits (ADR-0075). */
   --color-canvas-glow: rgba(58, 70, 140, 0.26);
+  /* END GENERATED */
 
   color-scheme: dark;
 }
