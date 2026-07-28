@@ -471,11 +471,19 @@
     "palettePresetsLabel": "Préréglage de palette",
     "palettePresets": {
       "solar": "Solar",
-      "astral": "Astral"
+      "vellum": "Vellum",
+      "herbarium": "Herbarium",
+      "astral": "Astral",
+      "obsidian": "Obsidian",
+      "ember": "Ember"
     },
     "palettePresetsHint": {
       "solar": "Le jour d’Hexly : papier ivoire chaud, encre sépia, or d’héliographe.",
-      "astral": "La nuit d’Hexly : indigo de minuit, encre parchemin, or des constellations."
+      "vellum": "Papier neutre et froid, encre ardoise. Sobre, et qui ne s’impose pas.",
+      "herbarium": "Sauge pâle, encre vert forêt et laiton — un spécimen pressé sous verre.",
+      "astral": "La nuit d’Hexly : indigo de minuit, encre parchemin, or des constellations.",
+      "obsidian": "Presque noir et neutre, encre froide, un fil de cyan. La nuit sans couleur propre.",
+      "ember": "Fusain chaud et encre de cendre, éclairés d’un orange de forge."
     },
     "overridesHeading": "Jetons individuels",
     "overridesHint": "Chaque jeton ci-dessous suit la palette tant que vous ne le fixez pas, et chaque case montre ce qu’il rend actuellement. La plupart découlent des ancres ; quelques-uns sont une ancre sous un autre nom, et quelques-uns sont des valeurs fixes qu’aucune ancre n’atteint. Sélectionnez-en un pour fixer le vôtre ; l’effacer rend le jeton à la palette.",

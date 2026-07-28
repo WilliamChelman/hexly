@@ -86,6 +86,17 @@ describe('PALETTE_PRESETS', () => {
     }
   });
 
+  it('gives every dark Preset a canvas glow of its own', () => {
+    // The stylesheet keys off `[data-color-scheme]` and a stored Theme carries no Preset id, so a dark
+    // Preset silent here inherits Astral's indigo starlight and a warm-charcoal World glows indigo —
+    // ADR-0075's named-literal exception failing exactly as ADR-0077 says it must not.
+    for (const id of PALETTE_PRESET_IDS) {
+      const preset = PALETTE_PRESETS[id];
+      if (preset.scheme !== 'dark') continue;
+      expect(preset.overrides?.['--color-canvas-glow'], id).toBeDefined();
+    }
+  });
+
   it('overrides only tokens a World Theme may override', () => {
     const overridable = OVERRIDABLE_TOKENS.map((decl) => decl.name);
     for (const id of PALETTE_PRESET_IDS) {

@@ -471,11 +471,19 @@
     "palettePresetsLabel": "Palette preset",
     "palettePresets": {
       "solar": "Solar",
-      "astral": "Astral"
+      "vellum": "Vellum",
+      "herbarium": "Herbarium",
+      "astral": "Astral",
+      "obsidian": "Obsidian",
+      "ember": "Ember"
     },
     "palettePresetsHint": {
       "solar": "Hexly's own day: warm ivory paper, sepia ink, heliograph gold.",
-      "astral": "Hexly's own night: midnight indigo, parchment ink, constellation gold."
+      "vellum": "Cool neutral paper and slate ink. Plain, and out of your way.",
+      "herbarium": "Pale sage, deep forest ink and brass — a pressed specimen under glass.",
+      "astral": "Hexly's own night: midnight indigo, parchment ink, constellation gold.",
+      "obsidian": "Neutral near-black, cool ink, a cyan edge. Night without a colour of its own.",
+      "ember": "Warm charcoal and ash ink, lit forge-orange."
     },
     "overridesHeading": "Individual tokens",
     "overridesHint": "Each token below follows the palette until you set it, and every cell shows what it currently renders as. Most are derived from the anchors; a few are an anchor under another name, and a few are fixed values no anchor reaches. Select one to set your own; clearing it hands the token back to the palette.",

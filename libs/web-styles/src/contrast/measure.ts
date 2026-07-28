@@ -10,6 +10,7 @@
  * so `apps/web-e2e` hands them to `page.evaluate` rather than testing a copy of them.
  */
 
+import type { DesignToken } from '../tokens/manifest';
 import {
   CHIP_GROUNDS,
   CONTRAST_TOKENS,
@@ -65,6 +66,16 @@ export function measureScheme(measurement: SchemeMeasurement): Record<string, st
   }
 }
 
+/** One batch of colours to rasterise, and what to paint under them where they are translucent. */
+export interface ColorRasterisation {
+  readonly values: readonly string[];
+  /** Painted first, so a translucent value composites the way the page renders it. */
+  readonly ground?: string;
+}
+
+/** An sRGB colour as it rasterises, alpha included — the four channels `getImageData` hands back. */
+export type RasterisedColor = [number, number, number, number];
+
 /**
  * Each CSS colour as a 2D drawing context rasterises it: 8-bit sRGB, gamut-mapped exactly as a display
  * will get it, which is what makes a ratio over these the one a reader experiences. It is also the only
@@ -73,8 +84,11 @@ export function measureScheme(measurement: SchemeMeasurement): Record<string, st
  * Alpha is answered rather than dropped: a contrast caller composites through `ground` and reads only
  * the first three channels, but the token snapshot holds a translucent `initial` to its alpha too, and
  * the serialisation boundary below forbids a second function to answer it.
+ *
+ * One argument, as {@link measureScheme} takes one, because `page.evaluate` passes exactly one — a
+ * ground reached only through a second parameter is a ground `apps/web-e2e` cannot ask for.
  */
-export function rasteriseColors(values: readonly string[], ground?: string): [number, number, number, number][] {
+export function rasteriseColors({ values, ground }: ColorRasterisation): RasterisedColor[] {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 1;
   const context = canvas.getContext('2d', { willReadFrequently: true });
@@ -84,7 +98,7 @@ export function rasteriseColors(values: readonly string[], ground?: string): [nu
     // Seeded, so a value the context refuses to parse leaves black rather than the previous colour.
     context.fillStyle = '#000000';
     // `ground` painted under first composites a translucent value the way the page does, rather than
-    // handing back its own channels with the alpha thrown away — `page.evaluate` never passes it.
+    // handing back its own channels with the alpha thrown away.
     if (ground !== undefined) {
       context.fillStyle = ground;
       context.fillRect(0, 0, 1, 1);
@@ -98,9 +112,56 @@ export function rasteriseColors(values: readonly string[], ground?: string): [nu
 }
 
 /**
+ * Every token a report resolves: the pairs it judges, plus each chip's soft fill — measured too, and
+ * only here, because those are 14% opaque and have to be composited before the alpha is gone.
+ */
+export const CONTRAST_REPORT_TOKENS: readonly DesignToken[] = [
+  ...CONTRAST_TOKENS,
+  ...CHIP_FILLS.map(([, fill]) => fill),
+];
+
+/**
+ * What an engine must rasterise for a report, given what it resolved: the opaque pairs first, then the
+ * soft fills over each ground a chip may sit on. `null` where the engine resolved nothing, which is a
+ * third answer and not a clean bill of health (ADR-0076).
+ */
+export function contrastRasterisations(
+  resolved: Readonly<Record<string, string>>,
+): readonly ColorRasterisation[] | null {
+  if (CONTRAST_REPORT_TOKENS.some((token) => !resolved[token])) return null;
+  return [
+    { values: CONTRAST_TOKENS.map((token) => resolved[token]) },
+    ...CHIP_GROUNDS.map((ground) => ({
+      values: CHIP_FILLS.map(([, fill]) => resolved[fill]),
+      ground: resolved[ground],
+    })),
+  ];
+}
+
+/**
+ * The report over what {@link contrastRasterisations} asked for, answered in that order.
+ *
+ * Split from {@link contrastReport} so the Preset contrast gate judges through this rather than a
+ * second copy of it (ADR-0077): the gate reaches the engine through `page.evaluate`, which it can only
+ * await, and a gate composing its own measurement could pass while the editor's panel warned.
+ */
+export function contrastVerdict(rasterised: readonly (readonly RasterisedColor[])[]): readonly ThemeWarning[] {
+  // Narrowed to the three channels a ratio is over: the pairs are opaque, and the fills have already
+  // been composited through their ground.
+  const opaque = ([red, green, blue]: RasterisedColor): Rgb => [red, green, blue];
+  const [pairs, ...composited] = rasterised;
+  const measured: MeasuredScheme = Object.fromEntries(CONTRAST_TOKENS.map((token, i) => [token, opaque(pairs[i])]));
+  const fills: Record<string, Record<string, Rgb>> = {};
+  CHIP_GROUNDS.forEach((ground, g) =>
+    CHIP_FILLS.forEach(([tone], i) => ((fills[tone] ??= {})[ground] = opaque(composited[g][i]))),
+  );
+  return themeWarnings(measured, fills);
+}
+
+/**
  * Whether one candidate Palette is readable in one ColorScheme: measure, rasterise, judge — the whole
- * face of the report. `null` where the engine resolved nothing, which is a third answer and not a clean
- * bill of health: readability can only be checked in a browser (ADR-0076).
+ * face of the report. `null` where the engine resolved nothing: readability can only be checked in a
+ * browser (ADR-0076).
  *
  * `scheme` is a string because `ColorScheme` lives in `@hexly/web-core` and this is a leaf lib.
  */
@@ -108,27 +169,7 @@ export function contrastReport(
   scheme: string,
   declarations: Readonly<Partial<Record<string, string>>>,
 ): readonly ThemeWarning[] | null {
-  // The soft fills are measured too, and only here: they are 14% opaque, so they have to be composited
-  // before the alpha is gone (`chipWarnings`).
-  const fillTokens = CHIP_FILLS.map(([, fill]) => fill);
-  const wanted = [...CONTRAST_TOKENS, ...fillTokens];
-  const resolved = measureScheme({ scheme, declarations, tokens: wanted });
-  if (wanted.some((token) => !resolved[token])) return null;
-
-  // Narrowed to the three channels a ratio is over: these are opaque, and the chip fills below have
-  // already been composited through their ground.
-  const rasterised = rasteriseColors(CONTRAST_TOKENS.map((token) => resolved[token])).map(
-    ([red, green, blue]): Rgb => [red, green, blue],
-  );
-  const measured: MeasuredScheme = Object.fromEntries(CONTRAST_TOKENS.map((token, i) => [token, rasterised[i]]));
-
-  const fills: Record<string, Record<string, Rgb>> = {};
-  for (const ground of CHIP_GROUNDS) {
-    const over = rasteriseColors(
-      fillTokens.map((fill) => resolved[fill]),
-      resolved[ground],
-    ).map(([red, green, blue]): Rgb => [red, green, blue]);
-    CHIP_FILLS.forEach(([tone], i) => ((fills[tone] ??= {})[ground] = over[i]));
-  }
-  return themeWarnings(measured, fills);
+  const resolved = measureScheme({ scheme, declarations, tokens: CONTRAST_REPORT_TOKENS });
+  const rasterisations = contrastRasterisations(resolved);
+  return rasterisations && contrastVerdict(rasterisations.map(rasteriseColors));
 }

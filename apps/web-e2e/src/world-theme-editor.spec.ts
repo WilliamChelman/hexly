@@ -62,7 +62,7 @@ async function restoreDefaultTheme(page: Page): Promise<void> {
 
 /** How light a resolved colour is, 0..765 — enough to tell a near-black foreground from a near-white. */
 async function brightnessOnRoot(page: Page, name: string): Promise<number> {
-  const [rgb] = await page.evaluate(rasteriseColors, [await resolvedOnRoot(page, name)]);
+  const [rgb] = await page.evaluate(rasteriseColors, { values: [await resolvedOnRoot(page, name)] });
   return rgb[0] + rgb[1] + rgb[2];
 }
 
