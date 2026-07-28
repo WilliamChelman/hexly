@@ -109,7 +109,7 @@ describe('World importers', () => {
     expect(goblin.detail.document[HEXLY_SOURCE_KEY]).toEqual({ importer: STUB_ID, sourceId: 'goblin', rev: 'rev-1' });
 
     // The derived provenance index mirrors the stamp — one row per imported Entity.
-    const rows = db.select().from(entityImportSource).where(eq(entityImportSource.worldId, world)).all();
+    const rows = db.select().from(entityImportSource).where(eq(entityImportSource.containerId, world)).all();
     expect(rows).toHaveLength(2);
     expect(rows).toContainEqual(
       expect.objectContaining({ entityId: goblin.id, importer: STUB_ID, sourceId: 'goblin', rev: 'rev-1' }),
@@ -191,7 +191,7 @@ describe('World importers', () => {
     await expectMissing(ada, world, 'Goblin');
     // The hand-authored Note is untouched — the delete is keyed by the provenance index alone.
     expect((await entityByName(ada, world, 'Chronicle')).id).toBe(chronicle);
-    expect(db.select().from(entityImportSource).where(eq(entityImportSource.worldId, world)).all()).toHaveLength(0);
+    expect(db.select().from(entityImportSource).where(eq(entityImportSource.containerId, world)).all()).toHaveLength(0);
   });
 
   it('surfaces the last-known imported state on the list, off the provenance index (#260)', async () => {
@@ -239,7 +239,7 @@ describe('World importers', () => {
     // The stamp never persisted: the Impostor carries none, and the only provenance row is the goblin's.
     const detail = (await ada.get(`/entities/${created.body.id}`).expect(200)).body;
     expect(detail.document[HEXLY_SOURCE_KEY]).toBeUndefined();
-    const rows = db.select().from(entityImportSource).where(eq(entityImportSource.worldId, world)).all();
+    const rows = db.select().from(entityImportSource).where(eq(entityImportSource.containerId, world)).all();
     expect(rows).toEqual([expect.objectContaining({ entityId: goblin.id, sourceId: 'goblin' })]);
   });
 

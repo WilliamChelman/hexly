@@ -199,7 +199,7 @@ describe('EntityWrites', () => {
     });
 
     /**
-     * The edge index (ADR-0046). `worldId` is denormalized off the source so the World Graph's
+     * The edge index (ADR-0046). `containerId` is denormalized off the source so the World Graph's
      * edge fetch is one indexed lookup; the target is unconstrained — dangling is valid, and `e2`
      * here does not exist.
      */
@@ -520,8 +520,20 @@ describe('EntityWrites', () => {
         // Persist the edges with the flags flipped — the corruption a pre-ADR-0069 harvest left behind.
         db.insert(entityEdges)
           .values([
-            { sourceEntityId: idOf('illustrated'), worldId: WORLD, targetKind: 'entity', targetId: 'e2', decor: true },
-            { sourceEntityId: idOf('illustrated'), worldId: WORLD, targetKind: 'asset', targetId: hash, decor: false },
+            {
+              sourceEntityId: idOf('illustrated'),
+              containerId: WORLD,
+              targetKind: 'entity',
+              targetId: 'e2',
+              decor: true,
+            },
+            {
+              sourceEntityId: idOf('illustrated'),
+              containerId: WORLD,
+              targetKind: 'asset',
+              targetId: hash,
+              decor: false,
+            },
           ])
           .run();
 
@@ -683,7 +695,7 @@ describe('EntityWrites', () => {
         db.insert(entities)
           .values({
             id,
-            worldId,
+            containerId: worldId,
             name: id,
             types: ['core.' + type],
             tags: [],
@@ -830,7 +842,7 @@ describe('EntityWrites', () => {
         db.insert(entities)
           .values({
             id,
-            worldId,
+            containerId: worldId,
             name: id,
             types: [...types],
             tags: [],
@@ -989,7 +1001,7 @@ describe('EntityWrites', () => {
     function importSourceOf(name: string) {
       return db
         .select({
-          worldId: entityImportSource.worldId,
+          worldId: entityImportSource.containerId,
           importer: entityImportSource.importer,
           sourceId: entityImportSource.sourceId,
           rev: entityImportSource.rev,
@@ -1004,7 +1016,7 @@ describe('EntityWrites', () => {
       return db
         .select({ entityId: entityImportSource.entityId })
         .from(entityImportSource)
-        .where(and(eq(entityImportSource.worldId, worldId), eq(entityImportSource.importer, importer)))
+        .where(and(eq(entityImportSource.containerId, worldId), eq(entityImportSource.importer, importer)))
         .all()
         .map((r) => r.entityId);
     }
@@ -1012,7 +1024,7 @@ describe('EntityWrites', () => {
     /** The denormalised Asset dedup-index rows an Entity carries, by name (ADR-0065). */
     function assetIndexOf(name: string) {
       return db
-        .select({ worldId: assetIndex.worldId, hash: assetIndex.hash })
+        .select({ worldId: assetIndex.containerId, hash: assetIndex.hash })
         .from(assetIndex)
         .where(eq(assetIndex.entityId, idOf(name)))
         .all();
@@ -1164,7 +1176,7 @@ describe('EntityWrites', () => {
     function edgesFrom(sourceEntityId: string) {
       return db
         .select({
-          worldId: entityEdges.worldId,
+          worldId: entityEdges.containerId,
           targetKind: entityEdges.targetKind,
           targetId: entityEdges.targetId,
           descriptor: entityEdges.descriptor,
@@ -1436,7 +1448,7 @@ describe('EntityWrites', () => {
       db.insert(entities)
         .values({
           id,
-          worldId: WORLD,
+          containerId: WORLD,
           name: id,
           types: [CORE_ASSET_TYPE_ID],
           tags: [],
@@ -1525,7 +1537,7 @@ describe('EntityWrites', () => {
       return db
         .select({ id: entities.id })
         .from(entities)
-        .where(eq(entities.worldId, worldId))
+        .where(eq(entities.containerId, worldId))
         .all()
         .map((r) => r.id)
         .sort();
@@ -1577,7 +1589,7 @@ describe('EntityWrites', () => {
     db.insert(entities)
       .values({
         id,
-        worldId,
+        containerId: worldId,
         name: id,
         types: ['core.type.note'],
         tags: [],

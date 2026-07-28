@@ -29,12 +29,12 @@ export function ownsEntity(userId: string, superadmin: boolean) {
 
 /** The caller has any membership row in the Entity's World (owner/contributor/viewer). */
 function isWorldMember(userId: string) {
-  return sql`EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${entities.worldId} AND ${worldMembers.userId} = ${userId})`;
+  return sql`EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${entities.containerId} AND ${worldMembers.userId} = ${userId})`;
 }
 
 /** The caller is a World Owner (role 'owner') of the Entity's World. */
 function isWorldOwner(userId: string) {
-  return sql`EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${entities.worldId} AND ${worldMembers.userId} = ${userId} AND ${worldMembers.role} = 'owner')`;
+  return sql`EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${entities.containerId} AND ${worldMembers.userId} = ${userId} AND ${worldMembers.role} = 'owner')`;
 }
 
 /**
@@ -106,7 +106,7 @@ export function tokenReachesEntity(db: Db, token: string, id: string): boolean {
   const viaWorld = db
     .select({ id: entities.id })
     .from(worldLinks)
-    .innerJoin(entities, and(eq(entities.worldId, worldLinks.worldId), eq(entities.id, id), sharedVisibility))
+    .innerJoin(entities, and(eq(entities.containerId, worldLinks.worldId), eq(entities.id, id), sharedVisibility))
     .where(eq(worldLinks.id, token))
     .get();
   return !!viaWorld;

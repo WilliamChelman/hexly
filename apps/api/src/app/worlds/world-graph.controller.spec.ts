@@ -334,7 +334,7 @@ describe('World Graph', () => {
     db.insert(entities)
       .values({
         id,
-        worldId,
+        containerId: worldId,
         name,
         types: ['core.type.asset'],
         tags: [],
@@ -345,7 +345,7 @@ describe('World Graph', () => {
         updatedAt: now,
       })
       .run();
-    db.insert(assetIndex).values({ entityId: id, worldId, hash }).run();
+    db.insert(assetIndex).values({ entityId: id, containerId: worldId, hash }).run();
     return id;
   }
 

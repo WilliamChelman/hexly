@@ -31,7 +31,7 @@ export interface MintedAsset {
  * Mint-and-dedup on upload (ADR-0065): an uploaded file becomes an **Asset** — an Entity carrying
  * `core.type.asset`, named after the filename stem, with the uploader as sole Owner and visibility
  * `shared`. Re-uploading identical bytes to the same World returns the existing Asset (no twin; the first
- * name sticks), resolved reconcile-style through the derived `(worldId, hash) → entity` index.
+ * name sticks), resolved reconcile-style through the derived `(containerId, hash) → entity` index.
  *
  * The gate (Contributor) lives at the caller (`WorldsService.uploadAsset`); this service is the pure mint.
  */
@@ -59,7 +59,7 @@ export class AssetMintService {
 
   /**
    * Mint (or dedup to) an Asset for `bytes` uploaded under `filename` into `worldId`, owned by `ownerId`,
-   * with the pre-computed {@link AssetExtraction} written in. Keyed on `(worldId, hash)`: identical bytes
+   * with the pre-computed {@link AssetExtraction} written in. Keyed on `(containerId, hash)`: identical bytes
    * already wrapped in this World return that Entity untouched — the on-disk bytes and served URL are
    * content-addressed, so nothing is written (not even a re-extraction) and the first name sticks. A fresh
    * mint pins the extension in the asset-ref, folds the stats into it, and stores the thumbnail beside the
@@ -76,7 +76,7 @@ export class AssetMintService {
     const existing = this.db
       .select({ entityId: assetIndex.entityId })
       .from(assetIndex)
-      .where(and(eq(assetIndex.worldId, worldId), eq(assetIndex.hash, hash)))
+      .where(and(eq(assetIndex.containerId, worldId), eq(assetIndex.hash, hash)))
       .get();
     if (existing) {
       const entity = this.entities.detailById(existing.entityId);

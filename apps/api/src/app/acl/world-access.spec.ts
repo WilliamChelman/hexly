@@ -119,7 +119,7 @@ describe('worldAccess', () => {
       db.insert(entities)
         .values({
           id: entityId,
-          worldId,
+          containerId: worldId,
           name: 'Relic',
           types: ['core.type.note'],
           tags: [],
@@ -170,7 +170,7 @@ describe('worldAccess', () => {
       db.insert(entities)
         .values({
           id: entityId,
-          worldId,
+          containerId: worldId,
           name: 'Relic',
           types: ['core.type.note'],
           tags: [],

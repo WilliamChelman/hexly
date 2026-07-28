@@ -30,7 +30,7 @@ function graphNodes(db: Db, access: EntityAccess, worldId: string): LinkedEntity
   return db
     .select({ id: entities.id, name: entities.name, types: entities.types })
     .from(entities)
-    .where(and(eq(entities.worldId, worldId), access.filter))
+    .where(and(eq(entities.containerId, worldId), access.filter))
     .orderBy(asc(entities.name), asc(entities.id))
     .all()
     .flatMap((row) => linkedEntity(row.id, row.name, row.types) ?? []);
@@ -43,12 +43,12 @@ function graphNodes(db: Db, access: EntityAccess, worldId: string): LinkedEntity
  *
  * Two kinds feed one edge list. `entity` edges name their target Entity directly. `asset` edges
  * (ADR-0065) name a content-addressed **hash**, not an id — the harvest never resolved it — so they
- * join the `(worldId, hash)` dedup index to reach the Asset's Entity here, at read time, making an
- * Asset's usage its inbound links like any other node. The hash join is World-scoped: identical
- * bytes in two Worlds share a hash but not an Entity.
+ * join the `(containerId, hash)` dedup index to reach the Asset's Entity here, at read time, making an
+ * Asset's usage its inbound links like any other node. The hash join is Container-scoped: identical
+ * bytes in two Containers share a hash but not an Entity.
  *
- * `worldId` is denormalized onto an edge to serve the indexed `WHERE worldId = ? AND targetKind = ?`
- * (`idx_entity_edges_world`).
+ * `containerId` is denormalized onto an edge to serve the indexed `WHERE containerId = ? AND
+ * targetKind = ?` (`idx_entity_edges_container`).
  */
 function graphEdges(db: Db, worldId: string, nodes: readonly LinkedEntity[]): WorldGraphEdge[] {
   const nodeIds = new Set(nodes.map((n) => n.id));
@@ -61,7 +61,7 @@ function graphEdges(db: Db, worldId: string, nodes: readonly LinkedEntity[]): Wo
       decor: entityEdges.decor,
     })
     .from(entityEdges)
-    .where(and(eq(entityEdges.worldId, worldId), eq(entityEdges.targetKind, 'entity')))
+    .where(and(eq(entityEdges.containerId, worldId), eq(entityEdges.targetKind, 'entity')))
     .orderBy(asc(entityEdges.sourceEntityId), asc(entityEdges.targetId), asc(entityEdges.descriptor))
     .all();
 
@@ -73,8 +73,11 @@ function graphEdges(db: Db, worldId: string, nodes: readonly LinkedEntity[]): Wo
       decor: entityEdges.decor,
     })
     .from(entityEdges)
-    .innerJoin(assetIndex, and(eq(assetIndex.hash, entityEdges.targetId), eq(assetIndex.worldId, entityEdges.worldId)))
-    .where(and(eq(entityEdges.worldId, worldId), eq(entityEdges.targetKind, 'asset')))
+    .innerJoin(
+      assetIndex,
+      and(eq(assetIndex.hash, entityEdges.targetId), eq(assetIndex.containerId, entityEdges.containerId)),
+    )
+    .where(and(eq(entityEdges.containerId, worldId), eq(entityEdges.targetKind, 'asset')))
     .orderBy(asc(entityEdges.sourceEntityId), asc(assetIndex.entityId), asc(entityEdges.descriptor))
     .all();
 

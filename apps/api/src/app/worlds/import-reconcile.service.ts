@@ -256,7 +256,7 @@ export class ImportReconcileService {
     return this.db
       .select({ sourceId: entityImportSource.sourceId, entityId: entityImportSource.entityId })
       .from(entityImportSource)
-      .where(and(eq(entityImportSource.worldId, worldId), eq(entityImportSource.importer, importer)))
+      .where(and(eq(entityImportSource.containerId, worldId), eq(entityImportSource.importer, importer)))
       .all();
   }
 
@@ -270,7 +270,7 @@ export class ImportReconcileService {
       .select({ rev: entityImportSource.rev, updatedAt: entities.updatedAt })
       .from(entityImportSource)
       .innerJoin(entities, eq(entities.id, entityImportSource.entityId))
-      .where(and(eq(entityImportSource.worldId, worldId), eq(entityImportSource.importer, importer)))
+      .where(and(eq(entityImportSource.containerId, worldId), eq(entityImportSource.importer, importer)))
       .all();
     if (rows.length === 0) return undefined;
     // Rows can disagree mid-reimport (chunks apply the new rev one at a time); the most common wins —

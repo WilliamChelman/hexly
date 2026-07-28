@@ -44,11 +44,11 @@ const INITIAL_VERSION = 1;
  */
 const MAX_BOUND_PARAMS = 32766;
 
-/** Columns bound per `entity_edges` row: source, world, kind, target, descriptor, decor. */
+/** Columns bound per `entity_edges` row: source, container, kind, target, descriptor, decor. */
 const EDGE_COLUMNS = 6;
 /** Columns bound per `entity_descriptors` row: entity, descriptor. */
 const DESCRIPTOR_COLUMNS = 2;
-/** Columns bound per `entity_field_facets` row: entity, world, key, value, num. */
+/** Columns bound per `entity_field_facets` row: entity, container, key, value, num. */
 const FIELD_FACET_COLUMNS = 5;
 
 /** Split `rows` into the largest batches a single `INSERT … VALUES` can bind. Empty in, nothing out. */
@@ -203,7 +203,7 @@ export class EntityWrites {
     const derived = this.derive(input.document, input.types, input.worldId);
     const row: EntityRow = {
       id: input.id ?? randomUUID(),
-      worldId: input.worldId,
+      containerId: input.worldId,
       name: input.name,
       types: [...input.types],
       tags: [...input.tags],
@@ -221,7 +221,7 @@ export class EntityWrites {
     return this.transact(() => {
       this.db.insert(entities).values(row).run();
       this.db.insert(entityGrants).values({ entityId: row.id, userId: input.ownerId, role: 'owner' }).run();
-      this.replaceDerived(row.id, row.worldId, derived);
+      this.replaceDerived(row.id, row.containerId, derived);
       return row;
     });
   }
@@ -242,12 +242,12 @@ export class EntityWrites {
     const now = Date.now();
     this.transact(() => {
       const existing = this.db
-        .select({ worldId: entities.worldId, seq: entities.seq, version: entities.version })
+        .select({ containerId: entities.containerId, seq: entities.seq, version: entities.version })
         .from(entities)
         .where(eq(entities.id, id))
         .get();
       if (!existing) return;
-      const derived = this.derive(input.document, input.types, existing.worldId);
+      const derived = this.derive(input.document, input.types, existing.containerId);
       this.db
         .update(entities)
         .set({
@@ -264,7 +264,7 @@ export class EntityWrites {
         })
         .where(eq(entities.id, id))
         .run();
-      this.replaceDerived(id, existing.worldId, derived);
+      this.replaceDerived(id, existing.containerId, derived);
       this.enqueue(id);
     });
   }
@@ -295,9 +295,9 @@ export class EntityWrites {
    */
   cascadeDeleteWorld(worldId: string): void {
     this.transact(() => {
-      const doomed = this.db.select({ id: entities.id }).from(entities).where(eq(entities.worldId, worldId)).all();
+      const doomed = this.db.select({ id: entities.id }).from(entities).where(eq(entities.containerId, worldId)).all();
       // entity_grants, entity_links, entity_descriptors and entity_edges cascade with each row.
-      this.db.delete(entities).where(eq(entities.worldId, worldId)).run();
+      this.db.delete(entities).where(eq(entities.containerId, worldId)).run();
       for (const { id } of doomed) this.enqueue(id);
     });
   }
@@ -324,7 +324,7 @@ export class EntityWrites {
       const shared = this.db
         .select({ id: entities.id })
         .from(entities)
-        .where(and(eq(entities.worldId, worldId), sharedVisibility))
+        .where(and(eq(entities.containerId, worldId), sharedVisibility))
         .all();
       if (shared.length === 0) return;
       const ids = shared.map((e) => e.id);
@@ -380,7 +380,7 @@ export class EntityWrites {
     const rows = this.db
       .select({
         id: entities.id,
-        worldId: entities.worldId,
+        containerId: entities.containerId,
         // Facets and link edges derive from the effective set — `types` plus the attachments derived from
         // the `document` (ADR-0048, ADR-0054, ADR-0057, #188).
         types: entities.types,
@@ -400,12 +400,12 @@ export class EntityWrites {
       try {
         derived.push({
           row,
-          derived: this.derive(JSON.parse(row.document) as EntityDocument, row.types, row.worldId),
+          derived: this.derive(JSON.parse(row.document) as EntityDocument, row.types, row.containerId),
         });
       } catch (err) {
         failures.push({
           entityId: row.id,
-          worldId: row.worldId,
+          worldId: row.containerId,
           reason: err instanceof Error ? err.message : String(err),
         });
       }
@@ -420,7 +420,7 @@ export class EntityWrites {
             .set({ contentText: d.searchText, thumbnailEntityId: d.thumbnailEntityId })
             .where(eq(entities.id, row.id))
             .run();
-          this.replaceDerived(row.id, row.worldId, d);
+          this.replaceDerived(row.id, row.containerId, d);
         }
       });
 
@@ -461,46 +461,46 @@ export class EntityWrites {
    * diffing, so they are self-pruning. Must run in the same transaction as the document write, so the
    * indexes reflect the last *successful* save and never a rejected one.
    */
-  private replaceDerived(id: string, worldId: string, derived: DocumentDerivedState): void {
+  private replaceDerived(id: string, containerId: string, derived: DocumentDerivedState): void {
     this.replaceDescriptors(id, derived.descriptors);
-    this.replaceEdges(id, worldId, derived.edges);
-    this.replaceFieldFacets(id, worldId, derived.fieldFacets);
-    this.replaceImportSource(id, worldId, derived.importSource);
-    this.replaceAssetIndex(id, worldId, derived.assetRef);
+    this.replaceEdges(id, containerId, derived.edges);
+    this.replaceFieldFacets(id, containerId, derived.fieldFacets);
+    this.replaceImportSource(id, containerId, derived.importSource);
+    this.replaceAssetIndex(id, containerId, derived.assetRef);
   }
 
   /**
    * Replace the Entity's **Asset dedup index** row with the freshly derived byte address (self-pruning,
    * ADR-0065): an asset-ref-carrying document materialises one row keyed on the bytes' hash, clearing the
    * ref removes it, and the FK cascade drops it with the Entity. Derived, never authoritative — an index
-   * over the document like the edge and provenance sets, so `worldId` is denormalised off the source. The
-   * `ext` rides along so a read can stat the exact file, and rewriting the row heals a pre-#325 row.
+   * over the document like the edge and provenance sets, so `containerId` is denormalised off the source.
+   * The `ext` rides along so a read can stat the exact file, and rewriting the row heals a pre-#325 row.
    */
-  private replaceAssetIndex(id: string, worldId: string, ref: AssetBytesRef | null): void {
+  private replaceAssetIndex(id: string, containerId: string, ref: AssetBytesRef | null): void {
     this.db.delete(assetIndex).where(eq(assetIndex.entityId, id)).run();
-    if (ref) this.db.insert(assetIndex).values({ entityId: id, worldId, hash: ref.hash, ext: ref.ext }).run();
+    if (ref) this.db.insert(assetIndex).values({ entityId: id, containerId, hash: ref.hash, ext: ref.ext }).run();
   }
 
   /**
    * Replace the Entity's **Import Source** row with the freshly derived provenance (self-pruning,
    * ADR-0060): a `hexly.source`-carrying document materialises one row, clearing or changing the stamp
    * rewrites it, and the FK cascade drops it with the Entity. Derived, never authoritative — an index
-   * over the document like the edge and facet sets, so `worldId` is denormalised off the source.
+   * over the document like the edge and facet sets, so `containerId` is denormalised off the source.
    */
-  private replaceImportSource(id: string, worldId: string, source: ImportSource | null): void {
+  private replaceImportSource(id: string, containerId: string, source: ImportSource | null): void {
     this.db.delete(entityImportSource).where(eq(entityImportSource.entityId, id)).run();
     if (source)
       this.db
         .insert(entityImportSource)
-        .values({ entityId: id, worldId, importer: source.importer, sourceId: source.sourceId, rev: source.rev })
+        .values({ entityId: id, containerId, importer: source.importer, sourceId: source.sourceId, rev: source.rev })
         .run();
   }
 
   /**
    * Replace the Entity's Field-facet rows with the freshly derived set (self-pruning, ADR-0048).
-   * `worldId` is denormalised off the source, so a World-scoped facet read is one indexed lookup.
+   * `containerId` is denormalised off the source, so a Container-scoped facet read is one indexed lookup.
    */
-  private replaceFieldFacets(id: string, worldId: string, facets: readonly FieldFacetValue[]): void {
+  private replaceFieldFacets(id: string, containerId: string, facets: readonly FieldFacetValue[]): void {
     this.db.delete(entityFieldFacets).where(eq(entityFieldFacets.entityId, id)).run();
     for (const batch of batched(facets, FIELD_FACET_COLUMNS)) {
       this.db
@@ -508,7 +508,7 @@ export class EntityWrites {
         .values(
           batch.map((f) => ({
             entityId: id,
-            worldId,
+            containerId,
             key: f.key,
             value: f.value,
             num: f.num,
@@ -530,16 +530,16 @@ export class EntityWrites {
   }
 
   /**
-   * Replace the Entity's outbound edge rows with the harvested set (self-pruning). `worldId` is
+   * Replace the Entity's outbound edge rows with the harvested set (self-pruning). `containerId` is
    * denormalized off the source here — the one place it can be, since an edge has no other
-   * relation to a World.
+   * relation to a Container.
    */
-  private replaceEdges(id: string, worldId: string, edges: readonly EntityEdge[]): void {
+  private replaceEdges(id: string, containerId: string, edges: readonly EntityEdge[]): void {
     this.db.delete(entityEdges).where(eq(entityEdges.sourceEntityId, id)).run();
     for (const batch of batched(edges, EDGE_COLUMNS)) {
       this.db
         .insert(entityEdges)
-        .values(batch.map((edge) => ({ ...edge, sourceEntityId: id, worldId })))
+        .values(batch.map((edge) => ({ ...edge, sourceEntityId: id, containerId })))
         .run();
     }
   }
@@ -607,7 +607,7 @@ export class EntityWrites {
     const systemFields = this.typeFields.systemManagedFields;
     if (systemFields.length > 0) {
       const idsOf = (types: readonly string[], doc: EntityDocument) =>
-        new Set(this.worldTypeFields.effectiveFields(row.worldId, types, doc).map((f) => f.id));
+        new Set(this.worldTypeFields.effectiveFields(row.containerId, types, doc).map((f) => f.id));
       const stored = idsOf(storedTypes, storedDoc);
       const next = idsOf(nextTypes, nextDoc);
       if (systemFields.some((fieldId) => stored.has(fieldId) !== next.has(fieldId))) return true;
@@ -616,12 +616,12 @@ export class EntityWrites {
     // Hash-presence invariant (ADR-0068): the marker governs shape not value, save the one identity the
     // value carries — an Asset's content hash. A raw edit that keeps the asset type/Field attached but
     // guts the asset-ref value (`{}` or a stripped hash) leaves the shape untouched yet harvests the hash
-    // to null, deleting the `(worldId, hash)` dedup row and orphaning the bytes on disk (unreachable by
+    // to null, deleting the `(containerId, hash)` dedup row and orphaning the bytes on disk (unreachable by
     // delete, unaccounted by Reindex) — the same leak stripping the shape would cause, by another door. So
     // a user edit may not drive an asset-typed Entity's harvested hash from non-null to null.
     if (change.document !== undefined && this.typeFields.systemManagedTypes.some((t) => nextTypes.includes(t))) {
-      const storedRef = this.derive(storedDoc, storedTypes, row.worldId).assetRef;
-      if (storedRef !== null && this.derive(nextDoc, nextTypes, row.worldId).assetRef === null) return true;
+      const storedRef = this.derive(storedDoc, storedTypes, row.containerId).assetRef;
+      if (storedRef !== null && this.derive(nextDoc, nextTypes, row.containerId).assetRef === null) return true;
     }
 
     return false;
@@ -632,7 +632,7 @@ export class EntityWrites {
     if (!this.deletions) return;
     this.deletions.reap({
       id: row.id,
-      worldId: row.worldId,
+      worldId: row.containerId,
       types: row.types,
       document: JSON.parse(row.document) as EntityDocument,
     });
@@ -690,7 +690,7 @@ export class EntityWrites {
       change.document !== undefined
         ? { ...stripReservedKeys(change.document), ...reservedKeys(JSON.parse(row.document) as EntityDocument) }
         : undefined;
-    const derived = document && this.derive(document, change.types ?? row.types, row.worldId);
+    const derived = document && this.derive(document, change.types ?? row.types, row.containerId);
     const set = {
       ...(change.name !== undefined && { name: change.name }),
       ...(change.tags !== undefined && { tags: [...change.tags] }),
@@ -721,7 +721,7 @@ export class EntityWrites {
     if (res.changes > 0) {
       // Same transaction as the document write, so the indexes always reflect the last *successful*
       // save, never a rejected one.
-      if (derived) this.replaceDerived(id, row.worldId, derived);
+      if (derived) this.replaceDerived(id, row.containerId, derived);
       return { status: 'ok', row: { ...row, ...set } };
     }
     // Zero rows: the version moved, or the predicate stopped matching. Re-read to tell them apart.
