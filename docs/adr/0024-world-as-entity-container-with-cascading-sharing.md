@@ -33,6 +33,8 @@ Auto-create one World per existing user and assign all their Entities to it (`wo
 
 ## Link-picker context
 
+> **Superseded by issue #394** — the Entity link picker binds the active World, so an off-world result is never _offered_ and there is no world-name suffix to render. Resolving an already-linked Entity stays unscoped, so a link that already crosses Worlds keeps rendering. The rest of this ADR stands.
+
 The Entity link picker (ADR-0023) orders results in-world first. Off-world results display a world name suffix; in-world results show none.
 
 ## Considered Options

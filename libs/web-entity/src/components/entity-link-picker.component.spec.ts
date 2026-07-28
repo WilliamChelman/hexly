@@ -199,8 +199,7 @@ describe('EntityLinkPicker', () => {
   });
 
   it('offers only Entities from the World being edited in (#394)', () => {
-    // The caller reaches both Worlds; the picker is a link-target read, so it is bound to the
-    // active World and never offers a target the editing World could not hold.
+    // Both Worlds are the caller's to reach, so this is scoping, not an access failure.
     stubEntities = [summary('n1', 'Riverbend'), summary('n2', 'Riverbend Keep', 'w2')];
     TestBed.inject(ActiveWorld).set('w1');
     const fixture = render();
@@ -213,8 +212,7 @@ describe('EntityLinkPicker', () => {
   });
 
   it('still resolves a link whose target lives outside the active World (#394)', () => {
-    // Only *offering* is scoped: a link that already exists keeps rendering its name, so scoping
-    // the search never turns an existing cross-World link into a dangling one.
+    // Scoping the search must never turn an existing cross-World link into a dangling one.
     stubEntities = [summary('n2', 'Riverbend Keep', 'w2')];
     TestBed.inject(ActiveWorld).set('w1');
     const fixture = render();

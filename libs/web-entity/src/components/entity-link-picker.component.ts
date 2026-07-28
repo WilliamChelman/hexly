@@ -150,12 +150,7 @@ export class EntityLinkPickerComponent {
   protected readonly open = signal(false);
   protected readonly query = signal('');
 
-  /**
-   * The World the user is editing in (ADR-0028), scoping what the picker *offers* (#394). A picker is
-   * a link-target read: it may only name Entities the editing World can hold, never every World the
-   * caller happens to reach. Resolving an existing link stays unscoped — a link that already points
-   * out of this World keeps rendering.
-   */
+  /** The World in the URL (ADR-0028) — never absent on the guarded `w/:worldId` routes this mounts under. */
   protected readonly activeWorldId = computed(() => this.activeWorld.worldId() ?? undefined);
 
   /**
