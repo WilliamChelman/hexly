@@ -72,9 +72,9 @@ describe('Settings page (ADR-0038)', () => {
   it('writes the ColorScheme and language through the same signals the user menu uses', () => {
     const fixture = render();
 
-    el<HTMLElement>(fixture, 'color-scheme-astral').click();
+    el<HTMLElement>(fixture, 'color-scheme-dark').click();
     fixture.detectChanges();
-    expect(TestBed.inject(ColorSchemeService).colorScheme()).toBe('astral');
+    expect(TestBed.inject(ColorSchemeService).colorScheme()).toBe('dark');
 
     const language = el<HTMLSelectElement>(fixture, 'language');
     language.value = 'fr';
@@ -159,7 +159,7 @@ describe('Settings page (ADR-0038)', () => {
     // No email address anywhere either, not merely no input for it.
     expect(html.textContent).not.toContain('ada@hexly.test');
 
-    for (const testid of ['color-scheme-solar', 'color-scheme-astral', 'language', 'format-locale']) {
+    for (const testid of ['color-scheme-light', 'color-scheme-dark', 'language', 'format-locale']) {
       expect(html.querySelector(`[data-testid="${testid}"]`)).not.toBeNull();
     }
   });

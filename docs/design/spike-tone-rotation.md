@@ -17,6 +17,13 @@ at 4.37:1. The eight tones the spike recommended are derived off it and moved wi
 what they measure **as shipped today** is `world-theme-spec.md` §2.3. This section is the
 analysis that chose them and is left at the values it was computed from.
 
+**Amended by ADR-0077.** Solar and Astral are no longer the names of the ColorSchemes;
+they name two of the six **Palette Presets** Hexly ships, and the axis is `light` | `dark`.
+The prose below is left at the vocabulary it was written in: the tones are rotations off
+`--color-accent`, so every separation figure here is a claim about the Solar and Astral
+accents specifically and says nothing about the four Presets added later. What holds for
+all six is the contrast gate, not these numbers.
+
 ---
 
 ## Verdict

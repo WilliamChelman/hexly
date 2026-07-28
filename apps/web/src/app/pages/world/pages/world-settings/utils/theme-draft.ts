@@ -16,20 +16,24 @@ import {
   declaredTokenValues,
   designTokenInitial,
   measureScheme,
-  readDesignToken,
   tokenDerivation,
 } from '@hexly/web-styles';
 import {
+  DEFAULT_PALETTE_PRESETS,
   FONT_PAIRINGS,
   FONT_PAIRING_IDS,
   FontPairingId,
   OVERRIDABLE_TOKENS,
+  PALETTE_PRESETS,
   PALETTE_TOKENS,
+  PalettePreset,
+  PalettePresetId,
   WORLD_THEME_VERSION,
   WorldTheme,
   WorldThemeInput,
   WorldThemePalette,
   colorTokenHex,
+  palettePresetsFor,
 } from '@hexly/domain';
 import {
   ColorScheme,
@@ -43,7 +47,7 @@ import {
  * The two halves an Owner authors in one sitting — a World Theme and a reader's ColorScheme are
  * orthogonal (ADR-0006).
  */
-export const COLOR_SCHEMES = ['solar', 'astral'] as const satisfies readonly ColorScheme[];
+export const COLOR_SCHEMES = ['light', 'dark'] as const satisfies readonly ColorScheme[];
 
 /** A numeric knob's domain — how far a control may take it, and at what grain. */
 export interface KnobRange {
@@ -172,7 +176,7 @@ export type ResolvedRoles = Readonly<Record<ColorScheme, Readonly<Partial<Record
  * (ADR-0075). The value is true of all fifty-one.
  *
  * Measured on the root rather than an offscreen probe, and for the ColorScheme the reader is *not* in
- * too — the tier-2 roles are declared once at `:root`, so a probe inherits the reader's own (ADR-0076).
+ * too — every tier is declared at `:root` alone, so a probe inherits the reader's own (ADR-0077).
  * Only jsdom takes the manifest fallback.
  */
 export function resolvedRoles(declarations: ThemeDeclarationSet): ResolvedRoles {
@@ -181,7 +185,7 @@ export function resolvedRoles(declarations: ThemeDeclarationSet): ResolvedRoles 
     const measured = measureScheme({ scheme, declarations: declarations[scheme], tokens });
     return Object.fromEntries(tokens.map((token) => [token, measured[token] || designTokenInitial(token)]));
   };
-  return { solar: forScheme('solar'), astral: forScheme('astral') };
+  return { light: forScheme('light'), dark: forScheme('dark') };
 }
 
 /** How each override row gets its value, keyed by the token — what the row is marked with (#374). */
@@ -194,7 +198,7 @@ let derivations: RoleDerivations | undefined;
  * mark on a row is the stylesheet's own answer and not a list beside it (ADR-0075).
  *
  * Read once and kept: the stylesheets do not change under a running app, and this walks every rule of
- * every sheet. Read as Solar, which is where the derivations *are* — a tier-2 role is one expression
+ * every sheet. Read as light, which is where the derivations *are* — a tier-2 role is one expression
  * for both ColorSchemes, and a ColorScheme that reassigns one is by construction stating a literal
  * outright. `world-theme-overrides.spec.ts` holds that to the stylesheets in a real engine.
  *
@@ -203,7 +207,7 @@ let derivations: RoleDerivations | undefined;
  */
 export function roleDerivations(): RoleDerivations {
   if (derivations) return derivations;
-  const declared = declaredTokenValues('solar');
+  const declared = declaredTokenValues('light');
   derivations = Object.fromEntries(
     OVERRIDE_CONTROLS.filter((control) => declared[control.token]).map((control) => [
       control.token,
@@ -336,8 +340,8 @@ export const FONT_PAIRING_CHOICES: readonly FontPairingChoice[] = FONT_PAIRING_I
  * from this editor cannot drop what a surface authoring the rest of the contract stored.
  */
 export interface ThemeDraft {
-  readonly solar: WorldThemePalette;
-  readonly astral: WorldThemePalette;
+  readonly light: WorldThemePalette;
+  readonly dark: WorldThemePalette;
   readonly radii?: WorldTheme['radii'];
   readonly fontPairing?: WorldTheme['fontPairing'];
   readonly overrides?: WorldTheme['overrides'];
@@ -348,8 +352,8 @@ export function draftFrom(theme: WorldTheme | null | undefined): ThemeDraft | nu
   if (!theme) return null;
   // Field by field rather than a spread minus `version`: what goes back out is stamped with the
   // contract this build knows, not the one it read.
-  const { solar, astral, radii, fontPairing, overrides } = theme;
-  return { solar, astral, radii, fontPairing, overrides };
+  const { light, dark, radii, fontPairing, overrides } = theme;
+  return { light, dark, radii, fontPairing, overrides };
 }
 
 /** The draft as it is sent, stamped with the contract version it was authored against (ADR-0076). */
@@ -393,21 +397,64 @@ export function withControlValue(palette: WorldThemePalette, control: PaletteCon
 }
 
 /**
- * Hexly's own Palette for a ColorScheme, read off the document rather than restated here: tier-1
- * declarations key off `[data-color-scheme]` on any element (ADR-0076), so the probe's own anchors beat
- * the World Theme inherited from the root. Only jsdom falls back.
+ * The Palette Presets on offer, per ColorScheme (#384). Read off the domain's own table rather than
+ * restated, so a Preset added there heads its column with no edit here — its name and its one-line
+ * description are copy, and are not.
+ */
+export const PALETTE_PRESET_CHOICES: Readonly<Record<ColorScheme, readonly PalettePreset[]>> = {
+  light: palettePresetsFor('light'),
+  dark: palettePresetsFor('dark'),
+};
+
+/**
+ * The eleven values as their own controls speak them — a hex per anchor, the number itself per knob.
+ * What {@link palettePresetOf} compares on: a Preset's values are authored notations while a stored
+ * Palette comes back canonicalised from the write choke point (ADR-0076), and `#f1e5c7` and its OKLCH
+ * are the same Palette.
+ */
+function paletteFingerprint(palette: WorldThemePalette): string {
+  return PALETTE_CONTROLS.map((control) => controlValue(palette, control)).join('|');
+}
+
+/**
+ * Which offered Preset `palette` is, or `undefined` for one authored away from every offer.
+ *
+ * Derived by comparison rather than read off a stored id, as {@link radiusPresetOf} is and for its
+ * reason: a Preset is stored as its values and never as its name, so renaming one is no migration
+ * against stored Themes (ADR-0077). It also makes the mark honest for free — an Owner who moves one
+ * anchor has moved away from the Preset, and the lookup stops answering.
+ */
+export function palettePresetOf(palette: WorldThemePalette, scheme: ColorScheme): PalettePresetId | undefined {
+  const authored = paletteFingerprint(palette);
+  return PALETTE_PRESET_CHOICES[scheme].find((preset) => paletteFingerprint(preset.values) === authored)?.id;
+}
+
+/**
+ * `draft` with one ColorScheme taken from `preset`: its Palette replaced **whole**, and the Preset's
+ * own named literals **merged** into that ColorScheme's overrides. The other ColorScheme, the radii and
+ * the font pairing are untouched — a Preset is one ColorScheme's Palette and nothing else (ADR-0077),
+ * and picking colours must not undo unrelated choices.
+ *
+ * The literals go through {@link withOverride}, so what a dark Preset writes is an override like any
+ * other: it shows as overridden, and the Owner can clear it back to derived.
+ */
+export function withPalettePreset(draft: ThemeDraft, preset: PalettePreset): ThemeDraft {
+  const scheme: ColorScheme = preset.scheme;
+  let overrides = draft.overrides;
+  for (const [token, value] of Object.entries(preset.overrides ?? {})) {
+    overrides = withOverride(overrides, scheme, token as PublicDesignToken, value);
+  }
+  // Copied: the table's entry is one shared object, and a draft is edited field by field.
+  return { ...draft, [scheme]: { ...preset.values }, overrides };
+}
+
+/**
+ * Hexly's own Palette for a ColorScheme — the Preset table's default entry (ADR-0077), which is what
+ * `tokens.css`'s tier-1 regions are generated from, so the editor and the stylesheet cannot disagree.
  */
 export function hexlyPalette(scheme: ColorScheme): WorldThemePalette {
-  const probe = document.createElement('div');
-  probe.dataset['colorScheme'] = scheme;
-  probe.style.display = 'none';
-  document.body.append(probe);
-  try {
-    const style = getComputedStyle(probe);
-    return paletteOf((token) => readDesignToken(style, token));
-  } finally {
-    probe.remove();
-  }
+  // Copied: the table's entry is one shared object, and a draft is edited field by field.
+  return { ...PALETTE_PRESETS[DEFAULT_PALETTE_PRESETS[scheme]].values };
 }
 
 /**
@@ -419,10 +466,10 @@ export function hexlyPalette(scheme: ColorScheme): WorldThemePalette {
 export function defaultPalettes(
   instance: WorldThemeLayer | null | undefined,
 ): Readonly<Record<ColorScheme, WorldThemePalette>> {
-  const hexly: WorldThemeLayer = { solar: hexlyPalette('solar'), astral: hexlyPalette('astral') };
+  const hexly: WorldThemeLayer = { light: hexlyPalette('light'), dark: hexlyPalette('dark') };
   const resolved = resolveWorldTheme([hexly, instance]);
   const readFrom = (declarations: ThemeDeclarations) => paletteOf((token) => declarations[token] ?? '');
-  return { solar: readFrom(resolved.solar), astral: readFrom(resolved.astral) };
+  return { light: readFrom(resolved.light), dark: readFrom(resolved.dark) };
 }
 
 /** One Palette, read token by token through `value` and typed by what the manifest declared. */

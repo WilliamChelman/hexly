@@ -140,7 +140,7 @@
     "backToWorlds": "Retour aux mondes",
     "eyebrow": "Système de design Hexly",
     "heroTitle": "La table du cartographe,<br />à la lueur des étoiles.",
-    "heroLede": "Une seule identité racontée à deux heures du jour. <strong>Solaire</strong> est l’almanach ensoleillé posé sur la table du cartographe ; <strong>Astral</strong> est la même carte sous le ciel nocturne. L’or est le fil conducteur — encre d’héliographe le jour, lignes de constellations la nuit — et le texte reste d’un crème ivoire chaleureux dans les deux. Tout ce qui suit est piloté par la même couche de propriétés personnalisées CSS que <code>apps/web</code> embarque.",
+    "heroLede": "Une seule identité racontée à deux heures du jour — les deux préréglages de palette qu’Hexly porte, un par schéma de couleurs. <strong>Solar</strong> est l’almanach ensoleillé posé sur la table du cartographe ; <strong>Astral</strong> est la même carte sous le ciel nocturne. L’or est le fil conducteur — encre d’héliographe le jour, lignes de constellations la nuit — et le texte reste d’un crème ivoire chaleureux dans les deux. Tout ce qui suit est piloté par la même couche de propriétés personnalisées CSS que <code>apps/web</code> embarque.",
     "swatch": {
       "table": "Table",
       "paper": "Papier",
@@ -165,6 +165,8 @@
     "paletteSemantic": "Palette · rôles sémantiques",
     "paletteNote": "Les tranches demandent un rôle, jamais une couleur brute. Schéma de couleurs actif affiché.",
     "paletteTerrain": "Palette · remplissages de terrain",
+    "palettePresets": "Palette · préréglages",
+    "palettePresetsNote": "Chaque palette qu’Hexly propose toute prête, dessinée avec ses propres ancres. Un thème de monde en prend une comme point de départ, puis conserve des valeurs et jamais un nom.",
     "typeScale": "Échelle typographique",
     "spacing": "Espacement",
     "radii": "Rayons",
@@ -238,10 +240,10 @@
     "signOut": "Se déconnecter",
     "login": "Connexion",
     "colorScheme": {
-      "solar": "Solaire (clair)",
-      "astral": "Astral (sombre)",
-      "toSolar": "Passer au schéma de couleurs solaire",
-      "toAstral": "Passer au schéma de couleurs astral"
+      "light": "Clair",
+      "dark": "Sombre",
+      "toLight": "Passer au schéma de couleurs clair",
+      "toDark": "Passer au schéma de couleurs sombre"
     },
     "cancel": "Annuler",
     "close": "Fermer",
@@ -465,6 +467,24 @@
     "copyEmpty": "Aucun de vos autres mondes ne porte encore de thème. Créez-en un n’importe où et il pourra être copié ici.",
     "copyLoadError": "Impossible de charger les mondes dont vous pouvez copier un thème.",
     "paletteHeading": "Palette",
+    "paletteLede": "Un préréglage de palette est un point de départ et non un engagement : en choisir un remplit les onze valeurs de ce schéma, et rien ne retient lequel vous avez pris. Un préréglage sombre fixe aussi d’emblée la lueur du champ de carte — un jeton individuel que vous pouvez rendre à la palette.",
+    "palettePresetsLabel": "Préréglage de palette",
+    "palettePresets": {
+      "solar": "Solar",
+      "vellum": "Vellum",
+      "herbarium": "Herbarium",
+      "astral": "Astral",
+      "obsidian": "Obsidian",
+      "ember": "Ember"
+    },
+    "palettePresetsHint": {
+      "solar": "Le jour d’Hexly : papier ivoire chaud, encre sépia, or d’héliographe.",
+      "vellum": "Papier neutre et froid, encre ardoise. Sobre, et qui ne s’impose pas.",
+      "herbarium": "Sauge pâle, encre vert forêt et laiton — un spécimen pressé sous verre.",
+      "astral": "La nuit d’Hexly : indigo de minuit, encre parchemin, or des constellations.",
+      "obsidian": "Presque noir et neutre, encre froide, un fil de cyan. La nuit sans couleur propre.",
+      "ember": "Fusain chaud et encre de cendre, éclairés d’un orange de forge."
+    },
     "overridesHeading": "Jetons individuels",
     "overridesHint": "Chaque jeton ci-dessous suit la palette tant que vous ne le fixez pas, et chaque case montre ce qu’il rend actuellement. La plupart découlent des ancres ; quelques-uns sont une ancre sous un autre nom, et quelques-uns sont des valeurs fixes qu’aucune ancre n’atteint. Sélectionnez-en un pour fixer le vôtre ; l’effacer rend le jeton à la palette.",
     "derivation": {

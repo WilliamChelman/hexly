@@ -1,8 +1,8 @@
 # World Theme — implementation spec
 
-The decisions and their justifications live in [ADR-0075](../adr/0075-three-tier-anchor-derived-design-tokens.md) (token architecture) and [ADR-0076](../adr/0076-world-theme-is-untrusted-input-stored-on-the-world.md) (the feature). The fitted numbers live in [`spike-token-derivation.md`](./spike-token-derivation.md) and [`spike-tone-rotation.md`](./spike-tone-rotation.md). This document is the implementable detail and does not re-argue any of it.
+The decisions and their justifications live in [ADR-0075](../adr/0075-three-tier-anchor-derived-design-tokens.md) (token architecture), [ADR-0076](../adr/0076-world-theme-is-untrusted-input-stored-on-the-world.md) (the feature) and [ADR-0077](../adr/0077-colorscheme-is-light-and-dark-solar-and-astral-become-palette-presets.md) (the ColorScheme's names, and Palette Presets). The fitted numbers live in [`spike-token-derivation.md`](./spike-token-derivation.md) and [`spike-tone-rotation.md`](./spike-tone-rotation.md). This document is the implementable detail and does not re-argue any of it.
 
-Vocabulary is fixed by `CONTEXT.md`: a **World Theme** is what an Owner authors; a **ColorScheme** is `Solar` or `Astral`; a **Palette** is one ColorScheme's anchors.
+Vocabulary is fixed by `CONTEXT.md`: a **World Theme** is what an Owner authors; a **ColorScheme** is `Light` or `Dark`; a **Palette** is one ColorScheme's anchors; a **Palette Preset** is a whole Palette Hexly ships ready to pick for one ColorScheme (§5.6). **Solar** and **Astral** are the two Presets Hexly wears, and name nothing else.
 
 ---
 
@@ -10,16 +10,18 @@ Vocabulary is fixed by `CONTEXT.md`: a **World Theme** is what an Owner authors;
 
 Eight anchors and three knobs per ColorScheme. Private: `--palette-*` is never referenced outside the derivation block, and the lint rule enforces that.
 
-| Anchor                | Role                                    | Solar     | Astral    |
-| --------------------- | --------------------------------------- | --------- | --------- |
-| `--palette-page`      | The table / outer paper                 | `#f1e5c7` | `#0b0c1a` |
-| `--palette-ink`       | Primary text ink                        | `#2e2412` | `#ece3cf` |
-| `--palette-ink-quiet` | Secondary ink — **carries its own hue** | `#6f5a36` | `#9aa0c8` |
-| `--palette-accent`    | The through-line accent                 | `#8c5e00` | `#d9b25a` |
-| `--palette-danger`    | Danger                                  | `#a4402e` | `#e88a6f` |
-| `--palette-success`   | Confirmation                            | `#4a6f2f` | `#86c46a` |
-| `--palette-canvas`    | The map field                           | `#efe2bf` | `#12152e` |
-| `--palette-soot`      | Shadow / scrim ink                      | `#3c2c16` | `#02020a` |
+The values below are Hexly's own two Palettes — the **Solar** and **Astral** Presets, authored in `libs/domain/src/lib/palette-preset.ts` and generated into `tokens.css` from there (§5.6). They are what the Light and Dark ColorSchemes paint as when no World Theme applies.
+
+| Anchor                | Role                                    | Solar (Light) | Astral (Dark) |
+| --------------------- | --------------------------------------- | ------------- | ------------- |
+| `--palette-page`      | The table / outer paper                 | `#f1e5c7`     | `#0b0c1a`     |
+| `--palette-ink`       | Primary text ink                        | `#2e2412`     | `#ece3cf`     |
+| `--palette-ink-quiet` | Secondary ink — **carries its own hue** | `#6f5a36`     | `#9aa0c8`     |
+| `--palette-accent`    | The through-line accent                 | `#8c5e00`     | `#d9b25a`     |
+| `--palette-danger`    | Danger                                  | `#a21b01`     | `#fe7a54`     |
+| `--palette-success`   | Confirmation                            | `#325e01`     | `#71ca42`     |
+| `--palette-canvas`    | The map field                           | `#efe2bf`     | `#12152e`     |
+| `--palette-soot`      | Shadow / scrim ink                      | `#3c2c16`     | `#02020a`     |
 
 `--palette-ink-quiet` is a separate anchor and not derivable: `ink-muted` rotates hue between schemes, and derived off `--palette-ink` with any fixed offset it collapses to grey (ΔE00 15.8/15.3). `--palette-soot` is the one anchor that is not already a shipped token — Solar's scrim ink sits _lighter_ than `--palette-ink`, so neither existing anchor reaches it.
 
@@ -27,11 +29,11 @@ Eight anchors and three knobs per ColorScheme. Private: `--palette-*` is never r
 
 The value is quantised on purpose. `#8d5e00` is what the unquantised OKLCH target rounds to and it measures **4.4923:1** — 0.008 under the floor, close enough to read as a pass on paper and warn in the app. A colour ships as an 8-bit hex, so the hex is what has to clear it.
 
-| Knob                   | Controls                                                              | Solar   | Astral |
-| ---------------------- | --------------------------------------------------------------------- | ------- | ------ |
-| `--palette-polarity`   | Scheme polarity (±1): every ramp direction and the paper chroma slope | `1`     | `-1`   |
-| `--palette-line-alpha` | Opacity of the drawn-rule ramp                                        | `0.371` | `0.16` |
-| `--palette-veil`       | Base opacity of shadows, scrims, and the vignette                     | `0.12`  | `0.5`  |
+| Knob                   | Controls                                                              | Solar (Light) | Astral (Dark) |
+| ---------------------- | --------------------------------------------------------------------- | ------------- | ------------- |
+| `--palette-polarity`   | Scheme polarity (±1): every ramp direction and the paper chroma slope | `1`           | `-1`          |
+| `--palette-line-alpha` | Opacity of the drawn-rule ramp                                        | `0.371`       | `0.16`        |
+| `--palette-veil`       | Base opacity of shadows, scrims, and the vignette                     | `0.12`        | `0.5`         |
 
 > The spike calls the polarity knob `--tone`. Renamed here to avoid colliding with the categorical `--color-tone-*`, which are unrelated.
 
@@ -217,16 +219,16 @@ const paletteSchema = z.object({
 });
 
 const worldThemeSchema = z.object({
-  version: z.literal(1),
-  solar: paletteSchema,
-  astral: paletteSchema,
+  version: z.literal(2),
+  light: paletteSchema,
+  dark: paletteSchema,
   radii: radiiSchema.optional(),
   fontPairing: z.enum(FONT_PAIRING_IDS).optional(),
   overrides: z
     .object({
       // tier-2 opt-outs, per ColorScheme
-      solar: z.record(designToken, tokenValue).optional(),
-      astral: z.record(designToken, tokenValue).optional(),
+      light: z.record(designToken, tokenValue).optional(),
+      dark: z.record(designToken, tokenValue).optional(),
     })
     .optional(),
 });
@@ -234,24 +236,26 @@ const worldThemeSchema = z.object({
 
 `colorToken` **parses and re-serialises** to a canonical `oklch(…)`. This is the security boundary: `url()` is not a colour and never round-trips, which is what stops an Owner exfiltrating anonymous Public Link visitors' IPs through `background: var(--gradient-accent-sheen)`.
 
-`version` exists because every public token is a compatibility commitment; renaming or removing one is a migration against stored themes.
+`version` exists because every public token is a compatibility commitment; renaming or removing one is a migration against stored themes. It went to **2** when the two ColorScheme keys became `light`/`dark` (ADR-0077), with a data-only SQL migration rewriting `$.solar`→`$.light` and `$.astral`→`$.dark` at both levels; an older client meeting a migrated World gets that explicit refusal rather than a validation error about a missing `solar`.
+
+**Values and no names.** The stored shape has no slot for a Palette Preset id and never gains one — §5.6 is why.
 
 ### 5.2 Resolution and application
 
 Chain: **instance default (ADR-0036 config YAML, ships empty) → World Theme → reader's ColorScheme.**
 
-The instance layer is a `theme` block in `hexly.yml` (#372), shaped as §5.1's schema with every field optional and `version` still required — an operator branding only their accent writes `solar.accent` and `astral.accent`. It is parsed at boot by the same `instanceThemeSchema`/`canonicalTokenValue` path an Owner's Theme is written through, refused **whole** on any bad or unknown key _within the block_ — a misspelled `theme:` itself is stripped like any top-level key (ADR-0052), which `profile:` needs and this cannot have both ways — and served on the unauthenticated `GET /api/config`. The browser lays it as the applier's first layer; because the config channel is a fetch, `INSTANCE_THEME_READY` holds the applier's app initializer until it settles — Angular starts initializers in order but awaits them together, so provider ordering alone would not have done it. What it does **not** get is a pre-paint replay: `index.html` writes only a World's cached Theme, so outside a World an operator's branding lands only once `/api/config` resolves. The unscoped `localStorage` key ADR-0076 reserves for it is the fix, unspent.
+The instance layer is a `theme` block in `hexly.yml` (#372), shaped as §5.1's schema with every field optional and `version` still required — an operator branding only their accent writes `light.accent` and `dark.accent`. Each ColorScheme may instead name a **Palette Preset** (ADR-0077, #385): `light: vellum` bare, or `light: { preset: vellum, accent: … }` to take one and override it anchor by anchor, the operator's own value winning field by field and the Preset's own tier-2 literals joining `overrides[scheme]` beneath any they state themselves. The id is resolved to values in the loader, so it is a compatibility surface in this file alone and nothing downstream — the config channel, the applier, the browser — ever learns one was named; an id belonging to the other ColorScheme, or to no Preset at all, is named at its key like any other bad value. It is parsed at boot by the same `instanceThemeSchema`/`canonicalTokenValue` path an Owner's Theme is written through, refused **whole** on any bad or unknown key _within the block_ — a misspelled `theme:` itself is stripped like any top-level key (ADR-0052), which `profile:` needs and this cannot have both ways — and served on the unauthenticated `GET /api/config`. The browser lays it as the applier's first layer; because the config channel is a fetch, `INSTANCE_THEME_READY` holds the applier's app initializer until it settles — Angular starts initializers in order but awaits them together, so provider ordering alone would not have done it. What it does **not** get is a pre-paint replay: `index.html` writes only a World's cached Theme, so outside a World an operator's branding lands only once `/api/config` resolves. The unscoped `localStorage` key ADR-0076 reserves for it is the fix, unspent.
 
 - Applied at `:root` via `documentElement.style.setProperty`, never a `<style>` block and never a subtree — CDK overlays portal to `<body>`.
 - The applier writes the **active ColorScheme's** anchors and overrides, and re-writes on toggle. `ColorSchemeService` owns the toggle.
 - Applied synchronously in the world-scope resolver. Last-applied theme cached in `localStorage` keyed by world id, so a hard reload into a World is flash-free. A flash on _first_ entry to a World is inherent — the pre-paint script in `index.html` cannot know the world before routing resolves.
-- Token declarations key off `[data-color-scheme]` **on any element**, not `:root[…]`, so the editor's probe (§5.3) works.
+- Token declarations key off `:root[data-color-scheme]` — the document root and nothing else. The widening this bullet once asked for existed for an offscreen probe; §5.3 measures on the root and `hexlyPalette` is a Palette Preset lookup, so it narrowed back (ADR-0077).
 - Served on the **unauthenticated** World read path; Public Link visitors need it.
 - A theme edit bumps `seq`, so live-follow (ADR-0044/0045) re-applies without a refresh.
 
 ### 5.3 Contrast reporting
 
-No maths is reimplemented in TS. The reporter renders an offscreen probe carrying `[data-color-scheme]` and the candidate anchors inline (**superseded — the probe is the document root; see the amendment below**), then reads resolved values with `getComputedStyle` — which returns _used_ values for `@property`-registered `<color>` properties, so relative colour syntax and `contrast-color()` come back absolute. The report therefore matches what renders, by construction, and covers the ColorScheme the author is not currently looking at.
+No maths is reimplemented in TS. The reporter renders an offscreen probe carrying `[data-color-scheme]` and the candidate anchors inline (**superseded — the probe is the document root, and since ADR-0077 an offscreen element could not carry a ColorScheme at all; see the amendment below**), then reads resolved values with `getComputedStyle` — which returns _used_ values for `@property`-registered `<color>` properties, so relative colour syntax and `contrast-color()` come back absolute. The report therefore matches what renders, by construction, and covers the ColorScheme the author is not currently looking at.
 
 - **On-colours flip automatically** via `contrast-color()`. Silent, no UI.
 - **Warn, never block**: `ink`/`ink-muted`/`accent` against `surface` and `bg`, with the computed ratio shown.
@@ -260,7 +264,7 @@ No maths is reimplemented in TS. The reporter renders an offscreen probe carryin
 
 **Amended in implementation (#373).** Four corrections, each one the section could not have known without an engine:
 
-- **The probe is the document root, not an offscreen element.** ADR-0076's widened `[data-color-scheme]` selector reaches only what `tokens.css` declares — tier 1, plus the raw roles `@theme` cannot hold — and not the _derived_ roles, which `@theme static` declares once at `:root`; a registered custom property computes _where it is declared_, so an offscreen probe re-declares `--palette-*` and inherits the root's already-derived `--color-*` (found in #370, pinned in `world-theme.spec.ts`). The reporter sets the root's `data-color-scheme` and the candidate declarations, forces one `getComputedStyle` read, and restores, all inside one task: no paint happens inside a task, so it is flash-free, and it costs no CSS. The alternative was re-declaring ~35 expression holders per `[data-color-scheme]`. `design-tokens.spec.ts` holds the measurement to the committed table's _other_ column.
+- **The probe is the document root, not an offscreen element.** ADR-0076's widened `[data-color-scheme]` selector reached only what `tokens.css` declares — tier 1, plus the raw roles `@theme` cannot hold — and not the _derived_ roles, which `@theme static` declares once at `:root`; a registered custom property computes _where it is declared_, so an offscreen probe re-declared `--palette-*` and inherited the root's already-derived `--color-*` (found in #370, pinned in `world-theme.spec.ts`). The reporter sets the root's `data-color-scheme` and the candidate declarations, forces one `getComputedStyle` read, and restores, all inside one task: no paint happens inside a task, so it is flash-free, and it costs no CSS. The alternative was re-declaring ~35 expression holders per `[data-color-scheme]`. `design-tokens.spec.ts` holds the measurement to the committed table's _other_ column. (**Since ADR-0077** the selector has narrowed back to `:root`, so an offscreen element re-declares nothing at all and inherits the reader's values entire — the conclusion is unchanged and the reason is now simpler.)
 - **The report is measured over the whole resolved chain**, not the anchors — a tier-2 override is exactly what an Owner reaches for when a derived role is wrong, and it must be in what is judged. The root's existing inline properties are cleared for the measurement, or the inactive scheme would be read wearing the active one's overrides.
 - **"If both black and white fail" cannot fire.** Pure black or white on the worst possible ground still reaches 4.58:1. What renders is `--color-on-fill` — the better of the two pulled 10% back toward the ground (§2.2) — and that bottoms out at 3.86:1, so the check reads the resolved on-colour against the accent. Hexly's own Solar accent trips it at 4.16:1, and its 3.77:1 against the page: both true, and consistent with ADR-0075's note that the accent ships at 4.37:1.
 - **The body pairs are five, not six.** Both inks against both grounds, and the accent against `bg` alone — ADR-0076's Decision bullet and #373 both name the accent only where a link sits on the page. `accent`×`surface` would be a policy change rather than a tightening.
@@ -281,6 +285,50 @@ A curated pairing set: `{ id, display, body, cartouche, mono }`, chosen from bun
 - **A World carrying no Theme is not offered.** It has nothing to copy, so the row would be a no-op with a name on it; the empty offer reads as its own state ("none of your other worlds carries a theme yet") rather than as an empty dropdown. This also means "nothing to copy from" is one shape whether the Owner has no other Worlds or no other _themed_ ones.
 - **A copy stages as the draft; it does not apply.** `draft.set(draftFrom(source))`, which is the whole behaviour: it previews through the applier like any moved anchor, `dirty()` offers the save, cancel puts the saved Theme back, and the save is the same `PATCH /worlds/:id` — so the copy has no write path of its own. The values land as this World's own and are editable from there; the `version` is re-stamped on the way out (`draftToTheme`), so a copy carries the contract this build knows rather than the one the source was authored against.
 
+### 5.6 Palette Presets
+
+**Built across the ADR-0077 epic (#378).** §1 reduced re-anchoring to eleven values per ColorScheme so that authoring a Palette would be an afternoon rather than a project; a Preset is the other half of that — the editor opening on something rather than on eleven blank colour wells.
+
+A **Palette Preset** is a whole Palette Hexly ships ready to pick. The table is `PALETTE_PRESETS` in `libs/domain/src/lib/palette-preset.ts` — the domain library and not a web one, because the server reads it to resolve an id named in `hexly.yml`.
+
+```ts
+interface PalettePreset {
+  readonly id: PalettePresetId;
+  readonly scheme: WorldThemeSchemeKey; // 'light' | 'dark'
+  readonly values: WorldThemePalette; // the eleven tier-1 values: 8 anchors + 3 knobs
+  readonly overrides?: Partial<Record<PublicDesignToken, string>>; // that scheme's tier-2 literals
+}
+```
+
+**A Preset is per-ColorScheme, not a light/dark pair.** That is the granularity everything else already works at: §5.1's stored Theme keys the two Palettes independently, the editor edits them independently, and `overrides` keys them independently. Pairing them in the picker alone would make the one surface where an Owner meets the concept disagree with every other surface about what a Palette is. So an Owner picks a light Preset and a dark one separately, and may pick two that were never designed together.
+
+**It carries what the editor permits for one ColorScheme**: the eleven tier-1 values, plus that ColorScheme's tier-2 overrides. The overrides slot is load-bearing rather than decoration — the stylesheet keys off `[data-color-scheme]` and a stored Theme carries no Preset id, so it can never know which Preset is active, and `overrides[scheme]` is the only mechanism that can carry a per-Preset named literal at all. Without it every dark Preset inherits Astral's indigo `--color-canvas-glow` (§2.2's named-literal exception, failing in the way it was written to avoid). The radius set and the font pairing are ColorScheme-independent — a light Preset carrying corners would change an Owner's corners when a reader toggles to dark — so they stay outside a Preset and keep their own pickers. This needs no schema change: a Preset writes into `light`/`dark` and `overrides[scheme]`, both of which already exist.
+
+**Picking writes values and remembers nothing.** No Preset id enters stored data, ever. Which Preset a Palette _is_ is derived by comparison — `palettePresetOf()` in `theme-draft.ts`, fingerprinting the eleven values, exactly as `radiusPresetOf()` already does and for its stated reason: stored as values and never as an id, so renaming one is no migration against stored Themes. Move one anchor and the fingerprint stops matching, so the editor's active mark clears itself rather than claiming an Owner is still on a Preset they have edited away from.
+
+**Applying replaces one ColorScheme and merges its literals.** `withPalettePreset()` sets that scheme's Palette wholesale and folds the Preset's `overrides` into `overrides[scheme]` through the same `withOverride` an Owner's own opt-out goes through — so a Preset-written token shows as overridden, which it genuinely is, and can be cleared back to derived. The other ColorScheme, the radii and the font pairing are untouched.
+
+**The six on offer.** Three per ColorScheme: Hexly's own, one plain, one with a different personality.
+
+| ColorScheme | Preset        | What it is                                                            |
+| ----------- | ------------- | --------------------------------------------------------------------- |
+| Light       | **Solar**     | The Light default. Warm ivory paper, sepia ink, heliograph gold.      |
+| Light       | **Vellum**    | Cool neutral paper, slate ink — Hexly's personality taken out.        |
+| Light       | **Herbarium** | Pale sage paper, deep forest ink, brass.                              |
+| Dark        | **Astral**    | The Dark default. Midnight indigo, parchment ink, constellation gold. |
+| Dark        | **Obsidian**  | Neutral near-black, cool ink, cyan.                                   |
+| Dark        | **Ember**     | Warm charcoal, ash ink, forge-orange.                                 |
+
+`DEFAULT_PALETTE_PRESETS` names the two Hexly wears, and `pnpm tokens:generate` writes `tokens.css`'s tier-1 regions from those two entries — committed output with a drift spec, the route the `@property` block and `index.html`'s allowlist already take. This is ADR-0075's own argument reapplied: a Preset table exercised only by other people's Palettes is a code path nobody on this project looks at.
+
+**Every Preset passes §5.3's report, and cannot ship otherwise.** The eight `--color-tone-*` are hue rotations off the accent (§2.3), so a Preset rotates the whole categorical set and its Tone-versus-status separation has to be measured rather than assumed. An e2e spec paints each of the six and asserts `themeWarnings()` returns nothing — its own file rather than folded into the token snapshot, because the snapshot is _meant_ to be regenerated when a formula legitimately moves and this gate must never be. Where a Preset could not pass, its anchors moved, exactly as Solar's accent was already darkened for the same report (§1). Adding a seventh Preset is a table entry plus a passing gate, and cannot be done without one.
+
+**Names are proper nouns and are not translated**, each carrying a translated one-line description. The house rule already visible in the catalogs: `RADIUS_PRESETS`' names _are_ translated, being descriptive adjectives, while the `codex` font pairing is byte-identical across catalogs with only its description localised.
+
+**An operator may name one in `hexly.yml`**, per ColorScheme, bare or with overriding anchors — §5.2 has the shape, and the README documents it for operators. An id is a compatibility surface in that file **alone**: config is re-read and validated at boot and already reports every offending key, so a renamed id fails at startup naming its key, where a stored one would fail silently years later. The loader resolves the id to values, so nothing downstream — the config channel, the applier, the browser — ever learns one was named.
+
+**Known and accepted:** `--color-terrain-mountain` stays violet by night under a non-indigo dark Preset. It is the hex map's tier-3 named literal (§3) and `OVERRIDABLE_TOKENS` deliberately excludes tier 3, a plugin's private vocabulary not being the design system's to theme. The gap already existed for any Owner authoring a custom dark Palette; the Presets make it ours and visible on first click. Reaching it means opening tier 3 to World Themes, which is a feature.
+
 ---
 
 ## 6. Out of the contract
@@ -293,7 +341,7 @@ Type scale, layout rails (`--rail-*`, `--container-reading`), and motion (`--dur
 
 **Token snapshot test.** Read `getComputedStyle(document.documentElement)` for every registered token in both ColorSchemes and assert against a committed table. This is the only net for the "Solar and Astral go through the derivation path" condition — `apps/web-e2e` has 57 specs and zero visual or snapshot assertions today. It also exercises the exact resolved-value path the contrast reporter depends on, so the test and the mechanism are the same thing.
 
-It ships as `apps/web-e2e/src/design-tokens.spec.ts`, and the table it asserts is `apps/web-e2e/src/design-tokens.table.json` — every _declared_ token (not only the registered ones), keyed by name, each carrying its `solar` and `astral` resolved value. The derivation work's diff to that file is the list of colours it moved. Regenerate it with `UPDATE_TOKEN_TABLE=1`, and read the diff rather than waving it through: a token that starts reading back as its raw declaration would land in the table as one, and the spec's own resolution check is what stops that being committed quietly.
+It ships as `apps/web-e2e/src/design-tokens.spec.ts`, and the table it asserts is `apps/web-e2e/src/design-tokens.table.json` — every _declared_ token (not only the registered ones), keyed by name, each carrying its `light` and `dark` resolved value. It stays at **one Palette per ColorScheme** rather than growing to all six Presets (§5.6): it exists to catch _derivation_ drift, every expression is exercised by any one Palette, and tripling it would triple the churn on every formula change for no additional signal. The derivation work's diff to that file is the list of colours it moved. Regenerate it with `UPDATE_TOKEN_TABLE=1`, and read the diff rather than waving it through: a token that starts reading back as its raw declaration would land in the table as one, and the spec's own resolution check is what stops that being committed quietly.
 
 **Nine public tokens sit outside that check, and the derivation work has to read their rows by eye.** `--shadow-1/2/3/inset/focus` and the four `--font-*` cannot be `@property`-registered — Properties & Values has no shadow or font-stack syntax component — so they read back as the token stream the stylesheet wrote, and the spec records them without asserting a shape. It asserts the one thing it can, that nothing reads back still carrying a `var()`. §2.2's re-parenting of `shadow-2/3/inset` onto an ink anchor therefore lands in the table as whatever expression survives substitution, which is legitimate for a `box-shadow` (the engine evaluates it at use) and would not be for anything a Canvas renderer reads. None of the nine is.
 

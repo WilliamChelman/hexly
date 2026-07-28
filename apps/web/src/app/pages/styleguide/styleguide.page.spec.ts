@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { terrainSet } from '@hexly/plugin-hexmap';
+import { PALETTE_PRESETS, PALETTE_PRESET_IDS, PALETTE_TOKENS } from '@hexly/domain';
 import { StyleguidePage } from './styleguide.page';
 
 describe('Styleguide', () => {
@@ -14,6 +15,16 @@ describe('Styleguide', () => {
     const fixture = TestBed.createComponent(StyleguidePage);
     fixture.detectChanges();
     return fixture;
+  }
+
+  /**
+   * What an engine reads back for a value it was given — the Preset table authors notations and the
+   * style object answers in its own, so both sides of an assertion go through the same parse.
+   */
+  function readBack(property: 'background' | 'color', value: string): string {
+    const probe = document.createElement('span');
+    probe.style.setProperty(property, value);
+    return probe.style.getPropertyValue(property);
   }
 
   /** Flip the active language and run change detection so the view reflows. */
@@ -97,12 +108,58 @@ describe('Styleguide', () => {
     // The emphasis/code markup survives the move into a single key.
     expect(lede().querySelector('strong')).not.toBeNull();
     expect(lede().querySelector('code')?.textContent).toBe('apps/web');
-    expect(lede().textContent).toContain('Solar');
+    expect(lede().textContent).toContain('One identity');
 
     switchTo(fixture, 'fr');
 
-    expect(lede().querySelector('strong')?.textContent).toBe('Solaire');
-    expect(lede().textContent).not.toContain('Solar');
+    expect(lede().textContent).toContain('Une seule identité');
+    expect(lede().textContent).not.toContain('One identity');
+    // The prose moves and the Preset it names does not: Solar is a proper noun (ADR-0077).
+    expect(lede().querySelector('strong')?.textContent).toBe('Solar');
+  });
+
+  it('galleries every Palette Preset the table offers, in that Preset’s own Anchors', () => {
+    // Read off `PALETTE_PRESETS` rather than a list here, which is the property under test: a Preset
+    // added to the table has to reach the gallery with no edit to the styleguide (ADR-0077).
+    const el = render().nativeElement as HTMLElement;
+
+    for (const id of PALETTE_PRESET_IDS) {
+      const preset = PALETTE_PRESETS[id];
+      const card = el.querySelector(`[data-testid="styleguide-preset-${id}"]`) as HTMLElement;
+      expect(card).not.toBeNull();
+
+      // Painted in its own colours, not in the reader's active Palette.
+      expect(card.style.background).toBe(readBack('background', preset.values.page));
+      expect(card.style.color).toBe(readBack('color', preset.values.ink));
+
+      // The eight Anchors, each named by the tier-1 token it writes; the three knobs are numbers the
+      // derivation turns rather than colours to show.
+      const anchors = Object.entries(PALETTE_TOKENS).filter(
+        ([field]) => typeof preset.values[field as keyof typeof preset.values] === 'string',
+      );
+      const chips = Array.from(card.querySelectorAll('.anchor-chip')) as HTMLElement[];
+      expect(chips.map((chip) => chip.dataset['token'])).toEqual(anchors.map(([, token]) => token));
+      expect(chips.map((chip) => chip.style.background)).toEqual(
+        anchors.map(([field]) => readBack('background', String(preset.values[field as keyof typeof preset.values]))),
+      );
+    }
+  });
+
+  it('names each Preset identically whatever the locale, and localizes its description', () => {
+    const fixture = render();
+    const el = fixture.nativeElement as HTMLElement;
+    const part = (id: string, selector: string) =>
+      (el.querySelector(`[data-testid="styleguide-preset-${id}"] ${selector}`) as HTMLElement).textContent?.trim();
+    const names = () => PALETTE_PRESET_IDS.map((id) => part(id, '.presetcard-name'));
+    const hints = () => PALETTE_PRESET_IDS.map((id) => part(id, '.presetcard-hint'));
+
+    const english = { names: names(), hints: hints() };
+
+    switchTo(fixture, 'fr');
+
+    // Proper nouns, byte-identical across catalogs; only the one-line description moves (ADR-0077).
+    expect(names()).toEqual(english.names);
+    for (const [index, hint] of hints().entries()) expect(hint).not.toBe(english.hints[index]);
   });
 
   it('keeps the Hexly brand untranslated in both languages', () => {

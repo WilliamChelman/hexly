@@ -15,7 +15,7 @@ import {
 } from './contrast';
 import * as contrastModule from './contrast';
 import * as measureModule from './measure';
-import { measureScheme, rasteriseColors } from './measure';
+import { RasterisedColor, contrastVerdict, measureScheme, rasteriseColors } from './measure';
 
 const BLACK: Rgb = [0, 0, 0];
 const WHITE: Rgb = [255, 255, 255];
@@ -69,6 +69,25 @@ describe('the functions apps/web-e2e hands to page.evaluate', () => {
     for (const name of siblings) {
       expect(source, `${name} would not exist inside page.evaluate`).not.toMatch(new RegExp(`\\b${name}\\b`));
     }
+  });
+});
+
+describe('contrastVerdict', () => {
+  const rasterised = (): { pairs: RasterisedColor[]; fills: Record<string, RasterisedColor[]> } => ({
+    pairs: CONTRAST_TOKENS.map(() => [255, 255, 255, 255]),
+    fills: Object.fromEntries(CHIP_GROUNDS.map((ground) => [ground, CHIP_FILLS.map(() => [255, 255, 255, 255])])),
+  });
+
+  it('refuses a ground it was never handed, rather than reading it as no warnings', () => {
+    const missing = rasterised();
+    delete missing.fills[CHIP_GROUNDS[0]];
+    expect(() => contrastVerdict(missing)).toThrow(CHIP_GROUNDS[0]);
+  });
+
+  it('judges by the ground each batch names, not by the order they arrive in', () => {
+    const forward = rasterised();
+    const reversed = { pairs: forward.pairs, fills: Object.fromEntries(Object.entries(forward.fills).reverse()) };
+    expect(contrastVerdict(reversed)).toEqual(contrastVerdict(forward));
   });
 });
 
@@ -188,17 +207,17 @@ describe('themeWarnings', () => {
     expect(collisions[0].distance).toBeLessThan(TONE_CONFUSION_MAX);
   });
 
-  it('leaves the eight tones alone when the accent has kept them out of the exclusion arc', () => {
-    // The tightest two pairs Hexly's own Palette ships, read off `design-tokens.table.json`: Astral
-    // tone-8 against danger and Solar tone-1 against success. The threshold is calibrated on the
+  it('leaves the eight tones alone when the accent has kept them clear of the status colours', () => {
+    // The tightest two pairs Hexly's own Palette ships, read off `design-tokens.table.json`: the dark
+    // Palette's tone-8 against danger and the light one's tone-1 against success. The threshold is calibrated on the
     // design's own revealed tolerance (spike-tone-rotation.md §2), so it must not condemn it.
-    const astralToneEight: Rgb = [242, 151, 186];
-    const astralDanger: Rgb = [232, 138, 111];
-    const solarToneOne: Rgb = [0, 85, 80];
-    const solarSuccess: Rgb = [74, 111, 47];
+    const darkToneEight: Rgb = [242, 151, 186];
+    const darkDanger: Rgb = [232, 138, 111];
+    const lightToneOne: Rgb = [0, 85, 80];
+    const lightSuccess: Rgb = [74, 111, 47];
 
-    expect(deltaE00(astralToneEight, astralDanger)).toBeGreaterThan(TONE_CONFUSION_MAX);
-    expect(deltaE00(solarToneOne, solarSuccess)).toBeGreaterThan(TONE_CONFUSION_MAX);
+    expect(deltaE00(darkToneEight, darkDanger)).toBeGreaterThan(TONE_CONFUSION_MAX);
+    expect(deltaE00(lightToneOne, lightSuccess)).toBeGreaterThan(TONE_CONFUSION_MAX);
   });
 
   it("warns when a chip's own text does not clear its own fill, naming the worse of the two grounds", () => {
@@ -225,7 +244,7 @@ describe('themeWarnings', () => {
   it('warns on a status chip too, which is the same component as a category one', () => {
     // `bg-danger-soft` with `text-danger` is a chip like any other (stat-block-view.component.ts), and
     // an Owner authors the danger anchor — so leaving the status roles off the list left the check
-    // blind on Hexly's own Solar Palette, where three of these pairs sat under the floor.
+    // blind on Hexly's own light Palette, where three of these pairs sat under the floor.
     const warnings = report(
       { '--color-danger': [200, 0, 0] },
       fills({ '--color-danger': { '--color-surface': [0x33, 0x33, 0x33], '--color-bg': [0x22, 0x22, 0x22] } }),
@@ -239,8 +258,8 @@ describe('themeWarnings', () => {
     });
   });
 
-  it('clears Hexly’s own tightest Solar chip, and by less on the page than on a panel', () => {
-    // Solar tone-4 off `design-tokens.table.json`, composited at the fill's 14%: 5.52:1 over `surface`
+  it('clears Hexly’s own tightest light chip, and by less on the page than on a panel', () => {
+    // The light Palette's tone-4 off `design-tokens.table.json`, composited at the fill's 14%: 5.52:1 over `surface`
     // and 4.86:1 over the page. Before the polarity term went on the tone rows the page read 4.19:1 —
     // this pair is why that term is there, and the page staying the tighter of the two is why the
     // check reports the worse ground rather than picking one.

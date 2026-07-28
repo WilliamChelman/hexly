@@ -60,12 +60,12 @@ describe('PreferencesSync (ADR-0038)', () => {
   it('adopts server Preferences when the session resolves — server wins over the local cache', () => {
     localStorage.setItem('hexly-u:hexly-locale', 'en');
 
-    auth.setUser(ada({ locale: 'fr', colorScheme: 'astral', formatLocale: 'en-GB' }));
+    auth.setUser(ada({ locale: 'fr', colorScheme: 'dark', formatLocale: 'en-GB' }));
     TestBed.flushEffects();
 
     expect(locale.lang()).toBe('fr');
     expect(locale.formatLocale()).toBe('en-GB');
-    expect(colorScheme.colorScheme()).toBe('astral');
+    expect(colorScheme.colorScheme()).toBe('dark');
     // The boot cache is overwritten too, so the next reload paints right away.
     expect(localStorage.getItem('hexly-u:hexly-locale')).toBe('fr');
     // Hydration is a read, never an echo back to the server.
@@ -89,7 +89,7 @@ describe('PreferencesSync (ADR-0038)', () => {
     // The ColorScheme is persisted unscoped (read before login), so an absent server
     // value must not reset a device-local choice to the OS default. Pick the opposite
     // of detection so a regression to detectColorScheme() would flip it.
-    const local = detectColorScheme() === 'astral' ? 'solar' : 'astral';
+    const local = detectColorScheme() === 'dark' ? 'light' : 'dark';
     colorScheme.set(local);
     TestBed.flushEffects();
 
@@ -127,7 +127,7 @@ describe('PreferencesSync (ADR-0038)', () => {
 
   it('persists nothing while anonymous — public-link viewers stay local-only', () => {
     locale.set('fr');
-    colorScheme.set('astral');
+    colorScheme.set('dark');
     TestBed.flushEffects();
 
     http.expectNone('/api/auth/me/preferences');

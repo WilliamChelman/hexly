@@ -13,7 +13,7 @@ export default [
     plugins: { 'hexly-design': hexlyDesignTokens },
     rules: {
       // ADR-0020, amended by ADR-0075 — every var(--…) resolves to a manifest-declared token on the
-      // right side of the tier boundary; built-in shadow utilities bake a Solar value (ADR-0021).
+      // right side of the tier boundary; built-in shadow utilities bake a light-scheme value (ADR-0021).
       // At the root, not opted into per project: the contract is one about strings, so it holds
       // wherever one can be written, and an opt-in list had it covering 6 of 13 browser libs.
       'hexly-design/no-unknown-design-token': 'error',

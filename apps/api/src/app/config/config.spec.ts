@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { basePluginConfigSchema } from '@hexly/domain';
+import { basePluginConfigSchema, colorTokenHex, DEFAULT_PALETTE_PRESETS, PALETTE_PRESETS } from '@hexly/domain';
 import * as z from 'zod';
 import { deploymentPins, loadConfig, parseSize, pinDeployment, PluginConfigContribution } from './config';
 
@@ -336,7 +336,7 @@ describe('loadConfig: the Inline Creation knobs (ADR-0073)', () => {
 
 describe('loadConfig: the Instance default Theme (ADR-0076, #372)', () => {
   /** An operator branding only their accent — the smallest useful default (#372). */
-  const ACCENT_YAML = "theme:\n  version: 1\n  solar:\n    accent: '#2f6f4f'\n  astral:\n    accent: '#7fd0a8'\n";
+  const ACCENT_YAML = "theme:\n  version: 2\n  light:\n    accent: '#2f6f4f'\n  dark:\n    accent: '#7fd0a8'\n";
 
   it('ships empty, so an untouched deployment carries no layer at all', () => {
     expect(loadConfig(dataDir(), PLUGINS).theme).toBeUndefined();
@@ -346,43 +346,55 @@ describe('loadConfig: the Instance default Theme (ADR-0076, #372)', () => {
   it('loads a partial default, canonicalising each value through the World Theme choke point', () => {
     const theme = loadConfig(dataDir(ACCENT_YAML), PLUGINS).theme;
 
-    expect(theme?.solar?.accent).toMatch(/^oklch\(/);
-    expect(theme?.astral?.accent).toMatch(/^oklch\(/);
+    expect(theme?.light?.accent).toMatch(/^oklch\(/);
+    expect(theme?.dark?.accent).toMatch(/^oklch\(/);
     // Silent about everything else, which is what lets the stylesheet answer for the rest.
-    expect(theme?.solar?.page).toBeUndefined();
+    expect(theme?.light?.page).toBeUndefined();
   });
 
   it('fails boot on a malformed value, naming the anchor rather than applying the rest', () => {
     // The acceptance criterion #372 is built around: a half-applied operator default is not a state
     // the Instance is allowed to reach.
-    const yaml = "theme:\n  version: 1\n  solar:\n    page: '#f1e5c7'\n    accent: 'url(https://evil.example/p.png)'\n";
+    const yaml = "theme:\n  version: 2\n  light:\n    page: '#f1e5c7'\n    accent: 'url(https://evil.example/p.png)'\n";
 
-    expect(() => loadConfig(dataDir(yaml), PLUGINS)).toThrow(/theme\.solar\.accent/);
+    expect(() => loadConfig(dataDir(yaml), PLUGINS)).toThrow(/theme\.light\.accent/);
   });
 
   it('fails boot on a misspelled key, which would otherwise brand nothing and say nothing', () => {
-    expect(() => loadConfig(dataDir("theme:\n  version: 1\n  solar:\n    acccent: '#2f6f4f'\n"), PLUGINS)).toThrow(
+    expect(() => loadConfig(dataDir("theme:\n  version: 2\n  light:\n    acccent: '#2f6f4f'\n"), PLUGINS)).toThrow(
       /acccent/,
     );
   });
 
   it('fails boot on a version this build does not know', () => {
     expect(() => loadConfig(dataDir('theme:\n  version: 9\n'), PLUGINS)).toThrow(/theme\.version/);
-    expect(() => loadConfig(dataDir("theme:\n  solar:\n    accent: '#2f6f4f'\n"), PLUGINS)).toThrow(/theme\.version/);
+    expect(() => loadConfig(dataDir("theme:\n  light:\n    accent: '#2f6f4f'\n"), PLUGINS)).toThrow(/theme\.version/);
   });
 
   it('reports every offending key at once, so one boot names the whole list', () => {
-    const yaml = "theme:\n  version: 1\n  solar:\n    accent: 'nope'\n  astral:\n    ink: 'also-nope'\n";
+    const yaml = "theme:\n  version: 2\n  light:\n    accent: 'nope'\n  dark:\n    ink: 'also-nope'\n";
 
-    expect(() => loadConfig(dataDir(yaml), PLUGINS)).toThrow(/theme\.solar\.accent[\s\S]*theme\.astral\.ink/);
+    expect(() => loadConfig(dataDir(yaml), PLUGINS)).toThrow(/theme\.light\.accent[\s\S]*theme\.dark\.ink/);
   });
 
-  it("loads the README's worked example — every field of the block, exactly as documented", () => {
-    // Documentation that would not boot is worse than none, so the README's example is a fixture.
+  // Documentation that would not boot is worse than none, so each of the README's three worked
+  // examples is a fixture. They are the three forms `light:`/`dark:` accept (#387).
+  it("loads the README's Form 1 — a bare Palette Preset id under each ColorScheme", () => {
+    const readme = ['theme:', '  version: 2', '  light: solar', '  dark: astral', ''].join('\n');
+
+    // What resolving an id gets you is the describe block below; this asserts only that the two ids
+    // the README prints are ids that exist, under the ColorSchemes it prints them under.
+    const theme = loadConfig(dataDir(readme), PLUGINS).theme;
+
+    expect(Object.keys(theme?.light ?? {})).toHaveLength(Object.keys(PALETTE_PRESETS.solar.values).length);
+    expect(Object.keys(theme?.dark ?? {})).toHaveLength(Object.keys(PALETTE_PRESETS.astral.values).length);
+  });
+
+  it("loads the README's Form 2 — an anchor set, every tier-1 field written out", () => {
     const readme = [
       'theme:',
-      '  version: 1',
-      '  solar:',
+      '  version: 2',
+      '  light:',
       "    page: '#f4ece0'",
       "    ink: '#20242e'",
       "    inkQuiet: '#5c6472'",
@@ -394,30 +406,128 @@ describe('loadConfig: the Instance default Theme (ADR-0076, #372)', () => {
       '    polarity: 1',
       '    lineAlpha: 0.371',
       '    veil: 0.12',
-      '  astral:',
+      '  dark:',
       "    accent: '#7ad3a4'",
+      '',
+    ].join('\n');
+
+    const theme = loadConfig(dataDir(readme), PLUGINS).theme;
+
+    expect(theme?.light?.polarity).toBe(1);
+    expect(theme?.dark?.accent).toMatch(/^oklch\(/);
+  });
+
+  it("loads the README's Form 3 — a Preset plus overriding anchors, and every remaining field", () => {
+    const readme = [
+      'theme:',
+      '  version: 2',
+      '  light:',
+      '    preset: solar',
+      "    accent: '#2f6f4f'",
+      '  dark:',
+      '    preset: astral',
       '  radii:',
       '    --radius-md: 0px',
       '  fontPairing: codex',
       '  overrides:',
-      '    solar:',
+      '    light:',
       "      --color-ink: '#101010'",
       '',
     ].join('\n');
 
     const theme = loadConfig(dataDir(readme), PLUGINS).theme;
 
-    expect(theme?.solar?.polarity).toBe(1);
-    expect(theme?.astral?.accent).toMatch(/^oklch\(/);
+    expect(colorTokenHex(theme?.light?.accent ?? '')).toBe('#2f6f4f');
+    expect(colorTokenHex(theme?.light?.page ?? '')).toBe(PALETTE_PRESETS.solar.values.page);
     expect(theme?.fontPairing).toBe('codex');
+    // The dark Preset's own field glow rides along, beneath the light override the operator wrote.
+    expect(theme?.overrides?.dark).toEqual(
+      expect.objectContaining({ '--color-canvas-glow': expect.stringContaining('oklch') }),
+    );
   });
 
   it('carries the radii and the tier-2 opt-outs an Owner may also author', () => {
     const yaml =
-      "theme:\n  version: 1\n  radii:\n    --radius-md: 0px\n  overrides:\n    solar:\n      --color-ink: '#101010'\n";
+      "theme:\n  version: 2\n  radii:\n    --radius-md: 0px\n  overrides:\n    light:\n      --color-ink: '#101010'\n";
     const theme = loadConfig(dataDir(yaml), PLUGINS).theme;
 
     expect(theme?.radii?.['--radius-md']).toBe('0px');
-    expect(theme?.overrides?.solar?.['--color-ink']).toMatch(/^oklch\(/);
+    expect(theme?.overrides?.light?.['--color-ink']).toMatch(/^oklch\(/);
+  });
+
+  it('still accepts an anchors-only block, so an upgrade never silently un-brands a deployment', () => {
+    const theme = loadConfig(dataDir(ACCENT_YAML), PLUGINS).theme;
+
+    // Word for word the pre-Preset spelling, and it must resolve to what it always did: the two
+    // anchors named and nothing else, with no trace of the machinery that now sits beside them.
+    expect(theme?.light).toEqual({ accent: expect.stringMatching(/^oklch\(/) });
+    expect(theme?.dark).toEqual({ accent: expect.stringMatching(/^oklch\(/) });
+    expect(theme?.overrides).toBeUndefined();
+  });
+});
+
+/**
+ * Naming a Palette Preset in `hexly.yml` (ADR-0077, #385) — the one surface a Preset id is a
+ * compatibility commitment on, because this is the file that is re-read and refused at boot.
+ *
+ * The ids come off the table rather than being spelled here: which Presets exist is the table's
+ * business, and a spec that restated them would have to be edited to add one.
+ */
+describe('loadConfig: an operator names a Palette Preset (ADR-0077)', () => {
+  const LIGHT_PRESET = DEFAULT_PALETTE_PRESETS.light;
+  const DARK_PRESET = DEFAULT_PALETTE_PRESETS.dark;
+
+  it('accepts a bare Preset id, so branding a deployment is one word and not eleven hex values', () => {
+    const theme = loadConfig(dataDir(`theme:\n  version: 2\n  light: ${LIGHT_PRESET}\n`), PLUGINS).theme;
+    const values = PALETTE_PRESETS[LIGHT_PRESET].values;
+
+    expect(Object.keys(theme?.light ?? {}).sort()).toEqual(Object.keys(values).sort());
+    // Through the same choke point an operator's own hex goes through, so the id buys no shortcut.
+    expect(colorTokenHex(theme?.light?.accent ?? '')).toBe(values.accent);
+    expect(theme?.light?.polarity).toBe(values.polarity);
+    // The id itself stops here: nothing downstream of the loader ever learns one was named.
+    expect(theme?.light).not.toHaveProperty('preset');
+  });
+
+  it('accepts a Preset id plus overriding anchors, resolving them field by field', () => {
+    const yaml = `theme:\n  version: 2\n  light:\n    preset: ${LIGHT_PRESET}\n    accent: '#2f6f4f'\n`;
+    const theme = loadConfig(dataDir(yaml), PLUGINS).theme;
+    const values = PALETTE_PRESETS[LIGHT_PRESET].values;
+
+    // The operator's accent wins; the ten values they said nothing about are still the Preset's.
+    expect(colorTokenHex(theme?.light?.accent ?? '')).toBe('#2f6f4f');
+    expect(colorTokenHex(theme?.light?.page ?? '')).toBe(values.page);
+  });
+
+  it('carries the tier-2 literals a Preset states, beneath any the operator states themselves', () => {
+    // Without this a dark Preset inherits Astral's indigo starlight — the named-literal exception
+    // `overrides` exists to carry (ADR-0077).
+    const stated = PALETTE_PRESETS[DARK_PRESET].overrides ?? {};
+    const yaml = `theme:\n  version: 2\n  dark: ${DARK_PRESET}\n`;
+
+    expect(Object.keys(loadConfig(dataDir(yaml), PLUGINS).theme?.overrides?.dark ?? {})).toEqual(Object.keys(stated));
+  });
+
+  it('fails boot on an unknown id, naming the key it was under rather than branding nothing', () => {
+    expect(() => loadConfig(dataDir('theme:\n  version: 2\n  light: vellm\n'), PLUGINS)).toThrow(
+      /theme\.light\.preset/,
+    );
+    expect(() => loadConfig(dataDir('theme:\n  version: 2\n  dark:\n    preset: obsidain\n'), PLUGINS)).toThrow(
+      /theme\.dark\.preset/,
+    );
+  });
+
+  it('fails boot on a Preset named under the other ColorScheme, which is eleven values for the wrong end', () => {
+    expect(() => loadConfig(dataDir(`theme:\n  version: 2\n  light: ${DARK_PRESET}\n`), PLUGINS)).toThrow(
+      /theme\.light\.preset/,
+    );
+  });
+
+  it('reports every offending key at once, so fixing a theme block is one pass and not five', () => {
+    const yaml = `theme:\n  version: 2\n  light: vellm\n  dark:\n    preset: obsidain\n    ink: 'not-a-colour'\n`;
+
+    expect(() => loadConfig(dataDir(yaml), PLUGINS)).toThrow(
+      /theme\.light\.preset[\s\S]*theme\.dark\.preset[\s\S]*theme\.dark\.ink/,
+    );
   });
 });

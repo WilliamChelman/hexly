@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { worldThemeSchema } from '@hexly/domain';
 import { createDb, resolveAssetsDir } from './db';
 
 /** Apply one migration file's SQL to a raw connection (`--> statement-breakpoint` is a comment). */
@@ -319,6 +320,115 @@ describe('Home-Entity removal migration (0011)', () => {
         )
         .all(),
     ).toEqual([{ id: 'home1' }]);
+    sqlite.close();
+  });
+});
+
+/**
+ * 0031 rewrites both surfaces the ColorScheme rename touches (ADR-0077): the stored World Theme's
+ * own `solar`/`astral` keys — at the top level and under `overrides` — with its version, and the
+ * roaming Preference's `colorScheme` value.
+ *
+ * Seeded on the current schema rather than by replaying 0000…0030: the migration is data-only, so
+ * the pre-migration *schema* is this one and only the rows differ.
+ */
+describe('ColorScheme light/dark migration round-trip (0031)', () => {
+  /** One Palette as version 1 stored it — the anchor set is unchanged by this migration. */
+  const PALETTE = {
+    page: 'oklch(0.92 0.045 87)',
+    ink: 'oklch(0.26 0.03 70)',
+    inkQuiet: 'oklch(0.48 0.05 78)',
+    accent: 'oklch(0.51 0.11 76)',
+    danger: 'oklch(0.47 0.18 33)',
+    success: 'oklch(0.44 0.13 132)',
+    canvas: 'oklch(0.91 0.04 87)',
+    soot: 'oklch(0.3 0.04 68)',
+    polarity: 1,
+    lineAlpha: 0.371,
+    veil: 0.12,
+  };
+
+  function seededPreRename(): Database.Database {
+    const db = createDb(':memory:');
+    const sqlite = db.$client;
+    sqlite.pragma('foreign_keys = OFF');
+    // A World themed before the upgrade, token overrides included — the fine-tuning that must not be
+    // the part that gets lost.
+    const theme = {
+      version: 1,
+      solar: PALETTE,
+      astral: { ...PALETTE, polarity: -1 },
+      radii: { '--radius-md': '0px' },
+      fontPairing: 'codex',
+      overrides: {
+        solar: { '--color-ink': 'oklch(0.2 0.01 90)' },
+        astral: { '--color-canvas-glow': 'rgba(1,2,3,0.4)' },
+      },
+    };
+    sqlite
+      .prepare(`INSERT INTO worlds (id, name, theme, created_at, updated_at) VALUES (?,?,?,0,0)`)
+      .run('w1', 'Aldermoor', JSON.stringify(theme));
+    // A World with no Theme at all, which is every World that never opened the editor.
+    sqlite.prepare(`INSERT INTO worlds (id, name, created_at, updated_at) VALUES ('w2','Whisperwood',0,0)`).run();
+    // Two readers with a roaming choice, and one who never expressed any.
+    for (const [id, prefs] of [
+      ['u1', '{"locale":"fr","colorScheme":"astral"}'],
+      ['u2', '{"colorScheme":"solar"}'],
+      ['u3', '{"locale":"en"}'],
+    ]) {
+      sqlite
+        .prepare(
+          `INSERT INTO users (id, email, display_name, password_hash, preferences, created_at) VALUES (?,?,?,?,?,0)`,
+        )
+        .run(id, `${id}@hexly.test`, id, 'h', prefs);
+    }
+    return sqlite;
+  }
+
+  function themeOf(sqlite: Database.Database, id: string): Record<string, unknown> | null {
+    const row = sqlite.prepare(`SELECT theme FROM worlds WHERE id = ?`).get(id) as { theme: string | null };
+    return row.theme === null ? null : (JSON.parse(row.theme) as Record<string, unknown>);
+  }
+
+  it('rewrites a stored Theme’s keys and version, at both levels, and it re-validates', () => {
+    const sqlite = seededPreRename();
+    applyMigration(sqlite, '0031_color_scheme_light_dark.sql');
+
+    const theme = themeOf(sqlite, 'w1');
+    expect(Object.keys(theme ?? {}).sort()).toEqual(['dark', 'fontPairing', 'light', 'overrides', 'radii', 'version']);
+    expect(Object.keys((theme?.['overrides'] as object) ?? {}).sort()).toEqual(['dark', 'light']);
+    // The values ride through untouched — a World already themed paints identically afterwards.
+    expect(theme?.['light']).toEqual(PALETTE);
+    expect(theme?.['dark']).toEqual({ ...PALETTE, polarity: -1 });
+    expect(theme?.['overrides']).toEqual({
+      light: { '--color-ink': 'oklch(0.2 0.01 90)' },
+      dark: { '--color-canvas-glow': 'rgba(1,2,3,0.4)' },
+    });
+
+    // The point of the version bump: what comes out is what this build's choke point accepts.
+    const parsed = worldThemeSchema.safeParse(theme);
+    expect(parsed.success, parsed.error?.message).toBe(true);
+
+    // A World that carries no Theme is left alone rather than given an empty one.
+    expect(themeOf(sqlite, 'w2')).toBeNull();
+    sqlite.close();
+  });
+
+  it('rewrites the roaming Preference, so a signed-in reader keeps the ColorScheme they chose', () => {
+    const sqlite = seededPreRename();
+    applyMigration(sqlite, '0031_color_scheme_light_dark.sql');
+
+    const prefs = (
+      sqlite.prepare(`SELECT id, preferences FROM users ORDER BY id`).all() as { id: string; preferences: string }[]
+    ).map((row) => [row.id, JSON.parse(row.preferences)]);
+
+    expect(prefs).toEqual([
+      // The other Preferences in the bag ride through untouched.
+      ['u1', { locale: 'fr', colorScheme: 'dark' }],
+      ['u2', { colorScheme: 'light' }],
+      // No expressed choice stays no expressed choice — the client still detects the OS preference.
+      ['u3', { locale: 'en' }],
+    ]);
     sqlite.close();
   });
 });

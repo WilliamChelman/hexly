@@ -32,15 +32,18 @@ const COLLABORATION_OFF_YAML = ['features:', '  collaboration: false', ''].join(
 // Inline Creation's own Type and Tag (ADR-0073), left divergent from `defaultType` — the two knobs
 // answer different questions, so a mention must not follow the New button's.
 const INLINE_TYPE_YAML = ['entities:', '  inlineType: core.type.hex-map', '  inlineTag: untriaged', ''].join('\n');
-// An operator branding their deployment (ADR-0076, #372): a partial layer — one anchor per
-// ColorScheme and a squared-off radius — so the spec can see both that it applies and that everything
-// it is silent about still falls through to the stylesheet.
+// An operator branding their deployment (ADR-0076, #372; ADR-0077, #385). Both spellings at once, so
+// one server covers both: `light` names a Palette Preset and overrides one of its anchors, while
+// `dark` is the anchors-only block an upgrading deployment already had. Partial on the dark side and a
+// squared-off radius, so the spec can still see what the block is silent about fall through to the
+// stylesheet.
 const INSTANCE_THEME_YAML = [
   'theme:',
-  '  version: 1',
-  '  solar:',
+  '  version: 2',
+  '  light:',
+  '    preset: solar',
   "    accent: '#2f6f4f'",
-  '  astral:',
+  '  dark:',
   "    accent: '#7fd0a8'",
   '  radii:',
   '    --radius-md: 0px',

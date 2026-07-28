@@ -76,7 +76,7 @@ describe('the @property registration block', () => {
 
   it('admits the tier-1 Palette and the public roles, and nothing a Theme cannot write', () => {
     const names = SETTABLE_TOKENS.map((decl) => decl.name);
-    // The anchors are private yet written: an Owner sets them as `solar`/`astral`, not as overrides.
+    // The anchors are private yet written: an Owner sets them as `light`/`dark`, not as overrides.
     expect(names).toEqual(expect.arrayContaining(['--palette-accent', '--palette-veil']));
     expect(names).toEqual(expect.arrayContaining(['--color-accent', '--radius-md', '--shadow-1', '--font-body']));
     expect(names).not.toContain('--text-base');

@@ -57,22 +57,22 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
             <button
               type="button"
               appButton
-              [active]="colorScheme() === 'solar'"
-              [attr.aria-pressed]="colorScheme() === 'solar'"
-              data-testid="color-scheme-solar"
-              (click)="setColorScheme('solar')"
+              [active]="colorScheme() === 'light'"
+              [attr.aria-pressed]="colorScheme() === 'light'"
+              data-testid="color-scheme-light"
+              (click)="setColorScheme('light')"
             >
-              {{ 'common.colorScheme.solar' | transloco }}
+              {{ 'common.colorScheme.light' | transloco }}
             </button>
             <button
               type="button"
               appButton
-              [active]="colorScheme() === 'astral'"
-              [attr.aria-pressed]="colorScheme() === 'astral'"
-              data-testid="color-scheme-astral"
-              (click)="setColorScheme('astral')"
+              [active]="colorScheme() === 'dark'"
+              [attr.aria-pressed]="colorScheme() === 'dark'"
+              data-testid="color-scheme-dark"
+              (click)="setColorScheme('dark')"
             >
-              {{ 'common.colorScheme.astral' | transloco }}
+              {{ 'common.colorScheme.dark' | transloco }}
             </button>
           </span>
         </div>

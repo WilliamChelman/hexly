@@ -21,7 +21,7 @@ export interface TokenDecl {
   /** The owning plugin's id, for tier 3. */
   readonly owner?: string;
   /**
-   * The token's value in the Solar ColorScheme, and the `@property` `initial-value` when registered —
+   * The token's value in the light ColorScheme, and the `@property` `initial-value` when registered —
    * so for a tier-2 role it is what the derivation *resolves to*, never the expression itself: an
    * `initial-value` must be computationally independent, which a `var(--palette-…)` is not.
    */

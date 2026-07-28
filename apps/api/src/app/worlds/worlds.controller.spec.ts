@@ -424,7 +424,7 @@ describe('Worlds endpoints', () => {
       lineAlpha: 0.371,
       veil: 0.12,
     };
-    const THEME = { version: 1, solar: PALETTE, astral: { ...PALETTE, polarity: -1 } };
+    const THEME = { version: 2, light: PALETTE, dark: { ...PALETTE, polarity: -1 } };
 
     /** Add `userId` to `worldId` with the given member role (Owners come from world creation). */
     function addMember(worldId: string, userId: string, role: 'contributor' | 'viewer') {
@@ -442,8 +442,8 @@ describe('Worlds endpoints', () => {
       const res = await ada.patch(`/worlds/${world.body.id}`).send({ theme: THEME }).expect(200);
 
       // Stored canonicalised: a colour goes in as hex and comes back as a colour (ADR-0076).
-      expect(res.body.theme.solar.accent).toMatch(/^oklch\(/);
-      expect(res.body.theme.astral.polarity).toBe(-1);
+      expect(res.body.theme.light.accent).toMatch(/^oklch\(/);
+      expect(res.body.theme.dark.polarity).toBe(-1);
       const reloaded = await ada.get(`/worlds/${world.body.id}`).expect(200);
       expect(reloaded.body.theme).toEqual(res.body.theme);
     });
@@ -460,7 +460,7 @@ describe('Worlds endpoints', () => {
       // A name-only PATCH leaves the Theme untouched (independent fields).
       await ada.patch(`/worlds/${world.body.id}`).send({ theme: THEME }).expect(200);
       const renamed = await ada.patch(`/worlds/${world.body.id}`).send({ name: 'Renamed' }).expect(200);
-      expect(renamed.body.theme.solar.accent).toMatch(/^oklch\(/);
+      expect(renamed.body.theme.light.accent).toMatch(/^oklch\(/);
     });
 
     it.each([
@@ -475,7 +475,7 @@ describe('Worlds endpoints', () => {
 
       await ada
         .patch(`/worlds/${world.body.id}`)
-        .send({ theme: { ...THEME, solar: { ...PALETTE, accent: value } } })
+        .send({ theme: { ...THEME, light: { ...PALETTE, accent: value } } })
         .expect(400);
 
       // Refused, not sanitised into something that stores.
@@ -486,7 +486,7 @@ describe('Worlds endpoints', () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
       const withOverride = (name: string, value: string) =>
-        ada.patch(`/worlds/${world.body.id}`).send({ theme: { ...THEME, overrides: { solar: { [name]: value } } } });
+        ada.patch(`/worlds/${world.body.id}`).send({ theme: { ...THEME, overrides: { light: { [name]: value } } } });
 
       // A colour token handed a length; a token nobody declares; one deliberately out of the contract.
       await withOverride('--color-ink', '6px').expect(400);
@@ -494,7 +494,7 @@ describe('Worlds endpoints', () => {
       await withOverride('--text-base', '2rem').expect(400);
       // And the one it does declare, canonicalised.
       const res = await withOverride('--color-ink', '#2e2412').expect(200);
-      expect(res.body.theme.overrides.solar['--color-ink']).toMatch(/^oklch\(/);
+      expect(res.body.theme.overrides.light['--color-ink']).toMatch(/^oklch\(/);
     });
 
     it('refuses an unknown `version` rather than applying the part it understands', async () => {
@@ -503,7 +503,13 @@ describe('Worlds endpoints', () => {
 
       await ada
         .patch(`/worlds/${world.body.id}`)
-        .send({ theme: { ...THEME, version: 2 } })
+        .send({ theme: { ...THEME, version: 3 } })
+        .expect(400);
+      // And the shape this build's version replaced (ADR-0077): an older client's Theme is refused
+      // outright rather than half-applied, which is what the version field is carried for.
+      await ada
+        .patch(`/worlds/${world.body.id}`)
+        .send({ theme: { version: 1, solar: PALETTE, astral: { ...PALETTE, polarity: -1 } } })
         .expect(400);
       expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body).not.toHaveProperty('theme');
     });
@@ -559,7 +565,7 @@ describe('Worlds endpoints', () => {
       // Thousands of unknown override keys, inside express's 100 kB body limit: every one is schema
       // work, and every one is invalid — so a 403 here cannot be the parser's answer.
       const overrides = Object.fromEntries(Array.from({ length: 3000 }, (_, i) => [`--color-x${i}`, 'zz']));
-      const hostile = { theme: { ...THEME, overrides: { solar: overrides } } };
+      const hostile = { theme: { ...THEME, overrides: { light: overrides } } };
       const safeParse = vi.spyOn(updateWorldRequestSchema, 'safeParse');
 
       try {
@@ -594,7 +600,7 @@ describe('Worlds endpoints', () => {
 
         // The target itself is excluded: "another World" is the server's answer, not the picker's.
         expect(res.body).toEqual([
-          { id: source.body.id, name: 'Whisperwood', theme: expect.objectContaining({ version: 1 }) },
+          { id: source.body.id, name: 'Whisperwood', theme: expect.objectContaining({ version: 2 }) },
         ]);
         // The values come over whole, so the copy the client stages is the source World's own Theme.
         expect(res.body[0].theme).toEqual((await ada.get(`/worlds/${source.body.id}`).expect(200)).body.theme);

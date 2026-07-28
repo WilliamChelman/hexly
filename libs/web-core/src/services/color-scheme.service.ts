@@ -2,16 +2,16 @@ import { EnvironmentProviders, inject, Injectable, provideAppInitializer, signal
 
 import { safeStorageGet, safeStorageSet } from '../utils/safe';
 
-/** The day/night axis the interface is painted along — not a World Theme (ADR-0075). */
-export type ColorScheme = 'solar' | 'astral';
+/** The day/night axis the interface is painted along — not a World Theme (ADR-0075, ADR-0077). */
+export type ColorScheme = 'light' | 'dark';
 
 const STORAGE_KEY = 'hexly-color-scheme';
 
 /** The app-default ColorScheme: follow the OS preference. */
 export function detectColorScheme(): ColorScheme {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches
-    ? 'astral'
-    : 'solar';
+    ? 'dark'
+    : 'light';
 }
 
 /**
@@ -27,7 +27,9 @@ export function detectColorScheme(): ColorScheme {
 export class ColorSchemeService {
   private read(): ColorScheme {
     const stored = safeStorageGet(STORAGE_KEY).unwrapOr(null); // private mode → null → OS preference
-    if (stored === 'solar' || stored === 'astral') return stored;
+    // A choice stored before ADR-0077 no longer matches: it lapses to the OS preference rather than
+    // being translated, and the next `set` rewrites it.
+    if (stored === 'light' || stored === 'dark') return stored;
     return detectColorScheme();
   }
 
@@ -39,9 +41,9 @@ export class ColorSchemeService {
     document.documentElement.dataset['colorScheme'] = this._colorScheme();
   }
 
-  /** Swap between solar (day) and astral (night). */
+  /** Swap between light (day) and dark (night). */
   toggle(): void {
-    this.set(this.colorScheme() === 'astral' ? 'solar' : 'astral');
+    this.set(this.colorScheme() === 'dark' ? 'light' : 'dark');
   }
 
   set(colorScheme: ColorScheme): void {

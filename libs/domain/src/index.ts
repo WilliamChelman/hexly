@@ -16,6 +16,9 @@ export * from './lib/join-search-text';
 export * from './lib/asset';
 export * from './lib/world';
 export * from './lib/world-theme';
+// The Preset table alone: `palette-block.ts` beside it generates committed stylesheet output
+// (ADR-0077) and is nothing the app or the server calls.
+export * from './lib/palette-preset';
 // Only the read-side notation helper: the canonicalisers are the write choke point's (ADR-0076), and a
 // caller reaching one outside the schema would be validating a Theme somewhere the server is not.
 export { colorTokenHex } from './lib/design-token-value';

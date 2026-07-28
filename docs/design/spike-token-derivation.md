@@ -17,6 +17,13 @@ Scope excludes tier-3 tokens moving to `plugin-hexmap-web` (`terrain-*`, `hex-li
 `feature-ink`, `label-ink`, `name-ink`) and `sea`/`astra` (covered by
 [`spike-tone-rotation.md`](./spike-tone-rotation.md)).
 
+**Amended by ADR-0077.** Solar and Astral are no longer the names of the ColorSchemes;
+they name the two **Palette Presets** Hexly ships, and the axis is `light` | `dark`.
+The prose below is left at the vocabulary it was written in, because every measurement
+here — the ΔE00 figures above all — is a claim about the Solar and Astral Palettes
+specifically, not about the Light and Dark ColorSchemes or about the four Presets added
+later. Read "scheme" throughout as "the Palette that ColorScheme wore at the time".
+
 ---
 
 ## Verdict

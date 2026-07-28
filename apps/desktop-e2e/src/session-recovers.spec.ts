@@ -30,7 +30,7 @@ test('a session deleted under the app is re-minted on the next navigation, where
   await run.window.waitForURL(/\/worlds$/);
   // Somewhere other than where main points the window, so "back where they were" is a claim worth making.
   await run.window.goto(`${run.origin}/settings`);
-  await expect(run.window.getByTestId('color-scheme-solar')).toBeVisible();
+  await expect(run.window.getByTestId('color-scheme-light')).toBeVisible();
 
   // Logout from inside the shell, because main holds the SQLite file open and one `node_modules` holds one ABI
   // (ADR-0070); same end state as an expiry.
@@ -44,7 +44,7 @@ test('a session deleted under the app is re-minted on the next navigation, where
 
   // The renewal ran before the guard's policy choice, so the navigation lands where it was going.
   await expect(run.window).toHaveURL(/\/settings$/);
-  await expect(run.window.getByTestId('color-scheme-solar')).toBeVisible();
+  await expect(run.window.getByTestId('color-scheme-light')).toBeVisible();
   await expect(run.window.getByTestId('session-error')).toHaveCount(0);
   // A real session, not a UI that merely stayed rendered.
   expect(await run.window.evaluate(() => fetch('/api/auth/me').then((r) => r.status))).toBe(200);

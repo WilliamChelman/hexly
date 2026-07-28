@@ -140,7 +140,7 @@
     "backToWorlds": "Back to worlds",
     "eyebrow": "Hexly design system",
     "heroTitle": "The cartographer’s table,<br />by starlight.",
-    "heroLede": "One identity told at two hours of the day. <strong>Solar</strong> is the sunlit almanac on the cartographer’s table; <strong>Astral</strong> is the same chart under the night sky. Gold is the through-line — heliograph ink by day, constellation lines by night — and the text stays a warm ivory-cream in both. Everything below is driven by the same CSS custom-property layer that <code>apps/web</code> ships.",
+    "heroLede": "One identity told at two hours of the day — the two palette presets Hexly wears, one per colour scheme. <strong>Solar</strong> is the sunlit almanac on the cartographer’s table; <strong>Astral</strong> is the same chart under the night sky. Gold is the through-line — heliograph ink by day, constellation lines by night — and the text stays a warm ivory-cream in both. Everything below is driven by the same CSS custom-property layer that <code>apps/web</code> ships.",
     "swatch": {
       "table": "Table",
       "paper": "Paper",
@@ -165,6 +165,8 @@
     "paletteSemantic": "Palette · semantic roles",
     "paletteNote": "Slices request a role, never a raw colour. Showing the active colour scheme.",
     "paletteTerrain": "Palette · terrain fills",
+    "palettePresets": "Palette · presets",
+    "palettePresetsNote": "Every palette Hexly ships ready to pick, drawn in its own anchors. A world theme takes one as a starting point and then holds values, never a name.",
     "typeScale": "Type scale",
     "spacing": "Spacing",
     "radii": "Radii",
@@ -238,10 +240,10 @@
     "signOut": "Sign out",
     "login": "Login",
     "colorScheme": {
-      "solar": "Solar (light)",
-      "astral": "Astral (dark)",
-      "toSolar": "Switch to the solar colour scheme",
-      "toAstral": "Switch to the astral colour scheme"
+      "light": "Light",
+      "dark": "Dark",
+      "toLight": "Switch to the light colour scheme",
+      "toDark": "Switch to the dark colour scheme"
     },
     "cancel": "Cancel",
     "close": "Close",
@@ -465,6 +467,24 @@
     "copyEmpty": "None of your other worlds carries a theme yet. Author one anywhere and it can be copied from here.",
     "copyLoadError": "Could not load the worlds you can copy a theme from.",
     "paletteHeading": "Palette",
+    "paletteLede": "A palette preset is a starting point, not a binding: picking one fills in that scheme's eleven values, and nothing records which one you took. A dark preset also sets the map field's glow outright — an individual token you can clear back to derived.",
+    "palettePresetsLabel": "Palette preset",
+    "palettePresets": {
+      "solar": "Solar",
+      "vellum": "Vellum",
+      "herbarium": "Herbarium",
+      "astral": "Astral",
+      "obsidian": "Obsidian",
+      "ember": "Ember"
+    },
+    "palettePresetsHint": {
+      "solar": "Hexly's own day: warm ivory paper, sepia ink, heliograph gold.",
+      "vellum": "Cool neutral paper and slate ink. Plain, and out of your way.",
+      "herbarium": "Pale sage, deep forest ink and brass — a pressed specimen under glass.",
+      "astral": "Hexly's own night: midnight indigo, parchment ink, constellation gold.",
+      "obsidian": "Neutral near-black, cool ink, a cyan edge. Night without a colour of its own.",
+      "ember": "Warm charcoal and ash ink, lit forge-orange."
+    },
     "overridesHeading": "Individual tokens",
     "overridesHint": "Each token below follows the palette until you set it, and every cell shows what it currently renders as. Most are derived from the anchors; a few are an anchor under another name, and a few are fixed values no anchor reaches. Select one to set your own; clearing it hands the token back to the palette.",
     "derivation": {

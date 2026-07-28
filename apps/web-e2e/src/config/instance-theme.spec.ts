@@ -5,14 +5,15 @@ import { idFromSegment, segment } from '../../../../libs/web-core/src/utils/pret
 
 /**
  * An Instance default Theme in `hexly.yml` — via its own server (ADR-0076, #372; ADR-0052, Seam 4;
- * server in `playwright.config.ts`). The configured layer is partial (one anchor per ColorScheme, one
- * radius) because a whole-Theme layer could not show the field-by-field precedence.
+ * server in `playwright.config.ts`). The configured layer names a Palette Preset for Light with one
+ * anchor overriding it (ADR-0077, #385) and is anchors-only for Dark; it stays partial — no `page` on
+ * the dark side, one radius — because a whole-Theme layer could not show the field-by-field precedence.
  */
 
 /** A crimson World Theme, far enough from the operator's green that a mix-up is visible. */
 const CRIMSON = {
-  version: 1,
-  solar: {
+  version: 2,
+  light: {
     page: '#f8e8e6',
     ink: '#2a1210',
     inkQuiet: '#7a4340',
@@ -25,7 +26,7 @@ const CRIMSON = {
     lineAlpha: 0.371,
     veil: 0.12,
   },
-  astral: {
+  dark: {
     page: '#170a0c',
     ink: '#f2dcd9',
     inkQuiet: '#c08e8a',
@@ -71,12 +72,37 @@ test('the operator’s default is served on the config channel, canonicalised li
 
   // Operator-supplied is still input: the same choke point re-serialises it, so what crosses is a
   // colour by construction rather than by trust (ADR-0076).
-  expect(config.theme.version).toBe(1);
-  expect(config.theme.solar.accent).toMatch(/^oklch\(/);
-  expect(config.theme.astral.accent).toMatch(/^oklch\(/);
+  expect(config.theme.version).toBe(2);
+  expect(config.theme.light.accent).toMatch(/^oklch\(/);
+  expect(config.theme.dark.accent).toMatch(/^oklch\(/);
   expect(config.theme.radii['--radius-md']).toBe('0px');
   // Partial on purpose: everything the operator was silent about must fall through to the stylesheet.
-  expect(config.theme.solar.page).toBeUndefined();
+  // The dark block is the anchors-only spelling an upgrading deployment already had, and still is.
+  expect(config.theme.dark.page).toBeUndefined();
+  // The named Preset resolved to values before the channel: an id is a `hexly.yml` surface and reaches
+  // nothing downstream of the loader (ADR-0077).
+  expect(config.theme.light.preset).toBeUndefined();
+  expect(config.theme.light.page).toMatch(/^oklch\(/);
+});
+
+test('a Preset named in the config file paints, and the operator’s own anchor still wins over it', async ({
+  page,
+  request,
+}) => {
+  const config = await (await request.get('/api/config')).json();
+
+  await page.goto('/');
+
+  // `page` is a value the file never states — it can only have come from the Preset the file names,
+  // which is what "one word rather than eleven hex values" has to mean to be worth anything.
+  await expect.poll(() => inlineOnRoot(page, '--palette-page')).toBe(config.theme.light.page);
+  // Tier 2 derives from tier 1 (ADR-0075), so the Preset's paper is what the interface is drawn on.
+  expect(await resolvedOnRoot(page, '--color-bg')).toBe(await resolvedOnRoot(page, '--palette-page'));
+
+  // And the one anchor the operator wrote beside it wins over the Preset's own — field by field, so
+  // naming a Preset is a starting point rather than a cage.
+  expect(await inlineOnRoot(page, '--palette-accent')).toBe(config.theme.light.accent);
+  expect(config.theme.light.accent).not.toBe(config.theme.light.page);
 });
 
 test('every World without a Theme of its own adopts the Instance default, and so does the Index', async ({
@@ -84,7 +110,7 @@ test('every World without a Theme of its own adopts the Instance default, and so
   request,
 }) => {
   const config = await (await request.get('/api/config')).json();
-  const branded = config.theme.solar.accent;
+  const branded = config.theme.light.accent;
 
   // The Instance layer is not a World's, so it applies where no World is open.
   await page.goto('/');
@@ -104,15 +130,19 @@ test('a World with its own Theme overrides the Instance default field by field, 
   request,
 }) => {
   const config = await (await request.get('/api/config')).json();
-  const branded = config.theme.solar.accent;
+  const branded = config.theme.light.accent;
   const worldSeg = await enterLibrary(page);
   const theme = await storeTheme(request, idFromSegment(worldSeg), CRIMSON);
   const plain = await (await request.post('/api/worlds', { data: { name: 'Undyed' } })).json();
 
   await page.reload();
 
-  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(theme.solar.accent);
-  expect(theme.solar.accent).not.toBe(branded);
+  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(theme.light.accent);
+  expect(theme.light.accent).not.toBe(branded);
+  // Including over the anchors the operator never wrote, which the Preset they named supplied: the
+  // Owner beats the Instance layer field by field, whichever way the operator authored the field.
+  expect(await inlineOnRoot(page, '--palette-page')).toBe(theme.light.page);
+  expect(theme.light.page).not.toBe(config.theme.light.page);
   // The Instance default survives where the World Theme is silent — this Theme carries no radii.
   expect(await inlineOnRoot(page, '--radius-md')).toBe('0px');
 

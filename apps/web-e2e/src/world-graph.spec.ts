@@ -114,7 +114,7 @@ test('draws on the sunken surface rather than on black', async ({ page }) => {
   );
   // Expected from the live token through the rasterise the contrast report uses, so the assertion holds
   // in whichever ColorScheme the suite is painted in.
-  const [expected] = await page.evaluate(rasteriseColors, [sunken]);
+  const [expected] = await page.evaluate(rasteriseColors, { values: [sunken] });
   const painted = await paintedBackground(drawing.locator('canvas'));
 
   // One 8-bit step of slack, for the trip through the GPU's unorm conversion and the screenshot's encode.

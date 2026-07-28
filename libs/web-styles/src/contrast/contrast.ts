@@ -159,7 +159,7 @@ function* midToneWarning(color: (token: DesignToken) => Rgb): Generator<ThemeWar
 
 /**
  * The eight tones are hue rotations off the accent (ADR-0075), while danger and success are anchors an
- * Owner sets independently — so the exclusion arc computed against Hexly's accent does not hold for
+ * Owner sets independently — so the separation measured against Hexly's accent does not hold for
  * theirs. Only the nearer status colour is reported: a chip reads as one thing, not two.
  */
 function* toneWarnings(color: (token: DesignToken) => Rgb): Generator<ThemeWarning> {

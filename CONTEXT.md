@@ -393,19 +393,23 @@ _Avoid_: Date format, regional settings, locale (bare — that means the UI lang
 ## Appearance
 
 **ColorScheme**:
-The day/night axis the interface is painted along — `Solar` (light) or `Astral` (dark). A user **Preference**, never a World's to set: a **World Theme** supplies both, and the reader chooses which one they see.
-_Avoid_: Theme (bare), dark mode, colour mode, scheme (bare), light/dark toggle
+The day/night axis the interface is painted along — `Light` or `Dark`. A user **Preference**, never a World's to set: a **World Theme** supplies both, and the reader chooses which one they see. Named for what it is rather than for the **Palette Presets** Hexly happens to wear at each end (ADR-0077).
+_Avoid_: Theme (bare), dark mode, colour mode, scheme (bare), light/dark toggle; Solar, Astral (those are **Palette Presets**)
 
 **World Theme**:
 The presentation a **World Owner** authors for one World — a **Palette** per **ColorScheme**, plus a radius set and a font pairing. Purely presentational: it never changes what an Entity contains or who may read it, and a reader keeps their own **ColorScheme** within it.
 _Avoid_: Skin, style, branding, world palette, theme (bare — that used to mean the **ColorScheme**)
 
 **Palette**:
-The small set of anchor colours one **ColorScheme** of a **World Theme** is authored as; every other colour the interface uses derives from it. What an Owner actually fills in.
+The small set of anchor colours one **ColorScheme** of a **World Theme** is authored as; every other colour the interface uses derives from it. What an Owner actually fills in, whether by hand or by taking a **Palette Preset**.
 _Avoid_: Swatch set, colour scheme, theme; terrain palette (that set is the **Terrain** list); graph palette (the **World Graph** paints each **Entity Type** in its **Tone**)
 
+**Palette Preset**:
+One of the **Palettes** Hexly ships ready to pick — a whole **Palette** for one **ColorScheme**, offered as a starting point and applied by copying its values into a **World Theme**, which then holds values and no name. **Solar** and **Astral** are two of them, and are also the pair Hexly itself wears (ADR-0077).
+_Avoid_: Theme preset, built-in theme, stock palette, swatch, skin; preset (bare — a radius set and a font pairing are offered the same way)
+
 **Anchor**:
-One of the eight colours a **Palette** is authored as — page, ink, quiet ink, accent, danger, success, canvas, and soot — each carrying its own hue, which is how the Solar→Astral rotation is expressed (ADR-0075). Every role the interface styles itself from is one expression over these, so a component asks for the role and never the Anchor.
+One of the eight colours a **Palette** is authored as — page, ink, quiet ink, accent, danger, success, canvas, and soot — each carrying its own hue, which is how the light→dark rotation is expressed (ADR-0075). Every role the interface styles itself from is one expression over these, so a component asks for the role and never the Anchor.
 _Avoid_: Base colour, brand colour, primitive, swatch, primary/secondary
 
 **Knob**:
@@ -413,12 +417,12 @@ One of the three numbers a **Palette** carries beside its **Anchors** — polari
 _Avoid_: Slider, parameter, colour setting; knob (bare, outside Appearance — that is any dial an operator turns)
 
 **Instance Default Theme**:
-The presentation an operator sets for a whole deployment, in **Instance Configuration** — the same anchors as a **World Theme**, from a different source, and any subset of them. A starting point, not an imposition: a World's own **World Theme** wins over it field by field, and the chain is Instance Default Theme → **World Theme** → the reader's **ColorScheme**. Ships empty. Shortened to "Instance default" in running prose, and to `InstanceTheme` in code.
+The presentation an operator sets for a whole deployment, in **Instance Configuration** — the same anchors as a **World Theme**, from a different source, and any subset of them, each **ColorScheme** given either as anchors or as the name of a **Palette Preset**. A starting point, not an imposition: a World's own **World Theme** wins over it field by field, and the chain is Instance Default Theme → **World Theme** → the reader's **ColorScheme**. Ships empty. Shortened to "Instance default" in running prose, and to `InstanceTheme` in code.
 _Avoid_: Global theme, site theme, default palette, instance branding, house style
 
 **Tone**:
 One of the eight categorical colours an **Entity Type** is drawn in — its chip's text and border, its nodes in the **World Graph** — derived from the accent by hue rotation, and assigned by hashing the Type's id unless the Type pins one (ADR-0075). Never identity on its own: no eight-hue set survives deuteranopia, so a chip carries the Entity Type's icon beside its label and the colour decorates. The soft fill is emphasis, not category. `--color-tone-1…8` in the tokens, `ChipTone` in code.
-_Avoid_: Colour, category colour, hue, tint; tone (as the Solar/Astral polarity — that **Knob** ships as `--palette-polarity`)
+_Avoid_: Colour, category colour, hue, tint; tone (as the light/dark polarity — that **Knob** ships as `--palette-polarity`)
 
 ## Self-hosting
 

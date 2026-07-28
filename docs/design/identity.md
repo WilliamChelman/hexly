@@ -5,23 +5,28 @@
 > open [`/styleguide`](http://localhost:4200/styleguide).
 
 Hexly is a hex-map editor for TTRPG worldbuilding, so the identity leans
-cartographic — an old sea-chart on a drafting table. The two **ColorSchemes** are the
-**same table at two times of day**, not a light mode and an unrelated dark mode:
+cartographic — an old sea-chart on a drafting table. The two **ColorSchemes** —
+**Light** and **Dark** — are the **same table at two times of day**, not a light mode
+and an unrelated dark mode. The pair Hexly itself wears has names:
 
-- **Solar** (light) — a sunlit almanac: warm ivory stock, sepia iron-gall ink,
-  heliograph gold, burnt-sienna marginalia, moss.
-- **Astral** (dark) — the same chart under the night sky: midnight-indigo paper,
-  constellation gold, coral marginalia, aurora green.
+- **Solar**, the Light default — a sunlit almanac: warm ivory stock, sepia iron-gall
+  ink, heliograph gold, burnt-sienna marginalia, moss.
+- **Astral**, the Dark default — the same chart under the night sky: midnight-indigo
+  paper, constellation gold, coral marginalia, aurora green.
+
+Those two are **Palette Presets** — ready-made Palettes anyone may pick — and not the
+name of the axis, which is Light and Dark and nothing else (ADR-0077).
 
 The bridge between them is deliberate: **gold** is the through-line (heliograph ink
 by day → constellation lines by night), and body text stays a warm parchment-cream in
 both so Astral reads as _night_, never as generic "dark mode."
 
 **Vocabulary.** "Theme" no longer means the day/night axis. That axis is a
-**ColorScheme** (`solar` / `astral`); a **Palette** is the anchor set one ColorScheme
-is authored as; a **World Theme** is the presentation a World Owner authors for one
-World. CONTEXT.md fixes all three, and this document uses no other word for any of
-them (ADR-0075, ADR-0076).
+**ColorScheme** (`light` / `dark`); a **Palette** is the anchor set one ColorScheme
+is authored as; a **Palette Preset** is a whole Palette Hexly ships ready to pick for
+one ColorScheme; a **World Theme** is the presentation a World Owner authors for one
+World. CONTEXT.md fixes all four, and this document uses no other word for any of
+them (ADR-0075, ADR-0076, ADR-0077).
 
 ## Three tiers
 
@@ -53,17 +58,18 @@ controls (ADR-0075).
 
 ## Where it lives
 
-| File                                                     | Role                                                                                                                                               |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `libs/web-styles/src/index.css`                          | The `@theme static` block — tier 2, one derivation per role — plus type, radii and fonts, and the elevation `@utility` wrappers.                   |
-| `libs/web-styles/src/tokens.css`                         | The two **Palettes** (tier 1), and what `@theme` can't hold: motion, layout rails, elevation, the sheen gradients.                                 |
-| `libs/web-styles/src/base.css`                           | Reset, document typography, the flat table background (`@layer base`).                                                                             |
-| `libs/web-styles/src/tokens/manifest.ts`                 | The token contract (above).                                                                                                                        |
-| `libs/web-styles/src/tokens/design-token-properties.css` | The `@property` registrations, generated from the manifest by `pnpm tokens:generate`.                                                              |
-| `libs/plugin-hexmap-web/src/hexmap-tokens.css`           | Tier 3 — the hex map's own vocabulary, derived from tier-2 roles so an Owner's field or ink carries into the map.                                  |
-| `apps/web/src/styles.css`                                | Build entry point: self-hosted fonts, then `web-styles`, then each plugin's tier-3 sheet — plus the `@source` scan set, automatic detection off.   |
-| `apps/web/src/app/pages/styleguide/`                     | The living `/styleguide` reference page — the one exemption from the tier gates, because rendering every token is what it is for.                  |
-| `apps/web-e2e/src/design-tokens.table.json`              | Every declared token's **resolved** value in both ColorSchemes, asserted in a real engine by `design-tokens.spec.ts`. The ground truth for values. |
+| File                                                     | Role                                                                                                                                                |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `libs/web-styles/src/index.css`                          | The `@theme static` block — tier 2, one derivation per role — plus type, radii and fonts, and the elevation `@utility` wrappers.                    |
+| `libs/web-styles/src/tokens.css`                         | The two **Palettes** (tier 1), generated from the Preset table, and what `@theme` can't hold: motion, layout rails, elevation, the sheen gradients. |
+| `libs/domain/src/lib/palette-preset.ts`                  | The **Palette Preset** table — the six ready-made Palettes, Hexly's own two among them (ADR-0077).                                                  |
+| `libs/web-styles/src/base.css`                           | Reset, document typography, the flat table background (`@layer base`).                                                                              |
+| `libs/web-styles/src/tokens/manifest.ts`                 | The token contract (above).                                                                                                                         |
+| `libs/web-styles/src/tokens/design-token-properties.css` | The `@property` registrations, generated from the manifest by `pnpm tokens:generate`.                                                               |
+| `libs/plugin-hexmap-web/src/hexmap-tokens.css`           | Tier 3 — the hex map's own vocabulary, derived from tier-2 roles so an Owner's field or ink carries into the map.                                   |
+| `apps/web/src/styles.css`                                | Build entry point: self-hosted fonts, then `web-styles`, then each plugin's tier-3 sheet — plus the `@source` scan set, automatic detection off.    |
+| `apps/web/src/app/pages/styleguide/`                     | The living `/styleguide` reference page — the one exemption from the tier gates, because rendering every token is what it is for.                   |
+| `apps/web-e2e/src/design-tokens.table.json`              | Every declared token's **resolved** value in both ColorSchemes, asserted in a real engine by `design-tokens.spec.ts`. The ground truth for values.  |
 
 Primitives (`Button`, `Panel`, `Chip`, `Coord`, …) own their **scoped** styles and
 consume the tokens directly (ADR-0007); there is no global component sheet, bar the
@@ -90,7 +96,7 @@ generates an on-brand utility (`bg-surface`, `text-ink`, `text-accent`,
 `border-line-strong`, `font-display`, `rounded-lg`, `text-tone-3`, `gap-5`, `text-md`)
 **and** is emitted as a CSS variable on `:root` for scoped component styles to consume
 via `var(--…)`. Colours are declared non-`inline` so the emitted `--color-*` carries the
-**derivation itself** — which is why `[data-color-scheme='astral']` reassigns the
+**derivation itself** — which is why `[data-color-scheme='dark']` reassigns the
 anchors and not the roles. `static` disables theme-variable tree-shaking so tokens read
 only by a Canvas renderer (`getComputedStyle`) or by raw `var(--…)` still resolve.
 Spacing uses Tailwind's default linear scale (`calc(var(--spacing) * N)`, 0.25rem base);
@@ -115,30 +121,31 @@ Type scale is modular (~1.25): `--text-2xs` (11px) → `--text-3xl` (41px). Sect
 eyebrows use `--tracking-wider` (0.14em) uppercase; the cartouche wordmark takes the
 gentler `--tracking-wide`.
 
-## Colour — tier 1, the two Palettes
+## Colour — tier 1, the Palettes Hexly wears
 
-Authored in `libs/web-styles/src/tokens.css`, and reproduced here because they are the
-only colour literals in the system and the only values a reader has to know. Hex,
-because that is how an anchor is authored and how it ships — an 8-bit hex is what a
-contrast floor has to clear — and the engine reads each one back as the identical
+Authored as **Palette Preset** entries in `libs/domain/src/lib/palette-preset.ts` and
+generated into `libs/web-styles/src/tokens.css` (ADR-0077), and reproduced here because
+they are the only colour literals in the system and the only values a reader has to
+know. Hex, because that is how an anchor is authored and how it ships — an 8-bit hex is
+what a contrast floor has to clear — and the engine reads each one back as the identical
 `rgb()` triple, so nothing is lost in the notation.
 
-| Anchor                | What it anchors                         | Solar     | Astral    |
-| --------------------- | --------------------------------------- | --------- | --------- |
-| `--palette-page`      | The table / outer paper                 | `#f1e5c7` | `#0b0c1a` |
-| `--palette-ink`       | Primary text ink                        | `#2e2412` | `#ece3cf` |
-| `--palette-ink-quiet` | Secondary ink — **carries its own hue** | `#6f5a36` | `#9aa0c8` |
-| `--palette-accent`    | The through-line accent                 | `#8c5e00` | `#d9b25a` |
-| `--palette-danger`    | Danger (marginalia)                     | `#a4402e` | `#e88a6f` |
-| `--palette-success`   | Confirm / "online"                      | `#4a6f2f` | `#86c46a` |
-| `--palette-canvas`    | The map field                           | `#efe2bf` | `#12152e` |
-| `--palette-soot`      | Shadow / scrim ink                      | `#3c2c16` | `#02020a` |
+| Anchor                | What it anchors                         | Solar (Light) | Astral (Dark) |
+| --------------------- | --------------------------------------- | ------------- | ------------- |
+| `--palette-page`      | The table / outer paper                 | `#f1e5c7`     | `#0b0c1a`     |
+| `--palette-ink`       | Primary text ink                        | `#2e2412`     | `#ece3cf`     |
+| `--palette-ink-quiet` | Secondary ink — **carries its own hue** | `#6f5a36`     | `#9aa0c8`     |
+| `--palette-accent`    | The through-line accent                 | `#8c5e00`     | `#d9b25a`     |
+| `--palette-danger`    | Danger (marginalia)                     | `#a21b01`     | `#fe7a54`     |
+| `--palette-success`   | Confirm / "online"                      | `#325e01`     | `#71ca42`     |
+| `--palette-canvas`    | The map field                           | `#efe2bf`     | `#12152e`     |
+| `--palette-soot`      | Shadow / scrim ink                      | `#3c2c16`     | `#02020a`     |
 
-| Knob                   | Controls                                                              | Solar   | Astral |
-| ---------------------- | --------------------------------------------------------------------- | ------- | ------ |
-| `--palette-polarity`   | Scheme polarity (±1): every ramp direction and the paper chroma slope | `1`     | `-1`   |
-| `--palette-line-alpha` | Opacity of the drawn-rule ramp                                        | `0.371` | `0.16` |
-| `--palette-veil`       | Base opacity of shadows, scrims, and the vignette                     | `0.12`  | `0.5`  |
+| Knob                   | Controls                                                              | Solar (Light) | Astral (Dark) |
+| ---------------------- | --------------------------------------------------------------------- | ------------- | ------------- |
+| `--palette-polarity`   | Scheme polarity (±1): every ramp direction and the paper chroma slope | `1`           | `-1`          |
+| `--palette-line-alpha` | Opacity of the drawn-rule ramp                                        | `0.371`       | `0.16`        |
+| `--palette-veil`       | Base opacity of shadows, scrims, and the vignette                     | `0.12`        | `0.5`         |
 
 Two of the eight look redundant and are not. **Quiet ink** is its own anchor because its
 hue _rotates_ between the ColorSchemes — sepia by day, lavender-grey by night — and off
@@ -147,6 +154,31 @@ Solar's scrim ink sits _lighter_ than its text ink, so no other anchor reaches i
 **polarity** is a finding rather than a fitting: Solar and Astral turned out to be mirror
 images of each other, and the ±1 asserts that symmetry instead of re-deriving it by hand
 each time a colour moves (ADR-0075).
+
+### The six Palette Presets
+
+Hexly ships **six** ready-made Palettes, three per ColorScheme: its own, one plain, and one
+with a different personality. That split answers the two things a World Owner actually
+arrives wanting — out of the sepia into something neutral, or into another identity
+altogether (ADR-0077).
+
+| ColorScheme | Preset        | What it is                                                             |
+| ----------- | ------------- | ---------------------------------------------------------------------- |
+| Light       | **Solar**     | Hexly's own day: warm ivory paper, sepia ink, heliograph gold.         |
+| Light       | **Vellum**    | Cool neutral paper, slate ink — the personality taken out.             |
+| Light       | **Herbarium** | Pale sage paper, deep forest ink, brass.                               |
+| Dark        | **Astral**    | Hexly's own night: midnight indigo, parchment ink, constellation gold. |
+| Dark        | **Obsidian**  | Neutral near-black, cool ink, cyan — the plain one, by night.          |
+| Dark        | **Ember**     | Warm charcoal, ash ink, forge-orange.                                  |
+
+Each carries the eleven values tabulated above, plus whatever tier-2 roles it states
+outright — every dark Preset states its own `--color-canvas-glow`, for the reason under
+_Named literals_ below. **Accents are fitted, not picked**: the eight categorical Tones are
+hue rotations off the accent, so a Preset rotates the entire categorical set, and each
+Preset's anchors moved until the contrast report was silent. The names are proper nouns and
+are not translated; each carries a translated one-line description. The mechanism — what a
+Preset holds, what picking one does, and how an operator names one — is
+`world-theme-spec.md` §5.6.
 
 ## Colour — tier 2, the semantic roles
 
@@ -160,7 +192,7 @@ real browser rather than recomputed.
 
 | Family       | Roles                                                                    | How they derive                                                                                                                                                                                                                                                   |
 | ------------ | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Paper        | `bg`, `bg-deep`, `surface`, `surface-raised`, `surface-sunken`           | Lightness steps off `--palette-page`, with chroma sloped against the step. The well sits below the page in Solar and above it in Astral — that swap is what polarity is for.                                                                                      |
+| Paper        | `bg`, `bg-deep`, `surface`, `surface-raised`, `surface-sunken`           | Lightness steps off `--palette-page`, with chroma sloped against the step. The well sits below the page at polarity `+1` and above it at `-1` — that swap is what polarity is for.                                                                                |
 | Scrim        | `overlay`                                                                | Soot at a power of the veil. Parented to soot, not the page, because a scrim is dark in **both** ColorSchemes.                                                                                                                                                    |
 | Ink          | `ink`, `ink-strong`, `ink-muted`, `ink-faint`                            | `ink` and `ink-muted` are the two ink anchors; `ink-strong` (headings) and `ink-faint` (placeholders, disabled) are one polarity step off them.                                                                                                                   |
 | Drawn rules  | `line`, `line-strong`, `line-faint`                                      | The accent at `--palette-line-alpha` × {1, 1.85, 0.44}. Translucent in both ColorSchemes, so a rule takes its colour from what it is drawn over.                                                                                                                  |
@@ -180,23 +212,34 @@ and 3 only, a 1px shadow having no travel to scale (`--shadow-*`, raw vars wrapp
 `@utility`, ADR-0021).
 
 **The categorical set** (`--color-tone-1…8`, plus `-soft`) is not a secondary and
-tertiary accent — it is eight hue rotations off `--color-accent`, whose only job is
-mutual distinguishability (ADR-0075). It is eight rather than twelve because the accent
-sits _between_ danger and success on the hue circle, leaving one continuous ~161° arc:
-cyan → blue → violet → magenta. That arc is the deuteranope confusion line — measured,
-the eight collapse to ΔE00 0.2–1.3 under simulation — so **colour here is decoration**:
-a chip carries its category in its text, its border, and the Entity Type's icon, never
-in the `-soft` fill, whose eight variants sit under a just-noticeable difference apart.
+tertiary accent — it is eight hue rotations off the accent anchor, whose only job is
+mutual distinguishability (ADR-0075). They span **252°** of the wheel in even 36° steps
+(offsets +81 to +333), so the set runs green → teal → blue → indigo → violet → magenta →
+red → brown rather than reading as one blue-purple family; the measured separation, taken
+after gamut mapping, is in `world-theme-spec.md` §2.3. The count is what that separation
+will bear rather than a round number.
+
+**Colour here is decoration**, and not because of where the tones sit: hue alone cannot
+carry eight categories for a dichromat wherever it is spent. Simulated for a deuteranope
+(Viénot–Brettel–Mollon) the closest two collapse to ΔE00 **1.6** — a shade over a
+just-noticeable difference — with a second pair at 1.7. So a chip carries its category in
+its text, its border, and the Entity Type's icon, never in the `-soft` fill, whose eight
+variants sit under a just-noticeable difference apart.
 Which type wears which tone is derived from the type id rather than stored, so a chip
 and its World Graph node cannot disagree (`typeTone`, ADR-0075).
 
 **Named literals.** Two colours resist derivation and are declared per ColorScheme
-instead: `--color-canvas-glow` (`rgba(255, 240, 202, 0.55)` Solar,
-`rgba(58, 70, 140, 0.26)` Astral) and the hex map's `--color-terrain-mountain`
+instead: `--color-canvas-glow` (`rgba(255, 240, 202, 0.55)` Light,
+`rgba(58, 70, 140, 0.26)` Dark) and the hex map's `--color-terrain-mountain`
 (`#b9a489` / `#474264`). Both are a change of _hue_ between the ColorSchemes that the
 field's own shift does not account for — two design ideas rather than one parameterised
 one, so a formula that hit both anyway would promise a World Owner a generalisation it
-does not have (ADR-0075).
+does not have (ADR-0075). The field glow is why a **Palette Preset** carries tier-2
+values beside its anchors: the stylesheet keys off `data-color-scheme` and can never know
+which Preset is active, so each dark Preset states its own glow or a warm-charcoal World
+would light up in Astral's indigo (ADR-0077). `--color-terrain-mountain` is tier 3 and out
+of the contract, so it stays violet by night under every dark Preset — a known gap, named
+in ADR-0077 rather than fixed there.
 
 ## Colour — tier 3, the hex map's own
 
@@ -235,20 +278,24 @@ spells that knob and a relative colour function destructures a single colour. Th
   to the OS preference when unset.
 - An inline boot script in `index.html` applies the ColorScheme **before first paint**
   (no flash). An explicit user choice always beats the OS preference.
-- Token declarations key off `[data-color-scheme]` on **any** element, not
-  `:root[data-color-scheme]` — that widening is what lets `hexlyPalette` read Hexly's own
-  anchors past a painted World Theme (ADR-0076).
+- Token declarations key off `:root[data-color-scheme]` — the **document root** and nothing
+  else. ADR-0076 had widened this to any element so an offscreen probe could carry the other
+  ColorScheme; `hexlyPalette` was its last reader and is now a Palette Preset lookup, so it
+  narrows back (ADR-0077). A subtree carrying its own `data-color-scheme` therefore resolves
+  nothing of its own — which is why the contrast report re-dresses the root instead.
 
 ## World Theme
 
 A World Owner authors a **World Theme** for their World: a Palette per ColorScheme, plus
 per-token overrides, a radius set, and a font pairing. What binds it to this document is
 that a World Theme and a reader's ColorScheme stay **orthogonal** — the Owner supplies
-the Palette, the reader still chooses Solar or Astral within it, which is why an Owner
+the Palette, the reader still chooses Light or Dark within it, which is why an Owner
 authors two anchor sets and not one. "One identity at two times of day" survives as a
-system property rather than as Hexly's own habit. An operator may set an **Instance
-Default Theme** under it, so the chain is instance default → World Theme → the reader's
-ColorScheme. The decisions are ADR-0076, the implementable detail is
+system property rather than as Hexly's own habit — and as a property of Hexly's own pair
+of Presets rather than one the system enforces on Worlds, since an Owner may take Solar by
+day and Ember by night if that is what they want (ADR-0077). An operator may set an
+**Instance Default Theme** under it, so the chain is instance default → World Theme → the
+reader's ColorScheme. The decisions are ADR-0076 and ADR-0077, the implementable detail is
 `world-theme-spec.md`, and the editor lives in
 `apps/web/src/app/pages/world/pages/world-settings/`.
 

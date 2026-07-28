@@ -20,8 +20,8 @@ import { FieldControlComponent, typeTone } from '@hexly/web-entity';
     <div class="flex flex-col gap-3" data-testid="entity-types-editor">
       <div class="flex flex-wrap items-center gap-2">
         @for (type of types(); track type; let i = $index) {
-          <!-- The icon, not the tone, is what carries the category: the tone arc is the deuteranope
-               confusion line (ADR-0075). Primacy is the "· Primary" marker, never the colour. -->
+          <!-- The icon, not the tone, is what carries the category: hue alone cannot separate eight
+               of them for a dichromat (ADR-0075). Primacy is the "· Primary" marker, never the colour. -->
           <app-chip [tone]="toneOf(type)" [icon]="iconOf(type)" [attr.data-testid]="'type-chip-' + type">
             {{ typeLabel(type) }}
             @if (i === 0) {

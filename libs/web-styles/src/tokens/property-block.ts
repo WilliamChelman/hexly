@@ -10,9 +10,47 @@ export const PRE_PAINT_REPLAY_PATH = 'apps/web/src/index.html';
 /** Quoted in the drift specs' failure messages, so the fix arrives with the failure. */
 export const GENERATE_COMMAND = 'pnpm tokens:generate';
 
+/**
+ * A run of generated lines fenced inside a committed file, so the generator rewrites it in place and
+ * leaves the hand-written rest alone. The path is carried because a missing fence has to fail by name.
+ */
+export interface FencedRegion {
+  readonly path: string;
+  readonly open: string;
+  readonly close: string;
+}
+
 /** Fences the generated allowlist inside {@link PRE_PAINT_REPLAY_PATH}. */
-const ALLOWLIST_OPEN = '/* GENERATED — design-token allowlist */';
-const ALLOWLIST_CLOSE = '/* END GENERATED */';
+const ALLOWLIST_REGION: FencedRegion = {
+  path: PRE_PAINT_REPLAY_PATH,
+  open: '/* GENERATED — design-token allowlist */',
+  close: '/* END GENERATED */',
+};
+
+/** Where a region's fences sit in `text`, and the indentation the opening one carries. */
+function boundsOf(region: FencedRegion, text: string): { start: number; end: number; indent: string } {
+  const open = text.indexOf(region.open);
+  const close = open === -1 ? -1 : text.indexOf(region.close, open);
+  if (open === -1 || close === -1) throw new Error(`${region.path} is missing the ${region.open} fence`);
+  const indent = text.slice(text.lastIndexOf('\n', open) + 1, open);
+  return { start: open - indent.length, end: close + region.close.length, indent };
+}
+
+/**
+ * `text` with the region re-rendered between its fences. `render` writes the fences too, so the one
+ * function knows where they go — and it is given the indentation the file chose rather than one this
+ * module guesses.
+ */
+export function withFencedRegion(region: FencedRegion, text: string, render: (indent: string) => string): string {
+  const { start, end, indent } = boundsOf(region, text);
+  return text.slice(0, start) + render(indent) + text.slice(end);
+}
+
+/** What `text` actually holds between the fences — read back rather than re-rendered. */
+export function fencedRegionIn(region: FencedRegion, text: string): string {
+  const { start, end } = boundsOf(region, text);
+  return text.slice(start, end);
+}
 
 /**
  * The `@property` syntax each token type registers under, or `null` for a type CSS cannot describe:
@@ -79,25 +117,15 @@ export function designTokenPropertyBlock(): string {
 export function designTokenAllowlistScript(indent = '        '): string {
   const names = SETTABLE_TOKENS.map((decl) => decl.name).join(',');
   return [
-    `${indent}${ALLOWLIST_OPEN}`,
+    `${indent}${ALLOWLIST_REGION.open}`,
     `${indent}var ALLOWED = '${names}'.split(',');`,
-    `${indent}${ALLOWLIST_CLOSE}`,
+    `${indent}${ALLOWLIST_REGION.close}`,
   ].join('\n');
 }
 
 /** {@link PRE_PAINT_REPLAY_PATH}'s contents with the allowlist re-spliced between its fences. */
 export function withDesignTokenAllowlist(html: string): string {
-  const open = html.indexOf(ALLOWLIST_OPEN);
-  const close = html.indexOf(ALLOWLIST_CLOSE);
-  if (open === -1 || close === -1) {
-    throw new Error(`${PRE_PAINT_REPLAY_PATH} is missing the ${ALLOWLIST_OPEN} fence`);
-  }
-  const indent = html.slice(html.lastIndexOf('\n', open) + 1, open);
-  return (
-    html.slice(0, open - indent.length) +
-    designTokenAllowlistScript(indent) +
-    html.slice(close + ALLOWLIST_CLOSE.length)
-  );
+  return withFencedRegion(ALLOWLIST_REGION, html, designTokenAllowlistScript);
 }
 
 /**
@@ -105,6 +133,7 @@ export function withDesignTokenAllowlist(html: string): string {
  * generator writes through Prettier and its wrapping is not this module's to predict.
  */
 export function allowlistIn(html: string): readonly string[] {
-  const fenced = html.slice(html.indexOf(ALLOWLIST_OPEN), html.indexOf(ALLOWLIST_CLOSE));
-  return [...fenced.matchAll(/'([^']*)'/g)].flatMap((quoted) => quoted[1].split(',')).filter((name) => name !== '');
+  return [...fencedRegionIn(ALLOWLIST_REGION, html).matchAll(/'([^']*)'/g)]
+    .flatMap((quoted) => quoted[1].split(','))
+    .filter((name) => name !== '');
 }

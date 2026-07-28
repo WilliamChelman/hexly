@@ -6,6 +6,7 @@ import {
   FontPairingId,
   InstanceTheme,
   OVERRIDABLE_TOKENS,
+  WORLD_THEME_VERSION,
   WorldTheme,
   WorldThemePalette,
 } from '@hexly/domain';
@@ -44,44 +45,44 @@ function palette(over: Partial<WorldThemePalette> = {}): WorldThemePalette {
 }
 
 function theme(over: Partial<WorldTheme> = {}): WorldTheme {
-  return { version: 1, solar: palette(), astral: palette({ polarity: -1 }), ...over } as WorldTheme;
+  return { version: WORLD_THEME_VERSION, light: palette(), dark: palette({ polarity: -1 }), ...over } as WorldTheme;
 }
 
 describe('the World Theme resolution chain (ADR-0076)', () => {
   it('writes the named ColorScheme’s anchors and knobs as their tier-1 tokens', () => {
     const declarations = resolveWorldTheme([theme()]);
 
-    expect(declarations.solar['--palette-accent']).toBe('oklch(0.55 0.14 40)');
-    expect(declarations.solar['--palette-ink-quiet']).toBe('oklch(0.45 0.04 80)');
-    expect(declarations.solar['--palette-polarity']).toBe('1');
-    expect(declarations.astral['--palette-polarity']).toBe('-1');
-    expect(declarations.solar['--palette-line-alpha']).toBe('0.371');
+    expect(declarations.light['--palette-accent']).toBe('oklch(0.55 0.14 40)');
+    expect(declarations.light['--palette-ink-quiet']).toBe('oklch(0.45 0.04 80)');
+    expect(declarations.light['--palette-polarity']).toBe('1');
+    expect(declarations.dark['--palette-polarity']).toBe('-1');
+    expect(declarations.light['--palette-line-alpha']).toBe('0.371');
   });
 
   it('lets the World Theme win over the Instance default, field by field', () => {
-    const instance: WorldThemeLayer = { solar: { accent: 'oklch(0.6 0.2 300)', canvas: 'oklch(0.7 0.01 300)' } };
+    const instance: WorldThemeLayer = { light: { accent: 'oklch(0.6 0.2 300)', canvas: 'oklch(0.7 0.01 300)' } };
 
     const declarations = resolveWorldTheme([instance, theme()]);
 
-    expect(declarations.solar['--palette-accent']).toBe('oklch(0.55 0.14 40)');
+    expect(declarations.light['--palette-accent']).toBe('oklch(0.55 0.14 40)');
   });
 
   it('keeps an Instance-default value the World Theme does not carry', () => {
-    const instance: WorldThemeLayer = { radii: { '--radius-md': '2px' }, solar: { accent: 'oklch(0.6 0.2 300)' } };
+    const instance: WorldThemeLayer = { radii: { '--radius-md': '2px' }, light: { accent: 'oklch(0.6 0.2 300)' } };
 
     // A layer with no palette of its own: an Owner may brand only their radii.
     const declarations = resolveWorldTheme([instance, { radii: { '--radius-sm': '1px' } }]);
 
-    expect(declarations.solar['--palette-accent']).toBe('oklch(0.6 0.2 300)');
-    expect(declarations.solar['--radius-md']).toBe('2px');
-    expect(declarations.solar['--radius-sm']).toBe('1px');
+    expect(declarations.light['--palette-accent']).toBe('oklch(0.6 0.2 300)');
+    expect(declarations.light['--radius-md']).toBe('2px');
+    expect(declarations.light['--radius-sm']).toBe('1px');
   });
 
   it('resolves a font pairing into the four font tokens it writes', () => {
     const declarations = resolveWorldTheme([theme({ fontPairing: 'codex' })]);
 
-    expect(declarations.solar['--font-display']).toContain('Marcellus');
-    expect(declarations.astral['--font-mono']).toContain('JetBrains Mono');
+    expect(declarations.light['--font-display']).toContain('Marcellus');
+    expect(declarations.dark['--font-mono']).toContain('JetBrains Mono');
   });
 
   it('writes whatever the curated table names, so a pairing added to it needs no change here (#375)', () => {
@@ -92,9 +93,9 @@ describe('the World Theme resolution chain (ADR-0076)', () => {
     try {
       const declarations = resolveWorldTheme([theme({ fontPairing: 'grimoire' as FontPairingId })]);
 
-      expect(declarations.solar['--font-display']).toBe("'Cinzel Decorative', serif");
+      expect(declarations.light['--font-display']).toBe("'Cinzel Decorative', serif");
       // Scheme-independent, like the radii: a pairing is one decision, not one per ColorScheme.
-      expect(declarations.astral['--font-body']).toBe("'Marcellus', serif");
+      expect(declarations.dark['--font-body']).toBe("'Marcellus', serif");
     } finally {
       delete table['grimoire'];
     }
@@ -102,15 +103,15 @@ describe('the World Theme resolution chain (ADR-0076)', () => {
 
   it('applies a tier-2 override per ColorScheme, over the anchors it opts out of', () => {
     const declarations = resolveWorldTheme([
-      theme({ overrides: { solar: { '--color-ink': 'oklch(0 0 0)' }, astral: {} } }),
+      theme({ overrides: { light: { '--color-ink': 'oklch(0 0 0)' }, dark: {} } }),
     ]);
 
-    expect(declarations.solar['--color-ink']).toBe('oklch(0 0 0)');
-    expect(declarations.astral['--color-ink']).toBeUndefined();
+    expect(declarations.light['--color-ink']).toBe('oklch(0 0 0)');
+    expect(declarations.dark['--color-ink']).toBeUndefined();
   });
 
   it('resolves to nothing at all when every layer is empty — the Hexly default', () => {
-    expect(resolveWorldTheme([null, undefined])).toEqual({ solar: {}, astral: {} });
+    expect(resolveWorldTheme([null, undefined])).toEqual({ light: {}, dark: {} });
   });
 
   it('resolves only tokens the fences admit, so nothing it writes survives a reload half-applied', () => {
@@ -121,11 +122,11 @@ describe('the World Theme resolution chain (ADR-0076)', () => {
       theme({
         fontPairing: 'codex',
         radii: { '--radius-sm': '1px', '--radius-md': '2px', '--radius-lg': '3px' },
-        overrides: { solar: overrides, astral: overrides },
+        overrides: { light: overrides, dark: overrides },
       } as Partial<WorldTheme>),
     ]);
 
-    const written = [...Object.keys(declarations.solar), ...Object.keys(declarations.astral)];
+    const written = [...Object.keys(declarations.light), ...Object.keys(declarations.dark)];
     expect(written.filter((name) => !isSettableToken(name))).toEqual([]);
   });
 });
@@ -158,7 +159,7 @@ describe('WorldThemeApplier (ADR-0076)', () => {
   beforeEach(() => {
     localStorage.clear();
     at('/');
-    root.dataset['colorScheme'] = 'solar';
+    root.dataset['colorScheme'] = 'light';
   });
 
   afterEach(() => {
@@ -176,12 +177,12 @@ describe('WorldThemeApplier (ADR-0076)', () => {
 
   it('rewrites to the other Palette on a ColorScheme toggle, and keeps the reader’s choice', () => {
     const applier = TestBed.inject(WorldThemeApplier);
-    applier.scope({ worldId: WORLD_ID }, theme({ astral: palette({ accent: 'oklch(0.8 0.14 40)', polarity: -1 }) }));
+    applier.scope({ worldId: WORLD_ID }, theme({ dark: palette({ accent: 'oklch(0.8 0.14 40)', polarity: -1 }) }));
 
     TestBed.inject(ColorSchemeService).toggle();
     TestBed.flushEffects();
 
-    expect(TestBed.inject(ColorSchemeService).colorScheme()).toBe('astral');
+    expect(TestBed.inject(ColorSchemeService).colorScheme()).toBe('dark');
     expect(read('--palette-accent')).toBe('oklch(0.8 0.14 40)');
   });
 
@@ -207,7 +208,7 @@ describe('WorldThemeApplier (ADR-0076)', () => {
     const applier = TestBed.inject(WorldThemeApplier);
     applier.scope({ worldId: WORLD_ID }, theme());
 
-    applier.scope({ worldId: WORLD_ID }, theme({ solar: palette({ accent: 'oklch(0.5 0.2 300)' }) }));
+    applier.scope({ worldId: WORLD_ID }, theme({ light: palette({ accent: 'oklch(0.5 0.2 300)' }) }));
 
     expect(read('--palette-accent')).toBe('oklch(0.5 0.2 300)');
   });
@@ -241,8 +242,8 @@ describe('WorldThemeApplier (ADR-0076)', () => {
     const cached = JSON.parse(localStorage.getItem(WORLD_THEME_CACHE_KEY) ?? '[]');
     expect(cached).toHaveLength(1);
     expect(cached[0].scope).toBe(`w/${segment(WORLD_ID)}`);
-    expect(cached[0].solar['--palette-accent']).toBe('oklch(0.55 0.14 40)');
-    expect(cached[0].astral['--palette-polarity']).toBe('-1');
+    expect(cached[0].light['--palette-accent']).toBe('oklch(0.55 0.14 40)');
+    expect(cached[0].dark['--palette-polarity']).toBe('-1');
   });
 
   it('drops a World’s cache entry once it carries no Theme, so the stale one cannot come back', () => {
@@ -256,13 +257,13 @@ describe('WorldThemeApplier (ADR-0076)', () => {
 
   it('keeps a World Theme out of the Instance layer in the cache, so an operator can change theirs', () => {
     TestBed.configureTestingModule({
-      providers: [{ provide: INSTANCE_THEME, useValue: { solar: { canvas: 'oklch(0.6 0.2 300)' } } }],
+      providers: [{ provide: INSTANCE_THEME, useValue: { light: { canvas: 'oklch(0.6 0.2 300)' } } }],
     });
     TestBed.inject(WorldThemeApplier).scope({ worldId: WORLD_ID }, theme());
 
     const cached = JSON.parse(localStorage.getItem(WORLD_THEME_CACHE_KEY) ?? '[]');
-    expect(cached[0].solar['--palette-canvas']).toBe('oklch(0.88 0.05 90)');
-    expect(cached[0].solar['--palette-accent']).toBe('oklch(0.55 0.14 40)');
+    expect(cached[0].light['--palette-canvas']).toBe('oklch(0.88 0.05 90)');
+    expect(cached[0].light['--palette-accent']).toBe('oklch(0.55 0.14 40)');
   });
 
   it('bumps a revision on every write — the cue a Canvas renderer re-reads its colours on', () => {
@@ -276,7 +277,7 @@ describe('WorldThemeApplier (ADR-0076)', () => {
 
   it('applies the Instance default outside every World, and under a World that has none', () => {
     TestBed.configureTestingModule({
-      providers: [{ provide: INSTANCE_THEME, useValue: { solar: { accent: 'oklch(0.6 0.2 300)' } } }],
+      providers: [{ provide: INSTANCE_THEME, useValue: { light: { accent: 'oklch(0.6 0.2 300)' } } }],
     });
     const applier = TestBed.inject(WorldThemeApplier);
 
@@ -291,7 +292,7 @@ describe('WorldThemeApplier (ADR-0076)', () => {
     const applier = TestBed.inject(WorldThemeApplier);
     applier.scope({ worldId: WORLD_ID }, theme());
 
-    applier.preview({ solar: { accent: 'oklch(0.5 0.2 300)' } });
+    applier.preview({ light: { accent: 'oklch(0.5 0.2 300)' } });
     expect(read('--palette-accent')).toBe('oklch(0.5 0.2 300)');
 
     applier.preview(undefined);
@@ -311,7 +312,7 @@ describe('WorldThemeApplier (ADR-0076)', () => {
     const applier = TestBed.inject(WorldThemeApplier);
     applier.scope({ worldId: WORLD_ID }, theme());
 
-    applier.preview({ solar: { accent: 'oklch(0.5 0.2 300)' } });
+    applier.preview({ light: { accent: 'oklch(0.5 0.2 300)' } });
 
     expect(localStorage.getItem(WORLD_THEME_CACHE_KEY)).not.toContain('oklch(0.5 0.2 300)');
   });
@@ -319,18 +320,38 @@ describe('WorldThemeApplier (ADR-0076)', () => {
   it('keeps the preview on top when the World read lands under it', () => {
     const applier = TestBed.inject(WorldThemeApplier);
     applier.scope({ worldId: WORLD_ID }, theme());
-    applier.preview({ solar: { accent: 'oklch(0.5 0.2 300)' } });
+    applier.preview({ light: { accent: 'oklch(0.5 0.2 300)' } });
 
     // The live-follow refetch a save triggers (ADR-0044) arrives while the Owner is still editing.
-    applier.scope({ worldId: WORLD_ID }, theme({ solar: palette({ accent: 'oklch(0.7 0.1 200)' }) }));
+    applier.scope({ worldId: WORLD_ID }, theme({ light: palette({ accent: 'oklch(0.7 0.1 200)' }) }));
 
     expect(read('--palette-accent')).toBe('oklch(0.5 0.2 300)');
+  });
+
+  it('lets a cache entry written before ADR-0077 lapse, rather than translating its keys', () => {
+    // One unthemed frame, deliberately: the entry's two Palettes are keyed `solar`/`astral`, so it
+    // yields nothing, and the World read landing underneath rewrites it in the new spelling.
+    localStorage.setItem(
+      WORLD_THEME_CACHE_KEY,
+      JSON.stringify([
+        { scope: `w/${segment(WORLD_ID)}`, solar: { '--palette-accent': 'oklch(0.5 0.2 300)' }, astral: {} },
+      ]),
+    );
+
+    at(`/w/${WORLD_SEG}`);
+    const applier = TestBed.inject(WorldThemeApplier);
+    expect(read('--palette-accent')).toBe('');
+
+    applier.scope({ worldId: WORLD_ID }, theme());
+    expect(read('--palette-accent')).toBe('oklch(0.55 0.14 40)');
+    const cached = JSON.parse(localStorage.getItem(WORLD_THEME_CACHE_KEY) ?? '[]');
+    expect(cached[0].light['--palette-accent']).toBe('oklch(0.55 0.14 40)');
   });
 
   it('ignores a cache entry that is not a set of declared design tokens', () => {
     localStorage.setItem(
       WORLD_THEME_CACHE_KEY,
-      JSON.stringify([{ scope: `w/${segment(WORLD_ID)}`, solar: { '--not-a-token': 'x' }, astral: {} }]),
+      JSON.stringify([{ scope: `w/${segment(WORLD_ID)}`, light: { '--not-a-token': 'x' }, dark: {} }]),
     );
 
     at(`/w/${WORLD_SEG}`);
@@ -347,8 +368,8 @@ describe('WorldThemeApplier (ADR-0076)', () => {
       JSON.stringify([
         {
           scope: `w/${segment(WORLD_ID)}`,
-          solar: { '--gradient-accent-sheen': 'url(https://example.invalid/pixel.png)', '--dur-fast': '9s' },
-          astral: {},
+          light: { '--gradient-accent-sheen': 'url(https://example.invalid/pixel.png)', '--dur-fast': '9s' },
+          dark: {},
         },
       ]),
     );
@@ -386,7 +407,7 @@ describe('the Instance default’s arrival (ADR-0076, #372)', () => {
     const boot = TestBed.inject(ApplicationInitStatus);
     expect(read('--palette-accent')).toBe('');
 
-    layer.set({ solar: { accent: 'oklch(0.6 0.2 300)' } });
+    layer.set({ light: { accent: 'oklch(0.6 0.2 300)' } });
     arrive();
     await boot.donePromise;
 
@@ -396,9 +417,9 @@ describe('the Instance default’s arrival (ADR-0076, #372)', () => {
   it('takes a loaded Instance default as a layer of the chain, with no shape of its own', () => {
     // A compile-time check as much as a runtime one: what `hexly.yml` parses to is what the applier
     // resolves, so the two cannot drift into two shapes of the same thing.
-    const loaded: InstanceTheme = { version: 1, solar: { accent: 'oklch(0.6 0.2 300)' } };
+    const loaded: InstanceTheme = { version: WORLD_THEME_VERSION, light: { accent: 'oklch(0.6 0.2 300)' } };
     const layer: WorldThemeLayer = loaded;
 
-    expect(resolveWorldTheme([layer]).solar['--palette-accent']).toBe('oklch(0.6 0.2 300)');
+    expect(resolveWorldTheme([layer]).light['--palette-accent']).toBe('oklch(0.6 0.2 300)');
   });
 });

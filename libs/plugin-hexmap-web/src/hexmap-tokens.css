@@ -9,12 +9,7 @@
  * Against the ten hand-tuned values these replace, the repaint costs ΔE00 ≤ 3.1 on eight of them and
  * 4.4 on forest; the per-token table is in `docs/design/world-theme-spec.md` §3.
  */
-/* Keyed off the attribute rather than `:root` only because the two blocks must have equal specificity
-   (0,1,0), so this one has to stay above the astral block. It buys no scoped re-resolve: the tier-2
-   roles these read are declared once at `:root` by `@theme static`, so a subtree carrying the other
-   ColorScheme inherits the roles the root already derived (`web-styles/src/contrast/measure.ts`). */
-:root,
-[data-color-scheme='solar'] {
+:root {
   /* The World's ink warmed with its accent, at two strengths; a Hex name is the Label's ink washed
      one step back into the field, which is what makes it the quieter of the two. */
   --color-feature-ink: color-mix(in oklab, var(--color-ink) 52%, var(--color-accent));
@@ -38,7 +33,7 @@
   /* A named literal (ADR-0075), on `--color-canvas-glow`'s precedent: warm tan by day and violet by
      night is a change of hue the field's own shift does not account for, so no one pigment sits at
      both ends of the wash. A formula that hit them anyway would promise a World Owner a
-     generalisation it does not have. Its Astral value sits below. */
+     generalisation it does not have. Its dark value sits below. */
   --color-terrain-mountain: #b9a489;
 }
 
@@ -46,6 +41,6 @@
  * The night half — the one terrain the wash does not carry, and nothing else: the five above are one
  * expression each and re-resolve here off the roles the ColorScheme has already re-themed.
  */
-[data-color-scheme='astral'] {
+:root[data-color-scheme='dark'] {
   --color-terrain-mountain: #474264;
 }

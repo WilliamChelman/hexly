@@ -76,16 +76,16 @@ import {
           type="button"
           appMenuItem
           [attr.aria-label]="
-            (colorScheme() === 'astral' ? 'common.colorScheme.toSolar' : 'common.colorScheme.toAstral') | transloco
+            (colorScheme() === 'dark' ? 'common.colorScheme.toLight' : 'common.colorScheme.toDark') | transloco
           "
           (triggered)="colorSchemeService.toggle()"
         >
-          @if (colorScheme() === 'astral') {
+          @if (colorScheme() === 'dark') {
             <app-icon name="sun" [size]="18" />
-            <span>{{ 'common.colorScheme.solar' | transloco }}</span>
+            <span>{{ 'common.colorScheme.light' | transloco }}</span>
           } @else {
             <app-icon name="moon" [size]="18" />
-            <span>{{ 'common.colorScheme.astral' | transloco }}</span>
+            <span>{{ 'common.colorScheme.dark' | transloco }}</span>
           }
         </button>
         <hr appRule class="mx-1 my-1" />

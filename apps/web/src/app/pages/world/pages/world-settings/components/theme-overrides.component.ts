@@ -105,8 +105,8 @@ export type OverrideEdit = SchemeEdit<OverrideControl, string | null>;
                       }
                       @case ('elevation') {
                         <!-- On its own ColorScheme's paper, not the panel's. An elevation is only
-                             ever the contrast it makes with what it falls on, and Astral's is
-                             near-black soot at four times Solar's alpha: over this panel's ivory it
+                             ever the contrast it makes with what it falls on, and the dark scheme's is
+                             near-black soot at four times the light one's alpha: over this panel's ivory it
                              reads as a bruise, and over the indigo it will sit on, as depth. -->
                         <span class="elevation-plate" [style.background]="ground(scheme)">
                           <span
@@ -232,7 +232,7 @@ export type OverrideEdit = SchemeEdit<OverrideControl, string | null>;
     .swatch-fill {
       @apply block h-full w-full;
     }
-    /* Room for the whole fall. Astral's shadow-3 travels 22px down, blurs 50px and pulls 11px back, so
+    /* Room for the whole fall. The dark scheme's shadow-3 travels 22px down, blurs 50px and pulls 11px back, so
        it reaches ~36px below the chip and ~14px to each side; a plate cropped tighter than that spills
        the tail onto the panel's own paper, which is the comparison this plate exists to end. Asymmetric
        for the same reason the shadow is: nothing reaches above. */
@@ -241,8 +241,8 @@ export type OverrideEdit = SchemeEdit<OverrideControl, string | null>;
     }
     /* Card-sized, because below ~80×48 the ladder *inverts*: shadow-3 pulls its spread 8px in and then
        blurs 36px, so on a chip whose short side is 24px there is almost nothing left to blur and it
-       lands fainter than shadow-1 (measured peak darkening 16 → 23 → 8 of 255 in Solar, 3 → 5 → 1 in
-       Astral). At 96×60 it is at the plateau — 16 → 23 → 42 and 3 → 5 → 10, the same reading a
+       lands fainter than shadow-1 (measured peak darkening 16 → 23 → 8 of 255 in light, 3 → 5 → 1 in
+       dark). At 96×60 it is at the plateau — 16 → 23 → 42 and 3 → 5 → 10, the same reading a
        320×180 card gives. The elevation ladder is scaled for the cards that wear it, and a swatch
        small enough to misreport it is a swatch that misreports it. */
     .elevation-chip {
@@ -281,9 +281,9 @@ export class ThemeOverridesComponent {
 
   /**
    * The paper an elevation preview falls on, and the card it lifts — that ColorScheme's own, measured
-   * with every other row (see {@link resolvedRoles}) rather than by re-dressing a subtree: the tier-2
-   * roles are declared once at `:root`, so a nested `[data-color-scheme]` re-resolves the *Palette* and
-   * inherits the reader's roles regardless (ADR-0076).
+   * with every other row (see {@link resolvedRoles}) rather than by re-dressing a subtree: every tier
+   * is declared at `:root` alone, so a nested `[data-color-scheme]` re-resolves nothing and inherits
+   * the reader's own (ADR-0077).
    */
   protected ground(scheme: ColorScheme): string {
     return this.resolved()[scheme]['--color-bg'] ?? '';

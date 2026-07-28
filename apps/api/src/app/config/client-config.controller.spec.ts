@@ -56,7 +56,7 @@ describe('ClientConfigController', () => {
   });
 
   it('carries the Instance default Theme, so the browser can lay the chain’s first layer (#372)', async () => {
-    const theme = { version: 1 as const, solar: { accent: 'oklch(0.5 0.1 150)' } };
+    const theme = { version: 2 as const, light: { accent: 'oklch(0.5 0.1 150)' } };
     const controller = await controllerFor(configWith({}, 'core.type.note', { theme }));
 
     expect(controller.getConfig().theme).toEqual(theme);

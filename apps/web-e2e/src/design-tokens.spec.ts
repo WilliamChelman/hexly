@@ -16,8 +16,8 @@ import { expect, preferencesPatched, test } from './fixtures';
  * ColorSchemes, against the committed table at {@link TABLE_PATH}.
  *
  * Resolved values, never how a token is spelled — asserting the expressions would freeze the formulas
- * the table exists to protect. Astral is pinned only here: `@property` allows one initial-value, so the
- * initial check below can only reach Solar, and a polarity sign error is invisible in that scheme.
+ * the table exists to protect. The dark scheme is pinned only here: `@property` allows one initial-value, so the
+ * initial check below can only reach the light one, and a polarity sign error is invisible there.
  *
  * `UPDATE_TOKEN_TABLE=1` rewrites the table; read the diff rather than waving it through.
  */
@@ -28,9 +28,9 @@ const TABLE_PATH = join(__dirname, 'design-tokens.table.json');
  * The day/night axis (ADR-0075), spelled here rather than imported: the `@hexly/web-core` barrel pulls
  * Angular into the Playwright process, and a `type`-only import is one careless edit away from doing it.
  */
-type ColorScheme = 'solar' | 'astral';
+type ColorScheme = 'light' | 'dark';
 
-const COLOR_SCHEMES = ['solar', 'astral'] as const satisfies readonly ColorScheme[];
+const COLOR_SCHEMES = ['light', 'dark'] as const satisfies readonly ColorScheme[];
 
 /** One token's resolved value in each ColorScheme, as the committed table records it. */
 type TokenTable = Record<string, Record<ColorScheme, string>>;
@@ -92,12 +92,12 @@ async function collect(page: Page): Promise<TokenTable> {
     // suite back the ColorScheme it lent us — on the failing path too, and waiting for the roaming
     // write, which is otherwise fire-and-forget.
     const restored = preferencesPatched(page);
-    await chooseColorScheme(page, 'solar');
+    await chooseColorScheme(page, 'light');
     await restored;
   }
 
   return Object.fromEntries(
-    TOKEN_NAMES.map((name) => [name, { solar: observed.solar[name], astral: observed.astral[name] }]),
+    TOKEN_NAMES.map((name) => [name, { light: observed.light[name], dark: observed.dark[name] }]),
   );
 }
 
@@ -124,7 +124,7 @@ test('every token reads back resolved and matches the committed table, in both C
   // The control: `--tracking-wider` is deliberately unregistered, so it still reads back as the `em` it
   // was written as rather than the `px` a registered `<length>` computes to. Without it, a run where
   // registration had silently stopped working would still satisfy the loop above vacuously.
-  expect(table['--tracking-wider'].solar).toMatch(/em$/);
+  expect(table['--tracking-wider'].light).toMatch(/em$/);
 
   // The one thing assertable about the tokens `@property` has no syntax component for (the shadows and
   // the font stacks): substitution still has to have happened. A surviving `var()` is a cycle or a
@@ -137,7 +137,7 @@ test('every token reads back resolved and matches the committed table, in both C
     'no token reads back still carrying a var()',
   ).toEqual([]);
 
-  // The manifest carries each colour token's Solar value as its `@property` initial-value, and for a
+  // The manifest carries each colour token's light value as its `@property` initial-value, and for a
   // derived one that is the value its expression *resolves to* — which no static reader can compute,
   // so `manifest.spec.ts` can only check it is a literal. This is where it is held to the engine: the
   // initial is the fallback three Canvas renderers take when a property fails to resolve (ADR-0075),
@@ -149,21 +149,15 @@ test('every token reads back resolved and matches the committed table, in both C
   // eighteen of these are, and a drifted `/ 0.14` would otherwise pass on colour alone.
   const colors = registeredTokens().filter((decl) => decl.type === 'color');
   const [resolved, initials] = await Promise.all([
-    page.evaluate(
-      rasteriseColors,
-      colors.map((decl) => table[decl.name].solar),
-    ),
-    page.evaluate(
-      rasteriseColors,
-      colors.map((decl) => decl.initial),
-    ),
+    page.evaluate(rasteriseColors, { values: colors.map((decl) => table[decl.name].light) }),
+    page.evaluate(rasteriseColors, { values: colors.map((decl) => decl.initial) }),
   ]);
   // One 8-bit step of slack: an `oklch()` rounds to the same channel a hand-written hex names, but
   // only to within the rounding itself.
   const drifted = colors.filter((_, i) => resolved[i].some((channel, c) => Math.abs(channel - initials[i][c]) > 1));
   expect(
     drifted.map((decl) => decl.name),
-    "every colour token's manifest initial is the value it resolves to in Solar",
+    "every colour token's manifest initial is the value it resolves to in light",
   ).toEqual([]);
 
   // Rewritten only once the values above are known to be resolved, so a reflexive regenerate cannot
@@ -188,7 +182,7 @@ test('the contrast report measures the ColorScheme the reader is not in, roles i
     // Both directions, because the reader's own scheme is what the probe has to *not* return, and a
     // measurement that quietly read the root would pass one direction on a Palette where the two agree.
     for (const active of COLOR_SCHEMES) {
-      const inactive = active === 'solar' ? 'astral' : 'solar';
+      const inactive = active === 'light' ? 'dark' : 'light';
       await chooseColorScheme(page, active);
 
       // A tier-2 override, inline on the root, standing in for the one the applier writes there for the
@@ -203,7 +197,8 @@ test('the contrast report measures the ColorScheme the reader is not in, roles i
       const measured = await page.evaluate(measureScheme, { scheme: inactive, declarations: {}, tokens: TOKEN_NAMES });
 
       // Every declared token, exactly as the *other* ColorScheme renders it — the tier-2 roles included,
-      // which is the half an offscreen probe silently gets wrong (see `world-theme.spec.ts`).
+      // which an offscreen element gets silently wrong, every tier being declared at `:root` alone
+      // (ADR-0077, pinned in `world-theme.spec.ts`).
       expect(measured, `the report for ${inactive} while reading ${active}`).toEqual(
         Object.fromEntries(TOKEN_NAMES.map((name) => [name, table[name][inactive]])),
       );
@@ -226,7 +221,7 @@ test('the contrast report measures the ColorScheme the reader is not in, roles i
   } finally {
     // As in `collect`: the preference roams on the shared e2e account, so hand back what we borrowed.
     const restored = preferencesPatched(page);
-    await chooseColorScheme(page, 'solar');
+    await chooseColorScheme(page, 'light');
     await restored;
   }
 });

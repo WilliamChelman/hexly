@@ -94,7 +94,7 @@ const DECLARATIONS = [
   { name: '--palette-veil', tier: 'palette', type: 'number', public: false, initial: '0.12' },
 
   // ---- Tier 2 — the semantic roles the UI styles itself from. The public contract.
-  //      Each `initial` is the Solar value its derivation resolves to, not the expression:
+  //      Each `initial` is the light ColorScheme's value its derivation resolves to, not the expression:
   //      an `@property` `initial-value` must be computationally independent, and a `var()` is not.
   { name: '--color-bg', tier: 'role', type: 'color', public: true, initial: '#f1e5c7' },
   { name: '--color-bg-deep', tier: 'role', type: 'color', public: true, initial: '#ebdcb6' },
