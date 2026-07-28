@@ -31,7 +31,7 @@ export const ENTITY_NUDGE_DEBOUNCE_MS = 150;
 /** The subset of list params the Facet-count read narrows against — no paging. */
 export type EntityFacetParams = Pick<
   EntityListParams,
-  'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId' | 'includeHidden'
+  'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId' | 'read' | 'includeHidden'
 >;
 
 /**
@@ -264,6 +264,9 @@ function facetParams(opts: EntityFacetParams): HttpParams {
   // Filter-by-Field: each `key:op:value` token repeats, like the other facet params.
   for (const f of opts.field ?? []) params = params.append('field', f);
   if (opts.worldId) params = params.set('worldId', opts.worldId);
+  // A link-target read declares itself; a navigation read is the server's default, so it stays off the
+  // wire (ADR-0079). On both reads, so a rail's counts and its options agree about Compendium Entries.
+  if (opts.read && opts.read !== 'navigation') params = params.set('read', opts.read);
   // Opt-in to hidden-from-default-listing types (ADR-0065) — set by the by-name pickers, not by a browse.
   // On both reads, so a rail's counts and its list agree about them.
   if (opts.includeHidden) params = params.set('includeHidden', '1');

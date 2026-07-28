@@ -198,6 +198,26 @@ describe('Draw Steel monsters import', () => {
     expect(typed.body.items).toHaveLength(1);
   });
 
+  /**
+   * The seal as the real pack meets it (#400, ADR-0079): the find/link line, drawn once in the list read,
+   * asserted here against installed content rather than a seeded Container. The rule's own cases live in
+   * `entities.controller.spec.ts`; this is the pack proving it is sealed by living where it lives.
+   */
+  it('lets the Palette find a pack monster that no picker will ever offer', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    await ada.post('/entities').send({ name: 'Goblin Warren', types: ['core.type.note'], worldId: world }).expect(201);
+    await runImport(ada, world);
+    const names = async (query: string) =>
+      ((await ada.get(`/entities?${query}`).expect(200)).body.items as { name: string }[]).map((e) => e.name);
+
+    // Navigation, unscoped as the Command Palette is: the monster is reachable by half a name, and the
+    // author's own note leads at equal relevance.
+    expect(await names('q=goblin')).toEqual(['Goblin Warren', 'Goblin Warrior']);
+    // Link-target, the same query: the pack's Goblin is not a thing anything may point at.
+    expect(await names('q=goblin&read=link-target')).toEqual(['Goblin Warren']);
+  });
+
   it('reimports in place, keeping each entry id and re-recording the revision', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);

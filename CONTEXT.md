@@ -132,6 +132,10 @@ _Avoid_: Compendium Entity (it is an Entity, in a place), record, item, stat blo
 The state of a **Compendium Entry**: read-only to everyone, the operator included, and never offered as a link target, so nothing outside its **Compendium** can point at it. A seal on _reachability_, not on _discovery_ — the **Command Palette** and full-text search still find it, ranked below authored Entities. Held by every link-target surface refusing to return one, not by the write choke point (ADR-0079).
 _Avoid_: Locked, frozen, immutable, protected; read-only (one half of it), hidden (it is findable)
 
+**Link-target read**:
+An Entity list read asking _"what may this point at?"_ — the `@` mention picker, the **Entity Link** Field picker, the Board **Embed** picker, and the **Vault** import's wikilink name-resolution. It never returns a **Compendium Entry**, which is the whole of the **Sealed** state on the read side. Its opposite is a **navigation read** — the **Command Palette**, full-text search, an id resolution, an Entity's own page — which does return one, ranked below authored Entities. The surface declares which kind it is making, so the rule is one rule and not four (ADR-0079).
+_Avoid_: Picker read, link read, mention search; filtered read (it is a kind of read, not a filter on one)
+
 **Compendium Importer**:
 An **Importer** that declares its output to be reference material, so it reconciles into a **Compendium** rather than a **World**. The declaration is part of the **Importer** contract rather than a per-plugin convention, and carries the Compendium's name and its attribution, both captured on install. What the Importer produces is a **Compendium Entry** by virtue of landing there — which is why a hand-written NPC carrying `draw-steel.type.monster` is untouched by any of this and stays an ordinary Entity.
 _Avoid_: Seeder, pack loader, content importer

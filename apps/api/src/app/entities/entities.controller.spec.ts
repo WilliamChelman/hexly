@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
@@ -18,6 +19,7 @@ import * as entityAccessModule from '../acl/entity-access';
 import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from '../worlds/worlds.module';
 import { WorldsService } from '../worlds/worlds.service';
+import { CompendiumWrites } from '../worlds/compendium-writes';
 
 /**
  * Register a code-style type whose Fields are registered by id, then referenced by `fieldRefs`
@@ -468,6 +470,203 @@ describe('Entities endpoints', () => {
       const res = await bob.get('/entities').query({ ids: [inA] }).expect(200);
       expect(res.body.items.map((e: { name: string }) => e.name)).toEqual(['Ashen Vale']);
     });
+  });
+
+  /**
+   * The **find versus link** line (#400, ADR-0079): one read, two kinds. A link-target read never
+   * returns a **Compendium Entry**, a navigation read does — so a user who half-remembers a monster's
+   * name reaches it, and nothing outside a Compendium comes to point at one.
+   *
+   * Driven through `GET /entities` for both kinds, because the seal is the read's behaviour and
+   * nothing else: there is no flag on the row and no rejection at the write.
+   */
+  describe('the find/link line: a link-target read versus a navigation read (ADR-0079)', () => {
+    const names = (res: { body: { items: { name: string }[] } }) => res.body.items.map((e) => e.name);
+
+    /**
+     * Ada’s own Goblin Warren note beside a pack’s plain Goblin — the ticket’s own example,
+     * so "my work before the shelf's" is asserted on the query that motivated it.
+     */
+    async function shelfAndAuthoredNote() {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = (await ada.get('/worlds').expect(200)).body[0].id;
+      const mine = await ada
+        .post('/entities')
+        .send({ name: 'Goblin Warren', types: ['core.type.note'], worldId: world })
+        .expect(201);
+      // A long note against a one-word entry, so bm25 — which rewards a short document — would put the
+      // pack's Goblin first on its own. That makes the assertion below about the tier and not the fixture.
+      await ada
+        .put(`/entities/${mine.body.id}`)
+        .send({
+          document: {
+            'core.field.content': tiptapContent({
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    {
+                      type: 'text',
+                      text: 'The tunnels run for miles beneath the hills, and the tribe that dug them has held the lower galleries for six generations without once coming up for air.',
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+          version: 1,
+          tags: [],
+        })
+        .expect(200);
+      const entry = seedCompendiumEntry('Goblin', 'Guards the sunken larder.');
+      return { ada, world, mine: mine.body.id as string, entry };
+    }
+
+    it('offers no Compendium Entry to a link-target read, and finds one for a navigation read', async () => {
+      const { ada, entry } = await shelfAndAuthoredNote();
+
+      // Navigation (the default): the Command Palette's read reaches both sides of the wall.
+      expect(names(await ada.get('/entities').query({ q: 'goblin' }).expect(200))).toContain('Goblin');
+      // Link-target: the same query, the same caller, one row short — the entry is unreachable as a target.
+      const offered = await ada.get('/entities').query({ q: 'goblin', read: 'link-target' }).expect(200);
+      expect(names(offered)).toEqual(['Goblin Warren']);
+      // Not an access failure: it is his to read, by id, on the navigation surface it has a page on.
+      await ada.get(`/entities/${entry}`).expect(200);
+    });
+
+    it('ranks an authored Entity above a Compendium Entry at equal relevance', async () => {
+      const { ada } = await shelfAndAuthoredNote();
+
+      // Both match "goblin" on the name field; the tier, not bm25, decides which leads.
+      expect(names(await ada.get('/entities').query({ q: 'goblin' }).expect(200))).toEqual([
+        'Goblin Warren',
+        'Goblin',
+      ]);
+    });
+
+    it('reaches compendium prose by full-text search, so a forgotten name is still findable', async () => {
+      const { ada } = await shelfAndAuthoredNote();
+
+      // A phrase from the entry's description, matching nothing the author wrote.
+      expect(names(await ada.get('/entities').query({ q: 'larder' }).expect(200))).toEqual(['Goblin']);
+    });
+
+    it('drops Compendium Entries from a link-target read’s Facet counts too', async () => {
+      const { ada } = await shelfAndAuthoredNote();
+
+      // A rail must never count what its list excludes — the same rule `includeHidden` follows (ADR-0065).
+      const navigation = await ada.get('/entities/facets').query({ q: 'goblin' }).expect(200);
+      expect(navigation.body.type).toContainEqual({ value: 'core.type.note', count: 2 });
+      const linkTarget = await ada.get('/entities/facets').query({ q: 'goblin', read: 'link-target' }).expect(200);
+      expect(linkTarget.body.type).toEqual([{ value: 'core.type.note', count: 1 }]);
+    });
+
+    it('narrows an unscoped link-target read too, not only a World-scoped one', async () => {
+      const { ada } = await shelfAndAuthoredNote();
+
+      // The `@` picker's read carries a World, but the exclusion must not *depend* on it: the seal is
+      // the read's kind, so a read that names no Container is still sealed (ADR-0079).
+      expect(names(await ada.get('/entities').query({ read: 'link-target' }).expect(200))).not.toContain('Goblin');
+    });
+
+    it('saves an Entity whose prose mentions a Compendium Entry, rather than failing the write', async () => {
+      const { ada, mine, entry } = await shelfAndAuthoredNote();
+
+      // Enforced by discovery, never at the write choke point: one inline mention in a long Content
+      // field must not fail a whole autosave (ADR-0079). The link is minted straight against the id,
+      // exactly as a forged one would be.
+      const document = {
+        'core.field.content': tiptapContent({
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'entityLink', attrs: { entityId: entry, label: 'Goblin' } }],
+            },
+          ],
+        }),
+      };
+      await ada.put(`/entities/${mine}`).send({ document, version: 2, tags: [] }).expect(200);
+      // And it renders: an id resolution is a navigation read, so the forged link is a live pill.
+      expect(names(await ada.get('/entities').query({ ids: [entry] }).expect(200))).toEqual(['Goblin']);
+    });
+
+    it('rejects an unknown read kind rather than silently navigating', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await ada.get('/entities').query({ q: 'goblin', read: 'linktarget' }).expect(400);
+    });
+
+    /**
+     * The relation surfaces are untouched by compendium content, so a relationship reading means what it
+     * always meant. Neither carries an exclusion rule: both are Container-scoped already (ADR-0078), and
+     * the Local Graph keeps that true even for a link forged straight at a known id, since its edges are
+     * sieved against the World's own nodes (ADR-0079 retires this question rather than answering it).
+     */
+    it('leaves References and the Local Graph with no compendium rows', async () => {
+      const { ada, world, mine, entry } = await shelfAndAuthoredNote();
+      const road = await ada
+        .post('/entities')
+        .send({ name: 'Hollow Road', types: ['core.type.note'], worldId: world })
+        .expect(201);
+      // One ordinary link beside one forged at the Compendium Entry, so each read is asserted to be
+      // *narrow* rather than merely empty.
+      const document = {
+        'core.field.content': tiptapContent({
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'entityLink', attrs: { entityId: road.body.id, label: 'Hollow Road' } },
+                { type: 'entityLink', attrs: { entityId: entry, label: 'Goblin' } },
+              ],
+            },
+          ],
+        }),
+      };
+      await ada.put(`/entities/${mine}`).send({ document, version: 2, tags: [] }).expect(200);
+
+      const graph = await ada.get(`/entities/${mine}/graph`).expect(200);
+      expect((graph.body.nodes as { name: string }[]).map((n) => n.name).sort()).toEqual([
+        'Goblin Warren',
+        'Hollow Road',
+      ]);
+      const references = await ada.get(`/entities/${road.body.id}/references`).expect(200);
+      expect((references.body.referencedBy as { source: { name: string } }[]).map((r) => r.source.name)).toEqual([
+        'Goblin Warren',
+      ]);
+      expect(references.body.references).toEqual([]);
+    });
+
+    /**
+     * Install a one-entry pack directly through the Compendium's own write handle — the Importer that
+     * fills a real one is exercised in `draw-steel-monsters-import.controller.spec.ts`; what matters
+     * here is only that the Entity lives in a Compendium Container.
+     */
+    function seedCompendiumEntry(name: string, prose: string): string {
+      const containerId = app
+        .get(CompendiumWrites)
+        .install(`test.importer.${name.toLowerCase().replace(/\W+/g, '-')}`, { name: 'Test Bestiary' }, 'rev-1');
+      const id = randomUUID();
+      app.get(EntitiesService).importEntity({
+        // The importer's runner takes an `owner` grant on what it lands, so an unscoped read of Ada's
+        // own is genuinely capable of returning the entry — which is what makes the exclusion visible.
+        ownerId: adaId,
+        containerId,
+        id,
+        name,
+        types: ['core.type.note'],
+        tags: [],
+        document: {
+          'core.field.content': tiptapContent({
+            type: 'doc',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: prose }] }],
+          }),
+        },
+      });
+      return id;
+    }
   });
 
   it('attaches Rights to list summaries only when the caller opts in (ADR-0039)', async () => {

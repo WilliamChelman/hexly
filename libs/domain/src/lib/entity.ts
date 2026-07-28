@@ -210,6 +210,25 @@ export const ENTITY_LIST_DEFAULT_LIMIT = 50;
 export const ENTITY_LIST_MAX_LIMIT = 200;
 
 /**
+ * Which side of the **find versus link** line a list read sits on (ADR-0079) — the one distinction
+ * the **Sealed** state is held by.
+ *
+ * A `link-target` read is asking _"what may this point at?"_ — the `@` mention picker, the **Entity
+ * Link** Field picker, the Board **Embed** picker — and never returns a **Compendium Entry**, so
+ * nothing outside a Compendium comes to point at one. A `navigation` read is asking _"where is
+ * it?"_ — the **Command Palette**, full-text search, an id resolution — and returns one, ranked
+ * below authored Entities.
+ *
+ * One rule rather than four: a surface declares the read it *is*, and the exclusion follows. The
+ * default is `navigation`, because the seal is held by discovery and not by an invariant — a link
+ * forged against a known id still renders (ADR-0079).
+ */
+export const entityReadSchema = z.enum(['navigation', 'link-target']);
+
+/** CONTEXT.md → Sealed. Which kind of read a `GET /entities` call is. */
+export type EntityRead = z.infer<typeof entityReadSchema>;
+
+/**
  * `GET /entities` query params, all optional and composable. Facet params
  * (`type`/`tag`/`visibility`) repeat in the query string (`?tag=a&tag=b`) and
  * combine OR within a category, AND across categories, all AND-ed with `q`.
@@ -243,6 +262,10 @@ export const entityListQuerySchema = z.object({
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
   worldId: z.string().min(1).optional(),
+  // Which side of the find/link line this read sits on (ADR-0079). Defaulted rather than optional, so
+  // every read names its kind by the time the service sees it and no caller reads an absent value as
+  // "whichever". An unknown value is a 400 — a typo'd `read=linktarget` must not silently navigate.
+  read: entityReadSchema.default('navigation'),
   cursor: z.string().optional(),
   // Opt-in per-row Rights; paths that omit it keep `list` a pure read-filter.
   rights: z
