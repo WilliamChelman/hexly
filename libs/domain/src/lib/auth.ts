@@ -41,7 +41,7 @@ export const FORMAT_LOCALE_TAGS = [
 
 const localeField = z.enum(['en', 'fr']);
 const formatLocaleField = z.enum(FORMAT_LOCALE_TAGS);
-const colorSchemeField = z.enum(['solar', 'astral']);
+const colorSchemeField = z.enum(['light', 'dark']);
 
 // The roaming Preferences bag stored on the user row; an absent field means "no
 // expressed choice" and the client falls back to its own detection. `.strip()`
@@ -53,7 +53,7 @@ export const preferencesSchema = z
     locale: localeField.optional(),
     /** Regional formatting (a BCP-47 tag), independent of the UI language. */
     formatLocale: formatLocaleField.optional(),
-    /** The day/night axis the reader is painted along (ADR-0075). */
+    /** The day/night axis the reader is painted along — Light or Dark (ADR-0077). */
     colorScheme: colorSchemeField.optional(),
   })
   .strip();

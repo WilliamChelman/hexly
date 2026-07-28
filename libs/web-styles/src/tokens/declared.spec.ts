@@ -59,6 +59,6 @@ describe('where a token gets its value', () => {
   });
 
   it('answers with nothing where no stylesheet is reachable, rather than throwing', () => {
-    expect(declaredTokenValues('solar')).toEqual({});
+    expect(declaredTokenValues('light')).toEqual({});
   });
 });

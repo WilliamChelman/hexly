@@ -20,7 +20,7 @@ describe('WorldThemePanel', () => {
   const OPERATOR_ACCENT = 'oklch(0.6 0.2 300)';
 
   /** An operator branding one anchor of one ColorScheme — the layer is partial by design (#372). */
-  const instance: WorldThemeLayer = { solar: { accent: OPERATOR_ACCENT } };
+  const instance: WorldThemeLayer = { light: { accent: OPERATOR_ACCENT } };
 
   let worlds: MockWorldsClient;
 
@@ -28,8 +28,8 @@ describe('WorldThemePanel', () => {
   function stored(): WorldTheme {
     const palette = Object.fromEntries(
       PALETTE_CONTROLS.map((control) => [control.field, control.type === 'number' ? 0.3 : 'oklch(0.5 0.1 40)']),
-    ) as WorldTheme['solar'];
-    return { version: WORLD_THEME_VERSION, solar: palette, astral: palette };
+    ) as WorldTheme['light'];
+    return { version: WORLD_THEME_VERSION, light: palette, dark: palette };
   }
 
   function mount(layer: WorldThemeLayer | null, stored?: WorldTheme): ComponentFixture<WorldThemePanelComponent> {
@@ -53,9 +53,9 @@ describe('WorldThemePanel', () => {
   const at = (fixture: ComponentFixture<WorldThemePanelComponent>, testid: string): HTMLElement =>
     fixture.nativeElement.querySelector(`[data-testid="${testid}"]`);
 
-  /** Move one Solar control through the DOM, exactly as an Owner does. */
+  /** Move one light control through the DOM, exactly as an Owner does. */
   function move(fixture: ComponentFixture<WorldThemePanelComponent>, field: string, value: string): void {
-    const control = at(fixture, `theme-control-solar-${field}`) as HTMLInputElement;
+    const control = at(fixture, `theme-control-light-${field}`) as HTMLInputElement;
     control.value = value;
     control.dispatchEvent(new Event('input'));
     fixture.detectChanges();
@@ -77,7 +77,7 @@ describe('WorldThemePanel', () => {
     const fixture = mount(instance);
 
     // The colour control speaks hex, so the operator's OKLCH arrives converted rather than verbatim.
-    expect((at(fixture, 'theme-control-solar-accent') as HTMLInputElement).value).toBe(colorTokenHex(OPERATOR_ACCENT));
+    expect((at(fixture, 'theme-control-light-accent') as HTMLInputElement).value).toBe(colorTokenHex(OPERATOR_ACCENT));
   });
 
   it('keeps the operator’s branding on every anchor an Owner did not move', () => {
@@ -88,15 +88,15 @@ describe('WorldThemePanel', () => {
 
     const sent = save(fixture);
 
-    expect(sent?.solar.ink).toBe('#112233');
-    expect(sent?.solar.accent).toBe(OPERATOR_ACCENT);
+    expect(sent?.light.ink).toBe('#112233');
+    expect(sent?.light.accent).toBe(OPERATOR_ACCENT);
   });
 
   it('sends every anchor, so an Owner’s Theme is whole rather than a patch', () => {
     const fixture = mount(null);
     move(fixture, 'ink', '#112233');
 
-    expect(Object.keys(save(fixture)?.solar ?? {}).sort()).toEqual(PALETTE_CONTROLS.map((c) => c.field).sort());
+    expect(Object.keys(save(fixture)?.light ?? {}).sort()).toEqual(PALETTE_CONTROLS.map((c) => c.field).sort());
   });
 
   it('clears a stored World Theme when a staged reset is saved', () => {
@@ -123,9 +123,9 @@ describe('WorldThemePanel', () => {
   describe('overriding an individual token', () => {
     /** Turn an untouched row into an override, then move the control it put there. */
     function override(fixture: ComponentFixture<WorldThemePanelComponent>, key: string, value: string): void {
-      at(fixture, `theme-override-set-solar-${key}`).click();
+      at(fixture, `theme-override-set-light-${key}`).click();
       fixture.detectChanges();
-      const control = at(fixture, `theme-override-solar-${key}`) as HTMLInputElement;
+      const control = at(fixture, `theme-override-light-${key}`) as HTMLInputElement;
       control.value = value;
       control.dispatchEvent(new Event('input'));
       fixture.detectChanges();
@@ -134,12 +134,12 @@ describe('WorldThemePanel', () => {
     it('offers a control per public role, and none for a private anchor or a plugin’s vocabulary', () => {
       const fixture = mount(null);
 
-      expect(at(fixture, 'theme-override-set-solar-color-ink-muted')).toBeTruthy();
-      expect(at(fixture, 'theme-override-set-astral-color-ink-muted')).toBeTruthy();
-      expect(at(fixture, 'theme-override-set-solar-shadow-2')).toBeTruthy();
+      expect(at(fixture, 'theme-override-set-light-color-ink-muted')).toBeTruthy();
+      expect(at(fixture, 'theme-override-set-dark-color-ink-muted')).toBeTruthy();
+      expect(at(fixture, 'theme-override-set-light-shadow-2')).toBeTruthy();
       // ADR-0075's tier boundary: the anchors are authored as the Palette, and tier 3 is not ours.
-      expect(at(fixture, 'theme-override-set-solar-palette-accent')).toBeNull();
-      expect(at(fixture, 'theme-override-set-solar-color-terrain-grass')).toBeNull();
+      expect(at(fixture, 'theme-override-set-light-palette-accent')).toBeNull();
+      expect(at(fixture, 'theme-override-set-light-color-terrain-grass')).toBeNull();
     });
 
     /**
@@ -151,7 +151,7 @@ describe('WorldThemePanel', () => {
     it('shows an untouched row as the value it renders as, in both ColorSchemes', () => {
       const fixture = mount(null);
 
-      for (const scheme of ['solar', 'astral']) {
+      for (const scheme of ['light', 'dark']) {
         const cell = at(fixture, `theme-override-set-${scheme}-color-canvas-glow`);
         expect(cell.textContent?.trim()).toBe(colorTokenHex(designTokenInitial('--color-canvas-glow')));
         expect(cell.getAttribute('aria-label')).toContain(designTokenInitial('--color-canvas-glow'));
@@ -161,12 +161,12 @@ describe('WorldThemePanel', () => {
     it('seeds a new override at that same value, so opting a token out changes nothing on screen', () => {
       const fixture = mount(null);
 
-      at(fixture, 'theme-override-set-astral-color-canvas-glow').click();
+      at(fixture, 'theme-override-set-dark-color-canvas-glow').click();
       fixture.detectChanges();
 
       // Seeded verbatim rather than through the hex, which would drop this role's 0.55 alpha. The
       // ColorScheme the reader is not in is seeded from its own measurement now, not from the root.
-      expect(save(fixture)?.overrides?.astral?.['--color-canvas-glow']).toBe(designTokenInitial('--color-canvas-glow'));
+      expect(save(fixture)?.overrides?.dark?.['--color-canvas-glow']).toBe(designTokenInitial('--color-canvas-glow'));
     });
 
     it('sends the override per ColorScheme, alongside a Palette it materialised whole', () => {
@@ -175,37 +175,37 @@ describe('WorldThemePanel', () => {
 
       const sent = save(fixture);
 
-      expect(sent?.overrides).toEqual({ solar: { '--color-ink-muted': '#112233' } });
+      expect(sent?.overrides).toEqual({ light: { '--color-ink-muted': '#112233' } });
       // A first edit is still a whole Theme, and the operator's branding survives it (#371 × #372).
-      expect(sent?.solar.accent).toBe(OPERATOR_ACCENT);
+      expect(sent?.light.accent).toBe(OPERATOR_ACCENT);
     });
 
     it('clears by sending no key at all, so the token goes back to what the anchors derive', () => {
       const fixture = mount(null);
       override(fixture, 'color-ink-muted', '#112233');
 
-      at(fixture, 'theme-override-clear-solar-color-ink-muted').click();
+      at(fixture, 'theme-override-clear-light-color-ink-muted').click();
       fixture.detectChanges();
 
       // Not an empty string and not the derived value written down: the applier takes back what a
       // previous write set and this one does not (ADR-0076), so an absent key *is* the derivation.
       expect(save(fixture)?.overrides).toBeUndefined();
-      expect(at(fixture, 'theme-override-set-solar-color-ink-muted')).toBeTruthy();
+      expect(at(fixture, 'theme-override-set-light-color-ink-muted')).toBeTruthy();
     });
 
     it('leaves an emptied field alone, so retyping a shadow does not take the field away', () => {
       const fixture = mount(null);
       override(fixture, 'shadow-2', '0 8px 20px rgba(0, 0, 0, 0.5)');
 
-      const field = at(fixture, 'theme-override-solar-shadow-2') as HTMLInputElement;
+      const field = at(fixture, 'theme-override-light-shadow-2') as HTMLInputElement;
       field.value = '';
       field.dispatchEvent(new Event('input'));
       fixture.detectChanges();
 
       // Still an override, still a field: an empty string is no value of any token's type, and clearing
       // is the ✕ — as `withControlValue` leaves an emptied knob at what it held.
-      expect(at(fixture, 'theme-override-solar-shadow-2')).toBeTruthy();
-      expect(save(fixture)?.overrides?.solar?.['--shadow-2']).toBe('0 8px 20px rgba(0, 0, 0, 0.5)');
+      expect(at(fixture, 'theme-override-light-shadow-2')).toBeTruthy();
+      expect(save(fixture)?.overrides?.light?.['--shadow-2']).toBe('0 8px 20px rgba(0, 0, 0, 0.5)');
     });
 
     it('reads an override set then cleared as no change at all', () => {
@@ -213,7 +213,7 @@ describe('WorldThemePanel', () => {
       override(fixture, 'color-ink-muted', '#112233');
       expect((at(fixture, 'theme-save') as HTMLButtonElement).disabled).toBe(false);
 
-      at(fixture, 'theme-override-clear-solar-color-ink-muted').click();
+      at(fixture, 'theme-override-clear-light-color-ink-muted').click();
       fixture.detectChanges();
 
       expect((at(fixture, 'theme-save') as HTMLButtonElement).disabled).toBe(true);
@@ -228,8 +228,8 @@ describe('WorldThemePanel', () => {
       move(fixture, 'accent', '#6a2ab0');
       const sent = save(fixture);
 
-      expect(sent?.solar.accent).toBe('#6a2ab0');
-      expect(sent?.overrides).toEqual({ solar: { '--color-ink-muted': '#112233' } });
+      expect(sent?.light.accent).toBe('#6a2ab0');
+      expect(sent?.overrides).toEqual({ light: { '--color-ink-muted': '#112233' } });
     });
   });
 
@@ -313,10 +313,10 @@ describe('WorldThemePanel', () => {
       const from = stored();
       return {
         ...from,
-        solar: { ...from.solar, accent: 'oklch(0.7 0.2 300)' },
+        light: { ...from.light, accent: 'oklch(0.7 0.2 300)' },
         radii: RADIUS_PRESETS[0].radii,
         fontPairing: 'codex',
-        overrides: { solar: { '--color-ink-muted': 'oklch(0.5 0.02 90)' } },
+        overrides: { light: { '--color-ink-muted': 'oklch(0.5 0.02 90)' } },
       };
     }
 
@@ -332,15 +332,15 @@ describe('WorldThemePanel', () => {
       // Staged, not applied: nothing was written, and the panel reads as carrying unsaved work.
       expect(worlds.setTheme).not.toHaveBeenCalled();
       expect(at(fixture, 'theme-unsaved')).toBeTruthy();
-      expect((at(fixture, 'theme-control-solar-accent') as HTMLInputElement).value).toBe(
+      expect((at(fixture, 'theme-control-light-accent') as HTMLInputElement).value).toBe(
         colorTokenHex('oklch(0.7 0.2 300)'),
       );
 
       // And cancel is still cancel — a copy an Owner previews and thinks better of costs nothing.
       at(fixture, 'theme-discard').click();
       fixture.detectChanges();
-      expect((at(fixture, 'theme-control-solar-accent') as HTMLInputElement).value).toBe(
-        colorTokenHex(stored().solar.accent),
+      expect((at(fixture, 'theme-control-light-accent') as HTMLInputElement).value).toBe(
+        colorTokenHex(stored().light.accent),
       );
     });
 
@@ -368,8 +368,8 @@ describe('WorldThemePanel', () => {
       move(fixture, 'ink', '#112233');
 
       const sent = save(fixture);
-      expect(sent?.solar.ink).toBe('#112233');
-      expect(sent?.solar.accent).toBe('oklch(0.7 0.2 300)');
+      expect(sent?.light.ink).toBe('#112233');
+      expect(sent?.light.accent).toBe('oklch(0.7 0.2 300)');
     });
 
     it('offers only what the server handed over, and says so plainly when that is nothing', () => {

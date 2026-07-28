@@ -61,6 +61,6 @@ describe('App', () => {
 
   it('applies a ColorScheme to the document on boot', () => {
     TestBed.createComponent(AppComponent);
-    expect(document.documentElement.dataset['colorScheme']).toMatch(/^(solar|astral)$/);
+    expect(document.documentElement.dataset['colorScheme']).toMatch(/^(light|dark)$/);
   });
 });

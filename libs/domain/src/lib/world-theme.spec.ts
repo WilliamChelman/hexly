@@ -28,7 +28,7 @@ describe('worldThemeSchema', () => {
       lineAlpha: 0.371,
       veil: 0.12,
     };
-    return { version: WORLD_THEME_VERSION, solar: palette, astral: { ...palette, polarity: -1 }, ...overrides };
+    return { version: WORLD_THEME_VERSION, light: palette, dark: { ...palette, polarity: -1 }, ...overrides };
   }
 
   /** The parsed Theme, or `undefined` when the choke point refused it. */
@@ -40,13 +40,13 @@ describe('worldThemeSchema', () => {
   it('accepts a well-formed Theme and emits every anchor as a colour', () => {
     const parsed = parse(theme());
 
-    expect(parsed?.solar.accent).toMatch(/^oklch\(/);
-    expect(parsed?.astral.soot).toMatch(/^oklch\(/);
-    expect(parsed?.astral.polarity).toBe(-1);
+    expect(parsed?.light.accent).toMatch(/^oklch\(/);
+    expect(parsed?.dark.soot).toMatch(/^oklch\(/);
+    expect(parsed?.dark.polarity).toBe(-1);
   });
 
   it('refuses a `url()` anchor — the value abuse the boundary exists for (ADR-0076)', () => {
-    expect(parse(theme({ solar: { ...theme().solar, accent: 'url(https://evil.example/p.png)' } }))).toBeUndefined();
+    expect(parse(theme({ light: { ...theme().light, accent: 'url(https://evil.example/p.png)' } }))).toBeUndefined();
   });
 
   it.each([
@@ -61,21 +61,30 @@ describe('worldThemeSchema', () => {
     ['a malformed function the parser throws on', 'f(1x)'],
     ['a dimension in a slot that takes none', 'rgb(0 0 0 / 50s)'],
   ])('refuses %s as an anchor', (_label, value) => {
-    expect(parse(theme({ solar: { ...theme().solar, accent: value } }))).toBeUndefined();
+    expect(parse(theme({ light: { ...theme().light, accent: value } }))).toBeUndefined();
   });
 
   it('refuses an anchor that is not a string at all', () => {
-    expect(parse(theme({ solar: { ...theme().solar, accent: 0xff0000 as unknown as string } }))).toBeUndefined();
+    expect(parse(theme({ light: { ...theme().light, accent: 0xff0000 as unknown as string } }))).toBeUndefined();
   });
 
   it('refuses an unknown `version` rather than applying the part it understands', () => {
-    expect(parse({ ...theme(), version: 2 })).toBeUndefined();
+    expect(parse({ ...theme(), version: 3 })).toBeUndefined();
     expect(parse({ ...theme(), version: undefined })).toBeUndefined();
+  });
+
+  it('refuses a version-1 payload outright rather than partly applying it (ADR-0077)', () => {
+    // The `solar`/`astral` shape as it was stored before the boot migration. The version field exists
+    // for exactly this: the refusal names the contract rather than a missing anchor set.
+    const { light, dark, ...rest } = theme();
+    expect(parse({ ...rest, version: 1, solar: light, astral: dark })).toBeUndefined();
+    // And the halfway house a lenient schema would produce — the keys renamed, the version not.
+    expect(parse({ ...theme(), version: 1 })).toBeUndefined();
   });
 
   it('canonicalises to one form, so the notation an Owner sends stops mattering', () => {
     const red = ['red', '#ff0000', 'rgb(255 0 0)', 'rgb(255, 0, 0)', 'hsl(0 100% 50%)'].map(
-      (notation) => parse(theme({ solar: { ...theme().solar, accent: notation } }))?.solar.accent,
+      (notation) => parse(theme({ light: { ...theme().light, accent: notation } }))?.light.accent,
     );
 
     expect(new Set(red).size).toBe(1);
@@ -83,38 +92,38 @@ describe('worldThemeSchema', () => {
   });
 
   it('keeps alpha, because the translucent roles are half the contract', () => {
-    expect(parse(theme({ solar: { ...theme().solar, soot: 'rgba(60, 44, 22, 0.42)' } }))?.solar.soot).toMatch(
+    expect(parse(theme({ light: { ...theme().light, soot: 'rgba(60, 44, 22, 0.42)' } }))?.light.soot).toMatch(
       / \/ 0\.42\)$/,
     );
   });
 
   it('refuses a knob outside the range its role has', () => {
-    expect(parse(theme({ solar: { ...theme().solar, veil: 1.4 } }))).toBeUndefined();
-    expect(parse(theme({ solar: { ...theme().solar, lineAlpha: -0.1 } }))).toBeUndefined();
-    expect(parse(theme({ solar: { ...theme().solar, polarity: Number.NaN } }))).toBeUndefined();
+    expect(parse(theme({ light: { ...theme().light, veil: 1.4 } }))).toBeUndefined();
+    expect(parse(theme({ light: { ...theme().light, lineAlpha: -0.1 } }))).toBeUndefined();
+    expect(parse(theme({ light: { ...theme().light, polarity: Number.NaN } }))).toBeUndefined();
   });
 
   it('holds polarity to the ±1 axis it is authored on, at the schema and not only at the control', () => {
     // The editor's slider is not the boundary — a `PATCH /worlds/:id` is. Off the axis, every derived
     // tone goes black for readers who did not choose the Theme and cannot opt out of it (ADR-0076).
-    expect(parse(theme({ solar: { ...theme().solar, polarity: 500 } }))).toBeUndefined();
-    expect(parse(theme({ solar: { ...theme().solar, polarity: -1.5 } }))).toBeUndefined();
-    expect(parse(theme({ solar: { ...theme().solar, polarity: 0 } }))?.solar.polarity).toBe(0);
+    expect(parse(theme({ light: { ...theme().light, polarity: 500 } }))).toBeUndefined();
+    expect(parse(theme({ light: { ...theme().light, polarity: -1.5 } }))).toBeUndefined();
+    expect(parse(theme({ light: { ...theme().light, polarity: 0 } }))?.light.polarity).toBe(0);
   });
 
   describe('overrides', () => {
     const withOverride = (name: string, value: unknown) =>
-      parse({ ...theme(), overrides: { solar: { [name]: value } } });
+      parse({ ...theme(), overrides: { light: { [name]: value } } });
 
     it('accepts a public role token and canonicalises its value', () => {
-      expect(withOverride('--color-ink-muted', '#6f5a36')?.overrides?.solar?.['--color-ink-muted']).toMatch(/^oklch\(/);
+      expect(withOverride('--color-ink-muted', '#6f5a36')?.overrides?.light?.['--color-ink-muted']).toMatch(/^oklch\(/);
     });
 
     it.each([
       ['an undeclared token', '--color-nope', '#fff'],
       ['a token out of the contract', '--text-base', '2rem'],
       ["another plugin's vocabulary", '--color-terrain-grass', '#fff'],
-      // The tier boundary (ADR-0075): the anchors are authored as `solar`/`astral`, and reaching one
+      // The tier boundary (ADR-0075): the anchors are authored as `light`/`dark`, and reaching one
       // through `overrides` would be a second way in, past the domains those fields hold them to.
       ['a private Palette anchor', '--palette-accent', '#fff'],
       ['a private Palette knob', '--palette-veil', '0.4'],
@@ -137,7 +146,7 @@ describe('worldThemeSchema', () => {
     it('refuses a `url()` anywhere in a shadow, and canonicalises the colour of a real one', () => {
       expect(withOverride('--shadow-2', '0 4px 12px url(https://evil.example/p.png)')).toBeUndefined();
       expect(
-        withOverride('--shadow-2', 'inset 0 1px 2px rgba(60, 44, 22, 0.12)')?.overrides?.solar?.['--shadow-2'],
+        withOverride('--shadow-2', 'inset 0 1px 2px rgba(60, 44, 22, 0.12)')?.overrides?.light?.['--shadow-2'],
       ).toMatch(/^inset 0 1px 2px oklch\(/);
     });
 
@@ -156,9 +165,9 @@ describe('worldThemeSchema', () => {
     });
 
     it('keeps the two ColorSchemes apart', () => {
-      const parsed = parse({ ...theme(), overrides: { astral: { '--color-ink': '#fff' } } });
-      expect(parsed?.overrides?.astral?.['--color-ink']).toMatch(/^oklch\(/);
-      expect(parsed?.overrides?.solar).toBeUndefined();
+      const parsed = parse({ ...theme(), overrides: { dark: { '--color-ink': '#fff' } } });
+      expect(parsed?.overrides?.dark?.['--color-ink']).toMatch(/^oklch\(/);
+      expect(parsed?.overrides?.light).toBeUndefined();
     });
   });
 
@@ -200,7 +209,7 @@ describe('worldThemeSchema', () => {
   it('maps every stored Palette field onto exactly the manifest’s tier-1 tokens', () => {
     // The applier reads this table, so both of its ends answer to their own source: the field names to
     // the stored schema, the token names to the manifest's Palette tier (ADR-0075).
-    const stored = Object.keys(worldThemeSchema.shape.solar.shape);
+    const stored = Object.keys(worldThemeSchema.shape.light.shape);
     expect(Object.keys(PALETTE_TOKENS).sort()).toEqual(stored.sort());
 
     const tier1 = DESIGN_TOKENS.filter((decl) => decl.tier === 'palette').map((decl) => decl.name);
@@ -238,56 +247,56 @@ describe('instanceThemeSchema', () => {
   }
 
   it('accepts a single anchor per ColorScheme — an operator branding only their accent', () => {
-    const parsed = parse({ version: 1, solar: { accent: '#2f6f4f' }, astral: { accent: '#7fd0a8' } });
+    const parsed = parse({ version: 2, light: { accent: '#2f6f4f' }, dark: { accent: '#7fd0a8' } });
 
-    expect(parsed?.solar?.accent).toMatch(/^oklch\(/);
-    expect(parsed?.astral?.accent).toMatch(/^oklch\(/);
+    expect(parsed?.light?.accent).toMatch(/^oklch\(/);
+    expect(parsed?.dark?.accent).toMatch(/^oklch\(/);
     // Everything it is silent about falls through to the stylesheet, so it must not materialise here.
-    expect(parsed?.solar?.page).toBeUndefined();
+    expect(parsed?.light?.page).toBeUndefined();
   });
 
   it('accepts the version alone — a block that brands nothing is the shipped default spelled out', () => {
-    expect(parse({ version: 1 })).toEqual({ version: 1 });
+    expect(parse({ version: 2 })).toEqual({ version: 2 });
   });
 
   it('refuses a value that is not of its token’s type, rather than dropping it', () => {
     // The half-applied default #372 forbids: seven anchors landing and the eighth silently absent.
-    expect(refusal({ version: 1, solar: { accent: 'url(https://evil.example/p.png)', page: '#f1e5c7' } })).toMatch(
-      /solar\.accent/,
+    expect(refusal({ version: 2, light: { accent: 'url(https://evil.example/p.png)', page: '#f1e5c7' } })).toMatch(
+      /light\.accent/,
     );
-    expect(parse({ version: 1, solar: { accent: 'not-a-colour' } })).toBeUndefined();
-    expect(parse({ version: 1, solar: { polarity: 'sideways' } })).toBeUndefined();
+    expect(parse({ version: 2, light: { accent: 'not-a-colour' } })).toBeUndefined();
+    expect(parse({ version: 2, light: { polarity: 'sideways' } })).toBeUndefined();
   });
 
   it('refuses a misspelled anchor by name, because a dropped one is a default applied half-way', () => {
-    expect(refusal({ version: 1, solar: { acccent: '#2f6f4f' } })).toMatch(/acccent/);
-    expect(refusal({ version: 1, palette: { accent: '#2f6f4f' } })).toMatch(/palette/);
+    expect(refusal({ version: 2, light: { acccent: '#2f6f4f' } })).toMatch(/acccent/);
+    expect(refusal({ version: 2, palette: { accent: '#2f6f4f' } })).toMatch(/palette/);
   });
 
   it('refuses a version it does not know, rather than applying the fields it recognises', () => {
-    expect(parse({ version: 2, solar: { accent: '#2f6f4f' } })).toBeUndefined();
-    expect(refusal({ solar: { accent: '#2f6f4f' } })).toMatch(/version/);
+    expect(parse({ version: 3, light: { accent: '#2f6f4f' } })).toBeUndefined();
+    expect(refusal({ light: { accent: '#2f6f4f' } })).toMatch(/version/);
   });
 
   it('carries the radii, the pairing, and the tier-2 opt-outs an Owner may also author', () => {
     const parsed = parse({
-      version: 1,
+      version: 2,
       radii: { '--radius-md': '0px' },
       fontPairing: 'codex',
-      overrides: { solar: { '--color-ink': '#101010' } },
+      overrides: { light: { '--color-ink': '#101010' } },
     });
 
     expect(parsed?.radii?.['--radius-md']).toBe('0px');
     expect(parsed?.fontPairing).toBe('codex');
-    expect(parsed?.overrides?.solar?.['--color-ink']).toMatch(/^oklch\(/);
+    expect(parsed?.overrides?.light?.['--color-ink']).toMatch(/^oklch\(/);
   });
 
   it('holds an operator to the same contract as an Owner — a token outside it is refused', () => {
-    expect(parse({ version: 1, radii: { '--text-base': '1rem' } })).toBeUndefined();
+    expect(parse({ version: 2, radii: { '--text-base': '1rem' } })).toBeUndefined();
     // A declared token held out of the contract (ADR-0076), so the refusal is the contract talking
     // rather than an unknown name bouncing off the manifest.
-    expect(parse({ version: 1, overrides: { solar: { '--rail-header': '900px' } } })).toBeUndefined();
-    expect(parse({ version: 1, fontPairing: 'comic-sans' })).toBeUndefined();
+    expect(parse({ version: 2, overrides: { light: { '--rail-header': '900px' } } })).toBeUndefined();
+    expect(parse({ version: 2, fontPairing: 'comic-sans' })).toBeUndefined();
   });
 });
 

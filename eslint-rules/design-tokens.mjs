@@ -76,7 +76,7 @@ const loadManifest = rereadOnChange(
 
 /**
  * The `@utility shadow-*` declarations; only these respect the [data-color-scheme] reassignment —
- * Tailwind's built-ins bake a Solar value (ADR-0021).
+ * Tailwind's built-ins bake a light-scheme value (ADR-0021).
  */
 const loadShadowUtilities = rereadOnChange(
   () => UTILITY_FILES.map(mtime).join('|'),
@@ -253,7 +253,7 @@ const noBuiltinShadow = {
     schema: [],
     messages: {
       builtin:
-        'Built-in shadow utility `{{cls}}` bakes a Solar value and ignores [data-color-scheme]. Use shadow-1, shadow-2, shadow-3, or shadow-inset instead (ADR-0021).',
+        'Built-in shadow utility `{{cls}}` bakes a light-scheme value and ignores [data-color-scheme]. Use shadow-1, shadow-2, shadow-3, or shadow-inset instead (ADR-0021).',
     },
   },
   create(context) {

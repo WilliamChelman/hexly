@@ -26,7 +26,7 @@ function resolvedOnRoot(page: Page, name: string): Promise<string> {
 async function openThemeEditor(page: Page, worldSeg: string): Promise<void> {
   await page.goto(`/w/${worldSeg}/settings`);
   await page.getByTestId('settings-nav-theme').click();
-  await expect(page.getByTestId('theme-scheme-solar')).toBeVisible();
+  await expect(page.getByTestId('theme-scheme-light')).toBeVisible();
 }
 
 /** Open one collapsed role family. ~50 rows is a wall, so the editor ships them closed (#374). */
@@ -66,48 +66,48 @@ test('an override beats the derivation, per ColorScheme, and clearing hands the 
 
   // Opting out starts where the derivation left the token, for the ColorScheme the reader is in: the
   // automation is a starting point, so the click that departs from it moves nothing on its own.
-  await page.getByTestId('theme-override-set-solar-color-tone-1').click();
+  await page.getByTestId('theme-override-set-light-color-tone-1').click();
   await expect.poll(() => inlineOnRoot(page, '--color-tone-1')).toBeTruthy();
   expect(await resolvedOnRoot(page, '--color-tone-1')).toBe(derived);
 
   // Applied live: an inline custom property on the root beats both schemes' stylesheet rules, so an
   // override needs no machinery beyond being written last (ADR-0076).
-  await page.getByTestId('theme-override-solar-color-tone-1').fill('#112233');
+  await page.getByTestId('theme-override-light-color-tone-1').fill('#112233');
   await expect.poll(() => inlineOnRoot(page, '--color-tone-1')).toBe('#112233');
   await expect.poll(() => resolvedOnRoot(page, '--color-tone-1')).not.toBe(derived);
 
   // Clearing removes the key rather than writing a value, so the derivation answers again. Asserted
   // before any save: the choke point rounds an anchor as it canonicalises it, so a derived value read
   // across a save differs in its last digits for reasons that have nothing to do with overriding.
-  await page.getByTestId('theme-override-clear-solar-color-tone-1').click();
+  await page.getByTestId('theme-override-clear-light-color-tone-1').click();
   await expect.poll(() => inlineOnRoot(page, '--color-tone-1')).toBe('');
   await expect.poll(() => resolvedOnRoot(page, '--color-tone-1')).toBe(derived);
 
-  // The other ColorScheme is a separate opt-out: authoring Astral's changes nothing a Solar reader sees.
-  await override(page, 'solar', 'color-tone-1', '#112233');
-  await override(page, 'astral', 'color-tone-1', '#445566');
+  // The other ColorScheme is a separate opt-out: authoring the dark one's changes nothing a light reader sees.
+  await override(page, 'light', 'color-tone-1', '#112233');
+  await override(page, 'dark', 'color-tone-1', '#445566');
   expect(await inlineOnRoot(page, '--color-tone-1')).toBe('#112233');
 
   await saveTheme(page);
   const stored = await storedTheme(page, worldId);
   // Canonicalised at the write choke point, and kept per ColorScheme.
-  expect(stored.overrides.solar['--color-tone-1']).toMatch(/^oklch\(/);
-  expect(stored.overrides.astral['--color-tone-1']).toMatch(/^oklch\(/);
-  expect(stored.overrides.solar['--color-tone-1']).not.toBe(stored.overrides.astral['--color-tone-1']);
+  expect(stored.overrides.light['--color-tone-1']).toMatch(/^oklch\(/);
+  expect(stored.overrides.dark['--color-tone-1']).toMatch(/^oklch\(/);
+  expect(stored.overrides.light['--color-tone-1']).not.toBe(stored.overrides.dark['--color-tone-1']);
 
   // Persists and reloads: the editor reopens on the override, not on a derived row.
   await page.reload();
-  await expect.poll(() => inlineOnRoot(page, '--color-tone-1')).toBe(stored.overrides.solar['--color-tone-1']);
+  await expect.poll(() => inlineOnRoot(page, '--color-tone-1')).toBe(stored.overrides.light['--color-tone-1']);
   await openThemeEditor(page, worldSeg);
   await openGroup(page, 'tones');
   await expect(page.getByTestId('theme-override-count-tones')).toBeVisible();
 
   // Cleared and saved: the key is gone, the other ColorScheme's is not, and the root carries nothing.
-  await page.getByTestId('theme-override-clear-solar-color-tone-1').click();
+  await page.getByTestId('theme-override-clear-light-color-tone-1').click();
   await saveTheme(page);
   const cleared = await storedTheme(page, worldId);
-  expect(cleared.overrides.solar).toBeUndefined();
-  expect(cleared.overrides.astral['--color-tone-1']).toBeTruthy();
+  expect(cleared.overrides.light).toBeUndefined();
+  expect(cleared.overrides.dark['--color-tone-1']).toBeTruthy();
 
   await page.reload();
   expect(await inlineOnRoot(page, '--color-tone-1')).toBe('');
@@ -120,26 +120,26 @@ test('an untouched row shows the value its own ColorScheme renders, not a word f
   await openThemeEditor(page, worldSeg);
   await openGroup(page, 'tones');
 
-  const solar = page.getByTestId('theme-override-set-solar-color-tone-5');
-  const astral = page.getByTestId('theme-override-set-astral-color-tone-5');
+  const light = page.getByTestId('theme-override-set-light-color-tone-5');
+  const dark = page.getByTestId('theme-override-set-dark-color-tone-5');
 
   // The cell carries the value; where it came from is the row's mark, one column over. The two used to
   // be one word, and that word was wrong wherever the value was not an expression over the anchors.
-  await expect(solar).toHaveText(/^#[0-9a-f]{6}$/i);
-  await expect(astral).toHaveText(/^#[0-9a-f]{6}$/i);
+  await expect(light).toHaveText(/^#[0-9a-f]{6}$/i);
+  await expect(dark).toHaveText(/^#[0-9a-f]{6}$/i);
 
-  // And each column is measured under *its own* Palette. On an unedited World, Solar's roles resolve
+  // And each column is measured under *its own* Palette. On an unedited World, the light scheme's roles resolve
   // to exactly what the manifest declares (`manifest.spec.ts`) — so a fallback to the manifest for the
   // ColorScheme the reader is not in would put the same value in both cells. It does not.
-  const shown = { solar: await solar.innerText(), astral: await astral.innerText() };
-  expect(shown.astral).not.toBe(shown.solar);
+  const shown = { light: await light.innerText(), dark: await dark.innerText() };
+  expect(shown.dark).not.toBe(shown.light);
 
   // And each is what its own opt-out starts at, so the click that departs from the derivation moves
   // nothing — in the ColorScheme the reader is not in as much as in the one they are.
-  await solar.click();
-  await astral.click();
-  await expect(page.getByTestId('theme-override-solar-color-tone-5')).toHaveValue(shown.solar);
-  await expect(page.getByTestId('theme-override-astral-color-tone-5')).toHaveValue(shown.astral);
+  await light.click();
+  await dark.click();
+  await expect(page.getByTestId('theme-override-light-color-tone-5')).toHaveValue(shown.light);
+  await expect(page.getByTestId('theme-override-dark-color-tone-5')).toHaveValue(shown.dark);
 });
 
 /**
@@ -174,7 +174,7 @@ test('marks each untouched row with where its value comes from, off the styleshe
 /**
  * What the row mark assumes: a tier-2 role is one expression for both ColorSchemes (ADR-0075), so it
  * can be read once. A ColorScheme that reassigns a public role therefore states a literal — the mark is
- * read as Solar, and this is what says that reading answers for Astral too.
+ * read as light, and this is what says that reading answers for dark too.
  */
 test('declares every public role once, so a ColorScheme only ever restates a literal', async ({ page }) => {
   await enterLibrary(page);
@@ -211,7 +211,7 @@ test('declares every public role once, so a ColorScheme only ever restates a lit
 
   // What a scheme states alone is a named literal — the two ColorSchemes' field glows are two design
   // ideas, not one parameterised one — and nothing in it may reach for an anchor.
-  expect(reassigned, 'the astral block declares at least the one named literal').not.toHaveLength(0);
+  expect(reassigned, 'the dark block declares at least the one named literal').not.toHaveLength(0);
   const computed = reassigned.filter(({ value }) =>
     /var\(--palette-|oklch\(\s*from|color-mix\(|contrast-color\(/.test(value),
   );
@@ -225,7 +225,7 @@ test('re-anchoring the Palette moves every derived token and leaves the overridd
 
   // The eight tones are hue rotations off the accent (ADR-0075), so one anchor moves all of them —
   // which is what makes this the sharpest witness that an override sits *after* the derivation.
-  await override(page, 'solar', 'color-tone-1', '#112233');
+  await override(page, 'light', 'color-tone-1', '#112233');
   const overridden = await resolvedOnRoot(page, '--color-tone-1');
   const before = {
     accent: await resolvedOnRoot(page, '--color-accent'),
@@ -233,7 +233,7 @@ test('re-anchoring the Palette moves every derived token and leaves the overridd
     tone3: await resolvedOnRoot(page, '--color-tone-3'),
   };
 
-  await page.getByTestId('theme-control-solar-accent').fill('#6a2ab0');
+  await page.getByTestId('theme-control-light-accent').fill('#6a2ab0');
 
   await expect.poll(() => resolvedOnRoot(page, '--color-accent')).not.toBe(before.accent);
   await expect.poll(() => resolvedOnRoot(page, '--color-tone-2')).not.toBe(before.tone2);
@@ -248,18 +248,18 @@ test('the editor offers only the public roles, and the choke point refuses the r
   await openThemeEditor(page, worldSeg);
 
   // Not offered: a private tier-1 anchor is authored as the Palette, and tier 3 belongs to its plugin.
-  await expect(page.getByTestId('theme-override-set-solar-palette-accent')).toHaveCount(0);
-  await expect(page.getByTestId('theme-override-set-solar-color-terrain-grass')).toHaveCount(0);
-  await expect(page.getByTestId('theme-override-set-solar-color-canvas-edge')).toHaveCount(1);
+  await expect(page.getByTestId('theme-override-set-light-palette-accent')).toHaveCount(0);
+  await expect(page.getByTestId('theme-override-set-light-color-terrain-grass')).toHaveCount(0);
+  await expect(page.getByTestId('theme-override-set-light-color-canvas-edge')).toHaveCount(1);
 
   // Save a Theme so there is a well-formed one to bend one key of.
-  await page.getByTestId('theme-control-solar-accent').fill('#6a2ab0');
+  await page.getByTestId('theme-control-light-accent').fill('#6a2ab0');
   await saveTheme(page);
   const stored = await storedTheme(page, worldId);
 
   const send = (name: string, value: string) =>
     page.request.patch(`/api/worlds/${worldId}`, {
-      data: { theme: { ...stored, overrides: { solar: { [name]: value } } } },
+      data: { theme: { ...stored, overrides: { light: { [name]: value } } } },
     });
 
   // Rejected if sent — "not offered" is a UI claim, and an Owner is untrusted input either way.

@@ -99,8 +99,8 @@ export class ThemePaletteComponent {
   protected readonly reports = computed<Readonly<Record<ColorScheme, readonly ThemeWarning[] | null>>>(() => {
     const declarations = this.declarations();
     return {
-      solar: contrastReport('solar', declarations.solar),
-      astral: contrastReport('astral', declarations.astral),
+      light: contrastReport('light', declarations.light),
+      dark: contrastReport('dark', declarations.dark),
     };
   });
 

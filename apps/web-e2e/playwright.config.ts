@@ -37,10 +37,10 @@ const INLINE_TYPE_YAML = ['entities:', '  inlineType: core.type.hex-map', '  inl
 // it is silent about still falls through to the stylesheet.
 const INSTANCE_THEME_YAML = [
   'theme:',
-  '  version: 1',
-  '  solar:',
+  '  version: 2',
+  '  light:',
   "    accent: '#2f6f4f'",
-  '  astral:',
+  '  dark:',
   "    accent: '#7fd0a8'",
   '  radii:',
   '    --radius-md: 0px',

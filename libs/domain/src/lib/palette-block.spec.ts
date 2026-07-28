@@ -44,12 +44,12 @@ describe('the tier-1 regions of tokens.css', () => {
     // `overrides` is the only mechanism that can carry a per-Preset named literal (ADR-0077).
     const glow = '--color-canvas-glow';
     expect(PALETTE_PRESETS.astral.overrides?.[glow]).toBeDefined();
-    expect(declarationsIn(palettePresetRegionIn(committed, 'astral'))).toContain(glow);
+    expect(declarationsIn(palettePresetRegionIn(committed, 'dark'))).toContain(glow);
     // Once in the whole sheet, so nothing outside the region restates it.
     expect(declarationsIn(committed).filter((name) => name === glow)).toHaveLength(1);
   });
 
-  it('leave the motion, elevation, layout-rail and sheen tokens the Solar block shares alone', () => {
+  it('leave the motion, elevation, layout-rail and sheen tokens the light block shares alone', () => {
     // `@theme` cannot hold these (ADR-0020), which is why they sit in the same block as tier 1 — and
     // why the generator writes a region and not the block.
     const shared = ['--dur-fast', '--ease-out', '--rail-header', '--shadow-2', '--gradient-accent-sheen'];
@@ -62,7 +62,7 @@ describe('the tier-1 regions of tokens.css', () => {
 
   it('splice under whatever indentation the stylesheet gave the fence', () => {
     // The fence's own indentation is read back rather than assumed, as the pre-paint allowlist's is.
-    for (const line of palettePresetRegion('solar', '    ').split('\n')) {
+    for (const line of palettePresetRegion('light', '    ').split('\n')) {
       if (line !== '') expect(line).toMatch(/^ {4}\S/);
     }
   });
@@ -98,8 +98,8 @@ describe('PALETTE_PRESETS', () => {
       const preset = PALETTE_PRESETS[id];
       const parsed = worldThemeSchema.safeParse({
         version: WORLD_THEME_VERSION,
-        solar: preset.values,
-        astral: preset.values,
+        light: preset.values,
+        dark: preset.values,
         overrides: { [preset.scheme]: preset.overrides ?? {} },
       });
       expect(parsed.success, `${id}: ${parsed.error?.message}`).toBe(true);
@@ -107,10 +107,10 @@ describe('PALETTE_PRESETS', () => {
   });
 
   it("restates the manifest's tier-1 initial values, which are the default light Preset's", () => {
-    // `@property` registers one initial-value per token and it is Solar's (ADR-0075). The manifest
+    // `@property` registers one initial-value per token and it is the light Palette's (ADR-0075). The manifest
     // cannot read this table — `web-styles` sits under `libs/domain`, not above it — so the drift the
     // generated stylesheet can no longer have is refused here instead.
-    const light = PALETTE_PRESETS[DEFAULT_PALETTE_PRESETS.solar].values;
+    const light = PALETTE_PRESETS[DEFAULT_PALETTE_PRESETS.light].values;
     const field = Object.fromEntries(Object.entries(PALETTE_TOKENS).map(([name, token]) => [token, name]));
     for (const decl of DESIGN_TOKENS.filter((token) => token.tier === 'palette')) {
       expect(String(light[field[decl.name] as keyof typeof light]), decl.name).toBe(decl.initial);

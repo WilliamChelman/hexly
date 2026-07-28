@@ -15,11 +15,14 @@ import type { PublicDesignToken } from '@hexly/web-styles';
 import type { WorldTheme, WorldThemePalette } from './world-theme';
 
 /**
- * The key a stored World Theme names one of its two Palettes by — not a word for the axis itself, which
- * CONTEXT.md reserves. Fenced against the `overrides` block's own keys, so a Preset cannot name a
- * ColorScheme only one of the two levels has.
+ * The key a stored World Theme names one of its two Palettes by — the ColorScheme itself since
+ * ADR-0077, where it used to be the Preset Hexly happens to wear at that end. Fenced against the
+ * `overrides` block's own keys, so a Preset cannot name a ColorScheme only one of the two levels has.
+ *
+ * Spelled here rather than taken from `ColorScheme`, which lives in `@hexly/web-core`: this library
+ * sits under that one, and the server reads this table.
  */
-export const WORLD_THEME_SCHEME_KEYS = ['solar', 'astral'] as const satisfies readonly (keyof NonNullable<
+export const WORLD_THEME_SCHEME_KEYS = ['light', 'dark'] as const satisfies readonly (keyof NonNullable<
   WorldTheme['overrides']
 >)[];
 
@@ -55,7 +58,7 @@ export interface PalettePreset {
 export const PALETTE_PRESETS: Readonly<Record<PalettePresetId, PalettePreset>> = {
   solar: {
     id: 'solar',
-    scheme: 'solar',
+    scheme: 'light',
     values: {
       page: '#f1e5c7', // the table / outer ivory paper
       ink: '#2e2412', // primary sepia-ink text
@@ -68,14 +71,14 @@ export const PALETTE_PRESETS: Readonly<Record<PalettePresetId, PalettePreset>> =
       canvas: '#efe2bf', // the map field
       // Shadow / scrim ink — warm sepia, and lighter than `ink`, which is why it is its own anchor.
       soot: '#3c2c16',
-      polarity: 1, // +1 Solar / −1 Astral: every ramp direction
+      polarity: 1, // +1 light / −1 dark: every ramp direction
       lineAlpha: 0.371, // opacity of the drawn-rule ramp
       veil: 0.12, // base opacity of shadows, scrims, the vignette
     },
   },
   astral: {
     id: 'astral',
-    scheme: 'astral',
+    scheme: 'dark',
     values: {
       page: '#0b0c1a', // the night table
       ink: '#ece3cf', // starlit parchment text
@@ -100,6 +103,6 @@ export const PALETTE_PRESETS: Readonly<Record<PalettePresetId, PalettePreset>> =
  * `tokens.css`'s generated regions restate.
  */
 export const DEFAULT_PALETTE_PRESETS = {
-  solar: 'solar',
-  astral: 'astral',
+  light: 'solar',
+  dark: 'astral',
 } as const satisfies Readonly<Record<WorldThemeSchemeKey, PalettePresetId>>;

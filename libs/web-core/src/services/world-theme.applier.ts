@@ -28,8 +28,8 @@ export type WorldScope = { readonly worldId: string } | { readonly publicToken: 
  * default may brand a deployment with far fewer values than an Owner authors.
  */
 export interface WorldThemeLayer {
-  readonly solar?: Partial<WorldThemePalette>;
-  readonly astral?: Partial<WorldThemePalette>;
+  readonly light?: Partial<WorldThemePalette>;
+  readonly dark?: Partial<WorldThemePalette>;
   readonly radii?: WorldTheme['radii'];
   readonly fontPairing?: WorldTheme['fontPairing'];
   readonly overrides?: WorldTheme['overrides'];
@@ -67,7 +67,7 @@ export const WORLD_THEME_CACHE_KEY = 'hexly-world-theme';
 /** How many Worlds' Themes the cache keeps, most recently applied first. */
 const CACHE_MAX = 8;
 
-const NOTHING: ThemeDeclarationSet = { solar: {}, astral: {} };
+const NOTHING: ThemeDeclarationSet = { light: {}, dark: {} };
 
 /** The two route families a World is reached through; a Public Link visitor never learns a World id. */
 const SCOPE_PATH = /^\/(public\/w|w)\/([^/]+)/;
@@ -119,16 +119,22 @@ function declarationsFor(layers: readonly (WorldThemeLayer | null | undefined)[]
  */
 export function resolveWorldTheme(layers: readonly (WorldThemeLayer | null | undefined)[]): ThemeDeclarationSet {
   return {
-    solar: declarationsFor(layers, 'solar'),
-    astral: declarationsFor(layers, 'astral'),
+    light: declarationsFor(layers, 'light'),
+    dark: declarationsFor(layers, 'dark'),
   };
 }
 
-/** One World's own last-applied Theme, cached resolved so the pre-paint replay carries no logic. */
+/**
+ * One World's own last-applied Theme, cached resolved so the pre-paint replay carries no logic.
+ *
+ * An entry written before ADR-0077 keys its two Palettes `solar`/`astral` and so reads back empty —
+ * deliberately lapsing rather than being translated: one unthemed frame, and the World read landing
+ * underneath rewrites it.
+ */
 interface CachedScope {
   readonly scope: string;
-  readonly solar: ThemeDeclarations;
-  readonly astral: ThemeDeclarations;
+  readonly light: ThemeDeclarations;
+  readonly dark: ThemeDeclarations;
 }
 
 /**
@@ -151,8 +157,8 @@ function readCache(): CachedScope[] {
     .filter((entry): entry is { scope: string } => typeof (entry as CachedScope)?.scope === 'string')
     .map((entry) => ({
       scope: entry.scope,
-      solar: declaredOnly((entry as Partial<CachedScope>).solar),
-      astral: declaredOnly((entry as Partial<CachedScope>).astral),
+      light: declaredOnly((entry as Partial<CachedScope>).light),
+      dark: declaredOnly((entry as Partial<CachedScope>).dark),
     }));
 }
 
@@ -232,9 +238,7 @@ export class WorldThemeApplier {
     const cached = scope === null ? undefined : readCache().find((entry) => entry.scope === scope);
     this.paint(
       scope,
-      cached
-        ? { solar: { ...instance.solar, ...cached.solar }, astral: { ...instance.astral, ...cached.astral } }
-        : instance,
+      cached ? { light: { ...instance.light, ...cached.light }, dark: { ...instance.dark, ...cached.dark } } : instance,
     );
   }
 

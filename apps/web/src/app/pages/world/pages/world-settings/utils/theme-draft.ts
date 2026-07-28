@@ -44,7 +44,7 @@ import {
  * The two halves an Owner authors in one sitting — a World Theme and a reader's ColorScheme are
  * orthogonal (ADR-0006).
  */
-export const COLOR_SCHEMES = ['solar', 'astral'] as const satisfies readonly ColorScheme[];
+export const COLOR_SCHEMES = ['light', 'dark'] as const satisfies readonly ColorScheme[];
 
 /** A numeric knob's domain — how far a control may take it, and at what grain. */
 export interface KnobRange {
@@ -182,7 +182,7 @@ export function resolvedRoles(declarations: ThemeDeclarationSet): ResolvedRoles 
     const measured = measureScheme({ scheme, declarations: declarations[scheme], tokens });
     return Object.fromEntries(tokens.map((token) => [token, measured[token] || designTokenInitial(token)]));
   };
-  return { solar: forScheme('solar'), astral: forScheme('astral') };
+  return { light: forScheme('light'), dark: forScheme('dark') };
 }
 
 /** How each override row gets its value, keyed by the token — what the row is marked with (#374). */
@@ -195,7 +195,7 @@ let derivations: RoleDerivations | undefined;
  * mark on a row is the stylesheet's own answer and not a list beside it (ADR-0075).
  *
  * Read once and kept: the stylesheets do not change under a running app, and this walks every rule of
- * every sheet. Read as Solar, which is where the derivations *are* — a tier-2 role is one expression
+ * every sheet. Read as light, which is where the derivations *are* — a tier-2 role is one expression
  * for both ColorSchemes, and a ColorScheme that reassigns one is by construction stating a literal
  * outright. `world-theme-overrides.spec.ts` holds that to the stylesheets in a real engine.
  *
@@ -204,7 +204,7 @@ let derivations: RoleDerivations | undefined;
  */
 export function roleDerivations(): RoleDerivations {
   if (derivations) return derivations;
-  const declared = declaredTokenValues('solar');
+  const declared = declaredTokenValues('light');
   derivations = Object.fromEntries(
     OVERRIDE_CONTROLS.filter((control) => declared[control.token]).map((control) => [
       control.token,
@@ -337,8 +337,8 @@ export const FONT_PAIRING_CHOICES: readonly FontPairingChoice[] = FONT_PAIRING_I
  * from this editor cannot drop what a surface authoring the rest of the contract stored.
  */
 export interface ThemeDraft {
-  readonly solar: WorldThemePalette;
-  readonly astral: WorldThemePalette;
+  readonly light: WorldThemePalette;
+  readonly dark: WorldThemePalette;
   readonly radii?: WorldTheme['radii'];
   readonly fontPairing?: WorldTheme['fontPairing'];
   readonly overrides?: WorldTheme['overrides'];
@@ -349,8 +349,8 @@ export function draftFrom(theme: WorldTheme | null | undefined): ThemeDraft | nu
   if (!theme) return null;
   // Field by field rather than a spread minus `version`: what goes back out is stamped with the
   // contract this build knows, not the one it read.
-  const { solar, astral, radii, fontPairing, overrides } = theme;
-  return { solar, astral, radii, fontPairing, overrides };
+  const { light, dark, radii, fontPairing, overrides } = theme;
+  return { light, dark, radii, fontPairing, overrides };
 }
 
 /** The draft as it is sent, stamped with the contract version it was authored against (ADR-0076). */
@@ -411,10 +411,10 @@ export function hexlyPalette(scheme: ColorScheme): WorldThemePalette {
 export function defaultPalettes(
   instance: WorldThemeLayer | null | undefined,
 ): Readonly<Record<ColorScheme, WorldThemePalette>> {
-  const hexly: WorldThemeLayer = { solar: hexlyPalette('solar'), astral: hexlyPalette('astral') };
+  const hexly: WorldThemeLayer = { light: hexlyPalette('light'), dark: hexlyPalette('dark') };
   const resolved = resolveWorldTheme([hexly, instance]);
   const readFrom = (declarations: ThemeDeclarations) => paletteOf((token) => declarations[token] ?? '');
-  return { solar: readFrom(resolved.solar), astral: readFrom(resolved.astral) };
+  return { light: readFrom(resolved.light), dark: readFrom(resolved.dark) };
 }
 
 /** One Palette, read token by token through `value` and typed by what the manifest declared. */

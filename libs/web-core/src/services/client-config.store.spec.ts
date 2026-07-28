@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { ClientConfig } from '@hexly/domain';
+import { ClientConfig, InstanceTheme, WORLD_THEME_VERSION } from '@hexly/domain';
 import { ClientConfigStore } from './client-config.store';
 
 describe('ClientConfigStore', () => {
@@ -87,7 +87,7 @@ describe('ClientConfigStore', () => {
   const PLUGINS_AND_TYPE = { plugins: {}, entities: { defaultType: 'core.type.note', inlineType: 'core.type.note' } };
 
   describe('the Instance default Theme (ADR-0076, #372)', () => {
-    const BRANDED = { version: 1 as const, solar: { accent: 'oklch(0.5 0.1 150)' } };
+    const BRANDED: InstanceTheme = { version: WORLD_THEME_VERSION, light: { accent: 'oklch(0.5 0.1 150)' } };
 
     it('exposes the layer the operator configured, for the applier to resolve the chain under', async () => {
       await initWith({ ...PLUGINS_AND_TYPE, theme: BRANDED });

@@ -4,7 +4,7 @@
  * fence-splicing itself, so the stylesheet stays a plain `@import` and `palette-block.spec.ts` fails
  * the build when the two drift.
  *
- * A *region* rather than a whole block: the Solar block interleaves tier 1 with the motion, elevation,
+ * A *region* rather than a whole block: the light block interleaves tier 1 with the motion, elevation,
  * layout-rail and sheen tokens `@theme` cannot hold, and none of those are a Preset's to write.
  */
 

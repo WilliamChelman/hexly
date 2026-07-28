@@ -7,11 +7,11 @@ import { tokenDerivation } from './declared';
 /**
  * The manifest declares the contract; the stylesheets still hold the values. These tests are the
  * join: a token added to the CSS without a declaration — or declared with an `initial` that no longer
- * matches its Solar value — fails here rather than quietly leaving the contract incomplete (ADR-0075,
+ * matches its light value — fails here rather than quietly leaving the contract incomplete (ADR-0075,
  * "A manifest is the single source of the contract").
  */
 
-/** Every custom property declared in a stylesheet, first declaration wins — which is the Solar one. */
+/** Every custom property declared in a stylesheet, first declaration wins — which is the light one. */
 function declaredTokens(...files: string[]): Map<string, string> {
   const found = new Map<string, string>();
   for (const file of files) {
@@ -103,7 +103,7 @@ describe('the design-token manifest', () => {
     return tokenDerivation(declared.get(name) ?? '').kind !== 'literal';
   }
 
-  it("carries each literal token's Solar value as its initial", () => {
+  it("carries each literal token's light value as its initial", () => {
     const drifted = DESIGN_TOKENS.filter(
       (decl) => !isDerived(decl.name) && canonical(decl.initial) !== declared.get(decl.name),
     );
@@ -111,7 +111,7 @@ describe('the design-token manifest', () => {
   });
 
   /**
-   * A derived token's initial is what its expression *resolves to* in Solar, which nothing outside an
+   * A derived token's initial is what its expression *resolves to* in the light scheme, which nothing outside an
    * engine can compute — `design-tokens.spec.ts` reads those values back from a real one. What is
    * checkable here is the constraint `@property` imposes: an `initial-value` carrying a `var()` is not
    * computationally independent, so the rule declaring it is dropped whole and the token silently

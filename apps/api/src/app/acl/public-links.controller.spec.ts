@@ -218,12 +218,12 @@ describe('Public links', () => {
 
     await ada
       .patch(`/worlds/${worldId}`)
-      .send({ theme: { version: 1, solar: palette, astral: { ...palette, polarity: -1 } } })
+      .send({ theme: { version: 2, light: palette, dark: { ...palette, polarity: -1 } } })
       .expect(200);
 
     // Readable by anyone holding the link — a conscious call (ADR-0076).
     const view = (await anon().get(`/public/worlds/${token}`).expect(200)).body;
-    expect(view.theme.solar.accent).toMatch(/^oklch\(/);
+    expect(view.theme.light.accent).toMatch(/^oklch\(/);
   });
 
   it('revoking a World link makes its token stop resolving immediately', async () => {

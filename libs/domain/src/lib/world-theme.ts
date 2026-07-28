@@ -22,8 +22,11 @@ import { canonicalTokenValue, isSettableTokenType } from './design-token-value';
  * The stored shape's version. Every public token is a compatibility commitment, so a Theme names the
  * contract it was authored against and a version this build does not know is refused rather than
  * partly applied (ADR-0076).
+ *
+ * 2 since the ColorScheme keys became `light`/`dark` (ADR-0077): an older client meeting a migrated
+ * World gets that refusal rather than a validation error about a missing `solar`.
  */
-export const WORLD_THEME_VERSION = 1;
+export const WORLD_THEME_VERSION = 2;
 
 /**
  * The curated font pairings (spec §5.4). One entry today; a pairing writes all four `--font-*` tokens,
@@ -99,7 +102,7 @@ const polarityKnob = z.number().min(-1).max(1);
 
 /**
  * One ColorScheme's Palette. A World Theme carries two, because a Theme and a reader's ColorScheme are
- * orthogonal — the Owner supplies identity, the reader still chooses Solar or Astral within it
+ * orthogonal — the Owner supplies identity, the reader still chooses Light or Dark within it
  * (ADR-0006, ADR-0076).
  *
  * The `satisfies` is the fence: a field per tier-1 token and no others, checked by the compiler. The
@@ -131,7 +134,7 @@ const radiiSchema = z.partialRecord(tokenEnum(RADIUS_TOKENS), tokenValue('length
 
 /**
  * The tokens an override may key: the **tier-2 roles** alone — not the tier-1 anchors (those are the
- * `solar`/`astral` sets) and not a plugin's tier-3 vocabulary — less the radii (scheme-independent, so
+ * `light`/`dark` sets) and not a plugin's tier-3 vocabulary — less the radii (scheme-independent, so
  * `radii` owns them and there is one place to set each token), and less the types no value may be
  * authored for.
  *
@@ -168,7 +171,7 @@ const overridesSchema = z.partialRecord(tokenEnum(OVERRIDABLE_TOKENS), z.string(
 });
 
 /** Both Themes' opt-out block, shared so the operator's and the Owner's cannot drift apart. */
-const overridesByScheme = { solar: overridesSchema.optional(), astral: overridesSchema.optional() };
+const overridesByScheme = { light: overridesSchema.optional(), dark: overridesSchema.optional() };
 
 /**
  * A World Theme as stored. Unknown keys are dropped rather than refused — an older client's extra
@@ -177,8 +180,8 @@ const overridesByScheme = { solar: overridesSchema.optional(), astral: overrides
  */
 export const worldThemeSchema = z.object({
   version: z.literal(WORLD_THEME_VERSION),
-  solar: paletteSchema,
-  astral: paletteSchema,
+  light: paletteSchema,
+  dark: paletteSchema,
   radii: radiiSchema.optional(),
   fontPairing: z.enum(FONT_PAIRING_IDS).optional(),
   overrides: z.object(overridesByScheme).optional(),
@@ -191,7 +194,7 @@ export type WorldTheme = z.infer<typeof worldThemeSchema>;
 export type WorldThemeInput = z.input<typeof worldThemeSchema>;
 
 /** One ColorScheme's stored Palette — the anchors and knobs {@link PALETTE_TOKENS} names. */
-export type WorldThemePalette = WorldTheme['solar'];
+export type WorldThemePalette = WorldTheme['light'];
 
 /** One ColorScheme's Palette as an operator authors it: the same fields, none of them required. */
 const partialPaletteSchema = z.strictObject(paletteSchema.partial().shape);
@@ -209,8 +212,8 @@ const partialPaletteSchema = z.strictObject(paletteSchema.partial().shape);
  */
 export const instanceThemeSchema = z.strictObject({
   version: z.literal(WORLD_THEME_VERSION),
-  solar: partialPaletteSchema.optional(),
-  astral: partialPaletteSchema.optional(),
+  light: partialPaletteSchema.optional(),
+  dark: partialPaletteSchema.optional(),
   radii: radiiSchema.optional(),
   fontPairing: z.enum(FONT_PAIRING_IDS).optional(),
   overrides: z.strictObject(overridesByScheme).optional(),

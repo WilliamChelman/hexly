@@ -93,7 +93,7 @@ function appliesTo(selectorText: string, scheme: string): boolean {
  * Every declared token, as `scheme` declares it. The first declaration wins, matching the order the
  * stylesheets are written in: the derivation at `:root` comes before Tailwind's own restatement of the
  * resolved value, and a ColorScheme that reassigns a token does so after the root has declared it —
- * so `astral` is read by taking its block's own declaration where there is one.
+ * so `dark` is read by taking its block's own declaration where there is one.
  *
  * `{}` where no stylesheet is reachable, which is jsdom and a cross-origin sheet alike.
  */

@@ -238,10 +238,10 @@
     "signOut": "Se déconnecter",
     "login": "Connexion",
     "colorScheme": {
-      "solar": "Solaire (clair)",
-      "astral": "Astral (sombre)",
-      "toSolar": "Passer au schéma de couleurs solaire",
-      "toAstral": "Passer au schéma de couleurs astral"
+      "light": "Clair",
+      "dark": "Sombre",
+      "toLight": "Passer au schéma de couleurs clair",
+      "toDark": "Passer au schéma de couleurs sombre"
     },
     "cancel": "Annuler",
     "close": "Fermer",

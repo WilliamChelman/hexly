@@ -43,7 +43,7 @@ test('the user menu keeps the ColorScheme and language and drops the session and
 
   // The ColorScheme and the language are account-independent preferences and stay.
   const colorScheme = await page.locator('html').getAttribute('data-color-scheme');
-  await menu.getByRole('menuitem', { name: /switch to the (solar|astral) colour scheme/i }).click();
+  await menu.getByRole('menuitem', { name: /switch to the (light|dark) colour scheme/i }).click();
   await expect(page.locator('html')).not.toHaveAttribute('data-color-scheme', String(colorScheme));
 
   await trigger.click();
@@ -62,7 +62,7 @@ test('the user menu keeps the ColorScheme and language and drops the session and
 test('Settings keeps its Preferences and offers no Profile section and no password form', async ({ page }) => {
   await page.goto('/settings');
 
-  for (const testid of ['color-scheme-solar', 'color-scheme-astral', 'language', 'format-locale']) {
+  for (const testid of ['color-scheme-light', 'color-scheme-dark', 'language', 'format-locale']) {
     await expect(page.getByTestId(testid)).toBeVisible();
   }
   // There is no account to manage, because there is no password anywhere (ADR-0070).

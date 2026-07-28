@@ -5,7 +5,7 @@
  * `@theme` block in index.css (ADR-0020). This file carries what `@theme` can't:
  *   1. The two **Palettes** — tier 1 (ADR-0075). Eight anchors and three knobs per
  *      ColorScheme. The derived roles are one expression each and do not repeat per
- *      scheme, so astral reassigns these and `--color-canvas-glow` — the one role
+ *      scheme, so the dark block reassigns these and `--color-canvas-glow` — the one role
  *      whose two schemes no single expression fits (index.css). Both regions are
  *      generated from `PALETTE_PRESETS` in `libs/domain` (ADR-0077): Hexly's own
  *      Palettes take the Preset table's code path rather than sitting beside it.
@@ -26,11 +26,11 @@
    made for the editor's offscreen probe has no reader left: the probe is a Preset lookup, and the
    contrast report re-dresses the root because the derived roles sit there (`measure.ts`). */
 :root {
-  /* ---- Tier 1 — the Solar Palette. Private: `--palette-*` is referenced only by
-     the derivation in index.css, and `no-unknown-design-token` enforces it. The
-     values are authored in the Preset table (ADR-0077), where the note on each
-     anchor lives beside it. ---- */
-  /* GENERATED — the solar Palette, from PALETTE_PRESETS in libs/domain. Run `pnpm tokens:generate`. */
+  /* ---- Tier 1 — the light ColorScheme's Palette, which is Solar. Private:
+     `--palette-*` is referenced only by the derivation in index.css, and
+     `no-unknown-design-token` enforces it. The values are authored in the Preset
+     table (ADR-0077), where the note on each anchor lives beside it. ---- */
+  /* GENERATED — the light Palette, from PALETTE_PRESETS in libs/domain. Run `pnpm tokens:generate`. */
   --palette-page: #f1e5c7;
   --palette-ink: #2e2412;
   --palette-ink-quiet: #6f5a36;
@@ -63,7 +63,7 @@
      shared, the travel re-themes, which is what §2.4 asked for and three
      unrelated offset ratios were not. The 1/2/3 alpha ladder is a *power* of the
      veil rather than a multiple of it, which is the only form both ColorSchemes
-     fit (world-theme-spec.md §2); at Astral's veil that power is nearly flat
+     fit (world-theme-spec.md §2); at the dark Palette's veil that power is nearly flat
      (α 0.50 → 0.71 across three levels), so the lift is what actually separates
      them there. Level 1 and the inset well are off both scales: at 1px there is
      no travel to give, and the well takes `shadow-1`'s own alpha. */
@@ -89,19 +89,19 @@
 }
 
 /* =========================================================================
- * The Astral ColorScheme — the night half
+ * The dark ColorScheme — the night half, which Hexly wears as Astral
  * The same chart at night: midnight-indigo paper, constellation-gold, aurora-teal.
  * Text stays warm parchment-cream so the two ColorSchemes read as one identity at
  * different hours.
  *
- * This block is the Astral **Palette**, and almost nothing else: the semantic roles
+ * This block is the dark **Palette**, and almost nothing else: the semantic roles
  * are derived once in index.css and re-resolve here off these anchors (ADR-0075).
  * What remains beside it is what the derivation does not reach — the one named
  * literal.
  * ======================================================================= */
-:root[data-color-scheme='astral'] {
-  /* ---- Tier 1 — the Astral Palette, and the tier-2 literals its Preset states. ---- */
-  /* GENERATED — the astral Palette, from PALETTE_PRESETS in libs/domain. Run `pnpm tokens:generate`. */
+:root[data-color-scheme='dark'] {
+  /* ---- Tier 1 — the dark Palette, and the tier-2 literals its Preset states. ---- */
+  /* GENERATED — the dark Palette, from PALETTE_PRESETS in libs/domain. Run `pnpm tokens:generate`. */
   --palette-page: #0b0c1a;
   --palette-ink: #ece3cf;
   --palette-ink-quiet: #9aa0c8;

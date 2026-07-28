@@ -238,10 +238,10 @@
     "signOut": "Sign out",
     "login": "Login",
     "colorScheme": {
-      "solar": "Solar (light)",
-      "astral": "Astral (dark)",
-      "toSolar": "Switch to the solar colour scheme",
-      "toAstral": "Switch to the astral colour scheme"
+      "light": "Light",
+      "dark": "Dark",
+      "toLight": "Switch to the light colour scheme",
+      "toDark": "Switch to the dark colour scheme"
     },
     "cancel": "Cancel",
     "close": "Close",

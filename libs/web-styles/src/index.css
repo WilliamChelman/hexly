@@ -23,7 +23,7 @@
  *
  * Colours are declared *non-`inline`* so the emitted `--color-*` carries the
  * derivation itself: each role is one expression over the tier-1 Palette in
- * tokens.css, and `[data-color-scheme='astral']` reassigns the *anchors*, not the
+ * tokens.css, and `[data-color-scheme='dark']` reassigns the *anchors*, not the
  * roles (ADR-0075). Spacing/type/radii/fonts are ColorScheme-invariant. Elevation
  * can't live here — see the @utility block below.
  *
@@ -108,7 +108,7 @@
   --color-surface-raised: oklch(
     from var(--palette-page) calc(1 - abs(1 - abs(l + 0.067))) calc(c - 0.0281 * var(--palette-polarity)) calc(h - 4.5)
   );
-  /* The well sits below the page in Solar and above it in Astral — the swap the
+  /* The well sits below the page in light and above it in dark — the swap the
      polarity knob exists for. Parented to the page, not to `surface`, because
      against `surface` the two schemes' offsets differ by 2.6× (spike §5). */
   --color-surface-sunken: oklch(
@@ -131,7 +131,7 @@
   ); /* tertiary, placeholders, disabled */
 
   /* Drawn rules — the accent at the line-alpha ramp {1, 1.85, 0.44}. Translucent
-     in both schemes now, so Solar's rules take their colour from what they are
+     in both schemes now, so the light scheme's rules take their colour from what they
      drawn over; they match their old values over `surface` (ADR-0075). */
   /* The ramp's own unit, as a role: a relative colour function destructures one
      colour, so a tier-3 rule wanting other channels at this alpha has no way to
@@ -170,8 +170,8 @@
     contrast-color(var(--color-accent-sheen-bright)) 90%,
     var(--color-accent-sheen-bright)
   );
-  /* The accent lifted to a light-source lightness — it glows in Solar, where the
-     accent is dark, and stays put in Astral, where it already is one. */
+  /* The accent lifted to a light-source lightness — it glows in the light scheme,
+     where the accent is dark, and stays put in the dark one, where it already is one. */
   --color-accent-glow: oklch(
     from var(--palette-accent) max(l, 0.713) calc(c + (0.713 - min(l, 0.713)) * 0.18) calc(h + 1) / 0.5
   );
@@ -239,7 +239,7 @@
       calc(h - 0.7)
   );
   /* The one named literal (ADR-0075) — a 5× lift mismatch between the two
-     ColorSchemes. Its Astral value sits in tokens.css beside the anchors. */
+     ColorSchemes. Its dark value sits in tokens.css beside the anchors. */
   --color-canvas-glow: rgba(255, 240, 202, 0.55);
   --color-canvas-edge: oklch(from var(--palette-soot) l c h / var(--palette-veil)); /* soft vignette */
   /* The halo behind name/label text — the page pushed one step away from the
@@ -257,8 +257,8 @@
      is not a colour, so nothing in the elevation family spells it, and reaching
      past them to the knob is the tier breach ADR-0075 forbids.
 
-     How far levels 2 and 3 lift off the page, as a multiple of the Solar geometry
-     — 1 by day, 1.4 by night. Astral needs more travel because a near-black shadow
+     How far levels 2 and 3 lift off the page, as a multiple of the light geometry
+     — 1 by day, 1.4 by night. The dark scheme needs more travel because a near-black shadow
      on near-black paper carries almost no signal: it reads as offset and blur long
      before it reads as darkness, which is why alpha alone cannot do it (§2.4). */
   --shadow-lift: calc(1.2 - 0.2 * var(--palette-polarity));
@@ -266,7 +266,7 @@
 
 /*
  * Elevation utilities. A `@theme` `shadow-*` inlines its value (to leave room
- * for `--tw-shadow-color`), baking the Solar shadow and ignoring [data-color-scheme].
+ * for `--tw-shadow-color`), baking the light shadow and ignoring [data-color-scheme].
  * Hexly never recolours a shadow via utility, so we wrap the raw re-themable
  * token instead: `shadow-1` → `box-shadow: var(--shadow-1)` (ADR-0021).
  * `--shadow-focus` has no utility — it's composed only in scoped focus rings.

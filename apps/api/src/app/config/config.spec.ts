@@ -336,7 +336,7 @@ describe('loadConfig: the Inline Creation knobs (ADR-0073)', () => {
 
 describe('loadConfig: the Instance default Theme (ADR-0076, #372)', () => {
   /** An operator branding only their accent — the smallest useful default (#372). */
-  const ACCENT_YAML = "theme:\n  version: 1\n  solar:\n    accent: '#2f6f4f'\n  astral:\n    accent: '#7fd0a8'\n";
+  const ACCENT_YAML = "theme:\n  version: 2\n  light:\n    accent: '#2f6f4f'\n  dark:\n    accent: '#7fd0a8'\n";
 
   it('ships empty, so an untouched deployment carries no layer at all', () => {
     expect(loadConfig(dataDir(), PLUGINS).theme).toBeUndefined();
@@ -346,43 +346,44 @@ describe('loadConfig: the Instance default Theme (ADR-0076, #372)', () => {
   it('loads a partial default, canonicalising each value through the World Theme choke point', () => {
     const theme = loadConfig(dataDir(ACCENT_YAML), PLUGINS).theme;
 
-    expect(theme?.solar?.accent).toMatch(/^oklch\(/);
-    expect(theme?.astral?.accent).toMatch(/^oklch\(/);
+    expect(theme?.light?.accent).toMatch(/^oklch\(/);
+    expect(theme?.dark?.accent).toMatch(/^oklch\(/);
     // Silent about everything else, which is what lets the stylesheet answer for the rest.
-    expect(theme?.solar?.page).toBeUndefined();
+    expect(theme?.light?.page).toBeUndefined();
   });
 
   it('fails boot on a malformed value, naming the anchor rather than applying the rest', () => {
     // The acceptance criterion #372 is built around: a half-applied operator default is not a state
     // the Instance is allowed to reach.
-    const yaml = "theme:\n  version: 1\n  solar:\n    page: '#f1e5c7'\n    accent: 'url(https://evil.example/p.png)'\n";
+    const yaml = "theme:\n  version: 2\n  light:\n    page: '#f1e5c7'\n    accent: 'url(https://evil.example/p.png)'\n";
 
-    expect(() => loadConfig(dataDir(yaml), PLUGINS)).toThrow(/theme\.solar\.accent/);
+    expect(() => loadConfig(dataDir(yaml), PLUGINS)).toThrow(/theme\.light\.accent/);
   });
 
   it('fails boot on a misspelled key, which would otherwise brand nothing and say nothing', () => {
-    expect(() => loadConfig(dataDir("theme:\n  version: 1\n  solar:\n    acccent: '#2f6f4f'\n"), PLUGINS)).toThrow(
+    expect(() => loadConfig(dataDir("theme:\n  version: 2\n  light:\n    acccent: '#2f6f4f'\n"), PLUGINS)).toThrow(
       /acccent/,
     );
   });
 
   it('fails boot on a version this build does not know', () => {
     expect(() => loadConfig(dataDir('theme:\n  version: 9\n'), PLUGINS)).toThrow(/theme\.version/);
-    expect(() => loadConfig(dataDir("theme:\n  solar:\n    accent: '#2f6f4f'\n"), PLUGINS)).toThrow(/theme\.version/);
+    expect(() => loadConfig(dataDir("theme:\n  light:\n    accent: '#2f6f4f'\n"), PLUGINS)).toThrow(/theme\.version/);
   });
 
   it('reports every offending key at once, so one boot names the whole list', () => {
-    const yaml = "theme:\n  version: 1\n  solar:\n    accent: 'nope'\n  astral:\n    ink: 'also-nope'\n";
+    const yaml = "theme:\n  version: 2\n  light:\n    accent: 'nope'\n  dark:\n    ink: 'also-nope'\n";
 
-    expect(() => loadConfig(dataDir(yaml), PLUGINS)).toThrow(/theme\.solar\.accent[\s\S]*theme\.astral\.ink/);
+    expect(() => loadConfig(dataDir(yaml), PLUGINS)).toThrow(/theme\.light\.accent[\s\S]*theme\.dark\.ink/);
   });
 
   it("loads the README's worked example — every field of the block, exactly as documented", () => {
     // Documentation that would not boot is worse than none, so the README's example is a fixture.
+    // Ahead of it for the moment: the README still spells the pre-ADR-0077 keys and catches up in #387.
     const readme = [
       'theme:',
-      '  version: 1',
-      '  solar:',
+      '  version: 2',
+      '  light:',
       "    page: '#f4ece0'",
       "    ink: '#20242e'",
       "    inkQuiet: '#5c6472'",
@@ -394,30 +395,30 @@ describe('loadConfig: the Instance default Theme (ADR-0076, #372)', () => {
       '    polarity: 1',
       '    lineAlpha: 0.371',
       '    veil: 0.12',
-      '  astral:',
+      '  dark:',
       "    accent: '#7ad3a4'",
       '  radii:',
       '    --radius-md: 0px',
       '  fontPairing: codex',
       '  overrides:',
-      '    solar:',
+      '    light:',
       "      --color-ink: '#101010'",
       '',
     ].join('\n');
 
     const theme = loadConfig(dataDir(readme), PLUGINS).theme;
 
-    expect(theme?.solar?.polarity).toBe(1);
-    expect(theme?.astral?.accent).toMatch(/^oklch\(/);
+    expect(theme?.light?.polarity).toBe(1);
+    expect(theme?.dark?.accent).toMatch(/^oklch\(/);
     expect(theme?.fontPairing).toBe('codex');
   });
 
   it('carries the radii and the tier-2 opt-outs an Owner may also author', () => {
     const yaml =
-      "theme:\n  version: 1\n  radii:\n    --radius-md: 0px\n  overrides:\n    solar:\n      --color-ink: '#101010'\n";
+      "theme:\n  version: 2\n  radii:\n    --radius-md: 0px\n  overrides:\n    light:\n      --color-ink: '#101010'\n";
     const theme = loadConfig(dataDir(yaml), PLUGINS).theme;
 
     expect(theme?.radii?.['--radius-md']).toBe('0px');
-    expect(theme?.overrides?.solar?.['--color-ink']).toMatch(/^oklch\(/);
+    expect(theme?.overrides?.light?.['--color-ink']).toMatch(/^oklch\(/);
   });
 });

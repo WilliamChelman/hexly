@@ -38,7 +38,7 @@ function resolvedOnRoot(page: Page, name: string): Promise<string> {
 async function openThemeEditor(page: Page, worldSeg: string): Promise<void> {
   await page.goto(`/w/${worldSeg}/settings`);
   await page.getByTestId('settings-nav-theme').click();
-  await expect(page.getByTestId('theme-scheme-solar')).toBeVisible();
+  await expect(page.getByTestId('theme-scheme-light')).toBeVisible();
 }
 
 /** Save the draft and wait for the World the choke point canonicalised it onto. */
@@ -123,7 +123,7 @@ test('the editor renders a control per declared tier-1 token, for both ColorSche
   // Theme and a reader's ColorScheme are orthogonal (ADR-0006), and an Owner who can only reach the
   // scheme they are sitting in ships half a Theme. Nothing here names a control the manifest doesn't.
   for (const { field, type } of PALETTE_FIELDS) {
-    for (const scheme of ['solar', 'astral']) {
+    for (const scheme of ['light', 'dark']) {
       const control = page.getByTestId(`theme-control-${scheme}-${field}`);
       await expect(control, `${scheme} ${field}`).toBeVisible();
       // The control comes from the declared *type*: a colour gets a colour well, a knob a slider.
@@ -131,7 +131,7 @@ test('the editor renders a control per declared tier-1 token, for both ColorSche
     }
   }
 
-  await expect(page.getByTestId('theme-scheme-astral')).toBeVisible();
+  await expect(page.getByTestId('theme-scheme-dark')).toBeVisible();
 });
 
 test('editing a value re-themes the interface immediately, and saving it survives a reload', async ({ page }) => {
@@ -142,7 +142,7 @@ test('editing a value re-themes the interface immediately, and saving it survive
   const beforeAccent = await resolvedOnRoot(page, '--color-accent');
 
   // Not saved, not reloaded — the control moves and the document is repainted from it.
-  await page.getByTestId('theme-control-solar-accent').fill('#6a2ab0');
+  await page.getByTestId('theme-control-light-accent').fill('#6a2ab0');
 
   await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe('#6a2ab0');
   // Tier 2 derives from tier 1 (ADR-0075), so one anchor re-themes every role above it.
@@ -150,24 +150,24 @@ test('editing a value re-themes the interface immediately, and saving it survive
   // A draft is not the World's Theme: nothing is stored until it is saved.
   expect(await storedTheme(page, worldId)).toBeFalsy();
 
-  // Both halves in one sitting — the astral anchor is authored without toggling the reader's own scheme.
-  await page.getByTestId('theme-control-astral-accent').fill('#33cc88');
-  await page.getByTestId('theme-control-solar-veil').fill('0.4');
-  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'solar');
+  // Both halves in one sitting — the dark anchor is authored without toggling the reader's own scheme.
+  await page.getByTestId('theme-control-dark-accent').fill('#33cc88');
+  await page.getByTestId('theme-control-light-veil').fill('0.4');
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
 
   await saveTheme(page);
 
   const stored = await storedTheme(page, worldId);
   // Canonicalised at the write choke point (ADR-0076) — the notation the control sent stops mattering.
-  expect(stored.solar.accent).toMatch(/^oklch\(/);
-  expect(stored.astral.accent).toMatch(/^oklch\(/);
-  expect(stored.solar.veil).toBe(0.4);
+  expect(stored.light.accent).toMatch(/^oklch\(/);
+  expect(stored.dark.accent).toMatch(/^oklch\(/);
+  expect(stored.light.veil).toBe(0.4);
 
   await page.reload();
-  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(stored.solar.accent);
+  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(stored.light.accent);
   // And the editor reopens on what stored, not on the Hexly default.
   await openThemeEditor(page, worldSeg);
-  await expect(page.getByTestId('theme-control-solar-veil')).toHaveValue('0.4');
+  await expect(page.getByTestId('theme-control-light-veil')).toHaveValue('0.4');
 });
 
 test('cancelling puts the saved Theme back, and reset then saved returns the World to the Hexly default', async ({
@@ -177,15 +177,15 @@ test('cancelling puts the saved Theme back, and reset then saved returns the Wor
   const worldId = idFromSegment(worldSeg);
   await openThemeEditor(page, worldSeg);
 
-  await page.getByTestId('theme-control-solar-accent').fill('#6a2ab0');
+  await page.getByTestId('theme-control-light-accent').fill('#6a2ab0');
   await saveTheme(page);
   const saved = await storedTheme(page, worldId);
 
   // A failed experiment costs nothing: cancel drops the draft and the saved Theme paints again.
-  await page.getByTestId('theme-control-solar-accent').fill('#118844');
+  await page.getByTestId('theme-control-light-accent').fill('#118844');
   await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe('#118844');
   await page.getByTestId('theme-discard').click();
-  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(saved.solar.accent);
+  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(saved.light.accent);
 
   // Reset stages the Hexly default — it previews at once, and saving is what returns the World to it.
   await page.getByTestId('theme-reset').click();
@@ -307,7 +307,7 @@ test('a Theme edit changes nothing about what Entities contain or who can read t
   const before = await (await request.get(`/api/worlds/${worldId}/graph`)).json();
 
   await openThemeEditor(page, worldSeg);
-  await page.getByTestId('theme-control-solar-accent').fill('#6a2ab0');
+  await page.getByTestId('theme-control-light-accent').fill('#6a2ab0');
   await saveTheme(page);
 
   const after = await (await request.get(`/api/worlds/${worldId}/graph`)).json();
@@ -352,27 +352,27 @@ test('the readability report covers the ColorScheme the author is not looking at
   const worldSeg = await enterLibrary(page);
   const worldId = idFromSegment(worldSeg);
   await openThemeEditor(page, worldSeg);
-  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'solar');
-  await expect(page.locator('[data-testid^="theme-warning-astral"]')).toHaveCount(0);
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
+  await expect(page.locator('[data-testid^="theme-warning-dark"]')).toHaveCount(0);
 
-  // Astral ink a shade off the Astral page — illegible, in the half of the Theme nobody is looking at.
-  await page.getByTestId('theme-control-astral-ink').fill('#12142a');
+  // Dark ink a shade off the dark page — illegible, in the half of the Theme nobody is looking at.
+  await page.getByTestId('theme-control-dark-ink').fill('#12142a');
 
-  const astral = page.getByTestId('theme-warning-astral-contrast-ink-bg');
-  await expect(astral).toBeVisible();
+  const dark = page.getByTestId('theme-warning-dark-contrast-ink-bg');
+  await expect(dark).toBeVisible();
   // The ratio is shown, so an Owner judges rather than guesses (ADR-0076).
-  await expect(astral).toHaveText(/\d+\.\d\d:1/);
-  await expect(page.getByTestId('theme-warning-astral-contrast-ink-surface')).toBeVisible();
-  // The reader is in Solar and Solar's ink has not moved, so the warning cannot be the active Palette's
+  await expect(dark).toHaveText(/\d+\.\d\d:1/);
+  await expect(page.getByTestId('theme-warning-dark-contrast-ink-surface')).toBeVisible();
+  // The reader is in light and the light ink has not moved, so the warning cannot be the active Palette's
   // wearing the other one's name. That is the assertion the whole feature turns on.
-  await expect(page.getByTestId('theme-warning-solar-contrast-ink-bg')).toHaveCount(0);
-  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'solar');
+  await expect(page.getByTestId('theme-warning-light-contrast-ink-bg')).toHaveCount(0);
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
 
-  // And the mirror image: put Astral back, break Solar, and the two reports swap over.
-  await page.getByTestId('theme-control-astral-ink').fill('#ece3cf');
-  await page.getByTestId('theme-control-solar-ink').fill('#efe4c8');
-  await expect(page.getByTestId('theme-warning-solar-contrast-ink-bg')).toBeVisible();
-  await expect(page.getByTestId('theme-warning-astral-contrast-ink-bg')).toHaveCount(0);
+  // And the mirror image: put dark back, break light, and the two reports swap over.
+  await page.getByTestId('theme-control-dark-ink').fill('#ece3cf');
+  await page.getByTestId('theme-control-light-ink').fill('#efe4c8');
+  await expect(page.getByTestId('theme-warning-light-contrast-ink-bg')).toBeVisible();
+  await expect(page.getByTestId('theme-warning-dark-contrast-ink-bg')).toHaveCount(0);
 
   // Warn, never block: a deliberately oppressive Palette in a horror World is a legitimate choice, and
   // a block just gets routed around by overriding a different token (ADR-0076).
@@ -390,24 +390,24 @@ test('a mid-tone accent and a tone rotated into a status colour each get their o
 
   // `contrast-color()` answers black or white and nothing between, so a mid-tone accent is one no
   // automatic foreground rescues — CSS cannot resolve it, and only reading it back makes it visible.
-  await page.getByTestId('theme-control-solar-accent').fill('#bb00ff');
-  await expect(page.getByTestId('theme-warning-solar-midtone')).toBeVisible();
+  await page.getByTestId('theme-control-light-accent').fill('#bb00ff');
+  await expect(page.getByTestId('theme-warning-light-midtone')).toBeVisible();
 
   // Re-anchoring the accent rotates all eight categorical tones with it, so the exclusion the check
   // computes against Hexly's accent stops holding for theirs: at this hue tone 6 lands on success,
   // ΔE00 5.6 against a bar of 10 (ADR-0075).
-  await page.getByTestId('theme-control-solar-accent').fill('#0099cc');
-  await expect(page.getByTestId('theme-warning-solar-midtone')).toHaveCount(0);
-  await expect(page.getByTestId('theme-warning-solar-tone-6-success')).toBeVisible();
+  await page.getByTestId('theme-control-light-accent').fill('#0099cc');
+  await expect(page.getByTestId('theme-warning-light-midtone')).toHaveCount(0);
+  await expect(page.getByTestId('theme-warning-light-tone-6-success')).toBeVisible();
 
   // On-colours flip silently and with no control of their own: the Owner moved the accent, and the
   // foreground that sits on it went the other way (ADR-0076).
-  await expect(page.getByTestId('theme-control-solar-onFill')).toHaveCount(0);
-  await page.getByTestId('theme-control-solar-accent').fill('#f5e6b0');
+  await expect(page.getByTestId('theme-control-light-onFill')).toHaveCount(0);
+  await page.getByTestId('theme-control-light-accent').fill('#f5e6b0');
   await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe('#f5e6b0');
   expect(await brightnessOnRoot(page, '--color-on-fill')).toBeLessThan(200);
 
-  await page.getByTestId('theme-control-solar-accent').fill('#241a05');
+  await page.getByTestId('theme-control-light-accent').fill('#241a05');
   await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe('#241a05');
   expect(await brightnessOnRoot(page, '--color-on-fill')).toBeGreaterThan(600);
   // Nothing is saved here, so nothing needs handing back: leaving the editor is a cancel (#371).
@@ -434,9 +434,9 @@ const SOURCE_PALETTE = {
  * imports this process must not pull in (see `fixtures.ts`).
  */
 const SOURCE_THEME = {
-  version: 1,
-  solar: SOURCE_PALETTE,
-  astral: { ...SOURCE_PALETTE, polarity: -1 },
+  version: 2,
+  light: SOURCE_PALETTE,
+  dark: { ...SOURCE_PALETTE, polarity: -1 },
   radii: {
     '--radius-sm': '0px',
     '--radius-md': '0px',
@@ -484,7 +484,7 @@ test('an Owner copies another World’s Theme in, keeps editing it, and the sour
 
   // Staged, not applied (#376): the whole contract previews at once — the corner set as much as the
   // anchors — and *nothing is stored*, so an Owner judges the copy in place before committing to it.
-  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(source.solar.accent);
+  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(source.light.accent);
   await expect.poll(() => inlineOnRoot(page, '--radius-md')).toBe('0px');
   expect(await storedTheme(page, worldId)).toBeFalsy();
 
@@ -495,21 +495,21 @@ test('an Owner copies another World’s Theme in, keeps editing it, and the sour
 
   // Copy again, then edit the copy before saving — it is this World's own draft, not a reference.
   await page.getByTestId('theme-copy').click();
-  await page.getByTestId('theme-control-solar-ink').fill('#112233');
+  await page.getByTestId('theme-control-light-ink').fill('#112233');
   await saveTheme(page);
 
   const copied = await storedTheme(page, worldId);
-  expect(copied.solar.accent).toBe(source.solar.accent);
-  expect(copied.astral.polarity).toBe(-1);
+  expect(copied.light.accent).toBe(source.light.accent);
+  expect(copied.dark.polarity).toBe(-1);
   expect(copied.radii['--radius-md']).toBe('0px');
   // The edit rode the same save, through the same PATCH choke point as any other Theme write.
-  expect(copied.solar.ink).not.toBe(source.solar.ink);
+  expect(copied.light.ink).not.toBe(source.light.ink);
 
   // A duplicate, not a link (ADR-0076): re-theming the source afterwards leaves the copy alone.
   expect(
     (
       await request.patch(`/api/worlds/${sourceId}`, {
-        data: { theme: { ...SOURCE_THEME, solar: { ...SOURCE_PALETTE, accent: '#0a7d55' } } },
+        data: { theme: { ...SOURCE_THEME, light: { ...SOURCE_PALETTE, accent: '#0a7d55' } } },
       })
     ).ok(),
   ).toBeTruthy();
@@ -517,7 +517,7 @@ test('an Owner copies another World’s Theme in, keeps editing it, and the sour
   await page.reload();
   expect(await storedTheme(page, worldId)).toEqual(copied);
   // And what renders is still the copy's accent, not the source's new one.
-  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(copied.solar.accent);
+  await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(copied.light.accent);
 
   await clearTheme(page.request, worldId);
   await clearTheme(page.request, sourceId);

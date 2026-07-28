@@ -67,11 +67,11 @@ describe('Auth endpoints', () => {
     // A later partial write must not clobber the earlier pref: PATCH merges.
     const patched = await agent
       .patch('/auth/me/preferences')
-      .send({ colorScheme: 'astral', formatLocale: 'en-GB' })
+      .send({ colorScheme: 'dark', formatLocale: 'en-GB' })
       .expect(200);
     expect(patched.body).toEqual({
       locale: 'fr',
-      colorScheme: 'astral',
+      colorScheme: 'dark',
       formatLocale: 'en-GB',
     });
 
@@ -79,7 +79,7 @@ describe('Auth endpoints', () => {
     const me = await agent.get('/auth/me').expect(200);
     expect(me.body.preferences).toEqual({
       locale: 'fr',
-      colorScheme: 'astral',
+      colorScheme: 'dark',
       formatLocale: 'en-GB',
     });
   });
