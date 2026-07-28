@@ -13,12 +13,12 @@ import { WorldsPage } from './worlds.page';
 
 /** The Types the import dialog offers — one ordinary, one System-managed the system alone assigns (ADR-0068). */
 const TYPES: TypeDefinition[] = [
-  { id: 'core.type.note', icon: 'note', graphColorToken: '--color-gold', labelText: 'Note', views: [] },
-  { id: 'world.type.rumour', icon: 'note', graphColorToken: '--color-gold', labelText: 'Rumour', views: [] },
+  { id: 'core.type.note', icon: 'note', graphColorToken: '--color-accent', labelText: 'Note', views: [] },
+  { id: 'world.type.rumour', icon: 'note', graphColorToken: '--color-accent', labelText: 'Rumour', views: [] },
   {
     id: 'core.type.asset',
     icon: 'note',
-    graphColorToken: '--color-gold',
+    graphColorToken: '--color-accent',
     labelText: 'Asset',
     views: [],
     systemManaged: true,

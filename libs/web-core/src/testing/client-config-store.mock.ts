@@ -1,5 +1,5 @@
 import { Signal, signal } from '@angular/core';
-import { DeploymentProfile } from '@hexly/domain';
+import { DeploymentProfile, InstanceTheme } from '@hexly/domain';
 import { ClientConfigStore } from '../services/client-config.store';
 
 /** What a spec drives on the fake store; anything omitted keeps the real store's fall-open answer. */
@@ -10,6 +10,7 @@ export interface ClientConfigOverrides {
   readonly inlineTag?: Signal<string | undefined>;
   readonly collaboration?: Signal<boolean>;
   readonly profile?: Signal<DeploymentProfile>;
+  readonly instanceTheme?: Signal<InstanceTheme | null>;
 }
 
 /**
@@ -32,6 +33,7 @@ export function mockClientConfigStore(overrides: ClientConfigOverrides = {}): Cl
     isPluginEnabled: (id: string) => !overrides.enabledPlugins || enabled().has(id),
     isCollaborationEnabled: () => collaboration(),
     isDesktopProfile: () => profile() === 'desktop',
+    instanceTheme: overrides.instanceTheme ?? signal(null),
     init: async () => undefined,
   } as unknown as ClientConfigStore;
 }

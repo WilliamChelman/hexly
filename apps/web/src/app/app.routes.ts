@@ -87,7 +87,9 @@ export const appRoutes: Route[] = [
         pathMatch: 'full',
         loadComponent: () =>
           import('./pages/world/pages/world-settings/world-settings.page').then((m) => m.WorldSettingsPage),
-        title: 'collab.owners.tabTitle',
+        // The page names its open section into `tabTitleNamed`; `title` is the fallback until it does.
+        title: 'worldSettings.tabTitle',
+        data: { documentTitleKey: 'worldSettings.tabTitleNamed' },
       },
       {
         path: 'entities',

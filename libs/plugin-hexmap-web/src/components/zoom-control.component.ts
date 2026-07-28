@@ -44,7 +44,7 @@ import { IconComponent } from '@hexly/web-ui';
         color var(--dur-fast) var(--ease-out);
     }
     .zbtn:hover {
-      @apply bg-gold-soft text-gold;
+      @apply bg-accent-soft text-accent;
     }
     .lvl {
       @apply min-w-[3.4em] text-center font-mono text-2xs tracking-[0.02em] text-ink;

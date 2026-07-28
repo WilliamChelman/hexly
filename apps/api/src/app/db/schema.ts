@@ -1,4 +1,4 @@
-import { EdgeTargetKind, FieldSchema, ViewPlacement } from '@hexly/domain';
+import { EdgeTargetKind, FieldSchema, ViewPlacement, WorldTheme } from '@hexly/domain';
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 // Keep in sync by hand with the `CREATE TABLE` DDL in `./db.ts`; column changes
@@ -143,6 +143,9 @@ export const worlds = sqliteTable('worlds', {
   // set per World. References, not enforced FKs — stale or inaccessible ids are
   // filtered per-viewer on read, never pruned on delete.
   pinnedEntityIds: text('pinned_entity_ids', { mode: 'json' }).$type<string[]>().notNull().default([]),
+  // The Owner-authored World Theme (ADR-0076), stored inline and patched wholesale like the pins.
+  // Every value reached this column re-serialised from its own parse; NULL is no Theme.
+  theme: text('theme', { mode: 'json' }).$type<WorldTheme>(),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

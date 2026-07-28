@@ -7,6 +7,7 @@ import { WorldDetail } from '@hexly/domain';
 import { WorldsClient } from './worlds.client';
 import { EVICTED } from './live-follow';
 import { ToasterService } from './toaster.service';
+import { WorldThemeApplier } from './world-theme.applier';
 import { healWorldSegment, idFromSegment } from '../utils/pretty-id';
 
 /**
@@ -21,6 +22,7 @@ export class ActiveWorld {
   private readonly worlds = inject(WorldsClient);
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
+  private readonly theme = inject(WorldThemeApplier);
   private readonly transloco = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly _world = signal<WorldDetail | null>(null);
@@ -72,6 +74,9 @@ export class ActiveWorld {
     if (_worldId !== this._worldId()) {
       this._worldId.set(_worldId);
     }
+    // Where a Theme becomes authoritative (ADR-0076), the live-follow refetch a Theme edit triggers
+    // included. Without a Detail it is unknown rather than absent, so the applier keeps what it cached.
+    this.theme.scope(_worldId === null ? null : { worldId: _worldId }, detail ? (detail.theme ?? null) : undefined);
   }
 
   /**
@@ -101,6 +106,9 @@ export const activeWorldGuard: CanActivateFn = (route, state) => {
   const worldId = idFromSegment(route.paramMap.get('worldId') ?? '');
   const active = inject(ActiveWorld);
   const router = inject(Router);
+  // The World scope resolves before its Detail does, so the Theme this reader last saw for it lands
+  // now — a hop between Worlds must not wear the previous one's while the fetch runs (ADR-0076).
+  inject(WorldThemeApplier).scope({ worldId });
 
   const proceed = (world: WorldDetail | null) => {
     active.set(world, worldId);

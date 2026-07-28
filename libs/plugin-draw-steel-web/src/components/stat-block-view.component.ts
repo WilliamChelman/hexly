@@ -98,7 +98,7 @@ import { dsIcon } from '../ds-glyphs';
           </div>
         } @else {
           <p
-            class="m-0 text-xs font-semibold uppercase tracking-[0.35em] text-gold-deep"
+            class="m-0 text-xs font-semibold uppercase tracking-[0.35em] text-accent-strong"
             data-testid="stat-block-identity"
           >
             {{ 'drawSteel.statBlock.stat.level' | transloco }} {{ display('level') }}
@@ -131,7 +131,7 @@ import { dsIcon } from '../ds-glyphs';
             }
           </div>
           <div
-            class="shrink-0 rounded border border-gold/40 bg-gold-soft px-2.5 py-1 text-center leading-none text-gold-deep"
+            class="shrink-0 rounded-sm border border-accent/40 bg-accent-soft px-2.5 py-1 text-center leading-none text-accent-strong"
           >
             <div class="text-2xs font-bold uppercase tracking-widest">
               {{ 'drawSteel.statBlock.stat.ev' | transloco }}
@@ -176,7 +176,9 @@ import { dsIcon } from '../ds-glyphs';
           <dl class="m-0 divide-y divide-line border-y border-line text-sm">
             @for (row of railRows(); track row.key) {
               <div class="flex items-center justify-between gap-3 py-1.5" [attr.data-testid]="'stat-' + row.key">
-                <dt class="flex shrink-0 items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-sea">
+                <dt
+                  class="flex shrink-0 items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-tone-1"
+                >
                   <app-icon [name]="row.icon" [size]="14" class="text-ink-muted" />
                   {{ row.labelKey | transloco }}
                 </dt>
@@ -207,7 +209,7 @@ import { dsIcon } from '../ds-glyphs';
           <div class="grid grid-cols-5 gap-1 rounded-md border border-line bg-surface-sunken p-2 text-center">
             @for (key of characteristicKeys; track key) {
               <div class="flex flex-col items-center gap-0.5" [attr.data-testid]="'stat-' + key">
-                <app-icon [name]="charIcon(key)" class="text-2xl text-sea" [label]="abbreviation(key)" />
+                <app-icon [name]="charIcon(key)" class="text-2xl text-tone-1" [label]="abbreviation(key)" />
                 @if (edit()) {
                   <ds-stat-slot
                     [field]="field(key)"
@@ -230,7 +232,7 @@ import { dsIcon } from '../ds-glyphs';
             <dl class="m-0 space-y-2 text-sm">
               @for (mapKey of damageSectionKeys; track mapKey) {
                 <div [attr.data-testid]="'section-' + mapKey">
-                  <dt class="font-semibold text-sea">{{ 'drawSteel.statBlock.section.' + mapKey | transloco }}</dt>
+                  <dt class="font-semibold text-tone-1">{{ 'drawSteel.statBlock.section.' + mapKey | transloco }}</dt>
                   <dd class="m-0 mt-1 text-ink">
                     <ds-damage-map
                       [mapKey]="mapKey"
@@ -246,7 +248,7 @@ import { dsIcon } from '../ds-glyphs';
           } @else if (damageEntries('immunities').length || damageEntries('weaknesses').length) {
             <div class="flex flex-wrap gap-1.5">
               @for (imm of damageEntries('immunities'); track imm.type) {
-                <span class="inline-flex items-center gap-1 rounded-full bg-positive-soft px-2.5 py-1 text-positive">
+                <span class="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-1 text-success">
                   <app-icon name="ds-immunity" [size]="12" />
                   <span class="text-2xs font-bold uppercase tracking-wider">{{
                     'drawSteel.statBlock.damage.' + imm.type | transloco
@@ -255,7 +257,7 @@ import { dsIcon } from '../ds-glyphs';
                 </span>
               }
               @for (weak of damageEntries('weaknesses'); track weak.type) {
-                <span class="inline-flex items-center gap-1 rounded-full bg-ember-soft px-2.5 py-1 text-ember">
+                <span class="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2.5 py-1 text-danger">
                   <app-icon name="ds-weakness" [size]="12" />
                   <span class="text-2xs font-bold uppercase tracking-wider">{{
                     'drawSteel.statBlock.damage.' + weak.type | transloco

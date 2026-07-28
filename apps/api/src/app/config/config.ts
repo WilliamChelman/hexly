@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DeploymentProfile, PluginConfig, PluginConfigSchema } from '@hexly/domain';
+import { DeploymentProfile, InstanceTheme, instanceThemeSchema, PluginConfig, PluginConfigSchema } from '@hexly/domain';
 import { parse as parseYaml } from 'yaml';
 import * as z from 'zod';
 
@@ -165,6 +165,10 @@ function buildConfigSchema(plugins: readonly PluginConfigContribution[]) {
         inlineTag: z.string().min(1).optional(),
       })
       .prefault({}),
+    // The Instance operator's default Theme (ADR-0076, #372): the chain's first layer, same anchors
+    // and same manifest as a World Owner's, different source. Absent by default — and absent, not
+    // empty, so nothing is written on the root for a deployment that never set one.
+    theme: instanceThemeSchema.optional(),
   });
 }
 
@@ -219,6 +223,11 @@ export interface HexlyConfig {
     /** The Tag applied to everything created inline (ADR-0073); absent unless the operator names one. */
     inlineTag?: string;
   };
+  /**
+   * The deployment's own branding (ADR-0076, #372): the resolution chain's first layer, beneath every
+   * World's own Theme. Absent unless the operator authored one, which is what "ships empty" means.
+   */
+  theme?: InstanceTheme;
 }
 
 /** Sizes are already validated by the schema, so `parseSize` cannot throw here. */
@@ -243,6 +252,7 @@ function processConfig(raw: HexlyConfigRaw, pins: DeploymentPins): HexlyConfig {
       inlineType: raw.entities.inlineType,
       inlineTag: raw.entities.inlineTag,
     },
+    theme: raw.theme,
   };
 }
 
@@ -263,8 +273,19 @@ export function loadConfig(
   pins: DeploymentPins = {},
 ): HexlyConfig {
   const text = readConfigText(instanceDir);
-  const raw = buildConfigSchema(plugins).parse((text === undefined ? undefined : parseYaml(text)) ?? {});
+  const raw = parseConfig(buildConfigSchema(plugins), (text === undefined ? undefined : parseYaml(text)) ?? {});
   return processConfig(raw, pins);
+}
+
+/**
+ * Parse the file, or fail boot naming the offending keys (ADR-0036). *Every* key, not the first: an
+ * Instance default Theme is refused whole rather than applied half-way (#372).
+ */
+function parseConfig<T extends z.ZodType>(schema: T, value: unknown): z.infer<T> {
+  const result = schema.safeParse(value);
+  if (result.success) return result.data;
+  const keys = result.error.issues.map((issue) => `  ${issue.path.join('.') || '(root)'}: ${issue.message}`);
+  throw new Error(`hexly.yml is invalid:\n${keys.join('\n')}`);
 }
 
 function readConfigText(instanceDir: string): string | undefined {

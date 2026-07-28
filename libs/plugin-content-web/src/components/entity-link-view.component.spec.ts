@@ -113,7 +113,7 @@ describe('EntityLinkView', () => {
       expect(link.tagName).toBe('SPAN');
       // Unfinished, not broken: tinted and dashed, and carrying the shared pill shape.
       expect(link.classList.contains('decoration-dashed')).toBe(true);
-      expect(link.classList.contains('rounded')).toBe(true);
+      expect(link.classList.contains('rounded-sm')).toBe(true);
     });
 
     it('stays distinct from a dangling link, whose target went away', () => {
@@ -127,7 +127,7 @@ describe('EntityLinkView', () => {
       // Muted and italic, never the unresolved dash — the two tones must stay apart.
       expect(link.classList.contains('italic')).toBe(true);
       expect(link.classList.contains('decoration-dashed')).toBe(false);
-      expect(link.classList.contains('rounded')).toBe(true);
+      expect(link.classList.contains('rounded-sm')).toBe(true);
     });
 
     it('keeps the `[[Target|display]]` override', () => {
@@ -202,8 +202,8 @@ describe('EntityLinkView', () => {
       const badge = fixture.nativeElement.querySelector('[data-testid=link-descriptor]');
       expect(badge.textContent).toContain('hunts');
       // The badge follows the pill, so all three states stay tellable apart (ADR-0021 utilities).
-      expect(badge.classList.contains('bg-astra')).toBe(true);
-      expect(badge.classList.contains('bg-gold')).toBe(false);
+      expect(badge.classList.contains('bg-tone-5')).toBe(true);
+      expect(badge.classList.contains('bg-accent')).toBe(false);
       expect(badge.classList.contains('bg-ink-muted')).toBe(false);
     });
   });

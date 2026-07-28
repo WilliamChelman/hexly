@@ -51,7 +51,7 @@ import {
   template: `
     <app-page-header sticky>
       <div pageHeaderTitle class="flex flex-col">
-        <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'worldGraph.eyebrow' | transloco }}</span>
+        <span appEyebrow class="text-accent-strong! tracking-[0.28em]">{{ 'worldGraph.eyebrow' | transloco }}</span>
         <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
           {{ worldName() }}
         </h1>

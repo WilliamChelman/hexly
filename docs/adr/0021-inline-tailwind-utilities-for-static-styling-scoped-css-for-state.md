@@ -62,7 +62,7 @@ state or share a property with the converted ones.
 - **Simple pseudo-state → a Tailwind variant.** A rule whose only "state" is a
   pseudo-class (`:hover`, `:focus`, `:focus-visible`, `:active`, `:disabled`,
   `:enabled`) and whose properties all map 1:1 becomes a variant utility on the
-  element (`hover:bg-gold-soft`, `disabled:opacity-50`). State is _not_ a reason
+  element (`hover:bg-accent-soft`, `disabled:opacity-50`). State is _not_ a reason
   to stay scoped on its own — the question is always whether the properties
   translate.
 - **Off-scale and math values → an arbitrary-value utility.** A static value
@@ -111,17 +111,17 @@ var(--shadow-1); }`. Call sites keep the clean `shadow-1` name, a single rule
     1. **An attribute the element already exposes for a11y** + a Tailwind
        attribute variant. The selected region row carries
        `[attr.aria-current]`, so its state is just
-       `aria-[current=true]:bg-gold-soft …` — the variant's attribute selector
+       `aria-[current=true]:bg-accent-soft …` — the variant's attribute selector
        out-specifies the base utility, so there's no conflict and the a11y
        attribute and the visual stay in sync by construction.
-    2. **Angular conditional class bindings** (`[class.bg-gold-soft]="active()"`)
+    2. **Angular conditional class bindings** (`[class.bg-accent-soft]="active()"`)
        — the default for a binary state. Toggle base and active utilities as
        _mutually exclusive_ pairs (`[class.bg-transparent]="!active()"`) so two
        conflicting utilities are never simultaneously applied.
     3. **An `[ngClass]` map for a one-of-N variant** — when an element selects a
        single utility from several keyed off one discriminant (the toaster's
-       left-border colour per `toast.tone`: error → `border-l-ember`, success →
-       `border-l-terrain-forest`, info → `border-l-gold-strong`), an `[ngClass]`
+       left-border colour per `toast.tone`: error → `border-l-danger`, success →
+       `border-l-terrain-forest`, info → `border-l-accent-strong`), an `[ngClass]`
        object reads more cleanly than three `[class.…]` pairs each restating the
        negation. Reach for it only past two or three mutually-exclusive
        utilities; a binary state stays a `[class.…]` pair, so `[ngClass]` stays
@@ -150,7 +150,7 @@ var(--shadow-1); }`. Call sites keep the clean `shadow-1` name, a single rule
     `background-clip`, `font: inherit`). Two cases are _not_ here — both convert
     to utilities (above): a self-contained `min()`/`calc()` over fixed values,
     and a **simple two-stop linear/conic gradient whose stops are theme
-    colours** (`bg-linear-[140deg] from-gold to-gold-strong`, which resolves to
+    colours** (`bg-linear-[140deg] from-accent to-accent-strong`, which resolves to
     the same `var(--color-*)` stops and re-themes). A `radial-gradient` with
     sized/positioned stops (the map canvas's washes) stays scoped.
 - **Split a mixed rule only when the two halves set different properties.** When

@@ -31,7 +31,7 @@ const IMAGE_KIND_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILT
         <div class="flex items-center gap-2">
           @if (currentThumb(); as thumb) {
             <img
-              class="h-12 w-12 shrink-0 rounded border border-line object-cover"
+              class="h-12 w-12 shrink-0 rounded-sm border border-line object-cover"
               data-testid="asset-link-preview"
               [src]="thumb"
               alt=""
@@ -39,7 +39,7 @@ const IMAGE_KIND_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILT
           } @else {
             <!-- No resolvable thumbnail (dangling, non-image, or not yet loaded): a neutral placeholder tile. -->
             <div
-              class="h-12 w-12 shrink-0 rounded border border-line bg-surface-sunken"
+              class="h-12 w-12 shrink-0 rounded-sm border border-line bg-surface-sunken"
               data-testid="asset-link-placeholder"
             ></div>
           }
@@ -59,7 +59,7 @@ const IMAGE_KIND_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILT
 
       @if (!disabled()) {
         @if (picking()) {
-          <div class="flex flex-col gap-2 rounded border border-line bg-surface p-2">
+          <div class="flex flex-col gap-2 rounded-md border border-line bg-surface p-2">
             <!-- Upload: mint (or dedup to) a new image Asset in place; its wrapper's id becomes the link. -->
             <label class="text-xs text-ink-muted" for="asset-link-upload">{{
               'fields.assetLink.upload' | transloco
@@ -85,7 +85,7 @@ const IMAGE_KIND_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILT
             <!-- Pick: search over the World's image Assets, rendered as preview tiles (picked by sight). -->
             <input
               type="search"
-              class="w-full rounded border border-line bg-surface-sunken px-2 py-1 text-sm"
+              class="w-full rounded-md border border-line bg-surface-sunken px-2 py-1 text-sm"
               data-testid="asset-link-search"
               [attr.placeholder]="'fields.assetLink.search' | transloco"
               [value]="query()"
@@ -97,7 +97,7 @@ const IMAGE_KIND_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILT
                   <button
                     type="button"
                     role="listitem"
-                    class="aspect-square overflow-hidden rounded border border-line bg-surface-sunken hover:border-gold focus-visible:border-gold outline-none"
+                    class="aspect-square overflow-hidden rounded-sm border border-line bg-surface-sunken hover:border-accent focus-visible:border-accent outline-none"
                     [title]="asset.name"
                     [attr.aria-label]="asset.name"
                     [attr.data-testid]="'asset-link-option-' + asset.id"
@@ -116,7 +116,7 @@ const IMAGE_KIND_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILT
         } @else {
           <button
             type="button"
-            class="self-start rounded border border-line bg-surface px-2 py-1 text-sm text-ink-muted hover:text-ink"
+            class="self-start rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink-muted hover:text-ink"
             data-testid="asset-link-open"
             [attr.aria-invalid]="invalid() || null"
             (click)="picking.set(true)"

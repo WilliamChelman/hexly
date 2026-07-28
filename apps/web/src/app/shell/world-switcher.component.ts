@@ -39,20 +39,20 @@ import {
       class="group flex items-center gap-2 w-full rounded-md text-left cursor-pointer outline-none transition-colors"
       [class]="
         expanded()
-          ? 'px-2 py-2 bg-surface-sunken border border-line hover:border-gold focus:border-gold'
+          ? 'px-2 py-2 bg-surface-sunken border border-line hover:border-accent focus:border-accent'
           : 'justify-center p-0 bg-transparent border-0'
       "
       [title]="activeName() ?? ('worlds.switcher' | transloco)"
       [attr.aria-label]="'worlds.switcherLabel' | transloco"
       [appMenuTrigger]="menu"
     >
-      <!-- A square gilt tile with a gold ring marks the active World. Its shape
+      <!-- A square gilt tile with an accent ring marks the active World. Its shape
            (against the round personal avatar in the rail foot) is what keeps the
            crest from reading as a second copy of the user menu. -->
       <span
         data-testid="switcher-initial"
-        class="grid place-items-center shrink-0 rounded-md font-mono text-2xs text-gold bg-surface-sunken border border-gold ring-2 ring-gold/30 [box-shadow:0_0_10px_-2px_var(--color-glow)] transition-colors"
-        [class]="expanded() ? 'size-7' : 'size-6 group-hover:bg-gold-soft group-hover:ring-gold/60'"
+        class="grid place-items-center shrink-0 rounded-md font-mono text-2xs text-accent-strong bg-surface-sunken border border-accent ring-2 ring-accent/30 [box-shadow:0_0_10px_-2px_var(--color-accent-glow)] transition-colors"
+        [class]="expanded() ? 'size-7' : 'size-6 group-hover:bg-accent-soft group-hover:ring-accent/60'"
         aria-hidden="true"
         >{{ initial() }}</span
       >

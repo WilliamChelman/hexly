@@ -26,7 +26,7 @@ import { HexMapStore } from '../services/hexmap-store';
     @for (region of store.regions(); track region.id) {
       <button
         type="button"
-        class="flex items-center gap-3 w-full py-2 px-3 text-sm text-ink bg-transparent border border-transparent rounded-md cursor-pointer text-left hover:bg-gold-soft aria-[current=true]:bg-gold-soft aria-[current=true]:border-gold aria-[current=true]:text-ink-strong"
+        class="flex items-center gap-3 w-full py-2 px-3 text-sm text-ink bg-transparent border border-transparent rounded-md cursor-pointer text-left hover:bg-accent-soft aria-[current=true]:bg-accent-soft aria-[current=true]:border-accent aria-[current=true]:text-ink-strong"
         data-testid="region-item"
         [attr.aria-current]="isRegionSelected(region.id) ? 'true' : null"
         (click)="store.selectRegion(region.id)"
@@ -45,7 +45,7 @@ import { HexMapStore } from '../services/hexmap-store';
       </p>
     }
   `,
-  // Scoped chrome (ADR-0007): a gold-ringed swatch that brightens to a soft
+  // Scoped chrome (ADR-0007): an accent-ringed swatch that brightens to a soft
   // glow on the selected Region.
   styles: `
     [appSwatch] {
@@ -56,7 +56,7 @@ import { HexMapStore } from '../services/hexmap-store';
     [aria-current='true'] [appSwatch] {
       box-shadow:
         var(--shadow-inset),
-        0 0 0 1px var(--color-gold),
+        0 0 0 1px var(--color-accent),
         0 0 11px -1px currentColor;
     }
   `,

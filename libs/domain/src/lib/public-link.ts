@@ -6,6 +6,7 @@
  */
 
 import { EntitySummary } from './entity';
+import { WorldTheme } from './world-theme';
 
 /**
  * A minted Public Link — just its token (the client composes the shareable URL).
@@ -23,4 +24,9 @@ export interface PublicWorldView {
   readonly worldId: string;
   readonly worldName: string;
   readonly entities: readonly EntitySummary[];
+  /**
+   * The World Theme (ADR-0076), absent when the World carries none. Served here because the visitor
+   * has no account to resolve one through, so holding the link is enough to read it.
+   */
+  readonly theme?: WorldTheme;
 }

@@ -2,6 +2,7 @@ import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
+import { terrainSet } from '@hexly/plugin-hexmap';
 import { StyleguidePage } from './styleguide.page';
 
 describe('Styleguide', () => {
@@ -28,8 +29,8 @@ describe('Styleguide', () => {
     switchTo(fixture, 'fr');
 
     const guide = el.querySelector('.guide-top') as HTMLElement;
-    expect(guide.textContent).toContain('Retour à la carte');
-    expect(guide.textContent).not.toContain('Back to map');
+    expect(guide.textContent).toContain('Retour aux mondes');
+    expect(guide.textContent).not.toContain('Back to worlds');
 
     const hero = el.querySelector('.hero') as HTMLElement;
     expect(hero.textContent).toContain('table du cartographe');
@@ -52,6 +53,16 @@ describe('Styleguide', () => {
     expect(swatches()).toContain('Or de boussole');
     expect(swatches()).toContain('Prairie');
     expect(swatches()).not.toContain('Compass gold');
+  });
+
+  it('swatches the terrain the hexmap plugin actually paints with, in its order', () => {
+    // The page may name another plugin's tier-3 tokens (ADR-0075), but nothing held the list to the
+    // set it mirrors — which is how a marsh swatch outlived the terrain it painted.
+    const el = render().nativeElement as HTMLElement;
+
+    const rendered = Array.from(el.querySelectorAll('.swatchcard code'), (code) => code.textContent?.trim());
+
+    expect(rendered.filter((token) => token?.startsWith('--color-terrain-'))).toEqual(terrainSet.map((t) => t.fill));
   });
 
   it('renders section titles and component-example copy from keys, localized', () => {

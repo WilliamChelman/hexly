@@ -9,9 +9,9 @@ import {
   PanelComponent,
   IconComponent,
   IconName,
-  ACCENT_BAR,
-  ACCENT_SIGIL,
-  accentFor,
+  TONE_BAR,
+  TONE_SIGIL,
+  toneFor,
 } from '@hexly/web-ui';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
@@ -54,7 +54,7 @@ export interface EntityCardVm {
   host: { class: 'contents' },
   template: `
     <section
-      class="group relative flex gap-4 p-4 pl-6 overflow-hidden h-full transition-shadow hover:shadow-3 has-[a:focus-visible]:[outline:2px_solid_var(--color-gold)] has-[a:focus-visible]:outline-offset-2"
+      class="group relative flex gap-4 p-4 pl-6 overflow-hidden h-full transition-shadow hover:shadow-3 has-[a:focus-visible]:[outline:2px_solid_var(--color-accent)] has-[a:focus-visible]:outline-offset-2"
       appPanel
       raised
     >
@@ -85,7 +85,7 @@ export interface EntityCardVm {
           <input
             type="text"
             appAutofocus
-            class="w-full font-display text-md text-ink-strong bg-surface-sunken border border-gold rounded-sm py-1 px-2 outline-none"
+            class="w-full font-display text-md text-ink-strong bg-surface-sunken border border-accent rounded-sm py-1 px-2 outline-none"
             [value]="card().title"
             [attr.data-testid]="'rename-input-' + card().id"
             [attr.aria-label]="'entityBrowser.renameLabel' | transloco"
@@ -104,7 +104,7 @@ export interface EntityCardVm {
             [attr.aria-label]="card().title"
           >
             <span
-              class="font-display text-lg text-ink-strong leading-tight line-clamp-2 group-hover:text-gold transition-colors"
+              class="font-display text-lg text-ink-strong leading-tight line-clamp-2 group-hover:text-accent-strong transition-colors"
               data-testid="entity-title"
               >{{ card().title }}</span
             >
@@ -184,8 +184,8 @@ export class EntityCardComponent {
   private readonly types = inject(TypeRegistry);
   private readonly transloco = inject(TranslocoService);
 
-  protected readonly bar = computed(() => ACCENT_BAR[accentFor(this.card().id)]);
-  protected readonly sigil = computed(() => ACCENT_SIGIL[accentFor(this.card().id)]);
+  protected readonly bar = computed(() => TONE_BAR[toneFor(this.card().id)]);
+  protected readonly sigil = computed(() => TONE_SIGIL[toneFor(this.card().id)]);
   /** The Entity type's registered icon (a hex map reads as terrain, a note as a label). */
   protected readonly typeIcon = computed<IconName>(() => this.types.resolve(this.card().type).icon);
   /** The primary type's display name, resolved by the registry (a user-defined name is never translated). */

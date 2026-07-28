@@ -1,20 +1,47 @@
 /*
- * Hexly design tokens — the theme-variant + non-utility layer.
+ * Hexly design tokens — the Palettes + the ColorScheme-variant / non-utility layer.
  *
  * Utility-shaped tokens (colours, fonts, type, spacing, radii) live in the
- * `@theme` block in styles.css (ADR-0020). This file carries what `@theme` can't:
- *   1. The DARK theme — reassigning the generated `--color-*` / `--shadow-*`
- *      under [data-theme='dark']. Imported after `tailwindcss`, so it cascades
- *      over the `:root` Tailwind emits.
+ * `@theme` block in index.css (ADR-0020). This file carries what `@theme` can't:
+ *   1. The two **Palettes** — tier 1 (ADR-0075). Eight anchors and three knobs per
+ *      ColorScheme. The derived roles are one expression each and do not repeat per
+ *      scheme, so astral reassigns these and `--color-canvas-glow` — the one role
+ *      whose two schemes no single expression fits (index.css).
  *   2. Raw non-utility tokens — motion (`--dur-*`/`--ease-*`), elevation
- *      (`--shadow-*`, see ADR-0021), layout rails (`--rail-*`, `--container-reading`).
+ *      (`--shadow-*`, see ADR-0021), layout rails (`--rail-*`, `--container-reading`),
+ *      and the sheen gradients. These are tier 2 by role but live here because
+ *      `@theme` cannot hold them, so the widened selector below carries them too.
  *
  * Concept: the Celestial Codex — the cartographer's table across the sky.
  *   - Light "Solar"  — a sunlit almanac: warm ivory paper, heliograph gold.
  *   - Dark  "Astral" — the same chart by night: indigo + constellation gold.
+ *
+ * The two Palettes are written adjacent on purpose: they are mirror images of each
+ * other, and the polarity knob is what asserts that in the derivation.
  */
 
-:root {
+/* A Palette is declared wherever a ColorScheme is, not only at the root (ADR-0076), so a
+   scoped subtree re-resolves under its own scheme. The contrast report does not use it:
+   the derived roles sit at `:root`, so it re-dresses the root instead (`measure.ts`). */
+:root,
+[data-color-scheme='solar'] {
+  /* ---- Tier 1 — the Solar Palette. Private: `--palette-*` is referenced only by
+     the derivation in index.css, and `no-unknown-design-token` enforces it. ---- */
+  --palette-page: #f1e5c7; /* the table / outer ivory paper                 */
+  --palette-ink: #2e2412; /* primary sepia-ink text                         */
+  --palette-ink-quiet: #6f5a36; /* secondary ink — carries its own hue      */
+  /* Darkened, and only in L, because ADR-0076's report warned on Hexly's own
+     untouched Palette — world-theme-spec.md §1. */
+  --palette-accent: #8c5e00; /* heliograph gold — the through-line accent   */
+  --palette-danger: #a21b01; /* burnt-sienna marginalia                     */
+  --palette-success: #325e01; /* moss                                       */
+  --palette-canvas: #efe2bf; /* the map field                               */
+  --palette-soot: #3c2c16; /* shadow / scrim ink — warm sepia, and lighter
+     than `--palette-ink`, which is why it is its own anchor                 */
+  --palette-polarity: 1; /* +1 Solar / −1 Astral: every ramp direction      */
+  --palette-line-alpha: 0.371; /* opacity of the drawn-rule ramp            */
+  --palette-veil: 0.12; /* base opacity of shadows, scrims, the vignette    */
+
   /* ---- Motion (raw values, not a Tailwind named scale) ------------------ */
   --dur-instant: 80ms;
   --dur-fast: 150ms;
@@ -26,98 +53,67 @@
 
   /* ---- Layout rails (fixed chrome dimensions) --------------------------- */
   --rail-header: 56px;
-  --rail-status: 30px;
-  --rail-inspector: 320px;
   --container-reading: 68ch;
 
   /* ---- Elevation — warm, paper-soft drop shadows. Raw re-themable vars
-     (ADR-0021); styles.css wraps 1/2/3/inset as `@utility shadow-*`. */
-  --shadow-1: 0 1px 2px rgba(60, 44, 22, 0.12);
-  --shadow-2: 0 4px 12px -2px rgba(60, 44, 22, 0.2);
-  --shadow-3: 0 16px 36px -8px rgba(50, 36, 18, 0.32);
-  --shadow-inset: inset 0 1px 2px rgba(60, 44, 22, 0.12);
-  --shadow-focus: 0 0 0 3px rgba(154, 106, 22, 0.32); /* focus-visible ring  */
+     (ADR-0021); index.css wraps 1/2/3/inset as `@utility shadow-*`. One geometry
+     for both ColorSchemes (ADR-0075), scaled by `--shadow-lift` — the shape is
+     shared, the travel re-themes, which is what §2.4 asked for and three
+     unrelated offset ratios were not. The 1/2/3 alpha ladder is a *power* of the
+     veil rather than a multiple of it, which is the only form both ColorSchemes
+     fit (world-theme-spec.md §2); at Astral's veil that power is nearly flat
+     (α 0.50 → 0.71 across three levels), so the lift is what actually separates
+     them there. Level 1 and the inset well are off both scales: at 1px there is
+     no travel to give, and the well takes `shadow-1`'s own alpha. */
+  --shadow-1: 0 1px 2px oklch(from var(--palette-soot) l c h / var(--palette-veil));
+  --shadow-2: 0 calc(4px * var(--shadow-lift)) calc(12px * var(--shadow-lift)) calc(-2px * var(--shadow-lift))
+    oklch(from var(--palette-soot) l c h / calc(pow(var(--palette-veil), 0.75)));
+  --shadow-3: 0 calc(16px * var(--shadow-lift)) calc(36px * var(--shadow-lift)) calc(-8px * var(--shadow-lift))
+    oklch(from var(--palette-soot) l c h / calc(pow(var(--palette-veil), 0.5)));
+  --shadow-inset: inset 0 1px 2px oklch(from var(--palette-soot) l c h / var(--palette-veil));
+  /* The focus ring is off the ladder too: a fixed alpha both ColorSchemes fit. */
+  --shadow-focus: 0 0 0 3px oklch(from var(--palette-accent) l c h / 0.345);
 
-  /* ---- Gilded chrome — metallic sheen + glow. Raw vars consumed by scoped
-     styles. --gradient-gold re-themes via its stop vars; only --color-glow
-     needs a dark override (below). */
-  --gradient-gold: linear-gradient(180deg, var(--color-gold-bright), var(--color-gold-deep));
-  --gradient-gold-radial: radial-gradient(circle at 50% 35%, var(--color-gold-bright), var(--color-gold-deep));
-  --color-glow: rgba(210, 150, 40, 0.5); /* gilded glow for active chrome */
+  /* ---- The accent sheen's gradients. Not utility-shaped, so `@theme` can't hold
+     them; they re-theme through the stops they name. */
+  --gradient-accent-sheen: linear-gradient(180deg, var(--color-accent-sheen-bright), var(--color-accent-sheen-deep));
+  --gradient-accent-sheen-radial: radial-gradient(
+    circle at 50% 35%,
+    var(--color-accent-sheen-bright),
+    var(--color-accent-sheen-deep)
+  );
 
   color-scheme: light;
 }
 
 /* =========================================================================
- * Dark theme — "Astral"
- * The same chart at night: midnight-indigo paper, constellation-gold,
- * aurora-teal. Text stays warm parchment-cream so the two themes read as
- * one identity at different hours. Reassigns the generated --color-* /
- * --shadow-* declared (light) in the styles.css @theme block.
+ * The Astral ColorScheme — the night half
+ * The same chart at night: midnight-indigo paper, constellation-gold, aurora-teal.
+ * Text stays warm parchment-cream so the two ColorSchemes read as one identity at
+ * different hours.
+ *
+ * This block is the Astral **Palette**, and almost nothing else: the semantic roles
+ * are derived once in index.css and re-resolve here off these anchors (ADR-0075).
+ * What remains beside it is what the derivation does not reach — the one named
+ * literal.
  * ======================================================================= */
-:root[data-theme='dark'] {
-  --color-bg: #0b0c1a; /* the night table                                   */
-  --color-bg-deep: #070710;
-  --color-surface: #10132b; /* lifted indigo panel                          */
-  --color-surface-raised: #181c3c; /* a chart pinned into the starlight     */
-  --color-surface-sunken: #0c0e22; /* wells                                 */
-  --color-overlay: rgba(4, 4, 14, 0.62);
+[data-color-scheme='astral'] {
+  /* ---- Tier 1 — the Astral Palette. */
+  --palette-page: #0b0c1a; /* the night table                               */
+  --palette-ink: #ece3cf; /* starlit parchment text                         */
+  --palette-ink-quiet: #9aa0c8; /* cool lavender-grey                       */
+  --palette-accent: #d9b25a; /* constellation gold leaf                     */
+  --palette-danger: #fe7a54; /* warm coral marginalia                       */
+  --palette-success: #71ca42; /* aurora green                               */
+  --palette-canvas: #12152e; /* the map field at night                      */
+  --palette-soot: #02020a; /* near-black scrim ink                          */
+  --palette-polarity: -1;
+  --palette-line-alpha: 0.16;
+  --palette-veil: 0.5;
 
-  --color-ink: #ece3cf; /* starlit parchment text                           */
-  --color-ink-strong: #fbf6e7;
-  --color-ink-muted: #9aa0c8; /* cool lavender-grey                         */
-  --color-ink-faint: #666c95;
-
-  --color-line: rgba(217, 178, 90, 0.16); /* gilded hairline edges          */
-  --color-line-strong: rgba(217, 178, 90, 0.32);
-  --color-line-faint: rgba(217, 178, 90, 0.08);
-
-  --color-gold: #d9b25a; /* constellation gold leaf — primary accent        */
-  --color-gold-strong: #f0d68a;
-  --color-gold-soft: rgba(217, 178, 90, 0.14);
-  --color-gold-bright: #f0d897; /* metallic highlight stop (constellation)  */
-  --color-gold-deep: #c59335; /*   deep gradient stop                       */
-  --color-on-gold: #15110a;
-  --color-on-gilded: #15110a; /* dark ink on the bright gilded gradient */
-
-  --color-sea: #54c8bb; /* aurora-teal                                      */
-  --color-sea-soft: rgba(84, 200, 187, 0.14);
-
-  --color-astra: #a18cf0; /* nebula violet                                  */
-  --color-astra-soft: rgba(161, 140, 240, 0.16);
-
-  --color-ember: #e88a6f; /* warm coral marginalia                          */
-  --color-ember-soft: rgba(232, 138, 111, 0.16);
-
-  --color-positive: #86c46a; /* aurora green                                */
-  --color-positive-soft: rgba(134, 196, 106, 0.16);
-
-  /* Canvas — the Vellum field at night: deep indigo paper (codex). */
-  --color-canvas-bg: #12152e;
-  --color-canvas-mat: #0a0c1d;
-  --color-canvas-glow: rgba(58, 70, 140, 0.26); /* indigo light at the field's top */
-  --color-canvas-edge: rgba(4, 4, 14, 0.5); /* deep-night vignette                 */
-  --color-hex-line: rgba(160, 170, 235, 0.15);
-  --color-feature-ink: #ecd49a; /* a placed Feature's marker — gilded       */
-  --color-label-ink: #ecd49a; /* free-positioned Label text — gilded cream   */
-  --color-name-ink: #cdbf9f; /* a Hex name — dimmed parchment               */
-  --color-ink-stroke: #0a0b16; /* halo behind name/label text — night ink, for legibility over any terrain (codex) */
-
-  --color-terrain-grass: #4c5d3b;
-  --color-terrain-forest: #264237;
-  --color-terrain-ocean: #1e3a55;
-  --color-terrain-mountain: #474264;
-  --color-terrain-desert: #6b5736;
-  --color-terrain-marsh: #3a4b44;
-  --color-terrain-sky: #45527d; /* open air — deep twilight indigo          */
-
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-2: 0 6px 18px -4px rgba(0, 0, 0, 0.6);
-  --shadow-3: 0 22px 48px -10px rgba(0, 0, 0, 0.72);
-  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-focus: 0 0 0 3px rgba(230, 182, 82, 0.34);
-
-  --color-glow: rgba(217, 178, 90, 0.5); /* constellation glow */
+  /* The named literal (ADR-0075): indigo starlight over indigo paper is a
+     different design idea from Solar's warm highlight of its own paper. */
+  --color-canvas-glow: rgba(58, 70, 140, 0.26);
 
   color-scheme: dark;
 }

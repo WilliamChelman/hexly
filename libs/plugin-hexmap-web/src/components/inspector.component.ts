@@ -1,11 +1,12 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { coordKey, Label, TerrainId } from '@hexly/plugin-hexmap';
+import { coordKey, Label } from '@hexly/plugin-hexmap';
 import { EntityLinkPickerComponent } from '@hexly/web-entity';
+import { DesignToken } from '@hexly/web-styles';
 import { ButtonComponent, CoordComponent, EyebrowComponent, FieldComponent, InputComponent } from '@hexly/web-ui';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HexMapStore, Selection } from '../services/hexmap-store';
-import { featureKey, terrainKey } from '../utils/catalog-keys';
+import { featureKey, terrainFill, terrainKey } from '../utils/catalog-keys';
 import { inputValue } from '../utils/input-value';
 import { RegionFieldsComponent } from './region-fields.component';
 
@@ -43,8 +44,8 @@ interface SelectedEntity {
   readonly kind: 'hex' | 'feature';
   readonly q: number;
   readonly r: number;
-  /** The hex's terrain id, for the identity swatch colour. */
-  readonly terrain: TerrainId;
+  /** The identity swatch's fill token, resolved from the hex's terrain rather than spliced in the template. */
+  readonly swatch: DesignToken;
   /**
    * The translation key for the entity's built-in catalog label, keyed by its stable
    * id (`map.terrain.<id>` / `map.feature.<id>`, ADR-0014): the Feature's key for a
@@ -186,7 +187,7 @@ interface SelectedEntity {
             @for (d of directions; track d.direction) {
               <button
                 type="button"
-                class="flex-1 bg-transparent text-ink-muted border border-line rounded-sm py-1 px-3 text-xs font-semibold cursor-pointer aria-[pressed=true]:text-ink aria-[pressed=true]:border-gold aria-[pressed=true]:bg-gold-soft"
+                class="flex-1 bg-transparent text-ink-muted border border-line rounded-sm py-1 px-3 text-xs font-semibold cursor-pointer aria-[pressed=true]:text-ink aria-[pressed=true]:border-accent aria-[pressed=true]:bg-accent-soft"
                 [attr.aria-pressed]="store.regionDirection() === d.direction"
                 [attr.data-testid]="d.testid"
                 (click)="store.armRegionDirection(d.direction)"
@@ -222,7 +223,7 @@ interface SelectedEntity {
 
       <div class="leaf">
         <div class="ident">
-          <span class="ident-swatch" [style.background]="'var(--color-terrain-' + entity.terrain + ')'"></span>
+          <span class="ident-swatch" [style.background]="'var(' + entity.swatch + ')'"></span>
           <div class="min-w-0">
             <div class="ident-name">
               {{ entity.name || (entity.detailKey | transloco) }}
@@ -310,7 +311,7 @@ interface SelectedEntity {
       </p>
     }
   `,
-  // Scoped chrome (ADR-0007): a framed "leaf" — gold corner brackets on lifted
+  // Scoped chrome (ADR-0007): a framed "leaf" — accent corner brackets on lifted
   // paper — around each single-selection editor.
   styles: `
     @reference '#app-styles.css';
@@ -321,7 +322,7 @@ interface SelectedEntity {
     .leaf::before,
     .leaf::after {
       content: '';
-      @apply absolute w-3 h-3 border border-gold opacity-50 pointer-events-none;
+      @apply absolute w-3 h-3 border border-accent opacity-50 pointer-events-none;
     }
     .leaf::before {
       @apply top-1.5 left-1.5 border-r-0 border-b-0;
@@ -338,7 +339,7 @@ interface SelectedEntity {
       /* multi-shadow list: named token + literal geometry — stays raw (ADR-0031). */
       box-shadow:
         var(--shadow-inset),
-        0 0 0 1px var(--color-gold-soft);
+        0 0 0 1px var(--color-accent-soft);
     }
     .ident-name {
       @apply font-display text-lg leading-[1.15] text-ink-strong overflow-hidden text-ellipsis whitespace-nowrap;
@@ -348,7 +349,7 @@ interface SelectedEntity {
       font-family: var(--font-cartouche);
       font-weight: 700;
       font-size: 1.5em;
-      color: var(--color-gold);
+      color: var(--color-accent);
       padding-right: 0.04em;
     }
     .ident-sub {
@@ -383,7 +384,7 @@ export class InspectorComponent {
       kind: sel.kind,
       q: sel.coord.q,
       r: sel.coord.r,
-      terrain: hex.terrain,
+      swatch: terrainFill(hex.terrain),
       detailKey,
       name: hex.name ?? '',
     };

@@ -61,7 +61,7 @@ import { AssetLinkPickerComponent } from './asset-link-picker.component';
               } @else {
                 <button
                   type="button"
-                  class="self-start rounded border border-line bg-surface px-2 py-1 text-sm text-ink-muted hover:text-ink"
+                  class="self-start rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink-muted hover:text-ink"
                   data-testid="entity-link-open"
                   [attr.aria-invalid]="invalid() || null"
                   (click)="picking.set(true)"
@@ -83,7 +83,7 @@ import { AssetLinkPickerComponent } from './asset-link-picker.component';
       }
       @case ('enum') {
         <select
-          class="w-full rounded border border-line bg-surface px-2 py-1 text-sm"
+          class="w-full rounded-md border border-line bg-surface px-2 py-1 text-sm"
           [disabled]="disabled()"
           [attr.aria-invalid]="invalid() || null"
           (change)="valueChange.emit(selectValue($event))"
@@ -99,7 +99,7 @@ import { AssetLinkPickerComponent } from './asset-link-picker.component';
       @case ('date') {
         <input
           type="date"
-          class="rounded border border-line bg-surface px-2 py-1 text-sm"
+          class="rounded-md border border-line bg-surface px-2 py-1 text-sm"
           [value]="stringValue()"
           [disabled]="disabled()"
           [attr.aria-invalid]="invalid() || null"
@@ -109,7 +109,7 @@ import { AssetLinkPickerComponent } from './asset-link-picker.component';
       @case ('number') {
         <input
           type="number"
-          class="w-full rounded border border-line bg-surface px-2 py-1 text-sm"
+          class="w-full rounded-md border border-line bg-surface px-2 py-1 text-sm"
           [value]="stringValue()"
           [disabled]="disabled()"
           [attr.aria-invalid]="invalid() || null"
@@ -120,7 +120,7 @@ import { AssetLinkPickerComponent } from './asset-link-picker.component';
         <!-- string, and list<scalar> as a comma-separated text field. -->
         <input
           type="text"
-          class="w-full rounded border border-line bg-surface px-2 py-1 text-sm"
+          class="w-full rounded-md border border-line bg-surface px-2 py-1 text-sm"
           [value]="stringValue()"
           [disabled]="disabled()"
           [attr.aria-invalid]="invalid() || null"

@@ -71,6 +71,19 @@ describe('EntityTypesEditor', () => {
     expect(q('type-chip-core.type.note').querySelector('[data-testid=type-primary]')).toBeNull();
   });
 
+  /**
+   * The tone arc is the deuteranope confusion line, so the glyph is the channel that carries the
+   * category and the colour is decoration (ADR-0075) — a chip without its icon is a regression.
+   */
+  it('renders the type’s icon beside its label, and the tone its id derives', () => {
+    render(['core.type.hex-map', 'core.type.note']);
+    const chip = q('type-chip-core.type.note');
+    expect(chip.querySelector('app-icon')).not.toBeNull();
+    // Derived, so it is the same tone on every run and in every install (ADR-0075).
+    expect(chip.classList.contains('is-tone-5')).toBe(true);
+    expect(q('type-chip-core.type.hex-map').classList.contains('is-tone-3')).toBe(true);
+  });
+
   it('moves a type up one place with ↑, re-primarying it when it reaches the front', () => {
     render(['core.type.hex-map', 'core.type.note']);
     q('type-move-up-core.type.note').click();

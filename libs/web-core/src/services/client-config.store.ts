@@ -9,13 +9,13 @@ import {
   Signal,
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { ClientConfig, ClientPluginConfig, DeploymentProfile } from '@hexly/domain';
+import { ClientConfig, ClientPluginConfig, DeploymentProfile, InstanceTheme } from '@hexly/domain';
 
 /**
  * The browser's end of the client config channel (ADR-0052, Seam 4): the enabled-Plugin set, the default
- * create Type, ADR-0073's two Inline Creation knobs, and ADR-0071's Deployment Profile and Collaboration
- * flag, hydrated once at boot from `GET /api/config`. Signals, not a resource, so a future live path
- * (ADR-0044) can push a fresh set in without touching the readers.
+ * create Type, ADR-0073's two Inline Creation knobs, ADR-0071's Deployment Profile and Collaboration
+ * flag, and ADR-0076's Instance default Theme, hydrated once at boot from `GET /api/config`. Signals, not
+ * a resource, so a future live path (ADR-0044) can push a fresh set in without touching the readers.
  *
  * Owns a predicate per flag rather than exposing raw values for callers to interpret. Until {@link init}
  * resolves (or if it fails) every gate falls open; the boot fetch is an `APP_INITIALIZER`, so nothing in the
@@ -36,6 +36,9 @@ export class ClientConfigStore {
   // Fall-open seeds, so an unresolved fetch and a failed one need no separate handling.
   private readonly collaborationSignal = signal(true);
   private readonly profileSignal = signal<DeploymentProfile>('server');
+  private readonly instanceThemeSignal = signal<InstanceTheme | null>(null);
+  /** Memoised, so the app initializer and whoever waits on the config share one fetch (#372). */
+  private fetched?: Promise<void>;
 
   /** The enabled bundled Plugins' ids; empty until {@link init} resolves. */
   readonly enabledPlugins: Signal<ReadonlySet<string>> = this.enabledSignal.asReadonly();
@@ -53,6 +56,12 @@ export class ClientConfigStore {
 
   /** The Tag applied to everything created inline (ADR-0073); `undefined` until {@link init} resolves, and when none is configured. */
   readonly inlineTag: Signal<string | undefined> = this.inlineTagSignal.asReadonly();
+
+  /**
+   * The Instance operator's default Theme (ADR-0076, #372) — the World Theme chain's first layer, and
+   * `null` for an unbranded Instance, before {@link init} resolves, and if the fetch fails.
+   */
+  readonly instanceTheme: Signal<InstanceTheme | null> = this.instanceThemeSignal.asReadonly();
 
   /** Whether `id`'s Plugin is enabled; reactive. Everything reads enabled until config loads (ADR-0052). */
   isPluginEnabled(id: string): boolean {
@@ -72,8 +81,16 @@ export class ClientConfigStore {
     return this.profileSignal() === 'desktop';
   }
 
-  /** Fetch `/api/config` and populate the signals; a failed fetch leaves the boot defaults (all gates open). */
-  async init(): Promise<void> {
+  /**
+   * Fetch `/api/config` and populate the signals; a failed fetch leaves the boot defaults (all gates
+   * open). Idempotent: the World Theme applier waits on this same settled promise for the Instance
+   * default (#372), so calling it twice must not cost a second round trip.
+   */
+  init(): Promise<void> {
+    return (this.fetched ??= this.load());
+  }
+
+  private async load(): Promise<void> {
     try {
       const http = this.injector.get(HttpClient);
       const config = await firstValueFrom(http.get<ClientConfig>('/api/config'));
@@ -88,6 +105,7 @@ export class ClientConfigStore {
       // Defaulted again: a payload that omits a flag must not close a gate (ADR-0071).
       this.collaborationSignal.set(config.collaboration ?? true);
       this.profileSignal.set(config.profile ?? 'server');
+      this.instanceThemeSignal.set(config.theme ?? null);
       this.loadedSignal.set(true);
     } catch {
       /* no channel means no config; the signals keep their boot defaults, so every gate falls open */

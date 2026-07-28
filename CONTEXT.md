@@ -379,7 +379,7 @@ The account-owned page where a signed-in user edits their own **Preferences** an
 _Avoid_: Account settings, profile page, options
 
 **Preferences**:
-A user's roaming presentation choices — UI **Locale**, **Format Locale**, and theme — bound to the account so they follow the user across devices.
+A user's roaming presentation choices — UI **Locale**, **Format Locale**, and **ColorScheme** — bound to the account so they follow the user across devices.
 _Avoid_: Settings, options, config
 
 **Locale**:
@@ -389,6 +389,36 @@ _Avoid_: Language (as a field name), i18n, region
 **Format Locale**:
 A user's chosen **regional formatting** (a BCP-47 tag) for dates, numbers, and times, independent of the UI **Locale**; defaults to it when unset.
 _Avoid_: Date format, regional settings, locale (bare — that means the UI language)
+
+## Appearance
+
+**ColorScheme**:
+The day/night axis the interface is painted along — `Solar` (light) or `Astral` (dark). A user **Preference**, never a World's to set: a **World Theme** supplies both, and the reader chooses which one they see.
+_Avoid_: Theme (bare), dark mode, colour mode, scheme (bare), light/dark toggle
+
+**World Theme**:
+The presentation a **World Owner** authors for one World — a **Palette** per **ColorScheme**, plus a radius set and a font pairing. Purely presentational: it never changes what an Entity contains or who may read it, and a reader keeps their own **ColorScheme** within it.
+_Avoid_: Skin, style, branding, world palette, theme (bare — that used to mean the **ColorScheme**)
+
+**Palette**:
+The small set of anchor colours one **ColorScheme** of a **World Theme** is authored as; every other colour the interface uses derives from it. What an Owner actually fills in.
+_Avoid_: Swatch set, colour scheme, theme; terrain palette (that set is the **Terrain** list); graph palette (the **World Graph** paints each **Entity Type** in its **Tone**)
+
+**Anchor**:
+One of the eight colours a **Palette** is authored as — page, ink, quiet ink, accent, danger, success, canvas, and soot — each carrying its own hue, which is how the Solar→Astral rotation is expressed (ADR-0075). Every role the interface styles itself from is one expression over these, so a component asks for the role and never the Anchor.
+_Avoid_: Base colour, brand colour, primitive, swatch, primary/secondary
+
+**Knob**:
+One of the three numbers a **Palette** carries beside its **Anchors** — polarity (±1, the mirror between the two **ColorSchemes**), line alpha, and veil — turned rather than picked, and read by the expressions the roles derive through (ADR-0075).
+_Avoid_: Slider, parameter, colour setting; knob (bare, outside Appearance — that is any dial an operator turns)
+
+**Instance Default Theme**:
+The presentation an operator sets for a whole deployment, in **Instance Configuration** — the same anchors as a **World Theme**, from a different source, and any subset of them. A starting point, not an imposition: a World's own **World Theme** wins over it field by field, and the chain is Instance Default Theme → **World Theme** → the reader's **ColorScheme**. Ships empty. Shortened to "Instance default" in running prose, and to `InstanceTheme` in code.
+_Avoid_: Global theme, site theme, default palette, instance branding, house style
+
+**Tone**:
+One of the eight categorical colours an **Entity Type** is drawn in — its chip's text and border, its nodes in the **World Graph** — derived from the accent by hue rotation, and assigned by hashing the Type's id unless the Type pins one (ADR-0075). Never identity on its own: no eight-hue set survives deuteranopia, so a chip carries the Entity Type's icon beside its label and the colour decorates. The soft fill is emphasis, not category. `--color-tone-1…8` in the tokens, `ChipTone` in code.
+_Avoid_: Colour, category colour, hue, tint; tone (as the Solar/Astral polarity — that **Knob** ships as `--palette-polarity`)
 
 ## Self-hosting
 

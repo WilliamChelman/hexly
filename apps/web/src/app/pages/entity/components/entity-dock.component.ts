@@ -77,11 +77,11 @@ const RESIZE_STEP = 16;
       @apply bg-line-strong;
     }
     /* The card is \`overflow-hidden\`, which clips the global focus ring (base.css draws it as a
-       box-shadow) to a sliver — so focus is carried by the grip's own rule, widened and in gold, which
+       box-shadow) to a sliver — so focus is carried by the grip's own rule, widened and in the accent, which
        clears 3:1 against the card in both themes where the hover hairline does not. */
     .resize-handle:focus-visible::after,
     .resize-handle.is-resizing::after {
-      @apply w-1 bg-gold;
+      @apply w-1 bg-accent;
     }
   `,
   template: `

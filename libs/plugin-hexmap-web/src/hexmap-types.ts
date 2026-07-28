@@ -56,7 +56,7 @@ export const HEXMAP_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     fieldRefs: CORE_HEXMAP_TYPE.fieldRefs,
     icon: 'terrain',
     views: [{ field: HEX_GRID_FIELD.id }, CORE_VIEW_RICH_CONTENT],
-    graphColorToken: '--color-gold',
+    graphColorToken: '--color-accent',
     // A plugin ships translated copy, so its chrome is transloco keys (ADR-0049) — unlike a
     // user-defined type, whose every label is its one authored name (#191).
     labels: {

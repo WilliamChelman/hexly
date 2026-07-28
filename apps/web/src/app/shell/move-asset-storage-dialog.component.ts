@@ -41,7 +41,7 @@ type MoveState = 'choosing' | 'copying' | 'cancelling' | 'moved' | 'failed';
             >
               <!-- Bytes, not files: one 4 GB map among a hundred thumbnails would make a file count lie. -->
               <div
-                class="h-full rounded-full bg-gold transition-[width] duration-200 motion-reduce:transition-none"
+                class="h-full rounded-full bg-accent transition-[width] duration-200 motion-reduce:transition-none"
                 [style.width.%]="percent()"
               ></div>
             </div>

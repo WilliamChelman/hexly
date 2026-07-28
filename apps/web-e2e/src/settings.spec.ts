@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures';
+import { expect, preferencesPatched, test, type Page } from './fixtures';
 
 /**
  * User Settings (ADR-0038): the Format Locale chosen on `/settings` persists on the
@@ -9,9 +9,7 @@ import { expect, test, type Page } from './fixtures';
 
 /** Pick a Format Locale on /settings and wait for the roaming PATCH to land. */
 async function chooseFormatLocale(page: Page, tag: string): Promise<void> {
-  const patched = page.waitForResponse(
-    (r) => r.url().endsWith('/api/auth/me/preferences') && r.request().method() === 'PATCH' && r.ok(),
-  );
+  const patched = preferencesPatched(page);
   await page.getByTestId('format-locale').selectOption(tag);
   await patched;
 }

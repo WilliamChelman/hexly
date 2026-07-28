@@ -20,6 +20,7 @@ const DEFAULT_TYPE_PORT = basePort + 2;
 const COLLAB_OFF_PORT = basePort + 3;
 const DESKTOP_PORT = basePort + 4;
 const INLINE_TYPE_PORT = basePort + 5;
+const INSTANCE_THEME_PORT = basePort + 6;
 
 // dnd off: its Types degrade to the generic Field View, values intact (ADR-0052).
 const DISABLE_DND_YAML = ['features:', '  plugin:', '    dnd:', '      enabled: false', ''].join('\n');
@@ -31,6 +32,20 @@ const COLLABORATION_OFF_YAML = ['features:', '  collaboration: false', ''].join(
 // Inline Creation's own Type and Tag (ADR-0073), left divergent from `defaultType` — the two knobs
 // answer different questions, so a mention must not follow the New button's.
 const INLINE_TYPE_YAML = ['entities:', '  inlineType: core.type.hex-map', '  inlineTag: untriaged', ''].join('\n');
+// An operator branding their deployment (ADR-0076, #372): a partial layer — one anchor per
+// ColorScheme and a squared-off radius — so the spec can see both that it applies and that everything
+// it is silent about still falls through to the stylesheet.
+const INSTANCE_THEME_YAML = [
+  'theme:',
+  '  version: 1',
+  '  solar:',
+  "    accent: '#2f6f4f'",
+  '  astral:',
+  "    accent: '#7fd0a8'",
+  '  radii:',
+  '    --radius-md: 0px',
+  '',
+].join('\n');
 
 /** One `e2e-server.mjs` invocation: its own port, throwaway Instance Directory, and optional hexly.yml. */
 function server(
@@ -102,7 +117,13 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['html', { open: 'never' }], ['list']] : 'list',
+  // Pinned: Playwright resolves both folders against the nearest package.json — the workspace root —
+  // not the config directory, so left implicit they miss project.json's `outputs`, .gitignore and
+  // CI's upload alike.
+  outputDir: join(__dirname, 'test-results'),
+  reporter: process.env.CI
+    ? [['html', { open: 'never', outputFolder: join(__dirname, 'playwright-report') }], ['list']]
+    : 'list',
   use: {
     baseURL: urlFor(DEFAULT_PORT),
     trace: 'on-first-retry',
@@ -139,6 +160,12 @@ export default defineConfig({
     authenticated('inline-type', INLINE_TYPE_PORT, {
       testMatch: /.*[/\\]config[/\\]inline-type\.spec\.ts/,
     }),
+    // An Instance default Theme (ADR-0076, #372): every World without its own adopts the operator's
+    // branding, and a World with one is unaffected by it.
+    setup('instance-theme', INSTANCE_THEME_PORT),
+    authenticated('instance-theme', INSTANCE_THEME_PORT, {
+      testMatch: /.*[/\\]config[/\\]instance-theme\.spec\.ts/,
+    }),
   ],
   webServer: [
     server(DEFAULT_PORT),
@@ -156,5 +183,6 @@ export default defineConfig({
       profile: 'desktop',
     }),
     server(INLINE_TYPE_PORT, { instanceSubdir: 'web-e2e-inline-type', configYaml: INLINE_TYPE_YAML }),
+    server(INSTANCE_THEME_PORT, { instanceSubdir: 'web-e2e-instance-theme', configYaml: INSTANCE_THEME_YAML }),
   ],
 });

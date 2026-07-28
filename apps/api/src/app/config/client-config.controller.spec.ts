@@ -7,7 +7,13 @@ import { HexlyConfig, HEXLY_CONFIG } from './config';
 function configWith(
   plugin: HexlyConfig['features']['plugin'],
   defaultType: string,
-  rest: { profile?: DeploymentProfile; collaboration?: boolean; inlineType?: string; inlineTag?: string } = {},
+  rest: {
+    profile?: DeploymentProfile;
+    collaboration?: boolean;
+    inlineType?: string;
+    inlineTag?: string;
+    theme?: HexlyConfig['theme'];
+  } = {},
 ): HexlyConfig {
   return {
     profile: rest.profile ?? 'server',
@@ -17,6 +23,7 @@ function configWith(
     liveFollow: { heartbeatSeconds: 30 },
     features: { plugin: plugin, collaboration: rest.collaboration ?? true },
     entities: { defaultType, inlineType: rest.inlineType ?? 'core.type.note', inlineTag: rest.inlineTag },
+    theme: rest.theme,
   };
 }
 
@@ -46,6 +53,19 @@ describe('ClientConfigController', () => {
       },
       entities: { defaultType: 'core.type.note', inlineType: 'core.type.note' },
     });
+  });
+
+  it('carries the Instance default Theme, so the browser can lay the chain’s first layer (#372)', async () => {
+    const theme = { version: 1 as const, solar: { accent: 'oklch(0.5 0.1 150)' } };
+    const controller = await controllerFor(configWith({}, 'core.type.note', { theme }));
+
+    expect(controller.getConfig().theme).toEqual(theme);
+  });
+
+  it('leaves `theme` off the payload when the Instance sets none — it ships empty (#372)', async () => {
+    const controller = await controllerFor(configWith({}, 'core.type.note'));
+
+    expect(JSON.parse(JSON.stringify(controller.getConfig()))).not.toHaveProperty('theme');
   });
 
   it('projects only `enabled`, dropping any other per-Plugin knobs the server holds', async () => {

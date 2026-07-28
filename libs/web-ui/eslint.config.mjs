@@ -1,6 +1,5 @@
 import nx from '@nx/eslint-plugin';
 import baseConfig from '../../eslint.config.mjs';
-import hexlyDesignTokens from '../../eslint-rules/design-tokens.mjs';
 
 export default [
   ...nx.configs['flat/angular'],
@@ -8,12 +7,7 @@ export default [
   ...baseConfig,
   {
     files: ['**/*.ts'],
-    plugins: { 'hexly-design': hexlyDesignTokens },
     rules: {
-      // ADR-0020 — every var(--…) must resolve to a defined design token, and built-in
-      // shadow utilities (which bake a light value) are barred (ADR-0021).
-      'hexly-design/no-unknown-design-token': 'error',
-      'hexly-design/no-builtin-shadow': 'error',
       '@angular-eslint/directive-selector': [
         'error',
         {

@@ -1,4 +1,5 @@
 import { Axial, hexToPixel, HexMap, Layout } from '@hexly/plugin-hexmap';
+import { DesignToken } from '@hexly/web-styles';
 import { Camera } from '../utils/camera';
 import { Canvas2dMapRenderer } from './map-renderer';
 
@@ -146,15 +147,17 @@ const BLOCKED_INK = 'rgb(2, 2, 2)';
 /** Drive the colour resolution so terrain fills are deterministic. */
 function stubTheme(): () => void {
   const original = window.getComputedStyle;
+  // `satisfies` so a stub for a token the manifest no longer declares fails to compile, rather than
+  // leaving every assertion below quietly reading a fallback (ADR-0075).
   const colours: Record<string, string> = {
     '--color-terrain-forest': FOREST,
     '--color-terrain-ocean': OCEAN,
     '--color-feature-ink': FEATURE_INK,
     '--color-label-ink': LABEL_INK,
     '--color-name-ink': NAME_INK,
-    '--color-gold-strong': SELECT_INK,
-    '--color-ember': BLOCKED_INK,
-  };
+    '--color-accent-strong': SELECT_INK,
+    '--color-danger': BLOCKED_INK,
+  } satisfies Partial<Record<DesignToken, string>>;
   window.getComputedStyle = (() => ({
     getPropertyValue: (name: string) => colours[name] ?? '',
   })) as unknown as typeof window.getComputedStyle;

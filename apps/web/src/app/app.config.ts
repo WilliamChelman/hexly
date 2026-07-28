@@ -12,9 +12,11 @@ import {
   TranslationTitleStrategy,
   provideEagerTranslations,
   provideLocale,
-  provideTheme,
+  provideColorScheme,
+  provideWorldTheme,
   providePreferencesSync,
   provideClientConfig,
+  provideInstanceTheme,
   CORE_TRANSLATIONS,
 } from '@hexly/web-core';
 // The `/i18n` entry points carry the scope declaration and nothing else: importing a lib's
@@ -76,9 +78,14 @@ export const appConfig: ApplicationConfig = {
     // resolve per the active locale's plural rules. It delegates {{…}} to the
     // default transpiler, so existing double-brace interpolation is unaffected.
     provideTranslocoMessageformat(),
-    // Apply the persisted/OS theme and load the active language's catalog
+    // Apply the persisted/OS ColorScheme and load the active language's catalog
     // during bootstrap, before the first paint and initial navigation.
-    provideTheme(),
+    provideColorScheme(),
+    // After the ColorScheme, whose Palette a World Theme replaces (ADR-0076): the applier adopts what
+    // `index.html`'s pre-paint replay put on the root, so leaving the World can take it back.
+    provideWorldTheme(),
+    // The chain's first layer (#372): an operator's branding, off the client config channel above.
+    provideInstanceTheme(),
     provideLocale(),
     // Roam Preferences with the account (ADR-0038): hydrate from /auth/me,
     // push signal changes back as PATCHes.

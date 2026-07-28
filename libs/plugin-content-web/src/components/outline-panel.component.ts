@@ -32,7 +32,7 @@ import { OutlineStore } from '../services/outline-store';
     @for (row of rows(); track $index) {
       <button
         type="button"
-        class="w-full py-1 pr-2 text-sm text-left text-ink-muted truncate bg-transparent border-none rounded cursor-pointer hover:bg-gold-soft hover:text-ink aria-current:text-ink-strong aria-current:font-medium "
+        class="w-full py-1 pr-2 text-sm text-left text-ink-muted truncate bg-transparent border-none rounded-sm cursor-pointer hover:bg-accent-soft hover:text-ink aria-current:text-ink-strong aria-current:font-medium "
         [style.paddingLeft.rem]="0.5 + row.depth * 0.75"
         [attr.aria-current]="activeIndex() === $index ? 'true' : null"
         data-testid="outline-item"

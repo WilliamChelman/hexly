@@ -174,7 +174,7 @@ const Z_ACTIONS = [
       </p>
     }
   `,
-  // Scoped chrome (ADR-0007): a framed "leaf" — gold corner brackets on lifted paper — around the
+  // Scoped chrome (ADR-0007): a framed "leaf" — accent corner brackets on lifted paper — around the
   // single-selection editor, mirroring the Hex Map Inspector.
   styles: `
     @reference '#app-styles.css';
@@ -185,7 +185,7 @@ const Z_ACTIONS = [
     .leaf::before,
     .leaf::after {
       content: '';
-      @apply absolute w-3 h-3 border border-gold opacity-50 pointer-events-none;
+      @apply absolute w-3 h-3 border border-accent opacity-50 pointer-events-none;
     }
     .leaf::before {
       @apply top-1.5 left-1.5 border-r-0 border-b-0;
@@ -195,7 +195,7 @@ const Z_ACTIONS = [
     }
     .view-select {
       @apply w-full rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink;
-      @apply focus-visible:border-gold outline-none;
+      @apply focus-visible:border-accent outline-none;
     }
   `,
 })

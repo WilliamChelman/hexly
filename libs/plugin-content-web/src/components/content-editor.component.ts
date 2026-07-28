@@ -67,7 +67,7 @@ const COMMIT_DEBOUNCE_MS = 250;
   ],
   host: {
     class:
-      'flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-6 py-3 text-ink cursor-text focus-within:border-gold',
+      'flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-6 py-3 text-ink cursor-text focus-within:border-accent',
   },
   template: `
     <!-- ProseMirror fills the flex column (scoped CSS below) so a click anywhere
@@ -89,7 +89,7 @@ const COMMIT_DEBOUNCE_MS = 250;
     @reference '#app-styles.css';
 
     /* .ProseMirror lives outside Angular's template — pierce with ::ng-deep.
-       Suppress its focus ring; host's focus-within:border-gold already signals focus. */
+       Suppress its focus ring; host's focus-within:border-accent already signals focus. */
     :host ::ng-deep .ProseMirror {
       flex: 1;
     }
@@ -185,7 +185,7 @@ const COMMIT_DEBOUNCE_MS = 250;
       font-size: 0.85em;
     }
     :host ::ng-deep .ProseMirror a {
-      @apply text-gold underline;
+      @apply text-accent-strong underline;
     }
     /* Callout (ADR-0033): a bordered box; the header carries its type + title, the
        body holds live block content (contentDOM). Colour-by-type is deferred. */
@@ -243,7 +243,7 @@ const COMMIT_DEBOUNCE_MS = 250;
     }
     /* Highlight mark (==text==): a warm wash that reads on the app's surface. */
     :host ::ng-deep .ProseMirror mark {
-      background: color-mix(in srgb, var(--color-gold) 30%, transparent);
+      background: color-mix(in srgb, var(--color-accent) 30%, transparent);
       border-radius: 0.15em;
       padding: 0 0.1em;
       color: inherit;
@@ -448,6 +448,16 @@ export class ContentEditorComponent {
   }
 
   /**
+   * The Entities an `@` mention may link — never the one being written in. `q` is full-text over prose
+   * (ADR-0035), so an autosave landing mid-mention indexes the name being typed and the host starts
+   * matching itself; offered, that row costs Enter the mint it promises (ADR-0073).
+   */
+  private async searchLinkTargets(name: string): Promise<EntitySummary[]> {
+    const hostId = this.session.current()?.id;
+    return (await this.resolver.search(name)).filter((entity) => entity.id !== hostId);
+  }
+
+  /**
    * Mint the Entity an `@` mention names, into the open Entity's World — typing must never author a
    * cross-World link (ADR-0073). A failed write is reported here and rethrown, so the extension can
    * put the typed text back where it was.
@@ -559,7 +569,7 @@ export class ContentEditorComponent {
 
     const mention = entityMention({
       getPicker: () => this.entityPicker(),
-      search: (name) => this.resolver.search(name),
+      search: (name) => this.searchLinkTargets(name),
       canCreate: this.canCreate,
       mint: (name) => this.mint(name),
       mintWithDetails: (name) => this.mintWithDetails(name),

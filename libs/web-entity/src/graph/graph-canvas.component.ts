@@ -12,12 +12,12 @@ import {
 } from '@angular/core';
 import type { Graph, GraphConfig } from '@cosmos.gl/graph';
 import { WorldGraph } from '@hexly/domain';
-import { Logger, ThemeService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
+import { ColorSchemeService, Logger, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
 import { FramingCamera, currentView, framingCamera, spaceScale } from './graph-camera';
 import { GraphFocus, graphFocus } from './graph-focus';
 import { GraphWarmPool, WarmGraph } from './graph-warm-pool';
 import { GraphPayload, graphPayload } from './graph-payload';
-import { palette } from './graph-palette';
+import { graphColors } from './graph-colors';
 import { SPACE, centerPoint, positionsById, seedBuffers } from './graph-seed';
 import { LabelGrid, selectLabels } from './select-labels';
 import { ENTITY_TYPES } from '../models/entity-types';
@@ -78,7 +78,7 @@ const REHEAT_ALPHA = 0.3;
 /**
  * A dark outline stamped around the white Entity labels — four diagonal offsets for the body of the
  * contour, one soft drop for depth — so a name stays legible over a pale node, a dark one, or the
- * links crossing behind it, in either theme. Cheaper and crisper at 9px than `-webkit-text-stroke`,
+ * links crossing behind it, in either ColorScheme. Cheaper and crisper at 9px than `-webkit-text-stroke`,
  * which thins the glyphs.
  */
 const LABEL_CONTOUR = '-1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1px 0 #111, 0 1px 2px rgba(0,0,0,0.6)';
@@ -146,7 +146,7 @@ export class GraphCanvasComponent {
 
   private readonly hostEl = viewChild.required<ElementRef<HTMLDivElement>>('host');
   private readonly overlayEl = viewChild.required<ElementRef<HTMLDivElement>>('overlay');
-  private readonly theme = inject(ThemeService);
+  private readonly colorScheme = inject(ColorSchemeService);
   private readonly logger = inject(Logger);
   private readonly types = inject(ENTITY_TYPES);
   private readonly pool = inject(GraphWarmPool);
@@ -185,7 +185,7 @@ export class GraphCanvasComponent {
       // New data re-seeds the *live* graph. Rebuilding it instead would recreate a WebGL context and
       // recompile cosmos.gl's shaders on the main thread — which is what every depth flip and decor
       // reveal in the Local Graph Panel used to cost (ADR-0072).
-      // `untracked`: the swap bakes the palette, and the type registry it reads is a signal — a plugin
+      // `untracked`: the swap bakes the colours, and the type registry it reads is a signal — a plugin
       // registering a type must not read as new graph data.
       const live = this.mounted;
       if (live && live.host === host) return void untracked(() => this.swap(live, graph, center));
@@ -219,11 +219,11 @@ export class GraphCanvasComponent {
       );
     });
 
-    // A theme flip re-bakes the colours and nothing else. Remounting would restart the force
+    // A ColorScheme flip re-bakes the colours and nothing else. Remounting would restart the force
     // simulation and throw away the settled layout the reader is looking at, to change a hue.
     effect(() => {
-      this.theme.theme();
-      this.mounted?.drawing.focus.usePalette(palette(this.types.all()));
+      this.colorScheme.colorScheme();
+      this.mounted?.drawing.focus.useColors(graphColors(this.types.all()));
     });
 
     // The labels follow their box — a Dock Panel dragged wider (ADR-0067), a window resize. cosmos.gl
@@ -247,12 +247,15 @@ export class GraphCanvasComponent {
 
     const payload = graphPayload(graph);
     const { nodes, links } = payload;
-    const colors = palette(this.types.all());
+    const colors = graphColors(this.types.all());
     const centerIndex = centerPoint(payload, center);
     const { positions, sizes } = seedBuffers(payload, centerIndex);
     // The settle mark describes the payload on screen (a hook for tests waiting on the layout), so a
     // previous mount's must not stand for this one's.
     delete host.dataset['settled'];
+    // The drawn mark describes the canvas, so only a new *mount* stands it down — a swap draws on
+    // through the one already painted. Taking the marker is what stands it down.
+    const markDrawn = firstFrameMark(host);
 
     // Adopt the pool's pre-warmed graph when one is free: its context creation and shader compile
     // then happened at browser idle, not on this click (see {@link GraphWarmPool}).
@@ -261,7 +264,7 @@ export class GraphCanvasComponent {
     const config: GraphConfig = {
       backgroundColor: colors.background,
       // Colour changes snap unless a render asks for a fade by itself — the hover fade passes its
-      // own duration; mount and theme flips must not inherit cosmos.gl's 800 ms default.
+      // own duration; mount and ColorScheme flips must not inherit cosmos.gl's 800 ms default.
       transitionDuration: 0,
       enableDrag: true,
       // The seed ring is what this frames; `camera` judges it from the first tick onwards, so the
@@ -303,6 +306,7 @@ export class GraphCanvasComponent {
       onDragEnd: () => (this.interacting = false),
       onSimulationTick: (alpha) => {
         camera.keepFramed();
+        markDrawn();
         // The settled mark says the layout is *readable*, not finished: the simulation runs on until alpha
         // crosses 1e-3 (`onSimulationEnd`), so it is set here, at a legible threshold, rather than tens of
         // seconds later. The label loop tracks the points until that real end.
@@ -337,7 +341,7 @@ export class GraphCanvasComponent {
     const drawing: Drawing = {
       payload,
       positions,
-      focus: graphFocus({ cosmos, nodes, links, palette: colors, onChange: () => this.wake() }),
+      focus: graphFocus({ cosmos, nodes, links, colors, onChange: () => this.wake() }),
       settled: false,
     };
 
@@ -394,7 +398,7 @@ export class GraphCanvasComponent {
       cosmos,
       nodes,
       links,
-      palette: palette(this.types.all()),
+      colors: graphColors(this.types.all()),
       onChange: () => this.wake(),
     });
     // `render` is where cosmos.gl adopts the staged data — it re-derives the counts and rebuilds the
@@ -597,6 +601,35 @@ export class GraphCanvasComponent {
     if (this.mounted) this.destroyMount(this.mounted);
     this.mounted = null;
   }
+}
+
+/** Which mount owns a host's drawn mark — a frame callback from an earlier one must not stamp. */
+const drawnMarkOwner = new WeakMap<HTMLDivElement, object>();
+
+/**
+ * Takes the host's drawn mark for a new mount and returns the marker that stamps it, once cosmos.gl has
+ * painted. This is the hook for a test that reads the canvas back, which {@link SETTLED_ALPHA} cannot
+ * be: alpha decays once per *rendered frame*, so the settle mark is a frame count (~650 at
+ * {@link SIMULATION_DECAY}), and a renderer without a GPU crosses it on no clock a test can name.
+ *
+ * Two frames, because the caller is `onSimulationTick`, which cosmos.gl invokes *inside* the render
+ * pass it is about to submit. Those frames can outlive the mount that asked for them, so the stamp is
+ * withheld unless this mount still owns the mark.
+ */
+function firstFrameMark(host: HTMLDivElement): () => void {
+  const owner = {};
+  drawnMarkOwner.set(host, owner);
+  delete host.dataset['drawn'];
+  let marked = false;
+  return () => {
+    if (marked) return;
+    marked = true;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (drawnMarkOwner.get(host) === owner) host.dataset['drawn'] = 'true';
+      }),
+    );
+  };
 }
 
 /** Flip an edge label that would otherwise read upside-down. */

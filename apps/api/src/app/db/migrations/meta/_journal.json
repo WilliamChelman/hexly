@@ -204,6 +204,20 @@
       "when": 1784955211481,
       "tag": "0028_eager_silver_centurion",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1785041611481,
+      "tag": "0029_color_scheme_preference",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1785104271792,
+      "tag": "0030_world_theme",
+      "breakpoints": true
     }
   ]
 }

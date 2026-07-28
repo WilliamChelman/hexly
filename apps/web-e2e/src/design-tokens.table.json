@@ -1,0 +1,458 @@
+{
+  "--font-cartouche": {
+    "solar": "\"Cinzel Decorative\", \"Marcellus\", Georgia, serif",
+    "astral": "\"Cinzel Decorative\", \"Marcellus\", Georgia, serif"
+  },
+  "--font-display": {
+    "solar": "\"Marcellus\", Georgia, serif",
+    "astral": "\"Marcellus\", Georgia, serif"
+  },
+  "--font-body": {
+    "solar": "\"Source Serif 4 Variable\", Georgia, \"Times New Roman\", serif",
+    "astral": "\"Source Serif 4 Variable\", Georgia, \"Times New Roman\", serif"
+  },
+  "--font-mono": {
+    "solar": "\"JetBrains Mono Variable\", \"SFMono-Regular\", Menlo, monospace",
+    "astral": "\"JetBrains Mono Variable\", \"SFMono-Regular\", Menlo, monospace"
+  },
+  "--text-2xs": {
+    "solar": ".6875rem",
+    "astral": ".6875rem"
+  },
+  "--text-xs": {
+    "solar": ".75rem",
+    "astral": ".75rem"
+  },
+  "--text-sm": {
+    "solar": ".8125rem",
+    "astral": ".8125rem"
+  },
+  "--text-base": {
+    "solar": ".9375rem",
+    "astral": ".9375rem"
+  },
+  "--text-md": {
+    "solar": "1.0625rem",
+    "astral": "1.0625rem"
+  },
+  "--text-lg": {
+    "solar": "1.3125rem",
+    "astral": "1.3125rem"
+  },
+  "--text-xl": {
+    "solar": "1.625rem",
+    "astral": "1.625rem"
+  },
+  "--text-2xl": {
+    "solar": "2.0625rem",
+    "astral": "2.0625rem"
+  },
+  "--text-3xl": {
+    "solar": "2.5625rem",
+    "astral": "2.5625rem"
+  },
+  "--leading-tight": {
+    "solar": "1.15",
+    "astral": "1.15"
+  },
+  "--leading-snug": {
+    "solar": "1.35",
+    "astral": "1.35"
+  },
+  "--leading-normal": {
+    "solar": "1.6",
+    "astral": "1.6"
+  },
+  "--tracking-tight": {
+    "solar": "-.01em",
+    "astral": "-.01em"
+  },
+  "--tracking-normal": {
+    "solar": "0",
+    "astral": "0"
+  },
+  "--tracking-wide": {
+    "solar": ".04em",
+    "astral": ".04em"
+  },
+  "--tracking-wider": {
+    "solar": ".14em",
+    "astral": ".14em"
+  },
+  "--font-weight-regular": {
+    "solar": "400",
+    "astral": "400"
+  },
+  "--font-weight-medium": {
+    "solar": "500",
+    "astral": "500"
+  },
+  "--font-weight-semibold": {
+    "solar": "600",
+    "astral": "600"
+  },
+  "--font-weight-bold": {
+    "solar": "700",
+    "astral": "700"
+  },
+  "--radius-sm": {
+    "solar": "3px",
+    "astral": "3px"
+  },
+  "--radius-md": {
+    "solar": "6px",
+    "astral": "6px"
+  },
+  "--radius-lg": {
+    "solar": "10px",
+    "astral": "10px"
+  },
+  "--radius-xl": {
+    "solar": "16px",
+    "astral": "16px"
+  },
+  "--radius-full": {
+    "solar": "999px",
+    "astral": "999px"
+  },
+  "--palette-page": {
+    "solar": "rgb(241, 229, 199)",
+    "astral": "rgb(11, 12, 26)"
+  },
+  "--palette-ink": {
+    "solar": "rgb(46, 36, 18)",
+    "astral": "rgb(236, 227, 207)"
+  },
+  "--palette-ink-quiet": {
+    "solar": "rgb(111, 90, 54)",
+    "astral": "rgb(154, 160, 200)"
+  },
+  "--palette-accent": {
+    "solar": "rgb(140, 94, 0)",
+    "astral": "rgb(217, 178, 90)"
+  },
+  "--palette-danger": {
+    "solar": "rgb(162, 27, 1)",
+    "astral": "rgb(254, 122, 84)"
+  },
+  "--palette-success": {
+    "solar": "rgb(50, 94, 1)",
+    "astral": "rgb(113, 202, 66)"
+  },
+  "--palette-canvas": {
+    "solar": "rgb(239, 226, 191)",
+    "astral": "rgb(18, 21, 46)"
+  },
+  "--palette-soot": {
+    "solar": "rgb(60, 44, 22)",
+    "astral": "rgb(2, 2, 10)"
+  },
+  "--palette-polarity": {
+    "solar": "1",
+    "astral": "-1"
+  },
+  "--palette-line-alpha": {
+    "solar": "0.371",
+    "astral": "0.16"
+  },
+  "--palette-veil": {
+    "solar": "0.12",
+    "astral": "0.5"
+  },
+  "--color-bg": {
+    "solar": "rgb(241, 229, 199)",
+    "astral": "rgb(11, 12, 26)"
+  },
+  "--color-bg-deep": {
+    "solar": "oklch(0.896689 0.0529423 88.7394)",
+    "astral": "oklch(0.13453 0.018169 279.451)"
+  },
+  "--color-surface": {
+    "solar": "oklch(0.969689 0.0223423 86.7394)",
+    "astral": "oklch(0.20753 0.048769 277.451)"
+  },
+  "--color-surface-raised": {
+    "solar": "oklch(0.990689 0.0135423 84.2394)",
+    "astral": "oklch(0.22853 0.057569 274.951)"
+  },
+  "--color-surface-sunken": {
+    "solar": "oklch(0.906689 0.0487423 89.7394)",
+    "astral": "oklch(0.17853 0.036569 280.451)"
+  },
+  "--color-overlay": {
+    "solar": "oklch(0.305948 0.0420615 73.9116 / 0.393405)",
+    "astral": "oklch(0.094139 0.0275525 279.72 / 0.737135)"
+  },
+  "--color-ink": {
+    "solar": "rgb(46, 36, 18)",
+    "astral": "rgb(236, 227, 207)"
+  },
+  "--color-ink-strong": {
+    "solar": "oklch(0.218382 0.0264858 85.2033)",
+    "astral": "oklch(0.966106 0.0213822 90.5649)"
+  },
+  "--color-ink-muted": {
+    "solar": "rgb(111, 90, 54)",
+    "astral": "rgb(154, 160, 200)"
+  },
+  "--color-ink-faint": {
+    "solar": "oklch(0.645857 0.0646971 84.6129)",
+    "astral": "oklch(0.548935 0.064605 282.669)"
+  },
+  "--line-alpha": {
+    "solar": "0.371",
+    "astral": "0.16"
+  },
+  "--shadow-lift": {
+    "solar": "1",
+    "astral": "1.4"
+  },
+  "--color-line": {
+    "solar": "oklch(0.518455 0.109056 75.6796 / 0.371)",
+    "astral": "oklch(0.780853 0.115859 85.5826 / 0.16)"
+  },
+  "--color-line-strong": {
+    "solar": "oklch(0.518455 0.109056 75.6796 / 0.68635)",
+    "astral": "oklch(0.780853 0.115859 85.5826 / 0.296)"
+  },
+  "--color-line-faint": {
+    "solar": "oklch(0.518455 0.109056 75.6796 / 0.16324)",
+    "astral": "oklch(0.780853 0.115859 85.5826 / 0.0704)"
+  },
+  "--color-accent": {
+    "solar": "rgb(140, 94, 0)",
+    "astral": "rgb(217, 178, 90)"
+  },
+  "--color-accent-strong": {
+    "solar": "oklch(0.432655 0.0930555 78.6796)",
+    "astral": "oklch(0.866653 0.0998589 88.5826)"
+  },
+  "--color-accent-soft": {
+    "solar": "oklch(0.518455 0.109056 75.6796 / 0.14)",
+    "astral": "oklch(0.780853 0.115859 85.5826 / 0.14)"
+  },
+  "--color-accent-sheen-bright": {
+    "solar": "oklch(0.876 0.1 85.1796)",
+    "astral": "oklch(0.876 0.1 95.0826)"
+  },
+  "--color-accent-sheen-deep": {
+    "solar": "oklch(0.605455 0.120056 73.1796)",
+    "astral": "oklch(0.693853 0.126859 83.0826)"
+  },
+  "--color-on-fill": {
+    "solar": "color(srgb 0.954902 0.936863 0.9)",
+    "astral": "color(srgb 0.085098 0.0698039 0.0352941)"
+  },
+  "--color-on-accent-sheen": {
+    "solar": "color(srgb 0.0958111 0.0822079 0.053343)",
+    "astral": "color(srgb 0.0919619 0.0839423 0.0535141)"
+  },
+  "--color-accent-glow": {
+    "solar": "oklch(0.713 0.144074 76.6796 / 0.5)",
+    "astral": "oklch(0.780853 0.115859 86.5826 / 0.5)"
+  },
+  "--color-tone-1": {
+    "solar": "oklch(0.387633 0.109056 156.68)",
+    "astral": "oklch(0.677799 0.115859 166.583)"
+  },
+  "--color-tone-1-soft": {
+    "solar": "oklch(0.387633 0.109056 156.68 / 0.14)",
+    "astral": "oklch(0.677799 0.115859 166.583 / 0.14)"
+  },
+  "--color-tone-2": {
+    "solar": "oklch(0.387633 0.109056 192.68)",
+    "astral": "oklch(0.677799 0.115859 202.583)"
+  },
+  "--color-tone-2-soft": {
+    "solar": "oklch(0.387633 0.109056 192.68 / 0.14)",
+    "astral": "oklch(0.677799 0.115859 202.583 / 0.14)"
+  },
+  "--color-tone-3": {
+    "solar": "oklch(0.387633 0.109056 228.68)",
+    "astral": "oklch(0.677799 0.115859 238.583)"
+  },
+  "--color-tone-3-soft": {
+    "solar": "oklch(0.387633 0.109056 228.68 / 0.14)",
+    "astral": "oklch(0.677799 0.115859 238.583 / 0.14)"
+  },
+  "--color-tone-4": {
+    "solar": "oklch(0.455032 0.109056 264.68)",
+    "astral": "oklch(0.77931 0.115859 274.583)"
+  },
+  "--color-tone-4-soft": {
+    "solar": "oklch(0.455032 0.109056 264.68 / 0.14)",
+    "astral": "oklch(0.77931 0.115859 274.583 / 0.14)"
+  },
+  "--color-tone-5": {
+    "solar": "oklch(0.455032 0.109056 300.68)",
+    "astral": "oklch(0.77931 0.115859 310.583)"
+  },
+  "--color-tone-5-soft": {
+    "solar": "oklch(0.455032 0.109056 300.68 / 0.14)",
+    "astral": "oklch(0.77931 0.115859 310.583 / 0.14)"
+  },
+  "--color-tone-6": {
+    "solar": "oklch(0.387633 0.109056 336.68)",
+    "astral": "oklch(0.677799 0.115859 346.583)"
+  },
+  "--color-tone-6-soft": {
+    "solar": "oklch(0.387633 0.109056 336.68 / 0.14)",
+    "astral": "oklch(0.677799 0.115859 346.583 / 0.14)"
+  },
+  "--color-tone-7": {
+    "solar": "oklch(0.387633 0.109056 12.6796)",
+    "astral": "oklch(0.677799 0.115859 22.5826)"
+  },
+  "--color-tone-7-soft": {
+    "solar": "oklch(0.387633 0.109056 12.6796 / 0.14)",
+    "astral": "oklch(0.677799 0.115859 22.5826 / 0.14)"
+  },
+  "--color-tone-8": {
+    "solar": "oklch(0.387633 0.109056 48.6796)",
+    "astral": "oklch(0.677799 0.115859 58.5826)"
+  },
+  "--color-tone-8-soft": {
+    "solar": "oklch(0.387633 0.109056 48.6796 / 0.14)",
+    "astral": "oklch(0.677799 0.115859 58.5826 / 0.14)"
+  },
+  "--color-danger": {
+    "solar": "rgb(162, 27, 1)",
+    "astral": "rgb(254, 122, 84)"
+  },
+  "--color-danger-soft": {
+    "solar": "oklch(0.459324 0.172441 32.1753 / 0.15)",
+    "astral": "oklch(0.726952 0.170013 36.8754 / 0.15)"
+  },
+  "--color-success": {
+    "solar": "rgb(50, 94, 1)",
+    "astral": "rgb(113, 202, 66)"
+  },
+  "--color-success-soft": {
+    "solar": "oklch(0.432866 0.123081 133.753 / 0.16)",
+    "astral": "oklch(0.755937 0.19081 136.691 / 0.16)"
+  },
+  "--color-canvas-bg": {
+    "solar": "rgb(239, 226, 191)",
+    "astral": "rgb(18, 21, 46)"
+  },
+  "--color-canvas-mat": {
+    "solar": "oklch(0.878262 0.0632544 89.3132)",
+    "astral": "oklch(0.171861 0.0342641 275.378)"
+  },
+  "--color-canvas-glow": {
+    "solar": "rgba(255, 240, 202, 0.55)",
+    "astral": "rgba(58, 70, 140, 0.26)"
+  },
+  "--color-canvas-edge": {
+    "solar": "oklch(0.305948 0.0420615 73.9116 / 0.12)",
+    "astral": "oklch(0.094139 0.0275525 279.72 / 0.5)"
+  },
+  "--color-ink-stroke": {
+    "solar": "oklch(0.953689 0.0290423 91.2394)",
+    "astral": "oklch(0.13153 0.016869 281.951)"
+  },
+  "--color-hex-line": {
+    "solar": "oklch(0.479857 0.0586971 80.1129 / 0.371)",
+    "astral": "oklch(0.714935 0.058605 278.169 / 0.16)"
+  },
+  "--color-feature-ink": {
+    "solar": "oklab(0.387637 0.0156105 0.0679279)",
+    "astral": "oklab(0.851964 0.00516768 0.0701793)"
+  },
+  "--color-label-ink": {
+    "solar": "oklab(0.357448 0.0129881 0.0592189)",
+    "astral": "oklab(0.868374 0.00430091 0.0597172)"
+  },
+  "--color-name-ink": {
+    "solar": "oklab(0.407561 0.0118182 0.0582231)",
+    "astral": "oklab(0.808928 0.00438427 0.0499249)"
+  },
+  "--color-terrain-grass": {
+    "solar": "oklab(0.796631 -0.0365094 0.0855566)",
+    "astral": "oklab(0.44343 -0.0338902 0.0369361)"
+  },
+  "--color-terrain-forest": {
+    "solar": "oklab(0.667131 -0.0527217 0.0585736)",
+    "astral": "oklab(0.31393 -0.0501026 0.00995319)"
+  },
+  "--color-terrain-ocean": {
+    "solar": "oklab(0.700631 -0.0333289 -0.0164913)",
+    "astral": "oklab(0.34743 -0.0307098 -0.0651118)"
+  },
+  "--color-terrain-mountain": {
+    "solar": "rgb(185, 164, 137)",
+    "astral": "rgb(71, 66, 100)"
+  },
+  "--color-terrain-desert": {
+    "solar": "oklab(0.826631 0.00402391 0.0939611)",
+    "astral": "oklab(0.473431 0.00664307 0.0453406)"
+  },
+  "--color-terrain-sky": {
+    "solar": "oklab(0.807631 -0.0131608 -0.0282959)",
+    "astral": "oklab(0.45443 -0.0105416 -0.0769164)"
+  },
+  "--dur-instant": {
+    "solar": "0.08s",
+    "astral": "0.08s"
+  },
+  "--dur-fast": {
+    "solar": "0.15s",
+    "astral": "0.15s"
+  },
+  "--dur-base": {
+    "solar": "0.24s",
+    "astral": "0.24s"
+  },
+  "--dur-slow": {
+    "solar": "0.42s",
+    "astral": "0.42s"
+  },
+  "--ease-out": {
+    "solar": "cubic-bezier(.22, 1, .36, 1)",
+    "astral": "cubic-bezier(.22, 1, .36, 1)"
+  },
+  "--ease-in-out": {
+    "solar": "cubic-bezier(.65, 0, .35, 1)",
+    "astral": "cubic-bezier(.65, 0, .35, 1)"
+  },
+  "--ease-spring": {
+    "solar": "cubic-bezier(.34, 1.56, .64, 1)",
+    "astral": "cubic-bezier(.34, 1.56, .64, 1)"
+  },
+  "--rail-header": {
+    "solar": "56px",
+    "astral": "56px"
+  },
+  "--container-reading": {
+    "solar": "68ch",
+    "astral": "68ch"
+  },
+  "--shadow-1": {
+    "solar": "0 1px 2px oklch(from rgb(60, 44, 22) l c h / 0.12)",
+    "astral": "0 1px 2px oklch(from rgb(2, 2, 10) l c h / 0.5)"
+  },
+  "--shadow-2": {
+    "solar": "0 calc(4px * 1) calc(12px * 1) calc(-2px * 1) oklch(from rgb(60, 44, 22) l c h / pow(0.12, .75) )",
+    "astral": "0 calc(4px * 1.4) calc(12px * 1.4) calc(-2px * 1.4) oklch(from rgb(2, 2, 10) l c h / pow(0.5, .75) )"
+  },
+  "--shadow-3": {
+    "solar": "0 calc(16px * 1) calc(36px * 1) calc(-8px * 1) oklch(from rgb(60, 44, 22) l c h / pow(0.12, .5) )",
+    "astral": "0 calc(16px * 1.4) calc(36px * 1.4) calc(-8px * 1.4) oklch(from rgb(2, 2, 10) l c h / pow(0.5, .5) )"
+  },
+  "--shadow-inset": {
+    "solar": "inset 0 1px 2px oklch(from rgb(60, 44, 22) l c h / 0.12)",
+    "astral": "inset 0 1px 2px oklch(from rgb(2, 2, 10) l c h / 0.5)"
+  },
+  "--shadow-focus": {
+    "solar": "0 0 0 3px oklch(from rgb(140, 94, 0) l c h / .345)",
+    "astral": "0 0 0 3px oklch(from rgb(217, 178, 90) l c h / .345)"
+  },
+  "--gradient-accent-sheen": {
+    "solar": "linear-gradient(180deg, oklch(0.876 0.1 85.1796), oklch(0.605455 0.120056 73.1796))",
+    "astral": "linear-gradient(180deg, oklch(0.876 0.1 95.0826), oklch(0.693853 0.126859 83.0826))"
+  },
+  "--gradient-accent-sheen-radial": {
+    "solar": "radial-gradient( circle at 50% 35%, oklch(0.876 0.1 85.1796), oklch(0.605455 0.120056 73.1796) )",
+    "astral": "radial-gradient( circle at 50% 35%, oklch(0.876 0.1 95.0826), oklch(0.693853 0.126859 83.0826) )"
+  }
+}

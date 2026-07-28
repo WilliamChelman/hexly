@@ -299,7 +299,69 @@ entities:
   inlineType: core.type.note # the Entity Type Inline Creation mints (ADR-0073)
   inlineTag: untriaged # a Tag put on everything created inline (ADR-0073);
   #     omit the key — the default — and nothing is tagged.
+theme: # your deployment's own branding (ADR-0076); omit the key — the default —
+  #     and Hexly renders exactly as it always has. See below.
+  version: 1
+  solar:
+    accent: '#2f6f4f'
+  astral:
+    accent: '#7ad3a4'
 ```
+
+#### Branding your deployment (`theme`)
+
+`theme` is an **Instance default Theme**: the first link of the chain **Instance
+default → World Theme → the reader's ColorScheme** (ADR-0076). It ships empty,
+and it is a **starting point, not an imposition** — a World that has authored its
+own Theme is unaffected by it, field by field, so your radii survive under a World
+that only re-anchors its colours.
+
+Every field is optional; branding your accent alone is two anchors. The whole
+surface:
+
+```yaml
+theme:
+  version: 1 # required whenever the block is present: the contract these values
+  #            were authored against. A version this build does not know fails
+  #            boot rather than being applied in part.
+  solar: # the day Palette: 8 anchors and 3 knobs, each optional (ADR-0075)
+    page: '#f4ece0' # the outer paper
+    ink: '#20242e' # primary text ink
+    inkQuiet: '#5c6472' # secondary ink; carries its own hue
+    accent: '#2f6f4f' # the through-line accent — the roles above it derive from it
+    danger: '#a4402e'
+    success: '#4a6f2f'
+    canvas: '#efe7db' # the map field
+    soot: '#2a2f38' # shadow / scrim ink
+    polarity: 1 # ±1, every ramp's direction: 1 for a light Palette, -1 for a dark one
+    lineAlpha: 0.371 # opacity of the drawn-rule ramp
+    veil: 0.12 # base opacity of shadows, scrims and the vignette
+  astral: # the night Palette, same fields. A reader still chooses Solar or Astral
+    accent: '#7ad3a4' #  within your identity — that choice is theirs, not yours.
+  radii: # the cheapest identity lever there is: sharp versus soft
+    --radius-md: 0px
+  fontPairing: codex # one of the curated pairings
+  overrides: # per-ColorScheme opt-outs from a derived role, keyed by token
+    solar:
+      --color-ink: '#101010'
+```
+
+Worth knowing before you write one:
+
+- **Quote your colours.** A bare `#2f6f4f` is a YAML comment. Any CSS colour
+  notation is accepted (`#rgb`, `rgb()`, `oklch()`, a named colour); it is parsed
+  and stored back as canonical `oklch(…)`, which is what the browser is then sent.
+- **A malformed value fails boot**, naming every offending key
+  (`theme.solar.accent: not a color value`). So does a key **misspelled inside**
+  the block — branding applied in part is worse than a refusal you can see. Alone
+  in `hexly.yml`, this block does not quietly strip what it does not recognise;
+  a misspelled `theme:` itself still does, as any top-level key does (ADR-0052).
+- **The `--radius-*` family is the whole of `radii`**, and `overrides` keys only
+  tokens in the public contract. The type scale, the layout rails and motion are
+  structure and reader accessibility rather than identity, and are deliberately
+  not themeable (ADR-0076).
+- **It is served unauthenticated**, on `GET /api/config`, because a World Public
+  Link visitor has no session and must still be themed.
 
 With `collaboration: false` the sharing and user-management endpoints — entity
 grants, owner sets, World members, both kinds of Public Link, and `/api/users` —

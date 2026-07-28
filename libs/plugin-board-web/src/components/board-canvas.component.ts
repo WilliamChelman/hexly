@@ -13,7 +13,8 @@ import {
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Point } from '@hexly/plugin-board';
-import { isTrackpadWheel, ThemeService, wheelDeltaPixels } from '@hexly/web-core';
+import { ColorSchemeService, WorldThemeApplier, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
+import { DesignToken, designTokenInitial, designTokenStyle, readDesignToken } from '@hexly/web-styles';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { Camera, fitCamera } from '../utils/camera';
 import { DRAG_THRESHOLD } from '../utils/gesture';
@@ -33,6 +34,8 @@ const ZOOM_SENSITIVITY_TOUCHPAD = 0.006;
 const ZOOM_SENSITIVITY_MOUSE = 0.002;
 /** World-pixel spacing of the reference dot grid — the surface's feedback for pan/zoom. */
 const GRID_SPACING = 48;
+/** The token the reference dots take their colour from, named once and manifest-typed (ADR-0075). */
+const DOT_TOKEN: DesignToken = '--color-line';
 /** A grid dot's drawn radius in screen pixels, held roughly constant across zoom. */
 const DOT_RADIUS = 1;
 /** Screen-pixel breathing room fit-to-content leaves around the framed elements. */
@@ -142,7 +145,8 @@ export class BoardCanvasComponent {
 
   protected readonly zoomPercent = computed(() => Math.round(this.cam.zoom() * 100));
 
-  private readonly theme = inject(ThemeService);
+  private readonly colorScheme = inject(ColorSchemeService);
+  private readonly worldTheme = inject(WorldThemeApplier);
   private readonly destroyRef = inject(DestroyRef);
 
   private ctx: CanvasRenderingContext2D | null = null;
@@ -150,7 +154,7 @@ export class BoardCanvasComponent {
   private dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
   private width = 0;
   private height = 0;
-  private dotColor = 'rgba(0,0,0,0.18)';
+  private dotColor = designTokenInitial(DOT_TOKEN);
   private centred = false;
 
   /**
@@ -166,9 +170,11 @@ export class BoardCanvasComponent {
     // Reading the camera inside renderFrame() registers it as a dependency, so a pan/zoom repaints.
     effect(() => this.renderFrame());
 
-    // A theme switch re-reads the dot colour via getComputedStyle, then repaints untracked.
+    // A ColorScheme switch — or an Owner's live World Theme edit (ADR-0076) — re-reads the dot colour
+    // via getComputedStyle, then repaints untracked.
     effect(() => {
-      this.theme.theme();
+      this.colorScheme.colorScheme();
+      this.worldTheme.revision();
       if (!this.ctx) return;
       this.refreshTheme();
       untracked(() => this.renderFrame());
@@ -335,12 +341,9 @@ export class BoardCanvasComponent {
     return this.cam.screenToWorld(this.localPoint(event.currentTarget as HTMLElement, event));
   }
 
-  /** Re-read the themed dot colour from the canvas's resolved styles (ADR-0007/0020). */
+  /** Re-read the themed dot colour off the root's resolved styles (ADR-0007/0020). */
   private refreshTheme(): void {
-    const canvas = this.canvasRef()?.nativeElement;
-    if (!canvas) return;
-    const line = getComputedStyle(canvas).getPropertyValue('--color-line').trim();
-    if (line) this.dotColor = line;
+    this.dotColor = readDesignToken(designTokenStyle(), DOT_TOKEN);
   }
 
   /**

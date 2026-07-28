@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Field, EntityDocument, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
-import { ButtonComponent, ChipComponent } from '@hexly/web-ui';
+import { ButtonComponent, ChipComponent, ChipTone, IconName } from '@hexly/web-ui';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { FieldControlComponent } from '@hexly/web-entity';
+import { FieldControlComponent, typeTone } from '@hexly/web-entity';
 
 /**
  * Pick, add, remove, and reorder an Entity's ordered Entity Type set, `types[0]` primary (ADR-0048).
@@ -20,7 +20,9 @@ import { FieldControlComponent } from '@hexly/web-entity';
     <div class="flex flex-col gap-3" data-testid="entity-types-editor">
       <div class="flex flex-wrap items-center gap-2">
         @for (type of types(); track type; let i = $index) {
-          <app-chip [tone]="i === 0 ? 'gold' : undefined" [attr.data-testid]="'type-chip-' + type">
+          <!-- The icon, not the tone, is what carries the category: the tone arc is the deuteranope
+               confusion line (ADR-0075). Primacy is the "· Primary" marker, never the colour. -->
+          <app-chip [tone]="toneOf(type)" [icon]="iconOf(type)" [attr.data-testid]="'type-chip-' + type">
             {{ typeLabel(type) }}
             @if (i === 0) {
               <span class="text-2xs opacity-70" data-testid="type-primary"
@@ -190,6 +192,16 @@ export class EntityTypesEditorComponent {
   /** A friendly label: a registered type's name (authored, for a user-defined one), else the raw id. */
   protected typeLabel(type: string): string {
     return this.registry.get(type) ? this.registry.chromeLabel(type, 'eyebrow') : type;
+  }
+
+  /** The type's tone. An unregistered type hashes its own id, so two unknown ids still read apart. */
+  protected toneOf(type: string): ChipTone {
+    return typeTone(this.registry.get(type) ?? { id: type });
+  }
+
+  /** The type's glyph; an unregistered one takes the generic chrome, as every other surface does. */
+  protected iconOf(type: string): IconName {
+    return this.registry.resolve(type).icon;
   }
 
   /** Whether the type is System-managed (ADR-0068) — the system alone assigns/removes it, so no remove renders. */

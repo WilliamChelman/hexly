@@ -5,14 +5,14 @@ import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
 import { ActiveWorld, EntitiesClient, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
 import { CORE_VIEW_MAP, EntitySearchPickerComponent } from '@hexly/web-entity';
 import {
-  ACCENT_BAR,
+  TONE_BAR,
   ButtonComponent,
   EyebrowComponent,
   IconComponent,
   IconName,
   PageHeaderComponent,
   PanelComponent,
-  accentFor,
+  toneFor,
 } from '@hexly/web-ui';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NewEntityButtonComponent } from '../../../../entity-types/new-entity-button.component';
@@ -50,7 +50,7 @@ const MAPS_LIMIT = 8;
          a distinct selector for an Entity showing in more than one list. -->
     <ng-template #tile let-e let-prefix="prefix">
       <section
-        class="group relative flex gap-3 p-4 pl-5 overflow-hidden h-full transition-shadow hover:shadow-3 has-[a:focus-visible]:[outline:2px_solid_var(--color-gold)] has-[a:focus-visible]:outline-offset-2"
+        class="group relative flex gap-3 p-4 pl-5 overflow-hidden h-full transition-shadow hover:shadow-3 has-[a:focus-visible]:[outline:2px_solid_var(--color-accent)] has-[a:focus-visible]:outline-offset-2"
         appPanel
         raised
       >
@@ -64,7 +64,7 @@ const MAPS_LIMIT = 8;
             [attr.aria-label]="e.name"
           >
             <span
-              class="font-display text-md text-ink-strong leading-tight line-clamp-2 group-hover:text-gold transition-colors"
+              class="font-display text-md text-ink-strong leading-tight line-clamp-2 group-hover:text-accent-strong transition-colors"
               >{{ e.name }}</span
             >
           </a>
@@ -79,7 +79,7 @@ const MAPS_LIMIT = 8;
 
     <app-page-header sticky>
       <div pageHeaderTitle class="flex flex-col">
-        <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'worldDashboard.eyebrow' | transloco }}</span>
+        <span appEyebrow class="text-accent-strong! tracking-[0.28em]">{{ 'worldDashboard.eyebrow' | transloco }}</span>
         <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
           {{ worldName() }}
         </h1>
@@ -324,7 +324,7 @@ export class WorldDashboardPage {
   }
 
   protected bar(id: string): string {
-    return ACCENT_BAR[accentFor(id)];
+    return TONE_BAR[toneFor(id)];
   }
 
   protected typeIcon(type: EntityType): IconName {

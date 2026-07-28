@@ -57,6 +57,7 @@
       "@hexly/web-entity": ["./libs/web-entity/src/index.ts"],
       "@hexly/web-entity/i18n": ["./libs/web-entity/src/i18n/index.ts"],
       "@hexly/web-entity/testing": ["./libs/web-entity/src/testing/index.ts"],
+      "@hexly/web-styles": ["./libs/web-styles/src/index.ts"],
       "@hexly/web-ui": ["./libs/web-ui/src/index.ts"]
     }
   },

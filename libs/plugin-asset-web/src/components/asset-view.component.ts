@@ -45,11 +45,11 @@ const KIND_ICONS: Record<string, IconName> = {
              fallback, and emit no src (#325). -->
         @if (bytesMissing()) {
           <div
-            class="mx-auto flex w-full max-w-sm flex-col items-center gap-2 rounded-md border border-dashed border-gold bg-surface px-6 py-10 text-center"
+            class="mx-auto flex w-full max-w-sm flex-col items-center gap-2 rounded-md border border-dashed border-accent bg-surface px-6 py-10 text-center"
             role="status"
             data-testid="asset-missing"
           >
-            <app-icon name="asset-missing" [size]="48" class="text-gold" />
+            <app-icon name="asset-missing" [size]="48" class="text-accent" />
             <span class="max-w-full truncate text-sm text-ink-strong">{{ name() }}</span>
             <span class="text-sm text-ink">{{ 'asset.missing.title' | transloco }}</span>
             <span class="text-xs text-ink-muted">{{ 'asset.missing.hint' | transloco }}</span>

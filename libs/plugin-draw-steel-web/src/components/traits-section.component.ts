@@ -18,7 +18,7 @@ import { Trait } from '@hexly/plugin-draw-steel';
   imports: [TranslocoPipe, ButtonComponent, InputComponent, TextareaComponent, IconComponent],
   template: `
     <section class="border-b border-line py-3 last:border-b-0" data-testid="section-traits">
-      <h3 class="m-0 mb-2 flex items-center gap-1.5 font-serif text-lg font-bold italic text-gold-deep">
+      <h3 class="m-0 mb-2 flex items-center gap-1.5 font-serif text-lg font-bold italic text-accent-strong">
         <app-icon name="ds-trait" class="text-base not-italic" />{{ 'drawSteel.statBlock.section.traits' | transloco }}
       </h3>
 
@@ -26,7 +26,7 @@ import { Trait } from '@hexly/plugin-draw-steel';
         <div class="flex flex-col gap-3">
           <!-- Tracked by index: a trait has no stable key and may be blank or duplicate. -->
           @for (trait of traits(); track $index; let first = $first; let last = $last) {
-            <div class="rounded border border-line bg-surface-sunken p-2" [attr.data-testid]="'trait-' + $index">
+            <div class="rounded-md border border-line bg-surface-sunken p-2" [attr.data-testid]="'trait-' + $index">
               <div class="flex items-center gap-2">
                 <input
                   appInput

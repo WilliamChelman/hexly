@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import sharp from 'sharp';
 import request from 'supertest';
 import { CONTENT_FIELD_ID, tiptapContent } from '@hexly/plugin-content';
+import { updateWorldRequestSchema } from '@hexly/domain';
 import { DB, Db, createDb } from '../db/db';
 import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthService } from '../auth/auth.service';
@@ -406,6 +407,244 @@ describe('Worlds endpoints', () => {
       .expect(403);
     // The pins stayed empty — a refused PATCH writes nothing.
     expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.pinnedEntityIds).toEqual([]);
+  });
+
+  describe('World Theme (ADR-0076)', () => {
+    /** One ColorScheme's eight anchors and three knobs (spec §1), as an Owner would send them. */
+    const PALETTE = {
+      page: '#f1e5c7',
+      ink: '#2e2412',
+      inkQuiet: '#6f5a36',
+      accent: '#9a6a16',
+      danger: '#a4402e',
+      success: '#4a6f2f',
+      canvas: '#efe2bf',
+      soot: '#3c2c16',
+      polarity: 1,
+      lineAlpha: 0.371,
+      veil: 0.12,
+    };
+    const THEME = { version: 1, solar: PALETTE, astral: { ...PALETTE, polarity: -1 } };
+
+    /** Add `userId` to `worldId` with the given member role (Owners come from world creation). */
+    function addMember(worldId: string, userId: string, role: 'contributor' | 'viewer') {
+      db.$client
+        .prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, ?)`)
+        .run(worldId, userId, role);
+    }
+
+    it('round-trips a Theme through PATCH and the World read, as colours', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      // A World that never had a Theme reads back without one.
+      expect(world.body).not.toHaveProperty('theme');
+
+      const res = await ada.patch(`/worlds/${world.body.id}`).send({ theme: THEME }).expect(200);
+
+      // Stored canonicalised: a colour goes in as hex and comes back as a colour (ADR-0076).
+      expect(res.body.theme.solar.accent).toMatch(/^oklch\(/);
+      expect(res.body.theme.astral.polarity).toBe(-1);
+      const reloaded = await ada.get(`/worlds/${world.body.id}`).expect(200);
+      expect(reloaded.body.theme).toEqual(res.body.theme);
+    });
+
+    it('clears the Theme when it is set empty', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      await ada.patch(`/worlds/${world.body.id}`).send({ theme: THEME }).expect(200);
+
+      const cleared = await ada.patch(`/worlds/${world.body.id}`).send({ theme: null }).expect(200);
+
+      expect(cleared.body).not.toHaveProperty('theme');
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body).not.toHaveProperty('theme');
+      // A name-only PATCH leaves the Theme untouched (independent fields).
+      await ada.patch(`/worlds/${world.body.id}`).send({ theme: THEME }).expect(200);
+      const renamed = await ada.patch(`/worlds/${world.body.id}`).send({ name: 'Renamed' }).expect(200);
+      expect(renamed.body.theme.solar.accent).toMatch(/^oklch\(/);
+    });
+
+    it.each([
+      ['a `url()` — the exfiltration a Public Link would carry', 'url(https://evil.example/p.png)'],
+      ['a garbage string', 'not-a-colour'],
+      ['a declaration smuggled into the value', 'red; background: url(//evil.example/p.png)'],
+      // A 400, not the 500 a parser that throws inside `safeParse` would produce.
+      ['a malformed function the colour parser throws on', 'f(1x)'],
+    ])('refuses %s as a colour, storing nothing', async (_label, value) => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+
+      await ada
+        .patch(`/worlds/${world.body.id}`)
+        .send({ theme: { ...THEME, solar: { ...PALETTE, accent: value } } })
+        .expect(400);
+
+      // Refused, not sanitised into something that stores.
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body).not.toHaveProperty('theme');
+    });
+
+    it('refuses an override that is not a value of the token it keys', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      const withOverride = (name: string, value: string) =>
+        ada.patch(`/worlds/${world.body.id}`).send({ theme: { ...THEME, overrides: { solar: { [name]: value } } } });
+
+      // A colour token handed a length; a token nobody declares; one deliberately out of the contract.
+      await withOverride('--color-ink', '6px').expect(400);
+      await withOverride('--color-nope', '#ff0000').expect(400);
+      await withOverride('--text-base', '2rem').expect(400);
+      // And the one it does declare, canonicalised.
+      const res = await withOverride('--color-ink', '#2e2412').expect(200);
+      expect(res.body.theme.overrides.solar['--color-ink']).toMatch(/^oklch\(/);
+    });
+
+    it('refuses an unknown `version` rather than applying the part it understands', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+
+      await ada
+        .patch(`/worlds/${world.body.id}`)
+        .send({ theme: { ...THEME, version: 2 } })
+        .expect(400);
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body).not.toHaveProperty('theme');
+    });
+
+    it('bumps the World’s freshness key, so a live-following reader re-applies (ADR-0045)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+
+      const res = await ada.patch(`/worlds/${world.body.id}`).send({ theme: THEME }).expect(200);
+
+      expect(res.body.seq).toBeGreaterThan(world.body.seq);
+    });
+
+    it('refuses a Contributor and a Viewer, and changes nothing about the Entities', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      const note = await ada
+        .post('/entities')
+        .send({ name: 'Shared lore', types: ['core.type.note'], worldId: world.body.id })
+        .expect(201);
+      await ada.patch(`/entities/${note.body.id}`).send({ visibility: 'shared' }).expect(200);
+
+      const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      addMember(world.body.id, bobId, 'contributor');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+      const cassId = await app.get(AuthService).seedUser('cass@hexly.test', 'quiet library', 'Cass');
+      addMember(world.body.id, cassId, 'viewer');
+      const cass = await signIn('cass@hexly.test', 'quiet library');
+
+      // Theming is a World management power (ADR-0024): reachable-but-not-Owner is a 403.
+      await bob.patch(`/worlds/${world.body.id}`).send({ theme: THEME }).expect(403);
+      await cass.patch(`/worlds/${world.body.id}`).send({ theme: THEME }).expect(403);
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body).not.toHaveProperty('theme');
+
+      // The Owner's own edit moves presentation and nothing else.
+      await ada.patch(`/worlds/${world.body.id}`).send({ theme: THEME }).expect(200);
+      const read = await cass.get(`/entities/${note.body.id}`).expect(200);
+      expect(read.body.name).toBe('Shared lore');
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.entityCount).toBe(1);
+    });
+
+    /**
+     * The Theme parser is untrusted-input work (ADR-0076), so it sits *behind* the Owner check rather
+     * than in front of it: reached first, it is CPU any signed-in user could spend against any World id.
+     * Refusing on authorisation grounds is the observable form of that ordering — parsed first, this
+     * same body answers 400, because the parse fails before the gate is ever consulted.
+     */
+    it('refuses a non-Owner’s hostile Theme without parsing it', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      await app.get(AuthService).seedUser('mal@hexly.test', 'no relation here', 'Mal');
+      const mal = await signIn('mal@hexly.test', 'no relation here');
+      // Thousands of unknown override keys, inside express's 100 kB body limit: every one is schema
+      // work, and every one is invalid — so a 403 here cannot be the parser's answer.
+      const overrides = Object.fromEntries(Array.from({ length: 3000 }, (_, i) => [`--color-x${i}`, 'zz']));
+      const hostile = { theme: { ...THEME, overrides: { solar: overrides } } };
+      const safeParse = vi.spyOn(updateWorldRequestSchema, 'safeParse');
+
+      try {
+        await mal.patch(`/worlds/${world.body.id}`).send(hostile).expect(403);
+
+        expect(safeParse).not.toHaveBeenCalled();
+        // An Owner sending the same nonsense still gets the validation answer, not a 403 or a 500.
+        await ada.patch(`/worlds/${world.body.id}`).send(hostile).expect(400);
+        expect(safeParse).toHaveBeenCalled();
+      } finally {
+        safeParse.mockRestore();
+      }
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body).not.toHaveProperty('theme');
+    });
+
+    /**
+     * The copy sources (#376): which Worlds' Themes an Owner may copy *into* this one. A duplicate and
+     * not a link (ADR-0076), so this route only hands over values — what makes the copy a write is the
+     * PATCH that follows, and nothing here bypasses it.
+     */
+    describe('copying a Theme from another World (#376)', () => {
+      it('offers the caller’s other themed Worlds, and neither this one nor an unthemed one', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const target = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+        const source = await ada.post('/worlds').send({ name: 'Whisperwood' }).expect(201);
+        await ada.patch(`/worlds/${source.body.id}`).send({ theme: THEME }).expect(200);
+        // A World of Ada's carrying no Theme has nothing to copy, so it is not on offer (#376).
+        await ada.post('/worlds').send({ name: 'Unthemed' }).expect(201);
+        await ada.patch(`/worlds/${target.body.id}`).send({ theme: THEME }).expect(200);
+
+        const res = await ada.get(`/worlds/${target.body.id}/theme-sources`).expect(200);
+
+        // The target itself is excluded: "another World" is the server's answer, not the picker's.
+        expect(res.body).toEqual([
+          { id: source.body.id, name: 'Whisperwood', theme: expect.objectContaining({ version: 1 }) },
+        ]);
+        // The values come over whole, so the copy the client stages is the source World's own Theme.
+        expect(res.body[0].theme).toEqual((await ada.get(`/worlds/${source.body.id}`).expect(200)).body.theme);
+      });
+
+      it('withholds a themed World the caller only reads — ownership is the server’s to decide', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const adasWorld = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+        await ada.patch(`/worlds/${adasWorld.body.id}`).send({ theme: THEME }).expect(200);
+
+        const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob', {
+          roles: ['create-worlds'],
+        });
+        // Bob reaches Ada's themed World as a Contributor, and owns a themed World of his own.
+        addMember(adasWorld.body.id, bobId, 'contributor');
+        const bob = await signIn('bob@hexly.test', 'battery staple');
+        const bobsTarget = await bob.post('/worlds').send({ name: 'Bob’s target' }).expect(201);
+        const bobsSource = await bob.post('/worlds').send({ name: 'Bob’s source' }).expect(201);
+        await bob.patch(`/worlds/${bobsSource.body.id}`).send({ theme: THEME }).expect(200);
+
+        const res = await bob.get(`/worlds/${bobsTarget.body.id}/theme-sources`).expect(200);
+
+        // A World he merely reads is not a source, however visible its Theme is on the read path.
+        expect(res.body.map((w: { id: string }) => w.id)).toEqual([bobsSource.body.id]);
+      });
+
+      it('refuses a Contributor and a Viewer of the World being themed, and 404s an unreachable one', async () => {
+        const ada = await signIn('ada@hexly.test', 'correct horse');
+        const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+
+        const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+        addMember(world.body.id, bobId, 'contributor');
+        const cassId = await app.get(AuthService).seedUser('cass@hexly.test', 'quiet library', 'Cass');
+        addMember(world.body.id, cassId, 'viewer');
+        const danId = await app.get(AuthService).seedUser('dan@hexly.test', 'no relation here', 'Dan');
+        expect(danId).toBeTruthy();
+
+        // Asking what may be copied *in* is part of theming, so it answers to the same Owner gate.
+        await (await signIn('bob@hexly.test', 'battery staple'))
+          .get(`/worlds/${world.body.id}/theme-sources`)
+          .expect(403);
+        await (await signIn('cass@hexly.test', 'quiet library'))
+          .get(`/worlds/${world.body.id}/theme-sources`)
+          .expect(403);
+        // Unreachable is indistinguishable from nonexistent (ADR-0004).
+        await (await signIn('dan@hexly.test', 'no relation here'))
+          .get(`/worlds/${world.body.id}/theme-sources`)
+          .expect(404);
+      });
+    });
   });
 
   describe('World Assets (#269, ADR-0034)', () => {

@@ -39,7 +39,7 @@ import { ReferenceRowComponent } from './reference-row.component';
         <button
           type="button"
           [attr.aria-pressed]="store.revealDecor()"
-          class="font-sans text-xs text-ink-muted px-1.5 py-0.5 rounded-sm hover:bg-surface-sunken aria-pressed:bg-gold/15 aria-pressed:text-gold"
+          class="font-sans text-xs text-ink-muted px-1.5 py-0.5 rounded-sm hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
           data-testid="references-decor-toggle"
           (click)="store.toggleRevealDecor()"
         >

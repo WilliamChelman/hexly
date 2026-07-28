@@ -103,6 +103,27 @@ export function statBlockViewToggle(fieldKey = 'dnd.field.stat-block'): string {
   return viewInstanceKey({ viewId: 'dnd.view.stat-block', fieldKey });
 }
 
+/**
+ * Wait for the roaming write a Preferences change fires (ADR-0038). It is fire-and-forget, so a spec
+ * whose choice must not outlive it — the e2e account is shared and survives the entities-only reset —
+ * arms this before the change, and again before undoing it.
+ */
+export function preferencesPatched(page: Page): Promise<Response> {
+  return page.waitForResponse(
+    (res) => res.url().endsWith('/api/auth/me/preferences') && res.request().method() === 'PATCH' && res.ok(),
+  );
+}
+
+/**
+ * The Entities `q` returns that are actually *named* `name`. A hit count answers a different question:
+ * `q` is full-text over prose (ADR-0035), so a note matches the mention typed into it as soon as an
+ * autosave indexes the text — which says nothing about what was created.
+ */
+export async function entitiesNamed(request: APIRequestContext, name: string): Promise<{ name: string }[]> {
+  const found = await (await request.get(`/api/entities?q=${encodeURIComponent(name)}`)).json();
+  return (found.items as { name: string }[]).filter((entity) => entity.name === name);
+}
+
 /** Wait for a successful entity PUT. There is no Save button (ADR-0026): pair this with Cmd/Ctrl+S. */
 export function waitForSave(page: Page): Promise<Response> {
   return page.waitForResponse(

@@ -22,6 +22,8 @@ import {
   WorldMember,
   WorldNudge,
   WorldSummary,
+  WorldThemeInput,
+  WorldThemeSource,
 } from '@hexly/domain';
 import { NudgeBusClient } from './nudge-bus.client';
 import { FollowStore } from './follow-store';
@@ -141,6 +143,26 @@ export class WorldsClient {
   setPins(id: string, pinnedEntityIds: string[]): Observable<WorldDetail> {
     // Write-through, as {@link rename} — a pin reorder fans out and its echo dedups.
     return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { pinnedEntityIds }).pipe(tap((d) => this.store.merge(d)));
+  }
+
+  /**
+   * Replace the World Theme wholesale (ADR-0076); `null` clears it, putting the World back on the
+   * Hexly default. Owner-gated server-side, and canonicalised there — a Theme is untrusted input, so
+   * this client sends the Owner's own notation and stores whatever the choke point re-serialises.
+   */
+  setTheme(id: string, theme: WorldThemeInput | null): Observable<WorldDetail> {
+    // Write-through, as {@link rename} — the saved Theme fans out and this tab's own echo dedups.
+    return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { theme }).pipe(tap((d) => this.store.merge(d)));
+  }
+
+  /**
+   * The Worlds whose Theme may be copied into this one (#376), Themes and all. Owner-gated
+   * server-side, which is also where *which* Worlds qualify is decided.
+   *
+   * Outside the live-follow store: other Worlds' Themes answer to no `world` nudge for this one.
+   */
+  themeSources(id: string): Observable<WorldThemeSource[]> {
+    return this.http.get<WorldThemeSource[]>(`/api/worlds/${id}/theme-sources`);
   }
 
   delete(id: string): Observable<void> {

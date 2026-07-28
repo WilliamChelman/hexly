@@ -3,5 +3,29 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/web-styles/src",
   "projectType": "library",
-  "tags": ["scope:web", "type:styles"]
+  "tags": ["scope:web", "type:styles"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/web-styles",
+        "main": "libs/web-styles/src/index.ts",
+        "tsConfig": "libs/web-styles/tsconfig.lib.json",
+        "assets": [{ "input": "libs/web-styles/src", "glob": "**/*.css", "output": "src" }]
+      }
+    },
+    "test": {
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/apps/web/src/**/*",
+        "{workspaceRoot}/libs/*/src/**/*",
+        "{workspaceRoot}/libs/*/project.json",
+        {
+          "externalDependencies": ["vitest", "postcss", "tailwindcss", "@tailwindcss/postcss"]
+        }
+      ]
+    }
+  }
 }

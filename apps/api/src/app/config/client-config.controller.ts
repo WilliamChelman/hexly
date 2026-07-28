@@ -38,6 +38,10 @@ export class ClientConfigController {
         inlineType: this.config.entities.inlineType,
         inlineTag: this.config.entities.inlineTag,
       },
+      // The Instance default Theme (ADR-0076, #372), whole: the browser resolves the chain, and it
+      // crosses unauthenticated for the reason a World's own Theme rides its public read — a Public
+      // Link visitor has no session and must still be themed.
+      theme: this.config.theme,
     };
   }
 }

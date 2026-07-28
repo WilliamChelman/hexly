@@ -44,6 +44,7 @@ import {
   WorldGraph,
   WorldMember,
   WorldSummary,
+  WorldThemeSource,
 } from '@hexly/domain';
 import type { Response } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -168,6 +169,14 @@ export class WorldsController {
     return graph;
   }
 
+  // The Worlds whose Theme this one may copy in (#376). Owner-gated in the service like every other
+  // theming route — asking what may be copied in is part of theming — and which Worlds qualify is
+  // decided there too.
+  @Get(':id/theme-sources')
+  themeSources(@CurrentUser() user: AuthUser, @Param('id') id: string): WorldThemeSource[] {
+    return aclSetResponse(this.worlds.themeSources(user.id, id), 'world');
+  }
+
   /**
    * The Facet counts for the Board image picker's rail (#281, ADR-0065): the same drill-down counts the
    * Asset Browser shows, pinned to the asset type + image kind. Before `:id/assets` matching so the literal
@@ -225,12 +234,24 @@ export class WorldsController {
     return result;
   }
 
-  // A partial update of the Owner-curated fields: `name` (rename) and/or `pinnedEntityIds`
-  // (Dashboard pins, #168). Owner-gated in the service; reachable-but-not-Owner is a 403.
+  /**
+   * A partial update of the Owner-curated fields: `name` (rename), `pinnedEntityIds` (Dashboard pins,
+   * #168) and/or the World Theme (ADR-0076). Owner-gated in the service; not an Owner is a 403, no such
+   * World a 404. The schema is the Theme's write choke point, so a value that is not one is a 400 here.
+   *
+   * Ownership is established *before* the parse, inverting this controller's usual order: the Theme
+   * schema is a colour parser over untrusted input (ADR-0076), so parsing first sells that work to any
+   * signed-in user for any World id. The whole body waits on the gate, non-Theme fields included —
+   * they share the one request schema, and a 400 an unauthorised caller never sees costs nothing.
+   */
   @Patch(':id')
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): WorldDetail {
+    const gate = this.worlds.gateUpdate(user.id, id);
+    if (gate === null) throw new NotFoundException();
+    if (gate === 'forbidden') throw new ForbiddenException();
     const parsed = updateWorldRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
+    // The service gates again; this is the ordering, not the authorisation.
     const result = this.worlds.update(user.id, id, parsed.data);
     if (result === null) throw new NotFoundException();
     if (result === 'forbidden') throw new ForbiddenException();

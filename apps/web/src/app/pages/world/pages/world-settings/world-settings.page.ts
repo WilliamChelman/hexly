@@ -1,14 +1,17 @@
-import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal } from '@angular/core';
-import { Router } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
-import { ActiveWorld, ClientConfigStore } from '@hexly/web-core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
+import { map, switchMap } from 'rxjs';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { ActiveWorld, ClientConfigStore, TitleService } from '@hexly/web-core';
 import { EyebrowComponent, PanelComponent, IconComponent, IconName } from '@hexly/web-ui';
 import { OwnerSetComponent, MemberSetComponent, PublicLinkComponent } from '@hexly/web-entity';
 import { WorldTypesPanelComponent } from './components/world-types-panel.component';
 import { WorldFieldsPanelComponent } from './components/world-fields-panel.component';
 import { WorldImportsPanelComponent } from './components/world-imports-panel.component';
+import { WorldThemePanelComponent } from './components/world-theme-panel.component';
 
-type Section = 'access' | 'schema' | 'imports' | 'sharing';
+type Section = 'access' | 'schema' | 'theme' | 'imports' | 'sharing';
 
 interface SectionItem {
   readonly section: Section;
@@ -24,6 +27,9 @@ interface SectionItem {
  * can cost the user reach to this World, so it drops back to the World Index.
  *
  * With Collaboration off (ADR-0071) the rail carries only the schema and imports groups.
+ *
+ * The open group lives in the URL's `section` param, so a refresh or a shared link lands on the same
+ * pane rather than the top of the rail — and names the tab title with it (ADR-0014).
  */
 @Component({
   selector: 'app-world-settings',
@@ -39,6 +45,7 @@ interface SectionItem {
     WorldTypesPanelComponent,
     WorldFieldsPanelComponent,
     WorldImportsPanelComponent,
+    WorldThemePanelComponent,
   ],
   template: `
     @if (worldId(); as id) {
@@ -51,7 +58,7 @@ interface SectionItem {
               class="rail-item"
               [class.is-active]="active() === item.section"
               [attr.data-testid]="'settings-nav-' + item.section"
-              (click)="active.set(item.section)"
+              (click)="select(item.section)"
             >
               <app-icon [name]="item.icon" [size]="18" />
               <span>{{ item.label | transloco }}</span>
@@ -83,6 +90,13 @@ interface SectionItem {
               <h2 class="group-head">{{ 'worldFields.heading' | transloco }}</h2>
               <p class="detail-sub">{{ 'worldFields.subhead' | transloco }}</p>
               <div class="pane" appPanel><app-world-fields [id]="id" /></div>
+            }
+            @case ('theme') {
+              <header class="detail-head">
+                <h1 class="detail-title">{{ 'worldTheme.heading' | transloco }}</h1>
+                <p class="detail-sub">{{ 'worldTheme.subhead' | transloco }}</p>
+              </header>
+              <div class="pane" appPanel><app-world-theme [id]="id" /></div>
             }
             @case ('imports') {
               <header class="detail-head">
@@ -145,16 +159,22 @@ interface SectionItem {
 })
 export class WorldSettingsPage {
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly clientConfig = inject(ClientConfigStore);
-  readonly worldId = inject(ActiveWorld).worldId;
+  private readonly activeWorld = inject(ActiveWorld);
+  readonly worldId = this.activeWorld.worldId;
 
   readonly items = computed<readonly SectionItem[]>(() => {
     const collaboration = this.clientConfig.isCollaborationEnabled();
+    // A Theme is authored, not read: only a caller who may manage the World gets the editor (ADR-0039),
+    // the same right the rail gates this whole page on.
+    const canManage = !!this.activeWorld.world()?.rights?.includes('manage');
     return [
       ...(collaboration
         ? [{ section: 'access' as const, icon: 'user' as const, label: 'collab.members.heading' }]
         : []),
       { section: 'schema' as const, icon: 'label' as const, label: 'worldTypes.heading' },
+      ...(canManage ? [{ section: 'theme' as const, icon: 'palette' as const, label: 'worldTheme.heading' }] : []),
       { section: 'imports' as const, icon: 'download' as const, label: 'imports.heading' },
       ...(collaboration
         ? [{ section: 'sharing' as const, icon: 'share' as const, label: 'collab.publicLink.worldHeading' }]
@@ -162,8 +182,44 @@ export class WorldSettingsPage {
     ];
   });
 
-  /** The open group; derived from {@link items} so a cut section can never stay selected. */
-  readonly active = linkedSignal<Section>(() => this.items()[0].section);
+  private readonly routedSection = toSignal(this.route.queryParamMap.pipe(map((q) => q.get('section'))));
+
+  /**
+   * The open group: whatever the URL names, narrowed to {@link items} so a section the rail does not
+   * carry — cut by config or by rights, or simply a stale link — falls back to the first one rather
+   * than showing an empty detail. The fallback only reads the rail, so a World refresh (saving a Theme
+   * re-pins one) leaves the URL, and the open pane, alone.
+   */
+  readonly active = computed<Section>(() => {
+    const sections = this.items().map((item) => item.section);
+    const routed = this.routedSection();
+    return sections.find((section) => section === routed) ?? sections[0];
+  });
+
+  constructor() {
+    const transloco = inject(TranslocoService);
+    const titles = inject(TitleService);
+    // The tab reads "Hexly — World theme": the open group's own rail label names it, so the two
+    // cannot drift, and selectTranslate re-resolves it on a live language switch (ADR-0014).
+    const label = toSignal(
+      toObservable(computed(() => this.items().find((item) => item.section === this.active())?.label)).pipe(
+        switchMap((key) => (key ? transloco.selectTranslate(key) : [null])),
+      ),
+    );
+    effect(() => titles.setDocumentName(label() ?? null));
+    // A stale section name would otherwise shadow the next page's title.
+    inject(DestroyRef).onDestroy(() => titles.setDocumentName(null));
+  }
+
+  /** Open a group by putting it in the URL, replacing rather than stacking so Back leaves the page. */
+  select(section: Section): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { section },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
 
   leave(): void {
     this.router.navigate(['/']);

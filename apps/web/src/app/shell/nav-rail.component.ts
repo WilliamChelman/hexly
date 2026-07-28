@@ -101,13 +101,13 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
       >
         <!-- The brand mark pulses while in-page work is in flight (fetch, entity load, save). -->
         <span
-          class="grid place-items-center text-gold [filter:drop-shadow(0_0_6px_var(--color-glow))]"
+          class="grid place-items-center text-accent [filter:drop-shadow(0_0_6px_var(--color-accent-glow))]"
           [class.animate-pulse]="loading() === 'subtle'"
           [attr.aria-busy]="loading() === 'subtle'"
           ><app-icon name="logo" [size]="26"
         /></span>
         <span
-          class="text-[22px] leading-none normal-case! bg-linear-[180deg] from-gold-bright to-gold-deep bg-clip-text text-transparent"
+          class="text-[22px] leading-none normal-case! bg-linear-[180deg] from-accent-sheen-bright to-accent-sheen-deep bg-clip-text text-transparent"
           [class.sr-only]="!expanded"
           appCartouche
           >Hexly</span
@@ -125,10 +125,10 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
             <a
               [routerLink]="entry.link"
               [attr.data-testid]="entry.testid"
-              routerLinkActive="text-gold bg-gold-soft"
+              routerLinkActive="text-accent-strong bg-accent-soft"
               [routerLinkActiveOptions]="{ exact: !!entry.exact }"
               ariaCurrentWhenActive="page"
-              class="flex items-center gap-3 px-2 py-2 rounded-sm no-underline text-ink hover:bg-gold-soft"
+              class="flex items-center gap-3 px-2 py-2 rounded-sm no-underline text-ink hover:bg-accent-soft"
               [class.justify-center]="!expanded"
               (click)="choose()"
             >

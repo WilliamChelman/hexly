@@ -6,6 +6,7 @@ import {
   ButtonGroupComponent,
   CartoucheComponent,
   ChipComponent,
+  ChipTone,
   CoordComponent,
   DialogComponent,
   DotComponent,
@@ -13,6 +14,7 @@ import {
   FieldComponent,
   IconButtonComponent,
   IconComponent,
+  IconName,
   InputComponent,
   KbdComponent,
   ListboxOptionComponent,
@@ -23,14 +25,16 @@ import {
   SwatchComponent,
   TextareaComponent,
 } from '@hexly/web-ui';
+import { DesignToken } from '@hexly/web-styles';
 
+// Each `token` reaches the template spliced into `var(…)`, which the lint rule cannot see (ADR-0075).
 interface SwatchRow {
-  readonly token: string;
+  readonly token: DesignToken;
   /** A `styleguide.swatch.*` translation key for the role's display name. */
   readonly nameKey: string;
 }
 interface TypeRow {
-  readonly token: string;
+  readonly token: DesignToken;
   readonly size: string;
   readonly sample: string;
 }
@@ -66,7 +70,7 @@ interface TypeRow {
   template: `
     <main class="max-w-[1080px] mx-auto pt-6 px-6 pb-24 flex flex-col gap-16">
       <header class="guide-top flex justify-between items-center">
-        <a appButton variant="ghost" size="sm" routerLink="/">← {{ 'styleguide.backToMap' | transloco }}</a>
+        <a appButton variant="ghost" size="sm" routerLink="/">← {{ 'styleguide.backToWorlds' | transloco }}</a>
       </header>
 
       <section class="hero flex flex-col gap-4 pt-12 pb-6 border-b border-line">
@@ -74,9 +78,11 @@ interface TypeRow {
         <h1 class="text-3xl leading-[1.06]" [innerHTML]="'styleguide.heroTitle' | transloco"></h1>
         <p class="hero-lede" [innerHTML]="'styleguide.heroLede' | transloco"></p>
         <div class="flex flex-wrap gap-2 mt-2">
-          <app-chip tone="gold">{{ 'styleguide.fontDisplay' | transloco }}</app-chip>
-          <app-chip tone="sea">{{ 'styleguide.fontBody' | transloco }}</app-chip>
-          <app-chip tone="astra">{{ 'styleguide.fontCoord' | transloco }}</app-chip>
+          <!-- Each names a typeface, so each leads with the typography glyph; the tones are the
+               decoration ADR-0075 allows colour to be once identity rides another channel. -->
+          <app-chip tone="accent" icon="label">{{ 'styleguide.fontDisplay' | transloco }}</app-chip>
+          <app-chip tone="tone-3" icon="label">{{ 'styleguide.fontBody' | transloco }}</app-chip>
+          <app-chip tone="tone-7" icon="label">{{ 'styleguide.fontCoord' | transloco }}</app-chip>
         </div>
       </section>
 
@@ -246,12 +252,19 @@ interface TypeRow {
               {{ 'styleguide.chipsCoords' | transloco }}
             </figcaption>
             <div class="specimen-row">
-              <app-chip>{{ 'styleguide.chipDefault' | transloco }}</app-chip>
-              <app-chip tone="gold">{{ 'styleguide.chipSettlement' | transloco }}</app-chip>
-              <app-chip tone="sea">{{ 'styleguide.chipEditing' | transloco }}</app-chip>
-              <app-chip tone="astra">{{ 'styleguide.chipRegion' | transloco }}</app-chip>
+              <app-chip [icon]="null">{{ 'styleguide.chipDefault' | transloco }}</app-chip>
+              <app-chip tone="accent" icon="region">{{ 'styleguide.chipSettlement' | transloco }}</app-chip>
               <app-coord>q 12 · r −4</app-coord>
               <kbd appKbd>⌘ Z</kbd>
+            </div>
+            <!-- Side by side, with glyphs: mutual distinguishability is all the set claims, so a row is
+                 the only honest way to read it (ADR-0075). -->
+            <div class="specimen-row">
+              @for (row of tones; track row.tone) {
+                <app-chip [tone]="row.tone" [icon]="row.icon">
+                  {{ row.tone }}
+                </app-chip>
+              }
             </div>
           </figure>
 
@@ -311,7 +324,7 @@ interface TypeRow {
               {{ 'styleguide.cartouche' | transloco }}
             </figcaption>
             <div class="specimen-row">
-              <span class="text-2xl text-gold" appCartouche>Hexly</span>
+              <span class="text-2xl text-accent" appCartouche>Hexly</span>
             </div>
           </figure>
 
@@ -335,7 +348,7 @@ interface TypeRow {
                 <span appDot></span>{{ 'styleguide.dotIdle' | transloco }}
               </span>
               <span class="inline-flex items-center gap-2 text-sm text-ink-muted">
-                <span appDot positive></span>{{ 'styleguide.dotHealthy' | transloco }}
+                <span appDot success></span>{{ 'styleguide.dotHealthy' | transloco }}
               </span>
             </div>
           </figure>
@@ -460,7 +473,7 @@ interface TypeRow {
     .hero-lede code,
     .section-note code,
     figcaption code {
-      @apply font-mono text-gold-strong;
+      @apply font-mono text-accent-strong;
       font-size: 0.86em;
     }
 
@@ -522,7 +535,7 @@ interface TypeRow {
     }
     .ramp-bar {
       @apply h-3.5 rounded-sm;
-      background: linear-gradient(90deg, var(--color-gold), var(--color-gold-strong));
+      background: linear-gradient(90deg, var(--color-accent), var(--color-accent-strong));
     }
     .radii {
       @apply flex flex-wrap gap-4;
@@ -531,7 +544,7 @@ interface TypeRow {
       @apply flex flex-col items-center gap-2 m-0 font-mono text-2xs text-ink-muted;
     }
     .radiicard-box {
-      @apply w-16 h-16 bg-surface-sunken border border-gold;
+      @apply w-16 h-16 bg-surface-sunken border border-accent;
     }
 
     .specimens {
@@ -571,7 +584,7 @@ interface TypeRow {
       @apply flex justify-between items-center pt-6 border-t border-line text-sm text-ink-muted;
     }
     .guide-foot .brand {
-      @apply text-md text-gold;
+      @apply text-md text-accent;
     }
     .guide-foot code {
       @apply font-mono text-2xs;
@@ -595,14 +608,29 @@ export class StyleguidePage {
     { token: '--color-surface-sunken', nameKey: 'styleguide.swatch.well' },
     { token: '--color-ink', nameKey: 'styleguide.swatch.ink' },
     { token: '--color-ink-muted', nameKey: 'styleguide.swatch.inkMuted' },
-    { token: '--color-gold', nameKey: 'styleguide.swatch.compassGold' },
-    { token: '--color-sea', nameKey: 'styleguide.swatch.seaAurora' },
-    { token: '--color-astra', nameKey: 'styleguide.swatch.nebula' },
-    { token: '--color-ember', nameKey: 'styleguide.swatch.marginalia' },
-    { token: '--color-positive', nameKey: 'styleguide.swatch.moss' },
+    { token: '--color-accent', nameKey: 'styleguide.swatch.compassGold' },
+    { token: '--color-danger', nameKey: 'styleguide.swatch.marginalia' },
+    { token: '--color-success', nameKey: 'styleguide.swatch.moss' },
     { token: '--color-line-strong', nameKey: 'styleguide.swatch.drawnRule' },
   ];
 
+  /** The categorical set, each with a glyph — the channel that survives where the hue does not. */
+  protected readonly tones: readonly { tone: ChipTone; icon: IconName }[] = [
+    { tone: 'tone-1', icon: 'region' },
+    { tone: 'tone-2', icon: 'label' },
+    { tone: 'tone-3', icon: 'library' },
+    { tone: 'tone-4', icon: 'graph' },
+    { tone: 'tone-5', icon: 'terrain' },
+    { tone: 'tone-6', icon: 'user' },
+    { tone: 'tone-7', icon: 'globe' },
+    { tone: 'tone-8', icon: 'link' },
+  ];
+
+  /**
+   * The hexmap plugin's terrain fills — tier 3, named here under the exemption this page holds, since
+   * rendering every token in the system is what it is for (ADR-0075, world-theme-spec §4). The spec
+   * holds the list to `terrainSet`.
+   */
   protected readonly terrain: SwatchRow[] = [
     { token: '--color-terrain-grass', nameKey: 'styleguide.swatch.grassland' },
     { token: '--color-terrain-forest', nameKey: 'styleguide.swatch.forest' },
@@ -612,7 +640,7 @@ export class StyleguidePage {
       nameKey: 'styleguide.swatch.mountains',
     },
     { token: '--color-terrain-desert', nameKey: 'styleguide.swatch.desert' },
-    { token: '--color-terrain-marsh', nameKey: 'styleguide.swatch.marsh' },
+    { token: '--color-terrain-sky', nameKey: 'styleguide.swatch.sky' },
   ];
 
   protected readonly typeScale: TypeRow[] = [
@@ -644,7 +672,7 @@ export class StyleguidePage {
 
   protected readonly spacing = [1, 2, 3, 4, 6, 8, 12];
 
-  protected readonly radii = ['--radius-sm', '--radius-md', '--radius-lg', '--radius-xl'];
+  protected readonly radii: readonly DesignToken[] = ['--radius-sm', '--radius-md', '--radius-lg', '--radius-xl'];
 
   /** Drives the live dialog specimen. */
   protected readonly dialogOpen = signal(false);

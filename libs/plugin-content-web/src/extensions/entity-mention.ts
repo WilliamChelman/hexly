@@ -11,7 +11,10 @@ import { takeMention } from './pending-mention';
 /** What the editor supplies the `@` trigger; each callback is deferred so the editor builds first. */
 export interface EntityMentionPorts {
   getPicker: () => EntityPickerComponent | undefined;
-  /** The owner's Entities matching the typed name, server-side (ADR-0025 `q`). */
+  /**
+   * The owner's Entities matching the typed name, server-side (ADR-0025 `q`), minus the one being
+   * written in — the host indexes the mention as prose the moment it autosaves (ADR-0035).
+   */
   search: (name: string) => Promise<EntitySummary[]>;
   /**
    * Whether the caller may create Entities in the host Entity's World — the `create-entity` Right
@@ -33,9 +36,9 @@ export interface EntityMentionPorts {
 /**
  * The `@` trigger for inserting a Content Entity Link (ADR-0023). A non-schema extension
  * (ProseMirror plugin, no node/mark), so it stays out of {@link CONTENT_EXTENSIONS}. It
- * searches the owner's Entity summaries server-side as the user types — unfiltered by type
- * or self (ADR-0025 `q`) — and a pick inserts the `entityLink` atom, snapshotting the name
- * as `label`.
+ * searches the owner's Entity summaries server-side as the user types — unfiltered by type, never the
+ * host ({@link EntityMentionPorts.search}) — and a pick inserts the `entityLink` atom, snapshotting the
+ * name as `label`.
  *
  * The picker's last two rows mint the typed name and link it (ADR-0073): `Create "…"` in one gesture,
  * unconditionally — no Type filter and no modal, because an unfilled `required` Field no longer refuses

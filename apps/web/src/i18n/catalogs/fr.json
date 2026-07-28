@@ -137,7 +137,7 @@
   },
   "styleguide": {
     "tabTitle": "Hexly — Système de design",
-    "backToMap": "Retour à la carte",
+    "backToWorlds": "Retour aux mondes",
     "eyebrow": "Système de design Hexly",
     "heroTitle": "La table du cartographe,<br />à la lueur des étoiles.",
     "heroLede": "Une seule identité racontée à deux heures du jour. <strong>Solaire</strong> est l’almanach ensoleillé posé sur la table du cartographe ; <strong>Astral</strong> est la même carte sous le ciel nocturne. L’or est le fil conducteur — encre d’héliographe le jour, lignes de constellations la nuit — et le texte reste d’un crème ivoire chaleureux dans les deux. Tout ce qui suit est piloté par la même couche de propriétés personnalisées CSS que <code>apps/web</code> embarque.",
@@ -149,8 +149,6 @@
       "ink": "Encre",
       "inkMuted": "Encre atténuée",
       "compassGold": "Or de boussole",
-      "seaAurora": "Mer / aurore",
-      "nebula": "Nébuleuse",
       "marginalia": "Marginalia",
       "moss": "Mousse",
       "drawnRule": "Filet tracé",
@@ -159,13 +157,13 @@
       "ocean": "Océan",
       "mountains": "Montagnes",
       "desert": "Désert",
-      "marsh": "Marais"
+      "sky": "Ciel"
     },
-    "fontDisplay": "Cinzel · titrage",
-    "fontBody": "Spectral · corps",
+    "fontDisplay": "Marcellus · titrage",
+    "fontBody": "Source Serif 4 · corps",
     "fontCoord": "JetBrains Mono · coordonnées",
     "paletteSemantic": "Palette · rôles sémantiques",
-    "paletteNote": "Les tranches demandent un rôle, jamais une couleur brute. Thème actif affiché.",
+    "paletteNote": "Les tranches demandent un rôle, jamais une couleur brute. Schéma de couleurs actif affiché.",
     "paletteTerrain": "Palette · remplissages de terrain",
     "typeScale": "Échelle typographique",
     "spacing": "Espacement",
@@ -192,8 +190,6 @@
     "iconUndo": "Annuler",
     "chipDefault": "Par défaut",
     "chipSettlement": "Colonie",
-    "chipEditing": "Édition",
-    "chipRegion": "Région",
     "fieldMapName": "Nom de la carte",
     "fieldNote": "Note",
     "fieldTerrain": "Terrain",
@@ -241,11 +237,11 @@
     "userMenu": "Ouvrir le menu utilisateur",
     "signOut": "Se déconnecter",
     "login": "Connexion",
-    "theme": {
+    "colorScheme": {
       "solar": "Solaire (clair)",
       "astral": "Astral (sombre)",
-      "toSolar": "Passer au thème solaire",
-      "toAstral": "Passer au thème astral"
+      "toSolar": "Passer au schéma de couleurs solaire",
+      "toAstral": "Passer au schéma de couleurs astral"
     },
     "cancel": "Annuler",
     "close": "Fermer",
@@ -455,6 +451,124 @@
     "updateError": "Impossible d'enregistrer ce champ. Veuillez réessayer.",
     "removeError": "Impossible de supprimer ce champ. Veuillez réessayer."
   },
+  "worldSettings": {
+    "tabTitle": "Hexly — Paramètres du monde",
+    "tabTitleNamed": "Hexly — {{name}}"
+  },
+  "worldTheme": {
+    "heading": "Thème du monde",
+    "subhead": "L’apparence que porte ce monde : huit couleurs d’ancrage et trois réglages par schéma de couleurs, dont toutes les autres couleurs découlent. Les modifications s’appliquent au fur et à mesure ; chaque lecteur garde son propre schéma de couleurs.",
+    "copyHeading": "Copier depuis un autre monde",
+    "copyLede": "Reprenez le thème d’un autre monde qui vous appartient. Il est copié, non lié : vous pourrez le modifier ici, et les changements ultérieurs de l’autre monde ne le suivront pas.",
+    "copyLabel": "Monde dont copier le thème",
+    "copy": "Copier le thème",
+    "copyEmpty": "Aucun de vos autres mondes ne porte encore de thème. Créez-en un n’importe où et il pourra être copié ici.",
+    "copyLoadError": "Impossible de charger les mondes dont vous pouvez copier un thème.",
+    "paletteHeading": "Palette",
+    "overridesHeading": "Jetons individuels",
+    "overridesHint": "Chaque jeton ci-dessous suit la palette tant que vous ne le fixez pas, et chaque case montre ce qu’il rend actuellement. La plupart découlent des ancres ; quelques-uns sont une ancre sous un autre nom, et quelques-uns sont des valeurs fixes qu’aucune ancre n’atteint. Sélectionnez-en un pour fixer le vôtre ; l’effacer rend le jeton à la palette.",
+    "derivation": {
+      "derived": "Dérivé",
+      "anchor": "Ancre",
+      "literal": "Fixe"
+    },
+    "setOverride": "Redéfinir {{name}}, actuellement {{value}}",
+    "overrideOf": "Redéfinition de {{name}}",
+    "clearOverride": "Effacer la redéfinition de {{name}}",
+    "overriddenCount": "{{count}} redéfini(s)",
+    "overrideGroup": {
+      "surfaces": "Papier et surfaces",
+      "ink": "Encres et premiers plans",
+      "lines": "Filets",
+      "accent": "Accent et éclat",
+      "tones": "Teintes catégorielles",
+      "status": "Danger et réussite",
+      "canvas": "Le champ de la carte",
+      "elevation": "Élévation",
+      "other": "Tout le reste"
+    },
+    "save": "Enregistrer",
+    "reset": "Revenir au thème Hexly par défaut",
+    "unsaved": "Modifications non enregistrées.",
+    "saveError": "Impossible d’enregistrer le thème du monde.",
+    "token": {
+      "page": "Page",
+      "ink": "Encre",
+      "inkQuiet": "Encre discrète",
+      "accent": "Accent",
+      "danger": "Danger",
+      "success": "Réussite",
+      "canvas": "Canevas",
+      "soot": "Suie",
+      "polarity": "Polarité",
+      "lineAlpha": "Opacité des filets",
+      "veil": "Voile"
+    },
+    "hint": {
+      "page": "La table sur laquelle repose le papier.",
+      "ink": "Encre principale du texte.",
+      "inkQuiet": "Encre secondaire — elle porte sa propre teinte.",
+      "accent": "L’accent directeur ; les couleurs catégorielles pivotent autour de lui.",
+      "danger": "Danger.",
+      "success": "Confirmation.",
+      "canvas": "Le champ de la carte.",
+      "soot": "Encre des ombres et des voiles.",
+      "polarity": "Le sens de tous les dégradés : papier clair ou sombre.",
+      "lineAlpha": "La force avec laquelle les filets se lisent.",
+      "veil": "Le poids des ombres, des voiles et de la vignette."
+    },
+    "role": {
+      "ink": "Encre",
+      "ink-muted": "Encre discrète",
+      "accent": "Accent",
+      "surface": "Surface",
+      "bg": "Page",
+      "danger": "Danger",
+      "success": "Réussite",
+      "tone-1": "Catégorie 1",
+      "tone-2": "Catégorie 2",
+      "tone-3": "Catégorie 3",
+      "tone-4": "Catégorie 4",
+      "tone-5": "Catégorie 5",
+      "tone-6": "Catégorie 6",
+      "tone-7": "Catégorie 7",
+      "tone-8": "Catégorie 8"
+    },
+    "contrast": {
+      "clear": "Lisible : toutes les paires atteignent 4,5:1.",
+      "contrast": "{{ink}} sur {{ground}} : {{ratio}}:1, sous le seuil de 4,5:1 du texte courant.",
+      "midToneAccent": "Cet accent est de ton moyen : aucune couleur de texte automatique n’y est lisible ({{ratio}}:1). Choisissez un accent plus clair ou plus foncé.",
+      "toneCollision": "{{tone}} a pivoté trop près de {{status}} (ΔE {{distance}}) ; une puce risque de se lire comme {{status}}.",
+      "chipContrast": "Les puces {{ink}} sont à {{ratio}}:1 sur {{ground}} — sous le seuil de 4,5:1. C'est leur texte qui porte le sens : il doit rester lisible."
+    },
+    "radiiHeading": "Angles",
+    "radiiLede": "La netteté ou la douceur des angles de ce monde. Un seul jeu couvre boutons, cartes, dialogues et pastilles.",
+    "radiiCustom": "Ce monde porte son propre jeu d’angles. En choisir un ici le remplacera.",
+    "radii": {
+      "sharp": "Nets",
+      "default": "Par défaut",
+      "soft": "Doux"
+    },
+    "radiiHint": {
+      "sharp": "Aucun arrondi — sévère, tracé à la règle.",
+      "default": "Ce monde n’en définit aucun.",
+      "soft": "Largement arrondi — accueillant."
+    },
+    "fontsHeading": "Typographie",
+    "fontsLede": "Les caractères de ce monde — titrage, texte, cartouche et chasse fixe, choisis par paire.",
+    "fonts": {
+      "default": "Par défaut",
+      "codex": "Codex"
+    },
+    "fontsHint": {
+      "default": "Ce monde n’en définit aucune ; il suit les caractères d’Hexly, quels qu’ils deviennent.",
+      "codex": "Les caractères d’Hexly, fixés sur ce monde — Marcellus, Source Serif, Cinzel Decorative, JetBrains Mono. La même typographie que la valeur par défaut aujourd’hui ; un changement ultérieur de celle-ci ne la déplacera pas."
+    },
+    "fontsSpecimen": {
+      "display": "La Route aux neuf détours",
+      "body": "À trois jours à l’est du fleuve, la route bifurque à une borne brisée."
+    }
+  },
   "imports": {
     "heading": "Imports",
     "subhead": "Importez une bibliothèque de référence gérée depuis la source d'un plugin. Un réimport écrase l'ensemble ; vos entités créées à la main ne sont pas touchées.",
@@ -489,7 +603,7 @@
     "subhead": "Vos préférences suivent votre compte sur tous vos appareils.",
     "preferences": {
       "heading": "Préférences",
-      "theme": "Thème",
+      "colorScheme": "Schéma de couleurs",
       "language": "Langue",
       "formatLocale": "Format régional",
       "formatLocaleHint": "Le format des dates et des nombres, indépendant de la langue.",

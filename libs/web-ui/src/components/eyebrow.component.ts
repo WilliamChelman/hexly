@@ -11,7 +11,7 @@ import { booleanAttribute, ChangeDetectionStrategy, Component, input } from '@an
   selector: '[appEyebrow]',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    class: 'font-display text-2xs font-semibold tracking-wider uppercase text-ink-muted',
+    class: 'font-display text-2xs tracking-wider uppercase text-ink-muted',
     '[class.is-marked]': 'mark()',
   },
   template: '<ng-content />',
@@ -19,7 +19,7 @@ import { booleanAttribute, ChangeDetectionStrategy, Component, input } from '@an
     :host(.is-marked)::before {
       content: '✦';
       margin-right: 0.5em;
-      color: var(--color-gold);
+      color: var(--color-accent);
       font-size: 0.85em;
       opacity: 0.7;
     }

@@ -27,7 +27,9 @@ export interface FieldChoice {
     <div class="fp-chips">
       @for (f of selectedFields(); track f.id) {
         <button type="button" class="fp-chip" [attr.aria-label]="'✕ ' + f.label" (click)="toggled.emit(f.id)">
-          <app-chip tone="gold">{{ f.label }} <span aria-hidden="true">✕</span></app-chip>
+          <!-- A selected Field, not an Entity Type: the accent tone is emphasis here, so there is no
+               category for a glyph to carry (ADR-0075). -->
+          <app-chip tone="accent" [icon]="null">{{ f.label }} <span aria-hidden="true">✕</span></app-chip>
         </button>
       } @empty {
         <span class="fp-chips-empty">{{ 'picker.selectedEmpty' | transloco }}</span>
@@ -112,13 +114,13 @@ export interface FieldChoice {
       @apply bg-surface-sunken;
     }
     .fp-opt.is-on {
-      @apply bg-gold-soft/60;
+      @apply bg-accent-soft/60;
     }
     .fp-box {
-      @apply grid size-4 shrink-0 place-items-center rounded-sm border border-line-strong text-2xs text-gold;
+      @apply grid size-4 shrink-0 place-items-center rounded-sm border border-line-strong text-2xs text-accent;
     }
     .fp-opt.is-on .fp-box {
-      @apply border-gold bg-gold/15;
+      @apply border-accent bg-accent/15;
     }
     .fp-name {
       @apply text-sm text-ink-strong;

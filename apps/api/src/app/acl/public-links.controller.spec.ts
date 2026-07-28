@@ -196,6 +196,36 @@ describe('Public links', () => {
     await anon().get(`/public/worlds/${token}/entities/${secretId}`).expect(404);
   });
 
+  it("serves the World's Theme to the anonymous reader, who has nothing else to style from", async () => {
+    const ada = await signIn('ada@hexly.test');
+    const worldId = await makeWorld(ada);
+    const palette = {
+      page: '#f1e5c7',
+      ink: '#2e2412',
+      inkQuiet: '#6f5a36',
+      accent: '#9a6a16',
+      danger: '#a4402e',
+      success: '#4a6f2f',
+      canvas: '#efe2bf',
+      soot: '#3c2c16',
+      polarity: 1,
+      lineAlpha: 0.371,
+      veil: 0.12,
+    };
+    const token = (await ada.post(`/worlds/${worldId}/link`).expect(200)).body.token;
+    // No Theme yet: the view carries no field to apply, and the reader keeps the default.
+    expect((await anon().get(`/public/worlds/${token}`).expect(200)).body).not.toHaveProperty('theme');
+
+    await ada
+      .patch(`/worlds/${worldId}`)
+      .send({ theme: { version: 1, solar: palette, astral: { ...palette, polarity: -1 } } })
+      .expect(200);
+
+    // Readable by anyone holding the link — a conscious call (ADR-0076).
+    const view = (await anon().get(`/public/worlds/${token}`).expect(200)).body;
+    expect(view.theme.solar.accent).toMatch(/^oklch\(/);
+  });
+
   it('revoking a World link makes its token stop resolving immediately', async () => {
     const ada = await signIn('ada@hexly.test');
     const worldId = await makeWorld(ada);

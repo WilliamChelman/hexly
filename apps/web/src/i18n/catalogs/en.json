@@ -137,7 +137,7 @@
   },
   "styleguide": {
     "tabTitle": "Hexly — Design system",
-    "backToMap": "Back to map",
+    "backToWorlds": "Back to worlds",
     "eyebrow": "Hexly design system",
     "heroTitle": "The cartographer’s table,<br />by starlight.",
     "heroLede": "One identity told at two hours of the day. <strong>Solar</strong> is the sunlit almanac on the cartographer’s table; <strong>Astral</strong> is the same chart under the night sky. Gold is the through-line — heliograph ink by day, constellation lines by night — and the text stays a warm ivory-cream in both. Everything below is driven by the same CSS custom-property layer that <code>apps/web</code> ships.",
@@ -149,8 +149,6 @@
       "ink": "Ink",
       "inkMuted": "Ink muted",
       "compassGold": "Compass gold",
-      "seaAurora": "Sea / aurora",
-      "nebula": "Nebula",
       "marginalia": "Marginalia",
       "moss": "Moss",
       "drawnRule": "Drawn rule",
@@ -159,13 +157,13 @@
       "ocean": "Ocean",
       "mountains": "Mountains",
       "desert": "Desert",
-      "marsh": "Marsh"
+      "sky": "Sky"
     },
-    "fontDisplay": "Cinzel · display",
-    "fontBody": "Spectral · body",
+    "fontDisplay": "Marcellus · display",
+    "fontBody": "Source Serif 4 · body",
     "fontCoord": "JetBrains Mono · coordinates",
     "paletteSemantic": "Palette · semantic roles",
-    "paletteNote": "Slices request a role, never a raw colour. Showing the active theme.",
+    "paletteNote": "Slices request a role, never a raw colour. Showing the active colour scheme.",
     "paletteTerrain": "Palette · terrain fills",
     "typeScale": "Type scale",
     "spacing": "Spacing",
@@ -192,8 +190,6 @@
     "iconUndo": "Undo",
     "chipDefault": "Default",
     "chipSettlement": "Settlement",
-    "chipEditing": "Editing",
-    "chipRegion": "Region",
     "fieldMapName": "Map name",
     "fieldNote": "Note",
     "fieldTerrain": "Terrain",
@@ -241,11 +237,11 @@
     "userMenu": "Open user menu",
     "signOut": "Sign out",
     "login": "Login",
-    "theme": {
+    "colorScheme": {
       "solar": "Solar (light)",
       "astral": "Astral (dark)",
-      "toSolar": "Switch to solar theme",
-      "toAstral": "Switch to astral theme"
+      "toSolar": "Switch to the solar colour scheme",
+      "toAstral": "Switch to the astral colour scheme"
     },
     "cancel": "Cancel",
     "close": "Close",
@@ -455,6 +451,124 @@
     "updateError": "Couldn't save that field. Please try again.",
     "removeError": "Couldn't delete that field. Please try again."
   },
+  "worldSettings": {
+    "tabTitle": "Hexly — World settings",
+    "tabTitleNamed": "Hexly — {{name}}"
+  },
+  "worldTheme": {
+    "heading": "World theme",
+    "subhead": "The presentation this world wears: eight anchor colours and three knobs per colour scheme, with every other colour derived from them. Changes apply as you make them; readers keep their own colour scheme within it.",
+    "copyHeading": "Copy from another world",
+    "copyLede": "Take the theme of another world you own. It is copied in, not linked: you can edit it here afterwards, and later changes to the other world will not follow it.",
+    "copyLabel": "World to copy the theme from",
+    "copy": "Copy theme",
+    "copyEmpty": "None of your other worlds carries a theme yet. Author one anywhere and it can be copied from here.",
+    "copyLoadError": "Could not load the worlds you can copy a theme from.",
+    "paletteHeading": "Palette",
+    "overridesHeading": "Individual tokens",
+    "overridesHint": "Each token below follows the palette until you set it, and every cell shows what it currently renders as. Most are derived from the anchors; a few are an anchor under another name, and a few are fixed values no anchor reaches. Select one to set your own; clearing it hands the token back to the palette.",
+    "derivation": {
+      "derived": "Derived",
+      "anchor": "Anchor",
+      "literal": "Fixed"
+    },
+    "setOverride": "Override {{name}}, currently {{value}}",
+    "overrideOf": "Override of {{name}}",
+    "clearOverride": "Clear the override of {{name}}",
+    "overriddenCount": "{{count}} overridden",
+    "overrideGroup": {
+      "surfaces": "Paper and surfaces",
+      "ink": "Ink and foregrounds",
+      "lines": "Rules",
+      "accent": "Accent and sheen",
+      "tones": "Categorical tones",
+      "status": "Danger and success",
+      "canvas": "The map field",
+      "elevation": "Elevation",
+      "other": "Everything else"
+    },
+    "save": "Save",
+    "reset": "Reset to the Hexly default",
+    "unsaved": "Unsaved changes.",
+    "saveError": "Could not save the world theme.",
+    "token": {
+      "page": "Page",
+      "ink": "Ink",
+      "inkQuiet": "Quiet ink",
+      "accent": "Accent",
+      "danger": "Danger",
+      "success": "Success",
+      "canvas": "Canvas",
+      "soot": "Soot",
+      "polarity": "Polarity",
+      "lineAlpha": "Rule opacity",
+      "veil": "Veil"
+    },
+    "hint": {
+      "page": "The table the paper sits on.",
+      "ink": "Primary text ink.",
+      "inkQuiet": "Secondary ink — it carries its own hue.",
+      "accent": "The through-line accent; the categorical colours rotate off it.",
+      "danger": "Danger.",
+      "success": "Confirmation.",
+      "canvas": "The map field.",
+      "soot": "Shadow and scrim ink.",
+      "polarity": "Which way every ramp runs: light paper or dark.",
+      "lineAlpha": "How strongly drawn rules read.",
+      "veil": "How heavy shadows, scrims and the vignette sit."
+    },
+    "role": {
+      "ink": "Ink",
+      "ink-muted": "Quiet ink",
+      "accent": "Accent",
+      "surface": "Surface",
+      "bg": "Page",
+      "danger": "Danger",
+      "success": "Success",
+      "tone-1": "Category 1",
+      "tone-2": "Category 2",
+      "tone-3": "Category 3",
+      "tone-4": "Category 4",
+      "tone-5": "Category 5",
+      "tone-6": "Category 6",
+      "tone-7": "Category 7",
+      "tone-8": "Category 8"
+    },
+    "contrast": {
+      "clear": "Readable: every pair clears 4.5:1.",
+      "contrast": "{{ink}} on {{ground}} is {{ratio}}:1, under the 4.5:1 floor for body text.",
+      "midToneAccent": "This accent is mid-tone: no automatic text colour is readable on it ({{ratio}}:1). Pick a lighter or darker accent.",
+      "toneCollision": "{{tone}} has rotated close to {{status}} (ΔE {{distance}}); a chip may read as {{status}}.",
+      "chipContrast": "{{ink}} chips read at {{ratio}}:1 on {{ground}} — under the 4.5:1 floor. Their text carries the meaning, so it has to be legible."
+    },
+    "radiiHeading": "Corners",
+    "radiiLede": "How sharp or soft this world reads. One set covers every button, card, dialog and chip.",
+    "radiiCustom": "This world carries a corner set of its own. Picking one of these replaces it.",
+    "radii": {
+      "sharp": "Sharp",
+      "default": "Default",
+      "soft": "Soft"
+    },
+    "radiiHint": {
+      "sharp": "No rounding at all — drafted, severe.",
+      "default": "This world sets none.",
+      "soft": "Generously rounded — inviting."
+    },
+    "fontsHeading": "Type",
+    "fontsLede": "The faces this world is set in — display, body, cartouche and monospace, picked as a pairing.",
+    "fonts": {
+      "default": "Default",
+      "codex": "Codex"
+    },
+    "fontsHint": {
+      "default": "This world sets none; it follows Hexly's own faces, whatever they become.",
+      "codex": "Hexly's own faces, pinned to this world — Marcellus, Source Serif, Cinzel Decorative, JetBrains Mono. The same type as the default today; a later change to the default will not move it."
+    },
+    "fontsSpecimen": {
+      "display": "The Ninefold Road",
+      "body": "Three days east of the river, the road forks at a broken milestone."
+    }
+  },
   "imports": {
     "heading": "Imports",
     "subhead": "Bring in a managed reference library from a plugin's source. A reimport overwrites the set; your hand-authored entities are untouched.",
@@ -489,7 +603,7 @@
     "subhead": "Your preferences follow your account on every device.",
     "preferences": {
       "heading": "Preferences",
-      "theme": "Theme",
+      "colorScheme": "Colour scheme",
       "language": "Language",
       "formatLocale": "Regional formatting",
       "formatLocaleHint": "How dates and numbers read, independent of the language.",

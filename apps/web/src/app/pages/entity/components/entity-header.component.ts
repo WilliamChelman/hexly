@@ -48,14 +48,14 @@ import { EntityViewStore } from '../services/entity-view-store';
     <app-page-header>
       <div pageHeaderTitle class="flex items-center gap-3 min-w-0 flex-1">
         <div class="flex items-center gap-3 shrink-0">
-          <span appEyebrow class="text-gold! tracking-[0.28em] whitespace-nowrap">{{ eyebrow() }}</span>
+          <span appEyebrow class="text-accent-strong! tracking-[0.28em] whitespace-nowrap">{{ eyebrow() }}</span>
           <!--
             Text is driven imperatively (effect, never while focused) rather than
             interpolated, so re-renders can't move the caret mid-edit.
           -->
           <div
             #titleEl
-            class="font-display text-[22px] font-semibold tracking-[0.01em] text-ink whitespace-nowrap py-1 px-2 -my-1 -mx-2 rounded-sm border border-transparent outline-none hover:border-line hover:bg-surface-sunken focus:bg-surface-sunken focus:border-gold"
+            class="font-display text-[22px] tracking-[0.01em] text-ink whitespace-nowrap py-1 px-2 -my-1 -mx-2 rounded-sm border border-transparent outline-none hover:border-line hover:bg-surface-sunken focus:bg-surface-sunken focus:border-accent"
             [class.cursor-text]="editable()"
             data-testid="title"
             role="textbox"

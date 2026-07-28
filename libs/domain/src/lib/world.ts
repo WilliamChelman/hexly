@@ -6,6 +6,7 @@
 
 import * as z from 'zod';
 import { ENTITY_LIST_MAX_LIMIT, entityTypeSchema, nameSchema } from './entity';
+import { WorldTheme, worldThemeSchema } from './world-theme';
 
 /**
  * A World container (CONTEXT.md → World): a `name` and its `owners`. A World
@@ -75,10 +76,10 @@ export const createWorldRequestSchema = z.object({ name: nameSchema });
 export type CreateWorldRequest = z.infer<typeof createWorldRequestSchema>;
 
 /**
- * PATCH /worlds/:id: the `name` and/or the ordered `pinnedEntityIds` set. Pins
- * are sent wholesale — add, remove, and reorder all collapse to "send the new
- * array". Ids are references, not enforced FKs: a stale or inaccessible id is
- * filtered per-viewer on read, never rejected here.
+ * PATCH /worlds/:id: the `name`, the ordered `pinnedEntityIds` set, and/or the
+ * World Theme. Pins are sent wholesale — add, remove, and reorder all collapse to
+ * "send the new array". Ids are references, not enforced FKs: a stale or
+ * inaccessible id is filtered per-viewer on read, never rejected here.
  */
 export const updateWorldRequestSchema = z.object({
   name: nameSchema.optional(),
@@ -90,6 +91,9 @@ export const updateWorldRequestSchema = z.object({
     .max(ENTITY_LIST_MAX_LIMIT)
     .transform((ids) => [...new Set(ids)])
     .optional(),
+  // The World Theme (ADR-0076), also wholesale; `null` clears it. A schema rather than a passthrough
+  // blob because this is the write choke point for untrusted input.
+  theme: z.union([worldThemeSchema, z.null()]).optional(),
 });
 
 export type UpdateWorldRequest = z.infer<typeof updateWorldRequestSchema>;
@@ -129,6 +133,19 @@ export interface WorldDetail extends WorldSummary {
    * pinned Entity a viewer can't reach simply drops off their Dashboard.
    */
   readonly pinnedEntityIds: readonly string[];
+  /** The Owner-authored World Theme (ADR-0076), absent when the World carries none. */
+  readonly theme?: WorldTheme;
+}
+
+/**
+ * A World whose Theme may be copied into another one (#376): what `GET /worlds/:id/theme-sources`
+ * returns. The Theme rides whole because the copy is a duplicate, not a link (ADR-0076) — the client
+ * stages these values as its own draft and stores them through the ordinary write choke point.
+ */
+export interface WorldThemeSource {
+  readonly id: string;
+  readonly name: string;
+  readonly theme: WorldTheme;
 }
 
 /**

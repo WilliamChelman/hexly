@@ -38,19 +38,20 @@ h2,
 h3,
 h4 {
   font-family: var(--font-display);
-  font-weight: var(--font-weight-semibold);
+  /* Regular rather than the UA's bold: the display face carries only 400 (see `--font-display`). */
+  font-weight: var(--font-weight-regular);
   line-height: var(--leading-tight);
   color: var(--color-ink-strong);
   letter-spacing: var(--tracking-tight);
 }
 
 a {
-  color: var(--color-gold-strong);
+  color: var(--color-accent-strong);
   text-decoration-color: var(--color-line-strong);
   text-underline-offset: 0.18em;
 }
 a:hover {
-  color: var(--color-gold);
+  color: var(--color-accent);
 }
 
 button,
@@ -62,7 +63,7 @@ textarea {
 }
 
 ::selection {
-  background: var(--color-gold-soft);
+  background: var(--color-accent-soft);
   color: var(--color-ink-strong);
 }
 

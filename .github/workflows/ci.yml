@@ -164,11 +164,18 @@ jobs:
 
       - run: pnpm exec nx e2e web-e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
+      # Only on red: the HTML report is written whatever the outcome, so uploading it always would cost
+      # three shards of it per push. Both folders — the report is browsable, `test-results` carries the
+      # raw trace.zip and error-context.md.
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-report-shard-${{ matrix.shard }}
-          path: apps/web-e2e/playwright-report/
+          path: |
+            apps/web-e2e/playwright-report/
+            apps/web-e2e/test-results/
+          # An empty upload is the defect this step exists to prevent, so it fails rather than warns.
+          if-no-files-found: error
           retention-days: 7
 
   # Version preview: reports the version that would be released, without cutting
@@ -328,11 +335,16 @@ jobs:
           fi
           gh release upload "$TAG" "${artifacts[0]}" --clobber
 
+      # The `-packaged` folders: this job runs the post-package smoke check, not the desktop-e2e gate.
+      # `ignore` rather than the e2e job's `error`, because the usual way this job goes red is
+      # electron-builder failing before Playwright ever runs.
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: desktop-package-report-${{ matrix.runner }}
-          path: apps/desktop-e2e/playwright-report/
+          path: |
+            apps/desktop-e2e/playwright-report-packaged/
+            apps/desktop-e2e/test-results-packaged/
           if-no-files-found: ignore
           retention-days: 7
 

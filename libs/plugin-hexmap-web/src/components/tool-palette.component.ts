@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { featureLibrary, terrainPalette } from '@hexly/plugin-hexmap';
+import { featureLibrary, terrainSet } from '@hexly/plugin-hexmap';
 import {
   IconButtonComponent,
   IconComponent,
@@ -194,7 +194,7 @@ export class ToolPaletteComponent {
 
   protected readonly clearKey = String(featureSubtools.indexOf('clear') + 1);
 
-  protected readonly terrainTools = terrainPalette.map((t, i) => ({
+  protected readonly terrainTools = terrainSet.map((t, i) => ({
     id: t.id,
     nameKey: terrainKey(t.id),
     swatch: t.fill,
