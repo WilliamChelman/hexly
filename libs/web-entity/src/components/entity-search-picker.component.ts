@@ -5,11 +5,11 @@ import { EntitiesClient } from '@hexly/web-core';
 import { ButtonComponent, InputComponent } from '@hexly/web-ui';
 
 /**
- * The shared server-side Entity picker (ADR-0025): a search box over the owner-scoped
- * `list({ q })` read, rendering matching Entities as pickable rows. Presentation + search
- * only — the consumer decides what a pick *means* (link a Map element, pin an Entity) and
- * owns the `query`. Projected content renders below the option list, for consumer-specific
- * actions like create-and-link.
+ * The shared server-side Entity picker (ADR-0025): a search box over the `list({ q })` read,
+ * rendering matching Entities as pickable rows. Presentation + search only — the consumer decides
+ * what a pick *means* (link a Map element, pin an Entity), owns the `query`, and names the
+ * {@link worldId} to search within. Projected content renders below the option list, for
+ * consumer-specific actions like create-and-link.
  *
  * ponytail: no debounce — small owner lists, fine until list sizes force it.
  */

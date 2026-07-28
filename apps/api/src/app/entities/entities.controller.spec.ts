@@ -424,6 +424,52 @@ describe('Entities endpoints', () => {
     expect(inB.body.items.map((e: { name: string }) => e.name).sort()).toEqual(['In Second World']);
   });
 
+  /**
+   * The read the Entity Link picker makes (#394), for the caller who reaches a second World — the
+   * case it used to leak. Only *offering* is scoped; resolving an existing link is not.
+   */
+  describe('the Entity Link picker’s read, for a caller reachable in two Worlds', () => {
+    /** Bob owns World B and merely contributes to Ada's World A — both reachable, only one active. */
+    async function bobInTwoWorlds() {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const worldA = (await ada.get('/worlds').expect(200)).body[0].id;
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      const worldB = app.get(WorldsService).mintWorld(bobId, 'Bob’s World');
+      await ada.post(`/worlds/${worldA}/members`).send({ userId: bobId, role: 'contributor' }).expect(200);
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      const inA = await bob
+        .post('/entities')
+        .send({ name: 'Ashen Vale', types: ['core.type.note'], worldId: worldA })
+        .expect(201);
+      await bob
+        .post('/entities')
+        .send({ name: 'Ashen Ridge', types: ['core.type.note'], worldId: worldB })
+        .expect(201);
+      return { bob, worldB, inA: inA.body.id };
+    }
+
+    it('offers nothing from the other World, though the caller reaches both', async () => {
+      const { bob, worldB } = await bobInTwoWorlds();
+
+      // Unscoped, both are his to see — so the scoped read below is scoping, not an access failure.
+      const reachable = await bob.get('/entities').query({ q: 'ashen' }).expect(200);
+      expect(reachable.body.items.map((e: { name: string }) => e.name).sort()).toEqual(['Ashen Ridge', 'Ashen Vale']);
+
+      const offered = await bob.get('/entities').query({ q: 'ashen', worldId: worldB }).expect(200);
+      expect(offered.body.items.map((e: { name: string }) => e.name)).toEqual(['Ashen Ridge']);
+    });
+
+    it('still resolves a link whose target lives outside the active World', async () => {
+      const { bob, inA } = await bobInTwoWorlds();
+
+      // The picker resolves an existing link by id, unscoped, so scoping the search never turns a
+      // link that already crosses Worlds into a dangling one.
+      const res = await bob.get('/entities').query({ ids: [inA] }).expect(200);
+      expect(res.body.items.map((e: { name: string }) => e.name)).toEqual(['Ashen Vale']);
+    });
+  });
+
   it('attaches Rights to list summaries only when the caller opts in (ADR-0039)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.type.note'] });

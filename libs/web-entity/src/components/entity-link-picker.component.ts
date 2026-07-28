@@ -21,9 +21,10 @@ import { ENTITY_TYPES } from '../models/entity-types';
 
 /**
  * The **Entity Link** control (CONTEXT.md → Entity Link) for one link-carrying slot: pick an Entity to
- * link, follow it, or remove it. Searches server-side via `list({ q })` and resolves the linked name
- * via `list({ ids: [id] })` (ADR-0025), never holding the whole owner list. A link to a
- * deleted/inaccessible target renders non-navigable rather than a dead link; the id stays in the
+ * link, follow it, or remove it. Searches server-side via `list({ q, worldId })` — bound to the active
+ * World (#394), so what it offers is what the World being edited in holds — and resolves the linked
+ * name via the unscoped `list({ ids: [id] })` (ADR-0025), never holding the whole owner list. A link to
+ * a deleted/inaccessible target renders non-navigable rather than a dead link; the id stays in the
  * document.
  *
  * The host owns the link: this component only reads the current value and emits the next one.
@@ -92,6 +93,7 @@ import { ENTITY_TYPES } from '../models/entity-types';
           testid="entity-link"
           placeholderKey="fields.entityLink.search"
           emptyKey="fields.entityLink.empty"
+          [worldId]="activeWorldId()"
           [query]="query()"
           (queryChange)="query.set($event)"
           (pick)="pick($event.id)"
@@ -147,6 +149,9 @@ export class EntityLinkPickerComponent {
 
   protected readonly open = signal(false);
   protected readonly query = signal('');
+
+  /** The World in the URL (ADR-0028) — never absent on the guarded `w/:worldId` routes this mounts under. */
+  protected readonly activeWorldId = computed(() => this.activeWorld.worldId() ?? undefined);
 
   /**
    * The Types create-and-link offers, each with the name to print on its button. `activeLang` is read
@@ -214,7 +219,7 @@ export class EntityLinkPickerComponent {
     this.entitiesClient
       // Scope the create-and-link Entity to the World in the URL (ADR-0028) so it
       // lands in the same World as the Entity being edited, not the owner's oldest.
-      .create(name, [type], this.activeWorld.worldId() ?? undefined)
+      .create(name, [type], this.activeWorldId())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((entity) => {
         // Remember it locally so its name resolves without a server round trip,
