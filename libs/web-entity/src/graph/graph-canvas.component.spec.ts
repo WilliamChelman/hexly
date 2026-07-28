@@ -119,7 +119,9 @@ describe('GraphCanvasComponent', () => {
       dispose: vi.fn(),
     };
     // Warm synchronously: the pool only asks the scheduler for a moment, and the moment is now.
+    // Both halves of the pair — the pool declines an idle scheduler it could not cancel.
     vi.stubGlobal('requestIdleCallback', (work: () => void) => work());
+    vi.stubGlobal('cancelIdleCallback', () => undefined);
 
     await TestBed.configureTestingModule({
       imports: [HostComponent, provideTranslocoTesting(WEB_ENTITY_TEST_CATALOGS)],

@@ -1,4 +1,4 @@
-import { Injectable, InjectionToken, inject } from '@angular/core';
+import { DestroyRef, Injectable, InjectionToken, inject } from '@angular/core';
 import type { Graph } from '@cosmos.gl/graph';
 import { Logger } from '@hexly/web-core';
 
@@ -25,6 +25,9 @@ export const WARM_GRAPH_FACTORY = new InjectionToken<() => Promise<WarmGraph>>('
 });
 
 async function buildWarmGraph(): Promise<WarmGraph> {
+  // Checked before the imports, not after: where WebGL2 is absent the device call could only fail,
+  // and pulling in the renderer's module graph to learn that costs a jsdom test run real time.
+  if (typeof WebGL2RenderingContext === 'undefined') throw new Error('WebGL2 is unavailable here');
   const [{ Graph }, { luma }, { webgl2Adapter }] = await Promise.all([
     import('@cosmos.gl/graph'),
     import('@luma.gl/core'),
@@ -73,9 +76,20 @@ async function buildWarmGraph(): Promise<WarmGraph> {
 /** Where `requestIdleCallback` is missing (jsdom, old Safari), warm on a timer instead. */
 const IDLE_FALLBACK_MS = 1500;
 
-function onIdle(work: () => void): void {
-  if (typeof requestIdleCallback === 'function') requestIdleCallback(() => work());
-  else setTimeout(work, IDLE_FALLBACK_MS);
+/**
+ * Schedule `work` for an idle moment; the returned callback un-schedules it if it has not run.
+ * Idle scheduling is taken only where it can also be cancelled, and the canceller is held from that
+ * moment rather than looked up again later — cancelling happens during teardown, when whatever is
+ * dismantling the environment may already have taken the global away.
+ */
+function onIdle(work: () => void): () => void {
+  if (typeof requestIdleCallback === 'function' && typeof cancelIdleCallback === 'function') {
+    const cancel = cancelIdleCallback.bind(globalThis);
+    const handle = requestIdleCallback(() => work());
+    return () => cancel(handle);
+  }
+  const timer = setTimeout(work, IDLE_FALLBACK_MS);
+  return () => clearTimeout(timer);
 }
 
 /**
@@ -105,12 +119,33 @@ export class GraphWarmPool {
   private warm: WarmGraph | null = null;
   private warming = false;
   private failed = false;
+  private destroyed = false;
+  private unschedule: (() => void) | null = null;
+
+  constructor() {
+    // Nothing the pool schedules may outlive the injector that owns it: an idle callback that fires
+    // after teardown builds a graph for an application that is gone — and in a unit test, lands its
+    // work in the next spec's environment. The pooled graph goes with it; it holds a GPU context.
+    inject(DestroyRef).onDestroy(() => {
+      this.destroyed = true;
+      this.unschedule?.();
+      this.unschedule = null;
+      this.warm?.dispose();
+      this.warm = null;
+    });
+  }
 
   /** Schedule a warm graph for an idle stretch. Idempotent; a no-op once one exists or the build failed. */
   warmUp(): void {
-    if (this.warm || this.warming || this.failed) return;
+    if (this.destroyed || this.warm || this.warming || this.failed) return;
     this.warming = true;
-    onIdle(() => void this.buildWarm());
+    this.unschedule = onIdle(() => {
+      this.unschedule = null;
+      // Belt and braces around the cancellation: a scheduler that fires a cancelled callback anyway
+      // (or one whose cancel the platform ignores) still must not build for a dead injector.
+      if (this.destroyed) return;
+      void this.buildWarm();
+    });
   }
 
   /** The warm graph, or `null` when none is ready. */
@@ -129,6 +164,11 @@ export class GraphWarmPool {
   private async buildWarm(): Promise<void> {
     try {
       const warm = await this.build();
+      // The injector can go while the build is in flight; the graph it produced is still ours to tear down.
+      if (this.destroyed) {
+        warm.dispose();
+        return;
+      }
       // A GPU reset kills the pooled context: discard the dead entry and warm a fresh one.
       void warm.lost.then(() => {
         if (this.warm === warm) {
