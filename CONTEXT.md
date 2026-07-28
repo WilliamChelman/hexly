@@ -128,6 +128,10 @@ _Avoid_: Library (retired), catalog, SRD, bestiary (one pack's subject, not the 
 The durable surface listing every installed **Compendium**'s entries at `/w/:worldId/compendium` — the **Entity Browser** preset to the shelf, on the **Asset Browser**'s precedent, with the same search and the same **Facets**. It names its **Containers** explicitly, because the read is _about_ compendium content rather than about a World; the World in its URL names the **Adoption** target, not the content's home.
 _Avoid_: Compendium page (that is a pack's own attribution page), pack browser, library
 
+**Compendium page**:
+One **Compendium**'s own page at `/w/:worldId/compendium/:compendiumId`, stating the terms its content is published under — publisher, license, notice, as its **Compendium Importer** declared them on install — beside the revision it is pinned at. Reached from the **Compendium browse** that credits it, and readable by every signed-in caller, because attribution belongs to whoever reads the content rather than to the operator who installed it (ADR-0061, ADR-0079). A term the pack did not record is absent, never an empty heading.
+_Avoid_: Compendium browse (that lists entries; this states terms), pack page, attribution panel, about page
+
 **Compendium Entry**:
 An **Entity** that lives in a **Compendium** — defined by that location alone, never by a flag, never by an **Entity Type**, and never by "has an **Import Source**" (the **Vault** import will carry one too). An ordinary Entity in a **Sealed** state, never a kind of its own: absent from every World-scoped reading (the **Entity Browser**, **Facets**, the **World Graph**, a World's counts) by the plain fact of belonging to another **Container**, with no exclusion rule anywhere naming it.
 _Avoid_: Compendium Entity (it is an Entity, in a place), record, item, stat block, monster (one pack's content)

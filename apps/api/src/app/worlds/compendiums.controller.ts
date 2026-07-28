@@ -1,8 +1,8 @@
-import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
+import { Controller, Get, Inject, NotFoundException, Param, UseGuards } from '@nestjs/common';
 import { CompendiumSummary } from '@hexly/domain';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
 import { DB, Db } from '../db/db';
-import { listCompendiums } from './compendiums';
+import { compendiumById, listCompendiums } from './compendiums';
 
 /**
  * The installed packs (CONTEXT.md → Compendium), Instance-wide and outside the World scope — a
@@ -25,5 +25,16 @@ export class CompendiumsController {
   @Get()
   list(): CompendiumSummary[] {
     return listCompendiums(this.db);
+  }
+
+  /**
+   * One installed pack, for the **Compendium page** (ADR-0061, #402). A World's id is a 404 here: the
+   * satellite is the discriminator (ADR-0078), so no Collaboration rule is ever consulted.
+   */
+  @Get(':id')
+  get(@Param('id') id: string): CompendiumSummary {
+    const compendium = compendiumById(this.db, id);
+    if (!compendium) throw new NotFoundException('Compendium not found');
+    return compendium;
   }
 }

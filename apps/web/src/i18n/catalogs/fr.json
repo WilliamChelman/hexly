@@ -32,7 +32,20 @@
     "emptyTitle": "Aucun matériel de référence n'est installé.",
     "emptyHint": "Un opérateur installe un Compendium pour toute l'instance.",
     "noMatchTitle": "Aucun élément du Compendium ne correspond à votre recherche.",
-    "noMatchHint": "Essayez un autre nom, un autre Compendium ou un autre mot."
+    "noMatchHint": "Essayez un autre nom, un autre Compendium ou un autre mot.",
+    "credits": "Matériel de référence issu de",
+    "page": {
+      "tabTitle": "Hexly — Compendium",
+      "tabTitleNamed": "Hexly — {{name}}",
+      "heading": "Compendium",
+      "backToBrowse": "Retour au Compendium",
+      "revision": "Révision {{rev}}",
+      "publisher": "Éditeur",
+      "license": "Licence",
+      "notice": "Mention légale",
+      "notFoundTitle": "Ce Compendium n'est pas installé.",
+      "notFoundHint": "Un opérateur l'a peut-être retiré de cette instance."
+    }
   },
   "auth": {
     "tabTitle": "Hexly — Se connecter",

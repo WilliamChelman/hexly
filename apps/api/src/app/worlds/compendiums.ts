@@ -35,6 +35,16 @@ export function listCompendiums(db: Db): CompendiumSummary[] {
   return selectCompendium(db).orderBy(asc(containers.name)).all().map(toCompendiumSummary);
 }
 
+/**
+ * One installed Compendium by Container id — undefined for a World's id too, since the read is driven
+ * off the satellite that discriminates (ADR-0078). Unguarded for the same reason {@link listCompendiums}
+ * is; it backs the **Compendium page** (#402).
+ */
+export function compendiumById(db: Db, id: string): CompendiumSummary | undefined {
+  const row = selectCompendium(db).where(eq(compendiums.id, id)).get();
+  return row && toCompendiumSummary(row);
+}
+
 /** One row for the wire, attribution folded back into the shape its Importer declared it in. */
 function toCompendiumSummary(row: CompendiumRow): CompendiumSummary {
   return {

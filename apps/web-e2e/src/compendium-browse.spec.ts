@@ -13,7 +13,7 @@ import { compendiumRailLink, enterEntities, expect, test } from './fixtures';
  * The pack is the Draw Steel monsters Importer with its codeload fetch port swapped for the committed
  * Ajax + Goblin fixtures under the e2e opt-in (`E2eFixtureImporters`), so the run stays offline.
  */
-test('the Compendium destination lists an installed pack, and an entry opens read-only under the browsing World', async ({
+test('the Compendium destination lists an installed pack, opens an entry read-only under the browsing World, and states the pack’s terms', async ({
   page,
 }) => {
   const worldSeg = await enterEntities(page);
@@ -79,4 +79,14 @@ test('the Compendium destination lists an installed pack, and an entry opens rea
   await page.goto(url);
   await expect(page.getByTestId('title')).toHaveText('Goblin Warrior');
   await expect(page).toHaveURL(new RegExp(`/w/${worldSeg}/entities/`));
+
+  // The terms are stated where the content is read (ADR-0061, #402): the browse credits each installed
+  // Compendium by name, and the name opens its own page — the reachability only a browser can show.
+  await compendiumRailLink(page).click();
+  await page.getByTestId('compendium-credits').getByText('Draw Steel: Monsters').click();
+  await expect(page).toHaveURL(new RegExp(`/w/${worldSeg}/compendium/`));
+  await expect(page.getByTestId('compendium-name')).toHaveText('Draw Steel: Monsters');
+  await expect(page.getByTestId('compendium-publisher')).toHaveText('MCDM Productions, LLC');
+  await expect(page.getByTestId('compendium-license')).toHaveText('Draw Steel Creator License');
+  await expect(page.getByTestId('compendium-notice')).toContainText('not affiliated with MCDM Productions, LLC');
 });

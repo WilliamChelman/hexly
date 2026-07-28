@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -11,6 +11,7 @@ import {
   EntitiesClient,
   EntityFacetParams,
   ToasterService,
+  worldCompendiumPageRoute,
 } from '@hexly/web-core';
 import { EyebrowComponent, ButtonComponent, PageHeaderComponent } from '@hexly/web-ui';
 import { EntityCardComponent, EntityCardVm } from '../entity-browser/components/entity-card.component';
@@ -57,6 +58,7 @@ const SEARCH_DEBOUNCE_MS = 150;
     EntitySearchComponent,
     EmptyStateComponent,
     FacetRailComponent,
+    RouterLink,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
@@ -76,6 +78,24 @@ const SEARCH_DEBOUNCE_MS = 150;
       <!-- The Entity Browser's own search box, verbatim (the Asset Browser's precedent): same control,
            same copy, same behaviour — there is no second way to search. -->
       <app-entity-search [value]="query()" (queryChange)="onSearch($event)" />
+
+      <!-- The credit line: every installed Compendium named, each linking to its **Compendium page**
+           and the terms it states (ADR-0061, #402). Names them all, whatever the Compendium facet
+           narrows to — the credit is the shelf's, not the result set's. -->
+      @if (credits().length > 0) {
+        <p class="font-sans text-xs text-ink-muted m-0 mb-6" data-testid="compendium-credits">
+          {{ 'compendium.credits' | transloco }}
+          @for (compendium of credits(); track compendium.id; let last = $last) {
+            <a
+              class="text-accent-strong hover:underline"
+              [attr.data-testid]="'compendium-credit-' + compendium.id"
+              [routerLink]="pageRoute(compendium)"
+              >{{ compendium.name }}</a
+            >{{ last ? '' : ', ' }}
+          }
+        </p>
+      }
+
       <div class="grid grid-cols-1 lg:grid-cols-[14rem_1fr] gap-8 items-start">
         <app-facet-rail
           [facetCounts]="facetCounts()"
@@ -151,6 +171,9 @@ export class CompendiumBrowserPage {
    * unscoped read of every Entity on the Instance — not an empty one.
    */
   private readonly installed = signal<CompendiumSummary[] | null>(null);
+
+  /** The credit line's rows: nothing to credit until the Compendiums load. */
+  protected readonly credits = computed(() => this.installed() ?? []);
 
   private readonly _entries = signal<EntitySummary[]>([]);
   protected readonly nextCursor = signal<string | null>(null);
@@ -255,6 +278,16 @@ export class CompendiumBrowserPage {
 
   protected onSearch(value: string): void {
     this.typed.next(value);
+  }
+
+  /** One Compendium's own page, under the World this browse was entered from. */
+  protected pageRoute(compendium: CompendiumSummary): string[] {
+    return worldCompendiumPageRoute(
+      this.worldId() ?? '',
+      compendium.id,
+      this.activeWorld.name() ?? undefined,
+      compendium.name,
+    );
   }
 
   protected toggleFacet({ category, value }: FacetToggle): void {
