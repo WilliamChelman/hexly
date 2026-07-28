@@ -121,7 +121,7 @@ export class AssetMintService {
     const name = nameSchema.catch('Asset').parse(basename(filename, rawExt));
     const row = this.writes.insert({
       ownerId,
-      worldId,
+      containerId: worldId,
       name,
       types: [CORE_ASSET_TYPE_ID],
       tags: [],

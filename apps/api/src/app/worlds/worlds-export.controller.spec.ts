@@ -630,7 +630,7 @@ describe('Vault export endpoint', () => {
     const bobNoteId = 'bob-shared-note';
     entities.importEntity({
       ownerId: bobId,
-      worldId,
+      containerId: worldId,
       id: bobNoteId,
       name: 'Bob Secret',
       types: ['core.type.note'],

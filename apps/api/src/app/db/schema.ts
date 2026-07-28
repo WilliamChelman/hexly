@@ -129,11 +129,14 @@ export const entityGrants = sqliteTable(
   (table) => [primaryKey({ columns: [table.entityId, table.userId] })],
 );
 
-/** The kinds of Container (ADR-0078). ADR-0079's `compendium` is the second. */
-export type ContainerKind = 'world';
+/** The kinds of Container (ADR-0078): a **World** a user authors into, or ADR-0079's **Compendium** shelf. */
+export type ContainerKind = 'world' | 'compendium';
 
 /** The {@link containers} kind every World row carries. */
 export const WORLD_CONTAINER_KIND: ContainerKind = 'world';
+
+/** The {@link containers} kind every Compendium row carries (ADR-0079). */
+export const COMPENDIUM_CONTAINER_KIND: ContainerKind = 'compendium';
 
 /**
  * A **Container** (ADR-0078): what an Entity belongs to. It holds identity and the substance every
@@ -177,6 +180,40 @@ export const worlds = sqliteTable('worlds', {
  * The two are keyed by the same id, so the join reads as one flat row.
  */
 export type WorldRow = typeof containers.$inferSelect & Omit<typeof worlds.$inferSelect, 'id'>;
+
+/**
+ * A **Compendium** (ADR-0079): the Container kind holding one installed pack of published reference
+ * material, Instance-wide. The {@link worlds} peer — identity lives on the {@link containers} row this
+ * `id` names, and only what a Compendium alone has stays here. It has no members, no public link, no
+ * Theme and no pins *by construction*: those tables key on {@link worlds}, which a Compendium has no
+ * row in (ADR-0078).
+ *
+ * `importer` is the **Compendium Importer** that produced this shelf, and it is `unique`: one
+ * Compendium per pack, which is what lets the reconcile's match key collapse from
+ * `(container, importer)` to the container alone. `rev` is the pinned source revision the entries
+ * currently reflect, and the three attribution columns are the pack's terms — publisher, license, and
+ * the verbatim notice — all captured from the Importer's declaration on install and re-captured on
+ * reimport, so they render where the content is read (#402) instead of only in the plugin's source
+ * tree (ADR-0061). Attribution is nullable throughout: a pack may state none.
+ */
+export const compendiums = sqliteTable('compendiums', {
+  id: text('id')
+    .primaryKey()
+    .references(() => containers.id, { onDelete: 'cascade' }),
+  // The one Compendium Importer that owns this shelf — the lookup "where does this Importer land?"
+  // and, being unique, the guarantee that answer is a single Container.
+  importer: text('importer').notNull().unique(),
+  rev: text('rev').notNull(),
+  publisher: text('publisher'),
+  license: text('license'),
+  notice: text('notice'),
+});
+
+/**
+ * A whole stored Compendium: its {@link containers} identity row joined to its {@link compendiums}
+ * satellite, the {@link WorldRow} peer.
+ */
+export type CompendiumRow = typeof containers.$inferSelect & Omit<typeof compendiums.$inferSelect, 'id'>;
 
 /**
  * World membership: a user is an `owner` (full control — the World's ownership

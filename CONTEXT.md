@@ -133,7 +133,7 @@ The state of a **Compendium Entry**: read-only to everyone, the operator include
 _Avoid_: Locked, frozen, immutable, protected; read-only (one half of it), hidden (it is findable)
 
 **Compendium Importer**:
-An **Importer** that declares its output to be reference material, so it reconciles into a **Compendium** rather than a **World**. The declaration is the Importer's, and what it produces is a **Compendium Entry** by virtue of landing there — which is why a hand-written NPC carrying `draw-steel.type.monster` is untouched by any of this and stays an ordinary Entity.
+An **Importer** that declares its output to be reference material, so it reconciles into a **Compendium** rather than a **World**. The declaration is part of the **Importer** contract rather than a per-plugin convention, and carries the Compendium's name and its attribution, both captured on install. What the Importer produces is a **Compendium Entry** by virtue of landing there — which is why a hand-written NPC carrying `draw-steel.type.monster` is untouched by any of this and stays an ordinary Entity.
 _Avoid_: Seeder, pack loader, content importer
 
 **Adoption**:

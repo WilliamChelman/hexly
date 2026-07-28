@@ -226,7 +226,7 @@ export class VaultImportService {
               const mintedId = randomUUID();
               this.entities.importEntity({
                 ownerId,
-                worldId,
+                containerId: worldId,
                 id: mintedId,
                 name: name.data,
                 types: [inlineType],
@@ -276,7 +276,7 @@ export class VaultImportService {
           };
           this.entities.importEntity({
             ownerId,
-            worldId,
+            containerId: worldId,
             id: note.id,
             name: note.name,
             types,

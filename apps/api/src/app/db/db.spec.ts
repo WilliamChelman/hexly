@@ -44,7 +44,10 @@ describe('createDb boot migration (ADR-0027)', () => {
         'users',
         'sessions',
         'entities',
+        'containers',
         'worlds',
+        // The Compendium satellite beside `worlds` on the shared Container (ADR-0078, ADR-0079).
+        'compendiums',
         'world_members',
         'world_links',
         'entity_descriptors',
