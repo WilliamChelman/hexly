@@ -49,6 +49,20 @@ export function worldCompendiumRoute(worldId: string, worldName?: string): strin
   return ['/w', segment(worldId, worldName), 'compendium'];
 }
 
+/**
+ * A **Compendium page** `/w/:worldId/compendium/:compendiumId` (ADR-0079, #402) — one pack's own page,
+ * stating the terms its content is published under. Nested under the browse it is reached from, and its
+ * World segment means what {@link worldCompendiumRoute}'s does: the adoption target, not a home.
+ */
+export function worldCompendiumPageRoute(
+  worldId: string,
+  compendiumId: string,
+  worldName?: string,
+  compendiumName?: string,
+): string[] {
+  return ['/w', segment(worldId, worldName), 'compendium', segment(compendiumId, compendiumName)];
+}
+
 export function entityRoute(worldId: string, entityId: string, worldName?: string, entityName?: string): string[] {
   return ['/w', segment(worldId, worldName), 'entities', segment(entityId, entityName)];
 }

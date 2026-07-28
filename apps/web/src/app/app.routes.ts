@@ -109,6 +109,16 @@ export const appRoutes: Route[] = [
         title: 'compendium.tabTitle',
       },
       {
+        // A pack's own page (ADR-0079, #402): the terms its content is published under, stated where
+        // that content is read rather than in a source-tree NOTICE.md nobody opens (ADR-0061). Nested
+        // under the browse it is reached from, and readable by anyone signed in — Instance-wide with no
+        // members means being signed in *is* the standing (ADR-0078).
+        path: 'compendium/:compendiumId',
+        pathMatch: 'full',
+        loadComponent: () => import('./pages/compendium-page/compendium.page').then((m) => m.CompendiumPage),
+        title: 'compendium.page.tabTitle',
+      },
+      {
         // The Asset Browser (ADR-0065, #282): the Entity Browser preset to the asset type — a World's
         // uploaded media as thumbnail tiles, with upload at hand.
         path: 'assets',

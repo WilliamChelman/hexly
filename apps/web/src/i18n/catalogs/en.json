@@ -32,7 +32,19 @@
     "emptyTitle": "No reference material is installed.",
     "emptyHint": "An operator installs a Compendium for the whole instance.",
     "noMatchTitle": "Nothing in the Compendium matches your search.",
-    "noMatchHint": "Try a different name, Compendium, or word."
+    "noMatchHint": "Try a different name, Compendium, or word.",
+    "credits": "Reference material from",
+    "page": {
+      "tabTitle": "Hexly — Compendium",
+      "heading": "Compendium",
+      "backToBrowse": "Back to the Compendium",
+      "revision": "Revision {{rev}}",
+      "publisher": "Publisher",
+      "license": "License",
+      "notice": "Notice",
+      "notFoundTitle": "This Compendium isn't installed.",
+      "notFoundHint": "An operator may have removed it from this instance."
+    }
   },
   "auth": {
     "tabTitle": "Hexly — Sign in",

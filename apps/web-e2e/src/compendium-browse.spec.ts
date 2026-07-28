@@ -79,4 +79,15 @@ test('the Compendium destination lists an installed pack, and an entry opens rea
   await page.goto(url);
   await expect(page.getByTestId('title')).toHaveText('Goblin Warrior');
   await expect(page).toHaveURL(new RegExp(`/w/${worldSeg}/entities/`));
+
+  // The pack states its terms where its content is read (#402). ADR-0061 discharges the Creator License
+  // with a NOTICE.md in the plugin's source tree — precisely what the person reading the monsters never
+  // opens — so the browse credits each installed Compendium by name, and the name opens its own page.
+  await compendiumRailLink(page).click();
+  await page.getByTestId('compendium-credits').getByText('Draw Steel: Monsters').click();
+  await expect(page).toHaveURL(new RegExp(`/w/${worldSeg}/compendium/`));
+  await expect(page.getByTestId('compendium-name')).toHaveText('Draw Steel: Monsters');
+  await expect(page.getByTestId('compendium-publisher')).toHaveText('MCDM Productions, LLC');
+  await expect(page.getByTestId('compendium-license')).toHaveText('Draw Steel Creator License');
+  await expect(page.getByTestId('compendium-notice')).toContainText('not affiliated with MCDM Productions, LLC');
 });
