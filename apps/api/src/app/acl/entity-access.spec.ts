@@ -122,7 +122,7 @@ describe('entityAccess', () => {
     });
 
     // Regression: the read predicate rides a SELECT projection in decideMeta, where a naive
-    // `worldMembers.world_id = entities.world_id` correlation can strip to a tautology and report
+    // `worldMembers.world_id = entities.container_id` correlation can strip to a tautology and report
     // "member of *any* World" as readable. A member of a DIFFERENT World, with no membership or
     // grant here, must not read this shared Entity.
     it('does not read a shared Entity for a member of a different World', () => {
@@ -186,7 +186,7 @@ describe('entityAccess', () => {
     db.insert(entities)
       .values({
         id,
-        worldId,
+        containerId: worldId,
         name: `e-${visibility}`,
         types: ['core.type.note'],
         tags: [],

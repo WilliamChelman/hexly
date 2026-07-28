@@ -49,7 +49,7 @@ export interface StoredAsset {
  * Per-World content-addressed Asset byte storage (ADR-0034, ADR-0065). Bytes are written to disk under
  * `<ASSETS_DIR>/<worldId>/<sha256>.<ext>`; the hash IS the capability token the unauthenticated serving
  * route relies on. Dedup and enumeration are the **Asset Entity's** job, resolved through the derived
- * `(worldId, hash) → entity` index (ADR-0065); byte serving reads disk with no table consulted.
+ * `(containerId, hash) → entity` index (ADR-0065); byte serving reads disk with no table consulted.
  */
 @Injectable()
 export class AssetsService implements OnModuleInit {
@@ -109,7 +109,7 @@ export class AssetsService implements OnModuleInit {
   /**
    * Write `bytes` for `worldId`, content-addressed by their sha256 (ADR-0034). Idempotent: identical
    * bytes hash to the same on-disk name, so a repeat overwrites a byte-identical file — the mint path's
-   * `(worldId, hash)` dedup decides whether a new Entity is minted. `filename` supplies the extension
+   * `(containerId, hash)` dedup decides whether a new Entity is minted. `filename` supplies the extension
    * (on disk and in the URL), pinned at first store so the served URL is stable across renames (ADR-0065).
    */
   store(worldId: string, filename: string, bytes: Uint8Array): StoredAsset {
@@ -222,7 +222,7 @@ export class AssetsService implements OnModuleInit {
       .select({ name: entities.name, document: entities.document, hash: assetIndex.hash })
       .from(assetIndex)
       .innerJoin(entities, eq(entities.id, assetIndex.entityId))
-      .where(eq(assetIndex.worldId, worldId))
+      .where(eq(assetIndex.containerId, worldId))
       .orderBy(asc(entities.createdAt), asc(assetIndex.hash))
       .all();
     const out: { name: string; value: NonNullable<ReturnType<typeof readAssetValue>> }[] = [];

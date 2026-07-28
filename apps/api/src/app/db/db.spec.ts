@@ -519,10 +519,135 @@ describe('containers backfill migration (0032)', () => {
     expect(sqlite.prepare(`SELECT world_id, field_id FROM world_fields`).all()).toEqual([
       { world_id: 'w1', field_id: 'world.field.era' },
     ]);
-    // No entity-side value is rewritten — that is #396's job, not this migration's.
+    // The entity side still names its column `world_id` here: #396 renames it, never a value.
     expect(sqlite.prepare(`SELECT id, world_id, seq FROM entities`).all()).toEqual([
       { id: 'e1', world_id: 'w1', seq: 3 },
     ]);
+    sqlite.close();
+  });
+});
+
+/**
+ * 0033 repoints the entity side at the Container (ADR-0078): five tables rename `world_id` to
+ * `container_id` and `entities`' foreign key moves to `containers`. The claims worth pinning are the
+ * ones a rename can silently break — not one stored value moves, the FTS index survives the `entities`
+ * rebuild, and the Asset dedup key still resolves every already-uploaded Asset's byte address. A fresh
+ * DB has nothing to carry across, so a World's worth of rows is seeded the old way.
+ */
+describe('container repoint migration (0033)', () => {
+  const HASH = 'a1b2c3';
+
+  function seededPre0033(): Database.Database {
+    const sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = OFF');
+    for (const file of readdirSync(resolve(__dirname, 'migrations'))
+      .filter((f) => f.endsWith('.sql') && f < '0033')
+      .sort()) {
+      applyMigration(sqlite, file);
+    }
+    sqlite
+      .prepare(
+        `INSERT INTO containers (id, kind, name, seq, created_at, updated_at) VALUES ('w1','world','Aldermoor',1,0,0)`,
+      )
+      .run();
+    sqlite.prepare(`INSERT INTO worlds (id, pinned_entity_ids) VALUES ('w1','[]')`).run();
+    for (const [id, name] of [
+      ['e1', 'Lady Mara'],
+      ['a1', 'Portrait'],
+    ]) {
+      sqlite
+        .prepare(
+          `INSERT INTO entities (id, world_id, name, types, tags, visibility, version, seq, document, content_text, created_at, updated_at)
+           VALUES (?,'w1',?,'[]','[]','shared',1,3,'{}','the buried obelisk',0,0)`,
+        )
+        .run(id, name);
+    }
+    // One row in each derived index, as the write choke point would have materialised it.
+    sqlite.prepare(`INSERT INTO asset_index (entity_id, world_id, hash, ext) VALUES ('a1','w1',?, '.png')`).run(HASH);
+    sqlite
+      .prepare(
+        `INSERT INTO entity_edges (source_entity_id, world_id, target_kind, target_id, descriptor, decor)
+         VALUES ('e1','w1','asset',?,NULL,1)`,
+      )
+      .run(HASH);
+    sqlite
+      .prepare(
+        `INSERT INTO entity_field_facets (entity_id, world_id, key, value, num) VALUES ('e1','w1','core.field.kind','image',NULL)`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO entity_import_source (entity_id, world_id, importer, source_id, rev)
+         VALUES ('e1','w1','draw-steel.importer.monsters','goblin','sha-abc')`,
+      )
+      .run();
+    return sqlite;
+  }
+
+  it('renames the column on all five tables and moves not one stored value', () => {
+    const sqlite = seededPre0033();
+    applyMigration(sqlite, '0033_entities_belong_to_containers.sql');
+
+    const containerIds = (table: string) =>
+      sqlite.prepare(`SELECT DISTINCT container_id AS id FROM ${table}`).all() as { id: string }[];
+    for (const table of ['entities', 'entity_edges', 'entity_field_facets', 'entity_import_source', 'asset_index']) {
+      // The World's Container id *is* the World's id, so every row stays where it was.
+      expect(containerIds(table), table).toEqual([{ id: 'w1' }]);
+      expect(
+        (sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name),
+        table,
+      ).not.toContain('world_id');
+    }
+    // The rest of each row rides through the rebuild untouched.
+    expect(sqlite.prepare(`SELECT id, name, seq FROM entities ORDER BY id`).all()).toEqual([
+      { id: 'a1', name: 'Portrait', seq: 3 },
+      { id: 'e1', name: 'Lady Mara', seq: 3 },
+    ]);
+    // `entities` now hangs off the Container, which is what lets a Compendium's Entity live here later.
+    expect(
+      (sqlite.prepare(`PRAGMA foreign_key_list(entities)`).all() as { table: string }[]).map((f) => f.table),
+    ).toEqual(['containers']);
+    sqlite.close();
+  });
+
+  it('carries rowid forward so the FTS index still matches by prose after the entities rebuild', () => {
+    const sqlite = seededPre0033();
+    applyMigration(sqlite, '0033_entities_belong_to_containers.sql');
+
+    expect(
+      sqlite
+        .prepare(
+          `SELECT e.id FROM entities_fts f JOIN entities e ON e.rowid = f.rowid WHERE entities_fts MATCH 'obelisk' ORDER BY e.id`,
+        )
+        .all(),
+    ).toEqual([{ id: 'a1' }, { id: 'e1' }]);
+    // The recreated triggers keep syncing, so a post-migration write is still findable.
+    sqlite.prepare(`UPDATE entities SET content_text = 'the drowned lighthouse' WHERE id = 'e1'`).run();
+    expect(
+      sqlite
+        .prepare(
+          `SELECT e.id FROM entities_fts f JOIN entities e ON e.rowid = f.rowid WHERE entities_fts MATCH 'lighthouse'`,
+        )
+        .all(),
+    ).toEqual([{ id: 'e1' }]);
+    sqlite.close();
+  });
+
+  it('keeps every uploaded Asset’s byte address and its dedup key resolving', () => {
+    const sqlite = seededPre0033();
+    applyMigration(sqlite, '0033_entities_belong_to_containers.sql');
+
+    // `<containerId>/<hash><ext>` is the on-disk address, and it is the same string it was before.
+    expect(sqlite.prepare(`SELECT container_id, hash, ext FROM asset_index WHERE entity_id = 'a1'`).get()).toEqual({
+      container_id: 'w1',
+      hash: HASH,
+      ext: '.png',
+    });
+    // The unique dedup key still holds, so re-uploading identical bytes still resolves to the Asset
+    // that already wraps them rather than minting a twin.
+    expect(() =>
+      sqlite.prepare(`INSERT INTO asset_index (entity_id, container_id, hash) VALUES ('e1','w1',?)`).run(HASH),
+    ).toThrow(/UNIQUE/);
     sqlite.close();
   });
 });

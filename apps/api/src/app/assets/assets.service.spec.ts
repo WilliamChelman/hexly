@@ -48,12 +48,12 @@ describe('AssetsService', () => {
     const doc = JSON.stringify({ 'core.field.asset': { hash, ext, mime: 'image/png', size, stats: null } });
     db.$client
       .prepare(
-        `INSERT INTO entities (id, world_id, name, types, tags, visibility, version, seq, document, created_at, updated_at)
+        `INSERT INTO entities (id, container_id, name, types, tags, visibility, version, seq, document, created_at, updated_at)
          VALUES (?,?,?,?,?,?,1,1,?,?,?)`,
       )
       .run(entityId, worldId, name, JSON.stringify(['core.type.asset']), '[]', 'shared', doc, 0, 0);
     db.$client
-      .prepare('INSERT INTO asset_index (entity_id, world_id, hash) VALUES (?,?,?)')
+      .prepare('INSERT INTO asset_index (entity_id, container_id, hash) VALUES (?,?,?)')
       .run(entityId, worldId, hash);
   }
 

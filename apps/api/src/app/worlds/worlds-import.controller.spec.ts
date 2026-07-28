@@ -1049,7 +1049,7 @@ describe('Vault import endpoint', () => {
     return db
       .select({ targetId: entityEdges.targetId })
       .from(entityEdges)
-      .where(and(eq(entityEdges.worldId, worldId), eq(entityEdges.targetKind, 'asset')))
+      .where(and(eq(entityEdges.containerId, worldId), eq(entityEdges.targetKind, 'asset')))
       .all()
       .map((row) => row.targetId);
   }

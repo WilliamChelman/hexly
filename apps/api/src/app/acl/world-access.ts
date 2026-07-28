@@ -11,7 +11,7 @@ const MATCH_ALL = sql`1`;
  * The predicate bodies below take the target World's id as a `worldRef` SQL expression rather than
  * hardcoding `worlds.id`. In a WHERE clause the two are equivalent, but drizzle strips table
  * qualifiers from column references embedded in a *top-level SELECT projection* — so a correlated
- * `entities.world_id = worlds.id` degrades to `world_id = id`, where the bare `id` binds to the
+ * `entities.container_id = worlds.id` degrades to `container_id = id`, where the bare `id` binds to the
  * inner `entities.id`, silently breaking the entity-grant reachability branch. {@link
  * WorldAccess.decideMeta} therefore passes the id as a bound parameter (no column, nothing to
  * strip); the composable filters pass `worlds.id` for the correlated WHERE form. One body, two refs.
@@ -26,7 +26,7 @@ const MATCH_ALL = sql`1`;
 function reachableBy(userId: string, worldRef: SQLWrapper) {
   return sql`(EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${worldRef} AND ${worldMembers.userId} = ${userId})
     OR EXISTS (SELECT 1 FROM ${entities} JOIN ${entityGrants} ON ${entityGrants.entityId} = ${entities.id}
-               WHERE ${entities.worldId} = ${worldRef} AND ${entityGrants.userId} = ${userId}))`;
+               WHERE ${entities.containerId} = ${worldRef} AND ${entityGrants.userId} = ${userId}))`;
 }
 
 /** The World management rule (ADR-0037): the caller holds the `owner` role. */

@@ -381,7 +381,7 @@ export class WorldsService {
     const shared = this.db
       .select({ id: entities.id })
       .from(entities)
-      .where(and(eq(entities.worldId, id), sharedVisibility))
+      .where(and(eq(entities.containerId, id), sharedVisibility))
       .all();
     for (const e of shared) this.bus.emitEntityChange(e.id);
     return { status: 'ok', value: null };
@@ -475,7 +475,7 @@ export class WorldsService {
     const [{ value: entityCount }] = this.db
       .select({ value: count() })
       .from(entities)
-      .where(eq(entities.worldId, world.id))
+      .where(eq(entities.containerId, world.id))
       .all();
     const owners = this.worldOwners(world.id);
     // Both standings come off the one meta read: the owner set can't answer `create-entity`, since a

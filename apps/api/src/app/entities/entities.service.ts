@@ -90,7 +90,7 @@ export interface ListOptions {
   readonly withRights?: boolean;
   /**
    * Attach each summary's served thumbnail URL (ADR-0065) — opt-in, the Asset Browser sets it. Resolved
-   * generically off the `(worldId, hash)` dedup index (a LEFT JOIN), so it names no type and other lists
+   * generically off the `(containerId, hash)` dedup index (a LEFT JOIN), so it names no type and other lists
    * never pay for the join.
    */
   readonly withThumbnails?: boolean;
@@ -176,7 +176,7 @@ export class EntitiesService {
     const query = this.db
       .select({
         id: entities.id,
-        worldId: entities.worldId,
+        containerId: entities.containerId,
         name: entities.name,
         types: entities.types,
         tags: entities.tags,
@@ -234,15 +234,15 @@ export class EntitiesService {
       let summary = toSummary(row);
       // Opt-in thumbnail with precedence (ADR-0066): the **Thumbnail** Field's designated image beats the
       // Entity's own bytes, so an Asset carrying the field emits the field's URL and a bare Asset its own; a
-      // non-Asset with no designation carries none. The field target's URL keys off *its* World (an
-      // entity-link stays in-World, so it equals the row's, but the resolved index is authoritative).
+      // non-Asset with no designation carries none. The field target's URL keys off *its* Container (an
+      // entity-link stays in-Container, so it equals the row's, but the resolved index is authoritative).
       if (opts.withThumbnails) {
         const assetRow = row as typeof row & ThumbnailRow;
-        const thumbnailUrl = resolveThumbnailUrl(assetRow, row.worldId);
+        const thumbnailUrl = resolveThumbnailUrl(assetRow, row.containerId);
         if (thumbnailUrl) summary = { ...summary, thumbnailUrl };
         // The missing-bytes state (#325) rides the same opt-in, so only rows that draw imagery pay the stat.
         // Own bytes only: a broken Thumbnail designation is the designated Asset's story, not this row's.
-        if (this.assetBytes.missing(row.worldId, assetRow.ownAssetHash, assetRow.ownAssetExt))
+        if (this.assetBytes.missing(row.containerId, assetRow.ownAssetHash, assetRow.ownAssetExt))
           summary = { ...summary, assetBytesMissing: true };
       }
       if (!opts.withRights) return summary;
@@ -535,7 +535,7 @@ export class EntitiesService {
           id: entities.id,
           name: entities.name,
           types: entities.types,
-          worldId: entities.worldId,
+          containerId: entities.containerId,
           ...thumbnailColumns,
         })
         .from(entityEdges)
@@ -544,7 +544,7 @@ export class EntitiesService {
           and(
             eq(entityEdges.targetKind, 'asset'),
             eq(edgeAsset.hash, entityEdges.targetId),
-            eq(edgeAsset.worldId, entityEdges.worldId),
+            eq(edgeAsset.containerId, entityEdges.containerId),
           ),
         )
         .leftJoin(entities, and(sql`${entities.id} = ${targetEntityId}`, access.filter))
@@ -575,12 +575,12 @@ export class EntitiesService {
           decor: row.decor,
           // An Entity whose stored types can't be read reads as a dangling target, same as an
           // unreadable or deleted one: the reference is there, the thing at the end of it is not.
-          // A resolved target carries a worldId, so the Thumbnail URL keys off *its* World. The
+          // A resolved target carries a containerId, so the Thumbnail URL keys off *its* Container. The
           // resolved id (not the raw hash of an asset edge) is what the row links to.
           target:
             row.name === null
               ? null
-              : linkedEntity(row.id, row.name, row.types, resolveThumbnailUrl(row, row.worldId ?? '')),
+              : linkedEntity(row.id, row.name, row.types, resolveThumbnailUrl(row, row.containerId ?? '')),
         }))
     );
   }
@@ -599,7 +599,7 @@ export class EntitiesService {
   private inbound(access: EntityAccess, id: string): InboundReference[] {
     // The Asset's content hash + World, when `id` is an Asset — its asset edges key on the hash, not the id.
     const asset = this.db
-      .select({ hash: assetIndex.hash, worldId: assetIndex.worldId })
+      .select({ hash: assetIndex.hash, containerId: assetIndex.containerId })
       .from(assetIndex)
       .where(eq(assetIndex.entityId, id))
       .get();
@@ -609,7 +609,7 @@ export class EntitiesService {
         ? and(
             eq(entityEdges.targetKind, 'asset'),
             eq(entityEdges.targetId, asset.hash),
-            eq(entityEdges.worldId, asset.worldId),
+            eq(entityEdges.containerId, asset.containerId),
           )
         : undefined,
     );
@@ -623,7 +623,7 @@ export class EntitiesService {
           decor: entityEdges.decor,
           name: entities.name,
           types: entities.types,
-          worldId: entities.worldId,
+          containerId: entities.containerId,
           ...thumbnailColumns,
         })
         .from(entityEdges)
@@ -645,7 +645,7 @@ export class EntitiesService {
         // A source is the thing doing the linking, so unlike {@link outbound}'s target it cannot
         // dangle: a row whose source has no drawable type drops out entirely.
         .flatMap((row) => {
-          const source = linkedEntity(row.sourceId, row.name, row.types, resolveThumbnailUrl(row, row.worldId));
+          const source = linkedEntity(row.sourceId, row.name, row.types, resolveThumbnailUrl(row, row.containerId));
           return source ? [{ descriptor: row.descriptor, source, decor: row.decor }] : [];
         })
     );
@@ -659,7 +659,7 @@ export class EntitiesService {
     return this.db
       .select()
       .from(entities)
-      .where(and(ownsEntity(userId, this.isSuperadmin(userId)), eq(entities.worldId, worldId)))
+      .where(and(ownsEntity(userId, this.isSuperadmin(userId)), eq(entities.containerId, worldId)))
       .all()
       .map(toDetail);
   }
@@ -772,8 +772,12 @@ export class EntitiesService {
     if (req.types === undefined) return;
     // Read the stored World so the effective set resolves this row's user-defined Fields. A missing row
     // 404s in `mutate` regardless.
-    const stored = this.db.select({ worldId: entities.worldId }).from(entities).where(eq(entities.id, id)).get();
-    this.assertTypedFieldsValid(userId, stored?.worldId, req.types, req.document);
+    const stored = this.db
+      .select({ containerId: entities.containerId })
+      .from(entities)
+      .where(eq(entities.id, id))
+      .get();
+    this.assertTypedFieldsValid(userId, stored?.containerId, req.types, req.document);
   }
 
   /**
@@ -1058,7 +1062,7 @@ export class EntitiesService {
     const row = this.db
       .select()
       .from(entities)
-      .where(and(eq(entities.id, id), eq(entities.worldId, worldId), sharedVisibility))
+      .where(and(eq(entities.id, id), eq(entities.containerId, worldId), sharedVisibility))
       .get();
     return row ? this.withAssetBytesState({ ...toDetail(row), rights: [...READ_ONLY_RIGHTS] }) : null;
   }
@@ -1068,7 +1072,7 @@ export class EntitiesService {
     return this.db
       .select()
       .from(entities)
-      .where(and(eq(entities.worldId, worldId), sharedVisibility))
+      .where(and(eq(entities.containerId, worldId), sharedVisibility))
       .orderBy(desc(entities.updatedAt), asc(entities.id))
       .all()
       .map(toSummary);
@@ -1146,7 +1150,7 @@ function filters(opts: FilterOptions) {
   if (opts.visibility?.length) predicates.push(inArray(entities.visibility, [...opts.visibility]));
   if (opts.tags?.length) predicates.push(hasAny(entities.tags, opts.tags));
   if (opts.fields?.length) predicates.push(...fieldFilters(opts.fields));
-  if (opts.worldId) predicates.push(eq(entities.worldId, opts.worldId));
+  if (opts.worldId) predicates.push(eq(entities.containerId, opts.worldId));
   return predicates;
 }
 
@@ -1260,7 +1264,7 @@ function thumbnailJoin() {
       // `hash + ext` is the file a read stats to mark a missing Asset (#325); one join answers both.
       ownAssetExt: ownAsset.ext,
       fieldAssetHash: fieldAsset.hash,
-      fieldAssetWorldId: fieldAsset.worldId,
+      fieldAssetContainerId: fieldAsset.containerId,
     },
   };
 }
@@ -1270,18 +1274,18 @@ interface ThumbnailRow {
   readonly ownAssetHash?: string | null;
   readonly ownAssetExt?: string | null;
   readonly fieldAssetHash?: string | null;
-  readonly fieldAssetWorldId?: string | null;
+  readonly fieldAssetContainerId?: string | null;
 }
 
 /**
  * The served Thumbnail URL for one {@link thumbnailJoin} row, with precedence (ADR-0066): the Thumbnail
  * Field's designated image beats the Entity's own bytes; neither resolves → `undefined`. The field
- * target's URL keys off *its* World (an entity-link stays in-World, so it equals the subject's, but the
- * resolved index is authoritative); own bytes key off the subject's World.
+ * target's URL keys off *its* Container (an entity-link stays in-Container, so it equals the subject's,
+ * but the resolved index is authoritative); own bytes key off the subject's Container.
  */
-function resolveThumbnailUrl(row: ThumbnailRow, worldId: string): string | undefined {
-  if (row.fieldAssetHash) return assetThumbnailUrl(row.fieldAssetWorldId ?? worldId, row.fieldAssetHash);
-  if (row.ownAssetHash) return assetThumbnailUrl(worldId, row.ownAssetHash);
+function resolveThumbnailUrl(row: ThumbnailRow, containerId: string): string | undefined {
+  if (row.fieldAssetHash) return assetThumbnailUrl(row.fieldAssetContainerId ?? containerId, row.fieldAssetHash);
+  if (row.ownAssetHash) return assetThumbnailUrl(containerId, row.ownAssetHash);
   return undefined;
 }
 
@@ -1293,7 +1297,9 @@ type SummaryColumns = Omit<SummaryRow, 'contentText' | 'seq' | 'thumbnailEntityI
 function toSummary(row: SummaryColumns): EntitySummary {
   return {
     id: row.id,
-    worldId: row.worldId,
+    // The API's `worldId` is the Entity's Container id: a World's Container id is the World's id
+    // (ADR-0078), so the contract is unchanged.
+    worldId: row.containerId,
     name: row.name,
     types: typesSchema.parse(row.types),
     tags: tagsSchema.parse(row.tags),

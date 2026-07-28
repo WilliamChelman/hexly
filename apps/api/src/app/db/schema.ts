@@ -68,9 +68,11 @@ export const entities = sqliteTable(
   'entities',
   {
     id: text('id').primaryKey(),
-    worldId: text('world_id')
+    // The {@link containers} row this Entity belongs to (ADR-0078). A World's Container id *is* the
+    // World's id, so every World-scoped read still binds a World id here and no stored value moved.
+    containerId: text('container_id')
       .notNull()
-      .references(() => worlds.id),
+      .references(() => containers.id),
     name: text('name').notNull(),
     // The ordered Entity Type set (CONTEXT.md → Entity Type); `types[0]` is primary. A multi-valued
     // JSON array mirroring `tags`, unrolled with `json_each` for the Type facet and array-membership
@@ -102,7 +104,7 @@ export const entities = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (table) => [index('idx_entities_world_id').on(table.worldId)],
+  (table) => [index('idx_entities_container_id').on(table.containerId)],
 );
 
 /**
@@ -285,12 +287,14 @@ export const entityLinks = sqliteTable(
  * point and Reindex rebuilds it, so an upload resolves dedup, and byte serving reads disk with no table
  * consulted at all. Deleting the Entity cascades the row away; the on-disk bytes are dropped separately.
  *
- * `entityId` is the PK — an Asset carries at most one asset-ref. `worldId` is denormalised off the source,
- * mirroring the other derived indexes; the unique `(worldId, hash)` is the per-World dedup key the upload
- * mint-and-dedup resolves against (re-uploading identical bytes returns the existing Asset).
+ * `entityId` is the PK — an Asset carries at most one asset-ref. `containerId` is denormalised off the
+ * source, mirroring the other derived indexes; the unique `(containerId, hash)` is the per-Container dedup
+ * key the upload mint-and-dedup resolves against (re-uploading identical bytes returns the existing Asset).
  *
- * `ext` completes the byte address `<worldId>/<hash><ext>`, so a presence check is one stat (#325). Nullable:
- * a row predating the column has an unknown address, which is never reported missing.
+ * `ext` completes the byte address `<containerId>/<hash><ext>` — the same folder {@link AssetsService}
+ * has always written under, since a World's Container id is the World's id — so a presence check is one
+ * stat (#325). Nullable: a row predating the column has an unknown address, which is never reported
+ * missing.
  */
 export const assetIndex = sqliteTable(
   'asset_index',
@@ -298,11 +302,11 @@ export const assetIndex = sqliteTable(
     entityId: text('entity_id')
       .primaryKey()
       .references(() => entities.id, { onDelete: 'cascade' }),
-    worldId: text('world_id').notNull(),
+    containerId: text('container_id').notNull(),
     hash: text('hash').notNull(),
     ext: text('ext'),
   },
-  (table) => [uniqueIndex('idx_asset_index_dedup').on(table.worldId, table.hash)],
+  (table) => [uniqueIndex('idx_asset_index_dedup').on(table.containerId, table.hash)],
 );
 
 /**
@@ -315,7 +319,7 @@ export const assetIndex = sqliteTable(
  * entirely in the read, which filters an inbound edge by the viewer's access to its *source*.
  *
  * `targetId` deliberately carries **no FK**: a link to a missing or unreadable Entity is a valid
- * document, so it is unconstrained text resolved opportunistically on read. `worldId` is
+ * document, so it is unconstrained text resolved opportunistically on read. `containerId` is
  * denormalized off the source so the World Graph's edge fetch is one indexed lookup.
  */
 export const entityEdges = sqliteTable(
@@ -324,7 +328,7 @@ export const entityEdges = sqliteTable(
     sourceEntityId: text('source_entity_id')
       .notNull()
       .references(() => entities.id, { onDelete: 'cascade' }),
-    worldId: text('world_id').notNull(),
+    containerId: text('container_id').notNull(),
     // entity | asset. Asset-hash edges are ordinary Decor Links now (ADR-0069) — hidden by
     // default on relation surfaces, always counted in inbound usage.
     targetKind: text('target_kind').$type<EdgeTargetKind>().notNull(),
@@ -344,7 +348,7 @@ export const entityEdges = sqliteTable(
     // Inbound: who links here (then filtered by the viewer's access to each source).
     index('idx_entity_edges_target').on(table.targetKind, table.targetId),
     // The World Graph's whole-World edge fetch.
-    index('idx_entity_edges_world').on(table.worldId, table.targetKind),
+    index('idx_entity_edges_container').on(table.containerId, table.targetKind),
   ],
 );
 
@@ -357,8 +361,8 @@ export const entityEdges = sqliteTable(
  * Entity cascades them away.
  *
  * `value` is the canonical string form; `num` is set only for a `number` Field, so a range filter
- * compares it numerically while an enum/date/string compares `value` lexically. `worldId` is
- * denormalised off the source, mirroring {@link entityEdges}, so a World-scoped facet read is one
+ * compares it numerically while an enum/date/string compares `value` lexically. `containerId` is
+ * denormalised off the source, mirroring {@link entityEdges}, so a Container-scoped facet read is one
  * indexed lookup. A `list` Field explodes to one row per item, so the composite PK is
  * `(entityId, key, value)`.
  */
@@ -368,7 +372,7 @@ export const entityFieldFacets = sqliteTable(
     entityId: text('entity_id')
       .notNull()
       .references(() => entities.id, { onDelete: 'cascade' }),
-    worldId: text('world_id').notNull(),
+    containerId: text('container_id').notNull(),
     // The EntityDocument key the Field types.
     key: text('key').notNull(),
     // The canonical string form of the value; the facet value the rail lists and eq/date filters match.
@@ -378,8 +382,8 @@ export const entityFieldFacets = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.entityId, table.key, table.value] }),
-    // The World-scoped facet count and filter: group/match by (world, key, value).
-    index('idx_entity_field_facets_key').on(table.worldId, table.key, table.value),
+    // The Container-scoped facet count and filter: group/match by (container, key, value).
+    index('idx_entity_field_facets_key').on(table.containerId, table.key, table.value),
   ],
 );
 
@@ -391,9 +395,10 @@ export const entityFieldFacets = sqliteTable(
  * choke point and Reindex rebuilds it, so a provenance filter ("what did this Importer create here")
  * answers with Entity ids alone, never loading a document blob. Deleting the Entity cascades the row away.
  *
- * `entityId` is the PK — an Entity carries at most one Import Source. `worldId` is denormalised off the
- * source, mirroring the other derived indexes, so a `(world, importer)` wipe/query is one indexed lookup;
- * the unique `(world, importer, sourceId)` is the reconcile's identity-preserving upsert-match key.
+ * `entityId` is the PK — an Entity carries at most one Import Source. `containerId` is denormalised off the
+ * source, mirroring the other derived indexes, so a `(container, importer)` wipe/query is one indexed
+ * lookup; the unique `(container, importer, sourceId)` is the reconcile's identity-preserving
+ * upsert-match key.
  */
 export const entityImportSource = sqliteTable(
   'entity_import_source',
@@ -401,16 +406,16 @@ export const entityImportSource = sqliteTable(
     entityId: text('entity_id')
       .primaryKey()
       .references(() => entities.id, { onDelete: 'cascade' }),
-    worldId: text('world_id').notNull(),
+    containerId: text('container_id').notNull(),
     importer: text('importer').notNull(),
     sourceId: text('source_id').notNull(),
     rev: text('rev').notNull(),
   },
   (table) => [
-    // Wipe/query: every Entity an Importer created in a World.
-    index('idx_entity_import_source_world_importer').on(table.worldId, table.importer),
-    // The reconcile's upsert-match key: one Entity per (world, importer, sourceId).
-    uniqueIndex('idx_entity_import_source_upsert').on(table.worldId, table.importer, table.sourceId),
+    // Wipe/query: every Entity an Importer created in a Container.
+    index('idx_entity_import_source_container_importer').on(table.containerId, table.importer),
+    // The reconcile's upsert-match key: one Entity per (container, importer, sourceId).
+    uniqueIndex('idx_entity_import_source_upsert').on(table.containerId, table.importer, table.sourceId),
   ],
 );
 
