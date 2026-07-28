@@ -54,7 +54,7 @@ import {
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config';
 import { AssetBytesRegistry } from './asset-bytes-registry';
-import { EntityWrites, InsertEntityInput } from './entity-writes';
+import { AclWriter, EntityWrites, InsertEntityInput } from './entity-writes';
 import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
 import { linkedEntity } from './utils/linked-entity';
@@ -918,6 +918,20 @@ export class EntitiesService {
     return gate({ reachable: !!meta?.canRead, isOwner: !!meta?.isOwner });
   }
 
+  /**
+   * Write a sharing change and surface the choke point's own refusal — `forbidden` (403), else
+   * undefined to proceed (composes with `?? { status: 'ok', … }`). {@link gateOwnerManagement} is no
+   * longer the last word on a `manage`: an Owner of a **Sealed** Entity is refused there (ADR-0079).
+   */
+  private manageRefusal(
+    userId: string,
+    id: string,
+    acl: (w: AclWriter) => void,
+  ): Extract<AclSetResult<never>, { status: 'forbidden' }> | undefined {
+    const result = this.writes.mutate(userId, id, { kind: 'manage', acl });
+    return result.status === 'forbidden' ? { status: 'forbidden' } : undefined;
+  }
+
   /** The Entity's ownership set, for an Owner. Unreachable → 404; not an Owner → 403. */
   listOwners(userId: string, id: string): OwnerSetResult {
     const gate = this.gateOwnerManagement(userId, id);
@@ -936,11 +950,12 @@ export class EntitiesService {
     // Owner wins: promoting a user who holds an editor/viewer grant overwrites it to owner.
     // Promotion grants `manage`, so a follower already holding this Entity must refetch —
     // hence the additive path nudges too, not just removals.
-    this.writes.mutate(userId, id, {
-      kind: 'manage',
-      acl: (w) => w.upsertOwner(targetUserId),
-    });
-    return { status: 'ok', value: this.entityOwnersOf(id) };
+    return (
+      this.manageRefusal(userId, id, (w) => w.upsertOwner(targetUserId)) ?? {
+        status: 'ok',
+        value: this.entityOwnersOf(id),
+      }
+    );
   }
 
   /**
@@ -955,11 +970,7 @@ export class EntitiesService {
     if (outcome.status !== 'ok') return outcome;
     // Delete the owner-role row — their access ends; they hold no other grant row. The nudge
     // evicts them live; every remaining Owner refetches their (unchanged) Rights.
-    this.writes.mutate(userId, id, {
-      kind: 'manage',
-      acl: (w) => w.removeOwner(targetUserId),
-    });
-    return outcome;
+    return this.manageRefusal(userId, id, (w) => w.removeOwner(targetUserId)) ?? outcome;
   }
 
   /** The Entity's grant set, for an Owner — same Owner-only gate as the owner set. */
@@ -978,11 +989,12 @@ export class EntitiesService {
     if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
     // An Editor demoted to Viewer must see their Save button vanish: `rights` ride the resource
     // (ADR-0039), so only a nudge-driven refetch refreshes them.
-    this.writes.mutate(userId, id, {
-      kind: 'manage',
-      acl: (w) => w.upsertGrant(targetUserId, role),
-    });
-    return { status: 'ok', value: this.entityGrantsOf(id) };
+    return (
+      this.manageRefusal(userId, id, (w) => w.upsertGrant(targetUserId, role)) ?? {
+        status: 'ok',
+        value: this.entityGrantsOf(id),
+      }
+    );
   }
 
   /**
@@ -995,11 +1007,12 @@ export class EntitiesService {
     // Editor/viewer rows only — an `owner` row is removed via removeOwner (which enforces the
     // ≥1-Owner invariant), never silently deleted here. Revocation is how entity-level access
     // ends, so the nudge evicts a live-following grantee rather than leaving them on a stale view.
-    this.writes.mutate(userId, id, {
-      kind: 'manage',
-      acl: (w) => w.removeGrant(targetUserId),
-    });
-    return { status: 'ok', value: this.entityGrantsOf(id) };
+    return (
+      this.manageRefusal(userId, id, (w) => w.removeGrant(targetUserId)) ?? {
+        status: 'ok',
+        value: this.entityGrantsOf(id),
+      }
+    );
   }
 
   /** The Entity's Public Link (active token or null), for an Owner — same Owner-only gate as grants. */

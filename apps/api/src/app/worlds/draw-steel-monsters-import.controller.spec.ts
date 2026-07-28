@@ -36,6 +36,7 @@ import { WorldsModule } from './worlds.module';
 describe('Draw Steel monsters import', () => {
   let app: INestApplication;
   let db: Db;
+  let adaId: string;
 
   beforeEach(async () => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
@@ -53,7 +54,7 @@ describe('Draw Steel monsters import', () => {
     // 4-tuple still in TIME_WAIT is RST as `socket hang up`.
     await app.listen(0);
 
-    await seed('ada@hexly.test', 'Ada');
+    adaId = await seed('ada@hexly.test', 'Ada');
   });
 
   afterEach(async () => {
@@ -127,7 +128,7 @@ describe('Draw Steel monsters import', () => {
     expect(bury?.powerRoll?.t1).toBe('5 damage; M < 0 bleeding (save ends)');
   });
 
-  it('records the Compendium\'s Importer, pinned rev and attribution on install', async () => {
+  it("records the Compendium's Importer, pinned rev and attribution on install", async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     await runImport(ada, world);
@@ -188,7 +189,10 @@ describe('Draw Steel monsters import', () => {
     const world = await makeWorld(ada);
     // The original complaint: compendium-ness is location, never Entity Type, so carrying the pack's
     // Type must not exile an authored Entity from its author's own Browser (ADR-0079).
-    await ada.post('/entities').send({ name: 'Grix the Turncoat', types: [DS_MONSTER], worldId: world }).expect(201);
+    await ada
+      .post('/entities')
+      .send({ name: 'Grix the Turncoat', types: [DS_MONSTER], worldId: world })
+      .expect(201);
     await runImport(ada, world);
 
     const list = await ada.get(`/entities?worldId=${world}`).expect(200);
@@ -196,6 +200,74 @@ describe('Draw Steel monsters import', () => {
     // And it is findable by the very Type the pack uses.
     const typed = await ada.get(`/entities?worldId=${world}&type=${DS_MONSTER}`).expect(200);
     expect(typed.body.items).toHaveLength(1);
+  });
+
+  it('refuses every write to a Compendium Entry — World Owner, Contributor and operator alike', async () => {
+    const bob = await seed('bob@hexly.test', 'Bob');
+    await seedOperator('ted@hexly.test', 'Ted');
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    await ada.post(`/worlds/${world}/members`).send({ userId: bob, role: 'contributor' }).expect(200);
+    await runImport(ada, world);
+    const goblin = await entityByName(ada, compendium().id, 'Goblin Warrior');
+
+    const refused = { save: 403, rename: 403, visibility: 403, grant: 403, coOwner: 403, delete: 403 };
+    // Ada holds every Right the model can confer here: she owns the World the run was asked from, and
+    // the install left her the entry's own `owner` grant. The seal refuses her all the same (ADR-0079).
+    expect(await writeStatuses(ada, goblin.id, bob)).toEqual(refused);
+    // The operator's Superadmin bypass short-circuits every access predicate to match-all, and is
+    // refused by the very same check — the seal is not a Right, so no Right outranks it.
+    expect(await writeStatuses(await signIn('ted@hexly.test'), goblin.id, bob)).toEqual(refused);
+    // A Contributor never reaches the row at all: Collaboration is World-only (ADR-0078), so nothing in
+    // the World's membership confers standing on the shelf, and unreachable reads as 404 (ADR-0004).
+    expect(await writeStatuses(await signIn('bob@hexly.test'), goblin.id, bob)).toEqual({
+      save: 404,
+      rename: 404,
+      visibility: 404,
+      grant: 404,
+      coOwner: 404,
+      delete: 404,
+    });
+
+    // Nothing landed: the entry is still exactly what the Importer produced, unshared and ungranted.
+    const after = (await ada.get(`/entities/${goblin.id}`).expect(200)).body;
+    expect(after).toMatchObject({ name: 'Goblin Warrior', visibility: 'private', document: goblin.detail.document });
+    expect((await ada.get(`/entities/${goblin.id}/grants`).expect(200)).body).toEqual([]);
+    expect((await ada.get(`/entities/${goblin.id}/owners`).expect(200)).body).toEqual([adaId]);
+  });
+
+  it('still lets the reconcile write and delete what no user may touch', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    await runImport(ada, world);
+    const packId = compendium().id;
+    const goblin = await entityByName(ada, packId, 'Goblin Warrior');
+    await ada.patch(`/entities/${goblin.id}`).send({ name: 'My Goblin' }).expect(403);
+
+    // The exception that proves the rule: the reconcile is the Compendium's producer, and writes
+    // through the system path — no `userId`, so it never reaches the choke point the seal sits at.
+    expect(await runImport(ada, world)).toMatchObject({ status: 'succeeded', updated: 2 });
+    await ada.delete(`/worlds/${world}/importers/${MONSTERS_IMPORTER_ID}`).expect(204);
+    expect((await ada.get(`/entities?worldId=${packId}`).expect(200)).body.items).toEqual([]);
+  });
+
+  it('leaves writes to the World’s own Entities entirely alone', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    // Carrying the pack's own Type, to pin that the seal reads location and nothing else.
+    const mine = await ada
+      .post('/entities')
+      .send({ name: 'Grix the Turncoat', types: [DS_MONSTER], worldId: world })
+      .expect(201);
+    await runImport(ada, world);
+
+    await ada
+      .put(`/entities/${mine.body.id}`)
+      .send({ document: {}, version: 1, tags: ['mine'] })
+      .expect(200);
+    await ada.patch(`/entities/${mine.body.id}`).send({ name: 'Grix the Loyal' }).expect(200);
+    await ada.patch(`/entities/${mine.body.id}`).send({ visibility: 'shared' }).expect(200);
+    await ada.delete(`/entities/${mine.body.id}`).expect(204);
   });
 
   it('reimports in place, keeping each entry id and re-recording the revision', async () => {
@@ -269,7 +341,10 @@ describe('Draw Steel monsters import', () => {
       }),
     );
 
-    await ada.post(`/worlds/${alpha}/importers/${MONSTERS_IMPORTER_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await ada
+      .post(`/worlds/${alpha}/importers/${MONSTERS_IMPORTER_ID}/run`)
+      .send({ visibility: 'private' })
+      .expect(202);
     await ada.post(`/worlds/${beta}/importers/${MONSTERS_IMPORTER_ID}/run`).send({ visibility: 'private' }).expect(409);
     // Removing it from a third angle is refused for the same reason: it would drop the Container out
     // from under the insert still running.
@@ -288,6 +363,11 @@ describe('Draw Steel monsters import', () => {
     return app.get(AuthService).seedUser(email, 'correct horse', name, { roles: ['create-worlds'] });
   }
 
+  /** The operator's in-app self (ADR-0037): the Superadmin whose bypass matches every row. */
+  async function seedOperator(email: string, name: string): Promise<string> {
+    return app.get(AuthService).seedUser(email, 'correct horse', name, { isSuperadmin: true });
+  }
+
   async function signIn(email: string) {
     const agent = request.agent(app.getHttpServer());
     await agent.post('/auth/login').send({ email, password: 'correct horse' }).expect(200);
@@ -304,7 +384,10 @@ describe('Draw Steel monsters import', () => {
   async function runImport(agent: Agent, worldId: string): Promise<Record<string, string>> {
     // Override the boot-time codeload port with the fixture-backed one.
     app.get(ImporterRegistry).register(createMonstersImporter(fixtureFetchPort()));
-    await agent.post(`/worlds/${worldId}/importers/${MONSTERS_IMPORTER_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await agent
+      .post(`/worlds/${worldId}/importers/${MONSTERS_IMPORTER_ID}/run`)
+      .send({ visibility: 'private' })
+      .expect(202);
     const done = await pollUntilDone(agent, worldId);
     expect(done, `the import run did not succeed: ${JSON.stringify(done)}`).toMatchObject({ status: 'succeeded' });
     return done;
@@ -315,6 +398,22 @@ describe('Draw Steel monsters import', () => {
     const row = compendiumByImporter(db, MONSTERS_IMPORTER_ID);
     expect(row, 'no Compendium was installed').toBeDefined();
     return row as NonNullable<typeof row>;
+  }
+
+  /**
+   * A write on each axis an Entity has, keyed by what it changes — substance twice over, then exposure,
+   * sharing both ways round, and lifecycle — so a caller kind is asserted in one line and a regression
+   * names the axis it broke.
+   */
+  async function writeStatuses(agent: Agent, id: string, grantee: string): Promise<Record<string, number>> {
+    return {
+      save: (await agent.put(`/entities/${id}`).send({ document: {}, version: 1, tags: [] })).status,
+      rename: (await agent.patch(`/entities/${id}`).send({ name: 'My Goblin' })).status,
+      visibility: (await agent.patch(`/entities/${id}`).send({ visibility: 'shared' })).status,
+      grant: (await agent.post(`/entities/${id}/grants`).send({ userId: grantee, role: 'editor' })).status,
+      coOwner: (await agent.post(`/entities/${id}/owners`).send({ userId: grantee })).status,
+      delete: (await agent.delete(`/entities/${id}`)).status,
+    };
   }
 
   async function entityByName(agent: Agent, containerId: string, name: string) {
