@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
@@ -14,10 +15,12 @@ import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from '../entities/entities.module';
+import { EntitiesService } from '../entities/entities.service';
 import { ConfigModule } from '../config/config.module';
 import { HEXLY_CONFIG, HexlyConfig, loadConfig } from '../config';
 import { BUNDLED_PLUGIN_CONFIGS } from '../entities/bundled-plugins';
 import { WorldsModule } from './worlds.module';
+import { CompendiumWrites } from './compendium-writes';
 import { CHUNK_SIZE } from './vault-import.service';
 
 /**
@@ -108,6 +111,7 @@ describe('Vault import endpoint', () => {
   let app: INestApplication;
   let db: Db;
   let assetsDir: string;
+  let adaId: string;
 
   /**
    * Boot an Instance over its own throwaway DB, seeded with Ada. `entities` re-states the Instance
@@ -143,7 +147,7 @@ describe('Vault import endpoint', () => {
     // 4-tuple still in TIME_WAIT is RST as `socket hang up`.
     await app.listen(0);
 
-    await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', {
+    adaId = await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', {
       roles: ['create-worlds'],
     });
   }
@@ -580,6 +584,36 @@ describe('Vault import endpoint', () => {
       expect(res.body).toMatchObject({ linksResolved: 0, linksCreated: 0, linksDangling: 1 });
       const list = await ada.get(`/entities?worldId=${res.body.worldId}`).expect(200);
       expect(list.body.items.map((e: { name: string }) => e.name)).toEqual(['Keep']);
+    });
+
+    /**
+     * The fourth link-target surface (#400, ADR-0079). Wikilink name-resolution runs over the vault's own
+     * notes and mints into the World the run creates, so a name a **Compendium Entry** happens to share
+     * resolves to neither — the seal holds here by where the resolution looks, with no exclusion rule to
+     * keep in step with the other three.
+     */
+    it('never resolves a wikilink to a Compendium Entry, minting the author’s own instead', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const containerId = app.get(CompendiumWrites).install('test.importer.bestiary', { name: 'Bestiary' }, 'rev-1');
+      const packGoblin = randomUUID();
+      app.get(EntitiesService).importEntity({
+        ownerId: adaId,
+        containerId,
+        id: packGoblin,
+        name: 'Goblin',
+        types: ['core.type.note'],
+        tags: [],
+        document: {},
+      });
+
+      const res = await importVault(ada, vaultZip({ 'Keep.md': 'Held against [[Goblin]].' }));
+
+      // Minted, not resolved: the link points at the author's own new Entity, in the new World.
+      expect(res.body).toMatchObject({ linksResolved: 0, linksCreated: 1, linksDangling: 0 });
+      const keep = await linksOf(ada, res.body.worldId, 'Keep');
+      expect(keep.links[0].attrs.entityId).not.toBe(packGoblin);
+      const { summary } = await entityNamed(ada, res.body.worldId, 'Goblin');
+      expect(keep.links[0].attrs.entityId).toBe(summary?.id);
     });
 
     it('converges two notes naming the same thing on one Entity, answering the second from the index', async () => {

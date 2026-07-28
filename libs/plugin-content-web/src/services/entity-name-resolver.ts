@@ -44,17 +44,27 @@ export class EntityNameResolver {
   private readonly pickerQuery$ = new Subject<string>();
   // Owned here, not left inside the stream, so {@link forgetSearches} can drop it.
   private readonly searchCache = new Map<string, EntitySummary[]>();
-  private readonly pickerResults$ = searchEntities(this.client, this.pickerQuery$, { cache: this.searchCache }).pipe(
-    share(),
-  );
+  /**
+   * The host Entity's World, as the last {@link search} named it. Held rather than threaded through the
+   * stream because it is fixed for the surface this resolver is provided on: the debounced request reads
+   * it back when it fires, and the memo stays keyed on the query alone.
+   */
+  private worldId: string | undefined;
+  private readonly pickerResults$ = searchEntities(this.client, this.pickerQuery$, {
+    cache: this.searchCache,
+    // The `@` picker is a link-target read (ADR-0079), confined to the host Entity's World — the same
+    // World a mention mints into, never the URL's (ADR-0073). So typing a name can neither author a
+    // cross-World link nor bind prose to a Compendium Entry.
+    params: () => ({ read: 'link-target', ...(this.worldId ? { worldId: this.worldId } : {}) }),
+  }).pipe(share());
 
   /**
-   * The owner's entities matching `query`, server-filtered (ADR-0025 `q`) — the
-   * `@` picker's source. `@tiptap/suggestion` awaits this per keystroke; the
-   * shared search debounces the burst and a failed search yields an empty list
-   * rather than rejecting the popup.
+   * The Entities `query` names that this note may link — server-filtered (ADR-0025 `q`), scoped to
+   * `worldId` and never a Compendium Entry. `@tiptap/suggestion` awaits this per keystroke; the shared
+   * search debounces the burst and a failed search yields an empty list rather than rejecting the popup.
    */
-  search(query: string): Promise<EntitySummary[]> {
+  search(query: string, worldId?: string): Promise<EntitySummary[]> {
+    this.worldId = worldId;
     // Subscribe before pushing so the live search catches this query.
     const result = firstValueFrom(this.pickerResults$);
     this.pickerQuery$.next(query);

@@ -311,6 +311,13 @@ export class ContentEditorComponent {
     return !!world && world.id === this.session.current()?.worldId && world.rights.includes('create-entity');
   });
 
+  /**
+   * The host Entity's World — what a repair's picker searches within, the same one {@link mintThrough}
+   * writes to (ADR-0073). Read off the open Entity rather than the route, so a note opened outside its
+   * own World still offers targets from where it lives.
+   */
+  private readonly hostWorldId = computed(() => this.session.current()?.worldId);
+
   private readonly slashMenu = viewChild(SlashMenuComponent);
   private readonly entityPicker = viewChild(EntityPickerComponent);
   private readonly descriptorPicker = viewChild(DescriptorPickerComponent);
@@ -451,10 +458,14 @@ export class ContentEditorComponent {
    * The Entities an `@` mention may link — never the one being written in. `q` is full-text over prose
    * (ADR-0035), so an autosave landing mid-mention indexes the name being typed and the host starts
    * matching itself; offered, that row costs Enter the mint it promises (ADR-0073).
+   *
+   * The World is the **host Entity's**, matching the one a mention mints into rather than whichever the
+   * URL names (ADR-0073) — so what a mention may point at and what it may create agree, and neither
+   * crosses into another World or onto a Compendium's shelf (ADR-0079).
    */
   private async searchLinkTargets(name: string): Promise<EntitySummary[]> {
-    const hostId = this.session.current()?.id;
-    return (await this.resolver.search(name)).filter((entity) => entity.id !== hostId);
+    const host = this.session.current();
+    return (await this.resolver.search(name, host?.worldId)).filter((entity) => entity.id !== host?.id);
   }
 
   /**
@@ -544,6 +555,7 @@ export class ContentEditorComponent {
     const repairHost: EntityLinkRepairHost = {
       writable: this.canRepairLinks,
       creatable: this.canCreate,
+      worldId: this.hostWorldId,
       mint: (name) => this.mint(name),
     };
     const entityLinkWithView = entityLinkNode.extend({
