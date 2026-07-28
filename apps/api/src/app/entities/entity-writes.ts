@@ -29,6 +29,7 @@ import {
   entityImportSource,
 } from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
+import { isCompendiumContainer } from '../worlds/compendiums';
 import { EntityDeletionRegistry } from './entity-deletion-registry';
 import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
@@ -564,6 +565,10 @@ export class EntityWrites {
           ? decision.isOwner
           : decision.canWrite;
     if (!permitted) return { status: 'forbidden' };
+    // The **Sealed** half of ADR-0079, for everyone the operator included: every change kind passes
+    // here, so one refusal covers substance, exposure, sharing and lifecycle. After the Rights gate,
+    // not instead of it — the seal is not a Right, so no Right outranks it.
+    if (isCompendiumContainer(this.db, decision.row.containerId)) return { status: 'forbidden' };
     // The System-managed shape guard (ADR-0068): a user write may not add or remove a System-managed type
     // or Field. System writes (insert/importOverwrite/reindexChunk) take no `userId` and never reach here,
     // so mint, importers, and Reindex assign the asset type/field freely.

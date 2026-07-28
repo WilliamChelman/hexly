@@ -33,3 +33,12 @@ function selectCompendium(db: Db) {
 export function compendiumByImporter(db: Db, importer: string): CompendiumRow | undefined {
   return selectCompendium(db).where(eq(compendiums.importer, importer)).get();
 }
+
+/**
+ * Whether the Container is a **Compendium** — the one question the **seal** asks (ADR-0079). An Entity
+ * is a **Compendium Entry** by where it lives and nothing else, so "may a user write this?" reduces to
+ * an indexed primary-key hit on the satellite, with no flag on the Entity to consult or to forge.
+ */
+export function isCompendiumContainer(db: Db, containerId: string): boolean {
+  return !!db.select({ id: compendiums.id }).from(compendiums).where(eq(compendiums.id, containerId)).get();
+}

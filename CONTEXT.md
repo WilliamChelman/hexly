@@ -129,7 +129,7 @@ An **Entity** that lives in a **Compendium** — defined by that location alone,
 _Avoid_: Compendium Entity (it is an Entity, in a place), record, item, stat block, monster (one pack's content)
 
 **Sealed**:
-The state of a **Compendium Entry**: read-only to everyone, the operator included, and never offered as a link target, so nothing outside its **Compendium** can point at it. A seal on _reachability_, not on _discovery_ — the **Command Palette** and full-text search still find it, ranked below authored Entities. Held by every link-target surface refusing to return one, not by the write choke point (ADR-0079).
+The state of a **Compendium Entry**: read-only to everyone, the operator included, and never offered as a link target, so nothing outside its **Compendium** can point at it. A seal on _reachability_, not on _discovery_ — the **Command Palette** and full-text search still find it, ranked below authored Entities. Two halves held in two places: read-only is one structural refusal at the entity write choke point, on ADR-0068's precedent; the no-link rule is every link-target surface refusing to return one, never a write-time rejection — that would land on prose (ADR-0079).
 _Avoid_: Locked, frozen, immutable, protected; read-only (one half of it), hidden (it is findable)
 
 **Compendium Importer**:
