@@ -16,9 +16,10 @@ import { TypeFieldRegistry } from './type-field-registry';
 import { WorldFields } from './world-fields';
 
 /**
- * The World-scoped view of the Entity Type set (ADR-0048): a World's user-defined types layered over
- * the instance-wide plugin types. Lives in the Entity module (not Worlds) because Worlds already
- * depends on Entities, and the write-path gate resolves through it.
+ * The Container-scoped view of the Entity Type set (ADR-0048, ADR-0078): a Container's user-defined
+ * types layered over the instance-wide plugin types. Lives in the Entity module (not Worlds) because
+ * Worlds already depends on Entities, and the write-path gate resolves through it. A World-scoped
+ * caller binds its World id here unchanged — a World's Container id *is* the World's id.
  */
 @Injectable()
 export class WorldTypeFields {
@@ -28,8 +29,8 @@ export class WorldTypeFields {
     private readonly worldFields: WorldFields,
   ) {}
 
-  /** A World's stored user-defined types, in a stable id order (the CRUD read + the merge source). */
-  list(worldId: string): UserDefinedType[] {
+  /** A Container's stored user-defined types, in a stable id order (the CRUD read + the merge source). */
+  list(containerId: string): UserDefinedType[] {
     return this.db
       .select({
         id: worldTypes.typeId,
@@ -38,7 +39,7 @@ export class WorldTypeFields {
         views: worldTypes.views,
       })
       .from(worldTypes)
-      .where(eq(worldTypes.worldId, worldId))
+      .where(eq(worldTypes.containerId, containerId))
       .orderBy(worldTypes.typeId)
       .all()
       .map((row) => ({
@@ -53,21 +54,21 @@ export class WorldTypeFields {
   }
 
   /**
-   * A {@link TypeFieldRefsResolver} scoped to one World: a user-defined type's default Field ids
-   * (`fieldRefs`) first, else the plugin registry's. The World's types are loaded once and closed
+   * A {@link TypeFieldRefsResolver} scoped to one Container: a user-defined type's default Field ids
+   * (`fieldRefs`) first, else the plugin registry's. The Container's types are loaded once and closed
    * over — resolving is a map lookup, not a query per type.
    */
-  private typeFieldRefsFor(worldId: string | undefined): TypeFieldRefsResolver {
-    if (!worldId) return this.plugins.typeFieldRefs;
-    const userRefs = new Map(this.list(worldId).map((type) => [type.id, type.fieldRefs]));
+  private typeFieldRefsFor(containerId: string | undefined): TypeFieldRefsResolver {
+    if (!containerId) return this.plugins.typeFieldRefs;
+    const userRefs = new Map(this.list(containerId).map((type) => [type.id, type.fieldRefs]));
     return (typeId) => userRefs.get(typeId) ?? this.plugins.typeFieldRefs(typeId);
   }
 
-  /** The Entity Types available in a World: the instance-wide plugin types plus this World's own. */
-  availableTypes(worldId: string): AvailableType[] {
+  /** The Entity Types available in a Container: the instance-wide plugin types plus its own. */
+  availableTypes(containerId: string): AvailableType[] {
     return [
       ...this.plugins.plugins(),
-      ...this.list(worldId).map((type): AvailableType => ({ ...type, source: 'user' })),
+      ...this.list(containerId).map((type): AvailableType => ({ ...type, source: 'user' })),
     ];
   }
 
@@ -79,15 +80,15 @@ export class WorldTypeFields {
    * Field, a deleted World Field, a foreign bare key, ADR-0052/0054) is skipped, its value left untouched
    * (forward-only) — one resolution path, id → Field, with no inline schema and no stored attachment list.
    */
-  effectiveFields(worldId: string | undefined, types: readonly string[], doc: EntityDocument | undefined): Field[] {
-    // World-scoped when a `worldId` is in play so its user-defined Fields resolve too; else the Plugin
-    // fields alone (a gate that runs before a row's World is known).
-    const fieldResolver = worldId ? this.worldFields.resolverFor(worldId) : this.plugins.fieldResolver;
+  effectiveFields(containerId: string | undefined, types: readonly string[], doc: EntityDocument | undefined): Field[] {
+    // Container-scoped when a `containerId` is in play so its user-defined Fields resolve too; else the
+    // Plugin fields alone (a gate that runs before a row's Container is known).
+    const fieldResolver = containerId ? this.worldFields.resolverFor(containerId) : this.plugins.fieldResolver;
     return resolveEffectiveFields({
       types,
       doc,
       fieldResolver,
-      typeFieldRefs: this.typeFieldRefsFor(worldId),
+      typeFieldRefs: this.typeFieldRefsFor(containerId),
     });
   }
 
@@ -100,12 +101,12 @@ export class WorldTypeFields {
    * over an actual document key (ADR-0055) — so dimensions only fill keys no scalar Field claims. The
    * insertion order is the rail's stable declaration order: scalars, then dimensions.
    */
-  facetSourcesByKey(worldId: string | undefined): Map<string, FacetSource> {
+  facetSourcesByKey(containerId: string | undefined): Map<string, FacetSource> {
     const byKey = new Map<string, FacetSource>();
-    // Scalar Fields first — Plugin then World, so a World-defined Field wins the key (ADR-0054).
+    // Scalar Fields first — Plugin then user-defined, so a World-defined Field wins the key (ADR-0054).
     for (const field of this.plugins.fields()) if (isFacetableField(field)) byKey.set(field.id, scalarSource(field));
-    if (worldId)
-      for (const field of this.worldFields.list(worldId))
+    if (containerId)
+      for (const field of this.worldFields.list(containerId))
         if (isFacetableField(field)) byKey.set(field.id, scalarSource(field));
     // Then harvested dimensions — the scalar walk ran first, so a shared key keeps its scalar (ADR-0055).
     for (const dataType of this.plugins.structuredDataTypes.values())

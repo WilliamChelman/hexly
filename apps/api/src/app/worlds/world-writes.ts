@@ -174,7 +174,8 @@ export class WorldWrites {
       this.db
         .insert(worldTypes)
         .values({
-          worldId,
+          // The vocabulary hangs off the Container (ADR-0078); a World's Container id is its own id.
+          containerId: worldId,
           typeId: type.id,
           label: type.label,
           fieldRefs: [...type.fieldRefs],
@@ -207,7 +208,7 @@ export class WorldWrites {
           ...(patch.views !== undefined ? { views: [...patch.views] } : {}),
           updatedAt: Date.now(),
         })
-        .where(and(eq(worldTypes.worldId, worldId), eq(worldTypes.typeId, typeId)))
+        .where(and(eq(worldTypes.containerId, worldId), eq(worldTypes.typeId, typeId)))
         .run();
       if (updated.changes === 0) return false;
       this.bumpAndNudge(worldId);
@@ -220,7 +221,7 @@ export class WorldWrites {
     return this.transact(() => {
       const deleted = this.db
         .delete(worldTypes)
-        .where(and(eq(worldTypes.worldId, worldId), eq(worldTypes.typeId, typeId)))
+        .where(and(eq(worldTypes.containerId, worldId), eq(worldTypes.typeId, typeId)))
         .run();
       if (deleted.changes === 0) return false;
       this.bumpAndNudge(worldId);
@@ -235,7 +236,10 @@ export class WorldWrites {
    */
   createField(worldId: string, fieldId: string, definition: FieldSchema, now: number = Date.now()): void {
     this.transact(() => {
-      this.db.insert(worldFields).values({ worldId, fieldId, definition, createdAt: now, updatedAt: now }).run();
+      this.db
+        .insert(worldFields)
+        .values({ containerId: worldId, fieldId, definition, createdAt: now, updatedAt: now })
+        .run();
       this.bumpAndNudge(worldId);
     });
   }
@@ -250,7 +254,7 @@ export class WorldWrites {
       const updated = this.db
         .update(worldFields)
         .set({ definition, updatedAt: Date.now() })
-        .where(and(eq(worldFields.worldId, worldId), eq(worldFields.fieldId, fieldId)))
+        .where(and(eq(worldFields.containerId, worldId), eq(worldFields.fieldId, fieldId)))
         .run();
       if (updated.changes === 0) return false;
       this.bumpAndNudge(worldId);
@@ -266,7 +270,7 @@ export class WorldWrites {
     return this.transact(() => {
       const deleted = this.db
         .delete(worldFields)
-        .where(and(eq(worldFields.worldId, worldId), eq(worldFields.fieldId, fieldId)))
+        .where(and(eq(worldFields.containerId, worldId), eq(worldFields.fieldId, fieldId)))
         .run();
       if (deleted.changes === 0) return false;
       this.bumpAndNudge(worldId);
