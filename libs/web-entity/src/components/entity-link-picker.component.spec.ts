@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { defineField, EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
-import { EntitiesClient } from '@hexly/web-core';
+import { ActiveWorld, EntitiesClient } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { WEB_ENTITY_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { provideEntityTypesTesting } from '../testing/entity-types.fake';
@@ -56,10 +56,10 @@ const monster: TypeDefinition = codeType('dnd.type.monster', [crField.id]);
 /** A System-managed type (ADR-0068), as `core.type.asset` is: never user-creatable. */
 const systemType: TypeDefinition = { ...codeType('test.type.system'), systemManaged: true };
 
-function summary(id: string, name: string): EntitySummary {
+function summary(id: string, name: string, worldId = 'w1'): EntitySummary {
   return {
     id,
-    worldId: 'w1',
+    worldId,
     name,
     types: ['core.type.note'],
     tags: [],
@@ -72,7 +72,7 @@ function summary(id: string, name: string): EntitySummary {
 
 /** The entities the stubbed client lists, and the creates it recorded. */
 let stubEntities: EntitySummary[] = [];
-let createdCalls: Array<{ name: string; type: EntityType }> = [];
+let createdCalls: Array<{ name: string; type: EntityType; worldId?: string }> = [];
 let nextCreatedId = 'created-1';
 
 /** A host holding the link, as the Hex Map's Inspector (and any other slot owner) does. */
@@ -104,15 +104,17 @@ describe('EntityLinkPicker', () => {
           provide: EntitiesClient,
           useValue: {
             // Mirror the server's envelope + filters (ADR-0025): `ids` selects, `q` matches names
-            // case-insensitively, so the picker's calls resolve as they do in prod.
-            list: (opts: { ids?: string[]; q?: string } = {}) => {
+            // case-insensitively, `worldId` narrows to one World, so the picker's calls resolve as
+            // they do in prod.
+            list: (opts: { ids?: string[]; q?: string; worldId?: string } = {}) => {
               let items = stubEntities;
               if (opts.ids) items = items.filter((e) => opts.ids?.includes(e.id));
               if (opts.q) items = items.filter((e) => e.name.toLowerCase().includes(opts.q?.toLowerCase() ?? ''));
+              if (opts.worldId) items = items.filter((e) => e.worldId === opts.worldId);
               return of({ items, nextCursor: null });
             },
-            create: (name: string, types: readonly EntityType[]) => {
-              createdCalls.push({ name, type: types[0] });
+            create: (name: string, types: readonly EntityType[], worldId?: string) => {
+              createdCalls.push({ name, type: types[0], worldId });
               const detail: EntityDetail = {
                 ...summary(nextCreatedId, name),
                 types: [...types],
@@ -194,6 +196,33 @@ describe('EntityLinkPicker', () => {
     expect(name.tagName).toBe('A');
     expect(name.getAttribute('href')).toBe('/entities/n1');
     expect(name.textContent).toContain('Riverbend');
+  });
+
+  it('offers only Entities from the World being edited in (#394)', () => {
+    // The caller reaches both Worlds; the picker is a link-target read, so it is bound to the
+    // active World and never offers a target the editing World could not hold.
+    stubEntities = [summary('n1', 'Riverbend'), summary('n2', 'Riverbend Keep', 'w2')];
+    TestBed.inject(ActiveWorld).set('w1');
+    const fixture = render();
+
+    click(fixture, 'entity-link-pick');
+    fixture.detectChanges();
+
+    expect(byId(fixture, 'entity-link-option-n1')).not.toBeNull();
+    expect(byId(fixture, 'entity-link-option-n2')).toBeNull();
+  });
+
+  it('still resolves a link whose target lives outside the active World (#394)', () => {
+    // Only *offering* is scoped: a link that already exists keeps rendering its name, so scoping
+    // the search never turns an existing cross-World link into a dangling one.
+    stubEntities = [summary('n2', 'Riverbend Keep', 'w2')];
+    TestBed.inject(ActiveWorld).set('w1');
+    const fixture = render();
+    fixture.componentInstance.linked.set('n2');
+    fixture.detectChanges();
+
+    expect(byId(fixture, 'entity-link-name')?.textContent).toContain('Riverbend Keep');
+    expect(byId(fixture, 'entity-link-dangling')).toBeNull();
   });
 
   it('renders a non-navigable dangling label when the link cannot be resolved', () => {
@@ -284,6 +313,18 @@ describe('EntityLinkPicker', () => {
 
       expect(createdCalls).toEqual([{ name: 'Ironhold', type: 'core.type.hex-map' }]);
       expect(fixture.componentInstance.linked()).toBe('iron');
+    });
+
+    it('still mints into the World being edited in (ADR-0028, #394)', () => {
+      TestBed.inject(ActiveWorld).set('w1');
+      const fixture = render();
+
+      click(fixture, 'entity-link-pick');
+      fixture.detectChanges();
+      click(fixture, 'entity-link-create-core.type.note');
+      fixture.detectChanges();
+
+      expect(createdCalls[0].worldId).toBe('w1');
     });
   });
 
