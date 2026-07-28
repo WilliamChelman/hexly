@@ -11,7 +11,7 @@ import {
   signal,
 } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { FontPairingId, WorldTheme, WorldThemePalette, WorldThemeSource } from '@hexly/domain';
+import { FontPairingId, PalettePreset, WorldTheme, WorldThemePalette, WorldThemeSource } from '@hexly/domain';
 import {
   ActiveWorld,
   ColorScheme,
@@ -32,6 +32,7 @@ import {
   sameDraft,
   withControlValue,
   withOverride,
+  withPalettePreset,
 } from '../utils/theme-draft';
 import { PaletteEdit, ThemePaletteComponent } from './theme-palette.component';
 import { OverrideEdit, ThemeOverridesComponent } from './theme-overrides.component';
@@ -73,7 +74,13 @@ import { ThemeCopyComponent } from './theme-copy.component';
       <!-- One section per part of the contract; the radius set and font pairing take their own. -->
       <section class="group">
         <h2 appEyebrow>{{ 'worldTheme.paletteHeading' | transloco }}</h2>
-        <app-theme-palette [palettes]="palettes()" [declarations]="declarations()" (changed)="apply($event)" />
+        <p class="lede">{{ 'worldTheme.paletteLede' | transloco }}</p>
+        <app-theme-palette
+          [palettes]="palettes()"
+          [declarations]="declarations()"
+          (changed)="apply($event)"
+          (presetPicked)="pickPalettePreset($event)"
+        />
       </section>
 
       <section class="group">
@@ -228,6 +235,18 @@ export class WorldThemePanelComponent implements OnInit {
   protected apply({ scheme, control, raw }: PaletteEdit): void {
     const draft = this.materialised();
     this.draft.set({ ...draft, [scheme]: withControlValue(draft[scheme], control, raw) });
+  }
+
+  /**
+   * Fold a picked Palette Preset into the draft (#384): one ColorScheme's eleven values, whole, and its
+   * own named literals merged into that ColorScheme's overrides. Written as values and never as an id,
+   * so a Preset stays a starting point and renaming one is no migration (ADR-0077).
+   *
+   * Materialises for the same reason a moved anchor does — a stored Theme carries both Palettes entire,
+   * so the ColorScheme this pick says nothing about still has to go out whole.
+   */
+  protected pickPalettePreset(preset: PalettePreset): void {
+    this.draft.set(withPalettePreset(this.materialised(), preset));
   }
 
   /**

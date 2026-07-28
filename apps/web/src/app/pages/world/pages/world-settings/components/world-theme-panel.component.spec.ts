@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import {
+  PALETTE_PRESETS,
+  PALETTE_PRESET_IDS,
   WORLD_THEME_VERSION,
   WorldDetail,
   WorldTheme,
@@ -58,6 +60,12 @@ describe('WorldThemePanel', () => {
     const control = at(fixture, `theme-control-light-${field}`) as HTMLInputElement;
     control.value = value;
     control.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+  }
+
+  /** Take one of the offered sets — a radius ladder, a font pairing, a Palette Preset — through its radio. */
+  function pick(fixture: ComponentFixture<WorldThemePanelComponent>, testid: string): void {
+    at(fixture, testid).click();
     fixture.detectChanges();
   }
 
@@ -233,13 +241,95 @@ describe('WorldThemePanel', () => {
     });
   });
 
+  /**
+   * The ready-made Palettes (#384). The pure helpers own the folding; what this asserts is the round
+   * trip an Owner actually drives — that the mark is *derived*, that a pick stages rather than stores,
+   * and that one column's pick leaves the other column and the rest of the contract alone.
+   */
+  describe('picking a Palette Preset', () => {
+    const checked = (fixture: ComponentFixture<WorldThemePanelComponent>, testid: string): boolean =>
+      (at(fixture, testid) as HTMLInputElement).checked;
+
+    it('marks the Preset each column’s Palette matches — an unthemed World wears Hexly’s own pair', () => {
+      // Derived by comparison and never read off a stored id (ADR-0077): nothing stored says "solar".
+      const fixture = mount(null);
+
+      expect(checked(fixture, 'theme-preset-light-solar')).toBe(true);
+      expect(checked(fixture, 'theme-preset-dark-astral')).toBe(true);
+    });
+
+    it('clears the mark the moment an anchor moves, so the editor never claims a Preset left behind', () => {
+      const fixture = mount(null);
+
+      move(fixture, 'ink', '#112233');
+
+      expect(checked(fixture, 'theme-preset-light-solar')).toBe(false);
+      // The other column has not moved, so its own mark stays where it was.
+      expect(checked(fixture, 'theme-preset-dark-astral')).toBe(true);
+    });
+
+    it('sends one ColorScheme’s eleven values and merges its literals, leaving the rest of the Theme alone', () => {
+      const sharp = RADIUS_PRESETS.find((preset) => preset.id === 'sharp')!.radii;
+      const fixture = mount(null, { ...stored(), radii: sharp, fontPairing: 'codex' });
+
+      pick(fixture, 'theme-preset-dark-astral');
+      const sent = save(fixture);
+
+      expect(sent?.dark).toEqual(PALETTE_PRESETS.astral.values);
+      // The other ColorScheme, the corners and the faces are none of a Palette Preset's business.
+      expect(sent?.light).toEqual(stored().light);
+      expect(sent?.radii).toEqual(sharp);
+      expect(sent?.fontPairing).toBe('codex');
+      expect(sent?.overrides?.dark).toEqual(PALETTE_PRESETS.astral.overrides);
+      // Values and no name: a Preset id never enters stored data, which is what makes renaming free.
+      for (const id of PALETTE_PRESET_IDS) expect(JSON.stringify(sent)).not.toContain(id);
+    });
+
+    it('shows a literal the Preset wrote as an override, and clearing it hands the token back', () => {
+      const fixture = mount(null, stored());
+
+      pick(fixture, 'theme-preset-dark-astral');
+      expect(at(fixture, 'theme-override-dark-color-canvas-glow')).toBeTruthy();
+
+      at(fixture, 'theme-override-clear-dark-color-canvas-glow').click();
+      fixture.detectChanges();
+
+      // Back to the row that offers an override rather than one that holds a value — derived again.
+      expect(at(fixture, 'theme-override-set-dark-color-canvas-glow')).toBeTruthy();
+      expect(save(fixture)?.overrides).toBeUndefined();
+    });
+
+    it('stages the pick, so it previews and can still be discarded without storing anything', () => {
+      const fixture = mount(null, stored());
+
+      pick(fixture, 'theme-preset-light-solar');
+
+      expect(worlds.setTheme).not.toHaveBeenCalled();
+      expect(at(fixture, 'theme-unsaved')).toBeTruthy();
+      expect(checked(fixture, 'theme-preset-light-solar')).toBe(true);
+
+      at(fixture, 'theme-discard').click();
+      fixture.detectChanges();
+
+      expect(worlds.setTheme).not.toHaveBeenCalled();
+      expect((at(fixture, 'theme-control-light-page') as HTMLInputElement).value).toBe(
+        colorTokenHex(stored().light.page),
+      );
+    });
+
+    it('picks the two columns apart, so neither Preset is forced on the other ColorScheme', () => {
+      const fixture = mount(null, stored());
+
+      pick(fixture, 'theme-preset-light-solar');
+
+      expect(checked(fixture, 'theme-preset-light-solar')).toBe(true);
+      expect(checked(fixture, 'theme-preset-dark-astral')).toBe(false);
+      expect(save(fixture)?.dark).toEqual(stored().dark);
+    });
+  });
+
   /** The non-colour half (#375): a corner-radius set and a font pairing, each picked whole. */
   describe('the corner-radius set and the font pairing', () => {
-    const pick = (fixture: ComponentFixture<WorldThemePanelComponent>, testid: string): void => {
-      at(fixture, testid).click();
-      fixture.detectChanges();
-    };
-
     const sharp = RADIUS_PRESETS.find((preset) => preset.id === 'sharp')!.radii;
 
     it('sends the picked set’s five values, alongside the Palette a first edit materialises', () => {
