@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { DESIGN_TOKENS, designTokenInitial } from '@hexly/web-styles';
 import {
+  DEFAULT_PALETTE_PRESETS,
   FONT_PAIRINGS,
   FONT_PAIRING_IDS,
   OVERRIDABLE_TOKENS,
+  PALETTE_PRESETS,
   PALETTE_TOKENS,
   WORLD_THEME_VERSION,
   WorldTheme,
@@ -389,6 +391,10 @@ describe('whether a draft has unsaved changes', () => {
   });
 });
 
+/**
+ * Hexly's own anchors, answered from the Preset table (ADR-0077) — so this environment, which loads no
+ * stylesheet, tests the accessor itself rather than the manifest fallback an offscreen probe took here.
+ */
 describe('the Hexly default each ColorScheme opens at', () => {
   it('answers a full Palette for either ColorScheme', () => {
     for (const scheme of COLOR_SCHEMES) {
@@ -396,25 +402,27 @@ describe('the Hexly default each ColorScheme opens at', () => {
     }
   });
 
-  it('types the knobs as numbers, whatever notation the document resolved them to', () => {
-    expect(typeof hexlyPalette('solar').polarity).toBe('number');
-    expect(typeof hexlyPalette('astral').veil).toBe('number');
+  it('answers each ColorScheme’s default Preset, which is what the stylesheet is generated from', () => {
+    for (const scheme of COLOR_SCHEMES) {
+      expect(hexlyPalette(scheme)).toEqual(PALETTE_PRESETS[DEFAULT_PALETTE_PRESETS[scheme]].values);
+    }
   });
 
-  it('leaves nothing of its probe behind on the document', () => {
-    const before = document.body.childElementCount;
+  it('hands back a copy, so editing a draft cannot reach into the table every World starts from', () => {
+    expect(hexlyPalette('solar')).not.toBe(PALETTE_PRESETS[DEFAULT_PALETTE_PRESETS['solar']].values);
+  });
 
-    hexlyPalette('astral');
-
-    expect(document.body.childElementCount).toBe(before);
+  it('types the knobs as numbers, which is what a knob control reads back', () => {
+    expect(typeof hexlyPalette('solar').polarity).toBe('number');
+    expect(typeof hexlyPalette('astral').veil).toBe('number');
   });
 });
 
 /**
  * What an unthemed World's controls open at (#371 × #372). The Instance default is a *starting point*
  * an Owner departs from, so the editor has to seed from the resolved chain — Instance layer where it
- * has a value, Hexly's own where it does not. The probe cannot see the operator's layer: it is written
- * inline on the root, and a `[data-color-scheme]` rule declaring the anchors beats inheritance.
+ * has a value, Hexly's own where it does not. The table cannot see the operator's layer at all, which
+ * is why the two are composed here rather than read off one place.
  */
 describe('the default an unthemed World opens at, under an Instance default', () => {
   const OPERATOR_ACCENT = 'oklch(0.6 0.2 300)';

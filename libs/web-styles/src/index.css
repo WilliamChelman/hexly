@@ -3,8 +3,8 @@
  * (ADR-0020). Both the app's real stylesheet (@import, emits once) and every
  * scoped component style (@reference '#app-styles.css', context-only) point
  * here, so tokens live in a leaf lib rather than inside a consuming app.
- * Order is load-bearing: tokens.css [data-color-scheme] must cascade after the
- * `tailwindcss` import and the @theme :root it emits.
+ * Order is load-bearing: tokens.css declares its Palettes at :root, which ties
+ * with the @theme :root the `tailwindcss` import emits, so it must cascade after.
  */
 /* `source(none)`: automatic detection walks the whole workspace, which is the only reason the plugin
    libraries that no `@source` names got their classes generated (#359). apps/web/src/styles.css
@@ -84,10 +84,9 @@
    * Colours — tier 2, the semantic roles, each derived from the tier-1 Palette
    * in tokens.css (ADR-0075). One expression per role, byte-identical in both
    * ColorSchemes: only the eight anchors and three knobs differ. `@theme static`
-   * declares them at `:root` and nowhere else, so it is the *root's*
-   * [data-color-scheme] that re-resolves them off the new Palette; a scoped
-   * subtree carries the anchors and inherits the roles the root already derived,
-   * which is why the contrast report re-dresses the root (contrast/measure.ts).
+   * declares them at `:root`, which is where tokens.css declares the anchors too
+   * (ADR-0077), so re-resolving a role is re-dressing the root — which is what the
+   * contrast report does (contrast/measure.ts).
    *
    * Every coefficient below is copied from the fit in
    * docs/design/spike-token-derivation.md §2, and each knob carries exactly one

@@ -16,14 +16,15 @@ import {
   declaredTokenValues,
   designTokenInitial,
   measureScheme,
-  readDesignToken,
   tokenDerivation,
 } from '@hexly/web-styles';
 import {
+  DEFAULT_PALETTE_PRESETS,
   FONT_PAIRINGS,
   FONT_PAIRING_IDS,
   FontPairingId,
   OVERRIDABLE_TOKENS,
+  PALETTE_PRESETS,
   PALETTE_TOKENS,
   WORLD_THEME_VERSION,
   WorldTheme,
@@ -172,7 +173,7 @@ export type ResolvedRoles = Readonly<Record<ColorScheme, Readonly<Partial<Record
  * (ADR-0075). The value is true of all fifty-one.
  *
  * Measured on the root rather than an offscreen probe, and for the ColorScheme the reader is *not* in
- * too — the tier-2 roles are declared once at `:root`, so a probe inherits the reader's own (ADR-0076).
+ * too — every tier is declared at `:root` alone, so a probe inherits the reader's own (ADR-0077).
  * Only jsdom takes the manifest fallback.
  */
 export function resolvedRoles(declarations: ThemeDeclarationSet): ResolvedRoles {
@@ -393,21 +394,12 @@ export function withControlValue(palette: WorldThemePalette, control: PaletteCon
 }
 
 /**
- * Hexly's own Palette for a ColorScheme, read off the document rather than restated here: tier-1
- * declarations key off `[data-color-scheme]` on any element (ADR-0076), so the probe's own anchors beat
- * the World Theme inherited from the root. Only jsdom falls back.
+ * Hexly's own Palette for a ColorScheme — the Preset table's default entry (ADR-0077), which is what
+ * `tokens.css`'s tier-1 regions are generated from, so the editor and the stylesheet cannot disagree.
  */
 export function hexlyPalette(scheme: ColorScheme): WorldThemePalette {
-  const probe = document.createElement('div');
-  probe.dataset['colorScheme'] = scheme;
-  probe.style.display = 'none';
-  document.body.append(probe);
-  try {
-    const style = getComputedStyle(probe);
-    return paletteOf((token) => readDesignToken(style, token));
-  } finally {
-    probe.remove();
-  }
+  // Copied: the table's entry is one shared object, and a draft is edited field by field.
+  return { ...PALETTE_PRESETS[DEFAULT_PALETTE_PRESETS[scheme]].values };
 }
 
 /**

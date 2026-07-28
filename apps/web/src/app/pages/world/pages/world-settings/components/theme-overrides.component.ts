@@ -281,9 +281,9 @@ export class ThemeOverridesComponent {
 
   /**
    * The paper an elevation preview falls on, and the card it lifts — that ColorScheme's own, measured
-   * with every other row (see {@link resolvedRoles}) rather than by re-dressing a subtree: the tier-2
-   * roles are declared once at `:root`, so a nested `[data-color-scheme]` re-resolves the *Palette* and
-   * inherits the reader's roles regardless (ADR-0076).
+   * with every other row (see {@link resolvedRoles}) rather than by re-dressing a subtree: every tier
+   * is declared at `:root` alone, so a nested `[data-color-scheme]` re-resolves nothing and inherits
+   * the reader's own (ADR-0077).
    */
   protected ground(scheme: ColorScheme): string {
     return this.resolved()[scheme]['--color-bg'] ?? '';

@@ -185,10 +185,10 @@ test('declares every public role once, so a ColorScheme only ever restates a lit
       for (const rule of Array.from(rules)) {
         // Tailwind lowers each `@property` into a `@supports` block that restates the resolved value.
         if (rule instanceof CSSSupportsRule) continue;
-        // A scheme's *own* block. `:root, [data-color-scheme='solar']` carries the shared declarations
-        // and is not one: naming the root is what makes a rule answer for both.
+        // A scheme's *own* block. Since ADR-0077 every Palette is declared at the root, so naming a
+        // ColorScheme — never `:root` alone — is what makes a rule one scheme's rather than both's.
         const selector = rule instanceof CSSStyleRule ? rule.selectorText : '';
-        if (rule instanceof CSSStyleRule && /\[data-color-scheme=/.test(selector) && !/:root|:host/.test(selector)) {
+        if (rule instanceof CSSStyleRule && /\[data-color-scheme=/.test(selector)) {
           for (const name of Array.from(rule.style)) {
             if (/^--(color|shadow)-/.test(name)) {
               found.push({ name, value: rule.style.getPropertyValue(name).trim() });

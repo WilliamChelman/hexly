@@ -203,7 +203,8 @@ test('the contrast report measures the ColorScheme the reader is not in, roles i
       const measured = await page.evaluate(measureScheme, { scheme: inactive, declarations: {}, tokens: TOKEN_NAMES });
 
       // Every declared token, exactly as the *other* ColorScheme renders it — the tier-2 roles included,
-      // which is the half an offscreen probe silently gets wrong (see `world-theme.spec.ts`).
+      // which an offscreen element gets silently wrong, every tier being declared at `:root` alone
+      // (ADR-0077, pinned in `world-theme.spec.ts`).
       expect(measured, `the report for ${inactive} while reading ${active}`).toEqual(
         Object.fromEntries(TOKEN_NAMES.map((name) => [name, table[name][inactive]])),
       );

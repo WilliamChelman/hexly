@@ -67,7 +67,7 @@ function resolvedOn(page: Page, selector: string, name: string): Promise<string>
   );
 }
 
-/** What an offscreen element carrying `scheme` resolves `name` to (world-theme-spec §5.3). */
+/** What an offscreen element carrying `scheme` resolves each `name` to — the root's, since ADR-0077. */
 function probe(page: Page, scheme: 'solar' | 'astral', names: readonly string[]): Promise<string[]> {
   return page.evaluate(
     ([colorScheme, tokens]) => {
@@ -113,33 +113,12 @@ test('a Theme paints the World it belongs to, reaches what portals off the root,
   );
   await page.keyboard.press('Escape');
 
-  // An offscreen element carrying the *other* ColorScheme resolves that scheme's tier-1 Palette, not
-  // the reader's and not the World's — Hexly's own Astral anchors, since a probe carries none of its
-  // own until one is put on it. This is what the widened selector bought (ADR-0076).
-  //
-  // Tier 2 does *not* follow it, and this pins that: the roles are declared once at `:root` by the
-  // `@theme` block, and a registered custom property computes where it is declared — so the probe
-  // inherits the root's already-derived `--color-*` rather than re-deriving from its own anchors.
-  // #373's contrast probe needs the whole chain, so it must either re-declare tier 2 per
-  // `[data-color-scheme]` or measure on the root itself between paints.
+  // Every tier is declared at `:root` alone (ADR-0077), so an offscreen element carrying the *other*
+  // ColorScheme inherits the root's — which is why the contrast report re-dresses the root instead
+  // (`web-styles/src/contrast/measure.ts`) and a renderer reads off it (`designTokenStyle`).
   const [probedAnchor, probedRole] = await probe(page, 'astral', ['--palette-page', '--color-bg']);
-  expect(probedAnchor).toBe('rgb(11, 12, 26)');
+  expect(probedAnchor).toBe(await resolvedOn(page, 'html', '--palette-page'));
   expect(probedRole).toBe(await resolvedOn(page, 'html', '--color-bg'));
-
-  // Which is why a renderer resolves its colours off the root and never off its own canvas
-  // (`designTokenStyle`): a canvas inside a scheme-carrying subtree would read that subtree's anchors
-  // and the root's derived roles at once, and paint half of each with nothing to show for it.
-  const canvasStraddle = await page.evaluate(() => {
-    const scoped = document.createElement('div');
-    scoped.dataset['colorScheme'] = 'astral';
-    const canvas = scoped.appendChild(document.createElement('canvas'));
-    document.body.append(scoped);
-    const read = (el: Element, token: string) => getComputedStyle(el).getPropertyValue(token).trim();
-    const straddled = read(canvas, '--palette-page') !== read(document.documentElement, '--palette-page');
-    scoped.remove();
-    return straddled;
-  });
-  expect(canvasStraddle, 'a canvas in a scheme-carrying subtree reads anchors the root does not').toBe(true);
 
   // Leaving for a World with no Theme takes it back: nothing is worse than it is today.
   await page.goto(`/w/${segment(plain.id, plain.name)}`);

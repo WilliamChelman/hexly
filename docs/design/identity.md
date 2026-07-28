@@ -237,9 +237,11 @@ spells that knob and a relative colour function destructures a single colour. Th
   to the OS preference when unset.
 - An inline boot script in `index.html` applies the ColorScheme **before first paint**
   (no flash). An explicit user choice always beats the OS preference.
-- Token declarations key off `[data-color-scheme]` on **any** element, not
-  `:root[data-color-scheme]` — that widening is what lets `hexlyPalette` read Hexly's own
-  anchors past a painted World Theme (ADR-0076).
+- Token declarations key off `:root[data-color-scheme]` — the **document root** and nothing
+  else. ADR-0076 had widened this to any element so an offscreen probe could carry the other
+  ColorScheme; `hexlyPalette` was its last reader and is now a Palette Preset lookup, so it
+  narrows back (ADR-0077). A subtree carrying its own `data-color-scheme` therefore resolves
+  nothing of its own — which is why the contrast report re-dresses the root instead.
 
 ## World Theme
 

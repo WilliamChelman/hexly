@@ -74,11 +74,19 @@ function* declaringRules(rules: CSSRuleList, scheme: string): Generator<CSSStyle
   }
 }
 
+/**
+ * Whether a rule speaks for one ColorScheme rather than both. The attribute, not `:root`, is what
+ * separates them — since ADR-0077 every Palette is declared at the root.
+ */
+function namesAScheme(selectorText: string): boolean {
+  return selectorText.includes('[data-color-scheme=');
+}
+
 /** Whether any selector in the list dresses the root as `scheme` — a Palette is declared there alone. */
 function appliesTo(selectorText: string, scheme: string): boolean {
   return selectorText
     .split(',')
-    .some((one) => /:root|:host/.test(one) || one.includes(`[data-color-scheme="${scheme}"]`));
+    .some((one) => (namesAScheme(one) ? one.includes(`[data-color-scheme="${scheme}"]`) : /:root|:host/.test(one)));
 }
 
 /**
@@ -101,8 +109,7 @@ export function declaredTokenValues(scheme: string): DeclaredTokens {
       continue;
     }
     for (const rule of declaringRules(rules, scheme)) {
-      const onlyThisScheme = !/:root|:host/.test(rule.selectorText);
-      const into = onlyThisScheme ? scoped : root;
+      const into = namesAScheme(rule.selectorText) ? scoped : root;
       for (const name of Array.from(rule.style)) {
         if (!isDesignToken(name) || name in into) continue;
         into[name] = collapse(rule.style.getPropertyValue(name));

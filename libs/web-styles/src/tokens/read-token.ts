@@ -17,10 +17,9 @@ export function readDesignToken(style: CSSStyleDeclaration, name: DesignToken): 
 }
 
 /**
- * The element a renderer resolves tokens from: the document root, never a descendant. A World Theme is
- * applied there (ADR-0076) and the tier-2 roles are declared only there (ADR-0075), so a deeper element
- * carrying its own `data-color-scheme` resolves *its* Palette anchors while still inheriting the root's
- * already-derived roles — half a repaint, in silence. The root cannot straddle that boundary.
+ * The element a renderer resolves tokens from: the document root. A World Theme is applied there
+ * (ADR-0076) and every tier is declared there and nowhere else (ADR-0077), so the root is the one
+ * element that answers for the whole chain rather than half of it.
  */
 export function designTokenStyle(): CSSStyleDeclaration {
   return getComputedStyle(document.documentElement);

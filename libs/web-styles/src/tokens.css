@@ -12,7 +12,7 @@
  *   2. Raw non-utility tokens — motion (`--dur-*`/`--ease-*`), elevation
  *      (`--shadow-*`, see ADR-0021), layout rails (`--rail-*`, `--container-reading`),
  *      and the sheen gradients. These are tier 2 by role but live here because
- *      `@theme` cannot hold them, so the widened selector below carries them too.
+ *      `@theme` cannot hold them, so the root block below carries them too.
  *
  * Concept: the Celestial Codex — the cartographer's table across the sky.
  *   - Light "Solar"  — a sunlit almanac: warm ivory paper, heliograph gold.
@@ -22,11 +22,10 @@
  * other, and the polarity knob is what asserts that in the derivation.
  */
 
-/* A Palette is declared wherever a ColorScheme is, not only at the root (ADR-0076), so a
-   scoped subtree re-resolves under its own scheme. The contrast report does not use it:
-   the derived roles sit at `:root`, so it re-dresses the root instead (`measure.ts`). */
-:root,
-[data-color-scheme='solar'] {
+/* A Palette is declared at the document root and nowhere else (ADR-0077). The widening ADR-0076
+   made for the editor's offscreen probe has no reader left: the probe is a Preset lookup, and the
+   contrast report re-dresses the root because the derived roles sit there (`measure.ts`). */
+:root {
   /* ---- Tier 1 — the Solar Palette. Private: `--palette-*` is referenced only by
      the derivation in index.css, and `no-unknown-design-token` enforces it. The
      values are authored in the Preset table (ADR-0077), where the note on each
@@ -100,7 +99,7 @@
  * What remains beside it is what the derivation does not reach — the one named
  * literal.
  * ======================================================================= */
-[data-color-scheme='astral'] {
+:root[data-color-scheme='astral'] {
   /* ---- Tier 1 — the Astral Palette, and the tier-2 literals its Preset states. ---- */
   /* GENERATED — the astral Palette, from PALETTE_PRESETS in libs/domain. Run `pnpm tokens:generate`. */
   --palette-page: #0b0c1a;

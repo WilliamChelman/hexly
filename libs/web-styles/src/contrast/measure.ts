@@ -1,10 +1,10 @@
 /**
  * Reading tokens as a ColorScheme other than the reader's own resolves them (ADR-0076).
  *
- * Measured on the document root, not on an offscreen probe: the widened `[data-color-scheme]` selector
- * reaches only what `tokens.css` declares, and the *derived* roles are declared once at `:root` by
- * `@theme static`, so a probe would inherit the reader's own. `world-theme.spec.ts` pins it. Swapping
- * the root and putting it back inside one task is flash-free — a paint happens between tasks.
+ * Measured on the document root, not on an offscreen probe: every tier is declared at `:root` alone
+ * (ADR-0077), so a probe carrying the other ColorScheme inherits the reader's values entire.
+ * `world-theme.spec.ts` pins it. Swapping the root and putting it back inside one task is flash-free —
+ * a paint happens between tasks.
  *
  * {@link measureScheme} and {@link rasteriseColors} reference nothing but their arguments and the DOM,
  * so `apps/web-e2e` hands them to `page.evaluate` rather than testing a copy of them.

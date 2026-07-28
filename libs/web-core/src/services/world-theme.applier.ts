@@ -115,7 +115,7 @@ function declarationsFor(layers: readonly (WorldThemeLayer | null | undefined)[]
 /**
  * Resolve the chain into what the applier writes. Later layers win field by field, so the Instance
  * default survives wherever the World Theme is silent. Pure — the seam the editor's preview and the
- * contrast probe read through too.
+ * contrast report read through too.
  */
 export function resolveWorldTheme(layers: readonly (WorldThemeLayer | null | undefined)[]): ThemeDeclarationSet {
   return {
