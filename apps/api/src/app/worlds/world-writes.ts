@@ -127,8 +127,7 @@ export class WorldWrites {
   delete(id: string): void {
     this.transact(() => {
       this.entities.cascadeDeleteWorld(id);
-      // The `worlds` satellite is keyed by the container id ON DELETE CASCADE, and the Collaboration
-      // rows hang off the satellite — so dropping the identity row takes the whole World with it.
+      // The satellite cascades off the container id, and the Collaboration rows cascade off it.
       this.db.delete(containers).where(eq(containers.id, id)).run();
       this.outbox.world(id);
     });

@@ -1,5 +1,5 @@
 import { WorldVerb } from '@hexly/domain';
-import { and, eq, inArray, sql, SQLWrapper } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, sql, SQLWrapper } from 'drizzle-orm';
 import { Db } from '../db/db';
 import { containers, entities, entityGrants, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
 import { isSuperadmin } from './owner-set';
@@ -65,6 +65,26 @@ export function canCreateEntityFilter(userId: string, superadmin: boolean) {
  */
 export function worldOwnerFilter(userId: string) {
   return ownedBy(userId, worlds.id);
+}
+
+/**
+ * The one home of the whole-World read: the Container's identity columns beside the satellite's
+ * own. Driven off `worlds`, never `containers` — the satellite *is* the "this is a World"
+ * discriminator, so no `kind` exclusion is needed here or anywhere else (ADR-0078).
+ */
+function selectWorld(db: Db) {
+  return db
+    .select({ ...getTableColumns(containers), pinnedEntityIds: worlds.pinnedEntityIds, theme: worlds.theme })
+    .from(worlds)
+    .innerJoin(containers, eq(containers.id, worlds.id));
+}
+
+/**
+ * The whole World at `id`, with no access check — for a caller that has already resolved one
+ * (an Owner-gated update). {@link WorldAccess.decide} is the reachability-filtered form.
+ */
+export function loadWorld(db: Db, id: string): WorldRow | undefined {
+  return selectWorld(db).where(eq(worlds.id, id)).get();
 }
 
 /**
@@ -144,21 +164,7 @@ export function worldAccess(db: Db, userId: string): WorldAccess {
       return new Set(rows.map((r) => r.id));
     },
     decide(id) {
-      // Driven off `worlds`, not `containers`: the satellite *is* the "this is a World" discriminator,
-      // so no `kind` exclusion is needed here or anywhere else (ADR-0078).
-      return db
-        .select({
-          id: containers.id,
-          kind: containers.kind,
-          name: containers.name,
-          seq: containers.seq,
-          createdAt: containers.createdAt,
-          updatedAt: containers.updatedAt,
-          pinnedEntityIds: worlds.pinnedEntityIds,
-          theme: worlds.theme,
-        })
-        .from(worlds)
-        .innerJoin(containers, eq(containers.id, worlds.id))
+      return selectWorld(db)
         .where(and(eq(worlds.id, id), reachFilter))
         .get();
     },

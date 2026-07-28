@@ -1109,8 +1109,7 @@ export class EntitiesService {
     const predicate = requestedId
       ? and(eq(worlds.id, requestedId), canCreateEntityFilter(ownerId, this.isSuperadmin(ownerId)))
       : worldOwnerFilter(ownerId);
-    // "Oldest" is the Container's `created_at` (ADR-0078); driving off `worlds` keeps the default
-    // target a World.
+    // "Oldest" is the Container's `created_at` (ADR-0078).
     const world = this.db
       .select({ id: worlds.id })
       .from(worlds)

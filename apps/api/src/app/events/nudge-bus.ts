@@ -199,8 +199,7 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   emitWorldChange(id: string): void {
     const matches = (ref: InterestRef) => ref.kind === 'world' && ref.id === id;
     if (!this.anyFollower(matches)) return;
-    // The freshness key lives on the Container (ADR-0078); joining `worlds` keeps a world ref
-    // answering for a World and nothing else.
+    // The freshness key lives on the Container (ADR-0078); the join keeps a world ref World-only.
     const row = this.db
       .select({ seq: containers.seq })
       .from(worlds)

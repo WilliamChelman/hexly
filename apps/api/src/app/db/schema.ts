@@ -127,25 +127,20 @@ export const entityGrants = sqliteTable(
   (table) => [primaryKey({ columns: [table.entityId, table.userId] })],
 );
 
-/**
- * The kinds of Container (ADR-0078). One member today; ADR-0079's `compendium` is the second.
- */
+/** The kinds of Container (ADR-0078). ADR-0079's `compendium` is the second. */
 export type ContainerKind = 'world';
 
 /** The {@link containers} kind every World row carries. */
 export const WORLD_CONTAINER_KIND: ContainerKind = 'world';
 
 /**
- * A **Container** (ADR-0078): the thing an Entity belongs to. It holds identity and the substance
- * every kind shares — `name`, `seq`, the timestamps — while a satellite table keyed by this `id`
- * holds what only one kind has. {@link worlds} is the first such satellite, and its `id` *is* the
- * container id: the generalization was a backfill, so no World id ever moved.
- *
- * `kind` names which satellite completes the row; it is never the discriminator a read filters on —
- * joining the satellite is (a World list joins `worlds`, so a Compendium cannot leak into it).
+ * A **Container** (ADR-0078): what an Entity belongs to. It holds identity and the substance every
+ * kind shares, while a satellite table keyed by this `id` holds what only one kind has.
  */
 export const containers = sqliteTable('containers', {
   id: text('id').primaryKey(),
+  // Which satellite completes this row. Never the discriminator a read filters on — joining the
+  // satellite is, so a World-scoped read cannot see a Compendium even by omission.
   kind: text('kind').$type<ContainerKind>().notNull(),
   name: text('name').notNull(),
   // The live-follow freshness key (ADR-0045), the Container peer of `entities.seq`: every
@@ -157,10 +152,10 @@ export const containers = sqliteTable('containers', {
 });
 
 /**
- * A World: the Container kind grouping Entities for one campaign. Identity — name, `seq`,
- * timestamps — lives on the {@link containers} row this `id` names; only what a World alone has
- * stays here. World Owners are `world_members` rows with `role: 'owner'` — no owner column here.
- * The landing page is a derived Dashboard, so a World holds no FK back to entities.
+ * A World: the Container kind grouping Entities for one campaign. Identity lives on the
+ * {@link containers} row this `id` names (ADR-0078); only what a World alone has stays here. World
+ * Owners are `world_members` rows with `role: 'owner'` — no owner column here. The landing page is
+ * a derived Dashboard, so a World holds no FK back to entities.
  */
 export const worlds = sqliteTable('worlds', {
   id: text('id')

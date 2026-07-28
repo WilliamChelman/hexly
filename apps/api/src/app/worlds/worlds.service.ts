@@ -23,7 +23,7 @@ import { EntitiesService } from '../entities/entities.service';
 import { AclSetResult, gate, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
 import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
-import { worldAccess, worldOwnerFilter, worldRightsOf } from '../acl/world-access';
+import { loadWorld, worldAccess, worldOwnerFilter, worldRightsOf } from '../acl/world-access';
 import { sharedVisibility } from '../acl/entity-access';
 import { NudgeBus } from '../events/nudge-bus';
 import { WorldWrites } from './world-writes';
@@ -68,8 +68,7 @@ export class WorldsService {
   list(userId: string): WorldSummary[] {
     // A Superadmin's access context returns match-all, so no special case here.
     const access = worldAccess(this.db, userId);
-    // Identity comes off the Container; driving the read from `worlds` is what makes the World Index
-    // a World Index by construction rather than by a `kind` exclusion (ADR-0078).
+    // Identity comes off the Container, the World-ness off the join (ADR-0078).
     const rows = this.db
       .select({
         id: containers.id,
@@ -177,9 +176,8 @@ export class WorldsService {
   update(userId: string, id: string, patch: UpdateWorldRequest): WorldDetail | 'forbidden' | null {
     const gate = this.gateUpdate(userId, id);
     if (gate !== 'ok') return gate;
-    // Only an Owner reaches here, so the reachability-filtered read is the same row an unfiltered
-    // one would return — and it already joins the Container to the satellite.
-    const world = worldAccess(this.db, userId).decide(id);
+    // The gate above already resolved access, so this is the unfiltered read.
+    const world = loadWorld(this.db, id);
     if (!world) return null;
     // The write handle bumps `seq`/`updatedAt` and nudges; the response carries the post-write row,
     // so the caller's own write-through advances its held freshness and the server's echo nudge for
