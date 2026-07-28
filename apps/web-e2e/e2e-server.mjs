@@ -87,7 +87,7 @@ const childEnv = {
 
 // Seed the e2e users before serving (synchronous: the server must not accept logins
 // before the users exist). The grantee is optional — the loop skips it if unset.
-// Only the login user gets a starter World: `enterLibrary` reaches its library by
+// Only the login user gets a starter World: `enterEntities` reaches the Entity Browser by
 // clicking a World card on the Index, so the suite is dead without one.
 // E2E_SOLE_USER gives the login user the Sole User's shape (ADR-0071), so a Collaboration-off
 // absence cannot be a role check's doing.

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { PanelComponent } from '@hexly/web-ui';
 
 /**
- * A centered panel for a list's zero-row states — empty library, no search matches, load error.
+ * A centered panel for a list's zero-row states — nothing authored yet, no search matches, load error.
  * The caller passes the already-translated title/hint. `display: contents` so the `<section>` sits
  * where the component is placed.
  */

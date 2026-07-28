@@ -70,7 +70,7 @@ describe('EntityBrowser', () => {
     TestBed.inject(ActiveWorld).set('w1');
   });
 
-  /** Create the library and resolve its first page; `nextCursor` defaults to null (single page). */
+  /** Create the browser and resolve its first page; `nextCursor` defaults to null (single page). */
   function renderWith(items: EntitySummary[], nextCursor: string | null = null) {
     client.list.mockReturnValueOnce(of({ items, nextCursor }));
     const fixture = TestBed.createComponent(EntityBrowserPage);
@@ -576,14 +576,14 @@ describe('EntityBrowser', () => {
     expect(titlesOf(el)).toEqual(['Breachwood']);
   });
 
-  it('shows a distinct no-matches state (not the empty-library state) when a query matches nothing (#154)', () => {
+  it('shows a distinct no-matches state (not the empty state) when a query matches nothing (#154)', () => {
     const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
     const el = fixture.nativeElement as HTMLElement;
 
     client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
     search(fixture, 'nothing matches this');
 
-    // A search that finds nothing reads as "no matches", never "your library is empty".
+    // A search that finds nothing reads as "no matches", never "no entities yet".
     expect(el.querySelector('[data-testid=no-matches]')).not.toBeNull();
     expect(el.querySelector('[data-testid=empty]')).toBeNull();
   });
