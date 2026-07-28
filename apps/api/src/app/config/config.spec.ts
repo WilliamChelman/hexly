@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { basePluginConfigSchema } from '@hexly/domain';
+import { basePluginConfigSchema, colorTokenHex, DEFAULT_PALETTE_PRESETS, PALETTE_PRESETS } from '@hexly/domain';
 import * as z from 'zod';
 import { deploymentPins, loadConfig, parseSize, pinDeployment, PluginConfigContribution } from './config';
 
@@ -420,5 +420,81 @@ describe('loadConfig: the Instance default Theme (ADR-0076, #372)', () => {
 
     expect(theme?.radii?.['--radius-md']).toBe('0px');
     expect(theme?.overrides?.light?.['--color-ink']).toMatch(/^oklch\(/);
+  });
+
+  it('still accepts an anchors-only block, so an upgrade never silently un-brands a deployment', () => {
+    const theme = loadConfig(dataDir(ACCENT_YAML), PLUGINS).theme;
+
+    // Word for word the pre-Preset spelling, and it must resolve to what it always did: the two
+    // anchors named and nothing else, with no trace of the machinery that now sits beside them.
+    expect(theme?.light).toEqual({ accent: expect.stringMatching(/^oklch\(/) });
+    expect(theme?.dark).toEqual({ accent: expect.stringMatching(/^oklch\(/) });
+    expect(theme?.overrides).toBeUndefined();
+  });
+});
+
+/**
+ * Naming a Palette Preset in `hexly.yml` (ADR-0077, #385) — the one surface a Preset id is a
+ * compatibility commitment on, because this is the file that is re-read and refused at boot.
+ *
+ * The ids come off the table rather than being spelled here: which Presets exist is the table's
+ * business, and a spec that restated them would have to be edited to add one.
+ */
+describe('loadConfig: an operator names a Palette Preset (ADR-0077)', () => {
+  const LIGHT_PRESET = DEFAULT_PALETTE_PRESETS.light;
+  const DARK_PRESET = DEFAULT_PALETTE_PRESETS.dark;
+
+  it('accepts a bare Preset id, so branding a deployment is one word and not eleven hex values', () => {
+    const theme = loadConfig(dataDir(`theme:\n  version: 2\n  light: ${LIGHT_PRESET}\n`), PLUGINS).theme;
+    const values = PALETTE_PRESETS[LIGHT_PRESET].values;
+
+    expect(Object.keys(theme?.light ?? {}).sort()).toEqual(Object.keys(values).sort());
+    // Through the same choke point an operator's own hex goes through, so the id buys no shortcut.
+    expect(colorTokenHex(theme?.light?.accent ?? '')).toBe(values.accent);
+    expect(theme?.light?.polarity).toBe(values.polarity);
+    // The id itself stops here: nothing downstream of the loader ever learns one was named.
+    expect(theme?.light).not.toHaveProperty('preset');
+  });
+
+  it('accepts a Preset id plus overriding anchors, resolving them field by field', () => {
+    const yaml = `theme:\n  version: 2\n  light:\n    preset: ${LIGHT_PRESET}\n    accent: '#2f6f4f'\n`;
+    const theme = loadConfig(dataDir(yaml), PLUGINS).theme;
+    const values = PALETTE_PRESETS[LIGHT_PRESET].values;
+
+    // The operator's accent wins; the ten values they said nothing about are still the Preset's.
+    expect(colorTokenHex(theme?.light?.accent ?? '')).toBe('#2f6f4f');
+    expect(colorTokenHex(theme?.light?.page ?? '')).toBe(values.page);
+  });
+
+  it('carries the tier-2 literals a Preset states, beneath any the operator states themselves', () => {
+    // Without this a dark Preset inherits Astral's indigo starlight — the named-literal exception
+    // `overrides` exists to carry (ADR-0077).
+    const stated = PALETTE_PRESETS[DARK_PRESET].overrides ?? {};
+    const yaml = `theme:\n  version: 2\n  dark: ${DARK_PRESET}\n`;
+
+    expect(Object.keys(loadConfig(dataDir(yaml), PLUGINS).theme?.overrides?.dark ?? {})).toEqual(Object.keys(stated));
+  });
+
+  it('fails boot on an unknown id, naming the key it was under rather than branding nothing', () => {
+    expect(() => loadConfig(dataDir('theme:\n  version: 2\n  light: vellm\n'), PLUGINS)).toThrow(
+      /theme\.light\.preset/,
+    );
+    expect(() => loadConfig(dataDir('theme:\n  version: 2\n  dark:\n    preset: obsidain\n'), PLUGINS)).toThrow(
+      /theme\.dark\.preset/,
+    );
+  });
+
+  it('fails boot on a Preset named under the other ColorScheme, which is eleven values for the wrong end', () => {
+    expect(() => loadConfig(dataDir(`theme:\n  version: 2\n  light: ${DARK_PRESET}\n`), PLUGINS)).toThrow(
+      /theme\.light\.preset/,
+    );
+  });
+
+  it('reports every offending key at once, so fixing a theme block is one pass and not five', () => {
+    const yaml = `theme:\n  version: 2\n  light: vellm\n  dark:\n    preset: obsidain\n    ink: 'not-a-colour'\n`;
+
+    expect(() => loadConfig(dataDir(yaml), PLUGINS)).toThrow(
+      /theme\.light\.preset[\s\S]*theme\.dark\.preset[\s\S]*theme\.dark\.ink/,
+    );
   });
 });

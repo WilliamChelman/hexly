@@ -17,6 +17,15 @@ import {
   designToken,
 } from '@hexly/web-styles';
 import { canonicalTokenValue, isSettableTokenType } from './design-token-value';
+// The table the server resolves an operator's Preset id against — which is why it lives in this
+// library at all (ADR-0077). The edge is one-way: the table imports only types from here.
+import {
+  PALETTE_PRESET_IDS,
+  PALETTE_PRESETS,
+  PalettePresetId,
+  WORLD_THEME_SCHEME_KEYS,
+  WorldThemeSchemeKey,
+} from './palette-preset';
 
 /**
  * The stored shape's version. Every public token is a compatibility commitment, so a Theme names the
@@ -196,8 +205,64 @@ export type WorldThemeInput = z.input<typeof worldThemeSchema>;
 /** One ColorScheme's stored Palette — the anchors and knobs {@link PALETTE_TOKENS} names. */
 export type WorldThemePalette = WorldTheme['light'];
 
-/** One ColorScheme's Palette as an operator authors it: the same fields, none of them required. */
-const partialPaletteSchema = z.strictObject(paletteSchema.partial().shape);
+/** One ColorScheme's tier-2 opt-outs, as both an operator and an Owner store them. */
+type SchemeOverrides = z.infer<typeof overridesSchema>;
+
+/**
+ * One ColorScheme's block in an operator's theme block (ADR-0077): anchors, a Palette Preset id, or a
+ * Preset id plus anchors overriding it. `light: vellum` is the same thing said shorter, normalised
+ * here rather than admitted through a union, so a misspelled id is named at `light.preset` instead of
+ * bouncing off both branches at once.
+ *
+ * The enum is that ColorScheme's slice of the table, so a dark Preset named under `light` — eleven
+ * values authored for the other end of the day — is refused with the ids that would have worked.
+ */
+function instancePaletteSchema(scheme: WorldThemeSchemeKey) {
+  const ids = PALETTE_PRESET_IDS.filter((id) => PALETTE_PRESETS[id].scheme === scheme);
+  return z.preprocess(
+    (raw) => (typeof raw === 'string' ? { preset: raw } : raw),
+    z.strictObject({
+      // The one surface a Preset id is allowed on (ADR-0077): config is re-read and validated at boot,
+      // so a renamed id fails at startup naming its key, where a stored one would fail silently years on.
+      preset: z.enum(ids as [PalettePresetId, ...PalettePresetId[]]).optional(),
+      ...paletteSchema.partial().shape,
+    }),
+  );
+}
+
+/** One ColorScheme's block as authored, before its Preset id is resolved away. */
+type InstancePaletteBlock = z.infer<ReturnType<typeof instancePaletteSchema>>;
+
+/**
+ * A Preset seeds the eleven values and the operator's own anchors win over it field by field, so
+ * naming one is a starting point rather than an imposition (ADR-0077) — Vellum with their own accent.
+ * The table's values are authored notations, so they go through the same choke point an operator's do.
+ */
+function resolveInstancePalette(authored: InstancePaletteBlock | undefined): Partial<WorldThemePalette> | undefined {
+  if (!authored) return undefined;
+  const { preset, ...anchors } = authored;
+  return preset ? { ...paletteSchema.parse(PALETTE_PRESETS[preset].values), ...anchors } : anchors;
+}
+
+/**
+ * The tier-2 literals the named Presets state, joined beneath the operator's own. Without them a dark
+ * Preset inherits Astral's indigo starlight, which is the named-literal exception `overrides` exists to
+ * carry (ADR-0077).
+ */
+function resolveInstanceOverrides(theme: {
+  light?: InstancePaletteBlock;
+  dark?: InstancePaletteBlock;
+  overrides?: Partial<Record<WorldThemeSchemeKey, SchemeOverrides>>;
+}): Partial<Record<WorldThemeSchemeKey, SchemeOverrides>> | undefined {
+  const resolved = { ...theme.overrides };
+  for (const scheme of WORLD_THEME_SCHEME_KEYS) {
+    const preset = theme[scheme]?.preset;
+    const stated = preset && PALETTE_PRESETS[preset].overrides;
+    if (stated) resolved[scheme] = { ...overridesSchema.parse(stated), ...resolved[scheme] };
+  }
+  // Absent, not empty: a deployment that branded nothing here must write nothing on the root.
+  return Object.keys(resolved).length > 0 ? resolved : undefined;
+}
 
 /**
  * An Instance operator's default Theme (#372): the chain's first layer, sourced from `hexly.yml`
@@ -209,15 +274,37 @@ const partialPaletteSchema = z.strictObject(paletteSchema.partial().shape);
  * Strict where the rest of `hexly.yml` strips an unknown key (ADR-0052): a misspelled anchor that
  * silently vanished would be exactly the default-applied-half-way this feature must not do, and
  * `version` already carries the cross-build compatibility the strip rule was there to protect.
+ *
+ * The block as authored; {@link instanceThemeSchema} is it plus the resolution its Preset ids need.
  */
-export const instanceThemeSchema = z.strictObject({
+const instanceThemeBlock = z.strictObject({
   version: z.literal(WORLD_THEME_VERSION),
-  light: partialPaletteSchema.optional(),
-  dark: partialPaletteSchema.optional(),
+  light: instancePaletteSchema('light').optional(),
+  dark: instancePaletteSchema('dark').optional(),
   radii: radiiSchema.optional(),
   fontPairing: z.enum(FONT_PAIRING_IDS).optional(),
   overrides: z.strictObject(overridesByScheme).optional(),
 });
 
-/** An Instance default as loaded — every value canonical, and a layer the applier can resolve. */
-export type InstanceTheme = z.infer<typeof instanceThemeSchema>;
+/**
+ * An Instance default as loaded — every value canonical, and a layer the applier can resolve. Only the
+ * two Palettes are restated off the block: they are the fields whose authored shape differs from their
+ * loaded one, because a Preset id is resolved away here and everything else is carried through.
+ */
+export type InstanceTheme = Omit<z.infer<typeof instanceThemeBlock>, 'light' | 'dark'> & {
+  light?: Partial<WorldThemePalette>;
+  dark?: Partial<WorldThemePalette>;
+};
+
+/**
+ * The operator's block, with every Preset id resolved to the values it names — so nothing downstream
+ * (the config channel, the applier, the browser) ever learns one was named (ADR-0077).
+ */
+export const instanceThemeSchema = instanceThemeBlock.transform(
+  (theme): InstanceTheme => ({
+    ...theme,
+    light: resolveInstancePalette(theme.light),
+    dark: resolveInstancePalette(theme.dark),
+    overrides: resolveInstanceOverrides(theme),
+  }),
+);

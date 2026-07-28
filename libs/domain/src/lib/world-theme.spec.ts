@@ -1,5 +1,6 @@
 import { DESIGN_TOKENS } from '@hexly/web-styles';
 import { canonicalTokenValue, colorTokenHex } from './design-token-value';
+import { DEFAULT_PALETTE_PRESETS } from './palette-preset';
 import {
   FONT_PAIRINGS,
   FONT_PAIRING_IDS,
@@ -214,6 +215,15 @@ describe('worldThemeSchema', () => {
 
     const tier1 = DESIGN_TOKENS.filter((decl) => decl.tier === 'palette').map((decl) => decl.name);
     expect(Object.values(PALETTE_TOKENS).sort()).toEqual(tier1.sort());
+  });
+
+  it('stores a Palette as values and never as a Preset id (ADR-0077)', () => {
+    // Which Preset a Palette *is* is derived by comparison. An id stored here would outlive the table
+    // and fail silently years later, where the same id in `hexly.yml` fails at the next boot.
+    const parsed = parse({ ...theme(), light: { ...theme().light, preset: DEFAULT_PALETTE_PRESETS.light } });
+
+    expect(parsed?.light).not.toHaveProperty('preset');
+    expect(parsed?.light.accent).toMatch(/^oklch\(/);
   });
 
   it('accepts every settable public token’s own shipped value, and settles after one pass', () => {
