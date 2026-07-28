@@ -2,6 +2,7 @@ import { EntityVerb, GrantRole } from '@hexly/domain';
 import { and, eq, getTableColumns, sql } from 'drizzle-orm';
 import { Db } from '../db/db';
 import { entities, entityGrants, entityLinks, worldLinks, worldMembers } from '../db/schema';
+import { inACompendium } from '../worlds/compendiums';
 import { isSuperadmin } from './owner-set';
 
 /** The Superadmin bypass: every predicate short-circuits to match-all. */
@@ -38,13 +39,19 @@ function isWorldOwner(userId: string) {
 }
 
 /**
- * The read predicate: `owner ∨ grant(editor|viewer) ∨ (member ∧ shared)`. An Entity
+ * The read predicate: `owner ∨ grant(editor|viewer) ∨ (member ∧ shared) ∨ compendium-entry`. An Entity
  * the caller can't read is indistinguishable from a missing one, so `private` never
  * leaks existence. An entity-level grant pierces `private` for exactly that user.
+ *
+ * The last disjunct is the **Compendium**'s own reachability rule (ADR-0078/0079): Instance-wide with
+ * no members, roles or public link means there is nothing per-caller to resolve, so being signed in is
+ * the standing. `worldMembers` cannot supply one — Collaboration stays World-only — and the reconcile's
+ * incidental `owner` grant would reach exactly the user who ran the import. Reachability only: the
+ * **seal** still refuses every write.
  */
 function canReadEntity(userId: string, superadmin: boolean) {
   if (superadmin) return MATCH_ALL;
-  return sql`(${hasGrant(userId, ['owner', 'editor', 'viewer'])} OR (${entities.visibility} = 'shared' AND ${isWorldMember(userId)}))`;
+  return sql`(${hasGrant(userId, ['owner', 'editor', 'viewer'])} OR (${entities.visibility} = 'shared' AND ${isWorldMember(userId)}) OR ${inACompendium()})`;
 }
 
 /**
@@ -70,15 +77,22 @@ function canEditSubstanceEntity(userId: string, superadmin: boolean) {
 /**
  * The caller's Entity Rights from a resolved access decision. `set-visibility` and
  * `delete` both project from `canWrite`. Order is stable for assertions.
+ *
+ * A **Sealed** Entity reports `read` and nothing else, whatever the predicates resolved to (ADR-0079):
+ * Rights are what a client renders affordances from, and the write choke point would refuse every other
+ * verb. Projected here rather than folded into the predicates, so the seal stays what #399 made it — a
+ * structural refusal, not a Right.
  */
 export function entityRightsOf(a: {
   canRead: boolean;
   canEditSubstance: boolean;
   canWrite: boolean;
   isOwner: boolean;
+  sealed: boolean;
 }): EntityVerb[] {
   const rights: EntityVerb[] = [];
   if (a.canRead) rights.push('read');
+  if (a.sealed) return rights;
   if (a.canEditSubstance) rights.push('edit');
   if (a.canWrite) rights.push('delete', 'set-visibility');
   if (a.isOwner) rights.push('manage');
@@ -119,6 +133,8 @@ export interface EntityDecision {
   canWrite: boolean;
   canEditSubstance: boolean;
   isOwner: boolean;
+  /** Whether the row is a **Compendium Entry** — resolved in the same round trip as the standing. */
+  sealed: boolean;
 }
 
 /**
@@ -170,19 +186,21 @@ export function entityAccess(db: Db, userId: string): EntityAccess {
           canWrite: canWriteEntity(userId, superadmin),
           canEditSubstance: canEditSubstanceEntity(userId, superadmin),
           isOwner: ownsEntity(userId, superadmin),
+          sealed: inACompendium(),
         })
         .from(entities)
         .where(eq(entities.id, id))
         .get();
       if (!result) return undefined;
       // Split the computed 0/1 columns off so `row` is a clean entity row for toDetail.
-      const { canRead, canWrite, canEditSubstance, isOwner, ...row } = result;
+      const { canRead, canWrite, canEditSubstance, isOwner, sealed, ...row } = result;
       return {
         row,
         canRead: !!canRead,
         canWrite: !!canWrite,
         canEditSubstance: !!canEditSubstance,
         isOwner: !!isOwner,
+        sealed: !!sealed,
       };
     },
     decideMeta(id) {

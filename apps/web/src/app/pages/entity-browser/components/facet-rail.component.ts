@@ -24,10 +24,19 @@ export interface ActiveFacets {
   readonly visibility: readonly string[];
   /** The active Field filters, keyed by EntityDocument key — the contextual dimension (ADR-0048, #188). */
   readonly fields: Readonly<Record<string, FieldSelection>>;
+  /**
+   * The selected **Compendiums** — Container ids (ADR-0079, #401). Only the Compendium browse fills it:
+   * the server offers the category by presence, and a browse scoped to one Container has nothing to
+   * narrow, so every other browse leaves it empty and the rail drops the section.
+   */
+  readonly compendium: readonly string[];
 }
 
-/** The universal facet categories — the closed trio that is always present. */
-export type FacetCategory = 'type' | 'tag' | 'visibility';
+/**
+ * The value-toggled facet categories: the universal trio, plus the **Compendium**, which the server
+ * offers only where a read spans more than one Container.
+ */
+export type FacetCategory = 'type' | 'tag' | 'visibility' | 'compendium';
 
 export interface FacetToggle {
   readonly category: FacetCategory;
@@ -176,6 +185,7 @@ export class FacetRailComponent {
     tag: [],
     visibility: [],
     fields: {},
+    compendium: [],
   });
   readonly canClear = input(false);
 
@@ -217,15 +227,23 @@ export class FacetRailComponent {
         category: 'type' as const,
         rows: counts.type,
         // A user-defined type's authored name; a code type's translated copy (#191).
-        label: (v: string) => this.types.name(v),
+        label: (v: FacetCount) => this.types.name(v.value),
       },
-      { category: 'tag' as const, rows: counts.tag, label: (v: string) => v },
+      { category: 'tag' as const, rows: counts.tag, label: (v: FacetCount) => v.value },
       {
         category: 'visibility' as const,
         // Nothing reads Visibility with Collaboration off (ADR-0071); emptied, the category falls to
         // the drop-empties filter below.
         rows: this.clientConfig.isCollaborationEnabled() ? counts.visibility : [],
-        label: (v: string) => this.transloco.translate(`entityBrowser.facets.${v}`),
+        label: (v: FacetCount) => this.transloco.translate(`entityBrowser.facets.${v.value}`),
+      },
+      {
+        // The Compendium (ADR-0079, #401): a Container id labelled with the pack's authored name, which
+        // the server sends beside the count — nothing client-side knows what a Container is called.
+        // Absent wherever the read names a single Container, so every other browse drops the section.
+        category: 'compendium' as const,
+        rows: counts.compendium ?? [],
+        label: (v: FacetCount) => v.label ?? v.value,
       },
     ];
     return categories
@@ -235,7 +253,7 @@ export class FacetRailComponent {
         rows: g.rows.map((r) => ({
           value: r.value,
           count: r.count,
-          label: g.label(r.value),
+          label: g.label(r),
           active: active[g.category].includes(r.value),
         })),
       }));

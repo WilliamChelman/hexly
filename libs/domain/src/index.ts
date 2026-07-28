@@ -29,6 +29,7 @@ export * from './lib/plugin-config';
 export * from './lib/client-config';
 export * from './lib/server-plugin';
 export * from './lib/importer';
+export * from './lib/compendium';
 export * from './lib/world-graph';
 export * from './lib/local-graph';
 export * from './lib/public-link';

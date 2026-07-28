@@ -218,16 +218,11 @@ describe('Draw Steel monsters import', () => {
     // The operator's Superadmin bypass short-circuits every access predicate to match-all, and is
     // refused by the very same check — the seal is not a Right, so no Right outranks it.
     expect(await writeStatuses(await signIn('ted@hexly.test'), goblin.id, bob)).toEqual(refused);
-    // A Contributor never reaches the row at all: Collaboration is World-only (ADR-0078), so nothing in
-    // the World's membership confers standing on the shelf, and unreachable reads as 404 (ADR-0004).
-    expect(await writeStatuses(await signIn('bob@hexly.test'), goblin.id, bob)).toEqual({
-      save: 404,
-      rename: 404,
-      visibility: 404,
-      grant: 404,
-      coOwner: 404,
-      delete: 404,
-    });
+    // A Contributor is refused *through the seal*, not by unreachability. Nothing in the World's
+    // membership confers standing on the shelf — Collaboration is World-only (ADR-0078) — but a
+    // Compendium is Instance-wide with no members, so being signed in is standing enough to read it
+    // (#401). Reachable and unwritable is what a 403 says, and it is now the same answer for everyone.
+    expect(await writeStatuses(await signIn('bob@hexly.test'), goblin.id, bob)).toEqual(refused);
 
     // Nothing landed: the entry is still exactly what the Importer produced, unshared and ungranted.
     const after = (await ada.get(`/entities/${goblin.id}`).expect(200)).body;

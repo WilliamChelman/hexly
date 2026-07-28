@@ -19,6 +19,21 @@
     "noMatchHint": "Try a different name, kind, or Tag.",
     "missing": "File missing"
   },
+  "compendium": {
+    "tabTitle": "Hexly — Compendium",
+    "eyebrow": "Compendium",
+    "heading": "Reference material",
+    "subheading": "Read-only, shared across this instance.",
+    "loadErrorTitle": "Couldn't load the Compendium.",
+    "loadErrorHint": "Something went wrong. Please try again in a moment.",
+    "loadMore": "Load more",
+    "loadingMore": "Loading…",
+    "loadMoreError": "Couldn't load more. Please try again.",
+    "emptyTitle": "No reference material is installed.",
+    "emptyHint": "An operator installs a Compendium for the whole instance.",
+    "noMatchTitle": "Nothing in the Compendium matches your search.",
+    "noMatchHint": "Try a different name, Compendium, or word."
+  },
   "auth": {
     "tabTitle": "Hexly — Sign in",
     "heading": "Sign in",
@@ -66,7 +81,8 @@
       "private": "Private",
       "shared": "Shared",
       "rangeMin": "{{field}} minimum",
-      "rangeMax": "{{field}} maximum"
+      "rangeMax": "{{field}} maximum",
+      "compendium": "Compendium"
     }
   },
   "entityTags": {
@@ -260,6 +276,7 @@
     "worlds": "Worlds",
     "dashboard": "Dashboard",
     "entities": "Entities",
+    "compendium": "Compendium",
     "assets": "Assets",
     "graph": "Graph",
     "styleguide": "Styleguide",

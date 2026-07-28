@@ -410,7 +410,7 @@ export class WorldsService {
       // A picker is unpaginated; the facet drill-down is what keeps the set small. The cap is the shared
       // list ceiling, so an image-heavy World never floods the grid in one read.
       limit: ENTITY_LIST_MAX_LIMIT,
-      worldId: id,
+      containerIds: [id],
       type: [CORE_ASSET_TYPE_ID as EntityType],
       q: opts.q,
       fields: [IMAGE_KIND_FIELD_FILTER, ...(opts.fields ?? [])],
@@ -429,7 +429,7 @@ export class WorldsService {
     if (!meta?.reachable) return 'not-found';
     if (!meta.canContribute) return 'forbidden';
     return this.entities.facets(userId, {
-      worldId: id,
+      containerIds: [id],
       type: [CORE_ASSET_TYPE_ID as EntityType],
       q: opts.q,
       fields: [IMAGE_KIND_FIELD_FILTER, ...(opts.fields ?? [])],

@@ -230,6 +230,16 @@ export function entitiesRailLink(within: Page | Locator): Locator {
 }
 
 /**
+ * The rail's **Compendium** destination (ADR-0079, #401) — the browse over every installed pack, at
+ * `/w/:worldId/compendium`. Exact-matched in the same shape as its neighbour: the rail's locators are
+ * exact by policy, so a future page whose copy contains the word cannot turn a click into a
+ * strict-mode violation.
+ */
+export function compendiumRailLink(within: Page | Locator): Locator {
+  return within.getByRole('link', { name: 'Compendium', exact: true });
+}
+
+/**
  * Enter a reachable World's Entity browser via the World Index at `/` (ADR-0028), and return the
  * entered World's id. The reset clears Entities only, never Worlds, so the Index is never empty here.
  */

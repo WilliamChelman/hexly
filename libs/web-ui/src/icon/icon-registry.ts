@@ -14,6 +14,7 @@ import {
   LucideExternalLink,
   LucideMaximize,
   LucideType,
+  LucideFiles,
   LucideLibrary,
   LucidePalette,
   LucideSquareDashed,
@@ -76,6 +77,9 @@ const LUCIDE_SOURCES = {
   fit: LucideMaximize,
   graph: LucideWaypoints,
   label: LucideType,
+  /** The World's own Entities — pages the author wrote, as against the `library` shelf beside them. */
+  entities: LucideFiles,
+  /** The reference shelf: the **Compendium**, which is what the word leans at (ADR-0079). */
   library: LucideLibrary,
   palette: LucidePalette,
   marquee: LucideSquareDashed,

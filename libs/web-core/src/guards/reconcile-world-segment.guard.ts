@@ -39,7 +39,9 @@ export const reconcileWorldSegment: CanActivateFn = (route) => {
         // Wrong World: point at the real one with a bare segment — the parent
         // guard heals its slug on the restart. Right World: preserve the (already
         // parent-healed) World segment and only canonicalise the Entity slug.
-        const worldWrong = idFromSegment(rawWorldSeg) !== target.worldId;
+        // A **Sealed** Entity has no World to be wrong about (ADR-0079): "correcting" the segment would
+        // put a Compendium id where the whole World scope expects a World.
+        const worldWrong = !target.sealed && idFromSegment(rawWorldSeg) !== target.worldId;
         const worldSeg = worldWrong ? segment(target.worldId) : rawWorldSeg;
 
         return worldSeg !== rawWorldSeg || entitySeg !== rawEntitySeg

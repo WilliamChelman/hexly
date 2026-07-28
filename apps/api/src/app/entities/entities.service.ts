@@ -44,7 +44,6 @@ import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } fro
 import { DB, Db } from '../db/db';
 import {
   assetIndex,
-  compendiums,
   containers,
   entities,
   entityDescriptors,
@@ -55,6 +54,7 @@ import {
   worlds,
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config';
+import { inACompendium } from '../worlds/compendiums';
 import { AssetBytesRegistry } from './asset-bytes-registry';
 import { AclWriter, EntityWrites, InsertEntityInput } from './entity-writes';
 import { TypeFieldRegistry } from './type-field-registry';
@@ -86,8 +86,19 @@ export interface ListOptions {
   /** Filter-by-Field (ADR-0048, #188): each constraint matches a facetable Field value — eq
    * membership (enum/list/string) or a gte/lte range (number/date). Same key OR / range, diff key AND. */
   readonly fields?: readonly FieldFilter[];
-  /** Restrict to one World. */
-  readonly worldId?: string;
+  /**
+   * The **Container** scope: which Containers this read is about. One id for every World-scoped read
+   * (the Entity Browser, the Dashboard, a Facet count); the whole shelf for the Compendium browse,
+   * which names its Containers explicitly because the read is *about* compendium content (ADR-0079).
+   * Empty or absent means unscoped — the Command Palette's cross-Container reach.
+   */
+  readonly containerIds?: readonly string[];
+  /**
+   * Facet: restrict to any of these **Compendiums** (OR within category). A narrowing *within*
+   * {@link containerIds}, not a redefinition of it — both predicates AND, so naming a Container the
+   * scope excludes reaches nothing — which is what lets the Compendium facet drill down like Type or Tag.
+   */
+  readonly compendium?: readonly string[];
   /** Which kind of read this is (ADR-0079): a link-target read drops every Compendium Entry. */
   readonly read?: EntityRead;
   /** Attach the caller's Rights to each summary — opt-in, the Entity Browser sets it. */
@@ -114,7 +125,16 @@ export interface ListOptions {
 /** The filter state a facet-count read narrows against — the list filters minus paging/ids. */
 export type FacetOptions = Pick<
   ListOptions,
-  'worldId' | 'read' | 'q' | 'type' | 'tags' | 'visibility' | 'fields' | 'excludedTypes' | 'includeHidden'
+  | 'containerIds'
+  | 'compendium'
+  | 'read'
+  | 'q'
+  | 'type'
+  | 'tags'
+  | 'visibility'
+  | 'fields'
+  | 'excludedTypes'
+  | 'includeHidden'
 >;
 
 /** Everything {@link filters} reads — shared by the paged list and the facet-count reads. */
@@ -188,6 +208,9 @@ export class EntitiesService {
         version: entities.version,
         createdAt: entities.createdAt,
         updatedAt: entities.updatedAt,
+        // The **Sealed** state (ADR-0079), on every list rather than opted into: one EXISTS on an indexed
+        // primary key, and the surfaces needing it are not the ones asking for Rights or thumbnails.
+        sealed: inACompendium(),
         // Opt-in: project the predicate columns so each summary carries the caller's Rights.
         ...(opts.withRights ? access.rightsColumns : {}),
         // Opt-in thumbnail resolution (ADR-0065/0066): the Entity's own bytes' hash, and — beating it by
@@ -243,6 +266,8 @@ export class EntitiesService {
     const hasMore = rows.length > opts.limit;
     const items = rows.slice(0, opts.limit).map((row) => {
       let summary = toSummary(row);
+      // Set only where it is true, so an ordinary Entity carries no marker at all (ADR-0079).
+      if (row.sealed) summary = { ...summary, sealed: true };
       // Opt-in thumbnail with precedence (ADR-0066): the **Thumbnail** Field's designated image beats the
       // Entity's own bytes, so an Asset carrying the field emits the field's URL and a bare Asset its own; a
       // non-Asset with no designation carries none. The field target's URL keys off *its* Container (an
@@ -266,6 +291,7 @@ export class EntitiesService {
           canEditSubstance: !!r.canEditSubstance,
           canWrite: !!r.canWrite,
           isOwner: !!r.isOwner,
+          sealed: !!row.sealed,
         }),
       };
     });
@@ -294,7 +320,35 @@ export class EntitiesService {
       tag: this.countJsonArray({ ...scoped, tags: undefined }, entities.tags, filter),
       // Field facets by presence in the result set — no longer gated on the active Type (ADR-0054, #231).
       fields: this.countFieldFacets(scoped, filter),
+      // The Compendium facet, by presence too (ADR-0079): a read scoped to one Container has nothing to
+      // narrow, so only a cross-Container read — the Compendium browse — carries the category at all.
+      ...((opts.containerIds?.length ?? 0) > 1
+        ? { compendium: this.countContainers({ ...scoped, compendium: undefined }, filter) }
+        : {}),
     };
+  }
+
+  /**
+   * The **Compendium** facet's values: one per Container in the scope that still holds a matching
+   * Entity, labelled with the pack's name. Counted like every other category — drilled down (its own
+   * selection dropped by the caller) and under every sibling constraint — so the rail can never
+   * annotate a list it disagrees with.
+   */
+  private countContainers(opts: FacetOptions, filter: SQL): FacetCount[] {
+    const match = opts.q ? toFtsMatch(opts.q) : null;
+    return this.db
+      .select({
+        value: entities.containerId,
+        count: sql<number>`count(*)`.as('count'),
+        // The Container's authored name, so the rail reads "Draw Steel: Monsters" and not a uuid.
+        label: containers.name,
+      })
+      .from(entities)
+      .innerJoin(containers, eq(containers.id, entities.containerId))
+      .where(facetWhere(opts, match, filter))
+      .groupBy(entities.containerId)
+      .orderBy(asc(containers.name))
+      .all();
   }
 
   /**
@@ -353,7 +407,7 @@ export class EntitiesService {
     // Iterate the registry-ordered source set (scalar Fields, then harvested dimensions), not the index
     // keys, so the rail keeps a stable declaration order; a candidate key with no resolvable source (a
     // deleted World Field, ADR-0052/0054) isn't in the map, so it drops — it can't be labelled.
-    const byKey = this.worldTypeFields.facetSourcesByKey(opts.worldId);
+    const byKey = this.worldTypeFields.facetSourcesByKey(opts.containerIds);
     return (
       [...byKey.values()]
         .filter((source) => candidates.has(source.key))
@@ -493,8 +547,13 @@ export class EntitiesService {
     // Rights let the editor gate itself: a Viewer opens read-only, an entity-level
     // Editor (canWrite false, canEditSubstance true) opens writable. canManage rides
     // the owner-only gate so the Share dialog is only offered to actual Owners.
+    // A **Compendium Entry** opens here like anything else: its own page is a navigation read (ADR-0079).
     return decision?.canRead
-      ? this.withAssetBytesState({ ...toDetail(decision.row), rights: access.rightsOf(decision) })
+      ? this.withAssetBytesState({
+          ...toDetail(decision.row),
+          ...(decision.sealed ? { sealed: true } : {}),
+          rights: access.rightsOf(decision),
+        })
       : null;
   }
 
@@ -1174,19 +1233,16 @@ function filters(opts: FilterOptions) {
   if (opts.visibility?.length) predicates.push(inArray(entities.visibility, [...opts.visibility]));
   if (opts.tags?.length) predicates.push(hasAny(entities.tags, opts.tags));
   if (opts.fields?.length) predicates.push(...fieldFilters(opts.fields));
-  if (opts.worldId) predicates.push(eq(entities.containerId, opts.worldId));
+  // The one Container predicate, whether the read names one Container or the whole shelf (ADR-0078).
+  // `entities.container_id` is indexed, so the set form costs no more than the single one did.
+  if (opts.containerIds?.length) predicates.push(inArray(entities.containerId, [...opts.containerIds]));
+  // The Compendium facet's selection: a second predicate on the same column, deliberately — the scope
+  // above says what the read is about, this says what the user narrowed it to, and they AND.
+  if (opts.compendium?.length) predicates.push(inArray(entities.containerId, [...opts.compendium]));
   // The only narrowing the Compendium adds to any read (ADR-0079); it sits here so `list` and `facets`
   // share it and a picker's rail cannot count what its options exclude.
   if (opts.read === 'link-target') predicates.push(sql`NOT ${inACompendium()}`);
   return predicates;
-}
-
-/**
- * Whether the row's Container is a Compendium. Reads the `compendiums` satellite, which *is* the
- * discriminator (ADR-0078), so the predicate names no pack, no flag and no Entity Type.
- */
-function inACompendium(): SQL {
-  return sql`EXISTS (SELECT 1 FROM ${compendiums} WHERE ${compendiums.id} = ${entities.containerId})`;
 }
 
 /**

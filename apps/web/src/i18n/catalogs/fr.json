@@ -19,6 +19,21 @@
     "noMatchHint": "Essayez un autre nom, type ou étiquette.",
     "missing": "Fichier absent"
   },
+  "compendium": {
+    "tabTitle": "Hexly — Compendium",
+    "eyebrow": "Compendium",
+    "heading": "Matériel de référence",
+    "subheading": "En lecture seule, partagé par toute l'instance.",
+    "loadErrorTitle": "Impossible de charger le Compendium.",
+    "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",
+    "loadMore": "Charger plus",
+    "loadingMore": "Chargement…",
+    "loadMoreError": "Impossible de charger plus. Veuillez réessayer.",
+    "emptyTitle": "Aucun matériel de référence n'est installé.",
+    "emptyHint": "Un opérateur installe un Compendium pour toute l'instance.",
+    "noMatchTitle": "Aucun élément du Compendium ne correspond à votre recherche.",
+    "noMatchHint": "Essayez un autre nom, un autre Compendium ou un autre mot."
+  },
   "auth": {
     "tabTitle": "Hexly — Se connecter",
     "heading": "Se connecter",
@@ -66,7 +81,8 @@
       "private": "Privé",
       "shared": "Partagé",
       "rangeMin": "{{field}} minimum",
-      "rangeMax": "{{field}} maximum"
+      "rangeMax": "{{field}} maximum",
+      "compendium": "Compendium"
     }
   },
   "entityTags": {
@@ -260,6 +276,7 @@
     "worlds": "Mondes",
     "dashboard": "Tableau de bord",
     "entities": "Entités",
+    "compendium": "Compendium",
     "assets": "Ressources",
     "graph": "Graphe",
     "styleguide": "Guide de style",

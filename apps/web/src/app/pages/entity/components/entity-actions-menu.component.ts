@@ -143,8 +143,13 @@ export class EntityActionsMenuComponent {
   /**
    * Whether the caller is a World Owner (`manage` Right on the active World, ADR-0039) — gates the
    * Pin toggle; a non-Owner's pin would 403 server-side, so the toggle stays hidden entirely.
+   *
+   * Never offered for a **Sealed** entry, whatever the caller's standing: a pin is a World pointing at
+   * an Entity, and nothing outside a **Compendium** points at one (ADR-0079).
    */
-  protected readonly canPin = computed(() => this.activeWorld.world()?.rights.includes('manage') ?? false);
+  protected readonly canPin = computed(
+    () => !this.session.current()?.sealed && (this.activeWorld.world()?.rights.includes('manage') ?? false),
+  );
 
   /** Whether the open Entity sits in the World's shared pin set (drives the checked state). */
   protected readonly pinned = computed(() => {

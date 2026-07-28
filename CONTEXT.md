@@ -121,15 +121,19 @@ _Avoid_: Origin, provenance record, external id, sync key
 ## Compendium
 
 **Compendium**:
-A **Container** of published reference material — one per pack, Instance-wide, installed and removed by the operator rather than authored in place, and carrying its own attribution (publisher, license, notice). Its Entities are **Sealed**, so the only way to use one is **Adoption** (ADR-0079).
-_Avoid_: Library (retired), catalog, SRD, bestiary (one pack's subject, not the kind); pack (informal prose only — the unit is a Compendium)
+A **Container** of published reference material — one per pack, Instance-wide, installed and removed by the operator rather than authored in place, and carrying its own attribution (publisher, license, notice). Its Entities are **Sealed**, so the only way to use one is **Adoption** (ADR-0079). Reachable by **every signed-in caller and no one else**: Instance-wide with no members means being on this Instance _is_ the standing, so there is nothing per-caller to resolve — the one reachability rule **Collaboration** does not answer (ADR-0078).
+_Avoid_: Library (retired), catalog, SRD, bestiary (one pack's subject, not the kind); pack (informal prose for the published artifact only — the thing Hexly holds is a Compendium, and the interface says so: ADR-0079's "**Pack** facet" ships as the **Compendium** facet)
+
+**Compendium browse**:
+The durable surface listing every installed **Compendium**'s entries at `/w/:worldId/compendium` — the **Entity Browser** preset to the shelf, on the **Asset Browser**'s precedent, with the same search and the same **Facets**. It names its **Containers** explicitly, because the read is _about_ compendium content rather than about a World; the World in its URL names the **Adoption** target, not the content's home.
+_Avoid_: Compendium page (that is a pack's own attribution page), pack browser, library
 
 **Compendium Entry**:
 An **Entity** that lives in a **Compendium** — defined by that location alone, never by a flag, never by an **Entity Type**, and never by "has an **Import Source**" (the **Vault** import will carry one too). An ordinary Entity in a **Sealed** state, never a kind of its own: absent from every World-scoped reading (the **Entity Browser**, **Facets**, the **World Graph**, a World's counts) by the plain fact of belonging to another **Container**, with no exclusion rule anywhere naming it.
 _Avoid_: Compendium Entity (it is an Entity, in a place), record, item, stat block, monster (one pack's content)
 
 **Sealed**:
-The state of a **Compendium Entry**: read-only to everyone, the operator included, and never offered as a link target, so nothing outside its **Compendium** can point at it. A seal on _reachability_, not on _discovery_ — the **Command Palette** and full-text search still find it, ranked below authored Entities. Two halves held in two places: read-only is one structural refusal at the entity write choke point, on ADR-0068's precedent; the no-link rule is every link-target surface refusing to return one, never a write-time rejection — that would land on prose (ADR-0079).
+The state of a **Compendium Entry**: read-only to everyone, the operator included, and never offered as a link target, so nothing outside its **Compendium** can point at it. A seal on _writing_, not on _reading_ — the **Command Palette** and full-text search still find it, ranked below authored Entities, and its own page opens to anyone signed in. Two halves held in two places: read-only is one structural refusal at the entity write choke point, on ADR-0068's precedent; the no-link rule is every link-target surface refusing to return one, never a write-time rejection — that would land on prose (ADR-0079). The seal is not a **Right** and no Right outranks it, but a sealed Entity's Rights report `read` alone, so nothing offers an affordance the write choke point would refuse.
 _Avoid_: Locked, frozen, immutable, protected; read-only (one half of it), hidden (it is findable)
 
 **Link-target read**:
@@ -379,8 +383,8 @@ The **Entity Browser** preset to the asset type, presented as thumbnail tiles wi
 _Avoid_: Media library, gallery, asset manager, file manager
 
 **Facet**:
-A filterable dimension of the Entities a browse lists — a **World**'s, or the **Compendium**'s — with its distinct values and counts — Type, Tag, and Visibility always, plus facetable **Fields** and harvested dimensions, surfaced _by presence_. Values within one Facet OR; across Facets AND.
-_Avoid_: Filter, dimension, aspect
+A filterable dimension of the Entities a browse lists — a **World**'s, or the **Compendium browse**'s — with its distinct values and counts — Type, Tag, and Visibility always, plus facetable **Fields**, harvested dimensions, and the **Compendium** itself, surfaced _by presence_. Values within one Facet OR; across Facets AND.
+_Avoid_: Filter, dimension, aspect; Pack facet (it is the **Compendium** facet)
 
 ## Dock
 

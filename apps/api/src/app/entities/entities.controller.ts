@@ -42,6 +42,15 @@ import { EntitiesService } from './entities.service';
 import { LocalGraphService } from './local-graph.service';
 
 /**
+ * The read's **Container** scope under either name: `worldId`, the single World every World-scoped read
+ * has always given, and the repeated `containerId` a cross-Container read names its own with (ADR-0079).
+ * One scope and one predicate downstream, so naming both simply asks for both.
+ */
+function containerScope(worldId: string | undefined, containerId: readonly string[] | undefined): string[] {
+  return [...(worldId ? [worldId] : []), ...(containerId ?? [])];
+}
+
+/**
  * The Entity REST surface (ADR-0018). Every route is owner-scoped: the guard resolves the session to
  * a user and the service only ever touches that user's rows. Bodies are validated against the shared
  * Zod schema (ADR-0001), so an invalid payload is a 400 here, never a 500 deeper down.
@@ -58,8 +67,23 @@ export class EntitiesController {
   list(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityPage {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { cursor, limit, ids, q, type, tag, visibility, field, worldId, read, rights, thumbnails, includeHidden } =
-      parsed.data;
+    const {
+      cursor,
+      limit,
+      ids,
+      q,
+      type,
+      tag,
+      visibility,
+      field,
+      worldId,
+      containerId,
+      compendium,
+      read,
+      rights,
+      thumbnails,
+      includeHidden,
+    } = parsed.data;
 
     // Absent cursor is page one; undecodable is a 400 (ADR-0001).
     const offset = cursor === undefined ? 0 : decodeCursor(cursor);
@@ -75,7 +99,8 @@ export class EntitiesController {
       visibility,
       // A malformed `field` token is dropped, not 400'd, so a stale URL degrades to no-filter.
       fields: parseFieldFilters(field),
-      worldId,
+      containerIds: containerScope(worldId, containerId),
+      compendium,
       // Which read this is (ADR-0079); the pickers that need a link target are the ones that say so.
       read,
       withRights: rights,
@@ -110,14 +135,15 @@ export class EntitiesController {
   facets(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityFacets {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { q, type, tag, visibility, field, worldId, read, includeHidden } = parsed.data;
+    const { q, type, tag, visibility, field, worldId, containerId, compendium, read, includeHidden } = parsed.data;
     return this.entities.facets(user.id, {
       q,
       type,
       tags: tag,
       visibility,
       fields: parseFieldFilters(field),
-      worldId,
+      containerIds: containerScope(worldId, containerId),
+      compendium,
       // Threaded for the same reason `includeHidden` is: a rail must never count what its list excludes.
       read,
       // Threaded so a rail can never annotate a list it disagrees with about hidden types (ADR-0065).

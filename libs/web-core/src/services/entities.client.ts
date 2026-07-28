@@ -31,7 +31,7 @@ export const ENTITY_NUDGE_DEBOUNCE_MS = 150;
 /** The subset of list params the Facet-count read narrows against — no paging. */
 export type EntityFacetParams = Pick<
   EntityListParams,
-  'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId' | 'read' | 'includeHidden'
+  'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId' | 'containerId' | 'compendium' | 'read' | 'includeHidden'
 >;
 
 /**
@@ -264,6 +264,10 @@ function facetParams(opts: EntityFacetParams): HttpParams {
   // Filter-by-Field: each `key:op:value` token repeats, like the other facet params.
   for (const f of opts.field ?? []) params = params.append('field', f);
   if (opts.worldId) params = params.set('worldId', opts.worldId);
+  // The Container scope a cross-Container read names explicitly (ADR-0079) — the Compendium browse's
+  // installed packs — and, separately, the Compendium facet's selection within it.
+  for (const c of opts.containerId ?? []) params = params.append('containerId', c);
+  for (const c of opts.compendium ?? []) params = params.append('compendium', c);
   // A link-target read declares itself; a navigation read is the server's default, so it stays off the
   // wire (ADR-0079). On both reads, so a rail's counts and its options agree about Compendium Entries.
   if (opts.read && opts.read !== 'navigation') params = params.set('read', opts.read);

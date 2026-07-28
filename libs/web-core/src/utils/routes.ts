@@ -40,6 +40,15 @@ export function worldAssetsRoute(worldId: string, worldName?: string): string[] 
   return ['/w', segment(worldId, worldName), 'assets'];
 }
 
+/**
+ * The Compendium browse `/w/:worldId/compendium` (ADR-0079) — the Entity Browser preset unioning every
+ * installed pack. The World in the path names the **adoption target**, not the content's home: a
+ * Compendium is Instance-wide and lives in no World, so the segment is the World you would adopt into.
+ */
+export function worldCompendiumRoute(worldId: string, worldName?: string): string[] {
+  return ['/w', segment(worldId, worldName), 'compendium'];
+}
+
 export function entityRoute(worldId: string, entityId: string, worldName?: string, entityName?: string): string[] {
   return ['/w', segment(worldId, worldName), 'entities', segment(entityId, entityName)];
 }

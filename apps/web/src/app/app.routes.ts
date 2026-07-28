@@ -98,6 +98,17 @@ export const appRoutes: Route[] = [
         title: 'entityBrowser.tabTitle',
       },
       {
+        // The Compendium browse (ADR-0079, #401): the Entity Browser preset to the installed packs —
+        // reference material, Instance-wide, unioned behind a Compendium facet. The `:worldId` above
+        // names the adoption target rather than the content's home, which is what makes this a World
+        // route at all: nothing here lives in that World.
+        path: 'compendium',
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('./pages/compendium-browser/compendium-browser.page').then((m) => m.CompendiumBrowserPage),
+        title: 'compendium.tabTitle',
+      },
+      {
         // The Asset Browser (ADR-0065, #282): the Entity Browser preset to the asset type — a World's
         // uploaded media as thumbnail tiles, with upload at hand.
         path: 'assets',
