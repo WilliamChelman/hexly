@@ -23,11 +23,11 @@ import { EntitiesService } from '../entities/entities.service';
 import { AclSetResult, gate, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
 import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
-import { worldAccess, worldOwnerFilter, worldRightsOf } from '../acl/world-access';
+import { loadWorld, worldAccess, worldOwnerFilter, worldRightsOf } from '../acl/world-access';
 import { sharedVisibility } from '../acl/entity-access';
 import { NudgeBus } from '../events/nudge-bus';
 import { WorldWrites } from './world-writes';
-import { INITIAL_SEQ, entities, worldLinks, worldMembers, worlds } from '../db/schema';
+import { INITIAL_SEQ, containers, entities, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
 
 /** The picker's search inputs (#281): the FTS `q` and any active image Field facets, both pinned to image kind. */
 export interface AssetSearchOptions {
@@ -68,16 +68,18 @@ export class WorldsService {
   list(userId: string): WorldSummary[] {
     // A Superadmin's access context returns match-all, so no special case here.
     const access = worldAccess(this.db, userId);
+    // Identity comes off the Container, the World-ness off the join (ADR-0078).
     const rows = this.db
       .select({
-        id: worlds.id,
-        name: worlds.name,
-        createdAt: worlds.createdAt,
-        updatedAt: worlds.updatedAt,
+        id: containers.id,
+        name: containers.name,
+        createdAt: containers.createdAt,
+        updatedAt: containers.updatedAt,
       })
       .from(worlds)
+      .innerJoin(containers, eq(containers.id, worlds.id))
       .where(access.reachFilter)
-      .orderBy(asc(worlds.createdAt), asc(worlds.id))
+      .orderBy(asc(containers.createdAt), asc(containers.id))
       .all();
     if (rows.length === 0) return [];
     // Owner sets for the whole page in one grouped read (a worldOwners() per World
@@ -174,7 +176,8 @@ export class WorldsService {
   update(userId: string, id: string, patch: UpdateWorldRequest): WorldDetail | 'forbidden' | null {
     const gate = this.gateUpdate(userId, id);
     if (gate !== 'ok') return gate;
-    const world = this.db.select().from(worlds).where(eq(worlds.id, id)).get();
+    // The gate above already resolved access, so this is the unfiltered read.
+    const world = loadWorld(this.db, id);
     if (!world) return null;
     // The write handle bumps `seq`/`updatedAt` and nudges; the response carries the post-write row,
     // so the caller's own write-through advances its held freshness and the server's echo nudge for
@@ -198,11 +201,12 @@ export class WorldsService {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     const rows = this.db
-      .select({ id: worlds.id, name: worlds.name, theme: worlds.theme })
+      .select({ id: containers.id, name: containers.name, theme: worlds.theme })
       .from(worlds)
+      .innerJoin(containers, eq(containers.id, worlds.id))
       .where(and(worldOwnerFilter(userId), ne(worlds.id, id), isNotNull(worlds.theme)))
       // By name: the Owner picks by the name they gave it, not by when they made it.
-      .orderBy(asc(worlds.name), asc(worlds.id))
+      .orderBy(asc(containers.name), asc(containers.id))
       .all();
     // The column is nullable, so the type needs the narrowing the WHERE already did.
     return { status: 'ok', value: rows.filter((row): row is WorldThemeSource => !!row.theme) };
@@ -467,7 +471,7 @@ export class WorldsService {
   }
 
   // Attach the World's Entity count, ownership set, and the caller's Rights.
-  private toDetail(world: typeof worlds.$inferSelect, callerId: string): WorldDetail {
+  private toDetail(world: WorldRow, callerId: string): WorldDetail {
     const [{ value: entityCount }] = this.db
       .select({ value: count() })
       .from(entities)

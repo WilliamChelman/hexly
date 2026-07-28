@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
@@ -365,11 +365,9 @@ describe('ColorScheme light/dark migration round-trip (0031)', () => {
         astral: { '--color-canvas-glow': 'rgba(1,2,3,0.4)' },
       },
     };
-    sqlite
-      .prepare(`INSERT INTO worlds (id, name, theme, created_at, updated_at) VALUES (?,?,?,0,0)`)
-      .run('w1', 'Aldermoor', JSON.stringify(theme));
+    seedWorld(sqlite, 'w1', 'Aldermoor', JSON.stringify(theme));
     // A World with no Theme at all, which is every World that never opened the editor.
-    sqlite.prepare(`INSERT INTO worlds (id, name, created_at, updated_at) VALUES ('w2','Whisperwood',0,0)`).run();
+    seedWorld(sqlite, 'w2', 'Whisperwood', null);
     // Two readers with a roaming choice, and one who never expressed any.
     for (const [id, prefs] of [
       ['u1', '{"locale":"fr","colorScheme":"astral"}'],
@@ -383,6 +381,14 @@ describe('ColorScheme light/dark migration round-trip (0031)', () => {
         .run(id, `${id}@hexly.test`, id, 'h', prefs);
     }
     return sqlite;
+  }
+
+  /** A World as the current schema stores it: its Container identity row plus its satellite (ADR-0078). */
+  function seedWorld(sqlite: Database.Database, id: string, name: string, theme: string | null): void {
+    sqlite
+      .prepare(`INSERT INTO containers (id, kind, name, created_at, updated_at) VALUES (?,'world',?,0,0)`)
+      .run(id, name);
+    sqlite.prepare(`INSERT INTO worlds (id, theme) VALUES (?,?)`).run(id, theme);
   }
 
   function themeOf(sqlite: Database.Database, id: string): Record<string, unknown> | null {
@@ -428,6 +434,94 @@ describe('ColorScheme light/dark migration round-trip (0031)', () => {
       ['u2', { colorScheme: 'light' }],
       // No expressed choice stays no expressed choice — the client still detects the OS preference.
       ['u3', { locale: 'en' }],
+    ]);
+    sqlite.close();
+  });
+});
+
+/**
+ * 0032 backfills every World into `containers` at its *own* id, then rebuilds `worlds` as the
+ * satellite. The claim worth pinning is that an existing Instance upgrades in place: no World id
+ * moves, no name / `seq` / timestamp is lost, and nothing hanging off a World is cascaded away by
+ * the rebuild. A fresh DB has no pre-existing Worlds, so one is seeded the old way.
+ */
+describe('containers backfill migration (0032)', () => {
+  function seededPre0032(): Database.Database {
+    const sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = OFF');
+    // Every file before this one — too many to list, unlike the earlier round-trips.
+    for (const file of readdirSync(resolve(__dirname, 'migrations'))
+      .filter((f) => f.endsWith('.sql') && f < '0032')
+      .sort()) {
+      applyMigration(sqlite, file);
+    }
+    sqlite
+      .prepare(
+        `INSERT INTO worlds (id, name, seq, pinned_entity_ids, theme, created_at, updated_at) VALUES (?,?,?,?,?,?,?)`,
+      )
+      .run('w1', 'Aldermoor', 42, '["e1"]', '{"version":2}', 100, 200);
+    sqlite
+      .prepare(
+        `INSERT INTO worlds (id, name, seq, pinned_entity_ids, theme, created_at, updated_at) VALUES (?,?,?,?,?,?,?)`,
+      )
+      .run('w2', 'Whisperwood', 7, '[]', null, 300, 400);
+    sqlite.prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES ('w1','u1','owner')`).run();
+    sqlite.prepare(`INSERT INTO world_links (id, world_id, created_at) VALUES ('tok','w1',0)`).run();
+    sqlite
+      .prepare(
+        `INSERT INTO world_types (world_id, type_id, label, field_refs, views, created_at, updated_at)
+         VALUES ('w1','world.type.deity','Deity','[]',NULL,0,0)`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO world_fields (world_id, field_id, definition, created_at, updated_at)
+         VALUES ('w1','world.field.era','{}',0,0)`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO entities (id, world_id, name, types, tags, visibility, version, seq, document, content_text, created_at, updated_at)
+         VALUES ('e1','w1','Lady Mara','[]','[]','shared',1,3,'{}','the buried obelisk',0,0)`,
+      )
+      .run();
+    return sqlite;
+  }
+
+  it('gives every World a Container at the same id, and keeps its name, seq and timestamps', () => {
+    const sqlite = seededPre0032();
+    applyMigration(sqlite, '0032_containers_hold_identity.sql');
+
+    expect(sqlite.prepare(`SELECT * FROM containers ORDER BY id`).all()).toEqual([
+      { id: 'w1', kind: 'world', name: 'Aldermoor', seq: 42, created_at: 100, updated_at: 200 },
+      { id: 'w2', kind: 'world', name: 'Whisperwood', seq: 7, created_at: 300, updated_at: 400 },
+    ]);
+    // The satellite keeps the pins and the Theme, at the same id, and sheds identity.
+    expect(sqlite.prepare(`SELECT * FROM worlds ORDER BY id`).all()).toEqual([
+      { id: 'w1', pinned_entity_ids: '["e1"]', theme: '{"version":2}' },
+      { id: 'w2', pinned_entity_ids: '[]', theme: null },
+    ]);
+    sqlite.close();
+  });
+
+  it('leaves Collaboration and every world_id pointing at the World untouched by the rebuild', () => {
+    const sqlite = seededPre0032();
+    applyMigration(sqlite, '0032_containers_hold_identity.sql');
+
+    // The DROP TABLE inside the rebuild must not have cascaded any of these away.
+    expect(sqlite.prepare(`SELECT world_id, user_id, role FROM world_members`).all()).toEqual([
+      { world_id: 'w1', user_id: 'u1', role: 'owner' },
+    ]);
+    expect(sqlite.prepare(`SELECT id, world_id FROM world_links`).all()).toEqual([{ id: 'tok', world_id: 'w1' }]);
+    expect(sqlite.prepare(`SELECT world_id, type_id FROM world_types`).all()).toEqual([
+      { world_id: 'w1', type_id: 'world.type.deity' },
+    ]);
+    expect(sqlite.prepare(`SELECT world_id, field_id FROM world_fields`).all()).toEqual([
+      { world_id: 'w1', field_id: 'world.field.era' },
+    ]);
+    // No entity-side value is rewritten — that is #396's job, not this migration's.
+    expect(sqlite.prepare(`SELECT id, world_id, seq FROM entities`).all()).toEqual([
+      { id: 'e1', world_id: 'w1', seq: 3 },
     ]);
     sqlite.close();
   });

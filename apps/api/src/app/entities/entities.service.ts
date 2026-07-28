@@ -43,6 +43,7 @@ import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } fro
 import { DB, Db } from '../db/db';
 import {
   assetIndex,
+  containers,
   entities,
   entityDescriptors,
   entityEdges,
@@ -1108,11 +1109,13 @@ export class EntitiesService {
     const predicate = requestedId
       ? and(eq(worlds.id, requestedId), canCreateEntityFilter(ownerId, this.isSuperadmin(ownerId)))
       : worldOwnerFilter(ownerId);
+    // "Oldest" is the Container's `created_at` (ADR-0078).
     const world = this.db
       .select({ id: worlds.id })
       .from(worlds)
+      .innerJoin(containers, eq(containers.id, worlds.id))
       .where(predicate)
-      .orderBy(asc(worlds.createdAt), asc(worlds.id))
+      .orderBy(asc(containers.createdAt), asc(containers.id))
       .get();
     if (!world)
       throw new NotFoundException({

@@ -18,7 +18,10 @@ function seedUserAndWorld(db: Db): void {
   db.$client
     .prepare('INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES (?,?,?,?,0)')
     .run('u1', 'a@b.c', 'A', 'h');
-  db.$client.prepare('INSERT INTO worlds (id, name, created_at, updated_at) VALUES (?,?,0,0)').run('world-1', 'W');
+  db.$client
+    .prepare("INSERT INTO containers (id, kind, name, created_at, updated_at) VALUES (?,'world',?,0,0)")
+    .run('world-1', 'W');
+  db.$client.prepare('INSERT INTO worlds (id) VALUES (?)').run('world-1');
 }
 
 describe('Asset serving endpoint', () => {

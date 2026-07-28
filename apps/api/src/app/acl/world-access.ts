@@ -1,7 +1,7 @@
 import { WorldVerb } from '@hexly/domain';
-import { and, eq, inArray, sql, SQLWrapper } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, sql, SQLWrapper } from 'drizzle-orm';
 import { Db } from '../db/db';
-import { entities, entityGrants, worldLinks, worldMembers, worlds } from '../db/schema';
+import { containers, entities, entityGrants, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
 import { isSuperadmin } from './owner-set';
 
 /** A Superadmin reaches and manages every World (ADR-0037, #163): predicates short-circuit here. */
@@ -68,6 +68,26 @@ export function worldOwnerFilter(userId: string) {
 }
 
 /**
+ * The one home of the whole-World read: the Container's identity columns beside the satellite's
+ * own. Driven off `worlds`, never `containers` — the satellite *is* the "this is a World"
+ * discriminator, so no `kind` exclusion is needed here or anywhere else (ADR-0078).
+ */
+function selectWorld(db: Db) {
+  return db
+    .select({ ...getTableColumns(containers), pinnedEntityIds: worlds.pinnedEntityIds, theme: worlds.theme })
+    .from(worlds)
+    .innerJoin(containers, eq(containers.id, worlds.id));
+}
+
+/**
+ * The whole World at `id`, with no access check — for a caller that has already resolved one
+ * (an Owner-gated update). {@link WorldAccess.decide} is the reachability-filtered form.
+ */
+export function loadWorld(db: Db, id: string): WorldRow | undefined {
+  return selectWorld(db).where(eq(worlds.id, id)).get();
+}
+
+/**
  * Whether a World Public Link *token* currently reaches World `id` — the reachability seam the
  * nudge bus checks for a token principal (ADR-0044, #178). The token *is* the grant: a live
  * `world_links` row pointing at the World grants anonymous Dashboard reach; a revoked token (row
@@ -111,8 +131,8 @@ export interface WorldAccess {
    * `canContribute`, in one caller-scoped read so a World list never fans out per World (ADR-0039).
    */
   contributingIn(ids: readonly string[]): Set<string>;
-  /** The World row if the caller can reach `id`, else undefined (unreachable ≡ missing). */
-  decide(id: string): typeof worlds.$inferSelect | undefined;
+  /** The whole World if the caller can reach `id`, else undefined (unreachable ≡ missing). */
+  decide(id: string): WorldRow | undefined;
   /**
    * Blob-free reachability + ownership + contribution in one query (no owner-set fetch), or
    * undefined if no such World. `canContribute` is the Entity-creation standing (owner ∨
@@ -144,9 +164,7 @@ export function worldAccess(db: Db, userId: string): WorldAccess {
       return new Set(rows.map((r) => r.id));
     },
     decide(id) {
-      return db
-        .select()
-        .from(worlds)
+      return selectWorld(db)
         .where(and(eq(worlds.id, id), reachFilter))
         .get();
     },
