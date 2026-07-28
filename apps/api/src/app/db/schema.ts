@@ -198,16 +198,19 @@ export const worldMembers = sqliteTable(
 );
 
 /**
- * A World's user-defined Type Definitions (ADR-0048): an Entity Type a World Owner authors as data,
- * scoped to this World. Keyed by `(worldId, typeId)`; `typeId` is the immutable `world.`-namespaced
- * Entity Type key. Rows cascade with the World; writes route through {@link WorldWrites}.
+ * A Container's user-defined Type Definitions (ADR-0048): an Entity Type a World Owner authors as
+ * data. The authored vocabulary belongs to the **Container**, not the World (ADR-0078), so it can
+ * travel with the content it types. Keyed by `(containerId, typeId)`; `typeId` is the immutable
+ * `world.`-namespaced Entity Type key. Rows cascade with the Container — and a World's satellite
+ * cascades off the same row, so deleting a World still takes its types with it. Writes route through
+ * {@link WorldWrites}.
  */
 export const worldTypes = sqliteTable(
   'world_types',
   {
-    worldId: text('world_id')
+    containerId: text('container_id')
       .notNull()
-      .references(() => worlds.id, { onDelete: 'cascade' }),
+      .references(() => containers.id, { onDelete: 'cascade' }),
     typeId: text('type_id').notNull(),
     label: text('label').notNull(),
     // The type's default Fields, referenced by id (`fieldRefs`, ADR-0054) — the sole Field declaration
@@ -221,29 +224,29 @@ export const worldTypes = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.worldId, table.typeId] })],
+  (table) => [primaryKey({ columns: [table.containerId, table.typeId] })],
 );
 
 /**
- * A World's user-defined **Fields** (CONTEXT.md → Field, ADR-0054): a first-class Field a World Owner
- * authors as data, scoped to this World. Keyed by `(worldId, fieldId)`; `fieldId` is the immutable
- * `world.`-namespaced reuse handle, split out so the id-less Field body rides in `definition` (a
- * FieldSchema, validated at the trust boundary). A JSON bag, never DB-queried — the resolver loads it
- * whole and composes it beside the Plugin fields. Rows cascade with the World; writes route through
- * {@link WorldWrites}.
+ * A Container's user-defined **Fields** (CONTEXT.md → Field, ADR-0054): a first-class Field a World
+ * Owner authors as data. Belongs to the **Container** beside {@link worldTypes} (ADR-0078). Keyed by
+ * `(containerId, fieldId)`; `fieldId` is the immutable `world.`-namespaced reuse handle, split out so
+ * the id-less Field body rides in `definition` (a FieldSchema, validated at the trust boundary). A JSON
+ * bag, never DB-queried — the resolver loads it whole and composes it beside the Plugin fields. Rows
+ * cascade with the Container; writes route through {@link WorldWrites}.
  */
 export const worldFields = sqliteTable(
   'world_fields',
   {
-    worldId: text('world_id')
+    containerId: text('container_id')
       .notNull()
-      .references(() => worlds.id, { onDelete: 'cascade' }),
+      .references(() => containers.id, { onDelete: 'cascade' }),
     fieldId: text('field_id').notNull(),
     definition: text('definition', { mode: 'json' }).$type<FieldSchema>().notNull(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.worldId, table.fieldId] })],
+  (table) => [primaryKey({ columns: [table.containerId, table.fieldId] })],
 );
 
 /**

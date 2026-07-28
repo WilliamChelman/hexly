@@ -443,11 +443,11 @@ export class EntityWrites {
    * a **Field of a Structured Data Type** offers its own edges, text, and facets through the data-type set,
    * so a new plugin needs no change here.
    */
-  private derive(doc: EntityDocument, types: readonly string[], worldId: string): DocumentDerivedState {
-    // The effective Field set (ADR-0054/ADR-0057), scoped to the Entity's World and derived from the
-    // document itself: an attached link Field harvests its edge and an attached facetable Field its facet,
-    // like a type default.
-    const fields = this.worldTypeFields.effectiveFields(worldId, types, doc);
+  private derive(doc: EntityDocument, types: readonly string[], containerId: string): DocumentDerivedState {
+    // The effective Field set (ADR-0054/ADR-0057), scoped to the Entity's Container — where the authored
+    // vocabulary lives since ADR-0078 — and derived from the document itself: an attached link Field
+    // harvests its edge and an attached facetable Field its facet, like a type default.
+    const fields = this.worldTypeFields.effectiveFields(containerId, types, doc);
     // Name the **Thumbnail** Field so the pure walk materialises its designation (ADR-0066) without the
     // domain learning any plugin's Field id. A disabled asset plugin leaves the key unresolved in the
     // effective set, so the designation derives to `null` and the value sits inert — no guard needed here.
