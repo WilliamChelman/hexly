@@ -43,8 +43,9 @@ export interface MembershipWriter {
 /**
  * The single write handle for a World — its `containers` identity row (ADR-0078), its `worlds`
  * satellite and `world_members` (ADR-0045). It owns the `seq` bump, the post-commit emit, and the
- * fan-out to the World's shared Entities. An ESLint rule bans `insert|update|delete(containers)`,
- * `(worlds)` and `(worldMembers)` everywhere else.
+ * fan-out to the World's shared Entities. An ESLint rule bans `insert|update|delete(worlds)` and
+ * `(worldMembers)` everywhere else, and `(containers)` everywhere but here and {@link CompendiumWrites}
+ * — the identity table is the one both kinds of Container write (ADR-0079).
  *
  * A World membership change moves Rights on two resources at once — the World, and every `shared`
  * Entity in it (`canRead` = `… ∨ (shared ∧ world-member)`, `canWrite` = `… ∨ (shared ∧ world-owner)`).

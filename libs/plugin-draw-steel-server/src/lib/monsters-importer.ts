@@ -21,7 +21,7 @@ import {
   Trait,
 } from '@hexly/plugin-draw-steel';
 import { CONTENT_FIELD } from '@hexly/plugin-content';
-import { ImportContext, Importer, ImportProduction, ImportRecord } from '@hexly/domain';
+import { CompendiumDeclaration, ImportContext, Importer, ImportProduction, ImportRecord } from '@hexly/domain';
 import * as z from 'zod';
 import { foundryProseToContent, foundryProseToText } from './foundry-prose';
 import { abilitiesOf, MonsterCharacteristics } from './monster-abilities';
@@ -45,6 +45,26 @@ export const MONSTERS_IMPORTER_LABEL = 'drawSteel.importer.monsters';
 export const MONSTERS_REV = MONSTERS_PINNED_SHA;
 
 /**
+ * The declaration that makes this a **Compendium Importer** (ADR-0079): the *Monsters* pack is published
+ * reference material, so it reconciles into its own Instance-wide **Compendium** and never into a World.
+ * Nothing about a landed monster says so — it is an ordinary Entity carrying `draw-steel.type.monster`,
+ * exactly like a hand-written NPC in a World — the Container it lives in is the whole of the difference.
+ *
+ * The attribution is the Creator License's, moved out of the plugin's `NOTICE.md` and onto the pack's
+ * row so the terms render where the monsters are actually read (ADR-0061, #402).
+ */
+export const MONSTERS_COMPENDIUM: CompendiumDeclaration = {
+  name: 'Draw Steel: Monsters',
+  attribution: {
+    publisher: 'MCDM Productions, LLC',
+    license: 'Draw Steel Creator License',
+    notice:
+      'Hexly is an independent product published under the DRAW STEEL Creator License and is not ' +
+      'affiliated with MCDM Productions, LLC. DRAW STEEL © 2026 MCDM Productions, LLC.',
+  },
+};
+
+/**
  * Build the `draw-steel.importer.monsters` Importer over a fetch port (ADR-0060). The port is a constructor
  * dependency, not a `produce` argument, so the composition root wires the real
  * {@link githubTarballFetchPort} while a test wires {@link fixtureFetchPort} — the whole pipe is then
@@ -54,6 +74,7 @@ export function createMonstersImporter(port: MonstersFetchPort): Importer {
   return {
     id: MONSTERS_IMPORTER_ID,
     label: MONSTERS_IMPORTER_LABEL,
+    compendium: MONSTERS_COMPENDIUM,
     async produce(ctx: ImportContext): Promise<ImportProduction> {
       const raw = await port.fetchMonsters(ctx);
       // A document the parse rejects (not an npc actor) is dropped here; a well-shaped one the reconcile

@@ -732,7 +732,7 @@ describe('Entities endpoints', () => {
       // import (#203) included, and `test.field.name` is required and absent here.
       app.get(EntitiesService).importEntity({
         ownerId: adaId,
-        worldId,
+        containerId: worldId,
         id: 'imported-beast',
         name: 'Kraken',
         types: ['test.type.beast'],

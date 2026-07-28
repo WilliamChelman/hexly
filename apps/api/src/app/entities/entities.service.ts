@@ -685,7 +685,7 @@ export class EntitiesService {
     const doc: EntityDocument = req.document ? { ...minted, ...stripReservedKeys(req.document) } : minted;
     const row = this.writes.insert({
       ownerId,
-      worldId,
+      containerId: worldId,
       name: req.name,
       types: req.types,
       tags: req.tags,

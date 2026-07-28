@@ -173,7 +173,7 @@ describe('EntityWrites', () => {
     it('an inserted Entity harvests its Link Descriptors, not just its search text', () => {
       writes.insert({
         ownerId: ADA,
-        worldId: WORLD,
+        containerId: WORLD,
         name: 'Ealdred',
         types: ['core.type.note'],
         tags: [],
@@ -188,7 +188,7 @@ describe('EntityWrites', () => {
     it('an inserted Hex Map indexes its grid’s Hex and Region names beside its prose', () => {
       writes.insert({
         ownerId: ADA,
-        worldId: WORLD,
+        containerId: WORLD,
         name: 'The Reach',
         types: ['core.type.hex-map'],
         tags: [],
@@ -206,7 +206,7 @@ describe('EntityWrites', () => {
     it('an inserted Entity stores the edges its document expresses', () => {
       writes.insert({
         ownerId: ADA,
-        worldId: WORLD,
+        containerId: WORLD,
         name: 'Ealdred',
         types: ['core.type.note'],
         tags: [],
@@ -232,7 +232,7 @@ describe('EntityWrites', () => {
       const hash = 'a'.repeat(64);
       writes.insert({
         ownerId: ADA,
-        worldId: WORLD,
+        containerId: WORLD,
         name: 'Illustrated',
         types: ['core.type.note'],
         tags: [],
@@ -267,7 +267,7 @@ describe('EntityWrites', () => {
     it('stores the authored descriptor on the edge, and its folded form in the vocabulary', () => {
       writes.insert({
         ownerId: ADA,
-        worldId: WORLD,
+        containerId: WORLD,
         name: 'Aldermoor',
         types: ['core.type.note'],
         tags: [],
@@ -303,7 +303,7 @@ describe('EntityWrites', () => {
     it('an edit replaces the descriptor set, so it prunes itself', () => {
       const row = writes.insert({
         ownerId: ADA,
-        worldId: WORLD,
+        containerId: WORLD,
         name: 'Ealdred',
         types: ['core.type.note'],
         tags: [],
@@ -323,7 +323,7 @@ describe('EntityWrites', () => {
     it('an edit replaces the edge set, so unlinking prunes the edge', () => {
       const row = writes.insert({
         ownerId: ADA,
-        worldId: WORLD,
+        containerId: WORLD,
         name: 'Ealdred',
         types: ['core.type.note'],
         tags: [],
@@ -346,7 +346,7 @@ describe('EntityWrites', () => {
     it('a conflicted edit leaves the edge set as the last successful save left it', () => {
       const row = writes.insert({
         ownerId: ADA,
-        worldId: WORLD,
+        containerId: WORLD,
         name: 'Ealdred',
         types: ['core.type.note'],
         tags: [],
@@ -733,7 +733,7 @@ describe('EntityWrites', () => {
       it('materialises an edge and a target-id facet from an Entity-Link Field value', () => {
         writes.insert({
           ownerId: ADA,
-          worldId: WORLD,
+          containerId: WORLD,
           name: 'Aboleth',
           types: ['test.type.monster'],
           tags: [],
@@ -752,7 +752,7 @@ describe('EntityWrites', () => {
       it('re-pointing the link replaces both the edge and the facet (self-pruning)', () => {
         const row = writes.insert({
           ownerId: ADA,
-          worldId: WORLD,
+          containerId: WORLD,
           name: 'Aboleth',
           types: ['test.type.monster'],
           tags: [],
@@ -802,7 +802,7 @@ describe('EntityWrites', () => {
       it('harvests an edge and a facet from an attached link Field its types never named (derived from the document, ADR-0057)', () => {
         writes.insert({
           ownerId: ADA,
-          worldId: WORLD,
+          containerId: WORLD,
           name: 'Ealdred',
           types: ['core.type.note'],
           // No stored attachment set: `test.field.ally` is a registered key the document carries that `core.type.note`
@@ -870,7 +870,7 @@ describe('EntityWrites', () => {
       it('materialises a row from a document carrying hexly.source', () => {
         writes.insert({
           ownerId: ADA,
-          worldId: WORLD,
+          containerId: WORLD,
           name: 'Goblin',
           types: ['core.type.note'],
           tags: [],
@@ -883,7 +883,7 @@ describe('EntityWrites', () => {
       it('leaves an un-stamped document without a provenance row', () => {
         writes.insert({
           ownerId: ADA,
-          worldId: WORLD,
+          containerId: WORLD,
           name: 'Plain',
           types: ['core.type.note'],
           tags: [],
@@ -897,7 +897,7 @@ describe('EntityWrites', () => {
       it('ignores a malformed hexly.source', () => {
         writes.insert({
           ownerId: ADA,
-          worldId: WORLD,
+          containerId: WORLD,
           name: 'Broken',
           types: ['core.type.note'],
           tags: [],
@@ -915,7 +915,7 @@ describe('EntityWrites', () => {
       it('preserves the stamp across a user edit — a forged or cleared hexly.source is ignored', () => {
         const row = writes.insert({
           ownerId: ADA,
-          worldId: WORLD,
+          containerId: WORLD,
           name: 'Goblin',
           types: ['core.type.note'],
           tags: [],
@@ -942,7 +942,7 @@ describe('EntityWrites', () => {
       it('cascades the provenance row away when the Entity is deleted', () => {
         const row = writes.insert({
           ownerId: ADA,
-          worldId: WORLD,
+          containerId: WORLD,
           name: 'Goblin',
           types: ['core.type.note'],
           tags: [],
@@ -963,7 +963,7 @@ describe('EntityWrites', () => {
       it('answers a (world, importer) query with Entity ids, excluding other importers', () => {
         const goblin = writes.insert({
           ownerId: ADA,
-          worldId: WORLD,
+          containerId: WORLD,
           name: 'Goblin',
           types: ['core.type.note'],
           tags: [],
@@ -971,7 +971,7 @@ describe('EntityWrites', () => {
         });
         const ajax = writes.insert({
           ownerId: ADA,
-          worldId: WORLD,
+          containerId: WORLD,
           name: 'Ajax',
           types: ['core.type.note'],
           tags: [],
@@ -980,7 +980,7 @@ describe('EntityWrites', () => {
         // A different Importer's Entity in the same World, excluded by the importer filter.
         writes.insert({
           ownerId: ADA,
-          worldId: WORLD,
+          containerId: WORLD,
           name: 'Foreign',
           types: ['core.type.note'],
           tags: [],
@@ -1061,7 +1061,7 @@ describe('EntityWrites', () => {
     it('deleting the source cascades its outbound edges, and leaves inbound rows to it standing', () => {
       const ealdred = writes.insert({
         ownerId: ADA,
-        worldId: WORLD,
+        containerId: WORLD,
         name: 'Ealdred',
         types: ['core.type.note'],
         tags: [],
@@ -1069,7 +1069,7 @@ describe('EntityWrites', () => {
       });
       const mira = writes.insert({
         ownerId: ADA,
-        worldId: WORLD,
+        containerId: WORLD,
         name: 'Mira',
         types: ['core.type.note'],
         tags: [],
@@ -1101,7 +1101,7 @@ describe('EntityWrites', () => {
 
       const row = writes.insert({
         ownerId: ADA,
-        worldId: WORLD,
+        containerId: WORLD,
         name: 'The Reach',
         types: ['core.type.hex-map'],
         tags: [],
@@ -1120,7 +1120,7 @@ describe('EntityWrites', () => {
       const geometry = { position: { x: 0, y: 0 }, size: { width: 100, height: 100 }, z: 0 } as const;
       writes.insert({
         ownerId: ADA,
-        worldId: WORLD,
+        containerId: WORLD,
         name: 'The Session Board',
         types: ['core.type.board'],
         tags: [],

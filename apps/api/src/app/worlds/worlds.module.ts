@@ -4,6 +4,7 @@ import { AssetsModule } from '../assets/assets.module';
 import { AuthModule } from '../auth/auth.module';
 import { HEXLY_CONFIG, type HexlyConfig } from '../config';
 import { DbModule } from '../db/db.module';
+import { CompendiumWrites } from './compendium-writes';
 import { EntitiesModule } from '../entities/entities.module';
 import { EventsModule } from '../events/events.module';
 import { ImporterRegistry } from './importer-registry';
@@ -46,6 +47,7 @@ import { WorldWrites } from './world-writes';
     WorldTypesService,
     WorldFieldsService,
     WorldWrites,
+    CompendiumWrites,
     WorldGraphService,
     VaultImportService,
     VaultExportService,

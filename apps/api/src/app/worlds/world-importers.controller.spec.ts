@@ -9,7 +9,7 @@ import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
 import { ConfigModule } from '../config/config.module';
 import { DB, Db, createDb } from '../db/db';
-import { entityImportSource } from '../db/schema';
+import { compendiums, containers, entityImportSource } from '../db/schema';
 import { EntitiesModule } from '../entities/entities.module';
 import { ImporterRegistry } from './importer-registry';
 import { WorldsModule } from './worlds.module';
@@ -114,6 +114,22 @@ describe('World importers', () => {
     expect(rows).toContainEqual(
       expect.objectContaining({ entityId: goblin.id, importer: STUB_ID, sourceId: 'goblin', rev: 'rev-1' }),
     );
+  });
+
+  it('reconciles an Importer that declares no Compendium into the World, unchanged', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    production = { rev: 'rev-1', records: [record('goblin', 'Goblin')] };
+
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await pollUntilDone(ada, world);
+
+    // The declaration is what redirects a run (ADR-0079); without one the Entity lands in the World the
+    // caller named, and no shelf is installed behind its back.
+    const goblin = await entityByName(ada, world, 'Goblin');
+    expect(goblin.detail.worldId).toBe(world);
+    expect(db.select().from(compendiums).all()).toEqual([]);
+    expect(db.select().from(containers).where(eq(containers.kind, 'compendium')).all()).toEqual([]);
   });
 
   it('honours the chosen visibility', async () => {

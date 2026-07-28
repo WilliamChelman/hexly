@@ -72,7 +72,11 @@ export interface ReindexChunk {
 export interface InsertEntityInput {
   id?: string;
   ownerId: string;
-  worldId: string;
+  /**
+   * The **Container** the Entity lands in (ADR-0078) — a World's id for anything a user authors, a
+   * Compendium's for what a Compendium Importer produces (ADR-0079).
+   */
+  containerId: string;
   name: string;
   /** The ordered Entity Type set; `types[0]` is primary. Carried alongside `tags`, not in the document. */
   types: readonly string[];
@@ -200,10 +204,10 @@ export class EntityWrites {
    */
   insert(input: InsertEntityInput): EntityRow {
     const now = Date.now();
-    const derived = this.derive(input.document, input.types, input.worldId);
+    const derived = this.derive(input.document, input.types, input.containerId);
     const row: EntityRow = {
       id: input.id ?? randomUUID(),
-      containerId: input.worldId,
+      containerId: input.containerId,
       name: input.name,
       types: [...input.types],
       tags: [...input.tags],

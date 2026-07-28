@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Importer, importerIdSchema, ImporterSummary } from '@hexly/domain';
+import { compendiumDeclarationSchema, Importer, importerIdSchema, ImporterSummary } from '@hexly/domain';
 import { HEXLY_CONFIG, HexlyConfig } from '../config';
 import { enabledPluginImporters } from '../entities/bundled-plugins';
 
@@ -21,6 +21,9 @@ export class ImporterRegistry {
   /** Register (or replace) an Importer, for a test-injected stub or a late contribution. Returns an unregister fn. */
   register(importer: Importer): () => void {
     importerIdSchema.parse(importer.id);
+    // A Compendium Importer's declaration is parsed here too, so a pack that names no Compendium name —
+    // the Container's, and the only handle a reader ever sees it by — fails at startup, not mid-run.
+    if (importer.compendium) compendiumDeclarationSchema.parse(importer.compendium);
     this.byId.set(importer.id, importer);
     return () => this.byId.delete(importer.id);
   }
