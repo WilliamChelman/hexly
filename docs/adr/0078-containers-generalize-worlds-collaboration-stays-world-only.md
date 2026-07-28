@@ -1,0 +1,23 @@
+# Containers generalize Worlds; Collaboration stays World-only
+
+An Instance-wide **Compendium** (ADR-0079) needs somewhere to put its Entities, and `entities.world_id` is `NOT NULL` against `worlds` — so the cheap move is a `worlds` row flagged as "not really a World," withheld from the World Index and guarded out of the Dashboard, the Graph, Settings, and membership one surface at a time. We rejected that lie and named the supertype instead: a **Container** is what an Entity belongs to, and **World** and **Compendium** are its two kinds. `containers` holds identity and the substance both kinds share (`id`, `kind`, `name`, `seq`, `createdAt`, `updatedAt`); `worlds` and `compendiums` are satellites keyed by container id, holding what only one kind has (pins and **World Theme**; importer, pinned `rev`, and attribution).
+
+Seven tables move from `world_id` to `container_id` — `entities`, `entityEdges`, `entityFieldFacets`, `entityImportSource`, `assetIndex`, `worldTypes`, `worldFields` — and two deliberately do **not**: `worldMembers` and `worldLinks`. The rule behind that split is one line: **container-scoped is Entities and their vocabulary; World-scoped is Collaboration.** `worldLinks` is the **World Public Link** table and `worldMembers` the role set; together with `entityGrants` they _are_ the **Collaboration** layer that ADR-0071 makes a switch you can throw off wholesale, and ADR-0037 resolves reachability from exactly those two. Making them container-generic would ask that resolution one question with two irreconcilable answers — is a Compendium reachable because you are a member, or because you are on this Instance? — and would mint a "Compendium Owner" who cannot edit (sealed), cannot share (already Instance-wide), and cannot delete (the operator's job).
+
+The migration is a backfill, not a rewrite: `worlds.id` stays the primary key and equals the container id, so `containers` gets one row per existing World with the _same_ id, no World id changes, no URL breaks, and no `entities.container_id` value is rewritten — 613 call sites across 95 files see a rename and an FK repoint.
+
+## Considered Options
+
+- **A `worlds` row flagged `kind = 'compendium'`.** Rejected: every World surface — the World Index, the switcher, the Dashboard, Settings, membership, the create-Entity target list — must then remember to exclude it, and each of those is a place a future reader forgets. The exclusions are unbounded and unenforced; the type is a lie the schema tells.
+- **Nullable `world_id` plus a nullable `compendium_id`, XOR-constrained.** Rejected: two nullable FKs where one containment relation exists, enforced by a constraint no query planner or reader benefits from.
+- **One wide `containers` table with a `kind` discriminator and nullable kind-specific columns.** Rejected on the same grounds as the flagged World, in column form: `theme` and `pinned_entity_ids` permanently null for every compendium row says the schema does not believe its own discriminator.
+- **A separate `compendium_entries` table, leaving `entities` untouched.** Rejected: a Compendium Entry needs **Entity Types**, **Fields**, **Views**, an **Entity Document**, an Entity page and **Adoption** — that is an Entity. A parallel shape would fork every renderer.
+- **Sweep all nine tables to `container_id`.** Rejected: `worldMembers` and `worldLinks` are the **Collaboration** layer, and generalizing them asks ADR-0037's reachability resolution one question with two irreconcilable answers. Deferring costs one column rename at a moment when a compendium role would actually mean something; committing now hardcodes an ACL surface the Rights engine has no answer for, and someone builds against it first.
+
+## Consequences
+
+- **User-defined Types and Fields travel with the Container.** That is what makes a future "publish this World as a reusable Compendium" possible at all — the authored vocabulary ships with the content instead of staying behind and half-rendering at the destination.
+- **A Compendium has no members, no public link, no Theme, no pins, and no Dashboard**, by construction rather than by exclusion rules. Its access model is uniform across the Instance.
+- **ADR-0037's reachability resolution stays World-shaped** and is untouched by this change.
+- Per-user or per-group compendium access — a homebrew shelf shared with three friends — remains reachable later as a column rename, but is explicitly not modelled now.
+- `CONTEXT.md` already listed _container_ under **World**'s `_Avoid_`. That entry now means what it says: Container is the supertype, World is one kind, and conflating them is the error it always warned about.
