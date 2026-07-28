@@ -1,6 +1,7 @@
-import { eq, getTableColumns } from 'drizzle-orm';
+import { CompendiumSummary } from '@hexly/domain';
+import { SQL, asc, eq, getTableColumns, sql } from 'drizzle-orm';
 import { Db } from '../db/db';
-import { CompendiumRow, compendiums, containers } from '../db/schema';
+import { CompendiumRow, compendiums, containers, entities } from '../db/schema';
 
 /**
  * The whole-Compendium read (ADR-0079), the peer of `world-access.ts`'s `selectWorld`: the Container's
@@ -26,6 +27,33 @@ function selectCompendium(db: Db) {
 }
 
 /**
+ * Every installed Compendium, by name. Unguarded for the same reason {@link selectCompendium} is:
+ * Instance-wide with no members means one answer for every caller — the entries' own reachability rule,
+ * one level up. The **Compendium browse** names its Containers from this list (ADR-0079).
+ */
+export function listCompendiums(db: Db): CompendiumSummary[] {
+  return selectCompendium(db).orderBy(asc(containers.name)).all().map(toCompendiumSummary);
+}
+
+/** One row for the wire, attribution folded back into the shape its Importer declared it in. */
+function toCompendiumSummary(row: CompendiumRow): CompendiumSummary {
+  return {
+    id: row.id,
+    name: row.name,
+    importer: row.importer,
+    rev: row.rev,
+    // Absent rather than null, so a pack stating no terms renders no empty scaffold (#402).
+    attribution: {
+      ...(row.publisher ? { publisher: row.publisher } : {}),
+      ...(row.license ? { license: row.license } : {}),
+      ...(row.notice ? { notice: row.notice } : {}),
+    },
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/**
  * The Compendium a **Compendium Importer** owns, or undefined before its first successful run. One
  * per pack — `compendiums.importer` is unique — so this answers "where does this Importer land?" with
  * exactly one Container.
@@ -41,4 +69,14 @@ export function compendiumByImporter(db: Db, importer: string): CompendiumRow | 
  */
 export function isCompendiumContainer(db: Db, containerId: string): boolean {
   return !!db.select({ id: compendiums.id }).from(compendiums).where(eq(compendiums.id, containerId)).get();
+}
+
+/**
+ * The same question as a predicate over an `entities` row. Reads the satellite that *is* the
+ * discriminator (ADR-0078), so it names no pack, no flag and no Entity Type — and it is one expression
+ * for four readers: the reachability rule, the **Sealed** projection, the link-target exclusion (#400)
+ * and the search tier that ranks the shelf below authored Entities.
+ */
+export function inACompendium(): SQL {
+  return sql`EXISTS (SELECT 1 FROM ${compendiums} WHERE ${compendiums.id} = ${entities.containerId})`;
 }

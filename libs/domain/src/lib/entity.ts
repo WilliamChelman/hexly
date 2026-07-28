@@ -252,6 +252,21 @@ export const entityListQuerySchema = z.object({
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
   worldId: z.string().min(1).optional(),
+  // The **Container** scope, repeatable — how a read that spans Containers names them (ADR-0079): the
+  // Compendium browse lists every installed pack, so it says which ones rather than riding the
+  // single-Container scoping every World read uses. `worldId` above is that same scope under the name a
+  // World-scoped caller knows it by; both fold into one predicate server-side.
+  containerId: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
+  // Facet: the **Compendium** facet's selection — a narrowing *within* the scope above, so it drills
+  // down like Type or Tag (dropped when counting its own values) rather than redefining what the read
+  // is about. Nothing outside the scope can be reached by naming it here: both predicates AND.
+  compendium: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
   // Defaulted rather than optional, so an unknown value is a 400: a typo'd `read=linktarget` must not
   // silently navigate.
   read: entityReadSchema.default('navigation'),
@@ -331,6 +346,12 @@ export interface EntityFacets {
   readonly tag: readonly FacetCount[];
   readonly visibility: readonly FacetCount[];
   readonly fields: readonly FieldFacet[];
+  /**
+   * The **Compendium** facet (ADR-0079): which pack each entry came from, `value` the Container id and
+   * `label` its name. Surfaced *by presence* like a Field facet — a read that names a single Container
+   * has nothing to narrow, so only a cross-Container read (the Compendium browse) carries it.
+   */
+  readonly compendium?: readonly FacetCount[];
 }
 
 /** What `GET /entities` lists; body fetched only on open. */
@@ -361,6 +382,16 @@ export interface EntitySummary {
    * read, so restoring the file clears it with no Reindex; absent for an Entity that owns no bytes.
    */
   readonly assetBytesMissing?: boolean;
+  /**
+   * Set when this Entity is **Sealed** (CONTEXT.md → Sealed): it lives in a **Compendium**, so it is
+   * read-only to everyone and nothing outside its Compendium may point at it. Derived from where the
+   * Entity lives, never stored — there is no flag on the row to set or to forge (ADR-0079).
+   *
+   * The read side of the seal the client needs: it is why {@link rights} says `read` alone, why the
+   * World segment in the entry's URL is navigation context rather than its home, and what an
+   * **Adoption** affordance keys off.
+   */
+  readonly sealed?: boolean;
 }
 
 /** What `GET /entities/:id` and saves return. */

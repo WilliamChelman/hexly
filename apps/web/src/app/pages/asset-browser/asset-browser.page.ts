@@ -3,7 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityFacets, EntityPage, EntitySummary, EntityType, parseFieldFilters, Visibility } from '@hexly/domain';
+import { EntityFacets, EntityPage, EntitySummary, EntityType, Visibility } from '@hexly/domain';
 import { CORE_ASSET_TYPE_ID } from '@hexly/plugin-asset';
 import {
   AppShellStore,
@@ -24,38 +24,10 @@ import {
   FieldRangeChange,
   FieldSelection,
   FieldValueToggle,
-  isFieldSelectionEmpty,
 } from '../entity-browser/components/facet-rail.component';
+import { fieldTokens, fieldsFromTokens, pruneField } from '../entity-browser/components/field-facet-url';
 
-/** Serialize the active Field selections to the `key:op:value` tokens the API + URL speak. */
-function fieldTokens(fields: Readonly<Record<string, FieldSelection>>): string[] {
-  const tokens: string[] = [];
-  for (const [key, sel] of Object.entries(fields)) {
-    for (const v of sel.values ?? []) tokens.push(`${key}:eq:${v}`);
-    if (sel.gte) tokens.push(`${key}:gte:${sel.gte}`);
-    if (sel.lte) tokens.push(`${key}:lte:${sel.lte}`);
-  }
-  return tokens;
-}
-
-/** Fold the repeated `field` params back into the per-key {@link FieldSelection} record. */
-function fieldsFromTokens(tokens: readonly string[]): Record<string, FieldSelection> {
-  const out: Record<string, { values: string[]; gte?: string; lte?: string }> = {};
-  for (const f of parseFieldFilters(tokens)) {
-    const sel = (out[f.key] ??= { values: [] });
-    if (f.op === 'eq') sel.values.push(f.value);
-    else if (f.op === 'gte') sel.gte = f.value;
-    else sel.lte = f.value;
-  }
-  return out;
-}
-
-/** Drop a Field key once its selection is empty, so `hasFilters`/the URL never carry a dead entry. */
-function pruneField(sel: FieldSelection): FieldSelection | undefined {
-  return isFieldSelectionEmpty(sel) ? undefined : sel;
-}
-
-const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [], fields: {} };
+const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [], fields: {}, compendium: [] };
 const NO_FACET_COUNTS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] };
 
 // A bounded first page, like the Entity Browser, so a media-heavy World loads fast.
@@ -309,7 +281,13 @@ export class AssetBrowserPage {
       )
       .subscribe((f) => {
         this.query.set(f.q);
-        this.activeFacets.set({ type: [], tag: f.tag, visibility: f.visibility, fields: fieldsFromTokens(f.field) });
+        this.activeFacets.set({
+          type: [],
+          tag: f.tag,
+          visibility: f.visibility,
+          fields: fieldsFromTokens(f.field),
+          compendium: [],
+        });
       });
 
     this.typed.pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed()).subscribe((raw) => {

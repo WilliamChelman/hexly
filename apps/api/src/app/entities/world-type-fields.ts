@@ -100,12 +100,16 @@ export class WorldTypeFields {
    * harvested facet dimensions. A scalar Field wins a key claimed by both — it is the direct lens
    * over an actual document key (ADR-0055) — so dimensions only fill keys no scalar Field claims. The
    * insertion order is the rail's stable declaration order: scalars, then dimensions.
+   *
+   * Takes the read's whole **Container** scope, since a browse may span several (the Compendium
+   * browse unions every installed pack): each Container's own Fields are folded in, later ones winning
+   * a shared key, exactly as one Container's win over a Plugin's.
    */
-  facetSourcesByKey(containerId: string | undefined): Map<string, FacetSource> {
+  facetSourcesByKey(containerIds: readonly string[] | undefined): Map<string, FacetSource> {
     const byKey = new Map<string, FacetSource>();
-    // Scalar Fields first — Plugin then user-defined, so a World-defined Field wins the key (ADR-0054).
+    // Scalar Fields first — Plugin then user-defined, so a Container-defined Field wins the key (ADR-0054).
     for (const field of this.plugins.fields()) if (isFacetableField(field)) byKey.set(field.id, scalarSource(field));
-    if (containerId)
+    for (const containerId of containerIds ?? [])
       for (const field of this.worldFields.list(containerId))
         if (isFacetableField(field)) byKey.set(field.id, scalarSource(field));
     // Then harvested dimensions — the scalar walk ran first, so a shared key keeps its scalar (ADR-0055).
