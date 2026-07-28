@@ -73,9 +73,8 @@ export interface InsertEntityInput {
   id?: string;
   ownerId: string;
   /**
-   * The **Container** the Entity lands in (ADR-0078) — a World's id for anything a user authors, and a
-   * Compendium's for what a Compendium Importer produces (ADR-0079). Named for the column, not for the
-   * World, because the import reconcile genuinely passes both.
+   * The **Container** the Entity lands in (ADR-0078) — a World's id for anything a user authors, a
+   * Compendium's for what a Compendium Importer produces (ADR-0079).
    */
   containerId: string;
   name: string;

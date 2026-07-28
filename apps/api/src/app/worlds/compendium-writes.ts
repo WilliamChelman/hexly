@@ -1,17 +1,21 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { CompendiumDeclaration } from '@hexly/domain';
+import { CompendiumAttribution, CompendiumDeclaration } from '@hexly/domain';
 import { eq, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { COMPENDIUM_CONTAINER_KIND, compendiums, containers } from '../db/schema';
-import { SyncOnly, WriteOutbox } from '../events/write-outbox';
+import { WriteOutbox } from '../events/write-outbox';
 import { compendiumByImporter } from './compendiums';
 
 /**
  * The single write handle for a **Compendium** — its `containers` identity row (ADR-0078) and its
- * `compendiums` satellite (ADR-0079). The {@link WorldWrites} peer: it owns the `seq` bump and the
- * post-commit nudge, and an ESLint rule bans `insert|update|delete(containers)` and `(compendiums)`
- * everywhere but the two handles.
+ * `compendiums` satellite (ADR-0079). The {@link WorldWrites} peer: it owns the `seq` bump, and an
+ * ESLint rule bans `insert|update|delete(containers)` and `(compendiums)` everywhere but the two handles.
+ *
+ * It emits no nudge, unlike its peers, because a Compendium has nothing to nudge: it has no Dashboard,
+ * no membership and no live-follow channel of its own — the entries it holds nudge individually through
+ * `EntityWrites`. The `seq` bump stays, so whatever first follows a Compendium has a freshness key that
+ * already moved with every write.
  *
  * Deliberately *not* a method on `WorldWrites`. That handle bumps a World's `seq` and fans membership
  * out to the World's `shared` Entities; a Compendium has no membership to fan out and no World
@@ -25,11 +29,6 @@ export class CompendiumWrites {
     private readonly outbox: WriteOutbox,
   ) {}
 
-  /** Run `fn` in the outermost transaction, flushing the nudge outbox on commit. */
-  transact<T>(fn: () => SyncOnly<T>): T {
-    return this.outbox.transact(fn);
-  }
-
   /**
    * Install a pack, or re-capture it on reimport: mint the Container and its satellite on the first
    * run, else refresh the pinned `rev`, the name and the attribution the Importer now declares.
@@ -41,7 +40,7 @@ export class CompendiumWrites {
    */
   install(importer: string, declaration: CompendiumDeclaration, rev: string, now: number = Date.now()): string {
     const attribution = declaration.attribution ?? {};
-    return this.transact(() => {
+    return this.outbox.transact(() => {
       const existing = compendiumByImporter(this.db, importer);
       const id = existing?.id ?? randomUUID();
       if (!existing) {
@@ -62,9 +61,6 @@ export class CompendiumWrites {
           .where(eq(compendiums.id, id))
           .run();
       }
-      // No nudge on the mint: nothing can be following an id that did not exist a moment ago. A
-      // reimport's refresh does nudge — a browse live-following the shelf re-reads its revision.
-      if (existing) this.outbox.world(id);
       return id;
     });
   }
@@ -76,15 +72,14 @@ export class CompendiumWrites {
    * silent.
    */
   uninstall(id: string): void {
-    this.transact(() => {
+    this.outbox.transact(() => {
       this.db.delete(containers).where(eq(containers.id, id)).run();
-      this.outbox.world(id);
     });
   }
 }
 
 /** The attribution columns as a patch — absent parts written as NULL, so a re-capture can clear a term. */
-function pickAttribution(attribution: { publisher?: string; license?: string; notice?: string }) {
+function pickAttribution(attribution: CompendiumAttribution) {
   return {
     publisher: attribution.publisher ?? null,
     license: attribution.license ?? null,

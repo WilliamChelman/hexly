@@ -123,7 +123,7 @@ export type CompendiumAttribution = z.infer<typeof compendiumAttributionSchema>;
 export const compendiumDeclarationSchema = z
   .object({
     /**
-     * The pack's name — the Compendium Container's `name`. A proper noun ("Draw Steel — Monsters"),
+     * The pack's name — the Compendium Container's `name`. A proper noun ("Draw Steel: Monsters"),
      * deliberately *not* a transloco key like {@link Importer.label}: it is stored content, read back
      * from the row by every surface that lists installed packs.
      */

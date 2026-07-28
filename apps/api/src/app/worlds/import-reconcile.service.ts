@@ -74,16 +74,17 @@ type ReconcileTarget =
  * a second is a 409. Job state lives on this singleton keyed by World, so a restart forgets an
  * unfinished run whose committed chunks are already on disk.
  *
- * The target is the Importer's to declare, not the caller's: a Compendium Importer lands its Entities
- * in the pack's Compendium Container and never in a World, which is the whole of what keeps reference
- * material out of the Entity Browser, the Facets, the Graph, the counts, in-World search and the Vault
- * export — no read gained a predicate for it (ADR-0079).
+ * The target is the Importer's to declare, not the caller's — which is why no World-scoped read needed a
+ * predicate for reference material (ADR-0079).
  */
 @Injectable()
 export class ImportReconcileService {
   private readonly jobs = new Map<string, ImportRunSummary>();
-  /** Worlds with an in-flight {@link remove} — it yields between chunks, so a run and a remove must serialize. */
-  private readonly removing = new Set<string>();
+  /**
+   * The {@link scopeOf} keys a run or a remove is currently holding. Both yield between chunks, so
+   * anything that would write the same Container has to queue behind rather than interleave with them.
+   */
+  private readonly reconciling = new Set<string>();
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -119,19 +120,23 @@ export class ImportReconcileService {
   /**
    * Start (or reimport) an Importer into a World and return at once, leaving the reconcile running
    * behind the response — the client follows it by polling {@link status}. Owner-gated; a 409 when a
-   * run is already in flight for this World. `run` never rejects: it lands every fault in the job.
+   * run is already in flight for this World, or when this Importer's target is already being
+   * reconciled from elsewhere. `run` never rejects: it lands every fault in the job.
    */
   start(userId: string, worldId: string, importerId: string, visibility: Visibility): ImportRunSummary | ImportRefusal {
     const gate = this.gate(userId, worldId);
     if (gate) return gate;
     const importer = this.registry.get(importerId);
     if (!importer) return 'no-such-importer';
-    // One reconcile at a time per World: a run in flight, or a remove mid-yield, refuses a start (409).
-    if (this.jobs.get(worldId)?.status === 'running' || this.removing.has(worldId))
+    // One reconcile at a time per World, and one per target: a run in flight here, or a run or remove
+    // mid-yield against the same Container from anywhere, refuses a start (409).
+    const scope = this.scopeOf(importer, worldId);
+    if (this.jobs.get(worldId)?.status === 'running' || this.reconciling.has(scope))
       throw new ConflictException({ code: ImporterErrorCode.ImportRunning });
     this.jobs.set(worldId, { ...IDLE, importer: importerId, status: 'running', startedAt: Date.now() });
+    this.reconciling.add(scope);
     // Deliberately not awaited: the reconcile outlives the request that asked for it.
-    void this.run(userId, worldId, importer, visibility);
+    void this.run(userId, worldId, importer, visibility, scope);
     return this.jobs.get(worldId) as ImportRunSummary;
   }
 
@@ -144,18 +149,21 @@ export class ImportReconcileService {
    * stops being installed rather than lingering empty at a revision nothing reflects. Adopted copies
    * live in a World and are untouched by either half (ADR-0079).
    *
-   * Refused with a 409 while a run is in flight for this World (or another remove is): the run yields
-   * between chunks, so an interleaved delete would evict the Entities it has committed so far and leave
-   * a half-imported World behind a "succeeded" run. Held under {@link removing} for the same reason —
-   * this loop yields between chunks too, so a concurrent start must see it.
+   * Refused with a 409 while a run is in flight for this World, or while anything else is reconciling
+   * the same target: the run yields between chunks, so an interleaved delete would evict the Entities it
+   * has committed so far and leave a half-imported Container behind a "succeeded" run — and for a pack,
+   * would drop the Container out from under an insert still running. Held under {@link reconciling} for
+   * the same reason: this loop yields between chunks too, so a concurrent start must see it.
    */
   async remove(userId: string, worldId: string, importerId: string): Promise<ImportRefusal | 'ok'> {
     const gate = this.gate(userId, worldId);
     if (gate) return gate;
-    if (!this.registry.get(importerId)) return 'no-such-importer';
-    if (this.jobs.get(worldId)?.status === 'running' || this.removing.has(worldId))
+    const importer = this.registry.get(importerId);
+    if (!importer) return 'no-such-importer';
+    const scope = this.scopeOf(importer, worldId);
+    if (this.jobs.get(worldId)?.status === 'running' || this.reconciling.has(scope))
       throw new ConflictException({ code: ImporterErrorCode.ImportRunning });
-    this.removing.add(worldId);
+    this.reconciling.add(scope);
     try {
       // A pack never installed has no target and nothing to remove — the same no-op as an Importer
       // that has produced nothing into this World.
@@ -172,7 +180,7 @@ export class ImportReconcileService {
       // it now takes the satellite — the pinned rev and the attribution — with it.
       if (target.kind === 'compendium') this.compendiums.uninstall(target.containerId);
     } finally {
-      this.removing.delete(worldId);
+      this.reconciling.delete(scope);
     }
     return 'ok';
   }
@@ -183,7 +191,13 @@ export class ImportReconcileService {
    * carries on. Yields before the first chunk (an `async` fn runs synchronously to its first `await`),
    * so a small World is not wholly reconciled before the POST returns.
    */
-  private async run(userId: string, worldId: string, importer: Importer, visibility: Visibility): Promise<void> {
+  private async run(
+    userId: string,
+    worldId: string,
+    importer: Importer,
+    visibility: Visibility,
+    scope: string,
+  ): Promise<void> {
     try {
       await yieldToEventLoop();
       const { rev, records } = await importer.produce({});
@@ -217,6 +231,10 @@ export class ImportReconcileService {
         finishedAt: Date.now(),
         error: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      // Released however the run ended, so a failed run is fixed by re-running it (ADR-0060) rather
+      // than by waiting out a hold nothing will ever drop.
+      this.reconciling.delete(scope);
     }
   }
 
@@ -303,6 +321,18 @@ export class ImportReconcileService {
   private resolveTarget(importer: Importer, worldId: string, rev: string): ReconcileTarget {
     if (!importer.compendium) return { kind: 'world', containerId: worldId, importer: importer.id };
     return { kind: 'compendium', containerId: this.compendiums.install(importer.id, importer.compendium, rev) };
+  }
+
+  /**
+   * What a reconcile of `importer` serializes on. An ordinary Importer writes into the World it was
+   * asked for, so the World is the scope, as it always was. A **Compendium Importer** writes into a
+   * Container the whole Instance shares, so its own id is the scope — one pack has one producer
+   * (ADR-0079), and the id is stable even before the first run has minted a Container to name instead.
+   * Without it two Worlds could reconcile one pack at once, or one could uninstall it mid-insert from
+   * under another.
+   */
+  private scopeOf(importer: Importer, worldId: string): string {
+    return importer.compendium ? importer.id : worldId;
   }
 
   /**

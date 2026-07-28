@@ -19,6 +19,7 @@ import { ConfigModule } from '../config/config.module';
 import { DB, Db, createDb } from '../db/db';
 import { compendiums, containers } from '../db/schema';
 import { EntitiesModule } from '../entities/entities.module';
+import { compendiumByImporter } from './compendiums';
 import { ImporterRegistry } from './importer-registry';
 import { WorldsModule } from './worlds.module';
 
@@ -28,11 +29,9 @@ import { WorldsModule } from './worlds.module';
  * (produce → reconcile → provenance) runs offline, never touching GitHub. The boot-time Importer uses the
  * real codeload port; each test re-registers a fixture- or failure-backed one under the same id.
  *
- * Since #398 it is a **Compendium Importer** (ADR-0079), so this file also carries the ticket's payoff: the
- * bestiary lands in the pack's own Compendium Container, and every World-scoped read goes quiet about it
- * with no exclusion predicate added anywhere. Those assertions are deliberately made at the HTTP seam
- * against the *same* endpoints a user hits, because "the read did not change" is only credible if the read
- * is the real one.
+ * Since #398 it is a **Compendium Importer** (ADR-0079): the bestiary lands in its own Compendium Container,
+ * and the World-scoped reads are asserted through the same endpoints a user hits, since "no exclusion
+ * predicate was added" is only shown by the real read staying quiet.
  */
 describe('Draw Steel monsters import', () => {
   let app: INestApplication;
@@ -128,7 +127,7 @@ describe('Draw Steel monsters import', () => {
     expect(bury?.powerRoll?.t1).toBe('5 damage; M < 0 bleeding (save ends)');
   });
 
-  it("records the pack's importer, pinned rev and attribution on install", async () => {
+  it('records the Compendium\'s Importer, pinned rev and attribution on install', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     await runImport(ada, world);
@@ -149,7 +148,7 @@ describe('Draw Steel monsters import', () => {
     expect(db.select().from(compendiums).all()).toHaveLength(1);
   });
 
-  it('leaves every World-scoped read with nothing to say about the pack', async () => {
+  it('leaves every World-scoped read with nothing to say about the Compendium', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     // One authored Entity, so each read is asserted to be *narrow* rather than merely empty.
@@ -212,7 +211,7 @@ describe('Draw Steel monsters import', () => {
     expect(compendium().rev).toBe(MONSTERS_REV);
   });
 
-  it('removes the pack, deleting its entries and uninstalling the shelf', async () => {
+  it('removes the Compendium, deleting its entries and the record of its install', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     await runImport(ada, world);
@@ -244,8 +243,43 @@ describe('Draw Steel monsters import', () => {
     const done = await pollUntilDone(ada, world);
     expect(done.status).toBe('failed');
     expect(done.error).toContain('codeload unreachable');
-    // A run that never fetched never learned a revision, so it installed no shelf to misreport one.
+    // A run that never fetched never learned a revision, so it installed nothing to misreport one.
     expect(db.select().from(compendiums).all()).toEqual([]);
+
+    // Re-running the failed run fixes it (ADR-0060) — the interesting half here, since the failure left
+    // no Compendium at all, so the recovery run has to mint one rather than reconcile into one.
+    const recovered = await runImport(ada, world);
+    expect(recovered).toMatchObject({ status: 'succeeded', created: 2 });
+    expect(compendium().rev).toBe(MONSTERS_REV);
+  });
+
+  it('refuses a second run of the same pack from another World while one is in flight', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const [alpha, beta] = [await makeWorld(ada), await makeWorld(ada)];
+    // A Compendium is Instance-wide, so "one reconcile at a time" has to mean one per *pack*, not one
+    // per World — else two Worlds interleave two reconciles into one Container (ADR-0079).
+    let release = () => undefined as void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    app.get(ImporterRegistry).register(
+      createMonstersImporter({
+        fetchMonsters: async (ctx) => {
+          await held;
+          return fixtureFetchPort().fetchMonsters(ctx);
+        },
+      }),
+    );
+
+    await ada.post(`/worlds/${alpha}/importers/${MONSTERS_IMPORTER_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await ada.post(`/worlds/${beta}/importers/${MONSTERS_IMPORTER_ID}/run`).send({ visibility: 'private' }).expect(409);
+    // Removing it from a third angle is refused for the same reason: it would drop the Container out
+    // from under the insert still running.
+    await ada.delete(`/worlds/${beta}/importers/${MONSTERS_IMPORTER_ID}`).expect(409);
+
+    release();
+    await pollUntilDone(ada, alpha);
+    // The hold is released however the run ends, so the pack is runnable again from either World.
+    await ada.post(`/worlds/${beta}/importers/${MONSTERS_IMPORTER_ID}/run`).send({ visibility: 'private' }).expect(202);
+    expect(await pollUntilDone(ada, beta)).toMatchObject({ status: 'succeeded' });
   });
 
   // ---- harness -------------------------------------------------------------
@@ -276,22 +310,9 @@ describe('Draw Steel monsters import', () => {
     return done;
   }
 
-  /** The installed pack, as its Container identity row joined to its satellite. */
+  /** The Compendium the Importer installed — its Container identity row joined to its satellite. */
   function compendium() {
-    const row = db
-      .select({
-        id: containers.id,
-        kind: containers.kind,
-        name: containers.name,
-        importer: compendiums.importer,
-        rev: compendiums.rev,
-        publisher: compendiums.publisher,
-        license: compendiums.license,
-        notice: compendiums.notice,
-      })
-      .from(compendiums)
-      .innerJoin(containers, eq(containers.id, compendiums.id))
-      .get();
+    const row = compendiumByImporter(db, MONSTERS_IMPORTER_ID);
     expect(row, 'no Compendium was installed').toBeDefined();
     return row as NonNullable<typeof row>;
   }

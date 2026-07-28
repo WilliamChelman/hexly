@@ -11,7 +11,7 @@ import { CompendiumRow, compendiums, containers } from '../db/schema';
  * Deliberately unguarded by an access context: a Compendium is Instance-wide and has no members, no
  * roles and no public link (ADR-0078), so unlike a World there is nothing per-caller to resolve.
  */
-export function selectCompendium(db: Db) {
+function selectCompendium(db: Db) {
   return db
     .select({
       ...getTableColumns(containers),
