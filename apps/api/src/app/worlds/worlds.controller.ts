@@ -33,6 +33,7 @@ import {
   createWorldRequestSchema,
   Field,
   ImportSummary,
+  InboundLinkCount,
   Mount,
   MountCandidate,
   parseFieldFilters,
@@ -265,6 +266,18 @@ export class WorldsController {
     return result;
   }
 
+  /**
+   * What deleting this World would break beyond it (ADR-0080, #414) — the confirm's number, read per
+   * act. Owner-gated like the delete, and never consulted by it.
+   */
+  @Get(':id/inbound-links')
+  inboundLinks(@CurrentUser() user: AuthUser, @Param('id') id: string): InboundLinkCount {
+    const result = this.worlds.inboundLinks(user.id, id);
+    if (result === null) throw new NotFoundException();
+    if (result === 'forbidden') throw new ForbiddenException();
+    return result;
+  }
+
   @Delete(':id')
   @HttpCode(204)
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string): void {
@@ -375,6 +388,20 @@ export class WorldsController {
     const parsed = reorderMountsRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     return mountResponse(this.mounts.reorder(user.id, id, parsed.data.containerIds));
+  }
+
+  /**
+   * The blast radius of dropping this Mount, read at the moment it is offered rather than stored
+   * anywhere (ADR-0080, #414). A GET beside the DELETE it precedes: the count is advice, and asking
+   * for it never commits to the act.
+   */
+  @Get(':id/mounts/:containerId/inbound-links')
+  mountInboundLinks(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('containerId') containerId: string,
+  ): InboundLinkCount {
+    return mountResponse(this.mounts.linkCount(user.id, id, containerId));
   }
 
   // The path param is the *mounted* Container, named as the add body names it (ADR-0080).

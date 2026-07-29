@@ -35,6 +35,26 @@ async function createWorld(page: Page, name: string): Promise<string> {
   return world.id as string;
 }
 
+/** A tiptap doc whose one paragraph carries a prose Entity Link to `entityId` — a semantic edge. */
+function proseLinking(entityId: string, label: string) {
+  return {
+    format: 'tiptap-v3',
+    snapshot: {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'entityLink', attrs: { entityId, label } }] }],
+    },
+  };
+}
+
+/** Mint a Note in `worldId`, optionally with a document — the fixture behind a countable link. */
+async function createEntity(page: Page, worldId: string, name: string, document?: unknown): Promise<string> {
+  const created = await page.request.post('/api/entities', {
+    data: { name, types: ['core.type.note'], worldId, ...(document ? { document } : {}) },
+  });
+  expect(created.ok(), `${created.status()} ${await created.text()}`).toBeTruthy();
+  return (await created.json()).id as string;
+}
+
 /** Mount `containerId` through the pane's add control, picked by id so a duplicate name cannot fool it. */
 async function mount(page: Page, containerId: string): Promise<void> {
   await page.getByTestId('mount-add-select').selectOption(containerId);
@@ -82,12 +102,44 @@ test('a World Owner declares what this World draws from, orders it, and withdraw
   await expect(mountedOrder(page).first()).toHaveAttribute('data-testid', `mount-${pack}`);
   await expect(mountedOrder(page).last()).toHaveAttribute('data-testid', `mount-${shelf}`);
 
-  // Unmounting withdraws that declaration and nothing else — the World it named is untouched.
+  // Unmounting withdraws that declaration and nothing else — the World it named is untouched. It
+  // states its blast radius first (#414): nothing points into this shelf, said in words.
   await page.getByTestId(`mount-remove-${shelf}`).click();
+  await expect(page.getByTestId('unmount-count')).toContainText('Nothing in this world points into it');
+  await page.getByTestId('confirm-unmount').click();
   await expect(page.getByTestId(`mount-${shelf}`)).toHaveCount(0);
   await expect(page.getByTestId(`mount-${pack}`)).toBeVisible();
   await page.goto(`/w/${shelf}`);
   await expect(page.getByTestId('dashboard-empty')).toBeVisible();
+});
+
+test('unmounting states how many links it would break, and unmounts anyway', async ({ page }) => {
+  const shelf = await createWorld(page, 'The Counted Shelf');
+  const campaign = await createWorld(page, 'The Counting Campaign');
+
+  // One link from the campaign into the shelf: the blast radius of dropping this Mount.
+  const sunset = await createEntity(page, shelf, 'Sunset over Aldermoor');
+  await createEntity(page, campaign, 'The Tavern', {
+    'core.field.content': proseLinking(sunset, 'Sunset over Aldermoor'),
+  });
+
+  await page.goto(`/w/${campaign}/settings`);
+  await page.getByTestId('settings-nav-mounts').click();
+  await mount(page, shelf);
+
+  await page.getByTestId(`mount-remove-${shelf}`).click();
+  // A number and a confirm (ADR-0080): stated before the act, worded for who keeps the links working.
+  await expect(page.getByTestId('unmount-count')).toContainText('1 link in this world points into it');
+  await expect(page.getByTestId('unmount-count')).toContainText('keep working for you');
+
+  // Backing out changes nothing…
+  await page.getByTestId('cancel-unmount').click();
+  await expect(page.getByTestId(`mount-${shelf}`)).toBeVisible();
+
+  // …and going through is never refused, whatever the number said.
+  await page.getByTestId(`mount-remove-${shelf}`).click();
+  await page.getByTestId('confirm-unmount').click();
+  await expect(page.getByTestId(`mount-${shelf}`)).toHaveCount(0);
 });
 
 test('mounting changes nothing about what the World holds', async ({ page, browser }) => {

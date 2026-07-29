@@ -70,6 +70,8 @@ test('type-to-confirm delete shows the entity count, enables on match, and remov
   await counted;
   // A fresh World holds no Entities (ADR-0043).
   await expect(page.getByTestId('delete-count')).toContainText('0');
+  // And nothing anywhere points into it, said in words rather than as a bare zero (#414, ADR-0080).
+  await expect(page.getByTestId('delete-links')).toContainText('Nothing outside this world points into it');
 
   // Delete is locked until the World's name is typed exactly.
   const confirm = page.getByTestId('confirm-delete');

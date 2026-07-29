@@ -8,6 +8,7 @@ import {
   EntityFacets,
   EntityType,
   FieldFilter,
+  InboundLinkCount,
   MemberRole,
   PublicLink,
   UpdateWorldRequest,
@@ -27,6 +28,7 @@ import { DB, Db } from '../db/db';
 import { loadWorld, worldAccess, worldOwnerFilter, worldRightsOf } from '../acl/world-access';
 import { sharedVisibility } from '../acl/entity-access';
 import { NudgeBus } from '../events/nudge-bus';
+import { ContainerLinksService } from './container-links.service';
 import { WorldWrites } from './world-writes';
 import { INITIAL_SEQ, containers, entities, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
 
@@ -58,6 +60,7 @@ export class WorldsService {
     private readonly entities: EntitiesService,
     private readonly bus: NudgeBus,
     private readonly writes: WorldWrites,
+    private readonly links: ContainerLinksService,
   ) {}
 
   /**
@@ -217,6 +220,17 @@ export class WorldsService {
       .all();
     // The column is nullable, so the type needs the narrowing the WHERE already did.
     return { status: 'ok', value: rows.filter((row): row is WorldThemeSource => !!row.theme) };
+  }
+
+  /**
+   * What deleting this World would break beyond it (ADR-0080, #414): the links pointing in from other
+   * Containers, and how many they come from. Owner-gated exactly like the delete it precedes, and
+   * advisory only — the delete never consults it, so a World nothing points into and a World fifty
+   * Worlds point into are equally deletable.
+   */
+  inboundLinks(userId: string, id: string): InboundLinkCount | 'forbidden' | null {
+    const gate = this.gateUpdate(userId, id);
+    return gate === 'ok' ? this.links.countInbound(id) : gate;
   }
 
   /**

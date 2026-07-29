@@ -7,6 +7,7 @@ import {
   ImportedState,
   ImporterErrorCode,
   ImporterSummary,
+  InboundLinkCount,
   ImportRecord,
   ImportRunSummary,
   ImportSkip,
@@ -20,6 +21,7 @@ import { DB, Db } from '../db/db';
 import { entities, entityImportSource } from '../db/schema';
 import { EntityWrites, ImportOverwrite, InsertEntityInput } from '../entities/entity-writes';
 import { CompendiumWrites } from './compendium-writes';
+import { ContainerLinksService } from './container-links.service';
 import { compendiumByImporter } from './compendiums';
 import { ImporterRegistry } from './importer-registry';
 
@@ -102,6 +104,7 @@ export class ImportReconcileService {
     private readonly writes: EntityWrites,
     private readonly compendiums: CompendiumWrites,
     private readonly registry: ImporterRegistry,
+    private readonly links: ContainerLinksService,
   ) {}
 
   /**
@@ -205,6 +208,21 @@ export class ImportReconcileService {
     const importer = this.packImporter(importerId);
     if (!importer?.compendium) return 'no-such-importer';
     return this.begin(userId, importer, { kind: 'pack', declaration: importer.compendium });
+  }
+
+  /**
+   * What removing this pack would break in the Worlds drawing on it (ADR-0080, #414): the links
+   * pointing into its Compendium, and how many Containers they come from. The operator sees the same
+   * pair a World Owner deleting their own Container does — a pack is nobody's to protect and every
+   * mounting World's to lose, so the number is stated on the same footing and refuses nothing.
+   *
+   * A pack the Instance no longer offers is a 404; one offered but never installed has no Container to
+   * point into, so it honestly counts zero.
+   */
+  packInboundLinks(importerId: string): InboundLinkCount | 'no-such-importer' {
+    if (!this.packImporter(importerId)) return 'no-such-importer';
+    const row = compendiumByImporter(this.db, importerId);
+    return row ? this.links.countInbound(row.id) : { links: 0, worlds: 0 };
   }
 
   /**

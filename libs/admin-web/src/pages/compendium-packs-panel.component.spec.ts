@@ -170,15 +170,61 @@ describe('CompendiumPacksPanel', () => {
     expect(has(`pack-status-${PACK}`)).toBe(false); // never the success line
   });
 
-  it('removes a pack, re-reads the list, and says so', () => {
+  it('states what removing a pack would break, then removes it, re-reads the list, and says so', () => {
+    admin.packs.mockReturnValue(of([compendiumPack({ importer: PACK, installed: installed() })]));
+    admin.packInboundLinks.mockReturnValue(of({ links: 9, worlds: 3 }));
+    render();
+
+    click(`pack-remove-${PACK}`);
+
+    // The same pair a World Owner deleting their own Container gets (ADR-0080, #414) — and asking
+    // costs nothing, so nothing has been removed yet.
+    expect(admin.packInboundLinks).toHaveBeenCalledWith(PACK);
+    expect(admin.removePack).not.toHaveBeenCalled();
+    expect(el('pack-remove-links').textContent).toContain('9');
+    expect(el('pack-remove-links').textContent).toContain('3');
+
+    click('confirm-pack-remove');
+
+    expect(admin.removePack).toHaveBeenCalledWith(PACK);
+    expect(admin.packs).toHaveBeenCalledTimes(2); // the load, then the re-read
+    expect(toaster.toasts().some((t) => t.tone === 'success')).toBe(true);
+    expect(has('pack-remove-modal')).toBe(false);
+  });
+
+  it('says nothing points into a pack rather than showing a bare zero', () => {
     admin.packs.mockReturnValue(of([compendiumPack({ importer: PACK, installed: installed() })]));
     render();
 
     click(`pack-remove-${PACK}`);
 
+    // The mock's default is a pack nothing points into.
+    expect(el('pack-remove-links').textContent).toContain('Nothing points into this pack');
+    expect(el('pack-remove-links').textContent).not.toContain('0');
+  });
+
+  it('removes whatever the count says, and removes even when the count would not load', () => {
+    admin.packs.mockReturnValue(of([compendiumPack({ importer: PACK, installed: installed() })]));
+    admin.packInboundLinks.mockReturnValue(throwError(() => new Error('boom')));
+    render();
+
+    click(`pack-remove-${PACK}`);
+
+    // The operator is never held hostage by a count: ADR-0080 rejects the veto by name.
+    expect(el('pack-remove-links').textContent).toContain("Couldn't count");
+    click('confirm-pack-remove');
     expect(admin.removePack).toHaveBeenCalledWith(PACK);
-    expect(admin.packs).toHaveBeenCalledTimes(2); // the load, then the re-read
-    expect(toaster.toasts().some((t) => t.tone === 'success')).toBe(true);
+  });
+
+  it('backs out of a pack removal without touching the shelf', () => {
+    admin.packs.mockReturnValue(of([compendiumPack({ importer: PACK, installed: installed() })]));
+    render();
+
+    click(`pack-remove-${PACK}`);
+    click('cancel-pack-remove');
+
+    expect(admin.removePack).not.toHaveBeenCalled();
+    expect(has(`pack-remove-${PACK}`)).toBe(true);
   });
 
   it('surfaces the structured refusal when the pack is already being installed', () => {

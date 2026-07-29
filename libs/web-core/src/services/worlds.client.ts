@@ -10,6 +10,7 @@ import {
   ImporterSummary,
   ImportRunSummary,
   ImportSummary,
+  InboundLinkCount,
   MemberRole,
   Mount,
   MountCandidate,
@@ -180,6 +181,15 @@ export class WorldsClient {
     return this.http.delete<void>(`/api/worlds/${id}`);
   }
 
+  /**
+   * What deleting this World would break beyond it (ADR-0080, #414): the links pointing in from other
+   * Containers, and how many they come from. Read at the moment the confirm opens rather than held
+   * anywhere, so it is never a number from before someone else's save.
+   */
+  inboundLinks(id: string): Observable<InboundLinkCount> {
+    return this.http.get<InboundLinkCount>(`/api/worlds/${id}/inbound-links`);
+  }
+
   /** The World's ownership set — Owner user ids. Owner-only server-side. */
   owners(id: string): Observable<string[]> {
     return this.http.get<string[]>(`/api/worlds/${id}/owners`);
@@ -242,6 +252,14 @@ export class WorldsClient {
   /** Replace the Mount order wholesale, as {@link setPins} replaces the pins. Owner-gated server-side. */
   reorderMounts(id: string, containerIds: string[]): Observable<Mount[]> {
     return this.http.patch<Mount[]>(`/api/worlds/${id}/mounts`, { containerIds });
+  }
+
+  /**
+   * What unmounting this Container would break: the links from *this* World pointing into it
+   * (ADR-0080, #414). Read per act, and advisory — {@link removeMount} never consults it.
+   */
+  mountInboundLinks(id: string, containerId: string): Observable<InboundLinkCount> {
+    return this.http.get<InboundLinkCount>(`/api/worlds/${id}/mounts/${containerId}/inbound-links`);
   }
 
   /** Unmount one Container; returns the remaining list. */

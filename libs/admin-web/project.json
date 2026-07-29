@@ -11,7 +11,8 @@
       "options": {
         "watch": false,
         "buildTarget": "web:build:development",
-        "tsConfig": "libs/admin-web/tsconfig.spec.json"
+        "tsConfig": "libs/admin-web/tsconfig.spec.json",
+        "setupFiles": ["libs/admin-web/src/test-setup.ts"]
       }
     }
   }

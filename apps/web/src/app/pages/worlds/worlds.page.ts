@@ -13,7 +13,7 @@ import {
   worldRoute,
   worldSettingsRoute,
 } from '@hexly/web-core';
-import { ImportSummary } from '@hexly/domain';
+import { ImportSummary, InboundLinkCount } from '@hexly/domain';
 import { ENTITY_TYPES } from '@hexly/web-entity';
 import {
   ButtonComponent,
@@ -361,6 +361,22 @@ import {
             {{ 'worldIndex.deleteCount' | transloco: { count: deleteCount() } }}
           }
         </p>
+        <!-- What deleting breaks *beyond* this World (ADR-0080, #414): the links other Containers
+             point in with, and how many they come from. A second line rather than a second dialog —
+             the entity count is what goes, this is what breaks. -->
+        <p class="text-sm text-ink-muted m-0" data-testid="delete-links">
+          @if (deleteLinks(); as blast) {
+            @if (blast.links === 0) {
+              {{ 'worldIndex.deleteLinksNone' | transloco }}
+            } @else {
+              {{ 'worldIndex.deleteLinks' | transloco: { links: blast.links, worlds: blast.worlds } }}
+            }
+          } @else if (deleteLinksFailed()) {
+            {{ 'worldIndex.deleteLinksUnknown' | transloco }}
+          } @else {
+            {{ 'worldIndex.deleteLinksCounting' | transloco }}
+          }
+        </p>
         <label class="flex flex-col gap-1 text-sm text-ink-muted">
           {{ 'worldIndex.deleteConfirmPrompt' | transloco: { name: target.name } }}
           <input
@@ -587,6 +603,10 @@ export class WorldsPage {
     name: string;
   } | null>(null);
   protected readonly deleteCount = signal<number | null>(null);
+  /** The open confirm's blast radius (ADR-0080, #414); null while it is still being read. */
+  protected readonly deleteLinks = signal<InboundLinkCount | null>(null);
+  /** Whether that read failed — told apart from "still loading", so neither reads as zero. */
+  protected readonly deleteLinksFailed = signal(false);
   protected readonly confirmText = signal('');
   protected readonly canConfirmDelete = computed(() => this.confirmText() === this.pendingDelete()?.name);
 
@@ -628,11 +648,16 @@ export class WorldsPage {
     });
   }
 
-  /** Open the type-to-confirm delete modal; the World Detail supplies the
-   * entity count it would destroy. */
+  /**
+   * Open the type-to-confirm delete modal. Two reads, both per act: the World Detail supplies the
+   * entity count it would destroy, and the blast radius what it would break beyond the World
+   * (ADR-0080, #414). Neither is stored, so neither can be stale by the time it is stated.
+   */
   protected askDelete(id: string, name: string): void {
     this.pendingDelete.set({ id, name });
     this.deleteCount.set(null);
+    this.deleteLinks.set(null);
+    this.deleteLinksFailed.set(false);
     this.confirmText.set('');
     this.worldsClient.get(id).subscribe({
       next: (world) => this.deleteCount.set(world.entityCount),
@@ -640,6 +665,12 @@ export class WorldsPage {
         this.cancelDelete();
         this.toaster.show(this.transloco.translate('worldIndex.deleteError'), 'error');
       },
+    });
+    this.worldsClient.inboundLinks(id).subscribe({
+      next: (blast) => this.deleteLinks.set(blast),
+      // A count that would not load degrades to a confirm without one, never to a refusal: a delete
+      // no configuration may veto is the whole posture (ADR-0080).
+      error: () => this.deleteLinksFailed.set(true),
     });
   }
 

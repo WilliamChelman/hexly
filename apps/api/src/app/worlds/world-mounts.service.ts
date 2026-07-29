@@ -1,10 +1,11 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { Mount, MountCandidate } from '@hexly/domain';
+import { InboundLinkCount, Mount, MountCandidate } from '@hexly/domain';
 import { and, asc, eq, isNotNull, notInArray, or } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { gate } from '../acl/owner-set';
 import { worldAccess, worldOwnerFilter } from '../acl/world-access';
 import { compendiums, containerMounts, containers, worlds } from '../db/schema';
+import { ContainerLinksService } from './container-links.service';
 import { WorldWrites } from './world-writes';
 
 /**
@@ -54,6 +55,7 @@ export class WorldMountsService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly writes: WorldWrites,
+    private readonly links: ContainerLinksService,
   ) {}
 
   /** The World's Mounts in the Owner-arranged order. Owner-gated; unreachable → 404, non-Owner → 403. */
@@ -126,6 +128,20 @@ export class WorldMountsService {
     if (current.every((m, i) => m.containerId === containerIds[i])) return { status: 'ok', value: current };
     this.writes.reorderMounts(worldId, containerIds);
     return { status: 'ok', value: this.mounts(worldId) };
+  }
+
+  /**
+   * What dropping this Mount would break: how many links from *this* World point into that Container
+   * (ADR-0080, #414). Read per act, so the panel asks the moment it offers the unmount and never
+   * caches an answer that a co-author's next save would make wrong.
+   *
+   * Owner-gated like the rest of the surface and nothing more — the Mount need not exist for the
+   * question to have an answer, and `remove` is the one that decides whether it is there to drop. The
+   * answer never refuses the unmount: it is a number and a confirm.
+   */
+  linkCount(userId: string, worldId: string, containerId: string): MountResult<InboundLinkCount> {
+    const gate = this.gateOwner(userId, worldId);
+    return gate ?? { status: 'ok', value: this.links.countInbound(containerId, worldId) };
   }
 
   /** Drop one Mount and nothing else. Unmounting what is not mounted is a 404, never a silent success. */

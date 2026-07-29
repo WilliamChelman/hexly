@@ -1,5 +1,5 @@
 import { Observable, of } from 'rxjs';
-import { CompendiumPackSummary, ImportRunSummary, ReindexJob } from '@hexly/domain';
+import { CompendiumPackSummary, ImportRunSummary, InboundLinkCount, ReindexJob } from '@hexly/domain';
 
 /** An import run in whatever state a spec needs, over the idle baseline. */
 export function importRun(run: Partial<ImportRunSummary> = {}): ImportRunSummary {
@@ -46,5 +46,8 @@ export class MockAdminClient {
   // Defaults to no packs, so a spec that only cares about the Reindex renders the panel and moves on.
   packs = vi.fn<() => Observable<CompendiumPackSummary[]>>(() => of<CompendiumPackSummary[]>([]));
   installPack = vi.fn<(importerId: string) => Observable<ImportRunSummary>>(() => of(importRun({ status: 'running' })));
+  // Defaults to a pack nothing points into (ADR-0080, #414), so a spec that only cares about install
+  // still opens the removal confirm; override per test.
+  packInboundLinks = vi.fn<(importerId: string) => Observable<InboundLinkCount>>(() => of({ links: 0, worlds: 0 }));
   removePack = vi.fn<(importerId: string) => Observable<void>>(() => of(undefined));
 }

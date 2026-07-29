@@ -589,6 +589,55 @@ describe('WorldIndex', () => {
     expect($(el, '[data-testid=delete-count]')?.textContent).toContain('3');
   });
 
+  it('states what deleting the World would break beyond it, and deletes whatever it says', () => {
+    const fixture = render([world('w1', 'Aldermoor')]);
+    const el = fixture.nativeElement as HTMLElement;
+    worldsClient.get.mockReturnValue(of({ ...world('w1', 'Aldermoor'), entityCount: 3, pinnedEntityIds: [], seq: 1 }));
+    worldsClient.inboundLinks.mockReturnValue(of({ links: 7, worlds: 2 }));
+
+    ($(el, '[data-testid=delete-world-w1]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    // Both halves of the blast radius (ADR-0080, #414): the links, and how many Worlds they come from.
+    expect(worldsClient.inboundLinks).toHaveBeenCalledWith('w1');
+    expect($(el, '[data-testid=delete-links]')?.textContent).toContain('7');
+    expect($(el, '[data-testid=delete-links]')?.textContent).toContain('2');
+    // And it refuses nothing: the confirm arms on the typed name alone, exactly as it did before.
+    const input = $(el, '[data-testid=delete-confirm-input]') as HTMLInputElement;
+    input.value = 'Aldermoor';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    worldsClient.delete.mockReturnValue(of(undefined));
+    ($(el, '[data-testid=confirm-delete]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(worldsClient.delete).toHaveBeenCalledWith('w1');
+  });
+
+  it('says nothing points into the World rather than showing a bare zero', () => {
+    const fixture = openDeleteModal('Aldermoor');
+    const el = fixture.nativeElement as HTMLElement;
+
+    // The mock's default is a Container nothing points into.
+    expect($(el, '[data-testid=delete-links]')?.textContent).toContain('Nothing outside this world points into it');
+  });
+
+  it('still deletes when the blast radius would not load', () => {
+    worldsClient.inboundLinks.mockReturnValue(throwError(() => new Error('boom')));
+    const fixture = openDeleteModal('Aldermoor');
+    const el = fixture.nativeElement as HTMLElement;
+
+    // A count is advice, never a gate — the veto is the option ADR-0080 rejects by name.
+    expect($(el, '[data-testid=delete-links]')?.textContent).toContain("Couldn't count");
+    const input = $(el, '[data-testid=delete-confirm-input]') as HTMLInputElement;
+    input.value = 'Aldermoor';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    worldsClient.delete.mockReturnValue(of(undefined));
+    ($(el, '[data-testid=confirm-delete]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(worldsClient.delete).toHaveBeenCalledWith('w1');
+  });
+
   /** Open the delete modal for w1 and resolve its entity count. */
   function openDeleteModal(name: string, count = 2) {
     const fixture = render([world('w1', name)]);
