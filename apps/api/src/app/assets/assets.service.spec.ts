@@ -180,9 +180,111 @@ describe('AssetsService', () => {
       expect(new Uint8Array(assets.exportAssets('world-1')[0].bytes)).toEqual(PNG_A);
     });
 
-    it('skips an Asset Entity whose bytes are missing on disk rather than aborting', () => {
+    it('skips an Asset Entity in Missing Bytes rather than aborting', () => {
       seedAsset('world-1', 'asset-1', 'Ghost', 'a'.repeat(64), '.png', 3);
       expect(assets.exportAssets('world-1')).toEqual([]);
+    });
+
+    describe('the foreign bytes a document draws on (ADR-0080, #415)', () => {
+      /** The shelf `world-1` draws from, and two of its notes to source edges from. */
+      beforeEach(() => {
+        db.$client
+          .prepare("INSERT INTO containers (id, kind, name, created_at, updated_at) VALUES (?,'world',?,0,0)")
+          .run('shelf-1', 'S');
+        db.$client.prepare('INSERT INTO worlds (id) VALUES (?)').run('shelf-1');
+        for (const [id, name] of [
+          ['note-1', 'Hero'],
+          ['note-2', 'The Lair'],
+        ])
+          db.$client
+            .prepare(
+              `INSERT INTO entities (id, container_id, name, types, tags, visibility, version, seq, document, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,1,1,?,?,?)`,
+            )
+            .run(id, 'world-1', name, JSON.stringify(['core.type.note']), '[]', 'private', '{}', 0, 0);
+      });
+
+      /** The `asset` edge a prose image mints: the source's Container, and the one its URL named (#407). */
+      function seedAssetEdge(sourceEntityId: string, targetContainerId: string, hash: string): void {
+        db.$client
+          .prepare(
+            `INSERT INTO entity_edges (source_entity_id, container_id, target_kind, target_id, target_container_id, decor)
+             VALUES (?,'world-1','asset',?,?,1)`,
+          )
+          .run(sourceEntityId, hash, targetContainerId);
+      }
+
+      /** An Asset Entity on the shelf, stored and indexed there — what a mounted image resolves to. */
+      function seedShelfAsset(name: string, bytes: Uint8Array): string {
+        const stored = assets.store('shelf-1', `${name}.png`, bytes);
+        seedAsset('shelf-1', `shelf-${name}`, name, stored.hash, '.png', bytes.length);
+        return stored.hash;
+      }
+
+      it("reads the bytes from the Container the edge's URL named, not the referencing World's", () => {
+        const hash = seedShelfAsset('Portrait', PNG_A);
+        seedAssetEdge('note-1', 'shelf-1', hash);
+
+        const exported = assets.exportAssets('world-1');
+        expect(exported).toEqual([
+          { servedUrl: `/assets/shelf-1/${hash}.png`, originalFilename: 'Portrait.png', bytes: expect.any(Buffer) },
+        ]);
+        expect(new Uint8Array(exported[0].bytes)).toEqual(PNG_A);
+      });
+
+      it("writes the World's own Assets first, so what it holds is never displaced by what it draws on", () => {
+        const own = assets.store('world-1', 'Portrait.png', PNG_A);
+        seedAsset('world-1', 'asset-1', 'Portrait', own.hash, '.png', PNG_A.length);
+        // The same human-readable name on both sides — the collision the export's uniquePath resolves.
+        const foreign = seedShelfAsset('Portrait', PNG_B);
+        seedAssetEdge('note-1', 'shelf-1', foreign);
+
+        expect(assets.exportAssets('world-1').map((a) => a.servedUrl)).toEqual([
+          `/assets/world-1/${own.hash}.png`,
+          `/assets/shelf-1/${foreign}.png`,
+        ]);
+      });
+
+      it('counts a World’s own Asset once, however many of its edges point at it', () => {
+        const own = assets.store('world-1', 'Portrait.png', PNG_A);
+        seedAsset('world-1', 'asset-1', 'Portrait', own.hash, '.png', PNG_A.length);
+        seedAssetEdge('note-1', 'world-1', own.hash);
+
+        expect(assets.exportAssets('world-1')).toHaveLength(1);
+      });
+
+      it('yields one entry however many documents reference the same foreign image', () => {
+        const hash = seedShelfAsset('Portrait', PNG_A);
+        seedAssetEdge('note-1', 'shelf-1', hash);
+        seedAssetEdge('note-2', 'shelf-1', hash);
+
+        expect(assets.exportAssets('world-1')).toHaveLength(1);
+      });
+
+      it('leaves out a foreign image in Missing Bytes rather than failing the export', () => {
+        // Indexed on the shelf, but nothing on disk — an unmounted volume, a relocated Assets root.
+        seedAsset('shelf-1', 'shelf-ghost', 'Ghost', 'a'.repeat(64), '.png', 3);
+        seedAssetEdge('note-1', 'shelf-1', 'a'.repeat(64));
+
+        expect(assets.exportAssets('world-1')).toEqual([]);
+      });
+
+      it('drops an edge naming no Asset in that Container — already dangling, nothing to flatten', () => {
+        seedAssetEdge('note-1', 'shelf-1', 'b'.repeat(64));
+        expect(assets.exportAssets('world-1')).toEqual([]);
+      });
+
+      it('ignores an entity edge, whose target Container is the source’s own', () => {
+        const hash = seedShelfAsset('Portrait', PNG_A);
+        db.$client
+          .prepare(
+            `INSERT INTO entity_edges (source_entity_id, container_id, target_kind, target_id, target_container_id, decor)
+             VALUES (?,'world-1','entity',?,NULL,0)`,
+          )
+          .run('note-1', hash);
+
+        expect(assets.exportAssets('world-1')).toEqual([]);
+      });
     });
   });
 });

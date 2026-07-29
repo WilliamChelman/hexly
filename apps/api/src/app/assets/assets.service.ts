@@ -4,11 +4,12 @@ import { basename, extname, join } from 'node:path';
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { AssetSummary, assetUrl, EntityDocument, entityDocumentSchema, THUMBNAIL_SUFFIX } from '@hexly/domain';
 import { assetSummaryOf, readAssetValue } from '@hexly/plugin-asset';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
-import { assetIndex, entities } from '../db/schema';
+import { assetIndex, entities, entityEdges } from '../db/schema';
 import { AssetBytesRegistry } from '../entities/asset-bytes-registry';
 import { DeletedEntity, EntityDeletionRegistry } from '../entities/entity-deletion-registry';
+import { edgeTargetContainerId } from '../entities/utils/asset-edge-target';
 
 /** DI token for the on-disk Assets root, resolved by `resolveAssetsDir` (ADR-0034). */
 export const ASSETS_DIR = Symbol('ASSETS_DIR');
@@ -35,6 +36,16 @@ export const ASSET_EXTENSIONS = new Set(Object.keys(MIME_BY_EXT));
 /** The content type a filename's extension serves as (ADR-0034); unlisted extensions are a generic download. */
 export function mimeForExt(ext: string): string {
   return MIME_BY_EXT[ext.toLowerCase()] ?? 'application/octet-stream';
+}
+
+/**
+ * One Asset as the Vault export writes it: the capability URL its docs reference (the key the export's
+ * `srcMap` repoints), the human-readable `name + ext` the zip entry takes, and the bytes themselves.
+ */
+export interface ExportAsset {
+  readonly servedUrl: string;
+  readonly originalFilename: string;
+  readonly bytes: Buffer;
 }
 
 /** What {@link AssetsService.store} tells the mint path: the capability URL and the bytes' content hash. */
@@ -166,18 +177,22 @@ export class AssetsService implements OnModuleInit {
   }
 
   /**
-   * Every Asset for a World, for the vault export (ADR-0033, ADR-0065): the capability URL its docs
-   * reference, the human-readable `name + ext` to write into the zip, and its bytes. Derived from the
-   * Asset Entities (their asset-ref) via the dedup index. An Entity whose bytes are
-   * missing on disk is skipped rather than aborting the export.
+   * Every Asset a World's vault export writes (ADR-0033, ADR-0065): the capability URL its docs
+   * reference, the human-readable `name + ext` to write into the zip, and its bytes. The World's own
+   * Asset Entities first, then the foreign ones its documents draw on from a Container it **Mounts**,
+   * flattened in so the archive opens without broken pictures (ADR-0080).
+   *
+   * Own-first is what keeps a World that draws on nothing entry-for-entry the archive it was: it has no
+   * foreign edges, so the second list is empty. An Entity in **Missing Bytes** is left out rather than
+   * aborting the export.
    */
-  exportAssets(worldId: string): { servedUrl: string; originalFilename: string; bytes: Buffer }[] {
-    const out: { servedUrl: string; originalFilename: string; bytes: Buffer }[] = [];
-    for (const { name, value } of this.assetEntities(worldId)) {
-      const found = this.read(worldId, value.hash + value.ext);
+  exportAssets(worldId: string): ExportAsset[] {
+    const out: ExportAsset[] = [];
+    for (const { containerId, name, value } of [...this.assetEntities(worldId), ...this.foreignAssets(worldId)]) {
+      const found = this.read(containerId, value.hash + value.ext);
       if (found) {
         // One home for the served-URL + `name + ext` derivation: the picker's {@link assetSummaryOf}.
-        const summary = assetSummaryOf(worldId, name, value);
+        const summary = assetSummaryOf(containerId, name, value);
         out.push({ servedUrl: summary.url, originalFilename: summary.originalFilename, bytes: found.bytes });
       }
     }
@@ -204,9 +219,7 @@ export class AssetsService implements OnModuleInit {
     const out: AssetSummary[] = [];
     for (const match of matches) {
       const raw = docs.get(match.id);
-      if (!raw) continue;
-      const parsed = entityDocumentSchema.safeParse(JSON.parse(raw) as EntityDocument);
-      const value = parsed.success ? readAssetValue(parsed.data) : null;
+      const value = raw ? assetRefOf(raw) : null;
       if (value) out.push(assetSummaryOf(worldId, match.name, value));
     }
     return out;
@@ -214,28 +227,80 @@ export class AssetsService implements OnModuleInit {
 
   /**
    * The World's Asset Entities' names and asset-ref values, joined off the derived dedup index (ADR-0065)
-   * — the source {@link exportAssets} enumerates. An Entity whose document carries no readable asset-ref
-   * (a placeholder ref this build cannot parse) is skipped forward-only.
+   * — the source {@link exportAssets} enumerates.
    */
-  private assetEntities(worldId: string): { name: string; value: NonNullable<ReturnType<typeof readAssetValue>> }[] {
-    const rows = this.db
-      .select({ name: entities.name, document: entities.document, hash: assetIndex.hash })
-      .from(assetIndex)
-      .innerJoin(entities, eq(entities.id, assetIndex.entityId))
-      .where(eq(assetIndex.containerId, worldId))
-      .orderBy(asc(entities.createdAt), asc(assetIndex.hash))
-      .all();
-    const out: { name: string; value: NonNullable<ReturnType<typeof readAssetValue>> }[] = [];
-    for (const row of rows) {
-      const parsed = entityDocumentSchema.safeParse(JSON.parse(row.document) as EntityDocument);
-      const value = parsed.success ? readAssetValue(parsed.data) : null;
-      if (value) out.push({ name: row.name, value });
-    }
-    return out;
+  private assetEntities(worldId: string): AssetEntityRow[] {
+    return readAssetRefs(
+      this.db
+        .select({ containerId: assetIndex.containerId, name: entities.name, document: entities.document })
+        .from(assetIndex)
+        .innerJoin(entities, eq(entities.id, assetIndex.entityId))
+        .where(eq(assetIndex.containerId, worldId))
+        .orderBy(asc(entities.createdAt), asc(assetIndex.hash))
+        .all(),
+    );
+  }
+
+  /**
+   * The Asset Entities this World's `asset` edges name in another Container — the second half of what
+   * {@link exportAssets} writes. Read off the edges, which carry the Container their URL named (#407),
+   * never through the **Mount** set, exactly as the harvest does not: unmounting stops a link being
+   * *followed*, it does not stop the bytes rendering, so dropping them the moment a Mount went away would
+   * lose pictures the page still shows (ADR-0080).
+   *
+   * Distinct because one image referenced by twenty notes is one set of bytes, and ordered by its address
+   * so an archive is reproducible. An edge whose Container holds no such Asset is already dangling and
+   * drops on the join: there is nothing to flatten.
+   */
+  private foreignAssets(worldId: string): AssetEntityRow[] {
+    return readAssetRefs(
+      this.db
+        .selectDistinct({ containerId: assetIndex.containerId, name: entities.name, document: entities.document })
+        .from(entityEdges)
+        .innerJoin(
+          assetIndex,
+          and(sql`${assetIndex.containerId} = ${edgeTargetContainerId}`, eq(assetIndex.hash, entityEdges.targetId)),
+        )
+        .innerJoin(entities, eq(entities.id, assetIndex.entityId))
+        .where(
+          and(
+            eq(entityEdges.containerId, worldId),
+            eq(entityEdges.targetKind, 'asset'),
+            sql`${edgeTargetContainerId} <> ${worldId}`,
+          ),
+        )
+        .orderBy(asc(assetIndex.containerId), asc(assetIndex.hash))
+        .all(),
+    );
   }
 
   /** Remove a World's entire Asset folder (its index rows cascade away with the World). Best-effort: a missing folder is fine. */
   deleteWorld(worldId: string): void {
     rmSync(join(this.dir, worldId), { recursive: true, force: true });
   }
+}
+
+/** One Asset Entity resolved for the export: where its bytes live, what to call them, and their address. */
+interface AssetEntityRow {
+  readonly containerId: string;
+  readonly name: string;
+  readonly value: AssetRef;
+}
+
+type AssetRef = NonNullable<ReturnType<typeof readAssetValue>>;
+
+/** The asset-ref a stored document carries, or null — a placeholder this build cannot parse reads as absent. */
+function assetRefOf(document: string): AssetRef | null {
+  const parsed = entityDocumentSchema.safeParse(JSON.parse(document) as EntityDocument);
+  return parsed.success ? readAssetValue(parsed.data) : null;
+}
+
+/** Resolve each queried row's asset-ref; one carrying none is skipped forward-only. */
+function readAssetRefs(rows: readonly { containerId: string; name: string; document: string }[]): AssetEntityRow[] {
+  const out: AssetEntityRow[] = [];
+  for (const row of rows) {
+    const value = assetRefOf(row.document);
+    if (value) out.push({ containerId: row.containerId, name: row.name, value });
+  }
+  return out;
 }
