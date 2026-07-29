@@ -221,9 +221,11 @@ export const ENTITY_LIST_DEFAULT_LIMIT = 50;
 export const ENTITY_LIST_MAX_LIMIT = 200;
 
 /**
- * CONTEXT.md → Link-target read. `link-target` returns no **Compendium Entry**; `navigation` does,
- * ranked below authored Entities. Declared by the surface, so one rule serves all four link-target
- * ones. Defaults to `navigation` — the seal is held by discovery, not by an invariant (ADR-0079).
+ * CONTEXT.md → Link-target read. `link-target` returns what its Container scope holds plus what that
+ * scope **Mounts**, the World's own ranked first (ADR-0080); `navigation` returns anything the caller
+ * can reach, **Compendium Entries** included and ranked below authored Entities. Declared by the
+ * surface, so one rule serves all four link-target ones. Defaults to `navigation` — the scope is held
+ * by discovery, not by an invariant (ADR-0079).
  */
 export const entityReadSchema = z.enum(['navigation', 'link-target']);
 
@@ -271,9 +273,10 @@ export const entityListQuerySchema = z.object({
     .union([z.string(), z.array(z.string())])
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
-  // Facet: the **Compendium** facet's selection — a narrowing *within* the scope above, so it drills
-  // down like Type or Tag (dropped when counting its own values) rather than redefining what the read
-  // is about. Nothing outside the scope can be reached by naming it here: both predicates AND.
+  // Facet: the **Container** facet's selection — one pack, or one **Mount**ed Shelf (ADR-0080). A
+  // narrowing *within* the scope above, so it drills down like Type or Tag (dropped when counting its
+  // own values) rather than redefining what the read is about. Nothing outside the scope can be
+  // reached by naming it here: both predicates AND. Named `compendium` for the browse it shipped for.
   compendium: z
     .union([z.string(), z.array(z.string())])
     .transform((v) => (Array.isArray(v) ? v : [v]))
@@ -358,9 +361,10 @@ export interface EntityFacets {
   readonly visibility: readonly FacetCount[];
   readonly fields: readonly FieldFacet[];
   /**
-   * The **Compendium** facet (ADR-0079): which pack each entry came from, `value` the Container id and
-   * `label` its name. Surfaced *by presence* like a Field facet — a read that names a single Container
-   * has nothing to narrow, so only a cross-Container read (the Compendium browse) carries it.
+   * The **Container** facet (ADR-0079, ADR-0080): which Container each row came from, `value` the
+   * Container id and `label` its name. Surfaced *by presence* like a Field facet — a read spanning a
+   * single Container has nothing to narrow, so only a cross-Container one carries it: the Compendium
+   * browse, and a link-target read in a World that **Mounts**, where it narrows to one pack or one Shelf.
    */
   readonly compendium?: readonly FacetCount[];
 }

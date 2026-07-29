@@ -84,8 +84,9 @@ export function isCompendiumContainer(db: Db, containerId: string): boolean {
 /**
  * The same question as a predicate over an `entities` row. Reads the satellite that *is* the
  * discriminator (ADR-0078), so it names no pack, no flag and no Entity Type — and it is one expression
- * for four readers: the reachability rule, the **Sealed** projection, the link-target exclusion (#400)
- * and the search tier that ranks the shelf below authored Entities.
+ * for four readers: the reachability rule, the **Sealed** projection, the link-target exclusion (#400,
+ * which a **Mount** is now the one exception to, ADR-0080) and the search tier that ranks the shelf
+ * below authored Entities.
  */
 export function inACompendium(): SQL {
   return sql`EXISTS (SELECT 1 FROM ${compendiums} WHERE ${compendiums.id} = ${entities.containerId})`;

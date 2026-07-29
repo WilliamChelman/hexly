@@ -72,6 +72,8 @@ function inspectorProviders() {
           if (opts.q) items = items.filter((e) => e.name.toLowerCase().includes(opts.q!.toLowerCase()));
           return of({ items, nextCursor: null });
         },
+        // The Container facet the picker offers to narrow by (ADR-0080): no Mounts here, so no category.
+        facets: () => of({ type: [], tag: [], visibility: [], fields: [] }),
         create: (name: string, types: readonly EntityType[]) => {
           // The create-and-link flow sends a one-element ordered set now (#189); record its primary.
           createdCalls.push({ name, type: types[0] });

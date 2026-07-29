@@ -88,14 +88,72 @@ describe('EntitySearchPicker', () => {
 
   /**
    * Every consumer of this picker asks the same question — what may this point at? — so the read says so
-   * once here rather than four times over, and the server answers it with no Compendium Entry (ADR-0079).
-   * That covers the Entity Link Field picker, the Board Embed picker and a broken link's relink popover.
+   * once here rather than four times over, and the server answers it with this World's Entities and the
+   * ones in the Containers it Mounts, and nothing else (ADR-0079, ADR-0080). That covers the Entity Link
+   * Field picker, the Board Embed picker and a broken link's relink popover, from one read.
    */
-  it('asks for link targets, so no Compendium Entry is ever offered', () => {
+  it('asks for link targets, so only what the World may point at is offered', () => {
     const fixture = TestBed.createComponent(Host);
     fixture.detectChanges();
 
     expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ read: 'link-target' }));
+  });
+
+  /**
+   * The **Container** facet (ADR-0080): where a World Mounts something, the picker offers one chip per
+   * Container the read reached, and picking one narrows to a single pack or Shelf. Counted off the same
+   * read the options come from — its own selection dropped, as every drill-down facet's is — so the
+   * chips can never annotate a list they disagree with.
+   */
+  describe('the Container facet', () => {
+    beforeEach(() => {
+      entities.facets.mockImplementation(() =>
+        of({
+          type: [],
+          tag: [],
+          visibility: [],
+          fields: [],
+          compendium: [
+            { value: 'w1', label: 'Aldermoor', count: 2 },
+            { value: 'shelf', label: 'The Art Shelf', count: 1 },
+          ],
+        }),
+      );
+    });
+
+    it('offers one chip per Container, labelled and counted', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      expect(byId(el, 'pin-picker-container-w1')?.textContent).toContain('Aldermoor');
+      expect(byId(el, 'pin-picker-container-shelf')?.textContent).toContain('The Art Shelf');
+      expect(byId(el, 'pin-picker-container-shelf')?.textContent).toContain('1');
+      // Counted with its own selection dropped, so the chip you stand on keeps its siblings.
+      expect(entities.facets).toHaveBeenCalledWith(expect.objectContaining({ compendium: undefined }));
+    });
+
+    it('narrows the read to the Container picked, and gives it back', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      byId(el, 'pin-picker-container-shelf')?.click();
+      fixture.detectChanges();
+      expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ compendium: ['shelf'] }));
+
+      byId(el, 'pin-picker-container-all')?.click();
+      fixture.detectChanges();
+      expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ compendium: undefined }));
+    });
+
+    it('offers no chip at all where the read spans one Container, there being nothing to narrow', () => {
+      entities.facets.mockImplementation(() => of({ type: [], tag: [], visibility: [], fields: [] }));
+      const fixture = TestBed.createComponent(Host);
+      fixture.detectChanges();
+
+      expect(byId(fixture.nativeElement as HTMLElement, 'pin-picker-containers')).toBeNull();
+    });
   });
 
   /**

@@ -113,6 +113,9 @@ describe('EntityLinkPicker', () => {
               if (opts.worldId) items = items.filter((e) => e.worldId === opts.worldId);
               return of({ items, nextCursor: null });
             },
+            // The Container facet the picker offers to narrow by (ADR-0080): no Mounts here, so no
+            // category — the shape a World that draws on nothing answers with.
+            facets: () => of({ type: [], tag: [], visibility: [], fields: [] }),
             create: (name: string, types: readonly EntityType[], worldId?: string) => {
               createdCalls.push({ name, type: types[0], worldId });
               const detail: EntityDetail = {
