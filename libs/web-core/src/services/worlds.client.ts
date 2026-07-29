@@ -11,6 +11,8 @@ import {
   ImportRunSummary,
   ImportSummary,
   MemberRole,
+  Mount,
+  MountCandidate,
   PublicLink,
   UpdateUserDefinedTypeRequest,
   UpdateWorldFieldRequest,
@@ -204,6 +206,40 @@ export class WorldsClient {
   /** Remove a member, or leave the World yourself (pass your own id); returns the updated member set. */
   removeMember(id: string, userId: string): Observable<WorldMember[]> {
     return this.http.delete<WorldMember[]>(`/api/worlds/${id}/members/${userId}`);
+  }
+
+  /**
+   * The Containers this World draws from (CONTEXT.md → Mount, ADR-0080), in the Owner-arranged order.
+   * World-Owner-gated server-side, as the whole Mount surface is.
+   *
+   * Outside the live-follow store: a Mount is another Container's identity, which answers to no `world`
+   * nudge for this one — the panel re-reads through the write it just made instead.
+   */
+  mounts(id: string): Observable<Mount[]> {
+    return this.http.get<Mount[]>(`/api/worlds/${id}/mounts`);
+  }
+
+  /** The Containers the caller may mount here: every installed Compendium plus every World they Own. */
+  mountCandidates(id: string): Observable<MountCandidate[]> {
+    return this.http.get<MountCandidate[]>(`/api/worlds/${id}/mount-candidates`);
+  }
+
+  /** Declare one more Container this World draws from; returns the updated list. Idempotent (200). */
+  addMount(id: string, containerId: string): Observable<Mount[]> {
+    return this.http.post<Mount[]>(`/api/worlds/${id}/mounts`, { containerId });
+  }
+
+  /**
+   * Replace the Mount order wholesale, as {@link setPins} replaces the pins. It reorders and nothing
+   * else — a list that is not a permutation of what is mounted is refused server-side.
+   */
+  reorderMounts(id: string, containerIds: string[]): Observable<Mount[]> {
+    return this.http.patch<Mount[]>(`/api/worlds/${id}/mounts`, { containerIds });
+  }
+
+  /** Unmount one Container; returns the remaining list. */
+  removeMount(id: string, containerId: string): Observable<Mount[]> {
+    return this.http.delete<Mount[]>(`/api/worlds/${id}/mounts/${containerId}`);
   }
 
   /** The Entity Types available in a World (#191): plugin + user-defined. Reachable-gated server-side. */

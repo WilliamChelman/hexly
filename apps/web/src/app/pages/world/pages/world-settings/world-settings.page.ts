@@ -9,9 +9,10 @@ import { OwnerSetComponent, MemberSetComponent, PublicLinkComponent } from '@hex
 import { WorldTypesPanelComponent } from './components/world-types-panel.component';
 import { WorldFieldsPanelComponent } from './components/world-fields-panel.component';
 import { WorldImportsPanelComponent } from './components/world-imports-panel.component';
+import { WorldMountsPanelComponent } from './components/world-mounts-panel.component';
 import { WorldThemePanelComponent } from './components/world-theme-panel.component';
 
-type Section = 'access' | 'schema' | 'theme' | 'imports' | 'sharing';
+type Section = 'access' | 'schema' | 'mounts' | 'theme' | 'imports' | 'sharing';
 
 interface SectionItem {
   readonly section: Section;
@@ -45,6 +46,7 @@ interface SectionItem {
     WorldTypesPanelComponent,
     WorldFieldsPanelComponent,
     WorldImportsPanelComponent,
+    WorldMountsPanelComponent,
     WorldThemePanelComponent,
   ],
   template: `
@@ -90,6 +92,13 @@ interface SectionItem {
               <h2 class="group-head">{{ 'worldFields.heading' | transloco }}</h2>
               <p class="detail-sub">{{ 'worldFields.subhead' | transloco }}</p>
               <div class="pane" appPanel><app-world-fields [id]="id" /></div>
+            }
+            @case ('mounts') {
+              <header class="detail-head">
+                <h1 class="detail-title">{{ 'mounts.heading' | transloco }}</h1>
+                <p class="detail-sub">{{ 'mounts.subhead' | transloco }}</p>
+              </header>
+              <div class="pane" appPanel><app-world-mounts [id]="id" /></div>
             }
             @case ('theme') {
               <header class="detail-head">
@@ -174,6 +183,9 @@ export class WorldSettingsPage {
         ? [{ section: 'access' as const, icon: 'user' as const, label: 'collab.members.heading' }]
         : []),
       { section: 'schema' as const, icon: 'label' as const, label: 'worldTypes.heading' },
+      // Declaring what this World draws from is the Owner's alone (ADR-0080), and the whole Mount
+      // surface is Owner-gated server-side — so it rides the same `manage` right the Theme does.
+      ...(canManage ? [{ section: 'mounts' as const, icon: 'library' as const, label: 'mounts.heading' }] : []),
       ...(canManage ? [{ section: 'theme' as const, icon: 'palette' as const, label: 'worldTheme.heading' }] : []),
       { section: 'imports' as const, icon: 'download' as const, label: 'imports.heading' },
       ...(collaboration

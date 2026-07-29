@@ -9,6 +9,8 @@ import {
   ImportRunSummary,
   ImportSummary,
   MemberRole,
+  Mount,
+  MountCandidate,
   PublicLink,
   UpdateUserDefinedTypeRequest,
   UpdateWorldFieldRequest,
@@ -51,6 +53,13 @@ export class MockWorldsClient {
   addMember = vi.fn<(id: string, userId: string, role: MemberRole) => Observable<WorldMember[]>>();
   setMemberRole = vi.fn<(id: string, userId: string, role: MemberRole) => Observable<WorldMember[]>>();
   removeMember = vi.fn<(id: string, userId: string) => Observable<WorldMember[]>>();
+  // Both default to empty, so a spec mounting the Mounts panel (ADR-0080, #408) without caring about
+  // it still renders — an unmounted World is the ordinary case; override per test as needed.
+  mounts = vi.fn<(id: string) => Observable<Mount[]>>(() => of<Mount[]>([]));
+  mountCandidates = vi.fn<(id: string) => Observable<MountCandidate[]>>(() => of<MountCandidate[]>([]));
+  addMount = vi.fn<(id: string, containerId: string) => Observable<Mount[]>>();
+  reorderMounts = vi.fn<(id: string, containerIds: string[]) => Observable<Mount[]>>();
+  removeMount = vi.fn<(id: string, containerId: string) => Observable<Mount[]>>();
   // Defaults to no available Importers so a spec mounting the Imports panel (#260) without caring
   // about it still renders; override per test as needed.
   importers = vi.fn<(id: string) => Observable<ImporterSummary[]>>(() => of<ImporterSummary[]>([]));

@@ -623,6 +623,27 @@
       "body": "À trois jours à l’est du fleuve, la route bifurque à une borne brisée."
     }
   },
+  "mounts": {
+    "heading": "Montages",
+    "subhead": "Les conteneurs dont ce monde se sert. Monter élargit ce que ce monde peut désigner — ce qu'il contient reste intact, donc ses entités, ses décomptes et son explorateur ne changent pas. Vous pouvez monter les mondes que vous possédez, ainsi que tout compendium installé.",
+    "empty": "Ce monde ne se sert encore de rien.",
+    "kind": {
+      "world": "Monde",
+      "compendium": "Compendium"
+    },
+    "unmount": "Démonter",
+    "moveUpLabel": "Déplacer {{name}} vers le haut",
+    "moveDownLabel": "Déplacer {{name}} vers le bas",
+    "addLabel": "Conteneur à monter",
+    "addPlaceholder": "Choisir un conteneur…",
+    "add": "Monter",
+    "noCandidates": "Plus rien à monter. Vous pouvez monter les mondes que vous possédez et les compendiums installés.",
+    "loadError": "Impossible de charger ce dont ce monde se sert.",
+    "candidatesError": "Impossible de charger ce que vous pouvez monter ici.",
+    "addError": "Impossible de monter ce conteneur. Veuillez réessayer.",
+    "removeError": "Impossible de démonter ce conteneur. Veuillez réessayer.",
+    "reorderError": "Impossible de réordonner les montages. Veuillez réessayer."
+  },
   "imports": {
     "heading": "Imports",
     "subhead": "Importez une bibliothèque de référence gérée depuis la source d'un plugin. Un réimport écrase l'ensemble ; vos entités créées à la main ne sont pas touchées.",
