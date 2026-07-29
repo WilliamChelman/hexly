@@ -3,6 +3,7 @@ import {
   AdoptEntityRequest,
   ApiError,
   assetThumbnailUrl,
+  assetUrl,
   CreateEntityRequest,
   emptyEntityDocument,
   entityDocumentSchema,
@@ -303,6 +304,12 @@ export class EntitiesService {
         const assetRow = row as typeof row & ThumbnailRow;
         const thumbnailUrl = resolveThumbnailUrl(assetRow, row.containerId);
         if (thumbnailUrl) summary = { ...summary, thumbnailUrl };
+        // The full-resolution capability URL rides the same join (ADR-0034/0065): what a Board **Image**
+        // stores, where the thumbnail is what a grid draws. Own bytes only — a Thumbnail designation
+        // decorates this row rather than being its content — and keyed off the row's *own* Container, so a
+        // mounted Shelf Asset places under the Shelf's and renders for every reader (ADR-0080).
+        if (assetRow.ownAssetHash && assetRow.ownAssetExt)
+          summary = { ...summary, assetUrl: assetUrl(row.containerId, assetRow.ownAssetHash, assetRow.ownAssetExt) };
         // The missing-bytes state (#325) rides the same opt-in, so only rows that draw imagery pay the stat.
         // Own bytes only: a broken Thumbnail designation is the designated Asset's story, not this row's.
         if (this.assetBytes.missing(row.containerId, assetRow.ownAssetHash, assetRow.ownAssetExt))

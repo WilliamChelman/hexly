@@ -3,8 +3,12 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { EntityFacets, EntityReferences, EntitySummary, FacetCount } from '@hexly/domain';
 import { tiptapContent } from '@hexly/plugin-content';
+import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
 import { ConfigModule } from '../config/config.module';
@@ -15,10 +19,11 @@ import { CompendiumWrites } from '../worlds/compendium-writes';
 import { WorldsModule } from '../worlds/worlds.module';
 
 /**
- * Every link picker offers what the World **Mounts** (#411, ADR-0080). The `@` mention picker, the
- * **Entity Link** Field picker and the Board **Embed** picker ask one question — *what may this point
- * at?* — through one read, so the widening is asserted once, here, at the read they share: a link
- * target must be in the linking Container or one it Mounts.
+ * Every link picker offers what the World **Mounts** (#411, #416, ADR-0080). The `@` mention picker, the
+ * **Entity Link** Field picker, the Board **Embed** picker and the asset pickers — the asset-link control
+ * and the Board **Image** chooser — ask one question, *what may this point at?*, through one read, so the
+ * widening is asserted once, here, at the read they share: a link target must be in the linking Container
+ * or one it Mounts.
  *
  * Driven through `GET /entities` and `GET /entities/facets` for the same reason #400's line is: the
  * scope *is* the read's behaviour, and there is no flag on a row to inspect instead.
@@ -26,6 +31,9 @@ import { WorldsModule } from '../worlds/worlds.module';
  * The cast is ADR-0080's: Ada owns the campaign, the shelf it draws from and every Mount declared
  * here; Bob plays in the campaign and is where the widening meets the cascade it rides.
  */
+/** A tiny valid-enough PNG; only its bytes' identity matters for the content address. */
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
 describe('Every link picker offers what the World Mounts', () => {
   let app: INestApplication;
   let db: Db;
@@ -45,17 +53,24 @@ describe('Every link picker offers what the World Mounts', () => {
   let sketch: string;
   /** One **Compendium Entry**, sealed by where it lives. */
   let entry: string;
+  /** One image Asset each side of the wall — what the asset pickers are asked to offer (#416). */
+  let ownArt: string;
+  let shelfArt: string;
+  let assetsDir: string;
 
   let ada: Awaited<ReturnType<typeof signIn>>;
 
   beforeEach(async () => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
+    assetsDir = mkdtempSync(join(tmpdir(), 'hexly-mounted-assets-'));
 
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule, AuthModule, WorldsModule, EntitiesModule],
     })
       .overrideProvider(DB)
       .useValue(db)
+      .overrideProvider(ASSETS_DIR)
+      .useValue(assetsDir)
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -85,12 +100,18 @@ describe('Every link picker offers what the World Mounts', () => {
     await share(sunset);
     sketch = await mintEntity(shelf, 'Rough Sketch');
 
+    // One image Asset each side, uploaded the ordinary way so each carries real content-addressed bytes
+    // in its own Container — identical bytes, so only the Container tells the two URLs apart (#416).
+    ownArt = await upload(campaign, 'Tavern Sign.png');
+    shelfArt = await upload(shelf, 'Sunset.png');
+
     pack = app.get(CompendiumWrites).install('draw-steel.importer.monsters', { name: 'Draw Steel: Monsters' }, '1.4.0');
     entry = seedEntry('Goblin Warrior');
   });
 
   afterEach(async () => {
     await app.close();
+    rmSync(assetsDir, { recursive: true, force: true });
   });
 
   it('offers a mounted shelf’s Entities beside the World’s own, and neither of them unmounted', async () => {
@@ -214,11 +235,74 @@ describe('Every link picker offers what the World Mounts', () => {
     // Every container-scoped reading is untouched (ADR-0080): the Entity Browser lists what this World
     // holds, and a Mount adds nothing to it.
     expect(await names(ada, `worldId=${campaign}`)).toEqual(['Goblin King']);
-    expect((await facets(ada, `worldId=${campaign}`)).type).toEqual([{ value: 'core.type.note', count: 1 }]);
+    // Its Facets count its own and only its own — one Note and one Asset here, never the shelf's twins.
+    expect((await facets(ada, `worldId=${campaign}`)).type).toEqual([
+      { value: 'core.type.asset', count: 1 },
+      { value: 'core.type.note', count: 1 },
+    ]);
     // Nor does it move the World a mounted Entity belongs to.
     expect(
       (await summaries(ada, `worldId=${campaign}&read=link-target`)).find((e) => e.id === shelfGoblin)?.worldId,
     ).toBe(shelf);
+  });
+
+  it('offers a mounted shelf’s Assets to the asset pickers, the World’s own first, each URL its own Container’s', async () => {
+    // Unmounted, an asset picker is exactly the picker it was: this World's art and no one else's.
+    expect((await assetsOffered(ada, `worldId=${campaign}`)).map((a) => a.id)).toEqual([ownArt]);
+
+    await mount(campaign, shelf);
+
+    // Mounted, the shelf's art is offered beside this World's own, and the World's own ranks first —
+    // the same outermost tier every other link picker rides, so a shelf cannot drown a campaign.
+    const offers = await assetsOffered(ada, `worldId=${campaign}`);
+    expect(offers.map((a) => a.id)).toEqual([ownArt, shelfArt]);
+
+    // Each Asset's URLs resolve against *its own* Container, never the reading World's (ADR-0080) —
+    // which is what makes a placed shelf image render for every reader of the campaign. Identical bytes,
+    // so the hash is shared and only the Container segment differs: the assertion is about the key.
+    const hash = offers[0].assetUrl?.split('/')[3];
+    expect(offers[0]).toMatchObject({
+      assetUrl: `/assets/${campaign}/${hash}`,
+      thumbnailUrl: `/assets/${campaign}/${hash?.replace(/\.png$/, '')}.thumb.webp`,
+    });
+    expect(offers[1]).toMatchObject({
+      assetUrl: `/assets/${shelf}/${hash}`,
+      thumbnailUrl: `/assets/${shelf}/${hash?.replace(/\.png$/, '')}.thumb.webp`,
+    });
+
+    // The Container facet narrows the asset pickers to one, counting what it narrows to.
+    expect(await containerFacet(ada, `worldId=${campaign}&type=core.type.asset`)).toEqual([
+      { value: campaign, label: 'Aldermoor', count: 1 },
+      { value: shelf, label: 'The Art Shelf', count: 1 },
+    ]);
+    expect((await assetsOffered(ada, `worldId=${campaign}&container=${shelf}`)).map((a) => a.id)).toEqual([shelfArt]);
+
+    // Unmounting withdraws the offer with the declaration.
+    await unmount(campaign, shelf);
+    expect((await assetsOffered(ada, `worldId=${campaign}`)).map((a) => a.id)).toEqual([ownArt]);
+  });
+
+  it('surfaces hidden-from-default-listing Assets in the pickers exactly as it always did', async () => {
+    await mount(campaign, shelf);
+
+    // The asset type is hidden from a default listing (ADR-0065), so a link-target read that names no
+    // type omits both sides of the wall alike — the widening changes nothing about that.
+    expect(await offered(ada, `worldId=${campaign}`)).not.toContain('Sunset');
+
+    // Selecting the type self-lifts the exclusion (what the asset pickers pin), and so does the by-name
+    // pickers' explicit opt-in. Both reach the mounted shelf's art, because the lift is about types and
+    // the widening is about Containers — one rule each, neither knowing the other.
+    expect((await assetsOffered(ada, `worldId=${campaign}`)).map((a) => a.name)).toEqual(['Tavern Sign', 'Sunset']);
+    expect(await offered(ada, `worldId=${campaign}&includeHidden=1`)).toContain('Sunset');
+  });
+
+  it('leaves the Asset Browser listing this World’s Assets, with its own counts and Facets', async () => {
+    await mount(campaign, shelf);
+
+    // The Asset Browser is a container-scoped browse, not a link-target read (ADR-0080): it lists what
+    // this World *holds*, and a Mount adds nothing to that — nor to the Facets annotating it.
+    expect(await names(ada, `worldId=${campaign}&type=core.type.asset`)).toEqual(['Tavern Sign']);
+    expect((await facets(ada, `worldId=${campaign}&type=core.type.asset`)).container).toBeUndefined();
   });
 
   // ---- harness -------------------------------------------------------------
@@ -284,6 +368,12 @@ describe('Every link picker offers what the World Mounts', () => {
     return id;
   }
 
+  /** Mint an image Asset in `worldId` the ordinary way (ADR-0065), returning the wrapper Entity's id. */
+  async function upload(worldId: string, filename: string): Promise<string> {
+    const res = await ada.post(`/worlds/${worldId}/assets`).attach('file', PNG, filename).expect(201);
+    return res.body.id as string;
+  }
+
   async function mount(worldId: string, containerId: string): Promise<void> {
     await ada.post(`/worlds/${worldId}/mounts`).send({ containerId }).expect(200);
   }
@@ -313,6 +403,15 @@ describe('Every link picker offers what the World Mounts', () => {
 
   async function facets(agent: Agent, query: string): Promise<EntityFacets> {
     return (await agent.get(`/entities/facets?${query}`).expect(200)).body;
+  }
+
+  /**
+   * What an asset picker would show: the same link-target read, preset to the asset type — which is also
+   * what lifts the hidden-from-default-listing exclusion Assets carry (ADR-0065) — with `thumbnails=1` for
+   * the tile it draws and the capability URL it places.
+   */
+  async function assetsOffered(agent: Agent, query: string): Promise<EntitySummary[]> {
+    return summaries(agent, `${query}&type=core.type.asset&thumbnails=1&read=link-target`);
   }
 
   /** The Container facet on a link-target read — the rail a widened picker offers to narrow by. */

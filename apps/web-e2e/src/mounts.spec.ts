@@ -21,6 +21,12 @@ import {
  * withdraw one; and that a player of the campaign then really lands on a shelf Entity's page.
  */
 
+/** A real 20x8 solid-colour PNG, so an uploaded shelf Asset has bytes a Board can actually draw. */
+const PNG_20x8 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAABQAAAAICAIAAAB2/0i6AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAFUlEQVQYlWOwyTtBNmIY1XxiiAQYACBM50E1XKcYAAAAAElFTkSuQmCC',
+  'base64',
+);
+
 /**
  * The Worlds this file minted, dropped again afterwards. The reset between specs clears Entities but
  * not Worlds (ADR-0009), so a spec that leaves three behind lengthens every other spec's World
@@ -59,12 +65,22 @@ function proseLinking(entityId: string, label: string) {
 }
 
 /** Mint a Note in `worldId`, optionally with a document — the fixture behind a countable link. */
-async function createEntity(page: Page, worldId: string, name: string, document?: unknown): Promise<string> {
+async function createNote(page: Page, worldId: string, name: string, document?: unknown): Promise<string> {
   const created = await page.request.post('/api/entities', {
     data: { name, types: ['core.type.note'], worldId, ...(document ? { document } : {}) },
   });
   expect(created.ok(), `${created.status()} ${await created.text()}`).toBeTruthy();
   return (await created.json()).id as string;
+}
+
+/** Mint an image Asset in `worldId` the ordinary way (ADR-0065) — the wrapper's id and its bytes' hash. */
+async function upload(page: Page, worldId: string, name: string): Promise<{ id: string; hash: string }> {
+  const res = await page.request.post(`/api/worlds/${worldId}/assets`, {
+    multipart: { file: { name, mimeType: 'image/png', buffer: PNG_20x8 } },
+  });
+  expect(res.ok(), `${res.status()} ${await res.text()}`).toBeTruthy();
+  const body = await res.json();
+  return { id: body.id as string, hash: body.document['core.field.asset'].hash as string };
 }
 
 /** Mount `containerId` through the pane's add control, picked by id so a duplicate name cannot fool it. */
@@ -141,8 +157,8 @@ test('unmounting states how many links it would break, and unmounts anyway', asy
   const campaign = await createWorld(page, 'The Counting Campaign');
 
   // One link from the campaign into the shelf: the blast radius of dropping this Mount.
-  const sunset = await createEntity(page, shelf, 'Sunset over Aldermoor');
-  await createEntity(page, campaign, 'The Tavern', {
+  const sunset = await createNote(page, shelf, 'Sunset over Aldermoor');
+  await createNote(page, campaign, 'The Tavern', {
     'core.field.content': proseLinking(sunset, 'Sunset over Aldermoor'),
   });
 
@@ -267,6 +283,81 @@ test('the Entity Link Field picker offers the same widened set, narrowed by Cont
   // Picking through the narrowed list links the mounted Entity, which is the whole point of offering it.
   await page.getByTestId(`entity-link-option-${painting}`).click();
   await expect(page.getByTestId('entity-link-name')).toContainText('Sunset over Aldermoor');
+});
+
+/**
+ * Art from a shelf is placeable on a **Board** (#416, ADR-0080). The Board **Image** picker is not a link
+ * picker — an Image is a capability URL, decor by construction (ADR-0069) — but it asks the same question,
+ * so it asks it through the same link-target read: what this World Mounts is offered, narrowable by
+ * Container, and what it places is served from the Asset's own Container, which is what makes a shelf
+ * image render for every reader of the campaign rather than only for the Owner who placed it.
+ */
+test('the Board Image picker offers a mounted shelf’s art, and what it places renders for every reader', async ({
+  page,
+  browser,
+}) => {
+  const shelf = await createWorld(page, 'The Painted Shelf');
+  const campaign = await createWorld(page, 'The Painting Campaign');
+
+  // One image Asset each side, minted the ordinary way (ADR-0065) so each carries real bytes. Identical
+  // bytes, deliberately: assets dedup per Container (ADR-0034), so the two share a hash and only the
+  // Container segment tells their URLs apart — which is the whole of what this spec is about.
+  const shelfArt = await upload(page, shelf, 'sunset.png');
+  const ownArt = await upload(page, campaign, 'tavern-sign.png');
+  expect(shelfArt.hash).toBe(ownArt.hash);
+  const hash = shelfArt.hash;
+
+  // A `shared` Board in the campaign to place it on, seeded over the API — the placement is the subject,
+  // not the minting of a Board.
+  const created = await page.request.post('/api/entities', {
+    data: { name: 'The Table', types: ['core.type.board'], worldId: campaign },
+  });
+  expect(created.ok(), `${created.status()} ${await created.text()}`).toBeTruthy();
+  const board = (await created.json()).id as string;
+  await page.request.patch(`/api/entities/${board}`, { data: { visibility: 'shared' } });
+
+  const canvas = page.getByRole('img', { name: 'Board surface' });
+
+  // Unmounted, the shelf is nothing this World may point at, so only the campaign's own art is on
+  // offer — and with one Container in the read there is nothing to narrow, so no chips at all.
+  await openEntity(page, board);
+  await page.getByTestId('tool-image').click();
+  await canvas.click({ position: { x: 200, y: 160 } });
+  await expect(page.getByTestId('image-search')).toBeVisible();
+  await expect(page.locator(`[data-asset-id="${ownArt.id}"]`)).toBeVisible();
+  await expect(page.locator(`[data-asset-id="${shelfArt.id}"]`)).toHaveCount(0);
+  await expect(page.getByTestId('image-containers')).toHaveCount(0);
+  await page.getByTestId('image-picker-cancel').click();
+
+  await page.goto(`/w/${campaign}/settings`);
+  await page.getByTestId('settings-nav-mounts').click();
+  await mount(page, shelf);
+
+  // Declared, and the same picker offers the shelf's art beside this World's own — this World's first,
+  // whatever the shelf's recency says — with the Container facet to narrow to one.
+  await openEntity(page, board);
+  await page.getByTestId('tool-image').click();
+  await canvas.click({ position: { x: 200, y: 160 } });
+  await expect(page.locator(`[data-asset-id="${shelfArt.id}"]`)).toBeVisible();
+  await expect(page.getByTestId('image-asset-choice').first()).toHaveAttribute('data-asset-id', ownArt.id);
+  await expect(page.getByTestId(`image-container-${shelf}`)).toContainText('The Painted Shelf');
+  await page.getByTestId(`image-container-${shelf}`).click();
+  await expect(page.locator(`[data-asset-id="${ownArt.id}"]`)).toHaveCount(0);
+  await page.locator(`[data-asset-id="${shelfArt.id}"]`).click();
+
+  // Placed, and drawn from the shelf's own Container — not the campaign's, which serves the very same
+  // bytes under its own segment, so nothing but the Container in the URL tells the two apart.
+  const placed = page.locator('[data-testid=image-asset]');
+  await expect(placed).toHaveAttribute('src', `/assets/${shelf}/${hash}.png`);
+  await flushSave(page);
+
+  // And for every reader of the campaign, not only the Owner who placed it: the byte route is
+  // unauthenticated and takes the Container from the path (ADR-0034, ADR-0080).
+  await addWorldMember(page, campaign, 'viewer');
+  const player = await signInGrantee(browser);
+  await openEntity(player, board);
+  await expect(player.locator('[data-testid=image-asset]')).toHaveAttribute('src', `/assets/${shelf}/${hash}.png`);
+  await player.context().close();
 });
 
 test('a player of the campaign lands on the shelf Entity’s own page, and an anonymous reader on the pack’s', async ({

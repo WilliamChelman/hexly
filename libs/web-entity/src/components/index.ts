@@ -1,5 +1,6 @@
 export * from './field-control.component';
 export * from './asset-link-picker.component';
+export * from './container-chips.component';
 export * from './details-panel.component';
 export * from './entity-link-picker.component';
 export * from './entity-search-picker.component';

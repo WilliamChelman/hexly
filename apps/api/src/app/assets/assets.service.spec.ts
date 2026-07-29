@@ -81,65 +81,6 @@ describe('AssetsService', () => {
     expect(readdirSync(join(dir, 'world-1'))).toHaveLength(2);
   });
 
-  describe('summariesFor (the picker source, #269, #281, ADR-0065)', () => {
-    it('returns an empty list when the entity-search matched nothing', () => {
-      expect(assets.summariesFor('world-1', [])).toEqual([]);
-    });
-
-    it('dresses each matched Asset Entity as an AssetSummary with its url, thumbnail, mime and size', () => {
-      const portrait = assets.store('world-1', 'Portrait.png', PNG_A);
-      seedAsset('world-1', 'asset-1', 'Portrait', portrait.hash, '.png', PNG_A.length);
-
-      const summaries = assets.summariesFor('world-1', [{ id: 'asset-1', name: 'Portrait' }]);
-      expect(summaries).toEqual([
-        {
-          url: portrait.url,
-          // The hash-derived thumbnail URL (ADR-0065); the serving route falls back to the original.
-          thumbnailUrl: `/assets/world-1/${portrait.hash}.thumb.webp`,
-          // The Entity's name (as the search returned it) + its ref's pinned extension — a rename relabels
-          // this, never the URL.
-          originalFilename: 'Portrait.png',
-          mime: 'image/png',
-          size: PNG_A.length,
-        },
-      ]);
-      // Metadata only — no hash leak to the summary.
-      expect(summaries[0]).not.toHaveProperty('hash');
-    });
-
-    it('preserves the search order the caller passed (relevance is authoritative, ADR-0065)', () => {
-      const a = assets.store('world-1', 'Portrait.png', PNG_A);
-      const b = assets.store('world-1', 'Map.png', PNG_B);
-      seedAsset('world-1', 'asset-a', 'Portrait', a.hash, '.png', PNG_A.length);
-      seedAsset('world-1', 'asset-b', 'Map', b.hash, '.png', PNG_B.length);
-
-      // Pass them B-then-A: the summaries come back in exactly that order, never re-sorted here.
-      expect(
-        assets
-          .summariesFor('world-1', [
-            { id: 'asset-b', name: 'Map' },
-            { id: 'asset-a', name: 'Portrait' },
-          ])
-          .map((s) => s.originalFilename),
-      ).toEqual(['Map.png', 'Portrait.png']);
-    });
-
-    it('drops a match whose Entity is gone (no readable asset-ref) rather than emitting a broken tile', () => {
-      const portrait = assets.store('world-1', 'Portrait.png', PNG_A);
-      seedAsset('world-1', 'asset-1', 'Portrait', portrait.hash, '.png', PNG_A.length);
-
-      // 'ghost' has no entities row, so no readable ref — it is skipped forward-only.
-      expect(
-        assets
-          .summariesFor('world-1', [
-            { id: 'ghost', name: 'Ghost' },
-            { id: 'asset-1', name: 'Portrait' },
-          ])
-          .map((s) => s.originalFilename),
-      ).toEqual(['Portrait.png']);
-    });
-  });
-
   describe('thumbnails (a regenerable cache beside the bytes, ADR-0065)', () => {
     const THUMB = new Uint8Array([0x52, 0x49, 0x46, 0x46, 1, 2, 3]); // stand-in WebP bytes
 

@@ -1,6 +1,6 @@
 import { ASSET_DATA_TYPE, ASSET_FIELD, CORE_ASSET, emptyAssetValue } from './asset-data-type';
 import { CORE_ASSET_TYPE } from './asset-type';
-import { readAssetValue, assetSummaryOf } from './asset-document';
+import { readAssetValue } from './asset-document';
 import type { AssetValue } from './asset-value';
 
 const HASH = 'a'.repeat(64);
@@ -71,16 +71,8 @@ describe('core.type.asset', () => {
 });
 
 describe('reading an Asset Entity’s ref', () => {
-  it('reads a filled asset-ref, and a picker summary derived from it', () => {
-    const doc = { 'core.field.asset': value };
-    expect(readAssetValue(doc)).toEqual(value);
-    expect(assetSummaryOf('world-1', 'Portrait', value)).toEqual({
-      url: `/assets/world-1/${HASH}.png`,
-      thumbnailUrl: `/assets/world-1/${HASH}.thumb.webp`,
-      originalFilename: 'Portrait.png',
-      mime: 'image/png',
-      size: 11,
-    });
+  it('reads a filled asset-ref', () => {
+    expect(readAssetValue({ 'core.field.asset': value })).toEqual(value);
   });
 
   it('reads a placeholder or absent ref as null (forward-only)', () => {

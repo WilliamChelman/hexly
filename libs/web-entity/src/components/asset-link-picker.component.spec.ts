@@ -5,7 +5,7 @@ import { EntityDetail, EntityLinkValue, EntityPage, EntitySummary } from '@hexly
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { AssetLinkPickerComponent } from './asset-link-picker.component';
-import { WEB_ENTITY_TEST_CATALOGS } from '../i18n/test-catalogs';
+import { COLLAB_TEST_CATALOGS, WEB_ENTITY_TEST_CATALOGS } from '../i18n/test-catalogs';
 
 /** An image Asset Entity summary carrying the thumbnail the picker previews (thumbnails=1). */
 function asset(id: string, name = id, thumbnailUrl = `/assets/w1/${id}.thumb.webp`): EntitySummary {
@@ -67,7 +67,7 @@ describe('AssetLinkPicker', () => {
       return of(page([asset('img-1', 'Castle'), asset('img-2', 'Forest')]));
     });
     await TestBed.configureTestingModule({
-      imports: [Host, provideTranslocoTesting(WEB_ENTITY_TEST_CATALOGS)],
+      imports: [Host, provideTranslocoTesting(WEB_ENTITY_TEST_CATALOGS, COLLAB_TEST_CATALOGS)],
       providers: [
         { provide: EntitiesClient, useValue: entities },
         { provide: AssetsClient, useValue: assets },
@@ -154,6 +154,47 @@ describe('AssetLinkPicker', () => {
 
     (byId(el, 'asset-link-clear') as HTMLButtonElement).click();
     expect(fixture.componentInstance.changed).toBeUndefined();
+  });
+
+  it('asks for a link target, so a Mounted shelf’s art is offered and narrowable to it (ADR-0080)', () => {
+    // The Container facet a widened read grows — this World and the Shelf it Mounts.
+    entities.facets.mockReturnValue(
+      of({
+        type: [],
+        tag: [],
+        visibility: [],
+        fields: [],
+        container: [
+          { value: 'w1', label: 'Aldermoor', count: 1 },
+          { value: 'shelf', label: 'The Art Shelf', count: 1 },
+        ],
+      }),
+    );
+    const { fixture, el } = render();
+    (byId(el, 'asset-link-open') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    // Pointing at an Asset is pointing at an Entity, so the search declares itself a link-target read —
+    // which is the whole of what offers a mounted Shelf's art beside this World's own.
+    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ read: 'link-target', worldId: 'w1' }));
+    // The chips are counted off that same read, its own selection dropped as every drill-down facet's is.
+    expect(entities.facets).toHaveBeenCalledWith(
+      expect.objectContaining({ read: 'link-target', container: undefined }),
+    );
+    expect(byId(el, 'asset-link-container-shelf')?.textContent).toContain('The Art Shelf');
+
+    // Narrowing to one Shelf re-reads through the same scope, narrowed.
+    (byId(el, 'asset-link-container-shelf') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ container: ['shelf'] }));
+  });
+
+  it('offers no Container chips in a World that Mounts nothing — the picker exactly as it was', () => {
+    const { fixture, el } = render();
+    (byId(el, 'asset-link-open') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(byId(el, 'asset-link-containers')).toBeNull();
   });
 
   it('renders no controls for a read-only opener', () => {
