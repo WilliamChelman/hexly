@@ -145,6 +145,12 @@ describe('A World’s Mounts', () => {
     // Read back cold: the order is stored, not an artefact of the response.
     expect((await mountsOf(ada, campaign)).map((m) => m.containerId)).toEqual([pack, shelf]);
 
+    // An order that is already the order changed nothing, so it announces nothing — the same restraint
+    // a re-declared Mount shows.
+    const seq = (await worldDetail(ada, campaign)).seq;
+    await reorder(ada, campaign, [pack, shelf]);
+    expect((await worldDetail(ada, campaign)).seq).toBe(seq);
+
     // A reorder reorders. Dropping one, or naming one that is not mounted, is refused — otherwise this
     // would be a second, ungated way to declare a Mount.
     await ada

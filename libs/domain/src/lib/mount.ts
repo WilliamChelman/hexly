@@ -8,8 +8,8 @@ import * as z from 'zod';
 
 /**
  * The kinds of **Container** (ADR-0078), on the wire: a **World** a user authors into, or a
- * **Compendium** shelf. A Mount names its Container's kind because the two read differently to the
- * Owner arranging them — "my other campaign" and "an installed pack" are not the same thing.
+ * **Compendium** shelf. A Mount names its Container's kind because "my other campaign" and "an
+ * installed pack" are not the same thing to the Owner arranging them.
  */
 export const containerKindSchema = z.enum(['world', 'compendium']);
 
@@ -21,7 +21,11 @@ export type ContainerKind = z.infer<typeof containerKindSchema>;
  * Owner-arranged order. The mounting World is the route's own `:id`, so it is not repeated here.
  */
 export interface Mount {
-  /** The mounted Container's id. */
+  /**
+   * The **mounted** Container's id — the one end a Mount names on the wire. The stored row names both
+   * (`container_mounts.container_id` is the mounting side), which is why the column and this field
+   * share a word for opposite ends.
+   */
   readonly containerId: string;
   readonly name: string;
   readonly kind: ContainerKind;

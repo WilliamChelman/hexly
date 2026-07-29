@@ -350,21 +350,17 @@ export class WorldsController {
   // the Desktop App mounts with no sharing concepts in sight (ADR-0071). Every route answers with the
   // whole ordered list, so a client never has to reassemble it from a partial response.
 
-  // The ordered Mount list, each entry naming its Container and which kind it is.
   @Get(':id/mounts')
   mountsOf(@CurrentUser() user: AuthUser, @Param('id') id: string): Mount[] {
     return mountResponse(this.mounts.list(user.id, id));
   }
 
-  // The Containers this caller may mount here: every installed Compendium plus every World they Own,
-  // minus what is already mounted. Before `:id/mounts/...` matching is irrelevant — a distinct literal.
   @Get(':id/mount-candidates')
   mountCandidates(@CurrentUser() user: AuthUser, @Param('id') id: string): MountCandidate[] {
     return mountResponse(this.mounts.candidates(user.id, id));
   }
 
-  // Declare one more Container this World draws from. Idempotent — mounting what is already mounted is
-  // the same Mount, not a second one — so a 200, not a 201.
+  // Idempotent — mounting what is already mounted is the same Mount — so a 200, not a 201.
   @Post(':id/mounts')
   @HttpCode(200)
   addMount(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Mount[] {
@@ -373,8 +369,6 @@ export class WorldsController {
     return mountResponse(this.mounts.add(user.id, id, parsed.data.containerId));
   }
 
-  // Reorder the Mounts, sent wholesale. It reorders and nothing else: a list that is not a permutation
-  // of what is mounted is a 400, so this route can never mint a Mount past the Own-only rule.
   @Patch(':id/mounts')
   reorderMounts(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Mount[] {
     const parsed = reorderMountsRequestSchema.safeParse(body);
@@ -382,10 +376,14 @@ export class WorldsController {
     return mountResponse(this.mounts.reorder(user.id, id, parsed.data.containerIds));
   }
 
-  // Unmount one Container, and nothing else. Returns the remaining list.
-  @Delete(':id/mounts/:mountedId')
-  removeMount(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('mountedId') mountedId: string): Mount[] {
-    return mountResponse(this.mounts.remove(user.id, id, mountedId));
+  // The path param is the *mounted* Container, named as the add body names it (ADR-0080).
+  @Delete(':id/mounts/:containerId')
+  removeMount(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('containerId') containerId: string,
+  ): Mount[] {
+    return mountResponse(this.mounts.remove(user.id, id, containerId));
   }
 
   /** Map a {@link TypeResult} to its HTTP outcome: `ok` unwraps, else the status's exception. */

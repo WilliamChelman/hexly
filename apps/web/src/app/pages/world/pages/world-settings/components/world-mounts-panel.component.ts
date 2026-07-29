@@ -10,14 +10,10 @@ import { ButtonComponent, SelectComponent } from '@hexly/web-ui';
  * draws from, an add control over what the caller may mount, reorder, and unmount. World-Owner-only,
  * like every other pane on this page (ADR-0039).
  *
- * The add control offers what the *server* says is mountable — every installed **Compendium** plus
- * every World the caller Owns, minus what is already mounted. The Own-only rule is an authorisation
- * answer, so it is never re-derived here: an empty offer is an empty offer, not a filter this panel
- * applied.
- *
- * Every write answers with the whole ordered list, so there is nothing to reassemble and a refusal
- * leaves the list exactly as it was. Reorder is sent wholesale — the same "send the new array" the
- * Dashboard pins use — so a move is one request, not two.
+ * The add control offers what the *server* says is mountable and never re-derives it: the Own-only
+ * rule is an authorisation answer, so an empty offer is an empty offer rather than a filter applied
+ * here. Every write answers with the whole ordered list, so a refusal leaves the list exactly as the
+ * server last said it was.
  */
 @Component({
   selector: 'app-world-mounts',
@@ -28,8 +24,6 @@ import { ButtonComponent, SelectComponent } from '@hexly/web-ui';
       @for (mount of mounts(); track mount.containerId; let i = $index) {
         <li class="mount-row" [attr.data-testid]="'mount-' + mount.containerId">
           <span class="mount-name">{{ mount.name }}</span>
-          <!-- Which kind it is, said in words: "my other World" and "an installed pack" are not the
-               same thing to the Owner arranging them. -->
           <span class="mount-kind" [attr.data-testid]="'mount-kind-' + mount.containerId">
             {{ 'mounts.kind.' + mount.kind | transloco }}
           </span>

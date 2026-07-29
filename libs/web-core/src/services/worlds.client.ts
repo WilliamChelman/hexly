@@ -229,10 +229,7 @@ export class WorldsClient {
     return this.http.post<Mount[]>(`/api/worlds/${id}/mounts`, { containerId });
   }
 
-  /**
-   * Replace the Mount order wholesale, as {@link setPins} replaces the pins. It reorders and nothing
-   * else — a list that is not a permutation of what is mounted is refused server-side.
-   */
+  /** Replace the Mount order wholesale, as {@link setPins} replaces the pins. Owner-gated server-side. */
   reorderMounts(id: string, containerIds: string[]): Observable<Mount[]> {
     return this.http.patch<Mount[]>(`/api/worlds/${id}/mounts`, { containerIds });
   }

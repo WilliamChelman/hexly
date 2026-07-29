@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundEx
 import { Mount, MountCandidate } from '@hexly/domain';
 import { and, asc, eq, isNotNull, notInArray, or } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
+import { gate } from '../acl/owner-set';
 import { worldAccess, worldOwnerFilter } from '../acl/world-access';
 import { compendiums, containerMounts, containers, worlds } from '../db/schema';
 import { WorldWrites } from './world-writes';
@@ -16,6 +17,9 @@ export type MountResult<T> =
   | { status: 'not-found' }
   | { status: 'forbidden' }
   | { status: 'invalid' };
+
+/** The refusal arms alone — what a gate returns, and what {@link gate} already produces. */
+type MountRefusal = Extract<MountResult<never>, { status: 'not-found' | 'forbidden' }>;
 
 /** Map a {@link MountResult} to its HTTP outcome: `ok` unwraps, else the status's exception. */
 export function mountResponse<T>(result: MountResult<T>): T {
@@ -33,23 +37,17 @@ export function mountResponse<T>(result: MountResult<T>): T {
 
 /**
  * A World's **Mounts** (CONTEXT.md → Mount, ADR-0080): the Containers it declares it draws from, and
- * the add / reorder / unmount that maintain them. A Mount widens what a World may *point at*, never
- * what it *holds*, so nothing in here touches an Entity, a count, or a container-scoped listing.
+ * the add / reorder / unmount that maintain them.
  *
- * **Only a Container you Own may be mounted.** That is what makes the read cascade this unlocks a
- * republication of content you already control rather than an escalation, so ownership here is
- * *personal* — {@link worldOwnerFilter}, which carries no Superadmin bypass, exactly as the Theme
- * sources read does. A **Compendium** is the exception: Instance-wide and already readable by every
- * signed-in caller (ADR-0079), so any World Owner may mount one and there is nothing extra to grant.
+ * Ownership on the mounted side is *personal* — {@link worldOwnerFilter} carries no Superadmin bypass
+ * — because the Own-only rule exists so a Mount can only republish content the caller already
+ * controls. A **Compendium** is exempt: Instance-wide and already readable by every signed-in caller,
+ * so mounting one grants nothing (ADR-0079).
  *
- * **A Compendium may be mounted; a Compendium may not mount.** Every route resolves its mounting
- * Container through `worlds` ({@link worldAccess.decideMeta} selects from the satellite), so a
- * Compendium's id is simply not a World here and answers 404 — no rule anywhere names the case.
- *
- * The whole surface is World-Owner-gated, like `/owners`, `/members` and `/link`: declaring what a
- * World draws from is the Owner's, and no read consumes a Mount yet (the Library that will is #412's).
- * It is *not* Collaboration-gated — a Sole User on the Desktop App mounts with no sharing concepts in
- * sight (ADR-0071).
+ * Every route resolves its *mounting* Container through `worlds`, which is the whole of "a Compendium
+ * may not mount": a pack's id is not a World here, so it 404s with no rule naming the case. The
+ * surface is World-Owner-gated like `/owners` and `/members`, and deliberately not Collaboration-gated
+ * (ADR-0071).
  */
 @Injectable()
 export class WorldMountsService {
@@ -111,17 +109,21 @@ export class WorldMountsService {
   }
 
   /**
-   * Rewrite the Mount order wholesale, as the Dashboard pins are (ADR-0043). It reorders and nothing
-   * else: a list that is not a permutation of what is mounted is a 400, so this write — the one that
-   * never asks the Own-only question — can never create a Mount either.
+   * Rewrite the Mount order wholesale, as the Dashboard pins are (ADR-0043). Anything that is not a
+   * permutation of what is mounted is a 400 — `reorderMountsRequestSchema` says why that refusal is
+   * load-bearing.
    */
   reorder(userId: string, worldId: string, containerIds: readonly string[]): MountResult<Mount[]> {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
-    const mounted = new Set(this.mounts(worldId).map((m) => m.containerId));
+    const current = this.mounts(worldId);
+    const mounted = new Set(current.map((m) => m.containerId));
     if (containerIds.length !== mounted.size || !containerIds.every((id) => mounted.has(id))) {
       return { status: 'invalid' };
     }
+    // An order that is already the order changed nothing, so it announces nothing — the same restraint
+    // re-declaring a Mount shows.
+    if (current.every((m, i) => m.containerId === containerIds[i])) return { status: 'ok', value: current };
     this.writes.reorderMounts(worldId, containerIds);
     return { status: 'ok', value: this.mounts(worldId) };
   }
@@ -146,25 +148,15 @@ export class WorldMountsService {
   }
 
   /**
-   * The mounting side's gate: World Owner on the World being configured. A Compendium's id resolves to
-   * no World row here, which is the whole of "a Compendium may not mount".
+   * The mounting side's gate — the shared owner-management gate (ADR-0037), which a Compendium's id
+   * never reaches: `decideMeta` reads the `worlds` satellite, so a pack resolves to no row.
    */
-  private gateOwner(
-    userId: string,
-    worldId: string,
-  ): Extract<MountResult<never>, { status: 'not-found' | 'forbidden' }> | undefined {
-    const meta = worldAccess(this.db, userId).decideMeta(worldId);
-    if (!meta?.reachable) return { status: 'not-found' };
-    if (!meta.isOwner) return { status: 'forbidden' };
-    return undefined;
+  private gateOwner(userId: string, worldId: string): MountRefusal | undefined {
+    return gate(worldAccess(this.db, userId).decideMeta(worldId) ?? { reachable: false, isOwner: false });
   }
 
   /** The mounted side's gate: the Own-only rule, with the Compendium exception. */
-  private gateMountable(
-    userId: string,
-    worldId: string,
-    containerId: string,
-  ): Extract<MountResult<never>, { status: 'not-found' | 'forbidden' }> | undefined {
+  private gateMountable(userId: string, worldId: string, containerId: string): MountRefusal | undefined {
     if (containerId === worldId) return { status: 'forbidden' };
     const compendium = this.db
       .select({ id: compendiums.id })

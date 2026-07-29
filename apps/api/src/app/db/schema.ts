@@ -220,21 +220,18 @@ export const compendiums = sqliteTable('compendiums', {
 export type CompendiumRow = typeof containers.$inferSelect & Omit<typeof compendiums.$inferSelect, 'id'>;
 
 /**
- * The **Mounts** a Container declares (ADR-0080): the Containers it draws from, in the Owner-arranged
- * order. `container_id` is the mounting side and `mounted_container_id` the mounted one; the pair is
- * the primary key, so declaring the same Mount twice is one row rather than two.
+ * The **Mounts** a Container declares (ADR-0080): the Containers it draws from, `container_id` the
+ * mounting side and `mounted_container_id` the mounted one. The pair is the primary key, so the same
+ * Mount declared twice is one row; `position` is order alone, never identity, which is what lets a
+ * reorder rewrite it wholesale.
  *
- * Both columns key {@link containers} rather than {@link worlds}, though only a World may mount today:
- * the generic name leaves room for a future Container kind that mounts without implying one exists, and
- * "a Compendium may not mount" is enforced on the write path, which resolves its mounting Container
- * through `worlds` (ADR-0079's Adoption-target seam, again). Both FKs cascade, so deleting either
- * Container drops the Mount with it and never leaves a row pointing at nothing.
+ * Both columns key {@link containers} rather than {@link worlds} though only a World may mount: the
+ * generic name leaves room for a kind that does without implying one exists, and "a Compendium may not
+ * mount" is the write path's, which resolves its mounting Container through `worlds`. Both FKs cascade,
+ * so deleting either Container drops the Mount with it.
  *
- * `position` is the order alone — a dense rank the reorder rewrites wholesale, never an identity: a
- * Mount survives a reorder as the same row, keyed by the pair.
- *
- * Carries no `seq` of its own: a Mount change bumps the mounting World's, so it rides the World's
- * freshness key like a membership change does. Written through {@link WorldWrites}.
+ * No `seq` of its own — a Mount change bumps the mounting World's, so it rides that freshness key like
+ * a membership change. Written through {@link WorldWrites}.
  */
 export const containerMounts = sqliteTable(
   'container_mounts',
