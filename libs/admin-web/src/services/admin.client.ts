@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { CompendiumPackSummary, ImportRunSummary, ReindexJob } from '@hexly/domain';
+import { CompendiumPackSummary, ImportRunSummary, InboundLinkCount, ReindexJob } from '@hexly/domain';
 
 /**
  * HTTP client for the `/api/admin` operator surface: the Reindex (ADR-0046) and the compendium packs
@@ -37,6 +37,15 @@ export class AdminClient {
   /** Install (or reimport) a pack. Returns at once (202) with the run `running`; follow it with {@link packs}. */
   installPack(importerId: string): Observable<ImportRunSummary> {
     return this.http.post<ImportRunSummary>(`/api/admin/compendiums/${importerId}/run`, {});
+  }
+
+  /**
+   * What removing this pack would break in the Worlds drawing on it (ADR-0080, #414): the links
+   * pointing into its Compendium, and how many Containers they come from. Read at the moment the
+   * confirm opens, and advisory — {@link removePack} never consults it.
+   */
+  packInboundLinks(importerId: string): Observable<InboundLinkCount> {
+    return this.http.get<InboundLinkCount>(`/api/admin/compendiums/${importerId}/inbound-links`);
   }
 
   /** Remove a pack: its entries go with it, and every adopted copy stays where it is. */

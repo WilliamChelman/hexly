@@ -110,16 +110,64 @@ describe('WorldMountsPanel', () => {
     ]);
   });
 
-  it('unmounts one Container, leaving the rest of the list alone', () => {
+  it('states how many links point into a Container before unmounting it, then unmounts', () => {
     worlds.mounts.mockReturnValue(of([shelf, pack]));
+    worlds.mountInboundLinks.mockReturnValue(of({ links: 4, worlds: 1 }));
     worlds.removeMount.mockReturnValue(of([pack]));
     render();
 
     click('mount-remove-c-shelf');
 
+    // The count is read for *this* act (ADR-0080, #414) — nothing is unmounted by asking.
+    expect(worlds.mountInboundLinks).toHaveBeenCalledWith('w1', 'c-shelf');
+    expect(worlds.removeMount).not.toHaveBeenCalled();
+    expect(el('unmount-count').textContent).toContain('4');
+    // Worth wording carefully: the links keep working for the Owner and stop for everyone else.
+    expect(el('unmount-count').textContent).toContain('keep working for you');
+
+    click('confirm-unmount');
+
     expect(worlds.removeMount).toHaveBeenCalledWith('w1', 'c-shelf');
     expect(has('mount-c-shelf')).toBe(false);
     expect(has('mount-c-pack')).toBe(true);
+    expect(has('unmount-modal')).toBe(false);
+  });
+
+  it('says nothing points into a Container rather than showing it a bare zero', () => {
+    worlds.mounts.mockReturnValue(of([shelf]));
+    worlds.mountInboundLinks.mockReturnValue(of({ links: 0, worlds: 0 }));
+    render();
+
+    click('mount-remove-c-shelf');
+
+    expect(el('unmount-count').textContent).toContain('Nothing in this world points into it');
+    expect(el('unmount-count').textContent).not.toContain('0');
+  });
+
+  it('unmounts whatever the count says, and unmounts even when the count would not load', () => {
+    worlds.mounts.mockReturnValue(of([shelf]));
+    worlds.mountInboundLinks.mockReturnValue(throwError(() => new Error('boom')));
+    worlds.removeMount.mockReturnValue(of([]));
+    render();
+
+    click('mount-remove-c-shelf');
+
+    // A blast radius is advice, never a gate: a count that failed to load degrades to a confirm
+    // without one rather than to a refusal (ADR-0080 rejects the veto by name).
+    expect(el('unmount-count').textContent).toContain("Couldn't count");
+    click('confirm-unmount');
+    expect(worlds.removeMount).toHaveBeenCalledWith('w1', 'c-shelf');
+  });
+
+  it('backs out of the unmount without touching the Mount', () => {
+    worlds.mounts.mockReturnValue(of([shelf]));
+    render();
+
+    click('mount-remove-c-shelf');
+    click('cancel-unmount');
+
+    expect(worlds.removeMount).not.toHaveBeenCalled();
+    expect(has('mount-c-shelf')).toBe(true);
   });
 
   it('leaves the list as the server last said it was when a write is refused', () => {
@@ -128,6 +176,7 @@ describe('WorldMountsPanel', () => {
     render();
 
     click('mount-remove-c-shelf');
+    click('confirm-unmount');
 
     expect(toaster.toasts().at(-1)?.tone).toBe('error');
     expect(has('mount-c-shelf')).toBe(true);

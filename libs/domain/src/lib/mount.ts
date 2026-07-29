@@ -40,6 +40,30 @@ export interface Mount {
 export type MountCandidate = Mount;
 
 /**
+ * The blast radius of an act that breaks links (ADR-0080, #414): how many links point into a Container,
+ * and how many **Worlds** they come from. Three acts ask for it — unmounting a Container, deleting one,
+ * and an operator removing a pack — and none of them is refused by the answer: a destructive act
+ * another user's configuration could veto is worse than a dangling link.
+ *
+ * Read per act rather than stored, so it is never stale, and counted raw rather than per-viewer: a
+ * blast radius that hid what the caller cannot read would understate the damage, and a pair of
+ * numbers names no content.
+ */
+export interface InboundLinkCount {
+  /**
+   * Links pointing in from the Worlds outside this Container. Its own internal links are not blast
+   * radius, so they are never counted, and a **Decor Link** is — a shelf image going non-navigable is
+   * exactly the damage this number exists to state (ADR-0069).
+   */
+  readonly links: number;
+  /**
+   * How many Worlds those links come from — the "from how many Worlds" half a delete and a pack removal
+   * state. At most 1 when the question already named a single one, as unmount's does.
+   */
+  readonly worlds: number;
+}
+
+/**
  * POST /worlds/:id/mounts: declare one more Container this World draws from, appended after the
  * Mounts already declared. Only the Container is client-supplied — a position is the reorder's
  * business, so an add has nothing to choose.

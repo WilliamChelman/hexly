@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject, input, OnInit, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { Mount, MountCandidate } from '@hexly/domain';
+import { InboundLinkCount, Mount, MountCandidate } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
-import { ButtonComponent, SelectComponent } from '@hexly/web-ui';
+import { ButtonComponent, DialogComponent, SelectComponent } from '@hexly/web-ui';
 
 /**
  * The World's **Mounts** (CONTEXT.md → Mount, ADR-0080): the ordered list of Containers this World
@@ -18,7 +18,7 @@ import { ButtonComponent, SelectComponent } from '@hexly/web-ui';
 @Component({
   selector: 'app-world-mounts',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, ButtonComponent, SelectComponent],
+  imports: [TranslocoPipe, ButtonComponent, DialogComponent, SelectComponent],
   template: `
     <ul class="mount-list">
       @for (mount of mounts(); track mount.containerId; let i = $index) {
@@ -52,7 +52,7 @@ import { ButtonComponent, SelectComponent } from '@hexly/web-ui';
             size="sm"
             danger
             [attr.data-testid]="'mount-remove-' + mount.containerId"
-            (click)="remove(mount.containerId)"
+            (click)="askUnmount(mount)"
           >
             {{ 'mounts.unmount' | transloco }}
           </button>
@@ -61,6 +61,38 @@ import { ButtonComponent, SelectComponent } from '@hexly/web-ui';
         <li class="mount-empty">{{ 'mounts.empty' | transloco }}</li>
       }
     </ul>
+
+    @if (pendingUnmount(); as target) {
+      <!-- The blast radius before the act (ADR-0080, #414): a number and a confirm, never a veto. The
+           button below is live from the first frame, so a count still loading — or one that failed to
+           load — delays nothing. -->
+      <app-dialog
+        [open]="true"
+        [heading]="'mounts.unmountHeading' | transloco: { name: target.name }"
+        (closed)="cancelUnmount()"
+        data-testid="unmount-modal"
+      >
+        <p class="text-sm text-ink-muted m-0" data-testid="unmount-count">
+          @if (unmountCount(); as count) {
+            @if (count.links === 0) {
+              {{ 'mounts.unmountNone' | transloco }}
+            } @else {
+              {{ 'mounts.unmountCount' | transloco: { count: count.links } }}
+            }
+          } @else if (countFailed()) {
+            {{ 'mounts.unmountCountUnknown' | transloco }}
+          } @else {
+            {{ 'mounts.unmountCounting' | transloco }}
+          }
+        </p>
+        <button dialogFooter type="button" appButton data-testid="cancel-unmount" (click)="cancelUnmount()">
+          {{ 'common.cancel' | transloco }}
+        </button>
+        <button dialogFooter type="button" appButton danger data-testid="confirm-unmount" (click)="confirmUnmount()">
+          {{ 'mounts.unmount' | transloco }}
+        </button>
+      </app-dialog>
+    }
 
     <div class="mount-add">
       <label class="mount-add-label" for="mount-add-select">{{ 'mounts.addLabel' | transloco }}</label>
@@ -135,6 +167,12 @@ export class WorldMountsPanelComponent implements OnInit {
   protected readonly candidates = signal<readonly MountCandidate[]>([]);
   /** The Container picked in the add control, or '' for the placeholder. */
   protected readonly selected = signal<string>('');
+  /** The Mount whose unmount is being confirmed, or null when no confirm is open. */
+  protected readonly pendingUnmount = signal<Mount | null>(null);
+  /** The open confirm's blast radius; null while it is still being read (ADR-0080, #414). */
+  protected readonly unmountCount = signal<InboundLinkCount | null>(null);
+  /** Whether that read failed — told apart from "still loading", so neither reads as zero. */
+  protected readonly countFailed = signal(false);
 
   ngOnInit(): void {
     this.worlds.mounts(this.id()).subscribe({
@@ -151,9 +189,36 @@ export class WorldMountsPanelComponent implements OnInit {
     this.apply(this.worlds.addMount(this.id(), containerId), 'mounts.addError', () => this.selected.set(''));
   }
 
-  /** Withdraw one declaration. The Container itself is untouched — nothing is deleted here. */
-  protected remove(containerId: string): void {
-    this.apply(this.worlds.removeMount(this.id(), containerId), 'mounts.removeError');
+  /**
+   * Offer the unmount, and read what it would break while the confirm is open (ADR-0080, #414). Read
+   * here rather than with the list: a count is only true at the moment it is stated, and a co-author's
+   * save between opening the pane and pressing the button would make a listed one a lie.
+   */
+  protected askUnmount(mount: Mount): void {
+    this.pendingUnmount.set(mount);
+    this.unmountCount.set(null);
+    this.countFailed.set(false);
+    this.worlds.mountInboundLinks(this.id(), mount.containerId).subscribe({
+      next: (count) => this.unmountCount.set(count),
+      // A count that would not load degrades to a confirm without one, never to a refusal: the act is
+      // the Owner's, and the number was only ever advice (ADR-0065).
+      error: () => this.countFailed.set(true),
+    });
+  }
+
+  protected cancelUnmount(): void {
+    this.pendingUnmount.set(null);
+  }
+
+  /**
+   * Withdraw one declaration, whatever the count said. The Container itself is untouched — nothing is
+   * deleted here; the links into it simply stop resolving for everyone but their Owner.
+   */
+  protected confirmUnmount(): void {
+    const target = this.pendingUnmount();
+    if (!target) return;
+    this.pendingUnmount.set(null);
+    this.apply(this.worlds.removeMount(this.id(), target.containerId), 'mounts.removeError');
   }
 
   /**

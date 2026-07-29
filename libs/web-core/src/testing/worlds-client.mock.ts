@@ -8,6 +8,7 @@ import {
   ImporterSummary,
   ImportRunSummary,
   ImportSummary,
+  InboundLinkCount,
   MemberRole,
   Mount,
   MountCandidate,
@@ -44,6 +45,9 @@ export class MockWorldsClient {
   // about it still renders; override per test as needed.
   themeSources = vi.fn<(id: string) => Observable<WorldThemeSource[]>>(() => of<WorldThemeSource[]>([]));
   delete = vi.fn<(id: string) => Observable<void>>();
+  // Defaults to a Container nothing points into (ADR-0080, #414), so a spec opening a delete or
+  // unmount confirm without caring about the blast radius still renders; override per test.
+  inboundLinks = vi.fn<(id: string) => Observable<InboundLinkCount>>(() => of({ links: 0, worlds: 0 }));
   // Defaults to an empty set so a spec that mounts the owner-set panel without
   // caring about it still renders; override per test as needed.
   owners = vi.fn<(id: string) => Observable<string[]>>(() => of<string[]>([]));
@@ -62,6 +66,9 @@ export class MockWorldsClient {
   addMount = vi.fn<(id: string, containerId: string) => Observable<Mount[]>>();
   reorderMounts = vi.fn<(id: string, containerIds: string[]) => Observable<Mount[]>>();
   removeMount = vi.fn<(id: string, containerId: string) => Observable<Mount[]>>();
+  mountInboundLinks = vi.fn<(id: string, containerId: string) => Observable<InboundLinkCount>>(() =>
+    of({ links: 0, worlds: 0 }),
+  );
   // Defaults to no available Importers so a spec mounting the Imports panel (#260) without caring
   // about it still renders; override per test as needed.
   importers = vi.fn<(id: string) => Observable<ImporterSummary[]>>(() => of<ImporterSummary[]>([]));

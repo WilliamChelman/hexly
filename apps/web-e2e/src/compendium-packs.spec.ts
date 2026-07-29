@@ -51,7 +51,11 @@ test('the operator installs the fixture-backed Draw Steel pack, sees its pinned 
   await expect(operator.getByTestId(MONSTER_PACK_INSTALL)).toContainText('Reimport');
 
   // Removal is the other half of the same panel: the shelf empties and the pack is offered afresh.
+  // It states its blast radius first (#414) — nothing points into this pack, said in words — and is
+  // refused by nothing it finds.
   await operator.getByTestId(MONSTER_PACK_REMOVE).click();
+  await expect(operator.getByTestId('pack-remove-links')).toContainText('Nothing points into this pack');
+  await operator.getByTestId('confirm-pack-remove').click();
   await expect(operator.getByTestId(MONSTER_PACK_ROW)).toContainText('Not installed');
   await expect(operator.getByTestId(MONSTER_PACK_INSTALL)).toContainText('Install');
   await expect(operator.getByTestId(MONSTER_PACK_REMOVE)).toHaveCount(0);
