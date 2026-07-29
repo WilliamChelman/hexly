@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { LocalGraph, WorldGraphEdge } from '@hexly/domain';
 import { entityAccess } from '../acl/entity-access';
 import { DB, Db } from '../db/db';
-import { worldGraphRead } from './utils/graph-reads';
+import { foreignNodeIds, worldGraphRead } from './utils/graph-reads';
 
 /**
  * The Local Graph read (ADR-0072): the World Graph narrowed to one Entity's neighbourhood, `depth`
@@ -29,8 +29,9 @@ export class LocalGraphService {
     const center = access.decide(id);
     if (!center?.canRead) return null;
 
-    const { nodes, edges } = worldGraphRead(this.db, access, center.row.containerId);
-    const kept = neighbourhood(id, edges, depth);
+    const graph = worldGraphRead(this.db, access, center.row.containerId);
+    const { nodes, edges } = graph;
+    const kept = neighbourhood(id, edges, depth, foreignNodeIds(graph));
 
     return {
       center: id,
@@ -50,8 +51,18 @@ export class LocalGraphService {
  * **Semantic edges only** (ADR-0069): a Decor Link is presentation, so it never widens the
  * neighbourhood. That is also what makes the result connected by construction — every returned node
  * has a semantic path to the centre — so the drawn graph has no orphans and needs no orphans filter.
+ *
+ * A **Foreign node** is reached and never left (ADR-0080): it joins the neighbourhood at the hop that
+ * found it and is not walked on from. Terminal by rule, not by accident — the far side of the boundary
+ * is another campaign's shape, and no depth is allowed to trace it into this one's Panel. It bounds
+ * this side too: two Entities sharing one shelf image are not thereby two hops apart.
  */
-function neighbourhood(center: string, edges: readonly WorldGraphEdge[], depth: number): ReadonlySet<string> {
+function neighbourhood(
+  center: string,
+  edges: readonly WorldGraphEdge[],
+  depth: number,
+  foreign: ReadonlySet<string>,
+): ReadonlySet<string> {
   const adjacency = new Map<string, string[]>();
   const link = (from: string, to: string) => {
     const known = adjacency.get(from);
@@ -72,7 +83,7 @@ function neighbourhood(center: string, edges: readonly WorldGraphEdge[], depth: 
       for (const neighbour of adjacency.get(id) ?? []) {
         if (seen.has(neighbour)) continue;
         seen.add(neighbour);
-        next.push(neighbour);
+        if (!foreign.has(neighbour)) next.push(neighbour);
       }
     }
     frontier = next;

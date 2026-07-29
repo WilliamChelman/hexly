@@ -30,7 +30,8 @@
     "referencedByEmpty": "Nothing links here",
     "showDecor": "Show decor",
     "decor": "decor",
-    "decorMark": "Decor Link — presentation only, not a worldbuilding relation"
+    "decorMark": "Decor Link — presentation only, not a worldbuilding relation",
+    "foreignContainer": "In {{ name }} — this link was made in another container"
   },
   "localGraph": {
     "toggle": "Local graph",

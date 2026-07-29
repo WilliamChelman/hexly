@@ -179,8 +179,11 @@ export interface EntityAccess {
   rightsOf: typeof entityRightsOf;
   /** Full single-row decision (row + standing), or undefined if no such Entity. */
   decide(id: string): EntityDecision | undefined;
-  /** Blob-free reachability + ownership (no `document`), or undefined if no such Entity. */
-  decideMeta(id: string): { canRead: boolean; isOwner: boolean } | undefined;
+  /**
+   * Blob-free reachability + ownership (no `document`), or undefined if no such Entity. The Container
+   * rides along, free on a row already read — a caller telling home content from foreign needs it (ADR-0080).
+   */
+  decideMeta(id: string): { canRead: boolean; isOwner: boolean; containerId: string } | undefined;
 }
 
 /** Resolve the Entity access context for `userId` (Superadmin resolved once). */
@@ -228,11 +231,12 @@ export function entityAccess(db: Db, userId: string): EntityAccess {
         .select({
           canRead: canReadEntity(userId, superadmin),
           isOwner: ownsEntity(userId, superadmin),
+          containerId: entities.containerId,
         })
         .from(entities)
         .where(eq(entities.id, id))
         .get();
-      return row ? { canRead: !!row.canRead, isOwner: !!row.isOwner } : undefined;
+      return row ? { canRead: !!row.canRead, isOwner: !!row.isOwner, containerId: row.containerId } : undefined;
     },
   };
 }

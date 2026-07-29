@@ -13,6 +13,7 @@ import {
 import type { Graph, GraphConfig } from '@cosmos.gl/graph';
 import { WorldGraph } from '@hexly/domain';
 import { ColorSchemeService, Logger, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
+import { nodeLabel } from './foreign-node';
 import { FramingCamera, currentView, framingCamera, spaceScale } from './graph-camera';
 import { GraphFocus, graphFocus } from './graph-focus';
 import { GraphWarmPool, WarmGraph } from './graph-warm-pool';
@@ -490,7 +491,7 @@ export class GraphCanvasComponent {
 
       const placeNode = (index: number, opacity: string) => {
         const [x, y] = cosmos.spaceToScreenPosition([positions[index * 2], positions[index * 2 + 1]]);
-        place(nodes[index].name, x, y + 6, null, opacity);
+        place(nodeLabel(nodes[index]), x, y + 6, null, opacity);
       };
 
       // The hovered neighbourhood reads on demand: its names are forced past the election, first —

@@ -216,10 +216,17 @@ export class WorldGraphPage {
     });
   }
 
+  /**
+   * Open the clicked node. Entity URLs are World-scoped (ADR-0028), so a **Foreign node** routes to *its
+   * own* Container — this page's World would be the wrong shell around it (ADR-0080).
+   */
   protected openEntity({ id, newTab }: GraphOpen): void {
-    const worldId = this.activeWorld.worldId();
-    if (!worldId) return;
-    const name = this.graph()?.nodes.find((n) => n.id === id)?.name;
-    openEntityRoute(this.router, entityRoute(worldId, id, this.worldName() ?? undefined, name), newTab);
+    const node = this.graph()?.nodes.find((n) => n.id === id);
+    const home = node?.foreignContainerId ?? this.activeWorld.worldId();
+    if (!home) return;
+    // Only this World's own name is known here; a Foreign one goes by bare id and `activeWorldGuard`
+    // heals the slug once the route lands.
+    const containerName = node?.foreignContainerId ? undefined : (this.worldName() ?? undefined);
+    openEntityRoute(this.router, entityRoute(home, id, containerName, node?.name), newTab);
   }
 }

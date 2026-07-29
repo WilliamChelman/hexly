@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { defineField, defineStructuredDataType, Field } from '@hexly/domain';
+import { defineField, defineStructuredDataType, Field, WorldGraphNode } from '@hexly/domain';
 import * as z from 'zod';
 import { emptyRichContent, tiptapContent } from '@hexly/plugin-content';
 import { coordKey } from '@hexly/plugin-hexmap';
@@ -605,12 +605,11 @@ describe('Entities endpoints', () => {
     });
 
     /**
-     * The relation surfaces are untouched by compendium content, so a relationship reading means what it
-     * always meant. Neither carries an exclusion rule: both are Container-scoped already (ADR-0078), and
-     * the Local Graph keeps that true even for a link forged straight at a known id, since its edges are
-     * sieved against the World's own nodes (ADR-0079 retires this question rather than answering it).
+     * The relation surfaces carry no compendium exclusion rule of their own, and still need none: a link
+     * forged straight at a Compendium Entry leaves the Container, so the Local Graph draws it the way it
+     * draws every such link — as a marked **Foreign node** (ADR-0080), never as one of this World's own.
      */
-    it('leaves References and the Local Graph with no compendium rows', async () => {
+    it('draws a Compendium Entry as a Foreign node, never as one of the World’s own', async () => {
       const { ada, world, mine, entry } = await shelfAndAuthoredNote();
       const road = await ada
         .post('/entities')
@@ -635,10 +634,19 @@ describe('Entities endpoints', () => {
       await ada.put(`/entities/${mine}`).send({ document, version: 2, tags: [] }).expect(200);
 
       const graph = await ada.get(`/entities/${mine}/graph`).expect(200);
-      expect((graph.body.nodes as { name: string }[]).map((n) => n.name).sort()).toEqual([
-        'Goblin Warren',
-        'Hollow Road',
-      ]);
+      const nodes = graph.body.nodes as WorldGraphNode[];
+      expect(nodes.map((n) => n.name).sort()).toEqual(['Goblin', 'Goblin Warren', 'Hollow Road']);
+      // The World's own nodes are still exactly its own Entities; the pack's entry is marked as the
+      // Compendium's, which is also what a click on it navigates by.
+      expect(
+        nodes
+          .filter((n) => !n.foreignContainerId)
+          .map((n) => n.name)
+          .sort(),
+      ).toEqual(['Goblin Warren', 'Hollow Road']);
+      const compendium = db.select({ id: entities.containerId }).from(entities).where(eq(entities.id, entry)).get();
+      expect(nodes.find((n) => n.name === 'Goblin')?.foreignContainerId).toBe(compendium?.id);
+
       const references = await ada.get(`/entities/${road.body.id}/references`).expect(200);
       expect((references.body.referencedBy as { source: { name: string } }[]).map((r) => r.source.name)).toEqual([
         'Goblin Warren',

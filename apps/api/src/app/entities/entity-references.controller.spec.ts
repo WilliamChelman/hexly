@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { assetThumbnailUrl, assetUrl, EntityDocument } from '@hexly/domain';
+import { assetThumbnailUrl, assetUrl, EntityDocument, InboundReference } from '@hexly/domain';
 import { emptyRichContent, tiptapContent } from '@hexly/plugin-content';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
@@ -315,19 +315,26 @@ describe('Entity references', () => {
       ]);
     });
 
-    /** The usage surface that answers *may I delete this picture?* must not stop at the Container wall. */
-    it('counts as usage on that Asset’s own References', async () => {
+    /**
+     * The usage surface that answers *may I delete this picture?* must not stop at the Container wall — and
+     * a real **Board** is the surface it stops at first: its Image elements harvest the same edge prose does.
+     */
+    it('counts as usage on that Asset’s own References, naming the World it came from', async () => {
       const ada = await signIn('ada@hexly.test');
       const world = await makeWorld(ada);
       const shelf = await makeWorld(ada, 'The Shelf');
       const portrait = mintAsset(shelf, HASH, 'Shelf Portrait');
-      const board = await makeEntity(ada, world, 'Mood Board');
-
-      await illustrate(ada, board, assetUrl(shelf, HASH, '.png'));
+      const board = await makeBoard(ada, world, 'Mood Board', assetUrl(shelf, HASH, '.png'));
 
       const { referencedBy } = await referencesOf(ada, portrait);
       expect(referencedBy).toEqual([
-        { descriptor: null, decor: true, source: { id: board, name: 'Mood Board', types: ['core.type.note'] } },
+        {
+          descriptor: null,
+          decor: true,
+          source: { id: board, name: 'Mood Board', types: ['core.type.board'] },
+          // Named, not merely identified: "which Worlds draw on this?" is the question being answered.
+          foreignContainer: { id: world, name: 'Aldermoor' },
+        },
       ]);
     });
 
@@ -393,6 +400,61 @@ describe('Entity references', () => {
     });
   });
 
+  /**
+   * Usage is what makes a shelf auditable: without it, a Shelf is where things go to become
+   * un-deletable-with-confidence (ADR-0080). So a shelf Entity's usage names the Worlds drawing on it —
+   * every one this viewer can read, and no others, since usage has always been gated on the *source*.
+   */
+  describe('An Entity linked into from another World', () => {
+    it('names the Worlds using it, and marks nothing that lives at home', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const aldermoor = await makeWorld(ada, 'Aldermoor');
+      const thornwood = await makeWorld(ada, 'Thornwood');
+      const goblin = await makeEntity(ada, shelf, 'Marauder Goblin');
+      const queen = await makeEntity(ada, shelf, 'Goblin Queen');
+      const tavern = await makeEntity(ada, aldermoor, 'The Salted Hart');
+      const road = await makeEntity(ada, thornwood, 'The Old Road');
+      for (const [source, descriptor] of [
+        [queen, 'commands'],
+        [tavern, 'raided'],
+        [road, 'ambushed on'],
+      ] as const) {
+        await link(ada, source, [{ entityId: goblin, descriptor }]);
+      }
+
+      const { referencedBy } = await referencesOf(ada, goblin);
+
+      expect(referencedBy.map((r: InboundReference) => [r.source.name, r.foreignContainer?.name ?? 'home'])).toEqual([
+        ['Goblin Queen', 'home'],
+        ['The Old Road', 'Thornwood'],
+        ['The Salted Hart', 'Aldermoor'],
+      ]);
+      expect(referencedBy[1].foreignContainer).toEqual({ id: thornwood, name: 'Thornwood' });
+    });
+
+    it('names no World whose linking Entity this viewer cannot read', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const bob = await signIn('bob@hexly.test');
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const aldermoor = await makeWorld(ada, 'Aldermoor');
+      const thornwood = await makeWorld(ada, 'Thornwood');
+      const goblin = await makeEntity(ada, shelf, 'Marauder Goblin');
+      await addMember(ada, shelf, bobId);
+      await share(ada, goblin);
+      const tavern = await makeEntity(ada, aldermoor, 'The Salted Hart');
+      await addMember(ada, aldermoor, bobId);
+      await share(ada, tavern);
+      const ledger = await makeEntity(ada, thornwood, 'Secret Ledger'); // private, in a World Bob is not in
+      await link(ada, tavern, [{ entityId: goblin }]);
+      await link(ada, ledger, [{ entityId: goblin }]);
+
+      // Ada sees both Worlds; Bob sees the one he can read into, and no trace of Thornwood.
+      expect(await sourceWorlds(ada, goblin)).toEqual(['Aldermoor', 'Thornwood']);
+      expect(await sourceWorlds(bob, goblin)).toEqual(['Aldermoor']);
+    });
+  });
+
   // ---- harness -------------------------------------------------------------
 
   async function seed(email: string, name: string): Promise<string> {
@@ -443,6 +505,26 @@ describe('Entity references', () => {
       }),
     };
     await owner.put(`/entities/${id}`).send({ document, version: current.version, tags: [] }).expect(200);
+  }
+
+  /** A **Board** whose surface carries one Image element at `src` — the Asset edge a mood board mints. */
+  async function makeBoard(owner: Agent, worldId: string, name: string, src: string): Promise<string> {
+    const id = (
+      await owner
+        .post('/entities')
+        .send({ name, types: ['core.type.board'], worldId })
+        .expect(201)
+    ).body.id;
+    const geometry = { position: { x: 0, y: 0 }, size: { width: 100, height: 100 }, z: 0 };
+    await owner
+      .put(`/entities/${id}`)
+      .send({
+        document: { 'core.field.surface': { elements: [{ id: 'i1', kind: 'image', assetUrl: src, ...geometry }] } },
+        version: 1,
+        tags: [],
+      })
+      .expect(200);
+    return id;
   }
 
   /** Save `id`'s RichContent as prose holding one `image` — which harvests as an asset edge. */
@@ -500,5 +582,11 @@ describe('Entity references', () => {
   async function sourceNames(viewer: Agent, id: string): Promise<string[]> {
     const { referencedBy } = await referencesOf(viewer, id);
     return referencedBy.map((r: { source: { name: string } }) => r.source.name);
+  }
+
+  /** The names of the *other* Containers using `id`, deduped and sorted — the shelf-audit question. */
+  async function sourceWorlds(viewer: Agent, id: string): Promise<string[]> {
+    const rows: InboundReference[] = (await referencesOf(viewer, id)).referencedBy;
+    return [...new Set(rows.flatMap((r) => r.foreignContainer?.name ?? []))].sort();
   }
 });

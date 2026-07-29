@@ -1,5 +1,5 @@
 import type { Graph } from '@cosmos.gl/graph';
-import { LinkedEntity } from '@hexly/domain';
+import { WorldGraphNode } from '@hexly/domain';
 import { GraphColors, linkColors, pointColors } from './graph-colors';
 
 /**
@@ -35,7 +35,7 @@ export interface GraphFocus {
 
 export interface GraphFocusOptions {
   readonly cosmos: Graph;
-  readonly nodes: readonly LinkedEntity[];
+  readonly nodes: readonly WorldGraphNode[];
   /** The payload's flat source/target pair array. */
   readonly links: Float32Array;
   /** The colours to open on — applied at once, so this is also the mount's colour seeding. */

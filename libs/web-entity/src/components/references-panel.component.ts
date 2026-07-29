@@ -20,7 +20,9 @@ import { ReferenceRowComponent } from './reference-row.component';
  *
  * *Referenced by* arrives already filtered by the viewer's access to each source; an outbound target the
  * viewer cannot read (or that no longer exists) arrives as `target: null`, which
- * {@link ReferenceRowComponent} renders as the non-navigable dangling label.
+ * {@link ReferenceRowComponent} renders as the non-navigable dangling label. Usage crosses the Container
+ * wall (ADR-0080), so an inbound row from elsewhere names the Container it came from — the surface a
+ * Shelf's keeper reads to answer "which Worlds draw on this?".
  *
  * Empty states are gated on `loaded()`: an in-flight fetch would otherwise show a false empty state.
  */
@@ -73,6 +75,7 @@ import { ReferenceRowComponent } from './reference-row.component';
         [entity]="ref.source"
         [descriptor]="ref.descriptor"
         [decor]="ref.decor"
+        [foreignContainer]="ref.foreignContainer"
       />
     } @empty {
       @if (store.loaded()) {

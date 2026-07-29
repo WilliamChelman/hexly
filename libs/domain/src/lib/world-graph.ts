@@ -23,13 +23,31 @@ export interface WorldGraphEdge {
 }
 
 /**
+ * One end of a link, as a graph draws it: a {@link LinkedEntity} plus, when it lives in another
+ * **Container**, the Container it lives in.
+ */
+export interface WorldGraphNode extends LinkedEntity {
+  /**
+   * A **Foreign node** (ADR-0080): the Container this Entity actually lives in, present only when that
+   * is not the graph's own. It is both the mark — the client draws such a node as living elsewhere —
+   * and what a click navigates by, since Entity URLs are World-scoped (ADR-0028) and this graph's own
+   * World would be the wrong shell.
+   */
+  readonly foreignContainerId?: string;
+}
+
+/**
  * `GET /worlds/:id/graph`. Nodes are every Entity of the World the viewer can read — orphans
  * included, Assets among them (ADR-0065). An Asset's usage is its inbound links, so its
  * content-addressed edges resolve to it as an ordinary node; the client's generic show-orphans
  * toggle keeps unlinked Entities of any type (bulk-minted Assets included) out of the picture by
  * default.
+ *
+ * A link leaving the Container adds one more kind: a **Foreign node**, carrying
+ * {@link WorldGraphNode.foreignContainerId}. The World's *own* nodes are still exactly its own
+ * Entities — a Foreign node is drawn, never counted among them.
  */
 export interface WorldGraph {
-  readonly nodes: readonly LinkedEntity[];
+  readonly nodes: readonly WorldGraphNode[];
   readonly edges: readonly WorldGraphEdge[];
 }
