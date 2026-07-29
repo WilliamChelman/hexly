@@ -20,6 +20,7 @@ import { WorldsController } from './worlds.controller';
 import { WorldsService } from './worlds.service';
 import { WorldTypesService } from './world-types.service';
 import { WorldFieldsService } from './world-fields.service';
+import { WorldMountsService } from './world-mounts.service';
 import { WorldWrites } from './world-writes';
 
 /**
@@ -48,6 +49,7 @@ import { WorldWrites } from './world-writes';
     WorldsService,
     WorldTypesService,
     WorldFieldsService,
+    WorldMountsService,
     WorldWrites,
     CompendiumWrites,
     WorldGraphService,

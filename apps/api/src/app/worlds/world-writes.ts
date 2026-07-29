@@ -4,6 +4,7 @@ import { FieldSchema, MemberRole, UserDefinedType, WorldKind, WorldTheme } from 
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import {
+  containerMounts,
   containers,
   WorldRow,
   worldFields,
@@ -281,6 +282,67 @@ export class WorldWrites {
       if (deleted.changes === 0) return false;
       this.bumpAndNudge(worldId);
       return true;
+    });
+  }
+
+  /**
+   * Declare one more **Mount** (ADR-0080), appended last. Returns whether a row landed: a Container
+   * already mounted is the same Mount, so the conflict is ignored and nothing is announced.
+   *
+   * Bumps `seq` alone, like {@link membership} — a Mount is World configuration its followers must
+   * refetch, not an edit that should send the World to the top of the Index. It fans out to nothing: a
+   * Mount grants no Rights on *this* World's Entities.
+   */
+  mount(worldId: string, mountedContainerId: string): boolean {
+    return this.transact(() => {
+      const nextPosition = this.db
+        .select({ next: sql<number>`coalesce(max(${containerMounts.position}), -1) + 1` })
+        .from(containerMounts)
+        .where(eq(containerMounts.containerId, worldId))
+        .get();
+      const inserted = this.db
+        .insert(containerMounts)
+        .values({ containerId: worldId, mountedContainerId, position: nextPosition?.next ?? 0 })
+        .onConflictDoNothing()
+        .run();
+      if (inserted.changes === 0) return false;
+      this.bumpAndNudge(worldId);
+      return true;
+    });
+  }
+
+  /** Drop one Mount, and nothing else. Returns whether a row matched, so unmounting nothing 404s. */
+  unmount(worldId: string, mountedContainerId: string): boolean {
+    return this.transact(() => {
+      const deleted = this.db
+        .delete(containerMounts)
+        .where(
+          and(eq(containerMounts.containerId, worldId), eq(containerMounts.mountedContainerId, mountedContainerId)),
+        )
+        .run();
+      if (deleted.changes === 0) return false;
+      this.bumpAndNudge(worldId);
+      return true;
+    });
+  }
+
+  /**
+   * Rewrite the Mount order to `mountedContainerIds`, which the caller has already checked is a
+   * permutation of what is mounted and actually different from it. Only `position` moves, so every
+   * Mount survives as the same row.
+   */
+  reorderMounts(worldId: string, mountedContainerIds: readonly string[]): void {
+    this.transact(() => {
+      mountedContainerIds.forEach((mountedContainerId, position) => {
+        this.db
+          .update(containerMounts)
+          .set({ position })
+          .where(
+            and(eq(containerMounts.containerId, worldId), eq(containerMounts.mountedContainerId, mountedContainerId)),
+          )
+          .run();
+      });
+      this.bumpAndNudge(worldId);
     });
   }
 

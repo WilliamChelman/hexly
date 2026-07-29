@@ -9,10 +9,11 @@ import { OwnerSetComponent, MemberSetComponent, PublicLinkComponent } from '@hex
 import { WorldTypesPanelComponent } from './components/world-types-panel.component';
 import { WorldFieldsPanelComponent } from './components/world-fields-panel.component';
 import { WorldImportsPanelComponent } from './components/world-imports-panel.component';
+import { WorldMountsPanelComponent } from './components/world-mounts-panel.component';
 import { WorldThemePanelComponent } from './components/world-theme-panel.component';
 import { WorldKindPanelComponent } from './components/world-kind-panel.component';
 
-type Section = 'access' | 'kind' | 'schema' | 'theme' | 'imports' | 'sharing';
+type Section = 'access' | 'kind' | 'schema' | 'mounts' | 'theme' | 'imports' | 'sharing';
 
 interface SectionItem {
   readonly section: Section;
@@ -46,6 +47,7 @@ interface SectionItem {
     WorldTypesPanelComponent,
     WorldFieldsPanelComponent,
     WorldImportsPanelComponent,
+    WorldMountsPanelComponent,
     WorldThemePanelComponent,
     WorldKindPanelComponent,
   ],
@@ -99,6 +101,13 @@ interface SectionItem {
               <h2 class="group-head">{{ 'worldFields.heading' | transloco }}</h2>
               <p class="detail-sub">{{ 'worldFields.subhead' | transloco }}</p>
               <div class="pane" appPanel><app-world-fields [id]="id" /></div>
+            }
+            @case ('mounts') {
+              <header class="detail-head">
+                <h1 class="detail-title">{{ 'mounts.heading' | transloco }}</h1>
+                <p class="detail-sub">{{ 'mounts.subhead' | transloco }}</p>
+              </header>
+              <div class="pane" appPanel><app-world-mounts [id]="id" /></div>
             }
             @case ('theme') {
               <header class="detail-head">
@@ -186,6 +195,9 @@ export class WorldSettingsPage {
       // Campaign-or-Shelf is a curation the World Owner alone makes (ADR-0080), gated on the same
       // right the Theme editor is — and never first, so the group Settings opens on is unchanged.
       ...(canManage ? [{ section: 'kind' as const, icon: 'globe' as const, label: 'worldKind.heading' }] : []),
+      // Declaring what this World draws from is the Owner's alone (ADR-0080), and the whole Mount
+      // surface is Owner-gated server-side — so it rides the same `manage` right the Theme does.
+      ...(canManage ? [{ section: 'mounts' as const, icon: 'library' as const, label: 'mounts.heading' }] : []),
       ...(canManage ? [{ section: 'theme' as const, icon: 'palette' as const, label: 'worldTheme.heading' }] : []),
       { section: 'imports' as const, icon: 'download' as const, label: 'imports.heading' },
       ...(collaboration

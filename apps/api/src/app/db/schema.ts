@@ -1,4 +1,12 @@
-import { DEFAULT_WORLD_KIND, EdgeTargetKind, FieldSchema, ViewPlacement, WorldKind, WorldTheme } from '@hexly/domain';
+import {
+  ContainerKind,
+  DEFAULT_WORLD_KIND,
+  EdgeTargetKind,
+  FieldSchema,
+  ViewPlacement,
+  WorldKind,
+  WorldTheme,
+} from '@hexly/domain';
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 // Keep in sync by hand with the `CREATE TABLE` DDL in `./db.ts`; column changes
@@ -129,8 +137,12 @@ export const entityGrants = sqliteTable(
   (table) => [primaryKey({ columns: [table.entityId, table.userId] })],
 );
 
-/** The kinds of Container (ADR-0078): a **World** a user authors into, or ADR-0079's **Compendium** shelf. */
-export type ContainerKind = 'world' | 'compendium';
+/**
+ * The kinds of Container (ADR-0078): a **World** a user authors into, or ADR-0079's **Compendium**
+ * shelf. Declared in `@hexly/domain` since a **Mount** names it on the wire (ADR-0080), and re-exported
+ * here so a schema reader finds the column's vocabulary beside the column.
+ */
+export type { ContainerKind };
 
 /** The {@link containers} kind every World row carries. */
 export const WORLD_CONTAINER_KIND: ContainerKind = 'world';
@@ -221,6 +233,39 @@ export const compendiums = sqliteTable('compendiums', {
  * satellite, the {@link WorldRow} peer.
  */
 export type CompendiumRow = typeof containers.$inferSelect & Omit<typeof compendiums.$inferSelect, 'id'>;
+
+/**
+ * The **Mounts** a Container declares (ADR-0080): the Containers it draws from, `container_id` the
+ * mounting side and `mounted_container_id` the mounted one. The pair is the primary key, so the same
+ * Mount declared twice is one row; `position` is order alone, never identity, which is what lets a
+ * reorder rewrite it wholesale.
+ *
+ * Both columns key {@link containers} rather than {@link worlds} though only a World may mount: the
+ * generic name leaves room for a kind that does without implying one exists, and "a Compendium may not
+ * mount" is the write path's, which resolves its mounting Container through `worlds`. Both FKs cascade,
+ * so deleting either Container drops the Mount with it.
+ *
+ * No `seq` of its own — a Mount change bumps the mounting World's, so it rides that freshness key like
+ * a membership change. Written through {@link WorldWrites}.
+ */
+export const containerMounts = sqliteTable(
+  'container_mounts',
+  {
+    containerId: text('container_id')
+      .notNull()
+      .references(() => containers.id, { onDelete: 'cascade' }),
+    mountedContainerId: text('mounted_container_id')
+      .notNull()
+      .references(() => containers.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.containerId, table.mountedContainerId] }),
+    // "Who mounts this Container?" — the direction the primary key does not serve, and the one a
+    // cascade-on-delete and every read behind this ticket asks.
+    index('idx_container_mounts_mounted').on(table.mountedContainerId),
+  ],
+);
 
 /**
  * World membership: a user is an `owner` (full control — the World's ownership

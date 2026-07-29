@@ -20,6 +20,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   addMemberRequestSchema,
+  addMountRequestSchema,
   addOwnerRequestSchema,
   AssetSummary,
   assetSearchQuerySchema,
@@ -32,8 +33,11 @@ import {
   createWorldRequestSchema,
   Field,
   ImportSummary,
+  Mount,
+  MountCandidate,
   parseFieldFilters,
   PublicLink,
+  reorderMountsRequestSchema,
   setMemberRoleRequestSchema,
   updateUserDefinedTypeRequestSchema,
   updateWorldFieldRequestSchema,
@@ -58,6 +62,7 @@ import { WorldGraphService } from './world-graph.service';
 import { WorldsService } from './worlds.service';
 import { TypeResult, WorldTypesService } from './world-types.service';
 import { WorldFieldsService } from './world-fields.service';
+import { mountResponse, WorldMountsService } from './world-mounts.service';
 
 /** The subset of multer's uploaded-file shape this controller uses (no @types/multer dep). */
 interface UploadedZip {
@@ -81,6 +86,7 @@ export class WorldsController {
     private readonly worlds: WorldsService,
     private readonly types: WorldTypesService,
     private readonly fields: WorldFieldsService,
+    private readonly mounts: WorldMountsService,
     private readonly importer: VaultImportService,
     private readonly exporter: VaultExportService,
     private readonly graphs: WorldGraphService,
@@ -338,6 +344,47 @@ export class WorldsController {
   @HttpCode(204)
   removeField(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('fieldId') fieldId: string): void {
     this.typeResult(this.fields.delete(user.id, id, fieldId));
+  }
+
+  // Below: the World's **Mounts** (ADR-0080) — the Containers it draws from. World-Owner-gated in the
+  // service like `/owners` and `/members`, but deliberately *not* Collaboration-gated: a Sole User on
+  // the Desktop App mounts with no sharing concepts in sight (ADR-0071). Every route answers with the
+  // whole ordered list, so a client never has to reassemble it from a partial response.
+
+  @Get(':id/mounts')
+  mountsOf(@CurrentUser() user: AuthUser, @Param('id') id: string): Mount[] {
+    return mountResponse(this.mounts.list(user.id, id));
+  }
+
+  @Get(':id/mount-candidates')
+  mountCandidates(@CurrentUser() user: AuthUser, @Param('id') id: string): MountCandidate[] {
+    return mountResponse(this.mounts.candidates(user.id, id));
+  }
+
+  // Idempotent — mounting what is already mounted is the same Mount — so a 200, not a 201.
+  @Post(':id/mounts')
+  @HttpCode(200)
+  addMount(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Mount[] {
+    const parsed = addMountRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return mountResponse(this.mounts.add(user.id, id, parsed.data.containerId));
+  }
+
+  @Patch(':id/mounts')
+  reorderMounts(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Mount[] {
+    const parsed = reorderMountsRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return mountResponse(this.mounts.reorder(user.id, id, parsed.data.containerIds));
+  }
+
+  // The path param is the *mounted* Container, named as the add body names it (ADR-0080).
+  @Delete(':id/mounts/:containerId')
+  removeMount(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('containerId') containerId: string,
+  ): Mount[] {
+    return mountResponse(this.mounts.remove(user.id, id, containerId));
   }
 
   /** Map a {@link TypeResult} to its HTTP outcome: `ok` unwraps, else the status's exception. */

@@ -636,6 +636,27 @@
     "note": "It is a label and nothing more: the world index groups by it, and nothing else anywhere reads it. A shelf keeps its members, its dashboard, its theme, its public link and its place in the world switcher, exactly as a campaign does.",
     "saveError": "Couldn't save that. Please try again."
   },
+  "mounts": {
+    "heading": "Mounts",
+    "subhead": "The containers this world draws from. Mounting widens what this world can point at — what it holds is untouched, so its entities, counts and browser read exactly as before. You can mount worlds you own, and any installed compendium.",
+    "empty": "This world draws on nothing yet.",
+    "kind": {
+      "world": "World",
+      "compendium": "Compendium"
+    },
+    "unmount": "Unmount",
+    "moveUpLabel": "Move {{name}} up",
+    "moveDownLabel": "Move {{name}} down",
+    "addLabel": "Container to mount",
+    "addPlaceholder": "Choose a container…",
+    "add": "Mount",
+    "noCandidates": "Nothing left to mount. You can mount worlds you own and installed compendiums.",
+    "loadError": "Couldn't load what this world draws from.",
+    "candidatesError": "Couldn't load what you can mount here.",
+    "addError": "Couldn't mount that container. Please try again.",
+    "removeError": "Couldn't unmount that container. Please try again.",
+    "reorderError": "Couldn't reorder the mounts. Please try again."
+  },
   "imports": {
     "heading": "Imports",
     "subhead": "Bring in a managed reference library from a plugin's source. A reimport overwrites the set; your hand-authored entities are untouched.",

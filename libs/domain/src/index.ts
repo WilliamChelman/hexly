@@ -15,6 +15,7 @@ export * from './lib/derive-document-state';
 export * from './lib/join-search-text';
 export * from './lib/asset';
 export * from './lib/world';
+export * from './lib/mount';
 export * from './lib/world-theme';
 // The Preset table alone: `palette-block.ts` beside it generates committed stylesheet output
 // (ADR-0077) and is nothing the app or the server calls.
