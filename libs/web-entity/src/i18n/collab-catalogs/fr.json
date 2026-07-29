@@ -64,6 +64,7 @@
   },
   "entitySearchPicker": {
     "searchPlaceholder": "Rechercher des entités…",
-    "empty": "Aucune entité correspondante"
+    "empty": "Aucune entité correspondante",
+    "allContainers": "Tout"
   }
 }

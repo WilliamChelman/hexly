@@ -259,14 +259,14 @@ describe('A Mount cascades read', () => {
     expect(await worldNames(bob)).toEqual(['Aldermoor']);
   });
 
-  it('is a scope on reading and not yet on pointing, so no picker widens', async () => {
+  it('leaves what the World *holds* alone, however much it now draws on', async () => {
     await mount(campaign, shelf);
     await mount(campaign, pack);
 
-    // Widening what a World may point *at* is #411's; a link-target read still stays inside the World
-    // being edited in (#394) and still offers no Compendium Entry (#400).
-    expect(await names(ada(), `worldId=${campaign}&read=link-target`)).toEqual(['The Tavern']);
-    expect(await names(ada(), `read=link-target&q=goblin`)).toEqual([]);
+    // A Mount widens what a World may point at, never what it holds (ADR-0080): the Entity Browser and
+    // every other container-scoped reading answer exactly as they did. What a picker offers is the one
+    // read that widens, and it is asserted in `mounted-link-targets.controller.spec.ts` (#411).
+    expect(await names(ada(), `worldId=${campaign}`)).toEqual(['The Tavern']);
   });
 
   it('puts the mounted World in its new readers’ Index, since they can now open it', async () => {

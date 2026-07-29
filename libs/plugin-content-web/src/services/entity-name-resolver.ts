@@ -49,13 +49,14 @@ export class EntityNameResolver {
   private readonly pickerResults$ = searchEntities(this.client, this.pickerQuery$, {
     cache: this.searchCache,
     // A link-target read (ADR-0079) in the host Entity's World — the World a mention mints into, never
-    // the URL's (ADR-0073) — so typing a name authors neither a cross-World link nor one onto a shelf.
+    // the URL's (ADR-0073) — so typing a name reaches that World's Entities and the ones in the
+    // Containers it Mounts, which is the whole of what it may point at (ADR-0080).
     params: () => ({ read: 'link-target', ...(this.worldId ? { worldId: this.worldId } : {}) }),
   }).pipe(share());
 
   /**
    * The Entities `query` names that this note may link — server-filtered (ADR-0025 `q`), scoped to
-   * `worldId` and never a Compendium Entry. `@tiptap/suggestion` awaits this per keystroke; the shared
+   * `worldId` and what it Mounts. `@tiptap/suggestion` awaits this per keystroke; the shared
    * search debounces the burst and a failed search yields an empty list rather than rejecting the popup.
    */
   search(query: string, worldId?: string): Promise<EntitySummary[]> {

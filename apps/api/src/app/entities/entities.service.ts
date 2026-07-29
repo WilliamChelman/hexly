@@ -52,6 +52,7 @@ import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } fro
 import { DB, Db } from '../db/db';
 import {
   assetIndex,
+  containerMounts,
   containers,
   entities,
   entityDescriptors,
@@ -106,12 +107,22 @@ export interface ListOptions {
    */
   readonly containerIds?: readonly string[];
   /**
+   * What this read's scope **Mounts** (ADR-0080, internal — never from the query): the Containers a
+   * **link-target read** may point at beside {@link containerIds}, resolved by
+   * {@link EntitiesService.mountScope}. Unioned with the scope rather than folded into it, so the read
+   * still knows which side is the World's own and can rank it first.
+   */
+  readonly mountedContainerIds?: readonly string[];
+  /**
    * Facet: restrict to any of these **Containers** (OR within category). A narrowing *within*
    * {@link containerIds}, not a redefinition of it — both predicates AND, so naming a Container the
    * scope excludes reaches nothing — which is what lets the Container facet drill down like Type or Tag.
    */
   readonly container?: readonly string[];
-  /** Which kind of read this is (ADR-0079): a link-target read drops every Compendium Entry. */
+  /**
+   * Which kind of read this is (ADR-0079): a link-target read asks *what may this point at?*, so it
+   * offers its scope plus what that scope **Mounts** and nothing else (ADR-0080).
+   */
   readonly read?: EntityRead;
   /** Attach the caller's Rights to each summary — opt-in, the Entity Browser sets it. */
   readonly withRights?: boolean;
@@ -138,6 +149,7 @@ export interface ListOptions {
 export type FacetOptions = Pick<
   ListOptions,
   | 'containerIds'
+  | 'mountedContainerIds'
   | 'container'
   | 'read'
   | 'q'
@@ -203,7 +215,7 @@ export class EntitiesService {
     // A text query becomes an FTS5 MATCH ranked by bm25; absent (or
     // all-punctuation) keeps the last-edited order.
     const match = opts.q ? toFtsMatch(opts.q) : null;
-    opts = { ...opts, excludedTypes: this.resolveExcludedTypes(opts) };
+    opts = this.mountScope({ ...opts, excludedTypes: this.resolveExcludedTypes(opts) });
     const w = this.config.search.weights;
     const access = entityAccess(this.db, readerId);
     // The dedup index (ADR-0065), aliased for the two thumbnail sources it answers (ADR-0066): the Entity's
@@ -261,7 +273,9 @@ export class EntitiesService {
       // rather than tuned. Compendium Entries last (ADR-0079), outermost since authored-before-published
       // outranks the Asset rule beneath it; then hidden types (ADR-0065). Only where a query ranks at
       // all — an unqueried list is `updatedAt` order, which no tier is asked to interrupt.
+      // Mounted content rides outside both, and outside the unqueried order too — see {@link mountedLast}.
       .orderBy(
+        ...this.mountedLast(opts),
         ...(match
           ? [
               inACompendium(),
@@ -319,6 +333,9 @@ export class EntitiesService {
   facets(readerId: string, opts: FacetOptions): EntityFacets {
     // Resolve the read filter (Superadmin bypass folded in) once, reuse it in every count.
     const { filter } = entityAccess(this.db, readerId);
+    // The same widening `list` applies (ADR-0080), resolved from the same signals: a rail must never
+    // count what its list excludes, nor exclude what its list offers.
+    opts = this.mountScope(opts);
     // The hidden-type exclusion (ADR-0065) rides every count *but* the type facet's: the type facet is the
     // opt-in surface, so a hidden type must still be counted over the full universe there — otherwise it
     // would never appear to be selected into view. Every sibling category resolves the exclusion exactly as
@@ -332,19 +349,18 @@ export class EntitiesService {
       tag: this.countJsonArray({ ...scoped, tags: undefined }, entities.tags, filter),
       // Field facets by presence in the result set — no longer gated on the active Type (ADR-0054, #231).
       fields: this.countFieldFacets(scoped, filter),
-      // The Container facet, by presence too (ADR-0079, ADR-0080): a read scoped to one Container has
-      // nothing to narrow, so only a cross-Container read — the Library — carries the category at all.
-      ...((opts.containerIds?.length ?? 0) > 1
-        ? { container: this.countContainers({ ...scoped, container: undefined }, filter) }
-        : {}),
+      // The Container facet, by presence too (ADR-0079, ADR-0080): a read that spans one Container has
+      // nothing to narrow, so only a cross-Container one carries the category — the Library, and a
+      // link-target read in a World that Mounts, where it narrows to one pack or one shelf.
+      ...(scopeSize(opts) > 1 ? { container: this.countContainers({ ...scoped, container: undefined }, filter) } : {}),
     };
   }
 
   /**
    * The **Container** facet's values: one per Container in the scope that still holds a matching
-   * Entity, labelled with its authored name. Counted like every other category — drilled down (its own
-   * selection dropped by the caller) and under every sibling constraint — so the rail can never
-   * annotate a list it disagrees with.
+   * Entity, labelled with its authored name — a pack or a Shelf alike (ADR-0079, ADR-0080). Counted
+   * like every other category — drilled down (its own selection dropped by the caller) and under every
+   * sibling constraint — so the rail can never annotate a list it disagrees with.
    *
    * Ordered by the scope's own order rather than by name or count: the **Library** names its
    * Containers in the Owner's **Mount** order (ADR-0080), and reading the request's order back is what
@@ -356,7 +372,8 @@ export class EntitiesService {
       .select({
         value: entities.containerId,
         count: sql<number>`count(*)`.as('count'),
-        // The Container's authored name, so the rail reads "Draw Steel: Monsters" and not a uuid.
+        // The Container's authored name, so the rail reads "Draw Steel: Monsters" or "The Art Shelf"
+        // and not a uuid.
         label: containers.name,
       })
       .from(entities)
@@ -365,8 +382,9 @@ export class EntitiesService {
       .groupBy(entities.containerId)
       .all();
     // Total, not a tiebreak: the scope is a `WHERE` and the `GROUP BY` yields each Container once, so
-    // every row has a distinct index in it.
-    const scope = opts.containerIds ?? [];
+    // every row has a distinct index in it. The widened form keeps the World's own Containers first,
+    // then Mounts in the Owner's order (ADR-0080).
+    const scope = scopedContainerIds(opts);
     return rows.sort((a, b) => scope.indexOf(a.value) - scope.indexOf(b.value));
   }
 
@@ -380,6 +398,43 @@ export class EntitiesService {
    */
   private resolveExcludedTypes(opts: Pick<FilterOptions, 'ids' | 'includeHidden' | 'type'>): string[] {
     return opts.ids || opts.includeHidden ? [] : this.excludedHiddenTypes(opts.type);
+  }
+
+  /**
+   * Widen a **link-target read** to what its scope **Mounts** (ADR-0080, #411): every picker that asks
+   * *what may this point at?* — the `@` picker, the Entity Link Field picker, the Board Embed picker,
+   * the asset pickers — asks it through this one read, and the answer is the linking Container or one
+   * it Mounts.
+   *
+   * Resolved here rather than asked for, so no caller can widen its own scope; one indexed read on
+   * `container_mounts`, and exactly one hop — Mounts do not chain (ADR-0080). A read that names no
+   * Container has no Mount set to resolve and stays as it was, which is ADR-0079's sealed model, as
+   * does a World that Mounts nothing.
+   */
+  private mountScope<T extends FacetOptions>(opts: T): T {
+    if (opts.read !== 'link-target' || !opts.containerIds?.length) return opts;
+    const scope = new Set(opts.containerIds);
+    const rows = this.db
+      .select({ id: containerMounts.mountedContainerId })
+      .from(containerMounts)
+      .where(inArray(containerMounts.containerId, [...scope]))
+      .all();
+    // A Set both dedups two Worlds mounting one Container and drops a scope member back out of it.
+    const mounted = new Set(rows.map((row) => row.id));
+    for (const id of scope) mounted.delete(id);
+    return mounted.size ? { ...opts, mountedContainerIds: [...mounted] } : opts;
+  }
+
+  /**
+   * The outermost sort key of a widened link-target read (ADR-0080): 0 for the World's own Entities and
+   * 1 for a mounted Container's, so ascending puts your own goblin king before a pack's at equal
+   * relevance. A tier rather than a scope switch — mounted results appear inline, ranked below, so
+   * nobody picks a haystack before searching it — and it rides the unqueried order too, where recency
+   * would otherwise let a two-thousand-entry bestiary drown the World's own.
+   */
+  private mountedLast(opts: ListOptions): SQL[] {
+    const mounted = opts.mountedContainerIds;
+    return mounted?.length ? [inArray(entities.containerId, [...mounted])] : [];
   }
 
   /**
@@ -1286,16 +1341,37 @@ function filters(opts: FilterOptions) {
   if (opts.visibility?.length) predicates.push(inArray(entities.visibility, [...opts.visibility]));
   if (opts.tags?.length) predicates.push(hasAny(entities.tags, opts.tags));
   if (opts.fields?.length) predicates.push(...fieldFilters(opts.fields));
-  // The one Container predicate, whether the read names one Container or the whole shelf (ADR-0078).
-  // `entities.container_id` is indexed, so the set form costs no more than the single one did.
-  if (opts.containerIds?.length) predicates.push(inArray(entities.containerId, [...opts.containerIds]));
+  // The one Container predicate, whether the read names one Container or the whole shelf (ADR-0078) —
+  // plus, for a link-target read, the Containers that scope Mounts (ADR-0080), because a Mount widens
+  // what a World may point at. `entities.container_id` is indexed, so the set form costs no more than
+  // the single one did.
+  const scope = scopedContainerIds(opts);
+  if (scope.length) predicates.push(inArray(entities.containerId, scope));
   // The Container facet's selection: a second predicate on the same column, deliberately — the scope
   // above says what the read is about, this says what the user narrowed it to, and they AND.
   if (opts.container?.length) predicates.push(inArray(entities.containerId, [...opts.container]));
   // The only narrowing the Compendium adds to any read (ADR-0079); it sits here so `list` and `facets`
-  // share it and a picker's rail cannot count what its options exclude.
-  if (opts.read === 'link-target') predicates.push(sql`NOT ${inACompendium()}`);
+  // share it and a picker's rail cannot count what its options exclude. A Mount is its one exception
+  // (ADR-0080): sealing once also forbade being pointed at, and that half is now the Mount scope — so a
+  // mounted pack's entries are offered as link targets and an unmounted one's, named or not, are not.
+  if (opts.read === 'link-target') {
+    const outsideACompendium = sql`NOT ${inACompendium()}`;
+    const mounted = opts.mountedContainerIds ?? [];
+    predicates.push(
+      mounted.length ? or(outsideACompendium, inArray(entities.containerId, [...mounted])) : outsideACompendium,
+    );
+  }
   return predicates;
+}
+
+/** The Containers a read may return from: what it is about, plus what a link-target read's scope Mounts. */
+function scopedContainerIds(opts: FacetOptions): string[] {
+  return [...(opts.containerIds ?? []), ...(opts.mountedContainerIds ?? [])];
+}
+
+/** How many Containers a read spans — the signal that there is a Container facet to offer at all. */
+function scopeSize(opts: FacetOptions): number {
+  return new Set(scopedContainerIds(opts)).size;
 }
 
 /**
