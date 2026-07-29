@@ -39,7 +39,14 @@ import { and, asc, desc, eq, inArray, or, sql, SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { IMAGE_KIND_FIELD_FILTER } from '@hexly/plugin-asset';
 import { AclSetResult, gate, isSuperadmin, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
-import { EntityAccess, entityAccess, ownsEntity, READ_ONLY_RIGHTS, sharedVisibility } from '../acl/entity-access';
+import {
+  EntityAccess,
+  entityAccess,
+  ownsEntity,
+  reachedByWorldLink,
+  READ_ONLY_RIGHTS,
+  sharedVisibility,
+} from '../acl/entity-access';
 import { canCreateEntityFilter, worldOwnerFilter } from '../acl/world-access';
 import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
@@ -1169,20 +1176,24 @@ export class EntitiesService {
   }
 
   /**
-   * The `shared` Entity in World `worldId` with this id, read-only — the per-entity
-   * read behind a World Public Link. Scoped to the token's World *and* `shared`, so
-   * the link reaches that World's shared surface and nothing else; anything else is null (404).
+   * The Entity with this id that a World Public Link on `worldId` reaches, read-only — that World's
+   * `shared` surface plus what its **Mounts** republish (ADR-0080). Anything else is null (404), so an
+   * unreached id stays indistinguishable from a missing one.
    */
-  loadSharedInWorld(worldId: string, id: string): EntityDetail | null {
+  loadThroughWorldLink(worldId: string, id: string): EntityDetail | null {
     const row = this.db
       .select()
       .from(entities)
-      .where(and(eq(entities.id, id), eq(entities.containerId, worldId), sharedVisibility))
+      .where(and(eq(entities.id, id), reachedByWorldLink(sql`${worldId}`)))
       .get();
     return row ? this.withAssetBytesState({ ...toDetail(row), rights: [...READ_ONLY_RIGHTS] }) : null;
   }
 
-  /** Summaries of a World's `shared` Entities, ordered like {@link list}. */
+  /**
+   * Summaries of a World's `shared` Entities, ordered like {@link list}. The World's *own*, deliberately:
+   * a Mount widens what a World may point at, never what it holds (ADR-0080), so the public view lists
+   * exactly what the Entity Browser would.
+   */
   listSharedByWorld(worldId: string): EntitySummary[] {
     return this.db
       .select()

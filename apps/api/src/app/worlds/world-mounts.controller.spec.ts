@@ -261,12 +261,12 @@ describe('A World’s Mounts', () => {
     expect(after.seq).toBeGreaterThan(before.detail.seq);
     expect(after.updatedAt).toBe(before.detail.updatedAt);
 
-    // And no read cascades yet: a Viewer of the mounting World still cannot reach what it draws from.
+    // The read the Mount *does* cascade is #410's, pinned in `mount-cascade.controller.spec.ts`; what
+    // belongs here is that it changes no container-scoped listing, for the mounting World's Viewer as
+    // much as for its Owner.
     await ada.post(`/worlds/${campaign}/members`).send({ userId: bobId, role: 'viewer' });
     const bob = await signIn('bob@hexly.test');
     expect(await names(bob, `worldId=${campaign}`)).toEqual(['The Tavern']);
-    await bob.get(`/worlds/${shelf}`).expect(404);
-    expect(await names(bob, `worldId=${shelf}`)).toEqual([]);
   });
 
   // ---- harness -------------------------------------------------------------

@@ -186,6 +186,16 @@ export const appRoutes: Route[] = [
     loadComponent: () => import('./pages/public/public-entity.page').then((m) => m.PublicEntityPage),
     title: 'publicView.tabTitle',
   },
+  {
+    // The Compendium page for the reader with no account: a Mount cascades read through this token's
+    // World, and a pack's terms must never sit behind a wall its content does not (ADR-0080). Hung off
+    // the token that got them here, since there is no World to hang it off.
+    path: 'public/w/:token/compendium/:compendiumId',
+    canActivate: [collaborationGuard],
+    loadComponent: () => import('./pages/compendium-page/compendium.page').then((m) => m.CompendiumPage),
+    title: 'compendium.page.tabTitle',
+    data: { documentTitleKey: 'compendium.page.tabTitleNamed' },
+  },
   // Unmatched URLs render the error page rather than bouncing to the Index, so a
   // wrong URL is visible, not papered over.
   {

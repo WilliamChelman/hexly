@@ -102,9 +102,16 @@ describe('The Compendium page read', () => {
     await ada.get('/compendiums/00000000-0000-4000-8000-000000000000').expect(404);
   });
 
-  it('is closed to a caller who is not signed in', async () => {
-    // Instance-wide is not public: the seal opens the shelf to everyone *on the Instance* (ADR-0079).
-    await request(app.getHttpServer()).get(`/compendiums/${monsters}`).expect(401);
+  it('states the terms to a caller who is not signed in at all', async () => {
+    // A **Mount** cascades read to anonymous World Public Link holders (ADR-0080), so a pack's content
+    // is reachable without an account — and a pack's terms must never sit behind a wall its content
+    // does not. The pack's unguessable id is what stands in for the credential.
+    expect((await request(app.getHttpServer()).get(`/compendiums/${monsters}`).expect(200)).body).toMatchObject({
+      name: 'Draw Steel: Monsters',
+      attribution: { license: 'Draw Steel Creator License' },
+    });
+    // The shelf itself stays signed-in, so what an Instance has installed is never there to enumerate.
+    await request(app.getHttpServer()).get('/compendiums').expect(401);
   });
 
   // ---- harness -------------------------------------------------------------
