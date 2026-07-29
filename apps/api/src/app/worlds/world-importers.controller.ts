@@ -1,6 +1,4 @@
 import {
-  BadRequestException,
-  Body,
   Controller,
   Delete,
   ForbiddenException,
@@ -11,7 +9,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { AuthUser, ImporterSummary, ImportRunSummary, runImportRequestSchema } from '@hexly/domain';
+import { AuthUser, ImporterSummary, ImportRunSummary } from '@hexly/domain';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
 import { ImportRefusal, ImportReconcileService } from './import-reconcile.service';
@@ -22,6 +20,10 @@ import { ImportRefusal, ImportReconcileService } from './import-reconcile.servic
  * (unreachable World ≡ 404, reachable-but-not-Owner ≡ 403), so a non-Owner never reaches an Importer.
  * The controller is importer-agnostic: it lists whatever Importers the enabled Plugins registered, and
  * runs / polls / removes them through the one reconcile.
+ *
+ * A **Compendium Importer** is not among them (ADR-0079): a pack is Instance-wide, so stocking one is
+ * the operator's job and lives in {@link CompendiumPacksController}. This surface neither lists nor
+ * runs one — an attempt is a 404, the same answer as for an Importer no Plugin registered.
  */
 @Controller('worlds/:worldId')
 @UseGuards(SessionAuthGuard)
@@ -35,9 +37,9 @@ export class WorldImportersController {
   }
 
   /**
-   * Run (or reimport) an Importer into this World with a chosen Visibility, and return at once (202) —
-   * the reconcile outlives the request; poll {@link status}. A second run while one is in flight is a
-   * 409 (raised in the service). An unknown Importer is a 404.
+   * Run (or reimport) an Importer into this World, and return at once (202) — the reconcile outlives
+   * the request; poll {@link status}. A second run while one is in flight is a 409 (raised in the
+   * service). An unknown Importer is a 404. No body: the run has nothing left to choose (ADR-0079).
    */
   @Post('importers/:importerId/run')
   @HttpCode(202)
@@ -45,11 +47,8 @@ export class WorldImportersController {
     @CurrentUser() user: AuthUser,
     @Param('worldId') worldId: string,
     @Param('importerId') importerId: string,
-    @Body() body: unknown,
   ): ImportRunSummary {
-    const parsed = runImportRequestSchema.safeParse(body);
-    if (!parsed.success) throw new BadRequestException();
-    return this.unwrap(this.imports.start(user.id, worldId, importerId, parsed.data.visibility));
+    return this.unwrap(this.imports.start(user.id, worldId, importerId));
   }
 
   /** Where this World's import run stands — the poll target for a running reconcile, plus the last finished run. */

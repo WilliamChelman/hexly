@@ -2,7 +2,7 @@ import {
   authorWorldField,
   authorWorldType,
   createEntity,
-  enterLibrary,
+  enterEntities,
   expect,
   openDetails,
   openWorldFieldEditor,
@@ -12,10 +12,10 @@ import {
 
 /** A World Type whose only Field is ticked "required" — the arrangement both facts below need. */
 async function authorKnight(page: Page): Promise<void> {
-  const worldId = await enterLibrary(page);
+  const worldId = await enterEntities(page);
   await authorWorldField(page, worldId, { segment: 'rank', label: 'Rank', required: true });
   await authorWorldType(page, worldId, { id: 'knight', name: 'Knight', fields: [], refs: ['world.field.rank'] });
-  await enterLibrary(page);
+  await enterEntities(page);
 }
 
 /**
@@ -59,7 +59,7 @@ test('the Details panel marks an unfilled required Field Incomplete, and clears 
 
 /** There is no migration for an expectation (ADR-0074), so the checkbox carries the new meaning itself. */
 test('the World field editor explains the required checkbox where the Owner ticks it', async ({ page }) => {
-  const worldId = await enterLibrary(page);
+  const worldId = await enterEntities(page);
   await openWorldFieldEditor(page, worldId);
 
   await expect(page.getByTestId('field-required')).toBeVisible();

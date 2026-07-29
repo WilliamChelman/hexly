@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
+import { createEntity, enterEntities, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
  * A hex name is structured metadata bound to its coordinate (ADR-0016), distinct from a
@@ -7,7 +7,7 @@ import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from '
  * renderer's drawing of the name is covered by the FakeContext unit tests.
  */
 test('names a painted hex in the Inspector, and the name survives a reload', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });

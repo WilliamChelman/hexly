@@ -125,6 +125,17 @@ export const createEntityRequestSchema = z.object({
 
 export type CreateEntityRequest = z.infer<typeof createEntityRequestSchema>;
 
+/**
+ * POST /entities/:id/adopt (CONTEXT.md → Adoption): the target World, everything else being read off
+ * the entry. Required rather than defaulted like a create's, because every surface offering Adoption is
+ * already read under a World — the `:worldId` of the **Compendium browse** (ADR-0079).
+ */
+export const adoptEntityRequestSchema = z.object({
+  worldId: z.string().min(1),
+});
+
+export type AdoptEntityRequest = z.infer<typeof adoptEntityRequestSchema>;
+
 /** PUT /entities/:id: stale `version` is rejected with 409. */
 export const saveEntityRequestSchema = z.object({
   document: entityDocumentSchema,
@@ -210,6 +221,15 @@ export const ENTITY_LIST_DEFAULT_LIMIT = 50;
 export const ENTITY_LIST_MAX_LIMIT = 200;
 
 /**
+ * CONTEXT.md → Link-target read. `link-target` returns no **Compendium Entry**; `navigation` does,
+ * ranked below authored Entities. Declared by the surface, so one rule serves all four link-target
+ * ones. Defaults to `navigation` — the seal is held by discovery, not by an invariant (ADR-0079).
+ */
+export const entityReadSchema = z.enum(['navigation', 'link-target']);
+
+export type EntityRead = z.infer<typeof entityReadSchema>;
+
+/**
  * `GET /entities` query params, all optional and composable. Facet params
  * (`type`/`tag`/`visibility`) repeat in the query string (`?tag=a&tag=b`) and
  * combine OR within a category, AND across categories, all AND-ed with `q`.
@@ -243,6 +263,24 @@ export const entityListQuerySchema = z.object({
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
   worldId: z.string().min(1).optional(),
+  // The **Container** scope, repeatable — how a read that spans Containers names them (ADR-0079): the
+  // Compendium browse lists every installed pack, so it says which ones rather than riding the
+  // single-Container scoping every World read uses. `worldId` above is that same scope under the name a
+  // World-scoped caller knows it by; both fold into one predicate server-side.
+  containerId: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
+  // Facet: the **Compendium** facet's selection — a narrowing *within* the scope above, so it drills
+  // down like Type or Tag (dropped when counting its own values) rather than redefining what the read
+  // is about. Nothing outside the scope can be reached by naming it here: both predicates AND.
+  compendium: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
+  // Defaulted rather than optional, so an unknown value is a 400: a typo'd `read=linktarget` must not
+  // silently navigate.
+  read: entityReadSchema.default('navigation'),
   cursor: z.string().optional(),
   // Opt-in per-row Rights; paths that omit it keep `list` a pure read-filter.
   rights: z
@@ -319,6 +357,12 @@ export interface EntityFacets {
   readonly tag: readonly FacetCount[];
   readonly visibility: readonly FacetCount[];
   readonly fields: readonly FieldFacet[];
+  /**
+   * The **Compendium** facet (ADR-0079): which pack each entry came from, `value` the Container id and
+   * `label` its name. Surfaced *by presence* like a Field facet — a read that names a single Container
+   * has nothing to narrow, so only a cross-Container read (the Compendium browse) carries it.
+   */
+  readonly compendium?: readonly FacetCount[];
 }
 
 /** What `GET /entities` lists; body fetched only on open. */
@@ -349,6 +393,16 @@ export interface EntitySummary {
    * read, so restoring the file clears it with no Reindex; absent for an Entity that owns no bytes.
    */
   readonly assetBytesMissing?: boolean;
+  /**
+   * Set when this Entity is **Sealed** (CONTEXT.md → Sealed): it lives in a **Compendium**, so it is
+   * read-only to everyone and nothing outside its Compendium may point at it. Derived from where the
+   * Entity lives, never stored — there is no flag on the row to set or to forge (ADR-0079).
+   *
+   * The read side of the seal the client needs: it is why {@link rights} says `read` alone, why the
+   * World segment in the entry's URL is navigation context rather than its home, and what an
+   * **Adoption** affordance keys off.
+   */
+  readonly sealed?: boolean;
 }
 
 /** What `GET /entities/:id` and saves return. */

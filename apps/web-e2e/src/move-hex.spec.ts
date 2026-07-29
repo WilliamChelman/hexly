@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
+import { createEntity, enterEntities, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
  * The whole-Hex move journey (ADR-0010): a press over a selected hex arms a move, crossing a small
@@ -8,7 +8,7 @@ import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from '
  * dragging ~100px lands the content on a different coordinate.
  */
 test('drags a hex under Select to a new coordinate, and the move survives a reload', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -70,7 +70,7 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
  * records rather than overwriting, so a move never silently destroys content.
  */
 test('drags a hex onto an occupied hex and swaps the two, surviving a reload', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -132,7 +132,7 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
  * origin and the destination stays Void.
  */
 test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -174,7 +174,7 @@ test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', as
  * the whole set.
  */
 test('drags a multi-hex selection so the whole group moves by one offset', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -227,7 +227,7 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
  * whole move is refused and the document is left untouched — nothing moves.
  */
 test('refuses a blocked group move, leaving every hex where it was', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   const mapId = await createEntity(page, 'core.type.hex-map');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });

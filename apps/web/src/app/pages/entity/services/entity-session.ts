@@ -458,7 +458,7 @@ export class EntitySession implements EntitySessionPort {
     for (const editor of this._editors()) editor.flushPendingCommit();
   }
 
-  /** Always a fresh fetch: the session outlives library trips, so a cached `current` can be stale (#70). */
+  /** Always a fresh fetch: the session outlives trips to the browser, so a cached `current` can be stale (#70). */
   openRoute(id: string): Observable<EntityDetail> {
     // Flush the previous Entity AND WAIT before clearing its canvas (ADR-0026): an in-app
     // swap reuses this route-scoped session, so the edit must land while the live signals

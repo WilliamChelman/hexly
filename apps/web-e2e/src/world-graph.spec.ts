@@ -1,6 +1,6 @@
 import type { Locator } from '@playwright/test';
 import { rasteriseColors } from '@hexly/web-styles';
-import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
+import { enterEntities, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /**
  * The World Graph journey (#181), and its generic show-orphans toggle (ADR-0065, #283). A linked
@@ -8,7 +8,7 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
  * an orphan the graph hides until the toggle asks for it.
  */
 test('hides orphan entities behind a generic show-orphans toggle', async ({ page }) => {
-  const worldId = await enterLibrary(page);
+  const worldId = await enterEntities(page);
 
   // The link target: a note the source can point at.
   await page.getByTestId('new-default-entity').click();
@@ -16,7 +16,7 @@ test('hides orphan entities behind a generic show-orphans toggle', async ({ page
   const targetId = entityIdFromUrl(page);
 
   // The source note, linked to the target via an @-mention — one edge, two non-orphan nodes.
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   await page.getByTestId('note-content').click();
@@ -27,7 +27,7 @@ test('hides orphan entities behind a generic show-orphans toggle', async ({ page
   await flushSave(page);
 
   // A third note left unlinked — the orphan.
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
@@ -92,7 +92,7 @@ async function paintedBackground(canvas: Locator): Promise<[number, number, numb
  * that stops at the resolved *value* passes such a colour, including the token snapshot's own rasterise.
  */
 test('draws on the sunken surface rather than on black', async ({ page }) => {
-  const worldId = await enterLibrary(page);
+  const worldId = await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 

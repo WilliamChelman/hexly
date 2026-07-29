@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { addWorldMember, enterLibrary, expect, openEntity, shareOpenEntity, signInGrantee, test } from './fixtures';
+import { addWorldMember, enterEntities, expect, openEntity, shareOpenEntity, signInGrantee, test } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 /**
@@ -20,7 +20,7 @@ interface Shared {
 }
 
 async function seedSharedNotes(page: Page): Promise<Shared> {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
 
   const mint = async (name: string) => {

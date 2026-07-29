@@ -41,6 +41,16 @@ const grantee = {
   name: process.env.E2E_GRANTEE_NAME,
 };
 
+// The operator (ADR-0047) — a Superadmin the suite signs in as only to reach the admin area, where
+// compendium packs are stocked (#404). A third account rather than a flag on the login user, so no
+// other spec inherits a bypass over every access predicate.
+const operator = {
+  email: process.env.E2E_OPERATOR_EMAIL,
+  password: process.env.E2E_OPERATOR_PASSWORD,
+  name: process.env.E2E_OPERATOR_NAME,
+  superadmin: true,
+};
+
 /** Fail loudly with a fix-it hint rather than a cryptic ENOENT mid-run. */
 function requireBuilt(path, what) {
   if (!existsSync(path)) {
@@ -87,13 +97,17 @@ const childEnv = {
 
 // Seed the e2e users before serving (synchronous: the server must not accept logins
 // before the users exist). The grantee is optional — the loop skips it if unset.
-// Only the login user gets a starter World: `enterLibrary` reaches its library by
+// Only the login user gets a starter World: `enterEntities` reaches the Entity Browser by
 // clicking a World card on the Index, so the suite is dead without one.
 // E2E_SOLE_USER gives the login user the Sole User's shape (ADR-0071), so a Collaboration-off
 // absence cannot be a role check's doing.
+const soleUser = !!process.env.E2E_SOLE_USER;
 const toSeed = [
-  { ...user, withWorld: true, soleUser: !!process.env.E2E_SOLE_USER },
+  { ...user, withWorld: true, soleUser },
   ...(grantee.email ? [grantee] : []),
+  // Never on a Sole User run: that account already *is* the operator, and a second Superadmin would
+  // contradict the shape the run exists to prove (ADR-0071).
+  ...(operator.email && !soleUser ? [operator] : []),
 ];
 for (const u of toSeed) {
   const seeded = spawnSync(
@@ -105,6 +119,7 @@ for (const u of toSeed) {
       u.name,
       ...(u.withWorld ? ['--with-world'] : []),
       ...(u.soleUser ? ['--sole-user'] : []),
+      ...(u.superadmin ? ['--superadmin'] : []),
     ],
     { env: childEnv, stdio: 'inherit' },
   );

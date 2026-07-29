@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { enterLibrary, entitiesNamed, entityIdFromUrl, expect, flushSave, segRe, test } from './fixtures';
+import { enterEntities, entitiesNamed, entityIdFromUrl, expect, flushSave, segRe, test } from './fixtures';
 
 /**
  * Inline Creation (issue #343, ADR-0073): `@` plus a name nothing matches creates the Entity and links
@@ -36,7 +36,7 @@ test('mints the Entity an unmatched mention names, links it, and keeps the autho
   page,
   request,
 }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const hostId = entityIdFromUrl(page);
@@ -83,7 +83,7 @@ test('mints the Entity an unmatched mention names, links it, and keeps the autho
 test('keeps writing across the round trip: the link lands where it was typed, not under the caret', async ({
   page,
 }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
@@ -104,7 +104,7 @@ test('keeps writing across the round trip: the link lands where it was typed, no
 test('offers Create beside the matches, and a second mention offers the Entity the first one minted', async ({
   page,
 }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
@@ -134,7 +134,7 @@ test('offers Create beside the matches, and a second mention offers the Entity t
 });
 
 test('a failed write puts the typed text back, exactly as it was typed', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
@@ -159,7 +159,7 @@ test('a failed write puts the typed text back, exactly as it was typed', async (
 });
 
 test('undo while the mint is in flight retracts the mention rather than doubling the text', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   await holdCreates(page, 1500);
@@ -185,7 +185,7 @@ test('undo while the mint is in flight retracts the mention rather than doubling
 });
 
 test('a mint landing after the author moved on leaves their caret where they put it', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   await holdCreates(page, 1200);
@@ -210,7 +210,7 @@ test('a mint landing after the author moved on leaves their caret where they put
 });
 
 test('two mentions of one name inside a single round trip converge on one Entity', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   await holdCreates(page, 1500);
@@ -235,7 +235,7 @@ test('two mentions of one name inside a single round trip converge on one Entity
 });
 
 test('Esc at the picker leaves the typed name as plain prose and creates nothing', async ({ page, request }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
@@ -259,7 +259,7 @@ test('Esc at the picker leaves the typed name as plain prose and creates nothing
 });
 
 test('the note being written in is never offered as a match for the mention typed into it', async ({ page }) => {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const hostId = entityIdFromUrl(page);

@@ -29,7 +29,7 @@ export class LocalGraphService {
     const center = access.decide(id);
     if (!center?.canRead) return null;
 
-    const { nodes, edges } = worldGraphRead(this.db, access, center.row.worldId);
+    const { nodes, edges } = worldGraphRead(this.db, access, center.row.containerId);
     const kept = neighbourhood(id, edges, depth);
 
     return {

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
@@ -44,7 +44,10 @@ describe('createDb boot migration (ADR-0027)', () => {
         'users',
         'sessions',
         'entities',
+        'containers',
         'worlds',
+        // The Compendium satellite beside `worlds` on the shared Container (ADR-0078, ADR-0079).
+        'compendiums',
         'world_members',
         'world_links',
         'entity_descriptors',
@@ -365,11 +368,9 @@ describe('ColorScheme light/dark migration round-trip (0031)', () => {
         astral: { '--color-canvas-glow': 'rgba(1,2,3,0.4)' },
       },
     };
-    sqlite
-      .prepare(`INSERT INTO worlds (id, name, theme, created_at, updated_at) VALUES (?,?,?,0,0)`)
-      .run('w1', 'Aldermoor', JSON.stringify(theme));
+    seedWorld(sqlite, 'w1', 'Aldermoor', JSON.stringify(theme));
     // A World with no Theme at all, which is every World that never opened the editor.
-    sqlite.prepare(`INSERT INTO worlds (id, name, created_at, updated_at) VALUES ('w2','Whisperwood',0,0)`).run();
+    seedWorld(sqlite, 'w2', 'Whisperwood', null);
     // Two readers with a roaming choice, and one who never expressed any.
     for (const [id, prefs] of [
       ['u1', '{"locale":"fr","colorScheme":"astral"}'],
@@ -383,6 +384,14 @@ describe('ColorScheme light/dark migration round-trip (0031)', () => {
         .run(id, `${id}@hexly.test`, id, 'h', prefs);
     }
     return sqlite;
+  }
+
+  /** A World as the current schema stores it: its Container identity row plus its satellite (ADR-0078). */
+  function seedWorld(sqlite: Database.Database, id: string, name: string, theme: string | null): void {
+    sqlite
+      .prepare(`INSERT INTO containers (id, kind, name, created_at, updated_at) VALUES (?,'world',?,0,0)`)
+      .run(id, name);
+    sqlite.prepare(`INSERT INTO worlds (id, theme) VALUES (?,?)`).run(id, theme);
   }
 
   function themeOf(sqlite: Database.Database, id: string): Record<string, unknown> | null {
@@ -429,6 +438,337 @@ describe('ColorScheme light/dark migration round-trip (0031)', () => {
       // No expressed choice stays no expressed choice — the client still detects the OS preference.
       ['u3', { locale: 'en' }],
     ]);
+    sqlite.close();
+  });
+});
+
+/**
+ * 0032 backfills every World into `containers` at its *own* id, then rebuilds `worlds` as the
+ * satellite. The claim worth pinning is that an existing Instance upgrades in place: no World id
+ * moves, no name / `seq` / timestamp is lost, and nothing hanging off a World is cascaded away by
+ * the rebuild. A fresh DB has no pre-existing Worlds, so one is seeded the old way.
+ */
+describe('containers backfill migration (0032)', () => {
+  function seededPre0032(): Database.Database {
+    const sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = OFF');
+    // Every file before this one — too many to list, unlike the earlier round-trips.
+    for (const file of readdirSync(resolve(__dirname, 'migrations'))
+      .filter((f) => f.endsWith('.sql') && f < '0032')
+      .sort()) {
+      applyMigration(sqlite, file);
+    }
+    sqlite
+      .prepare(
+        `INSERT INTO worlds (id, name, seq, pinned_entity_ids, theme, created_at, updated_at) VALUES (?,?,?,?,?,?,?)`,
+      )
+      .run('w1', 'Aldermoor', 42, '["e1"]', '{"version":2}', 100, 200);
+    sqlite
+      .prepare(
+        `INSERT INTO worlds (id, name, seq, pinned_entity_ids, theme, created_at, updated_at) VALUES (?,?,?,?,?,?,?)`,
+      )
+      .run('w2', 'Whisperwood', 7, '[]', null, 300, 400);
+    sqlite.prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES ('w1','u1','owner')`).run();
+    sqlite.prepare(`INSERT INTO world_links (id, world_id, created_at) VALUES ('tok','w1',0)`).run();
+    sqlite
+      .prepare(
+        `INSERT INTO world_types (world_id, type_id, label, field_refs, views, created_at, updated_at)
+         VALUES ('w1','world.type.deity','Deity','[]',NULL,0,0)`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO world_fields (world_id, field_id, definition, created_at, updated_at)
+         VALUES ('w1','world.field.era','{}',0,0)`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO entities (id, world_id, name, types, tags, visibility, version, seq, document, content_text, created_at, updated_at)
+         VALUES ('e1','w1','Lady Mara','[]','[]','shared',1,3,'{}','the buried obelisk',0,0)`,
+      )
+      .run();
+    return sqlite;
+  }
+
+  it('gives every World a Container at the same id, and keeps its name, seq and timestamps', () => {
+    const sqlite = seededPre0032();
+    applyMigration(sqlite, '0032_containers_hold_identity.sql');
+
+    expect(sqlite.prepare(`SELECT * FROM containers ORDER BY id`).all()).toEqual([
+      { id: 'w1', kind: 'world', name: 'Aldermoor', seq: 42, created_at: 100, updated_at: 200 },
+      { id: 'w2', kind: 'world', name: 'Whisperwood', seq: 7, created_at: 300, updated_at: 400 },
+    ]);
+    // The satellite keeps the pins and the Theme, at the same id, and sheds identity.
+    expect(sqlite.prepare(`SELECT * FROM worlds ORDER BY id`).all()).toEqual([
+      { id: 'w1', pinned_entity_ids: '["e1"]', theme: '{"version":2}' },
+      { id: 'w2', pinned_entity_ids: '[]', theme: null },
+    ]);
+    sqlite.close();
+  });
+
+  it('leaves Collaboration and every world_id pointing at the World untouched by the rebuild', () => {
+    const sqlite = seededPre0032();
+    applyMigration(sqlite, '0032_containers_hold_identity.sql');
+
+    // The DROP TABLE inside the rebuild must not have cascaded any of these away.
+    expect(sqlite.prepare(`SELECT world_id, user_id, role FROM world_members`).all()).toEqual([
+      { world_id: 'w1', user_id: 'u1', role: 'owner' },
+    ]);
+    expect(sqlite.prepare(`SELECT id, world_id FROM world_links`).all()).toEqual([{ id: 'tok', world_id: 'w1' }]);
+    expect(sqlite.prepare(`SELECT world_id, type_id FROM world_types`).all()).toEqual([
+      { world_id: 'w1', type_id: 'world.type.deity' },
+    ]);
+    expect(sqlite.prepare(`SELECT world_id, field_id FROM world_fields`).all()).toEqual([
+      { world_id: 'w1', field_id: 'world.field.era' },
+    ]);
+    // The entity side still names its column `world_id` here: #396 renames it, never a value.
+    expect(sqlite.prepare(`SELECT id, world_id, seq FROM entities`).all()).toEqual([
+      { id: 'e1', world_id: 'w1', seq: 3 },
+    ]);
+    sqlite.close();
+  });
+});
+
+/**
+ * 0033 repoints the entity side at the Container (ADR-0078): five tables rename `world_id` to
+ * `container_id` and `entities`' foreign key moves to `containers`. The claims worth pinning are the
+ * ones a rename can silently break — not one stored value moves, the FTS index survives the `entities`
+ * rebuild, and the Asset dedup key still resolves every already-uploaded Asset's byte address. A fresh
+ * DB has nothing to carry across, so a World's worth of rows is seeded the old way.
+ */
+describe('container repoint migration (0033)', () => {
+  const HASH = 'a1b2c3';
+
+  function seededPre0033(): Database.Database {
+    const sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = OFF');
+    for (const file of readdirSync(resolve(__dirname, 'migrations'))
+      .filter((f) => f.endsWith('.sql') && f < '0033')
+      .sort()) {
+      applyMigration(sqlite, file);
+    }
+    sqlite
+      .prepare(
+        `INSERT INTO containers (id, kind, name, seq, created_at, updated_at) VALUES ('w1','world','Aldermoor',1,0,0)`,
+      )
+      .run();
+    sqlite.prepare(`INSERT INTO worlds (id, pinned_entity_ids) VALUES ('w1','[]')`).run();
+    for (const [id, name] of [
+      ['e1', 'Lady Mara'],
+      ['a1', 'Portrait'],
+    ]) {
+      sqlite
+        .prepare(
+          `INSERT INTO entities (id, world_id, name, types, tags, visibility, version, seq, document, content_text, created_at, updated_at)
+           VALUES (?,'w1',?,'[]','[]','shared',1,3,'{}','the buried obelisk',0,0)`,
+        )
+        .run(id, name);
+    }
+    // One row in each derived index, as the write choke point would have materialised it.
+    sqlite.prepare(`INSERT INTO asset_index (entity_id, world_id, hash, ext) VALUES ('a1','w1',?, '.png')`).run(HASH);
+    sqlite
+      .prepare(
+        `INSERT INTO entity_edges (source_entity_id, world_id, target_kind, target_id, descriptor, decor)
+         VALUES ('e1','w1','asset',?,NULL,1)`,
+      )
+      .run(HASH);
+    sqlite
+      .prepare(
+        `INSERT INTO entity_field_facets (entity_id, world_id, key, value, num) VALUES ('e1','w1','core.field.kind','image',NULL)`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO entity_import_source (entity_id, world_id, importer, source_id, rev)
+         VALUES ('e1','w1','draw-steel.importer.monsters','goblin','sha-abc')`,
+      )
+      .run();
+    return sqlite;
+  }
+
+  it('renames the column on all five tables and moves not one stored value', () => {
+    const sqlite = seededPre0033();
+    applyMigration(sqlite, '0033_entities_belong_to_containers.sql');
+
+    const containerIds = (table: string) =>
+      sqlite.prepare(`SELECT DISTINCT container_id AS id FROM ${table}`).all() as { id: string }[];
+    for (const table of ['entities', 'entity_edges', 'entity_field_facets', 'entity_import_source', 'asset_index']) {
+      // The World's Container id *is* the World's id, so every row stays where it was.
+      expect(containerIds(table), table).toEqual([{ id: 'w1' }]);
+      expect(
+        (sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name),
+        table,
+      ).not.toContain('world_id');
+    }
+    // The rest of each row rides through the rebuild untouched.
+    expect(sqlite.prepare(`SELECT id, name, seq FROM entities ORDER BY id`).all()).toEqual([
+      { id: 'a1', name: 'Portrait', seq: 3 },
+      { id: 'e1', name: 'Lady Mara', seq: 3 },
+    ]);
+    // `entities` now hangs off the Container, which is what lets a Compendium's Entity live here later.
+    expect(
+      (sqlite.prepare(`PRAGMA foreign_key_list(entities)`).all() as { table: string }[]).map((f) => f.table),
+    ).toEqual(['containers']);
+    sqlite.close();
+  });
+
+  it('carries rowid forward so the FTS index still matches by prose after the entities rebuild', () => {
+    const sqlite = seededPre0033();
+    applyMigration(sqlite, '0033_entities_belong_to_containers.sql');
+
+    expect(
+      sqlite
+        .prepare(
+          `SELECT e.id FROM entities_fts f JOIN entities e ON e.rowid = f.rowid WHERE entities_fts MATCH 'obelisk' ORDER BY e.id`,
+        )
+        .all(),
+    ).toEqual([{ id: 'a1' }, { id: 'e1' }]);
+    // The recreated triggers keep syncing, so a post-migration write is still findable.
+    sqlite.prepare(`UPDATE entities SET content_text = 'the drowned lighthouse' WHERE id = 'e1'`).run();
+    expect(
+      sqlite
+        .prepare(
+          `SELECT e.id FROM entities_fts f JOIN entities e ON e.rowid = f.rowid WHERE entities_fts MATCH 'lighthouse'`,
+        )
+        .all(),
+    ).toEqual([{ id: 'e1' }]);
+    sqlite.close();
+  });
+
+  it('keeps every uploaded Asset’s byte address and its dedup key resolving', () => {
+    const sqlite = seededPre0033();
+    applyMigration(sqlite, '0033_entities_belong_to_containers.sql');
+
+    // `<containerId>/<hash><ext>` is the on-disk address, and it is the same string it was before.
+    expect(sqlite.prepare(`SELECT container_id, hash, ext FROM asset_index WHERE entity_id = 'a1'`).get()).toEqual({
+      container_id: 'w1',
+      hash: HASH,
+      ext: '.png',
+    });
+    // The unique dedup key still holds, so re-uploading identical bytes still resolves to the Asset
+    // that already wraps them rather than minting a twin.
+    expect(() =>
+      sqlite.prepare(`INSERT INTO asset_index (entity_id, container_id, hash) VALUES ('e1','w1',?)`).run(HASH),
+    ).toThrow(/UNIQUE/);
+    sqlite.close();
+  });
+});
+
+/**
+ * 0034 repoints the authored vocabulary at the Container (ADR-0078): `world_types` and `world_fields`
+ * rename `world_id` to `container_id` and hang off `containers`. Both are rebuilt, since the foreign key
+ * and the composite primary key both span the renamed column. The claims worth pinning are what a
+ * rebuild can silently break — not one stored value moves, the composite key still refuses a twin, and
+ * the cascade that used to run through the `worlds` satellite still takes a deleted World's vocabulary
+ * with it. A fresh DB has nothing to carry across, so a World's worth of rows is seeded the old way.
+ */
+describe('vocabulary repoint migration (0034)', () => {
+  function seededPre0034(): Database.Database {
+    const sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = OFF');
+    for (const file of readdirSync(resolve(__dirname, 'migrations'))
+      .filter((f) => f.endsWith('.sql') && f < '0034')
+      .sort()) {
+      applyMigration(sqlite, file);
+    }
+    sqlite
+      .prepare(
+        `INSERT INTO containers (id, kind, name, seq, created_at, updated_at) VALUES ('w1','world','Aldermoor',1,0,0)`,
+      )
+      .run();
+    sqlite.prepare(`INSERT INTO worlds (id, pinned_entity_ids) VALUES ('w1','[]')`).run();
+    sqlite
+      .prepare(
+        `INSERT INTO world_types (world_id, type_id, label, field_refs, views, created_at, updated_at)
+         VALUES ('w1','world.type.deity','Deity','["world.field.era"]','[{"fieldId":"world.field.era"}]',10,20)`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO world_fields (world_id, field_id, definition, created_at, updated_at)
+         VALUES ('w1','world.field.era','{"label":"Era","dataType":"string"}',30,40)`,
+      )
+      .run();
+    return sqlite;
+  }
+
+  it('renames the column on both tables and moves not one stored value', () => {
+    const sqlite = seededPre0034();
+    applyMigration(sqlite, '0034_types_and_fields_belong_to_containers.sql');
+
+    for (const table of ['world_types', 'world_fields']) {
+      expect(
+        (sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name),
+        table,
+      ).not.toContain('world_id');
+      // The World's Container id *is* the World's id, so the vocabulary stays where it was.
+      expect(sqlite.prepare(`SELECT DISTINCT container_id AS id FROM ${table}`).all(), table).toEqual([{ id: 'w1' }]);
+      // The vocabulary now hangs off the Container, which is what lets it travel with the content later.
+      expect(
+        (sqlite.prepare(`PRAGMA foreign_key_list(${table})`).all() as { table: string }[]).map((f) => f.table),
+        table,
+      ).toEqual(['containers']);
+    }
+    // The rest of each row rides through the rebuild untouched — the authored labels, the Field
+    // references, the View order a type named, and both timestamps.
+    expect(sqlite.prepare(`SELECT * FROM world_types`).all()).toEqual([
+      {
+        container_id: 'w1',
+        type_id: 'world.type.deity',
+        label: 'Deity',
+        field_refs: '["world.field.era"]',
+        views: '[{"fieldId":"world.field.era"}]',
+        created_at: 10,
+        updated_at: 20,
+      },
+    ]);
+    expect(sqlite.prepare(`SELECT * FROM world_fields`).all()).toEqual([
+      {
+        container_id: 'w1',
+        field_id: 'world.field.era',
+        definition: '{"label":"Era","dataType":"string"}',
+        created_at: 30,
+        updated_at: 40,
+      },
+    ]);
+    sqlite.close();
+  });
+
+  it('re-heads the composite key on the container, so an id is still authored at most once', () => {
+    const sqlite = seededPre0034();
+    applyMigration(sqlite, '0034_types_and_fields_belong_to_containers.sql');
+
+    expect(() =>
+      sqlite
+        .prepare(
+          `INSERT INTO world_types (container_id, type_id, label, field_refs, views, created_at, updated_at)
+           VALUES ('w1','world.type.deity','Twin','[]',NULL,0,0)`,
+        )
+        .run(),
+    ).toThrow(/UNIQUE|PRIMARY KEY/);
+    expect(() =>
+      sqlite
+        .prepare(
+          `INSERT INTO world_fields (container_id, field_id, definition, created_at, updated_at)
+           VALUES ('w1','world.field.era','{}',0,0)`,
+        )
+        .run(),
+    ).toThrow(/UNIQUE|PRIMARY KEY/);
+    sqlite.close();
+  });
+
+  it('still takes a deleted World’s Types and Fields with it, now cascading off the Container', () => {
+    const sqlite = seededPre0034();
+    applyMigration(sqlite, '0034_types_and_fields_belong_to_containers.sql');
+    // The cascade source moved from the `worlds` satellite to the `containers` row; enforcement is on
+    // for the runtime connection, which is where a World delete actually runs (createDb, ADR-0027).
+    sqlite.pragma('foreign_keys = ON');
+
+    sqlite.prepare(`DELETE FROM containers WHERE id = 'w1'`).run();
+
+    expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM world_types`).get()).toEqual({ n: 0 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM world_fields`).get()).toEqual({ n: 0 });
     sqlite.close();
   });
 });

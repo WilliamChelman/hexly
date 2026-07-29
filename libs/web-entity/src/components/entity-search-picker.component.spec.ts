@@ -87,6 +87,18 @@ describe('EntitySearchPicker', () => {
   });
 
   /**
+   * Every consumer of this picker asks the same question — what may this point at? — so the read says so
+   * once here rather than four times over, and the server answers it with no Compendium Entry (ADR-0079).
+   * That covers the Entity Link Field picker, the Board Embed picker and a broken link's relink popover.
+   */
+  it('asks for link targets, so no Compendium Entry is ever offered', () => {
+    const fixture = TestBed.createComponent(Host);
+    fixture.detectChanges();
+
+    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ read: 'link-target' }));
+  });
+
+  /**
    * A picker is no browse: an Asset stays pickable by name (a Board Embed of one, a pinned one), unlike in
    * the Entity Browser's own listing (ADR-0065). The server ranks hidden types last, so they never lead.
    */

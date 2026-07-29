@@ -3,9 +3,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { switchMap, takeWhile, timer } from 'rxjs';
-import { ImporterErrorCode, ImporterSummary, ImportRunSummary, Visibility } from '@hexly/domain';
-import { ClientConfigStore, HexlyDatePipe, ToasterService, WorldsClient } from '@hexly/web-core';
-import { ButtonComponent, SelectComponent } from '@hexly/web-ui';
+import { ImporterErrorCode, ImporterSummary, ImportRunSummary } from '@hexly/domain';
+import { HexlyDatePipe, ToasterService, WorldsClient } from '@hexly/web-core';
+import { ButtonComponent } from '@hexly/web-ui';
 
 /** How often a running reconcile is polled — the reindex cadence (ADR-0046), one at a time per World. */
 const IMPORT_POLL_MS = 1000;
@@ -22,17 +22,20 @@ type ImporterStatusLine =
 
 /**
  * The generic World-Owner Imports panel (ADR-0060): it lists whatever {@link Importer}s the enabled
- * Plugins registered for this World and, per row, offers Import/Reimport, Remove, and a
- * shared/private Visibility (cut with the rest of Visibility when Collaboration is off, ADR-0071).
+ * Plugins registered for this World and, per row, offers Import/Reimport and Remove.
  * Importer-agnostic — the label is the summary's transloco key piped
- * through, so a Plugin (e.g. Draw Steel) supplies its copy via its web catalogs and this panel never
- * names it. The reconcile outlives the request that starts it, so the panel follows the one run per
- * World by polling; the server's status is the source of truth for whether one is in flight.
+ * through, so a Plugin supplies its copy via its web catalogs and this panel never names it. The
+ * reconcile outlives the request that starts it, so the panel follows the one run per World by
+ * polling; the server's status is the source of truth for whether one is in flight.
+ *
+ * A **Compendium Importer** is not among the rows and cannot be (ADR-0079, #404): a pack is
+ * Instance-wide, so it is stocked from the operator's admin surface, and the server does not list one
+ * here. Nor is there a Visibility to choose any more — a run lands at the default.
  */
 @Component({
   selector: 'app-world-imports',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, HexlyDatePipe, ButtonComponent, SelectComponent],
+  imports: [TranslocoPipe, HexlyDatePipe, ButtonComponent],
   template: `
     <ul class="importer-list">
       @for (imp of importers(); track imp.id) {
@@ -67,22 +70,6 @@ type ImporterStatusLine =
               }
             }
           </div>
-
-          <!-- Visibility goes with every other Visibility affordance when Collaboration is off (ADR-0071). -->
-          @if (collaboration()) {
-            <select
-              appSelect
-              class="importer-visibility"
-              [attr.aria-label]="'imports.visibility' | transloco"
-              [attr.data-testid]="'importer-visibility-' + imp.id"
-              [value]="visibilityFor(imp.id)"
-              [disabled]="running()"
-              (change)="setVisibility(imp.id, $event)"
-            >
-              <option value="shared">{{ 'imports.shared' | transloco }}</option>
-              <option value="private">{{ 'imports.private' | transloco }}</option>
-            </select>
-          }
 
           <button
             appButton
@@ -143,16 +130,10 @@ export class WorldImportsPanelComponent implements OnInit {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly clientConfig = inject(ClientConfigStore);
-
-  /** Whether the Collaboration layer is on (ADR-0071) — with it off an import has no Visibility to choose. */
-  protected readonly collaboration = computed(() => this.clientConfig.isCollaborationEnabled());
 
   protected readonly importers = signal<readonly ImporterSummary[]>([]);
   /** The World's one import run as last seen from the server; `null` until fetched. Drives the busy state. */
   protected readonly status = signal<ImportRunSummary | null>(null);
-  /** Per-Importer Visibility choice for the next run; defaults to `shared`, the panel's opening stance. */
-  private readonly visibility = signal<Record<string, Visibility>>({});
 
   /** The server's word, not a local latch — a reload mid-run still finds one importer busy. */
   protected readonly running = computed(() => this.status()?.status === 'running');
@@ -173,16 +154,6 @@ export class WorldImportsPanelComponent implements OnInit {
       // A status fetch failing shouldn't blank the whole panel; the list still renders and a run re-seeds it.
       error: () => undefined,
     });
-  }
-
-  protected visibilityFor(importerId: string): Visibility {
-    // No toggle means no intent to honour: the import mints at the schema default (ADR-0071).
-    return this.visibility()[importerId] ?? (this.collaboration() ? 'shared' : 'private');
-  }
-
-  protected setVisibility(importerId: string, event: Event): void {
-    const value = (event.target as HTMLSelectElement).value as Visibility;
-    this.visibility.update((all) => ({ ...all, [importerId]: value }));
   }
 
   /**
@@ -212,10 +183,10 @@ export class WorldImportsPanelComponent implements OnInit {
     return rev ? rev.slice(0, 7) : '';
   }
 
-  /** Start (or reimport) an Importer at its chosen Visibility, then follow the reconcile home. */
+  /** Start (or reimport) an Importer, then follow the reconcile home. */
   protected run(importerId: string): void {
     if (this.running()) return;
-    this.worlds.runImport(this.id(), importerId, this.visibilityFor(importerId)).subscribe({
+    this.worlds.runImport(this.id(), importerId).subscribe({
       // The run is now the live state; a still-in-flight initial GET must not rewind it (#262 review).
       next: (job) => {
         this.runEstablished = true;

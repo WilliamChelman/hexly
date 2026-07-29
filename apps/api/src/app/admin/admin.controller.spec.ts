@@ -226,7 +226,7 @@ describe('Superadmin repair surface', () => {
     return db
       .select({
         entityId: assetIndex.entityId,
-        worldId: assetIndex.worldId,
+        worldId: assetIndex.containerId,
         hash: assetIndex.hash,
         ext: assetIndex.ext,
       })

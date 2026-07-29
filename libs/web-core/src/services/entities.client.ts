@@ -31,7 +31,7 @@ export const ENTITY_NUDGE_DEBOUNCE_MS = 150;
 /** The subset of list params the Facet-count read narrows against — no paging. */
 export type EntityFacetParams = Pick<
   EntityListParams,
-  'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId' | 'includeHidden'
+  'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId' | 'containerId' | 'compendium' | 'read' | 'includeHidden'
 >;
 
 /**
@@ -163,6 +163,15 @@ export class EntitiesClient {
     });
   }
 
+  /**
+   * **Adopt** a **Compendium Entry** into `worldId` (CONTEXT.md → Adoption). Not written through the
+   * follow store: nothing can be watching an Entity that did not exist a moment ago, and the entry it
+   * was copied from is untouched.
+   */
+  adopt(id: string, worldId: string): Observable<EntityDetail> {
+    return this.http.post<EntityDetail>(`/api/entities/${id}/adopt`, { worldId });
+  }
+
   /** Raw read — the store's own refetch source (the store seeds its held from it directly). */
   private read(id: string): Observable<EntityDetail> {
     return this.http.get<EntityDetail>(`/api/entities/${id}`);
@@ -264,6 +273,13 @@ function facetParams(opts: EntityFacetParams): HttpParams {
   // Filter-by-Field: each `key:op:value` token repeats, like the other facet params.
   for (const f of opts.field ?? []) params = params.append('field', f);
   if (opts.worldId) params = params.set('worldId', opts.worldId);
+  // The Container scope a cross-Container read names explicitly (ADR-0079) — the Compendium browse's
+  // installed packs — and, separately, the Compendium facet's selection within it.
+  for (const c of opts.containerId ?? []) params = params.append('containerId', c);
+  for (const c of opts.compendium ?? []) params = params.append('compendium', c);
+  // A link-target read declares itself; a navigation read is the server's default, so it stays off the
+  // wire (ADR-0079). On both reads, so a rail's counts and its options agree about Compendium Entries.
+  if (opts.read && opts.read !== 'navigation') params = params.set('read', opts.read);
   // Opt-in to hidden-from-default-listing types (ADR-0065) — set by the by-name pickers, not by a browse.
   // On both reads, so a rail's counts and its list agree about them.
   if (opts.includeHidden) params = params.set('includeHidden', '1');

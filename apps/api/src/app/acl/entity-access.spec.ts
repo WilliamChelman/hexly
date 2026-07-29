@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { EntityVerb } from '@hexly/domain';
 import { createDb, Db } from '../db/db';
-import { entities, entityGrants, users, worldMembers, worlds } from '../db/schema';
+import { containers, entities, entityGrants, users, worldMembers, worlds, WORLD_CONTAINER_KIND } from '../db/schema';
 import { entityAccess } from './entity-access';
 
 /**
@@ -122,19 +122,11 @@ describe('entityAccess', () => {
     });
 
     // Regression: the read predicate rides a SELECT projection in decideMeta, where a naive
-    // `worldMembers.world_id = entities.world_id` correlation can strip to a tautology and report
+    // `worldMembers.world_id = entities.container_id` correlation can strip to a tautology and report
     // "member of *any* World" as readable. A member of a DIFFERENT World, with no membership or
     // grant here, must not read this shared Entity.
     it('does not read a shared Entity for a member of a different World', () => {
-      const otherWorld = randomUUID();
-      db.insert(worlds)
-        .values({
-          id: otherWorld,
-          name: 'Elsewhere',
-          createdAt: 1,
-          updatedAt: 1,
-        })
-        .run();
+      const otherWorld = seedWorld('Elsewhere');
       const outsider = seedUser();
       db.insert(worldMembers).values({ worldId: otherWorld, userId: outsider, role: 'contributor' }).run();
       expect(entityAccess(db, outsider).decideMeta(shared)).toEqual({
@@ -167,9 +159,10 @@ describe('entityAccess', () => {
   });
 
   // ── seed helpers ──────────────────────────────────────────────────────────
-  function seedWorld(): string {
+  function seedWorld(name = 'Aldermoor'): string {
     const id = randomUUID();
-    db.insert(worlds).values({ id, name: 'Aldermoor', createdAt: 1, updatedAt: 1 }).run();
+    db.insert(containers).values({ id, kind: WORLD_CONTAINER_KIND, name, createdAt: 1, updatedAt: 1 }).run();
+    db.insert(worlds).values({ id }).run();
     return id;
   }
 
@@ -193,7 +186,7 @@ describe('entityAccess', () => {
     db.insert(entities)
       .values({
         id,
-        worldId,
+        containerId: worldId,
         name: `e-${visibility}`,
         types: ['core.type.note'],
         tags: [],

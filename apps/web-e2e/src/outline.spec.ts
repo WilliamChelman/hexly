@@ -1,11 +1,11 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterEntities, expect, flushSave, test } from './fixtures';
 import type { Page } from '@playwright/test';
 
 /** The Outline panel end-to-end, driven with real TipTap keyboard input (markdown `# ` input rules). */
 
 /** Create a fresh note and land on its editor surface, returning the content locator. */
 async function newNote(page: Page) {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const surface = page.getByTestId('note-content');

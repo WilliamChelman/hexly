@@ -1,4 +1,4 @@
-import { enterLibrary, expect, test, widenDockPanel } from './fixtures';
+import { enterEntities, expect, test, widenDockPanel } from './fixtures';
 import type { Page } from '@playwright/test';
 
 /**
@@ -9,7 +9,7 @@ import type { Page } from '@playwright/test';
  */
 
 async function newNote(page: Page) {
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   await expect(page.getByTestId('note-content')).toBeVisible();

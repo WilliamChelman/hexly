@@ -1,4 +1,4 @@
-import { enterLibrary, expect, openEntity, test } from './fixtures';
+import { enterEntities, expect, openEntity, test } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 // A real 20×8 solid-color PNG: minting it runs sharp, so the Asset gets image Stats (a landscape
@@ -18,7 +18,7 @@ const PNG_20x8 = Buffer.from(
 test('the Board image picker searches + facets Assets, and picking one lands a capability-URL Image', async ({
   page,
 }) => {
-  const worldId = idFromSegment(await enterLibrary(page)); // raw id the API keys on, decoded from the pretty segment
+  const worldId = idFromSegment(await enterEntities(page)); // raw id the API keys on, decoded from the pretty segment
 
   // Mint an image Asset through the ordinary upload path; it returns the wrapper Entity carrying the ref.
   const uploaded = await page.request.post(`/api/worlds/${worldId}/assets`, {
@@ -75,9 +75,9 @@ test('the Board image picker searches + facets Assets, and picking one lands a c
  * therefore hidden — it is pinned, never a choice here).
  */
 test('the Asset Browser lists uploaded media as thumbnail tiles, with upload, search and Facets', async ({ page }) => {
-  const worldId = idFromSegment(await enterLibrary(page)); // raw id the API keys on, decoded from the pretty segment
+  const worldId = idFromSegment(await enterEntities(page)); // raw id the API keys on, decoded from the pretty segment
 
-  // The Asset Browser is a nav destination beside the Library (ADR-0041) — every reader reaches it.
+  // The Asset Browser is a nav destination beside Entities (ADR-0041) — every reader reaches it.
   await page.getByTestId('nav-assets').click();
   await page.waitForURL(/\/w\/[\w-]+\/assets$/);
 
@@ -121,7 +121,7 @@ test('the Asset Browser lists uploaded media as thumbnail tiles, with upload, se
  * then pins it to the Dashboard and confirms the pinned tile resolves.
  */
 test('Quick Open matches an Asset by name and it can be pinned to the World Dashboard', async ({ page }) => {
-  const prettyWorld = await enterLibrary(page); // the pretty `slug-base62(id)` segment the URL carries
+  const prettyWorld = await enterEntities(page); // the pretty `slug-base62(id)` segment the URL carries
   const worldId = idFromSegment(prettyWorld); // the raw id the API keys on
 
   // Mint an Asset with a distinctive name so the FTS match is unambiguous.

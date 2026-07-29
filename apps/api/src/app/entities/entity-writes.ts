@@ -29,6 +29,7 @@ import {
   entityImportSource,
 } from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
+import { isCompendiumContainer } from '../worlds/compendiums';
 import { EntityDeletionRegistry } from './entity-deletion-registry';
 import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
@@ -44,11 +45,11 @@ const INITIAL_VERSION = 1;
  */
 const MAX_BOUND_PARAMS = 32766;
 
-/** Columns bound per `entity_edges` row: source, world, kind, target, descriptor, decor. */
+/** Columns bound per `entity_edges` row: source, container, kind, target, descriptor, decor. */
 const EDGE_COLUMNS = 6;
 /** Columns bound per `entity_descriptors` row: entity, descriptor. */
 const DESCRIPTOR_COLUMNS = 2;
-/** Columns bound per `entity_field_facets` row: entity, world, key, value, num. */
+/** Columns bound per `entity_field_facets` row: entity, container, key, value, num. */
 const FIELD_FACET_COLUMNS = 5;
 
 /** Split `rows` into the largest batches a single `INSERT … VALUES` can bind. Empty in, nothing out. */
@@ -72,31 +73,35 @@ export interface ReindexChunk {
 export interface InsertEntityInput {
   id?: string;
   ownerId: string;
-  worldId: string;
+  /**
+   * The **Container** the Entity lands in (ADR-0078) — a World's id for anything a user authors, a
+   * Compendium's for what a Compendium Importer produces (ADR-0079).
+   */
+  containerId: string;
   name: string;
   /** The ordered Entity Type set; `types[0]` is primary. Carried alongside `tags`, not in the document. */
   types: readonly string[];
   tags: readonly string[];
   document: EntityDocument;
   /**
-   * The Entity's initial Visibility; defaults to `private`. The reconcile sets it from the run's
-   * chosen visibility so an imported set can land `shared` in one pass (ADR-0060); a plain create
-   * omits it and starts private like any hand-authored Entity.
+   * The Entity's initial Visibility; defaults to `private`. The vault import sets it so a whole
+   * imported vault can land `shared` in one pass (ADR-0033); everything else omits it and starts
+   * private like any hand-authored Entity.
    */
   visibility?: Visibility;
 }
 
 /**
  * The fields an import reconcile overwrites onto an existing Entity, reusing its id (ADR-0060). Owner,
- * grants, and `createdAt` are left untouched — an imported set is a managed reference library whose
- * identity survives reimport, not its authored edits.
+ * grants, Visibility, and `createdAt` are left untouched — an imported set is a managed reference
+ * library whose identity survives reimport, not its authored edits. Visibility joined that list when
+ * the run stopped taking one (ADR-0079): a reconcile has no exposure to impose.
  */
 export interface ImportOverwrite {
   name: string;
   types: readonly string[];
   tags: readonly string[];
   document: EntityDocument;
-  visibility: Visibility;
 }
 
 /** A stored `entities` row. */
@@ -200,10 +205,10 @@ export class EntityWrites {
    */
   insert(input: InsertEntityInput): EntityRow {
     const now = Date.now();
-    const derived = this.derive(input.document, input.types, input.worldId);
+    const derived = this.derive(input.document, input.types, input.containerId);
     const row: EntityRow = {
       id: input.id ?? randomUUID(),
-      worldId: input.worldId,
+      containerId: input.containerId,
       name: input.name,
       types: [...input.types],
       tags: [...input.tags],
@@ -221,16 +226,16 @@ export class EntityWrites {
     return this.transact(() => {
       this.db.insert(entities).values(row).run();
       this.db.insert(entityGrants).values({ entityId: row.id, userId: input.ownerId, role: 'owner' }).run();
-      this.replaceDerived(row.id, row.worldId, derived);
+      this.replaceDerived(row.id, row.containerId, derived);
       return row;
     });
   }
 
   /**
    * Overwrite an imported Entity in place, reusing its id (ADR-0060) — a **system write** the import
-   * reconcile drives once the World's Owner gate has run. Identity-preserving: the id, owner grants,
-   * and `createdAt` are kept, so a pre-existing inbound Entity Link still resolves; the document,
-   * types, tags, and visibility are replaced wholesale and the derived indexes (`hexly.source`
+   * reconcile drives once its surface's gate has run. Identity-preserving: the id, owner grants,
+   * Visibility, and `createdAt` are kept, so a pre-existing inbound Entity Link still resolves; the
+   * document, types, and tags are replaced wholesale and the derived indexes (`hexly.source`
    * included) re-materialised, so a user's authored edits are *not* preserved across a reimport.
    * Bumps `seq` and nudges. A row that vanished between plan and apply is a silent no-op — the next
    * (idempotent) run reconciles it.
@@ -242,19 +247,18 @@ export class EntityWrites {
     const now = Date.now();
     this.transact(() => {
       const existing = this.db
-        .select({ worldId: entities.worldId, seq: entities.seq, version: entities.version })
+        .select({ containerId: entities.containerId, seq: entities.seq, version: entities.version })
         .from(entities)
         .where(eq(entities.id, id))
         .get();
       if (!existing) return;
-      const derived = this.derive(input.document, input.types, existing.worldId);
+      const derived = this.derive(input.document, input.types, existing.containerId);
       this.db
         .update(entities)
         .set({
           name: input.name,
           types: [...input.types],
           tags: [...input.tags],
-          visibility: input.visibility,
           document: JSON.stringify(input.document),
           contentText: derived.searchText,
           thumbnailEntityId: derived.thumbnailEntityId,
@@ -264,7 +268,7 @@ export class EntityWrites {
         })
         .where(eq(entities.id, id))
         .run();
-      this.replaceDerived(id, existing.worldId, derived);
+      this.replaceDerived(id, existing.containerId, derived);
       this.enqueue(id);
     });
   }
@@ -295,9 +299,9 @@ export class EntityWrites {
    */
   cascadeDeleteWorld(worldId: string): void {
     this.transact(() => {
-      const doomed = this.db.select({ id: entities.id }).from(entities).where(eq(entities.worldId, worldId)).all();
+      const doomed = this.db.select({ id: entities.id }).from(entities).where(eq(entities.containerId, worldId)).all();
       // entity_grants, entity_links, entity_descriptors and entity_edges cascade with each row.
-      this.db.delete(entities).where(eq(entities.worldId, worldId)).run();
+      this.db.delete(entities).where(eq(entities.containerId, worldId)).run();
       for (const { id } of doomed) this.enqueue(id);
     });
   }
@@ -324,7 +328,7 @@ export class EntityWrites {
       const shared = this.db
         .select({ id: entities.id })
         .from(entities)
-        .where(and(eq(entities.worldId, worldId), sharedVisibility))
+        .where(and(eq(entities.containerId, worldId), sharedVisibility))
         .all();
       if (shared.length === 0) return;
       const ids = shared.map((e) => e.id);
@@ -380,7 +384,7 @@ export class EntityWrites {
     const rows = this.db
       .select({
         id: entities.id,
-        worldId: entities.worldId,
+        containerId: entities.containerId,
         // Facets and link edges derive from the effective set — `types` plus the attachments derived from
         // the `document` (ADR-0048, ADR-0054, ADR-0057, #188).
         types: entities.types,
@@ -400,12 +404,12 @@ export class EntityWrites {
       try {
         derived.push({
           row,
-          derived: this.derive(JSON.parse(row.document) as EntityDocument, row.types, row.worldId),
+          derived: this.derive(JSON.parse(row.document) as EntityDocument, row.types, row.containerId),
         });
       } catch (err) {
         failures.push({
           entityId: row.id,
-          worldId: row.worldId,
+          worldId: row.containerId,
           reason: err instanceof Error ? err.message : String(err),
         });
       }
@@ -420,7 +424,7 @@ export class EntityWrites {
             .set({ contentText: d.searchText, thumbnailEntityId: d.thumbnailEntityId })
             .where(eq(entities.id, row.id))
             .run();
-          this.replaceDerived(row.id, row.worldId, d);
+          this.replaceDerived(row.id, row.containerId, d);
         }
       });
 
@@ -443,11 +447,11 @@ export class EntityWrites {
    * a **Field of a Structured Data Type** offers its own edges, text, and facets through the data-type set,
    * so a new plugin needs no change here.
    */
-  private derive(doc: EntityDocument, types: readonly string[], worldId: string): DocumentDerivedState {
-    // The effective Field set (ADR-0054/ADR-0057), scoped to the Entity's World and derived from the
-    // document itself: an attached link Field harvests its edge and an attached facetable Field its facet,
-    // like a type default.
-    const fields = this.worldTypeFields.effectiveFields(worldId, types, doc);
+  private derive(doc: EntityDocument, types: readonly string[], containerId: string): DocumentDerivedState {
+    // The effective Field set (ADR-0054/ADR-0057), scoped to the Entity's Container — where the authored
+    // vocabulary lives since ADR-0078 — and derived from the document itself: an attached link Field
+    // harvests its edge and an attached facetable Field its facet, like a type default.
+    const fields = this.worldTypeFields.effectiveFields(containerId, types, doc);
     // Name the **Thumbnail** Field so the pure walk materialises its designation (ADR-0066) without the
     // domain learning any plugin's Field id. A disabled asset plugin leaves the key unresolved in the
     // effective set, so the designation derives to `null` and the value sits inert — no guard needed here.
@@ -461,46 +465,46 @@ export class EntityWrites {
    * diffing, so they are self-pruning. Must run in the same transaction as the document write, so the
    * indexes reflect the last *successful* save and never a rejected one.
    */
-  private replaceDerived(id: string, worldId: string, derived: DocumentDerivedState): void {
+  private replaceDerived(id: string, containerId: string, derived: DocumentDerivedState): void {
     this.replaceDescriptors(id, derived.descriptors);
-    this.replaceEdges(id, worldId, derived.edges);
-    this.replaceFieldFacets(id, worldId, derived.fieldFacets);
-    this.replaceImportSource(id, worldId, derived.importSource);
-    this.replaceAssetIndex(id, worldId, derived.assetRef);
+    this.replaceEdges(id, containerId, derived.edges);
+    this.replaceFieldFacets(id, containerId, derived.fieldFacets);
+    this.replaceImportSource(id, containerId, derived.importSource);
+    this.replaceAssetIndex(id, containerId, derived.assetRef);
   }
 
   /**
    * Replace the Entity's **Asset dedup index** row with the freshly derived byte address (self-pruning,
    * ADR-0065): an asset-ref-carrying document materialises one row keyed on the bytes' hash, clearing the
    * ref removes it, and the FK cascade drops it with the Entity. Derived, never authoritative — an index
-   * over the document like the edge and provenance sets, so `worldId` is denormalised off the source. The
-   * `ext` rides along so a read can stat the exact file, and rewriting the row heals a pre-#325 row.
+   * over the document like the edge and provenance sets, so `containerId` is denormalised off the source.
+   * The `ext` rides along so a read can stat the exact file, and rewriting the row heals a pre-#325 row.
    */
-  private replaceAssetIndex(id: string, worldId: string, ref: AssetBytesRef | null): void {
+  private replaceAssetIndex(id: string, containerId: string, ref: AssetBytesRef | null): void {
     this.db.delete(assetIndex).where(eq(assetIndex.entityId, id)).run();
-    if (ref) this.db.insert(assetIndex).values({ entityId: id, worldId, hash: ref.hash, ext: ref.ext }).run();
+    if (ref) this.db.insert(assetIndex).values({ entityId: id, containerId, hash: ref.hash, ext: ref.ext }).run();
   }
 
   /**
    * Replace the Entity's **Import Source** row with the freshly derived provenance (self-pruning,
    * ADR-0060): a `hexly.source`-carrying document materialises one row, clearing or changing the stamp
    * rewrites it, and the FK cascade drops it with the Entity. Derived, never authoritative — an index
-   * over the document like the edge and facet sets, so `worldId` is denormalised off the source.
+   * over the document like the edge and facet sets, so `containerId` is denormalised off the source.
    */
-  private replaceImportSource(id: string, worldId: string, source: ImportSource | null): void {
+  private replaceImportSource(id: string, containerId: string, source: ImportSource | null): void {
     this.db.delete(entityImportSource).where(eq(entityImportSource.entityId, id)).run();
     if (source)
       this.db
         .insert(entityImportSource)
-        .values({ entityId: id, worldId, importer: source.importer, sourceId: source.sourceId, rev: source.rev })
+        .values({ entityId: id, containerId, importer: source.importer, sourceId: source.sourceId, rev: source.rev })
         .run();
   }
 
   /**
    * Replace the Entity's Field-facet rows with the freshly derived set (self-pruning, ADR-0048).
-   * `worldId` is denormalised off the source, so a World-scoped facet read is one indexed lookup.
+   * `containerId` is denormalised off the source, so a Container-scoped facet read is one indexed lookup.
    */
-  private replaceFieldFacets(id: string, worldId: string, facets: readonly FieldFacetValue[]): void {
+  private replaceFieldFacets(id: string, containerId: string, facets: readonly FieldFacetValue[]): void {
     this.db.delete(entityFieldFacets).where(eq(entityFieldFacets.entityId, id)).run();
     for (const batch of batched(facets, FIELD_FACET_COLUMNS)) {
       this.db
@@ -508,7 +512,7 @@ export class EntityWrites {
         .values(
           batch.map((f) => ({
             entityId: id,
-            worldId,
+            containerId,
             key: f.key,
             value: f.value,
             num: f.num,
@@ -530,16 +534,16 @@ export class EntityWrites {
   }
 
   /**
-   * Replace the Entity's outbound edge rows with the harvested set (self-pruning). `worldId` is
+   * Replace the Entity's outbound edge rows with the harvested set (self-pruning). `containerId` is
    * denormalized off the source here — the one place it can be, since an edge has no other
-   * relation to a World.
+   * relation to a Container.
    */
-  private replaceEdges(id: string, worldId: string, edges: readonly EntityEdge[]): void {
+  private replaceEdges(id: string, containerId: string, edges: readonly EntityEdge[]): void {
     this.db.delete(entityEdges).where(eq(entityEdges.sourceEntityId, id)).run();
     for (const batch of batched(edges, EDGE_COLUMNS)) {
       this.db
         .insert(entityEdges)
-        .values(batch.map((edge) => ({ ...edge, sourceEntityId: id, worldId })))
+        .values(batch.map((edge) => ({ ...edge, sourceEntityId: id, containerId })))
         .run();
     }
   }
@@ -560,6 +564,10 @@ export class EntityWrites {
           ? decision.isOwner
           : decision.canWrite;
     if (!permitted) return { status: 'forbidden' };
+    // The **Sealed** half of ADR-0079, for everyone the operator included: every change kind passes
+    // here, so one refusal covers substance, exposure, sharing and lifecycle. After the Rights gate,
+    // not instead of it — the seal is not a Right, so no Right outranks it.
+    if (isCompendiumContainer(this.db, decision.row.containerId)) return { status: 'forbidden' };
     // The System-managed shape guard (ADR-0068): a user write may not add or remove a System-managed type
     // or Field. System writes (insert/importOverwrite/reindexChunk) take no `userId` and never reach here,
     // so mint, importers, and Reindex assign the asset type/field freely.
@@ -607,7 +615,7 @@ export class EntityWrites {
     const systemFields = this.typeFields.systemManagedFields;
     if (systemFields.length > 0) {
       const idsOf = (types: readonly string[], doc: EntityDocument) =>
-        new Set(this.worldTypeFields.effectiveFields(row.worldId, types, doc).map((f) => f.id));
+        new Set(this.worldTypeFields.effectiveFields(row.containerId, types, doc).map((f) => f.id));
       const stored = idsOf(storedTypes, storedDoc);
       const next = idsOf(nextTypes, nextDoc);
       if (systemFields.some((fieldId) => stored.has(fieldId) !== next.has(fieldId))) return true;
@@ -616,12 +624,12 @@ export class EntityWrites {
     // Hash-presence invariant (ADR-0068): the marker governs shape not value, save the one identity the
     // value carries — an Asset's content hash. A raw edit that keeps the asset type/Field attached but
     // guts the asset-ref value (`{}` or a stripped hash) leaves the shape untouched yet harvests the hash
-    // to null, deleting the `(worldId, hash)` dedup row and orphaning the bytes on disk (unreachable by
+    // to null, deleting the `(containerId, hash)` dedup row and orphaning the bytes on disk (unreachable by
     // delete, unaccounted by Reindex) — the same leak stripping the shape would cause, by another door. So
     // a user edit may not drive an asset-typed Entity's harvested hash from non-null to null.
     if (change.document !== undefined && this.typeFields.systemManagedTypes.some((t) => nextTypes.includes(t))) {
-      const storedRef = this.derive(storedDoc, storedTypes, row.worldId).assetRef;
-      if (storedRef !== null && this.derive(nextDoc, nextTypes, row.worldId).assetRef === null) return true;
+      const storedRef = this.derive(storedDoc, storedTypes, row.containerId).assetRef;
+      if (storedRef !== null && this.derive(nextDoc, nextTypes, row.containerId).assetRef === null) return true;
     }
 
     return false;
@@ -632,7 +640,7 @@ export class EntityWrites {
     if (!this.deletions) return;
     this.deletions.reap({
       id: row.id,
-      worldId: row.worldId,
+      worldId: row.containerId,
       types: row.types,
       document: JSON.parse(row.document) as EntityDocument,
     });
@@ -690,7 +698,7 @@ export class EntityWrites {
       change.document !== undefined
         ? { ...stripReservedKeys(change.document), ...reservedKeys(JSON.parse(row.document) as EntityDocument) }
         : undefined;
-    const derived = document && this.derive(document, change.types ?? row.types, row.worldId);
+    const derived = document && this.derive(document, change.types ?? row.types, row.containerId);
     const set = {
       ...(change.name !== undefined && { name: change.name }),
       ...(change.tags !== undefined && { tags: [...change.tags] }),
@@ -721,7 +729,7 @@ export class EntityWrites {
     if (res.changes > 0) {
       // Same transaction as the document write, so the indexes always reflect the last *successful*
       // save, never a rejected one.
-      if (derived) this.replaceDerived(id, row.worldId, derived);
+      if (derived) this.replaceDerived(id, row.containerId, derived);
       return { status: 'ok', row: { ...row, ...set } };
     }
     // Zero rows: the version moved, or the predicate stopped matching. Re-read to tell them apart.

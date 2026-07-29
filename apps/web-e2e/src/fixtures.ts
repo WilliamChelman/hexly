@@ -1,7 +1,15 @@
 import { join } from 'node:path';
-import { test as base, expect, type APIRequestContext, type Browser, type Page, type Response } from '@playwright/test';
+import {
+  test as base,
+  expect,
+  type APIRequestContext,
+  type Browser,
+  type Locator,
+  type Page,
+  type Response,
+} from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
-import { TEST_GRANTEE } from './test-user';
+import { TEST_GRANTEE, TEST_OPERATOR } from './test-user';
 // The app's own pretty-URL codec (ADR-0042). Imported by file path, not via the @hexly/web-core
 // barrel: the barrel re-exports the Angular services layer, which must stay out of the Playwright
 // process. The nx module-boundary rule is waived for these pure utils via eslint.config.mjs `allow`.
@@ -193,14 +201,51 @@ export async function addWorldMember(page: Page, worldSeg: string, role: 'contri
  * authenticated storage state is the *first* user's, so a second standing needs its own context.
  */
 export async function signInGrantee(browser: Browser): Promise<Page> {
+  return signInAs(browser, TEST_GRANTEE);
+}
+
+/**
+ * Log the **operator** in, in their own cookie-less context (ADR-0047). The only standing that
+ * reaches the admin area, where compendium packs are stocked (#404) — the login user is deliberately
+ * not a Superadmin, so a spec that needs an installed pack borrows this session for the install.
+ */
+export async function signInOperator(browser: Browser): Promise<Page> {
+  return signInAs(browser, TEST_OPERATOR);
+}
+
+/** The shared sign-in journey; the project's authenticated storage state is the *first* user's. */
+async function signInAs(browser: Browser, who: { email: string; password: string }): Promise<Page> {
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   await page.goto('/login');
-  await page.getByLabel('Email').fill(TEST_GRANTEE.email);
-  await page.getByLabel('Password').fill(TEST_GRANTEE.password);
+  await page.getByLabel('Email').fill(who.email);
+  await page.getByLabel('Password').fill(who.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveTitle(/Worlds/);
   return page;
+}
+
+/** The Draw Steel monsters pack's row on the operator's admin panel, and the button that stocks it. */
+export const MONSTER_PACK_ROW = 'pack-draw-steel.importer.monsters';
+export const MONSTER_PACK_INSTALL = 'pack-install-draw-steel.importer.monsters';
+export const MONSTER_PACK_STATUS = 'pack-status-draw-steel.importer.monsters';
+export const MONSTER_PACK_REMOVE = 'pack-remove-draw-steel.importer.monsters';
+
+/**
+ * Stock the Instance's shelf with the Draw Steel monsters pack, as the operator, and close the
+ * session again — a pack is Instance-wide, so every other page in the run sees it (#404). Its
+ * codeload fetch port is swapped for the committed Ajax + Goblin fixtures under the e2e opt-in
+ * (`E2eFixtureImporters`), so the run stays offline and lands exactly two entries.
+ *
+ * The reset between specs clears Entities but not the install itself, so the button may read Install
+ * or Reimport; both are the same control, and both end at two entries on the shelf.
+ */
+export async function installMonsterPack(browser: Browser): Promise<void> {
+  const operator = await signInOperator(browser);
+  await operator.goto('/admin');
+  await operator.getByTestId(MONSTER_PACK_INSTALL).click();
+  await expect(operator.getByTestId(MONSTER_PACK_STATUS)).toContainText('2 entries', { timeout: 15_000 });
+  await operator.context().close();
 }
 
 /**
@@ -214,25 +259,43 @@ export async function openEntity(page: Page, entityId: string): Promise<void> {
 }
 
 /**
+ * The rail's **Entities** destination (ADR-0041). Exact-matched: the accessible name is a substring
+ * of the World Dashboard's "Browse all entities" action, which shares the page with the rail.
+ */
+export function entitiesRailLink(within: Page | Locator): Locator {
+  return within.getByRole('link', { name: 'Entities', exact: true });
+}
+
+/**
+ * The rail's **Compendium** destination (ADR-0079, #401) — the browse over every installed pack, at
+ * `/w/:worldId/compendium`. Exact-matched in the same shape as its neighbour: the rail's locators are
+ * exact by policy, so a future page whose copy contains the word cannot turn a click into a
+ * strict-mode violation.
+ */
+export function compendiumRailLink(within: Page | Locator): Locator {
+  return within.getByRole('link', { name: 'Compendium', exact: true });
+}
+
+/**
  * Enter a reachable World's Entity browser via the World Index at `/` (ADR-0028), and return the
  * entered World's id. The reset clears Entities only, never Worlds, so the Index is never empty here.
  */
-export async function enterLibrary(page: Page): Promise<string> {
+export async function enterEntities(page: Page): Promise<string> {
   await page.goto('/');
   // The card lands on the World Dashboard — the World root (ADR-0043); the rail's
-  // Library link enters the Entity browser from there.
+  // Entities link enters the Entity browser from there.
   await page
     .getByTestId(/^world-/)
     .first()
     .click();
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await page.waitForURL(/\/w\/[\w-]+\/entities$/);
   return page.url().match(/\/w\/([\w-]+)\/entities/)![1];
 }
 
 /**
  * Create an Entity of `typeId` through the "New" split button's type menu, open it, and return its
- * canonical id. The caller must already be on a surface carrying the button — `enterLibrary`, or an
+ * canonical id. The caller must already be on a surface carrying the button — `enterEntities`, or an
  * empty World Dashboard. Every Type mints this way, `required` Fields and all (ADR-0074).
  */
 export async function createEntity(page: Page, typeId: string): Promise<string> {

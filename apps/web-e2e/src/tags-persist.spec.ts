@@ -1,8 +1,8 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
+import { enterEntities, entitiesRailLink, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /** #72 — tags share the version-checked save path and are stored as Entity metadata (ADR-0018). */
-test('adds tags on a note, saves, and they survive reload and show in the library', async ({ page, request }) => {
-  await enterLibrary(page);
+test('adds tags on a note, saves, and they survive reload and show in the Entity Browser', async ({ page, request }) => {
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
@@ -26,7 +26,7 @@ test('adds tags on a note, saves, and they survive reload and show in the librar
   await expect(page.getByTestId('entity-tags')).toContainText('deity');
   await expect(page.getByTestId('entity-tags')).not.toContainText('ruined');
 
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await expect(page.getByTestId(`tags-${noteId}`)).toContainText('deity');
   await expect(page.getByTestId(`tags-${noteId}`)).not.toContainText('ruined');
 

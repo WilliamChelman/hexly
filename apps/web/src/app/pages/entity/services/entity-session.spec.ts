@@ -760,7 +760,7 @@ describe('EntitySession', () => {
     openAldermoor();
 
     // Re-entering the route must re-fetch, not trust a retained `current`: the
-    // route-scoped session outlives a trip to the library (e.g. in-library rename) (#70).
+    // route-scoped session outlives a trip to the Entity Browser (e.g. a rename there) (#70).
     const renamed: EntityDetail = { ...aldermoor, name: 'Lady Mara' };
     entities.load.mockReturnValue(of(renamed));
 

@@ -68,9 +68,11 @@ export const entities = sqliteTable(
   'entities',
   {
     id: text('id').primaryKey(),
-    worldId: text('world_id')
+    // The {@link containers} row this Entity belongs to (ADR-0078). A World's Container id *is* the
+    // World's id, so every World-scoped read still binds a World id here and no stored value moved.
+    containerId: text('container_id')
       .notNull()
-      .references(() => worlds.id),
+      .references(() => containers.id),
     name: text('name').notNull(),
     // The ordered Entity Type set (CONTEXT.md → Entity Type); `types[0]` is primary. A multi-valued
     // JSON array mirroring `tags`, unrolled with `json_each` for the Type facet and array-membership
@@ -102,7 +104,7 @@ export const entities = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (table) => [index('idx_entities_world_id').on(table.worldId)],
+  (table) => [index('idx_entities_container_id').on(table.containerId)],
 );
 
 /**
@@ -127,18 +129,43 @@ export const entityGrants = sqliteTable(
   (table) => [primaryKey({ columns: [table.entityId, table.userId] })],
 );
 
+/** The kinds of Container (ADR-0078): a **World** a user authors into, or ADR-0079's **Compendium** shelf. */
+export type ContainerKind = 'world' | 'compendium';
+
+/** The {@link containers} kind every World row carries. */
+export const WORLD_CONTAINER_KIND: ContainerKind = 'world';
+
+/** The {@link containers} kind every Compendium row carries (ADR-0079). */
+export const COMPENDIUM_CONTAINER_KIND: ContainerKind = 'compendium';
+
 /**
- * A World: a lightweight container grouping Entities for one campaign. World
- * Owners are `world_members` rows with `role: 'owner'` — no owner column here.
- * The landing page is a derived Dashboard, so a World holds no FK back to entities.
+ * A **Container** (ADR-0078): what an Entity belongs to. It holds identity and the substance every
+ * kind shares, while a satellite table keyed by this `id` holds what only one kind has.
  */
-export const worlds = sqliteTable('worlds', {
+export const containers = sqliteTable('containers', {
   id: text('id').primaryKey(),
+  // Which satellite completes this row. Never the discriminator a read filters on — joining the
+  // satellite is, so a World-scoped read cannot see a Compendium even by omission.
+  kind: text('kind').$type<ContainerKind>().notNull(),
   name: text('name').notNull(),
-  // The live-follow freshness key (ADR-0045), the World peer of `entities.seq`: every
+  // The live-follow freshness key (ADR-0045), the Container peer of `entities.seq`: every
   // committed change bumps it, including the membership mutations that deliberately
   // leave `updatedAt` alone so adding a member never reorders the World Index.
   seq: integer('seq').notNull().default(INITIAL_SEQ),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+/**
+ * A World: the Container kind grouping Entities for one campaign. Identity lives on the
+ * {@link containers} row this `id` names (ADR-0078); only what a World alone has stays here. World
+ * Owners are `world_members` rows with `role: 'owner'` — no owner column here. The landing page is
+ * a derived Dashboard, so a World holds no FK back to entities.
+ */
+export const worlds = sqliteTable('worlds', {
+  id: text('id')
+    .primaryKey()
+    .references(() => containers.id, { onDelete: 'cascade' }),
   // Owner-curated Dashboard pins: an ordered JSON array of Entity ids, one shared
   // set per World. References, not enforced FKs — stale or inaccessible ids are
   // filtered per-viewer on read, never pruned on delete.
@@ -146,9 +173,47 @@ export const worlds = sqliteTable('worlds', {
   // The Owner-authored World Theme (ADR-0076), stored inline and patched wholesale like the pins.
   // Every value reached this column re-serialised from its own parse; NULL is no Theme.
   theme: text('theme', { mode: 'json' }).$type<WorldTheme>(),
-  createdAt: integer('created_at').notNull(),
-  updatedAt: integer('updated_at').notNull(),
 });
+
+/**
+ * A whole stored World: its {@link containers} identity row joined to its {@link worlds} satellite.
+ * The two are keyed by the same id, so the join reads as one flat row.
+ */
+export type WorldRow = typeof containers.$inferSelect & Omit<typeof worlds.$inferSelect, 'id'>;
+
+/**
+ * A **Compendium** (ADR-0079): the Container kind holding one installed pack of published reference
+ * material, Instance-wide. The {@link worlds} peer — identity lives on the {@link containers} row this
+ * `id` names, and only what a Compendium alone has stays here. It has no members, no public link, no
+ * Theme and no pins *by construction*: those tables key on {@link worlds}, which a Compendium has no
+ * row in (ADR-0078).
+ *
+ * `importer` is the **Compendium Importer** that produced this shelf, and it is `unique`: one
+ * Compendium per pack, which is what lets the reconcile's match key collapse from
+ * `(container, importer)` to the container alone. `rev` is the pinned source revision the entries
+ * currently reflect, and the three attribution columns are the pack's terms — publisher, license, and
+ * the verbatim notice — all captured from the Importer's declaration on install and re-captured on
+ * reimport, so they render where the content is read (#402) instead of only in the plugin's source
+ * tree (ADR-0061). Attribution is nullable throughout: a pack may state none.
+ */
+export const compendiums = sqliteTable('compendiums', {
+  id: text('id')
+    .primaryKey()
+    .references(() => containers.id, { onDelete: 'cascade' }),
+  // The one Compendium Importer that owns this shelf — the lookup "where does this Importer land?"
+  // and, being unique, the guarantee that answer is a single Container.
+  importer: text('importer').notNull().unique(),
+  rev: text('rev').notNull(),
+  publisher: text('publisher'),
+  license: text('license'),
+  notice: text('notice'),
+});
+
+/**
+ * A whole stored Compendium: its {@link containers} identity row joined to its {@link compendiums}
+ * satellite, the {@link WorldRow} peer.
+ */
+export type CompendiumRow = typeof containers.$inferSelect & Omit<typeof compendiums.$inferSelect, 'id'>;
 
 /**
  * World membership: a user is an `owner` (full control — the World's ownership
@@ -170,16 +235,19 @@ export const worldMembers = sqliteTable(
 );
 
 /**
- * A World's user-defined Type Definitions (ADR-0048): an Entity Type a World Owner authors as data,
- * scoped to this World. Keyed by `(worldId, typeId)`; `typeId` is the immutable `world.`-namespaced
- * Entity Type key. Rows cascade with the World; writes route through {@link WorldWrites}.
+ * A Container's user-defined Type Definitions (ADR-0048): an Entity Type a World Owner authors as
+ * data. The authored vocabulary belongs to the **Container**, not the World (ADR-0078), so it can
+ * travel with the content it types. Keyed by `(containerId, typeId)`; `typeId` is the immutable
+ * `world.`-namespaced Entity Type key. Rows cascade with the Container — and a World's satellite
+ * cascades off the same row, so deleting a World still takes its types with it. Writes route through
+ * {@link WorldWrites}.
  */
 export const worldTypes = sqliteTable(
   'world_types',
   {
-    worldId: text('world_id')
+    containerId: text('container_id')
       .notNull()
-      .references(() => worlds.id, { onDelete: 'cascade' }),
+      .references(() => containers.id, { onDelete: 'cascade' }),
     typeId: text('type_id').notNull(),
     label: text('label').notNull(),
     // The type's default Fields, referenced by id (`fieldRefs`, ADR-0054) — the sole Field declaration
@@ -193,29 +261,29 @@ export const worldTypes = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.worldId, table.typeId] })],
+  (table) => [primaryKey({ columns: [table.containerId, table.typeId] })],
 );
 
 /**
- * A World's user-defined **Fields** (CONTEXT.md → Field, ADR-0054): a first-class Field a World Owner
- * authors as data, scoped to this World. Keyed by `(worldId, fieldId)`; `fieldId` is the immutable
- * `world.`-namespaced reuse handle, split out so the id-less Field body rides in `definition` (a
- * FieldSchema, validated at the trust boundary). A JSON bag, never DB-queried — the resolver loads it
- * whole and composes it beside the Plugin fields. Rows cascade with the World; writes route through
- * {@link WorldWrites}.
+ * A Container's user-defined **Fields** (CONTEXT.md → Field, ADR-0054): a first-class Field a World
+ * Owner authors as data. Belongs to the **Container** beside {@link worldTypes} (ADR-0078). Keyed by
+ * `(containerId, fieldId)`; `fieldId` is the immutable `world.`-namespaced reuse handle, split out so
+ * the id-less Field body rides in `definition` (a FieldSchema, validated at the trust boundary). A JSON
+ * bag, never DB-queried — the resolver loads it whole and composes it beside the Plugin fields. Rows
+ * cascade with the Container; writes route through {@link WorldWrites}.
  */
 export const worldFields = sqliteTable(
   'world_fields',
   {
-    worldId: text('world_id')
+    containerId: text('container_id')
       .notNull()
-      .references(() => worlds.id, { onDelete: 'cascade' }),
+      .references(() => containers.id, { onDelete: 'cascade' }),
     fieldId: text('field_id').notNull(),
     definition: text('definition', { mode: 'json' }).$type<FieldSchema>().notNull(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.worldId, table.fieldId] })],
+  (table) => [primaryKey({ columns: [table.containerId, table.fieldId] })],
 );
 
 /**
@@ -259,12 +327,14 @@ export const entityLinks = sqliteTable(
  * point and Reindex rebuilds it, so an upload resolves dedup, and byte serving reads disk with no table
  * consulted at all. Deleting the Entity cascades the row away; the on-disk bytes are dropped separately.
  *
- * `entityId` is the PK — an Asset carries at most one asset-ref. `worldId` is denormalised off the source,
- * mirroring the other derived indexes; the unique `(worldId, hash)` is the per-World dedup key the upload
- * mint-and-dedup resolves against (re-uploading identical bytes returns the existing Asset).
+ * `entityId` is the PK — an Asset carries at most one asset-ref. `containerId` is denormalised off the
+ * source, mirroring the other derived indexes; the unique `(containerId, hash)` is the per-Container dedup
+ * key the upload mint-and-dedup resolves against (re-uploading identical bytes returns the existing Asset).
  *
- * `ext` completes the byte address `<worldId>/<hash><ext>`, so a presence check is one stat (#325). Nullable:
- * a row predating the column has an unknown address, which is never reported missing.
+ * `ext` completes the byte address `<containerId>/<hash><ext>` — the same folder {@link AssetsService}
+ * has always written under, since a World's Container id is the World's id — so a presence check is one
+ * stat (#325). Nullable: a row predating the column has an unknown address, which is never reported
+ * missing.
  */
 export const assetIndex = sqliteTable(
   'asset_index',
@@ -272,11 +342,11 @@ export const assetIndex = sqliteTable(
     entityId: text('entity_id')
       .primaryKey()
       .references(() => entities.id, { onDelete: 'cascade' }),
-    worldId: text('world_id').notNull(),
+    containerId: text('container_id').notNull(),
     hash: text('hash').notNull(),
     ext: text('ext'),
   },
-  (table) => [uniqueIndex('idx_asset_index_dedup').on(table.worldId, table.hash)],
+  (table) => [uniqueIndex('idx_asset_index_dedup').on(table.containerId, table.hash)],
 );
 
 /**
@@ -289,7 +359,7 @@ export const assetIndex = sqliteTable(
  * entirely in the read, which filters an inbound edge by the viewer's access to its *source*.
  *
  * `targetId` deliberately carries **no FK**: a link to a missing or unreadable Entity is a valid
- * document, so it is unconstrained text resolved opportunistically on read. `worldId` is
+ * document, so it is unconstrained text resolved opportunistically on read. `containerId` is
  * denormalized off the source so the World Graph's edge fetch is one indexed lookup.
  */
 export const entityEdges = sqliteTable(
@@ -298,7 +368,7 @@ export const entityEdges = sqliteTable(
     sourceEntityId: text('source_entity_id')
       .notNull()
       .references(() => entities.id, { onDelete: 'cascade' }),
-    worldId: text('world_id').notNull(),
+    containerId: text('container_id').notNull(),
     // entity | asset. Asset-hash edges are ordinary Decor Links now (ADR-0069) — hidden by
     // default on relation surfaces, always counted in inbound usage.
     targetKind: text('target_kind').$type<EdgeTargetKind>().notNull(),
@@ -318,7 +388,7 @@ export const entityEdges = sqliteTable(
     // Inbound: who links here (then filtered by the viewer's access to each source).
     index('idx_entity_edges_target').on(table.targetKind, table.targetId),
     // The World Graph's whole-World edge fetch.
-    index('idx_entity_edges_world').on(table.worldId, table.targetKind),
+    index('idx_entity_edges_container').on(table.containerId, table.targetKind),
   ],
 );
 
@@ -331,8 +401,8 @@ export const entityEdges = sqliteTable(
  * Entity cascades them away.
  *
  * `value` is the canonical string form; `num` is set only for a `number` Field, so a range filter
- * compares it numerically while an enum/date/string compares `value` lexically. `worldId` is
- * denormalised off the source, mirroring {@link entityEdges}, so a World-scoped facet read is one
+ * compares it numerically while an enum/date/string compares `value` lexically. `containerId` is
+ * denormalised off the source, mirroring {@link entityEdges}, so a Container-scoped facet read is one
  * indexed lookup. A `list` Field explodes to one row per item, so the composite PK is
  * `(entityId, key, value)`.
  */
@@ -342,7 +412,7 @@ export const entityFieldFacets = sqliteTable(
     entityId: text('entity_id')
       .notNull()
       .references(() => entities.id, { onDelete: 'cascade' }),
-    worldId: text('world_id').notNull(),
+    containerId: text('container_id').notNull(),
     // The EntityDocument key the Field types.
     key: text('key').notNull(),
     // The canonical string form of the value; the facet value the rail lists and eq/date filters match.
@@ -352,8 +422,8 @@ export const entityFieldFacets = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.entityId, table.key, table.value] }),
-    // The World-scoped facet count and filter: group/match by (world, key, value).
-    index('idx_entity_field_facets_key').on(table.worldId, table.key, table.value),
+    // The Container-scoped facet count and filter: group/match by (container, key, value).
+    index('idx_entity_field_facets_key').on(table.containerId, table.key, table.value),
   ],
 );
 
@@ -365,9 +435,10 @@ export const entityFieldFacets = sqliteTable(
  * choke point and Reindex rebuilds it, so a provenance filter ("what did this Importer create here")
  * answers with Entity ids alone, never loading a document blob. Deleting the Entity cascades the row away.
  *
- * `entityId` is the PK — an Entity carries at most one Import Source. `worldId` is denormalised off the
- * source, mirroring the other derived indexes, so a `(world, importer)` wipe/query is one indexed lookup;
- * the unique `(world, importer, sourceId)` is the reconcile's identity-preserving upsert-match key.
+ * `entityId` is the PK — an Entity carries at most one Import Source. `containerId` is denormalised off the
+ * source, mirroring the other derived indexes, so a `(container, importer)` wipe/query is one indexed
+ * lookup; the unique `(container, importer, sourceId)` is the reconcile's identity-preserving
+ * upsert-match key.
  */
 export const entityImportSource = sqliteTable(
   'entity_import_source',
@@ -375,16 +446,16 @@ export const entityImportSource = sqliteTable(
     entityId: text('entity_id')
       .primaryKey()
       .references(() => entities.id, { onDelete: 'cascade' }),
-    worldId: text('world_id').notNull(),
+    containerId: text('container_id').notNull(),
     importer: text('importer').notNull(),
     sourceId: text('source_id').notNull(),
     rev: text('rev').notNull(),
   },
   (table) => [
-    // Wipe/query: every Entity an Importer created in a World.
-    index('idx_entity_import_source_world_importer').on(table.worldId, table.importer),
-    // The reconcile's upsert-match key: one Entity per (world, importer, sourceId).
-    uniqueIndex('idx_entity_import_source_upsert').on(table.worldId, table.importer, table.sourceId),
+    // Wipe/query: every Entity an Importer created in a Container.
+    index('idx_entity_import_source_container_importer').on(table.containerId, table.importer),
+    // The reconcile's upsert-match key: one Entity per (container, importer, sourceId).
+    uniqueIndex('idx_entity_import_source_upsert').on(table.containerId, table.importer, table.sourceId),
   ],
 );
 

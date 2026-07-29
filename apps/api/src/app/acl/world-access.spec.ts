@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { WorldVerb } from '@hexly/domain';
 import { createDb, Db } from '../db/db';
-import { entities, entityGrants, users, worldMembers, worlds } from '../db/schema';
+import { containers, entities, entityGrants, users, worldMembers, worlds, WORLD_CONTAINER_KIND } from '../db/schema';
 import { canCreateEntityFilter, worldAccess, worldOwnerFilter } from './world-access';
 
 /**
@@ -119,7 +119,7 @@ describe('worldAccess', () => {
       db.insert(entities)
         .values({
           id: entityId,
-          worldId,
+          containerId: worldId,
           name: 'Relic',
           types: ['core.type.note'],
           tags: [],
@@ -170,7 +170,7 @@ describe('worldAccess', () => {
       db.insert(entities)
         .values({
           id: entityId,
-          worldId,
+          containerId: worldId,
           name: 'Relic',
           types: ['core.type.note'],
           tags: [],
@@ -252,7 +252,10 @@ describe('worldAccess', () => {
   // ── seed helpers ──────────────────────────────────────────────────────────
   function seedWorld(): string {
     const id = randomUUID();
-    db.insert(worlds).values({ id, name: 'Aldermoor', createdAt: 1, updatedAt: 1 }).run();
+    db.insert(containers)
+      .values({ id, kind: WORLD_CONTAINER_KIND, name: 'Aldermoor', createdAt: 1, updatedAt: 1 })
+      .run();
+    db.insert(worlds).values({ id }).run();
     return id;
   }
 

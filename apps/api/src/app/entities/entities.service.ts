@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  AdoptEntityRequest,
   ApiError,
   assetThumbnailUrl,
   CreateEntityRequest,
@@ -9,6 +10,7 @@ import {
   EntityDocument,
   EntityErrorCode,
   EntityFacets,
+  EntityRead,
   EntityReferences,
   EntitySaveOutcome,
   EntitySummary,
@@ -43,6 +45,7 @@ import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } fro
 import { DB, Db } from '../db/db';
 import {
   assetIndex,
+  containers,
   entities,
   entityDescriptors,
   entityEdges,
@@ -52,8 +55,9 @@ import {
   worlds,
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config';
+import { inACompendium } from '../worlds/compendiums';
 import { AssetBytesRegistry } from './asset-bytes-registry';
-import { EntityWrites, InsertEntityInput } from './entity-writes';
+import { AclWriter, EntityWrites, InsertEntityInput } from './entity-writes';
 import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
 import { linkedEntity } from './utils/linked-entity';
@@ -83,13 +87,26 @@ export interface ListOptions {
   /** Filter-by-Field (ADR-0048, #188): each constraint matches a facetable Field value — eq
    * membership (enum/list/string) or a gte/lte range (number/date). Same key OR / range, diff key AND. */
   readonly fields?: readonly FieldFilter[];
-  /** Restrict to one World. */
-  readonly worldId?: string;
+  /**
+   * The **Container** scope: which Containers this read is about. One id for every World-scoped read
+   * (the Entity Browser, the Dashboard, a Facet count); the whole shelf for the Compendium browse,
+   * which names its Containers explicitly because the read is *about* compendium content (ADR-0079).
+   * Empty or absent means unscoped — the Command Palette's cross-Container reach.
+   */
+  readonly containerIds?: readonly string[];
+  /**
+   * Facet: restrict to any of these **Compendiums** (OR within category). A narrowing *within*
+   * {@link containerIds}, not a redefinition of it — both predicates AND, so naming a Container the
+   * scope excludes reaches nothing — which is what lets the Compendium facet drill down like Type or Tag.
+   */
+  readonly compendium?: readonly string[];
+  /** Which kind of read this is (ADR-0079): a link-target read drops every Compendium Entry. */
+  readonly read?: EntityRead;
   /** Attach the caller's Rights to each summary — opt-in, the Entity Browser sets it. */
   readonly withRights?: boolean;
   /**
    * Attach each summary's served thumbnail URL (ADR-0065) — opt-in, the Asset Browser sets it. Resolved
-   * generically off the `(worldId, hash)` dedup index (a LEFT JOIN), so it names no type and other lists
+   * generically off the `(containerId, hash)` dedup index (a LEFT JOIN), so it names no type and other lists
    * never pay for the join.
    */
   readonly withThumbnails?: boolean;
@@ -109,7 +126,16 @@ export interface ListOptions {
 /** The filter state a facet-count read narrows against — the list filters minus paging/ids. */
 export type FacetOptions = Pick<
   ListOptions,
-  'worldId' | 'q' | 'type' | 'tags' | 'visibility' | 'fields' | 'excludedTypes' | 'includeHidden'
+  | 'containerIds'
+  | 'compendium'
+  | 'read'
+  | 'q'
+  | 'type'
+  | 'tags'
+  | 'visibility'
+  | 'fields'
+  | 'excludedTypes'
+  | 'includeHidden'
 >;
 
 /** Everything {@link filters} reads — shared by the paged list and the facet-count reads. */
@@ -175,7 +201,7 @@ export class EntitiesService {
     const query = this.db
       .select({
         id: entities.id,
-        worldId: entities.worldId,
+        containerId: entities.containerId,
         name: entities.name,
         types: entities.types,
         tags: entities.tags,
@@ -183,6 +209,9 @@ export class EntitiesService {
         version: entities.version,
         createdAt: entities.createdAt,
         updatedAt: entities.updatedAt,
+        // The **Sealed** state (ADR-0079), on every list rather than opted into: one EXISTS on an indexed
+        // primary key, and the surfaces needing it are not the ones asking for Rights or thumbnails.
+        sealed: inACompendium(),
         // Opt-in: project the predicate columns so each summary carries the caller's Rights.
         ...(opts.withRights ? access.rightsColumns : {}),
         // Opt-in thumbnail resolution (ADR-0065/0066): the Entity's own bytes' hash, and — beating it by
@@ -217,11 +246,18 @@ export class EntitiesService {
       .where(and(access.filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined))
       // With a query: best match first (bm25 ascending), id for a stable page boundary;
       // otherwise newest first. Weight order must match the FTS DDL: name, tags, content_text.
-      // Hidden types (ADR-0065) sort last, ahead of relevance: an Asset must not outrank the Entity whose
-      // name it shares. A tier, not a bm25 penalty, so the order is explainable rather than tuned.
+      // Two tiers ride ahead of relevance, tiers rather than bm25 penalties so the order is explainable
+      // rather than tuned. Compendium Entries last (ADR-0079), outermost since authored-before-published
+      // outranks the Asset rule beneath it; then hidden types (ADR-0065). Only where a query ranks at
+      // all — an unqueried list is `updatedAt` order, which no tier is asked to interrupt.
       .orderBy(
         ...(match
-          ? [...this.hiddenLast(), sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`, asc(entities.id)]
+          ? [
+              inACompendium(),
+              ...this.hiddenLast(),
+              sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`,
+              asc(entities.id),
+            ]
           : [desc(entities.updatedAt), asc(entities.id)]),
       )
       .limit(opts.limit + 1)
@@ -231,17 +267,19 @@ export class EntitiesService {
     const hasMore = rows.length > opts.limit;
     const items = rows.slice(0, opts.limit).map((row) => {
       let summary = toSummary(row);
+      // Set only where it is true, so an ordinary Entity carries no marker at all (ADR-0079).
+      if (row.sealed) summary = { ...summary, sealed: true };
       // Opt-in thumbnail with precedence (ADR-0066): the **Thumbnail** Field's designated image beats the
       // Entity's own bytes, so an Asset carrying the field emits the field's URL and a bare Asset its own; a
-      // non-Asset with no designation carries none. The field target's URL keys off *its* World (an
-      // entity-link stays in-World, so it equals the row's, but the resolved index is authoritative).
+      // non-Asset with no designation carries none. The field target's URL keys off *its* Container (an
+      // entity-link stays in-Container, so it equals the row's, but the resolved index is authoritative).
       if (opts.withThumbnails) {
         const assetRow = row as typeof row & ThumbnailRow;
-        const thumbnailUrl = resolveThumbnailUrl(assetRow, row.worldId);
+        const thumbnailUrl = resolveThumbnailUrl(assetRow, row.containerId);
         if (thumbnailUrl) summary = { ...summary, thumbnailUrl };
         // The missing-bytes state (#325) rides the same opt-in, so only rows that draw imagery pay the stat.
         // Own bytes only: a broken Thumbnail designation is the designated Asset's story, not this row's.
-        if (this.assetBytes.missing(row.worldId, assetRow.ownAssetHash, assetRow.ownAssetExt))
+        if (this.assetBytes.missing(row.containerId, assetRow.ownAssetHash, assetRow.ownAssetExt))
           summary = { ...summary, assetBytesMissing: true };
       }
       if (!opts.withRights) return summary;
@@ -254,6 +292,7 @@ export class EntitiesService {
           canEditSubstance: !!r.canEditSubstance,
           canWrite: !!r.canWrite,
           isOwner: !!r.isOwner,
+          sealed: !!row.sealed,
         }),
       };
     });
@@ -282,7 +321,35 @@ export class EntitiesService {
       tag: this.countJsonArray({ ...scoped, tags: undefined }, entities.tags, filter),
       // Field facets by presence in the result set — no longer gated on the active Type (ADR-0054, #231).
       fields: this.countFieldFacets(scoped, filter),
+      // The Compendium facet, by presence too (ADR-0079): a read scoped to one Container has nothing to
+      // narrow, so only a cross-Container read — the Compendium browse — carries the category at all.
+      ...((opts.containerIds?.length ?? 0) > 1
+        ? { compendium: this.countContainers({ ...scoped, compendium: undefined }, filter) }
+        : {}),
     };
+  }
+
+  /**
+   * The **Compendium** facet's values: one per Container in the scope that still holds a matching
+   * Entity, labelled with the pack's name. Counted like every other category — drilled down (its own
+   * selection dropped by the caller) and under every sibling constraint — so the rail can never
+   * annotate a list it disagrees with.
+   */
+  private countContainers(opts: FacetOptions, filter: SQL): FacetCount[] {
+    const match = opts.q ? toFtsMatch(opts.q) : null;
+    return this.db
+      .select({
+        value: entities.containerId,
+        count: sql<number>`count(*)`.as('count'),
+        // The Container's authored name, so the rail reads "Draw Steel: Monsters" and not a uuid.
+        label: containers.name,
+      })
+      .from(entities)
+      .innerJoin(containers, eq(containers.id, entities.containerId))
+      .where(facetWhere(opts, match, filter))
+      .groupBy(entities.containerId)
+      .orderBy(asc(containers.name))
+      .all();
   }
 
   /**
@@ -341,7 +408,7 @@ export class EntitiesService {
     // Iterate the registry-ordered source set (scalar Fields, then harvested dimensions), not the index
     // keys, so the rail keeps a stable declaration order; a candidate key with no resolvable source (a
     // deleted World Field, ADR-0052/0054) isn't in the map, so it drops — it can't be labelled.
-    const byKey = this.worldTypeFields.facetSourcesByKey(opts.worldId);
+    const byKey = this.worldTypeFields.facetSourcesByKey(opts.containerIds);
     return (
       [...byKey.values()]
         .filter((source) => candidates.has(source.key))
@@ -481,8 +548,13 @@ export class EntitiesService {
     // Rights let the editor gate itself: a Viewer opens read-only, an entity-level
     // Editor (canWrite false, canEditSubstance true) opens writable. canManage rides
     // the owner-only gate so the Share dialog is only offered to actual Owners.
+    // A **Compendium Entry** opens here like anything else: its own page is a navigation read (ADR-0079).
     return decision?.canRead
-      ? this.withAssetBytesState({ ...toDetail(decision.row), rights: access.rightsOf(decision) })
+      ? this.withAssetBytesState({
+          ...toDetail(decision.row),
+          ...(decision.sealed ? { sealed: true } : {}),
+          rights: access.rightsOf(decision),
+        })
       : null;
   }
 
@@ -534,7 +606,7 @@ export class EntitiesService {
           id: entities.id,
           name: entities.name,
           types: entities.types,
-          worldId: entities.worldId,
+          containerId: entities.containerId,
           ...thumbnailColumns,
         })
         .from(entityEdges)
@@ -543,7 +615,7 @@ export class EntitiesService {
           and(
             eq(entityEdges.targetKind, 'asset'),
             eq(edgeAsset.hash, entityEdges.targetId),
-            eq(edgeAsset.worldId, entityEdges.worldId),
+            eq(edgeAsset.containerId, entityEdges.containerId),
           ),
         )
         .leftJoin(entities, and(sql`${entities.id} = ${targetEntityId}`, access.filter))
@@ -574,12 +646,12 @@ export class EntitiesService {
           decor: row.decor,
           // An Entity whose stored types can't be read reads as a dangling target, same as an
           // unreadable or deleted one: the reference is there, the thing at the end of it is not.
-          // A resolved target carries a worldId, so the Thumbnail URL keys off *its* World. The
+          // A resolved target carries a containerId, so the Thumbnail URL keys off *its* Container. The
           // resolved id (not the raw hash of an asset edge) is what the row links to.
           target:
             row.name === null
               ? null
-              : linkedEntity(row.id, row.name, row.types, resolveThumbnailUrl(row, row.worldId ?? '')),
+              : linkedEntity(row.id, row.name, row.types, resolveThumbnailUrl(row, row.containerId ?? '')),
         }))
     );
   }
@@ -598,7 +670,7 @@ export class EntitiesService {
   private inbound(access: EntityAccess, id: string): InboundReference[] {
     // The Asset's content hash + World, when `id` is an Asset — its asset edges key on the hash, not the id.
     const asset = this.db
-      .select({ hash: assetIndex.hash, worldId: assetIndex.worldId })
+      .select({ hash: assetIndex.hash, containerId: assetIndex.containerId })
       .from(assetIndex)
       .where(eq(assetIndex.entityId, id))
       .get();
@@ -608,7 +680,7 @@ export class EntitiesService {
         ? and(
             eq(entityEdges.targetKind, 'asset'),
             eq(entityEdges.targetId, asset.hash),
-            eq(entityEdges.worldId, asset.worldId),
+            eq(entityEdges.containerId, asset.containerId),
           )
         : undefined,
     );
@@ -622,7 +694,7 @@ export class EntitiesService {
           decor: entityEdges.decor,
           name: entities.name,
           types: entities.types,
-          worldId: entities.worldId,
+          containerId: entities.containerId,
           ...thumbnailColumns,
         })
         .from(entityEdges)
@@ -644,7 +716,7 @@ export class EntitiesService {
         // A source is the thing doing the linking, so unlike {@link outbound}'s target it cannot
         // dangle: a row whose source has no drawable type drops out entirely.
         .flatMap((row) => {
-          const source = linkedEntity(row.sourceId, row.name, row.types, resolveThumbnailUrl(row, row.worldId));
+          const source = linkedEntity(row.sourceId, row.name, row.types, resolveThumbnailUrl(row, row.containerId));
           return source ? [{ descriptor: row.descriptor, source, decor: row.decor }] : [];
         })
     );
@@ -658,7 +730,7 @@ export class EntitiesService {
     return this.db
       .select()
       .from(entities)
-      .where(and(ownsEntity(userId, this.isSuperadmin(userId)), eq(entities.worldId, worldId)))
+      .where(and(ownsEntity(userId, this.isSuperadmin(userId)), eq(entities.containerId, worldId)))
       .all()
       .map(toDetail);
   }
@@ -684,13 +756,40 @@ export class EntitiesService {
     const doc: EntityDocument = req.document ? { ...minted, ...stripReservedKeys(req.document) } : minted;
     const row = this.writes.insert({
       ownerId,
-      worldId,
+      containerId: worldId,
       name: req.name,
       types: req.types,
       tags: req.tags,
       document: doc,
     });
     return detailOf(row, doc);
+  }
+
+  /**
+   * **Adoption** (CONTEXT.md → Adoption): copy a **Compendium Entry** into a World. `null` when the
+   * entry is unreachable, like every other read.
+   *
+   * Routed through {@link create} rather than `writes.insert` because that seam already *is* every
+   * property Adoption needs: a World target (a Compendium has no `worlds` row to resolve), the
+   * create-Entity gate a Contributor passes, `private` and owned by the adopter — and the reserved
+   * `hexly.*` strip, which is what leaves the copy with no `hexly.source`. That last one is load-bearing:
+   * a copy keeping the stamp would read as **Sealed** and be a delete candidate on the next reconcile
+   * through its colliding `sourceId` (ADR-0079).
+   */
+  adopt(userId: string, id: string, req: AdoptEntityRequest): EntityDetail | null {
+    const decision = entityAccess(this.db, userId).decide(id);
+    if (!decision?.canRead) return null;
+    // `sealed` is the location fact the seal reads, already resolved here — so adoption mints no
+    // predicate of its own to ask "is this on the shelf?" (ADR-0079).
+    if (!decision.sealed) throw new BadRequestException();
+    const source = toDetail(decision.row);
+    return this.create(userId, {
+      worldId: req.worldId,
+      name: source.name,
+      types: [...source.types],
+      tags: [...source.tags],
+      document: source.document,
+    });
   }
 
   /**
@@ -771,8 +870,12 @@ export class EntitiesService {
     if (req.types === undefined) return;
     // Read the stored World so the effective set resolves this row's user-defined Fields. A missing row
     // 404s in `mutate` regardless.
-    const stored = this.db.select({ worldId: entities.worldId }).from(entities).where(eq(entities.id, id)).get();
-    this.assertTypedFieldsValid(userId, stored?.worldId, req.types, req.document);
+    const stored = this.db
+      .select({ containerId: entities.containerId })
+      .from(entities)
+      .where(eq(entities.id, id))
+      .get();
+    this.assertTypedFieldsValid(userId, stored?.containerId, req.types, req.document);
   }
 
   /**
@@ -913,6 +1016,20 @@ export class EntitiesService {
     return gate({ reachable: !!meta?.canRead, isOwner: !!meta?.isOwner });
   }
 
+  /**
+   * Write a sharing change and surface the choke point's own refusal — `forbidden` (403), else
+   * undefined to proceed (composes with `?? { status: 'ok', … }`). {@link gateOwnerManagement} is no
+   * longer the last word on a `manage`: an Owner of a **Sealed** Entity is refused there (ADR-0079).
+   */
+  private manageRefusal(
+    userId: string,
+    id: string,
+    acl: (w: AclWriter) => void,
+  ): Extract<AclSetResult<never>, { status: 'forbidden' }> | undefined {
+    const result = this.writes.mutate(userId, id, { kind: 'manage', acl });
+    return result.status === 'forbidden' ? { status: 'forbidden' } : undefined;
+  }
+
   /** The Entity's ownership set, for an Owner. Unreachable → 404; not an Owner → 403. */
   listOwners(userId: string, id: string): OwnerSetResult {
     const gate = this.gateOwnerManagement(userId, id);
@@ -931,11 +1048,12 @@ export class EntitiesService {
     // Owner wins: promoting a user who holds an editor/viewer grant overwrites it to owner.
     // Promotion grants `manage`, so a follower already holding this Entity must refetch —
     // hence the additive path nudges too, not just removals.
-    this.writes.mutate(userId, id, {
-      kind: 'manage',
-      acl: (w) => w.upsertOwner(targetUserId),
-    });
-    return { status: 'ok', value: this.entityOwnersOf(id) };
+    return (
+      this.manageRefusal(userId, id, (w) => w.upsertOwner(targetUserId)) ?? {
+        status: 'ok',
+        value: this.entityOwnersOf(id),
+      }
+    );
   }
 
   /**
@@ -950,11 +1068,7 @@ export class EntitiesService {
     if (outcome.status !== 'ok') return outcome;
     // Delete the owner-role row — their access ends; they hold no other grant row. The nudge
     // evicts them live; every remaining Owner refetches their (unchanged) Rights.
-    this.writes.mutate(userId, id, {
-      kind: 'manage',
-      acl: (w) => w.removeOwner(targetUserId),
-    });
-    return outcome;
+    return this.manageRefusal(userId, id, (w) => w.removeOwner(targetUserId)) ?? outcome;
   }
 
   /** The Entity's grant set, for an Owner — same Owner-only gate as the owner set. */
@@ -973,11 +1087,12 @@ export class EntitiesService {
     if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
     // An Editor demoted to Viewer must see their Save button vanish: `rights` ride the resource
     // (ADR-0039), so only a nudge-driven refetch refreshes them.
-    this.writes.mutate(userId, id, {
-      kind: 'manage',
-      acl: (w) => w.upsertGrant(targetUserId, role),
-    });
-    return { status: 'ok', value: this.entityGrantsOf(id) };
+    return (
+      this.manageRefusal(userId, id, (w) => w.upsertGrant(targetUserId, role)) ?? {
+        status: 'ok',
+        value: this.entityGrantsOf(id),
+      }
+    );
   }
 
   /**
@@ -990,11 +1105,12 @@ export class EntitiesService {
     // Editor/viewer rows only — an `owner` row is removed via removeOwner (which enforces the
     // ≥1-Owner invariant), never silently deleted here. Revocation is how entity-level access
     // ends, so the nudge evicts a live-following grantee rather than leaving them on a stale view.
-    this.writes.mutate(userId, id, {
-      kind: 'manage',
-      acl: (w) => w.removeGrant(targetUserId),
-    });
-    return { status: 'ok', value: this.entityGrantsOf(id) };
+    return (
+      this.manageRefusal(userId, id, (w) => w.removeGrant(targetUserId)) ?? {
+        status: 'ok',
+        value: this.entityGrantsOf(id),
+      }
+    );
   }
 
   /** The Entity's Public Link (active token or null), for an Owner — same Owner-only gate as grants. */
@@ -1057,7 +1173,7 @@ export class EntitiesService {
     const row = this.db
       .select()
       .from(entities)
-      .where(and(eq(entities.id, id), eq(entities.worldId, worldId), sharedVisibility))
+      .where(and(eq(entities.id, id), eq(entities.containerId, worldId), sharedVisibility))
       .get();
     return row ? this.withAssetBytesState({ ...toDetail(row), rights: [...READ_ONLY_RIGHTS] }) : null;
   }
@@ -1067,7 +1183,7 @@ export class EntitiesService {
     return this.db
       .select()
       .from(entities)
-      .where(and(eq(entities.worldId, worldId), sharedVisibility))
+      .where(and(eq(entities.containerId, worldId), sharedVisibility))
       .orderBy(desc(entities.updatedAt), asc(entities.id))
       .all()
       .map(toSummary);
@@ -1108,11 +1224,13 @@ export class EntitiesService {
     const predicate = requestedId
       ? and(eq(worlds.id, requestedId), canCreateEntityFilter(ownerId, this.isSuperadmin(ownerId)))
       : worldOwnerFilter(ownerId);
+    // "Oldest" is the Container's `created_at` (ADR-0078).
     const world = this.db
       .select({ id: worlds.id })
       .from(worlds)
+      .innerJoin(containers, eq(containers.id, worlds.id))
       .where(predicate)
-      .orderBy(asc(worlds.createdAt), asc(worlds.id))
+      .orderBy(asc(containers.createdAt), asc(containers.id))
       .get();
     if (!world)
       throw new NotFoundException({
@@ -1143,7 +1261,15 @@ function filters(opts: FilterOptions) {
   if (opts.visibility?.length) predicates.push(inArray(entities.visibility, [...opts.visibility]));
   if (opts.tags?.length) predicates.push(hasAny(entities.tags, opts.tags));
   if (opts.fields?.length) predicates.push(...fieldFilters(opts.fields));
-  if (opts.worldId) predicates.push(eq(entities.worldId, opts.worldId));
+  // The one Container predicate, whether the read names one Container or the whole shelf (ADR-0078).
+  // `entities.container_id` is indexed, so the set form costs no more than the single one did.
+  if (opts.containerIds?.length) predicates.push(inArray(entities.containerId, [...opts.containerIds]));
+  // The Compendium facet's selection: a second predicate on the same column, deliberately — the scope
+  // above says what the read is about, this says what the user narrowed it to, and they AND.
+  if (opts.compendium?.length) predicates.push(inArray(entities.containerId, [...opts.compendium]));
+  // The only narrowing the Compendium adds to any read (ADR-0079); it sits here so `list` and `facets`
+  // share it and a picker's rail cannot count what its options exclude.
+  if (opts.read === 'link-target') predicates.push(sql`NOT ${inACompendium()}`);
   return predicates;
 }
 
@@ -1257,7 +1383,7 @@ function thumbnailJoin() {
       // `hash + ext` is the file a read stats to mark a missing Asset (#325); one join answers both.
       ownAssetExt: ownAsset.ext,
       fieldAssetHash: fieldAsset.hash,
-      fieldAssetWorldId: fieldAsset.worldId,
+      fieldAssetContainerId: fieldAsset.containerId,
     },
   };
 }
@@ -1267,18 +1393,18 @@ interface ThumbnailRow {
   readonly ownAssetHash?: string | null;
   readonly ownAssetExt?: string | null;
   readonly fieldAssetHash?: string | null;
-  readonly fieldAssetWorldId?: string | null;
+  readonly fieldAssetContainerId?: string | null;
 }
 
 /**
  * The served Thumbnail URL for one {@link thumbnailJoin} row, with precedence (ADR-0066): the Thumbnail
  * Field's designated image beats the Entity's own bytes; neither resolves → `undefined`. The field
- * target's URL keys off *its* World (an entity-link stays in-World, so it equals the subject's, but the
- * resolved index is authoritative); own bytes key off the subject's World.
+ * target's URL keys off *its* Container (an entity-link stays in-Container, so it equals the subject's,
+ * but the resolved index is authoritative); own bytes key off the subject's Container.
  */
-function resolveThumbnailUrl(row: ThumbnailRow, worldId: string): string | undefined {
-  if (row.fieldAssetHash) return assetThumbnailUrl(row.fieldAssetWorldId ?? worldId, row.fieldAssetHash);
-  if (row.ownAssetHash) return assetThumbnailUrl(worldId, row.ownAssetHash);
+function resolveThumbnailUrl(row: ThumbnailRow, containerId: string): string | undefined {
+  if (row.fieldAssetHash) return assetThumbnailUrl(row.fieldAssetContainerId ?? containerId, row.fieldAssetHash);
+  if (row.ownAssetHash) return assetThumbnailUrl(containerId, row.ownAssetHash);
   return undefined;
 }
 
@@ -1290,7 +1416,9 @@ type SummaryColumns = Omit<SummaryRow, 'contentText' | 'seq' | 'thumbnailEntityI
 function toSummary(row: SummaryColumns): EntitySummary {
   return {
     id: row.id,
-    worldId: row.worldId,
+    // The API's `worldId` is the Entity's Container id: a World's Container id is the World's id
+    // (ADR-0078), so the contract is unchanged.
+    worldId: row.containerId,
     name: row.name,
     types: typesSchema.parse(row.types),
     tags: tagsSchema.parse(row.tags),

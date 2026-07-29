@@ -1,6 +1,25 @@
 {
   "tabTitle": "Admin — Hexly",
-  "heading": "Instance repair",
+  "heading": "Instance administration",
+  "packs": {
+    "heading": "Compendium packs",
+    "description": "Published reference material, installed once for the whole instance. Every world can browse and adopt from an installed pack; removing one deletes its entries and leaves adopted copies alone.",
+    "empty": "No packs available. Enable a plugin that publishes one.",
+    "install": "Install",
+    "reimport": "Reimport",
+    "remove": "Remove",
+    "running": "Installing…",
+    "notInstalled": "Not installed",
+    "installed": "Revision {{rev}} · {{count}} entries · {{date}}",
+    "lastRunFailed": "The last install failed. Try again.",
+    "imported": "Installed {count, plural, one {# entry} other {# entries}}.",
+    "removed": "Removed the pack.",
+    "loadError": "Couldn't load the compendium packs.",
+    "statusError": "Lost track of the install. Reload to check where it landed.",
+    "runError": "The install didn't finish. Please try again.",
+    "runningError": "That pack is already being installed.",
+    "removeError": "Couldn't remove that pack. Please try again."
+  },
   "reindex": {
     "heading": "Repair",
     "description": "Recompute every Entity's search text, Link Descriptors, and links from its content. Safe to run at any time.",

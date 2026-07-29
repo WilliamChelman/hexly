@@ -1,0 +1,92 @@
+import { CompendiumSummary } from '@hexly/domain';
+import { SQL, asc, eq, getTableColumns, sql } from 'drizzle-orm';
+import { Db } from '../db/db';
+import { CompendiumRow, compendiums, containers, entities } from '../db/schema';
+
+/**
+ * The whole-Compendium read (ADR-0079), the peer of `world-access.ts`'s `selectWorld`: the Container's
+ * identity columns beside its satellite's own. Driven off `compendiums`, never `containers` — the
+ * satellite *is* the "this is a Compendium" discriminator, so no `kind` filter is needed here or
+ * anywhere else (ADR-0078).
+ *
+ * Deliberately unguarded by an access context: a Compendium is Instance-wide and has no members, no
+ * roles and no public link (ADR-0078), so unlike a World there is nothing per-caller to resolve.
+ */
+function selectCompendium(db: Db) {
+  return db
+    .select({
+      ...getTableColumns(containers),
+      importer: compendiums.importer,
+      rev: compendiums.rev,
+      publisher: compendiums.publisher,
+      license: compendiums.license,
+      notice: compendiums.notice,
+    })
+    .from(compendiums)
+    .innerJoin(containers, eq(containers.id, compendiums.id));
+}
+
+/**
+ * Every installed Compendium, by name. Unguarded for the same reason {@link selectCompendium} is:
+ * Instance-wide with no members means one answer for every caller — the entries' own reachability rule,
+ * one level up. The **Compendium browse** names its Containers from this list (ADR-0079).
+ */
+export function listCompendiums(db: Db): CompendiumSummary[] {
+  return selectCompendium(db).orderBy(asc(containers.name)).all().map(toCompendiumSummary);
+}
+
+/**
+ * One installed Compendium by Container id — undefined for a World's id too, since the read is driven
+ * off the satellite that discriminates (ADR-0078). Unguarded for the same reason {@link listCompendiums}
+ * is; it backs the **Compendium page** (#402).
+ */
+export function compendiumById(db: Db, id: string): CompendiumSummary | undefined {
+  const row = selectCompendium(db).where(eq(compendiums.id, id)).get();
+  return row && toCompendiumSummary(row);
+}
+
+/** One row for the wire, attribution folded back into the shape its Importer declared it in. */
+function toCompendiumSummary(row: CompendiumRow): CompendiumSummary {
+  return {
+    id: row.id,
+    name: row.name,
+    importer: row.importer,
+    rev: row.rev,
+    // Absent rather than null, so a pack stating no terms renders no empty scaffold (#402).
+    attribution: {
+      ...(row.publisher ? { publisher: row.publisher } : {}),
+      ...(row.license ? { license: row.license } : {}),
+      ...(row.notice ? { notice: row.notice } : {}),
+    },
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/**
+ * The Compendium a **Compendium Importer** owns, or undefined before its first successful run. One
+ * per pack — `compendiums.importer` is unique — so this answers "where does this Importer land?" with
+ * exactly one Container.
+ */
+export function compendiumByImporter(db: Db, importer: string): CompendiumRow | undefined {
+  return selectCompendium(db).where(eq(compendiums.importer, importer)).get();
+}
+
+/**
+ * Whether the Container is a **Compendium** — the one question the **seal** asks (ADR-0079). An Entity
+ * is a **Compendium Entry** by where it lives and nothing else, so "may a user write this?" reduces to
+ * an indexed primary-key hit on the satellite, with no flag on the Entity to consult or to forge.
+ */
+export function isCompendiumContainer(db: Db, containerId: string): boolean {
+  return !!db.select({ id: compendiums.id }).from(compendiums).where(eq(compendiums.id, containerId)).get();
+}
+
+/**
+ * The same question as a predicate over an `entities` row. Reads the satellite that *is* the
+ * discriminator (ADR-0078), so it names no pack, no flag and no Entity Type — and it is one expression
+ * for four readers: the reachability rule, the **Sealed** projection, the link-target exclusion (#400)
+ * and the search tier that ranks the shelf below authored Entities.
+ */
+export function inACompendium(): SQL {
+  return sql`EXISTS (SELECT 1 FROM ${compendiums} WHERE ${compendiums.id} = ${entities.containerId})`;
+}

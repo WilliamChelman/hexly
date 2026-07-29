@@ -37,6 +37,12 @@ export interface EntityLinkRepair {
    * inherits the Contributor gate: without it the row is absent, not present-and-failing (ADR-0073).
    */
   readonly creatable: Signal<boolean>;
+  /**
+   * The host Entity's World, which retargeting searches within — the World a promotion mints into, never
+   * the URL's (ADR-0073). Unset until the surface resolves one, which widens the search but never
+   * unseals it: a link-target read returns no Compendium Entry either way (ADR-0079).
+   */
+  readonly worldId: Signal<string | undefined>;
   /** Rewrite this link's target in place: the prose, the `display` and the `heading` are untouched. */
   readonly retarget: (entity: EntitySummary) => void;
   /** Mint an Entity named `name` and point this link at it, in place, on the same terms. */
@@ -44,7 +50,7 @@ export interface EntityLinkRepair {
 }
 
 /** The half of a repair the editing surface owns; the node view supplies the document position. */
-export interface EntityLinkRepairHost extends Pick<EntityLinkRepair, 'writable' | 'creatable'> {
+export interface EntityLinkRepairHost extends Pick<EntityLinkRepair, 'writable' | 'creatable' | 'worldId'> {
   /** Mint `name` in the host Entity's World; rejects once the failure has been reported to the author. */
   readonly mint: (name: string) => Promise<EntitySummary>;
 }
@@ -137,6 +143,7 @@ export interface EntityLinkRepairHost extends Pick<EntityLinkRepair, 'writable' 
             testid="entity-link-repair-picker"
             placeholderKey="editor.entityLink.relinkSearch"
             emptyKey="editor.entityLink.relinkEmpty"
+            [worldId]="repair()?.worldId?.()"
             [query]="query()"
             (queryChange)="query.set($event)"
             (pick)="choose($event)"
@@ -403,6 +410,7 @@ export function createEntityLinkNodeView(
   ref.setInput('repair', {
     writable: host.writable,
     creatable: host.creatable,
+    worldId: host.worldId,
     retarget: pointAt,
     // The same rewrite behind a mint, so promoting keeps what retargeting keeps. The mint reports its
     // own failure, so a rejection leaves the link as it was.

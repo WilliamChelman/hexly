@@ -4,9 +4,8 @@ import { By } from '@angular/platform-browser';
 import { HttpErrorResponse } from '@angular/common/http';
 import { map, of, throwError, timer } from 'rxjs';
 import { ImporterSummary, ImportRunSummary } from '@hexly/domain';
-import { signal } from '@angular/core';
-import { ClientConfigStore, ToasterService, WorldsClient } from '@hexly/web-core';
-import { MockWorldsClient, mockClientConfigStore } from '@hexly/web-core/testing';
+import { ToasterService, WorldsClient } from '@hexly/web-core';
+import { MockWorldsClient } from '@hexly/web-core/testing';
 import { WorldImportsPanelComponent } from './world-imports-panel.component';
 
 /** Matches the panel's own poll interval; one `tick` of it advances the reconcile by one poll. */
@@ -31,14 +30,15 @@ function runSummary(partial: Partial<ImportRunSummary> = {}): ImportRunSummary {
 }
 
 /**
- * The generic Imports panel (#260): it lists whatever Importers the enabled Plugins registered and
- * runs / removes them through the World-scoped endpoints, following the one reconcile per World by
- * polling. These specs drive it through the {@link MockWorldsClient}.
+ * The generic Imports panel (#260): it lists whatever non-Compendium Importers the enabled Plugins
+ * registered and runs / removes them through the World-scoped endpoints, following the one reconcile
+ * per World by polling. These specs drive it through the {@link MockWorldsClient}. The Draw Steel
+ * monsters Importer stands in for a listed row here; the server stopped listing it once it became a
+ * pack (#404), which the API seam is where that is pinned.
  */
 describe('WorldImportsPanel', () => {
   let worlds: MockWorldsClient;
   let toaster: ToasterService;
-  let collaboration: ReturnType<typeof signal<boolean>>;
   let fixture: ComponentFixture<WorldImportsPanelComponent>;
 
   // Draw Steel's real Importer: its label is a transloco key resolved through the plugin's web catalogs.
@@ -46,16 +46,12 @@ describe('WorldImportsPanel', () => {
 
   beforeEach(async () => {
     worlds = new MockWorldsClient();
-    collaboration = signal(true);
     worlds.importers.mockReturnValue(of<ImporterSummary[]>([monsters]));
     // Idle on load so the run button is live; a spec that rejoins a run overrides this.
     worlds.importStatus.mockReturnValue(of(runSummary()));
     await TestBed.configureTestingModule({
       imports: [WorldImportsPanelComponent, provideTranslocoTesting()],
-      providers: [
-        { provide: WorldsClient, useValue: worlds },
-        { provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration }) },
-      ],
+      providers: [{ provide: WorldsClient, useValue: worlds }],
     }).compileComponents();
     toaster = TestBed.inject(ToasterService);
     vi.useFakeTimers();
@@ -91,33 +87,16 @@ describe('WorldImportsPanel', () => {
     expect(el('importer-draw-steel.importer.monsters').textContent).toContain('Draw Steel — Monsters');
   });
 
-  it('runs the chosen importer through the World-scoped endpoint at the selected visibility', () => {
+  it('runs the chosen importer through the World-scoped endpoint, with nothing left to choose', () => {
     worlds.runImport.mockReturnValue(of(runSummary({ importer: monsters.id, status: 'running' })));
     render();
 
-    // Default visibility is shared; switch to private before running.
-    const select = el('importer-visibility-draw-steel.importer.monsters') as HTMLSelectElement;
-    select.value = 'private';
-    select.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-
-    click('importer-run-draw-steel.importer.monsters');
-
-    expect(worlds.runImport).toHaveBeenCalledWith('w1', 'draw-steel.importer.monsters', 'private');
-  });
-
-  it('with Collaboration off offers no Visibility and imports at the schema default', () => {
-    collaboration.set(false);
-    worlds.runImport.mockReturnValue(of(runSummary({ importer: monsters.id, status: 'running' })));
-    render();
-
-    // The row is not sharing; only its Visibility choice is cut (ADR-0071).
-    expect(has('importer-draw-steel.importer.monsters')).toBe(true);
+    // No Visibility control: a run lands at the schema default, here as on the pack surface (ADR-0079).
     expect(has('importer-visibility-draw-steel.importer.monsters')).toBe(false);
 
     click('importer-run-draw-steel.importer.monsters');
 
-    expect(worlds.runImport).toHaveBeenCalledWith('w1', 'draw-steel.importer.monsters', 'private');
+    expect(worlds.runImport).toHaveBeenCalledWith('w1', 'draw-steel.importer.monsters');
   });
 
   it('follows a run to completion and toasts the landed count', () => {

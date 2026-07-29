@@ -1,9 +1,11 @@
 import { ApplicationRef, ComponentRef, EnvironmentInjector, Injector, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { of } from 'rxjs';
 import { Editor } from '@tiptap/core';
 import { EntitySummary } from '@hexly/domain';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { EntitiesClient } from '@hexly/web-core';
+import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { CONTENT_EXTENSIONS } from '../extensions/content-extensions';
 import { EntityNameResolver, EntityResolution } from '../services/entity-name-resolver';
@@ -26,6 +28,8 @@ const found = (name: string): EntityResolution => ({
 });
 
 describe('EntityLinkView', () => {
+  let entities: MockEntitiesClient;
+
   function mount(inputs: {
     entityId: string;
     label: string;
@@ -51,15 +55,22 @@ describe('EntityLinkView', () => {
     return {
       writable: signal(true),
       creatable: signal(true),
+      worldId: signal<string | undefined>('w1'),
       retarget: vi.fn<(entity: EntitySummary) => void>(),
       promote: vi.fn<(name: string) => void>(),
     } satisfies EntityLinkRepair;
   }
 
   function configure(resolution: EntityResolution) {
+    entities = new MockEntitiesClient();
+    entities.list.mockReturnValue(of({ items: [], nextCursor: null }));
     TestBed.configureTestingModule({
       imports: [EntityLinkViewComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
-      providers: [{ provide: EntityNameResolver, useValue: new StubResolver(resolution) }, provideRouter([])],
+      providers: [
+        { provide: EntityNameResolver, useValue: new StubResolver(resolution) },
+        { provide: EntitiesClient, useValue: entities },
+        provideRouter([]),
+      ],
     });
   }
 
@@ -160,6 +171,28 @@ describe('EntityLinkView', () => {
       fixture.destroy();
     });
 
+    /**
+     * Retargeting is the same rule's fourth reach: it offers only the host Entity's World (ADR-0073 —
+     * the World a promotion would mint into), and asks for link targets, so a broken link can never be
+     * repaired onto a Compendium Entry (ADR-0079).
+     */
+    it('searches the host Entity’s World for link targets alone', async () => {
+      configure(found('Avalon'));
+      const fixture = mount({ entityId: '', label: 'Zorblax', repair: repairStub() });
+
+      (fixture.nativeElement.querySelector('[data-testid=entity-link]') as HTMLElement).click();
+      fixture.detectChanges();
+      await flushMicrotasks();
+      // Newest, not first: a portaled popover from an earlier test outlives its fixture at the end of <body>.
+      const menus = document.body.querySelectorAll('[data-testid=entity-link-repair]');
+      const menu = menus[menus.length - 1] as HTMLElement;
+      (menu.querySelector('[data-testid=entity-link-repair-relink]') as HTMLElement).click();
+      fixture.detectChanges();
+
+      expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1', read: 'link-target' }));
+      fixture.destroy();
+    });
+
     it('mints once while a promotion is out — clicking Create again is not a second Entity', async () => {
       // The link stays unresolved until the mint lands, so its popover can be opened and asked again —
       // and a second mint is exactly the duplicate ADR-0073 keeps Create away from a dangling link over.
@@ -172,7 +205,7 @@ describe('EntityLinkView', () => {
         node,
         editor,
         () => 1,
-        { writable: signal(true), creatable: signal(true), mint },
+        { writable: signal(true), creatable: signal(true), worldId: signal(undefined), mint },
         TestBed.inject(EnvironmentInjector),
         TestBed.inject(Injector),
         TestBed.inject(ApplicationRef),

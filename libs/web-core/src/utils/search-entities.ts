@@ -12,7 +12,7 @@ import {
   tap,
 } from 'rxjs';
 import { EntitySummary } from '@hexly/domain';
-import { EntitiesClient } from '../services/entities.client';
+import { EntitiesClient, EntityListParams } from '../services/entities.client';
 
 /** Autocomplete page cap — a picker only shows a handful of rows at a time. */
 const SEARCH_LIMIT = 20;
@@ -25,6 +25,14 @@ const CACHE_LIMIT = 50;
  * (ADR-0066) — surfaces that render a preview tile (the Command Palette) set it, plain pickers don't. */
 export interface SearchEntitiesOptions {
   readonly thumbnails?: boolean;
+  /**
+   * Extra list params, resolved per request — what makes this search the *read* it is (ADR-0079). The
+   * `@` mention picker asks for link targets in the host Entity's World; the Command Palette asks for
+   * anywhere, and passes none. A supplier rather than a value because the host World is known per
+   * keystroke and not when the stream is built; it is fixed for one stream's lifetime (a resolver is
+   * provided per note surface), so the memo below stays keyed on the query alone.
+   */
+  readonly params?: () => EntityListParams;
   /**
    * The stale-while-revalidate store, supplied by a caller that must be able to *drop* it: a
    * take-first consumer never revalidates, so one that writes an Entity its own next search has to
@@ -60,7 +68,13 @@ export function searchEntities(
       // includeHidden: this helper backs pickers, not browses, so an Asset stays findable by name
       // (ADR-0065) — ranked below ordinary matches server-side.
       const fresh$ = defer(() =>
-        client.list({ q, limit: SEARCH_LIMIT, includeHidden: true, ...(opts.thumbnails ? { thumbnails: true } : {}) }),
+        client.list({
+          q,
+          limit: SEARCH_LIMIT,
+          includeHidden: true,
+          ...(opts.thumbnails ? { thumbnails: true } : {}),
+          ...opts.params?.(),
+        }),
       ).pipe(
         map((page) => page.items),
         // tap only runs on a successful emission, so failed searches never cache;

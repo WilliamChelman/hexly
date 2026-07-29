@@ -225,6 +225,34 @@
       "when": 1785190671792,
       "tag": "0031_color_scheme_light_dark",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1785266055569,
+      "tag": "0032_containers_hold_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1785268193915,
+      "tag": "0033_entities_belong_to_containers",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1785270415815,
+      "tag": "0034_types_and_fields_belong_to_containers",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1785271908948,
+      "tag": "0035_compendiums_satellite",
+      "breakpoints": true
     }
   ]
 }

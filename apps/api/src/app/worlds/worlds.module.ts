@@ -4,6 +4,9 @@ import { AssetsModule } from '../assets/assets.module';
 import { AuthModule } from '../auth/auth.module';
 import { HEXLY_CONFIG, type HexlyConfig } from '../config';
 import { DbModule } from '../db/db.module';
+import { CompendiumPacksController } from './compendium-packs.controller';
+import { CompendiumWrites } from './compendium-writes';
+import { CompendiumsController } from './compendiums.controller';
 import { EntitiesModule } from '../entities/entities.module';
 import { EventsModule } from '../events/events.module';
 import { ImporterRegistry } from './importer-registry';
@@ -40,12 +43,13 @@ import { WorldWrites } from './world-writes';
       }),
     }),
   ],
-  controllers: [WorldsController, WorldImportersController],
+  controllers: [WorldsController, WorldImportersController, CompendiumsController, CompendiumPacksController],
   providers: [
     WorldsService,
     WorldTypesService,
     WorldFieldsService,
     WorldWrites,
+    CompendiumWrites,
     WorldGraphService,
     VaultImportService,
     VaultExportService,

@@ -21,6 +21,7 @@ export * from './services/auth-scoped-storage';
 export * from './services/auth.client';
 export * from './services/client-config.store';
 export * from './services/color-scheme.service';
+export * from './services/compendiums.client';
 export * from './services/desktop-bridge';
 export * from './services/entities.client';
 export * from './services/instance-theme.provider';

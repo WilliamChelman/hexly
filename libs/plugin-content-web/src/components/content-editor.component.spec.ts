@@ -384,6 +384,23 @@ describe('ContentEditor', () => {
       expect(picker.querySelector('[data-testid=entity-picker-option-e9]')).not.toBeNull();
     });
 
+    /**
+     * The `@` picker is a link-target read, confined to the **host Entity's** World (ADR-0079/0073) —
+     * the same World a mint lands in, so what a mention may point at and what it may create agree, and
+     * typing a name can neither cross into another World nor bind prose to a Compendium Entry.
+     */
+    it('searches link targets in the host Entity’s World, not the route’s', async () => {
+      const search = vi.fn(async () => []);
+      TestBed.overrideProvider(EntityNameResolver, { useValue: { ...stubResolver, search } });
+      // A route World that is *not* the open Entity's, so the assertion names one of the two.
+      pinWorld({ id: 'w2', rights: ['read', 'create-entity'] });
+      TestBed.inject(FakeEntitySession).loadDetail(note('Lady Mara'));
+
+      await openPicker(create());
+
+      expect(search).toHaveBeenCalledWith('Zorblax', 'w1');
+    });
+
     it('withholds Create while no World is loaded at all', async () => {
       pinWorld(null);
       TestBed.inject(FakeEntitySession).loadDetail(note('Lady Mara'));

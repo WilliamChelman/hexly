@@ -3,12 +3,17 @@ import { Inject, Injectable } from '@nestjs/common';
 import { FieldSchema, MemberRole, UserDefinedType, WorldTheme } from '@hexly/domain';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
-import { INITIAL_SEQ, worldFields, worldMembers, worlds, worldTypes } from '../db/schema';
+import {
+  containers,
+  WorldRow,
+  worldFields,
+  worldMembers,
+  worlds,
+  worldTypes,
+  WORLD_CONTAINER_KIND,
+} from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
 import { EntityWrites } from '../entities/entity-writes';
-
-/** A stored `worlds` row. */
-export type WorldRow = typeof worlds.$inferSelect;
 
 /**
  * The narrow handle a membership change writes `world_members` rows through. Runs inside the
@@ -36,9 +41,11 @@ export interface MembershipWriter {
 }
 
 /**
- * The single write handle for `worlds` and `world_members` (ADR-0045). It owns the `seq` bump, the
- * post-commit emit, and the fan-out to the World's shared Entities. An ESLint rule bans
- * `insert|update|delete(worlds)` and `insert|update|delete(worldMembers)` everywhere else.
+ * The single write handle for a World — its `containers` identity row (ADR-0078), its `worlds`
+ * satellite and `world_members` (ADR-0045). It owns the `seq` bump, the post-commit emit, and the
+ * fan-out to the World's shared Entities. An ESLint rule bans `insert|update|delete(worlds)` and
+ * `(worldMembers)` everywhere else, and `(containers)` everywhere but here and {@link CompendiumWrites}
+ * — the identity table is the one both kinds of Container write (ADR-0079).
  *
  * A World membership change moves Rights on two resources at once — the World, and every `shared`
  * Entity in it (`canRead` = `… ∨ (shared ∧ world-member)`, `canWrite` = `… ∨ (shared ∧ world-owner)`).
@@ -57,14 +64,16 @@ export class WorldWrites {
   }
 
   /**
-   * Insert an empty World and its creator's `owner` membership together, so a new World is never
-   * ownerless. Returns the new World id. No nudge: nothing can be following an id that did not
+   * Insert an empty World — its Container identity row, its `worlds` satellite, and its creator's
+   * `owner` membership together, so a new World is never ownerless. Returns the new World id, which
+   * is also its container id (ADR-0078). No nudge: nothing can be following an id that did not
    * exist a moment ago.
    */
   mint(ownerId: string, name: string, now: number = Date.now()): string {
     const id = randomUUID();
     return this.transact(() => {
-      this.db.insert(worlds).values({ id, name, createdAt: now, updatedAt: now }).run();
+      this.db.insert(containers).values({ id, kind: WORLD_CONTAINER_KIND, name, createdAt: now, updatedAt: now }).run();
+      this.db.insert(worlds).values({ id }).run();
       this.db.insert(worldMembers).values({ worldId: id, userId: ownerId, role: 'owner' }).run();
       return id;
     });
@@ -90,15 +99,15 @@ export class WorldWrites {
       seq: row.seq + 1,
     };
     return this.transact(() => {
+      // Identity and freshness on the Container, pins and Theme on the satellite (ADR-0078).
+      this.db
+        .update(containers)
+        .set({ name: next.name, updatedAt: next.updatedAt, seq: next.seq })
+        .where(eq(containers.id, row.id))
+        .run();
       this.db
         .update(worlds)
-        .set({
-          name: next.name,
-          pinnedEntityIds: next.pinnedEntityIds,
-          theme: next.theme,
-          updatedAt: next.updatedAt,
-          seq: next.seq,
-        })
+        .set({ pinnedEntityIds: next.pinnedEntityIds, theme: next.theme })
         .where(eq(worlds.id, row.id))
         .run();
       // Rename, pin reorder and a Theme edit all ride this one world-detail nudge — a theme edit bumps
@@ -119,7 +128,8 @@ export class WorldWrites {
   delete(id: string): void {
     this.transact(() => {
       this.entities.cascadeDeleteWorld(id);
-      this.db.delete(worlds).where(eq(worlds.id, id)).run();
+      // The satellite cascades off the container id, and the Collaboration rows cascade off it.
+      this.db.delete(containers).where(eq(containers.id, id)).run();
       this.outbox.world(id);
     });
   }
@@ -144,9 +154,9 @@ export class WorldWrites {
       // the World as it found it: no bump, no nudge, no fan-out.
       if (!changed()) return false;
       this.db
-        .update(worlds)
-        .set({ seq: sql`${worlds.seq} + 1` })
-        .where(eq(worlds.id, id))
+        .update(containers)
+        .set({ seq: sql`${containers.seq} + 1` })
+        .where(eq(containers.id, id))
         .run();
       this.outbox.world(id);
       // The World's `shared` Entities confer Rights derived from this membership set, so they move
@@ -165,7 +175,8 @@ export class WorldWrites {
       this.db
         .insert(worldTypes)
         .values({
-          worldId,
+          // The vocabulary hangs off the Container (ADR-0078); a World's Container id is its own id.
+          containerId: worldId,
           typeId: type.id,
           label: type.label,
           fieldRefs: [...type.fieldRefs],
@@ -198,7 +209,7 @@ export class WorldWrites {
           ...(patch.views !== undefined ? { views: [...patch.views] } : {}),
           updatedAt: Date.now(),
         })
-        .where(and(eq(worldTypes.worldId, worldId), eq(worldTypes.typeId, typeId)))
+        .where(and(eq(worldTypes.containerId, worldId), eq(worldTypes.typeId, typeId)))
         .run();
       if (updated.changes === 0) return false;
       this.bumpAndNudge(worldId);
@@ -211,7 +222,7 @@ export class WorldWrites {
     return this.transact(() => {
       const deleted = this.db
         .delete(worldTypes)
-        .where(and(eq(worldTypes.worldId, worldId), eq(worldTypes.typeId, typeId)))
+        .where(and(eq(worldTypes.containerId, worldId), eq(worldTypes.typeId, typeId)))
         .run();
       if (deleted.changes === 0) return false;
       this.bumpAndNudge(worldId);
@@ -226,7 +237,10 @@ export class WorldWrites {
    */
   createField(worldId: string, fieldId: string, definition: FieldSchema, now: number = Date.now()): void {
     this.transact(() => {
-      this.db.insert(worldFields).values({ worldId, fieldId, definition, createdAt: now, updatedAt: now }).run();
+      this.db
+        .insert(worldFields)
+        .values({ containerId: worldId, fieldId, definition, createdAt: now, updatedAt: now })
+        .run();
       this.bumpAndNudge(worldId);
     });
   }
@@ -241,7 +255,7 @@ export class WorldWrites {
       const updated = this.db
         .update(worldFields)
         .set({ definition, updatedAt: Date.now() })
-        .where(and(eq(worldFields.worldId, worldId), eq(worldFields.fieldId, fieldId)))
+        .where(and(eq(worldFields.containerId, worldId), eq(worldFields.fieldId, fieldId)))
         .run();
       if (updated.changes === 0) return false;
       this.bumpAndNudge(worldId);
@@ -257,7 +271,7 @@ export class WorldWrites {
     return this.transact(() => {
       const deleted = this.db
         .delete(worldFields)
-        .where(and(eq(worldFields.worldId, worldId), eq(worldFields.fieldId, fieldId)))
+        .where(and(eq(worldFields.containerId, worldId), eq(worldFields.fieldId, fieldId)))
         .run();
       if (deleted.changes === 0) return false;
       this.bumpAndNudge(worldId);
@@ -268,9 +282,9 @@ export class WorldWrites {
   /** Bump the World's `seq` and nudge its followers — the freshness half every type write shares. */
   private bumpAndNudge(worldId: string): void {
     this.db
-      .update(worlds)
-      .set({ seq: sql`${worlds.seq} + 1` })
-      .where(eq(worlds.id, worldId))
+      .update(containers)
+      .set({ seq: sql`${containers.seq} + 1` })
+      .where(eq(containers.id, worldId))
       .run();
     this.outbox.world(worldId);
   }
@@ -292,9 +306,9 @@ export class WorldWrites {
       if (touched.length === 0) return;
       this.db.delete(worldMembers).where(eq(worldMembers.userId, userId)).run();
       this.db
-        .update(worlds)
-        .set({ seq: sql`${worlds.seq} + 1` })
-        .where(inArray(worlds.id, touched))
+        .update(containers)
+        .set({ seq: sql`${containers.seq} + 1` })
+        .where(inArray(containers.id, touched))
         .run();
     });
   }

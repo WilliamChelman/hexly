@@ -9,7 +9,7 @@
  */
 
 import * as z from 'zod';
-import { EntityType, HEXLY_METADATA_PREFIX, visibilitySchema } from './entity';
+import { EntityType, HEXLY_METADATA_PREFIX } from './entity';
 import { EntityDocument } from './field';
 import { kindedIdRegex } from './kinded-id';
 
@@ -94,6 +94,48 @@ export interface ImportProduction {
 }
 
 /**
+ * A pack's **attribution** (ADR-0079, ADR-0061): who published the content, under what terms, and the
+ * notice its license obliges us to carry. Captured on install onto the Compendium's satellite so the
+ * terms render where the content is actually read (#402), rather than only in the plugin's source tree.
+ * Every part optional — a homemade pack may state none, and the page renders no empty scaffold.
+ */
+export const compendiumAttributionSchema = z
+  .object({
+    publisher: z.string().min(1).optional(),
+    license: z.string().min(1).optional(),
+    /** The verbatim notice text the license requires; prose, shown as given. */
+    notice: z.string().min(1).optional(),
+  })
+  .strict();
+
+/** CONTEXT.md → Compendium, the attribution half. */
+export type CompendiumAttribution = z.infer<typeof compendiumAttributionSchema>;
+
+/**
+ * An {@link Importer}'s declaration that its output is **reference material** (CONTEXT.md → Compendium
+ * Importer, ADR-0079) — the thing that makes it a **Compendium Importer**. Its presence, not a
+ * per-plugin convention, is what sends the reconcile into a **Compendium** Container instead of a
+ * World; an Importer without it still reconciles into a World, unchanged.
+ *
+ * The Compendium is one per pack, so this declaration *is* the pack's identity: the `name` its
+ * Container carries and the {@link CompendiumAttribution} captured beside it on install.
+ */
+export const compendiumDeclarationSchema = z
+  .object({
+    /**
+     * The pack's name — the Compendium Container's `name`. A proper noun ("Draw Steel: Monsters"),
+     * deliberately *not* a transloco key like {@link Importer.label}: it is stored content, read back
+     * from the row by every surface that lists installed packs.
+     */
+    name: z.string().min(1),
+    attribution: compendiumAttributionSchema.optional(),
+  })
+  .strict();
+
+/** CONTEXT.md → Compendium Importer: what an Importer declares to make its output reference material. */
+export type CompendiumDeclaration = z.infer<typeof compendiumDeclarationSchema>;
+
+/**
  * A code-registered producer that turns an external source into Entities (CONTEXT.md → Importer). A
  * Plugin contributes one by `namespace.id` through {@link ServerPlugin.importers}; it only fetches and
  * transforms, yielding an {@link ImportProduction}, and never touches the database, provenance, or the
@@ -110,14 +152,22 @@ export interface Importer {
    * a `produce()` alone.
    */
   readonly label?: string;
+  /**
+   * Present → this is a **Compendium Importer** (ADR-0079): its output is reference material, so the
+   * reconcile lands it in the pack's own **Compendium** Container rather than in a World. Absent → a
+   * World, exactly as before. Part of the contract precisely so no read has to ask what an Entity *is*:
+   * where it lands answers it (CONTEXT.md → Compendium Entry).
+   */
+  readonly compendium?: CompendiumDeclaration;
   /** Fetch and transform the source into an {@link ImportProduction}; the reconcile lands it. */
   produce(ctx: ImportContext): Promise<ImportProduction>;
 }
 
 /**
- * One Importer as the generic Imports panel lists it (CONTEXT.md → Importer): its `id` and the copy to
- * show. The reconcile's `list` surface returns whatever Importers the enabled Plugins registered for a
- * World — no per-Importer route or chrome.
+ * One Importer as the generic World Imports panel lists it (CONTEXT.md → Importer): its `id` and the
+ * copy to show. The reconcile's `list` surface returns whatever non-Compendium Importers the enabled
+ * Plugins registered — no per-Importer route or chrome. A **Compendium Importer** is listed by
+ * {@link CompendiumPackSummary} on the operator's surface instead, never here (ADR-0079).
  */
 export interface ImporterSummary {
   readonly id: string;
@@ -148,19 +198,13 @@ export interface ImportedState {
   readonly updatedAt: number | null;
 }
 
-/** The body of `POST /worlds/:worldId/importers/:importerId/run`: the {@link Visibility} landed Entities take. */
-export const runImportRequestSchema = z.object({ visibility: visibilitySchema }).strict();
-
-/** A validated import-run request. */
-export type RunImportRequest = z.infer<typeof runImportRequestSchema>;
-
 /**
  * The stable reasons the per-World Importer surface refuses a run — distinct from the vault
  * `ImportErrorCode` (that gates a `.zip` upload; this gates a plugin Importer reconcile). Returned as
  * `{ code }` in the 4xx body.
  */
 export const ImporterErrorCode = {
-  /** A run is already reconciling this World — one at a time, so a second is a 409 (ADR-0060). */
+  /** A run is already reconciling this World — or this pack — so a second is a 409 (ADR-0060, ADR-0079). */
   ImportRunning: 'import-running',
 } as const;
 
@@ -181,7 +225,7 @@ export interface ImportSkip {
 }
 
 /**
- * Where a World's one import run stands. `idle` is the state before any run this process has seen;
+ * Where one import run stands. `idle` is the state before any run this process has seen;
  * `succeeded` means the reconcile finished, even if it skipped Records (see {@link ImportRunSummary.skipped}).
  * `failed` is reserved for a run that *aborted* — the Importer's fetch threw or the database refused,
  * never a single bad Record.
@@ -189,11 +233,11 @@ export interface ImportSkip {
 export type ImportRunStatus = 'idle' | 'running' | 'succeeded' | 'failed';
 
 /**
- * A World's import run (ADR-0060) — the generic, importer-agnostic reconcile of an Importer's
- * {@link ImportProduction} into one World. `POST …/run` starts it and returns at once (202); the
- * matching `GET …/import/status` polls. Only ever one per World: a second run while one is in flight
- * is a 409. Job state lives in the API process, not the DB — a restart forgets an unfinished run whose
- * done chunks are already on disk (like the Reindex, ADR-0046).
+ * One import run (ADR-0060) — the generic, importer-agnostic reconcile of an Importer's
+ * {@link ImportProduction} into one Container. `POST …/run` starts it and returns at once (202); a
+ * poll follows it home. Only ever one per World, and one per pack: a second run while one is in
+ * flight is a 409. Job state lives in the API process, not the DB — a restart forgets an unfinished
+ * run whose done chunks are already on disk (like the Reindex, ADR-0046).
  *
  * `created + updated` is the Records landed; `deleted` the Entities whose `sourceId` vanished upstream;
  * `skipped` the ill-shaped Records, with reasons.

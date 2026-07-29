@@ -1,4 +1,4 @@
-import { enterLibrary, entityIdFromUrl, expect, mapViewToggle, test } from '../fixtures';
+import { enterEntities, entityIdFromUrl, expect, mapViewToggle, test } from '../fixtures';
 
 /**
  * `entities.defaultType: core.type.hex-map` — an enabled non-note Type — via its own server (ADR-0052,
@@ -14,7 +14,7 @@ test('the primary "New" button is labelled after — and creates — the configu
   const config = await res.json();
   expect(config.entities.defaultType).toBe('core.type.hex-map');
 
-  await enterLibrary(page);
+  await enterEntities(page);
 
   // The primary button's copy is the resolved Type's create chrome (ADR-0052), not a static "New Note".
   const primary = page.getByTestId('new-default-entity');

@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, Subject, map, of, shareReplay } from 'rxjs';
 import { EntitySummary } from '@hexly/domain';
-import { EntitiesClient, searchEntities, entityRoute } from '@hexly/web-core';
+import { EntitiesClient, searchEntities, entityRoute, idFromSegment } from '@hexly/web-core';
 import { Command, CommandProvider } from '@hexly/command-palette-web';
 
 /**
@@ -44,7 +44,13 @@ export class EntityQuickOpen implements CommandProvider {
   }
 
   private toCommand(entity: EntitySummary): Command {
-    const route = entityRoute(entity.worldId, entity.id);
+    // A **Sealed** entry has no World of its own (ADR-0079), so the segment is navigation context: the
+    // World it is read from, and the one an **Adoption** would copy it into (#403). Read off the URL
+    // rather than from `ActiveWorld`, whose injection would pull the World scope into a root singleton.
+    // Picked from outside any World it still falls back to its Container and lands nowhere useful —
+    // unchanged from before, and only fixable by giving a Compendium Entry a World-free page.
+    const worldId = (entity.sealed && worldIdInUrl(this.router.url)) || entity.worldId;
+    const route = entityRoute(worldId, entity.id);
     return {
       id: entity.id,
       label: entity.name,
@@ -57,4 +63,10 @@ export class EntityQuickOpen implements CommandProvider {
       run: () => void this.router.navigate(route),
     };
   }
+}
+
+/** The World the reader is currently in, off the URL — `null` anywhere outside the `/w/:worldId` scope. */
+function worldIdInUrl(url: string): string | null {
+  const segment = url.match(/^\/w\/([^/?#]+)/)?.[1];
+  return segment ? idFromSegment(segment) : null;
 }

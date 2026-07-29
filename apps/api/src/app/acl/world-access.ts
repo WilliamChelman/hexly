@@ -1,7 +1,7 @@
 import { WorldVerb } from '@hexly/domain';
-import { and, eq, inArray, sql, SQLWrapper } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, sql, SQLWrapper } from 'drizzle-orm';
 import { Db } from '../db/db';
-import { entities, entityGrants, worldLinks, worldMembers, worlds } from '../db/schema';
+import { containers, entities, entityGrants, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
 import { isSuperadmin } from './owner-set';
 
 /** A Superadmin reaches and manages every World (ADR-0037, #163): predicates short-circuit here. */
@@ -11,7 +11,7 @@ const MATCH_ALL = sql`1`;
  * The predicate bodies below take the target World's id as a `worldRef` SQL expression rather than
  * hardcoding `worlds.id`. In a WHERE clause the two are equivalent, but drizzle strips table
  * qualifiers from column references embedded in a *top-level SELECT projection* — so a correlated
- * `entities.world_id = worlds.id` degrades to `world_id = id`, where the bare `id` binds to the
+ * `entities.container_id = worlds.id` degrades to `container_id = id`, where the bare `id` binds to the
  * inner `entities.id`, silently breaking the entity-grant reachability branch. {@link
  * WorldAccess.decideMeta} therefore passes the id as a bound parameter (no column, nothing to
  * strip); the composable filters pass `worlds.id` for the correlated WHERE form. One body, two refs.
@@ -26,7 +26,7 @@ const MATCH_ALL = sql`1`;
 function reachableBy(userId: string, worldRef: SQLWrapper) {
   return sql`(EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${worldRef} AND ${worldMembers.userId} = ${userId})
     OR EXISTS (SELECT 1 FROM ${entities} JOIN ${entityGrants} ON ${entityGrants.entityId} = ${entities.id}
-               WHERE ${entities.worldId} = ${worldRef} AND ${entityGrants.userId} = ${userId}))`;
+               WHERE ${entities.containerId} = ${worldRef} AND ${entityGrants.userId} = ${userId}))`;
 }
 
 /** The World management rule (ADR-0037): the caller holds the `owner` role. */
@@ -65,6 +65,26 @@ export function canCreateEntityFilter(userId: string, superadmin: boolean) {
  */
 export function worldOwnerFilter(userId: string) {
   return ownedBy(userId, worlds.id);
+}
+
+/**
+ * The one home of the whole-World read: the Container's identity columns beside the satellite's
+ * own. Driven off `worlds`, never `containers` — the satellite *is* the "this is a World"
+ * discriminator, so no `kind` exclusion is needed here or anywhere else (ADR-0078).
+ */
+function selectWorld(db: Db) {
+  return db
+    .select({ ...getTableColumns(containers), pinnedEntityIds: worlds.pinnedEntityIds, theme: worlds.theme })
+    .from(worlds)
+    .innerJoin(containers, eq(containers.id, worlds.id));
+}
+
+/**
+ * The whole World at `id`, with no access check — for a caller that has already resolved one
+ * (an Owner-gated update). {@link WorldAccess.decide} is the reachability-filtered form.
+ */
+export function loadWorld(db: Db, id: string): WorldRow | undefined {
+  return selectWorld(db).where(eq(worlds.id, id)).get();
 }
 
 /**
@@ -111,8 +131,8 @@ export interface WorldAccess {
    * `canContribute`, in one caller-scoped read so a World list never fans out per World (ADR-0039).
    */
   contributingIn(ids: readonly string[]): Set<string>;
-  /** The World row if the caller can reach `id`, else undefined (unreachable ≡ missing). */
-  decide(id: string): typeof worlds.$inferSelect | undefined;
+  /** The whole World if the caller can reach `id`, else undefined (unreachable ≡ missing). */
+  decide(id: string): WorldRow | undefined;
   /**
    * Blob-free reachability + ownership + contribution in one query (no owner-set fetch), or
    * undefined if no such World. `canContribute` is the Entity-creation standing (owner ∨
@@ -144,9 +164,7 @@ export function worldAccess(db: Db, userId: string): WorldAccess {
       return new Set(rows.map((r) => r.id));
     },
     decide(id) {
-      return db
-        .select()
-        .from(worlds)
+      return selectWorld(db)
         .where(and(eq(worlds.id, id), reachFilter))
         .get();
     },

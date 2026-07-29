@@ -1,4 +1,4 @@
-import { entityIdFromUrl, expect, segRe, test, type Page } from './fixtures';
+import { entitiesRailLink, entityIdFromUrl, expect, segRe, test, type Page } from './fixtures';
 
 /**
  * URL-scoped Worlds + World Index (ADR-0028): the root `/` is the World Index; the
@@ -24,7 +24,7 @@ async function createWorldFromIndex(page: Page, name?: string): Promise<{ id: st
   return world;
 }
 
-/** Create a fresh note in a World's Library and return its entity id. */
+/** Create a fresh note in a World's Entity Browser and return its entity id. */
 async function createNote(page: Page, worldId: string): Promise<string> {
   await page.goto(`/w/${worldId}/entities`);
   await page.getByTestId('new-default-entity').click();
@@ -96,12 +96,12 @@ test('a stale World segment reconciles to the Entity’s real World (ADR-0028, #
 
 test('the entity browser is scoped by the URL World; switching Worlds filters it', async ({ page }) => {
   const worldA = await createWorldFromIndex(page);
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities$`));
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities/[\\w-]+$`));
   const noteId = entityIdFromUrl(page);
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await page.getByTestId(`rename-${noteId}`).click();
   const input = page.getByTestId(`rename-input-${noteId}`);
   await input.fill('Alpha in A');
@@ -110,7 +110,7 @@ test('the entity browser is scoped by the URL World; switching Worlds filters it
 
   // World B is a different scope; A's note is out of scope.
   const worldB = await createWorldFromIndex(page);
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldB.id)}/entities$`));
   await expect(page.getByText('Alpha in A')).toHaveCount(0);
   expect(worldB.id).not.toBe(worldA.id);
@@ -118,8 +118,8 @@ test('the entity browser is scoped by the URL World; switching Worlds filters it
   // Switch back to World A via the switcher — it lands on A's Dashboard (ADR-0043).
   await switchToWorld(page, worldA.id);
   await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}$`));
-  // Back in A's Library, its note returns.
-  await page.getByRole('link', { name: 'Library' }).click();
+  // Back in A's Entity Browser, its note returns.
+  await entitiesRailLink(page).click();
   await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities$`));
   await expect(page.getByText('Alpha in A')).toBeVisible();
 });

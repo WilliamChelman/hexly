@@ -706,6 +706,7 @@ export class StyleguidePage {
     'fit',
     'graph',
     'label',
+    'entities',
     'library',
     'palette',
     'marquee',

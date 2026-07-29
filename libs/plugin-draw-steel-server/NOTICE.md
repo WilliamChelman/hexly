@@ -10,3 +10,8 @@ The Creator License requires the following notice on any product that uses its c
 
 > Hexly is an independent product published under the DRAW STEEL Creator License and is not affiliated
 > with MCDM Productions, LLC. DRAW STEEL © 2026 MCDM Productions, LLC.
+
+That notice is not only stated here. `MONSTERS_COMPENDIUM` in `src/lib/monsters-importer.ts` carries it as the
+**Compendium Importer**'s declared attribution (ADR-0079), which the install captures onto the pack's own row —
+so the terms reach the person reading the monsters, not just the person reading the source tree. Keep the two
+copies of the notice text in step.

@@ -161,7 +161,7 @@ export class VaultImportService {
 
     // Mint an Asset for EVERY binary in the zip, not only the ones a note embeds (ADR-0065): an imported
     // vault is immediately browsable, and a re-imported export re-mints its `assets/` folder by hash so
-    // references heal even where prose lost the reference. Deduped per `(worldId, hash)` — twin files
+    // references heal even where prose lost the reference. Deduped per `(containerId, hash)` — twin files
     // collapse to one Entity, first (path-sorted, for determinism) name winning — and the resulting
     // `path → URL` map lets each note's storeAsset resolve its src to the already-minted capability URL.
     // Every Asset mints before the first note: a note may embed one from any chunk.
@@ -226,7 +226,7 @@ export class VaultImportService {
               const mintedId = randomUUID();
               this.entities.importEntity({
                 ownerId,
-                worldId,
+                containerId: worldId,
                 id: mintedId,
                 name: name.data,
                 types: [inlineType],
@@ -276,7 +276,7 @@ export class VaultImportService {
           };
           this.entities.importEntity({
             ownerId,
-            worldId,
+            containerId: worldId,
             id: note.id,
             name: note.name,
             types,

@@ -14,6 +14,7 @@ export default [
       // ADR-0045 — one write handle per resource: a direct write skips the `seq` bump and the
       // post-commit nudge, and the omission is silent (stale Viewers keep live-following).
       'hexly-writes/no-direct-entity-writes': 'error',
+      'hexly-writes/no-direct-container-writes': 'error',
       'hexly-writes/no-direct-world-writes': 'error',
     },
   },

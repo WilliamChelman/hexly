@@ -1,4 +1,4 @@
-import { attachField, createEntity, enterLibrary, expect, flushSave, test } from './fixtures';
+import { attachField, createEntity, enterEntities, entitiesRailLink, expect, flushSave, test } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 /** The canonical Thumbnail Field — an entityLink to an image Asset, attach-on-demand (ADR-0066). */
@@ -20,7 +20,7 @@ const PNG_20x8 = Buffer.from(
  * resolves it back to a served URL.
  */
 test('attaches the Thumbnail Field, uploads an image in place, and sees it on the note card', async ({ page }) => {
-  const prettyWorld = await enterLibrary(page);
+  const prettyWorld = await enterEntities(page);
   const worldId = idFromSegment(prettyWorld); // the raw id the served asset URL keys on
 
   const noteId = await createEntity(page, 'core.type.note');
@@ -52,7 +52,7 @@ test('attaches the Thumbnail Field, uploads an image in place, and sees it on th
   // Back in the Entity Browser, the note's card resolves the Thumbnail to a served URL (#287): the list
   // opts into thumbnails=1, the write-time derivation materialised the designation, and the reload proves
   // the whole round trip persisted rather than a live in-memory value.
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await page.waitForURL(/\/w\/[\w-]+\/entities$/);
   await page.reload();
 

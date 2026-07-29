@@ -5,11 +5,15 @@ import { EntitiesClient } from '@hexly/web-core';
 import { ButtonComponent, InputComponent } from '@hexly/web-ui';
 
 /**
- * The shared server-side Entity picker (ADR-0025): a search box over the owner-scoped
- * `list({ q })` read, rendering matching Entities as pickable rows. Presentation + search
- * only — the consumer decides what a pick *means* (link a Map element, pin an Entity) and
- * owns the `query`. Projected content renders below the option list, for consumer-specific
- * actions like create-and-link.
+ * The shared server-side Entity picker (ADR-0025): a search box over the `list({ q })` read,
+ * rendering matching Entities as pickable rows. Presentation + search only — the consumer decides
+ * what a pick *means* (link a Map element, pin an Entity), owns the `query`, and names the
+ * {@link worldId} to search within. Projected content renders below the option list, for
+ * consumer-specific actions like create-and-link.
+ *
+ * Every consumer asks the same question — *what may this point at?* — so the read is a **link-target
+ * read** here rather than once per consumer (ADR-0079), which covers the **Entity Link** Field picker,
+ * the Board **Embed** picker and a broken link's relink popover together.
  *
  * ponytail: no debounce — small owner lists, fine until list sizes force it.
  */
@@ -88,6 +92,7 @@ export class EntitySearchPickerComponent {
           q: this.query().trim(),
           worldId: this.worldId(),
           type: types?.length ? [...types] : undefined,
+          read: 'link-target',
           // A picker is no browse: an Embed of an Asset and a pinned Asset stay pickable by name (ADR-0065).
           includeHidden: true,
         })

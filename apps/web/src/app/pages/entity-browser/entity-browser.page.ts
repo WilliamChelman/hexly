@@ -3,7 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityFacets, EntityPage, EntitySummary, EntityType, parseFieldFilters, Visibility } from '@hexly/domain';
+import { EntityFacets, EntityPage, EntitySummary, EntityType, Visibility } from '@hexly/domain';
 import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, AppShellStore } from '@hexly/web-core';
 import { ButtonComponent, DialogService, EyebrowComponent, PageHeaderComponent } from '@hexly/web-ui';
 import { NewEntityButtonComponent } from '../../entity-types/new-entity-button.component';
@@ -18,14 +18,17 @@ import {
   FieldRangeChange,
   FieldSelection,
   FieldValueToggle,
-  isFieldSelectionEmpty,
 } from './components/facet-rail.component';
+import { fieldTokens, fieldsFromTokens, pruneField } from './components/field-facet-url';
 
 const NO_FACETS: ActiveFacets = {
   type: [],
   tag: [],
   visibility: [],
   fields: {},
+  // Never filled here: the server offers the Compendium facet only where a read spans more than one
+  // Container, and the Entity Browser is scoped to one World (ADR-0079).
+  compendium: [],
 };
 
 const NO_FACET_COUNTS: EntityFacets = {
@@ -34,34 +37,6 @@ const NO_FACET_COUNTS: EntityFacets = {
   visibility: [],
   fields: [],
 };
-
-/** Serialize the active Field selections to the repeated `key:op:value` tokens the API + URL speak. */
-function fieldTokens(fields: Readonly<Record<string, FieldSelection>>): string[] {
-  const tokens: string[] = [];
-  for (const [key, sel] of Object.entries(fields)) {
-    for (const v of sel.values ?? []) tokens.push(`${key}:eq:${v}`);
-    if (sel.gte) tokens.push(`${key}:gte:${sel.gte}`);
-    if (sel.lte) tokens.push(`${key}:lte:${sel.lte}`);
-  }
-  return tokens;
-}
-
-/** Fold the repeated `field` params back into the per-key {@link FieldSelection} record. */
-function fieldsFromTokens(tokens: readonly string[]): Record<string, FieldSelection> {
-  const out: Record<string, { values: string[]; gte?: string; lte?: string }> = {};
-  for (const f of parseFieldFilters(tokens)) {
-    const sel = (out[f.key] ??= { values: [] });
-    if (f.op === 'eq') sel.values.push(f.value);
-    else if (f.op === 'gte') sel.gte = f.value;
-    else sel.lte = f.value;
-  }
-  return out;
-}
-
-/** Drop a Field key once its selection is empty, so `hasFilters`/the URL never carry a dead entry. */
-function pruneField(sel: FieldSelection): FieldSelection | undefined {
-  return isFieldSelectionEmpty(sel) ? undefined : sel;
-}
 
 // ponytail: bounded first page so a large vault loads fast; bump or make
 // configurable only if a real page size proves wrong in use.
@@ -270,6 +245,7 @@ export class EntityBrowserPage {
           tag: f.tag,
           visibility: f.visibility,
           fields: fieldsFromTokens(f.field),
+          compendium: [],
         });
       });
 

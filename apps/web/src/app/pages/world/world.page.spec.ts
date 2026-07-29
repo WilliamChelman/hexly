@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { WorldDetail, WorldVerb } from '@hexly/domain';
-import { ActiveWorld, worldDashboardRoute, worldGraphRoute } from '@hexly/web-core';
+import { ActiveWorld, worldCompendiumRoute, worldDashboardRoute, worldGraphRoute } from '@hexly/web-core';
 import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { NavRailStore } from '../../shell/nav-rail.store';
 import { WorldPage } from './world.page';
@@ -35,10 +35,11 @@ describe('WorldLayout', () => {
     return TestBed.inject(NavRailStore).entries();
   }
 
-  it('fills the rail with the Dashboard, Library, Assets and Graph links from the active World (ADR-0041)', () => {
+  it('fills the rail with the Dashboard, Entities, Compendium, Assets and Graph links from the active World (ADR-0041)', () => {
     expect(railFor(world(['read'])).map((e) => e.testid)).toEqual([
       'nav-dashboard',
       'nav-entities',
+      'nav-compendium',
       'nav-assets',
       'nav-world-graph',
     ]);
@@ -46,8 +47,18 @@ describe('WorldLayout', () => {
 
   /** The World Graph is a read of the World, so it shows to anyone who can reach it (#181). */
   it('links the World Graph with the canonical slug-base62 route (ADR-0042)', () => {
-    const graph = railFor(world(['read']))[3];
+    const graph = railFor(world(['read']))[4];
     expect(graph.link).toEqual(worldGraphRoute('w1', 'Aldermoor'));
+  });
+
+  /**
+   * The Compendium is Instance-wide and belongs to no World (ADR-0078/0079), so the World in its link
+   * is the **adoption target** rather than the content's home — and, being a read any signed-in caller
+   * may make, it sits beside the Graph with no rights gate.
+   */
+  it('offers the Compendium to every reader, under the active World (ADR-0079)', () => {
+    const compendium = railFor(world(['read']))[2];
+    expect(compendium.link).toEqual(worldCompendiumRoute('w1', 'Aldermoor'));
   });
 
   it('matches the Dashboard link exactly, so it does not stay lit across the World scope', () => {
@@ -60,6 +71,7 @@ describe('WorldLayout', () => {
     expect(railFor(world(['read', 'manage'])).map((e) => e.testid)).toEqual([
       'nav-dashboard',
       'nav-entities',
+      'nav-compendium',
       'nav-assets',
       'nav-world-graph',
       'nav-world-settings',

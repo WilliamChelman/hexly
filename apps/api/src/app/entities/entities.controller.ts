@@ -17,6 +17,7 @@ import {
 import {
   addGrantRequestSchema,
   addOwnerRequestSchema,
+  adoptEntityRequestSchema,
   AuthUser,
   createEntityRequestSchema,
   EntityDetail,
@@ -42,6 +43,15 @@ import { EntitiesService } from './entities.service';
 import { LocalGraphService } from './local-graph.service';
 
 /**
+ * The read's **Container** scope under either name: `worldId`, the single World every World-scoped read
+ * has always given, and the repeated `containerId` a cross-Container read names its own with (ADR-0079).
+ * One scope and one predicate downstream, so naming both simply asks for both.
+ */
+function containerScope(worldId: string | undefined, containerId: readonly string[] | undefined): string[] {
+  return [...(worldId ? [worldId] : []), ...(containerId ?? [])];
+}
+
+/**
  * The Entity REST surface (ADR-0018). Every route is owner-scoped: the guard resolves the session to
  * a user and the service only ever touches that user's rows. Bodies are validated against the shared
  * Zod schema (ADR-0001), so an invalid payload is a 400 here, never a 500 deeper down.
@@ -58,8 +68,23 @@ export class EntitiesController {
   list(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityPage {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { cursor, limit, ids, q, type, tag, visibility, field, worldId, rights, thumbnails, includeHidden } =
-      parsed.data;
+    const {
+      cursor,
+      limit,
+      ids,
+      q,
+      type,
+      tag,
+      visibility,
+      field,
+      worldId,
+      containerId,
+      compendium,
+      read,
+      rights,
+      thumbnails,
+      includeHidden,
+    } = parsed.data;
 
     // Absent cursor is page one; undecodable is a 400 (ADR-0001).
     const offset = cursor === undefined ? 0 : decodeCursor(cursor);
@@ -75,7 +100,10 @@ export class EntitiesController {
       visibility,
       // A malformed `field` token is dropped, not 400'd, so a stale URL degrades to no-filter.
       fields: parseFieldFilters(field),
-      worldId,
+      containerIds: containerScope(worldId, containerId),
+      compendium,
+      // Which read this is (ADR-0079); the pickers that need a link target are the ones that say so.
+      read,
       withRights: rights,
       withThumbnails: thumbnails,
       includeHidden,
@@ -88,6 +116,18 @@ export class EntitiesController {
     const parsed = createEntityRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     return this.entities.create(user.id, parsed.data);
+  }
+
+  // **Adoption** (ADR-0079): the copy lands in the World the body names, so it is a create — 201.
+  // Unreachable entry is a 404 like any read; an Entity outside a Compendium a 400, there being no
+  // such act as adopting one.
+  @Post(':id/adopt')
+  adopt(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): EntityDetail {
+    const parsed = adoptEntityRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    const adopted = this.entities.adopt(user.id, id, parsed.data);
+    if (!adopted) throw new NotFoundException();
+    return adopted;
   }
 
   // Before `:id` so literal path isn't captured. Owner's `::` Link Descriptor vocabulary (#96).
@@ -108,14 +148,17 @@ export class EntitiesController {
   facets(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityFacets {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { q, type, tag, visibility, field, worldId, includeHidden } = parsed.data;
+    const { q, type, tag, visibility, field, worldId, containerId, compendium, read, includeHidden } = parsed.data;
     return this.entities.facets(user.id, {
       q,
       type,
       tags: tag,
       visibility,
       fields: parseFieldFilters(field),
-      worldId,
+      containerIds: containerScope(worldId, containerId),
+      compendium,
+      // Threaded for the same reason `includeHidden` is: a rail must never count what its list excludes.
+      read,
       // Threaded so a rail can never annotate a list it disagrees with about hidden types (ADR-0065).
       includeHidden,
     });

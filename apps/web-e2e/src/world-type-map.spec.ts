@@ -1,7 +1,7 @@
 import {
   authorWorldType,
   createEntity,
-  enterLibrary,
+  enterEntities,
   expect,
   flushSave,
   mapViewToggle,
@@ -20,7 +20,7 @@ const BATTLEMAP_VIEW = mapViewToggle('world.field.battle-map');
  * another View exists); its scalar Fields live in the Details Panel.
  */
 test('a World Owner gives a user-defined type a map, and painting it persists', async ({ page, request }) => {
-  const worldId = await enterLibrary(page);
+  const worldId = await enterEntities(page);
 
   // Author `world.type.deity` with a `domain` string and a `battlemap` hex-grid — the map plugin's
   // data-type, offered beside `string` and `enum`, and the whole ceremony.
@@ -40,7 +40,7 @@ test('a World Owner gives a user-defined type a map, and painting it persists', 
   await page.getByTestId('type-cancel').click();
 
   // The type reaches the "New" menu like a plugin's: the registry does not care who authored one.
-  await enterLibrary(page);
+  await enterEntities(page);
   const deityId = await createEntity(page, 'world.type.deity');
   await expect(page.getByTestId('title')).toBeVisible();
 

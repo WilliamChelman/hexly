@@ -184,6 +184,9 @@ export class AssetLinkPickerComponent {
           type: [CORE_ASSET_TYPE_ID],
           field: [IMAGE_KIND_TOKEN],
           thumbnails: true,
+          // Designating a Thumbnail is pointing at an Entity, so the search is a link-target read like
+          // any other Entity Link Field picker's (ADR-0079); resolving the *current* value above is not.
+          read: 'link-target',
         })
         .subscribe({
           next: (page) => this.results.set(page.items),

@@ -1,4 +1,14 @@
-import { enterLibrary, entityIdFromUrl, expect, openEntityActions, test } from '../fixtures';
+import {
+  MONSTER_PACK_INSTALL,
+  MONSTER_PACK_STATUS,
+  compendiumRailLink,
+  enterEntities,
+  entitiesRailLink,
+  entityIdFromUrl,
+  expect,
+  openEntityActions,
+  test,
+} from '../fixtures';
 // The pretty-URL codec (ADR-0042), imported by path like the other framework-free e2e utils.
 import { idFromSegment } from '../../../../libs/web-core/src/utils/pretty-id';
 
@@ -20,7 +30,7 @@ test('Collaboration off: an Entity carries no sharing affordance, and the routes
   // Two independent knobs (ADR-0071): Collaboration is off, but this is still a server.
   expect(config.profile).toBe('server');
 
-  await enterLibrary(page);
+  await enterEntities(page);
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const id = entityIdFromUrl(page);
@@ -39,7 +49,7 @@ test('Collaboration off: an Entity carries no sharing affordance, and the routes
   await expect(page.locator('app-public-link')).toHaveCount(0);
   await expect(page.getByTestId('public-link-create')).toHaveCount(0);
 
-  await page.getByRole('link', { name: 'Library' }).click();
+  await entitiesRailLink(page).click();
   await expect(page.getByTestId('facet-heading-type')).toBeVisible();
   await expect(page.getByTestId('facet-heading-visibility')).toHaveCount(0);
   await expect(page.getByTestId('facet-visibility-private')).toHaveCount(0);
@@ -57,7 +67,7 @@ test('Collaboration off: World Settings keeps its schema and imports groups and 
   page,
   request,
 }) => {
-  const worldSeg = await enterLibrary(page);
+  const worldSeg = await enterEntities(page);
   await page.goto(`/w/${worldSeg}/settings`);
 
   await expect(page.getByTestId('settings-nav-schema')).toBeVisible();
@@ -70,11 +80,10 @@ test('Collaboration off: World Settings keeps its schema and imports groups and 
   await expect(page.locator('app-owner-set')).toHaveCount(0);
   await expect(page.locator('app-member-set')).toHaveCount(0);
 
-  // The Imports row is not sharing; only its Visibility choice is cut (ADR-0071).
+  // Imports is not sharing, so the group survives the flag — it simply lists no Compendium Importer,
+  // here as anywhere: a pack is stocked from the admin area (#404), not from World Settings.
   await page.getByTestId('settings-nav-imports').click();
-  await expect(page.getByTestId('importer-draw-steel.importer.monsters')).toBeVisible();
-  await expect(page.getByTestId('importer-run-draw-steel.importer.monsters')).toBeVisible();
-  await expect(page.getByTestId('importer-visibility-draw-steel.importer.monsters')).toHaveCount(0);
+  await expect(page.getByTestId('importer-draw-steel.importer.monsters')).toHaveCount(0);
 
   // Enforced too (#315), and no token route a link would hand out is a destination.
   const worldId = idFromSegment(worldSeg);
@@ -113,4 +122,18 @@ test('Collaboration off: user management is unreachable by route, rail or Palett
   await expect(page).toHaveURL(/\/admin$/);
   await page.getByTestId('reindex').click();
   await expect(page.locator('.toast', { hasText: 'Reindexed' })).toBeVisible();
+});
+
+test('Collaboration off: the Compendium is stocked and browsed unchanged', async ({ page }) => {
+  // The shelf and the sharing switch are independent (ADR-0079, story 39). This account is Sole-User
+  // shaped, so it is its own operator — which is what makes the distinction invisible on a
+  // single-user Instance, rather than absent from it.
+  await page.goto('/admin');
+  await page.getByTestId(MONSTER_PACK_INSTALL).click();
+  await expect(page.getByTestId(MONSTER_PACK_STATUS)).toContainText('2 entries', { timeout: 15_000 });
+
+  const worldSeg = await enterEntities(page);
+  await compendiumRailLink(page).click();
+  await expect(page).toHaveURL(new RegExp(`/w/${worldSeg}/compendium$`));
+  await expect(page.getByText('Goblin Warrior', { exact: true })).toBeVisible();
 });
