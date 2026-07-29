@@ -143,6 +143,16 @@ describe('AssetLinkPicker', () => {
     expect(byId(el, 'asset-link-error')).not.toBeNull();
   });
 
+  it('previews a value living in a Mounted Container — resolving it names no World (ADR-0080)', () => {
+    const { fixture } = render();
+    fixture.componentInstance.value.set({ entityId: 'shelf-art', label: 'Sunset' });
+    fixture.detectChanges();
+
+    // "Resolve exactly this id" is no browse: naming a World would scope the lookup to it and blank the
+    // preview of the very link this picker offered from a Shelf the World Mounts.
+    expect(entities.list).toHaveBeenCalledWith({ ids: ['shelf-art'], thumbnails: true });
+  });
+
   it('previews the current value as a tile and clears it on demand', () => {
     const { fixture, el } = render();
     fixture.componentInstance.value.set({ entityId: 'whisperwood', label: 'The Whisperwood' });

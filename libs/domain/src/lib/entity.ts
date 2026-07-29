@@ -397,13 +397,10 @@ export interface EntitySummary {
    */
   readonly thumbnailUrl?: string;
   /**
-   * The served **capability URL** of this Entity's *own* bytes (ADR-0034), riding the same `thumbnails=1`
-   * opt-in and the same index join — the full-resolution address a Board **Image** element stores, where
-   * {@link thumbnailUrl} is the tile a grid draws. Own bytes only: a **Thumbnail** Field's designation
-   * decorates this row, it is not this row's content.
-   *
-   * Keyed off the Entity's *own* Container, never the reading World's (ADR-0080), so an Image placed from a
-   * mounted Shelf points at the Shelf's bytes and renders for every reader of the World it was placed in.
+   * The served **capability URL** of this Entity's *own* bytes (ADR-0034), on the same `thumbnails=1`
+   * opt-in and the same index join — the full-resolution address a Board **Image** stores, where
+   * {@link thumbnailUrl} is the tile a grid draws. Keyed off the Entity's *own* Container, never the
+   * reading World's (ADR-0080), so art placed from a mounted Shelf renders for every reader.
    */
   readonly assetUrl?: string;
   /**

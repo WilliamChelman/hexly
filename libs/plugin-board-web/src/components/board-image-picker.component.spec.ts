@@ -171,7 +171,8 @@ describe('BoardImagePicker', () => {
       container: undefined,
       read: 'link-target',
     };
-    expect(entities.list).toHaveBeenLastCalledWith({ ...expected, thumbnails: true });
+    // Unpaginated, as this grid has always been: the shared list ceiling, not the default page size.
+    expect(entities.list).toHaveBeenLastCalledWith({ ...expected, thumbnails: true, limit: 200 });
     // The rail comes off that same read, so it can never annotate a grid it disagrees with.
     expect(entities.facets).toHaveBeenLastCalledWith(expected);
   });

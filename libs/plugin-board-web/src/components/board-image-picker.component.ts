@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityFacets, EntitySummary, FacetCount, FieldFacet } from '@hexly/domain';
+import { ENTITY_LIST_MAX_LIMIT, EntityFacets, EntitySummary, FacetCount, FieldFacet } from '@hexly/domain';
 import {
   assetValueUrl,
   ASSET_KIND_FACET_KEY,
   CORE_ASSET_TYPE_ID,
-  IMAGE_KIND_FIELD_FILTER,
+  IMAGE_KIND_FIELD_TOKEN,
   readAssetValue,
 } from '@hexly/plugin-asset';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
@@ -24,9 +24,6 @@ const NO_FACETS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] 
 type PlaceableAsset = EntitySummary & { readonly assetUrl: string };
 
 const isPlaceable = (e: EntitySummary): e is PlaceableAsset => !!e.assetUrl;
-
-/** The image-kind `key:op:value` facet token the picker AND-s into its entity-search (ADR-0065). */
-const IMAGE_KIND_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILTER.op}:${IMAGE_KIND_FIELD_FILTER.value}`;
 
 /**
  * The **Image** source chooser (#269, #281): the one dialog the Image Tool opens to obtain an Asset URL
@@ -204,7 +201,9 @@ export class BoardImagePickerComponent {
     // reads the same as a World with no matching images, and upload still works.
     effect((onCleanup) => {
       const params = this.read();
-      const search = this.entitiesClient.list({ ...params, thumbnails: true }).subscribe({
+      // Unpaginated, as this grid has always been: the Facets are what keep the set small, and the cap is
+      // the shared list ceiling so an image-heavy World never floods it in one read.
+      const search = this.entitiesClient.list({ ...params, thumbnails: true, limit: ENTITY_LIST_MAX_LIMIT }).subscribe({
         // Only what can actually be placed: a wrapper carrying no resolvable bytes has no URL for an
         // Image element to hold, so it is dropped forward-only rather than offered as a dead tile.
         next: (page) => this.assets.set(page.items.filter(isPlaceable)),
@@ -233,7 +232,7 @@ export class BoardImagePickerComponent {
       q: this.query().trim() || undefined,
       worldId: this.ref.data.worldId,
       type: [CORE_ASSET_TYPE_ID],
-      field: [IMAGE_KIND_TOKEN, ...this.fieldTokens()],
+      field: [IMAGE_KIND_FIELD_TOKEN, ...this.fieldTokens()],
       container: container ? [container] : undefined,
       read: 'link-target' as const,
     };

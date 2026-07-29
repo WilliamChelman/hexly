@@ -5,15 +5,10 @@ import { ButtonComponent } from '@hexly/web-ui';
 
 /**
  * The **Container** facet as chips (ADR-0080): "All" plus one counted chip per Container a widened read
- * reached — this World, and the packs and Shelves it **Mounts**. Narrowing to one is the drill-down every
- * other Facet category affords, brought to a picker that has no rail to put it in.
- *
- * Renders nothing below two Containers: a read that spans one has nothing to narrow, which is the same
- * by-presence rule the server counts it under — so a World that Mounts nothing shows no chip at all and
- * every picker looks exactly as it did.
- *
- * Presentational and read-only about scope: the counts must come from the same read the options come
- * from, so the consumer owns both and this cannot annotate a list it disagrees with.
+ * reached — this World, and the packs and Shelves it **Mounts** — for the pickers that have no Facet rail
+ * to put the category in. Renders nothing below two Containers, the server's own by-presence rule, so a
+ * World that Mounts nothing shows no chip and every picker looks exactly as it did. The consumer owns
+ * both the counts and the options, so these cannot annotate a list they disagree with.
  */
 @Component({
   selector: 'app-container-chips',

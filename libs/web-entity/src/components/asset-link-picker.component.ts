@@ -1,12 +1,9 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityLinkValue, EntitySummary, FacetCount } from '@hexly/domain';
-import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_FILTER } from '@hexly/plugin-asset';
+import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_TOKEN } from '@hexly/plugin-asset';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
 import { ContainerChipsComponent } from './container-chips.component';
-
-/** The image-kind `key:op:value` facet token the picker AND-s into its entity-search (ADR-0065/0066). */
-const IMAGE_KIND_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILTER.op}:${IMAGE_KIND_FIELD_FILTER.value}`;
 
 /**
  * The **pick-or-upload** affordance the core entityLink control grows whenever a Field's `targetTypes`
@@ -166,11 +163,13 @@ export class AssetLinkPickerComponent {
   constructor() {
     // Resolve the current value's preview tile whenever the link changes (ADR-0066): one read by id with
     // thumbnails=1. A dangling/non-image target resolves to no thumbnailUrl and falls back to the placeholder.
+    // No World scope: "resolve exactly this id" is no browse, and naming one would blank the preview of a
+    // link the picker itself offered from a Mounted Shelf (ADR-0080).
     effect((onCleanup) => {
       const current = this.value();
       this.currentThumb.set(undefined);
       if (!current) return;
-      const sub = this.entities.list({ ids: [current.entityId], thumbnails: true, worldId: this.worldId() }).subscribe({
+      const sub = this.entities.list({ ids: [current.entityId], thumbnails: true }).subscribe({
         next: (page) => this.currentThumb.set(page.items[0]?.thumbnailUrl),
         error: () => this.currentThumb.set(undefined),
       });
@@ -227,7 +226,7 @@ export class AssetLinkPickerComponent {
       q: this.query().trim(),
       worldId: this.worldId(),
       type: [CORE_ASSET_TYPE_ID],
-      field: [IMAGE_KIND_TOKEN],
+      field: [IMAGE_KIND_FIELD_TOKEN],
       container: container ? [container] : undefined,
       read: 'link-target' as const,
     };

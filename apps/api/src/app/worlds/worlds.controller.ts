@@ -180,11 +180,6 @@ export class WorldsController {
     return aclSetResponse(this.worlds.themeSources(user.id, id), 'world');
   }
 
-  // The Board image picker's search and its Facet rail used to live here, on a World-scoped listing of
-  // their own. They are asset pickers — they ask *what may this point at?* — so they now speak the one
-  // link-target read at `GET /entities`, preset to the asset type and image kind, and mount scope is
-  // resolved in exactly one place rather than learned twice (ADR-0080, #416).
-
   /**
    * Upload a file, minting (or deduping to) a World Asset in one step (#269, ADR-0034, ADR-0065),
    * returning the wrapper **Asset Entity** for the author to reference. Contributor-gated in the service:

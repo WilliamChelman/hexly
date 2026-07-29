@@ -18,6 +18,9 @@ import { EntitiesService } from '../entities/entities.service';
 import { CompendiumWrites } from '../worlds/compendium-writes';
 import { WorldsModule } from '../worlds/worlds.module';
 
+/** A tiny valid-enough PNG; only its bytes' identity matters for the content address. */
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
 /**
  * Every link picker offers what the World **Mounts** (#411, #416, ADR-0080). The `@` mention picker, the
  * **Entity Link** Field picker, the Board **Embed** picker and the asset pickers — the asset-link control
@@ -31,9 +34,6 @@ import { WorldsModule } from '../worlds/worlds.module';
  * The cast is ADR-0080's: Ada owns the campaign, the shelf it draws from and every Mount declared
  * here; Bob plays in the campaign and is where the widening meets the cascade it rides.
  */
-/** A tiny valid-enough PNG; only its bytes' identity matters for the content address. */
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
-
 describe('Every link picker offers what the World Mounts', () => {
   let app: INestApplication;
   let db: Db;
@@ -260,14 +260,15 @@ describe('Every link picker offers what the World Mounts', () => {
     // Each Asset's URLs resolve against *its own* Container, never the reading World's (ADR-0080) —
     // which is what makes a placed shelf image render for every reader of the campaign. Identical bytes,
     // so the hash is shared and only the Container segment differs: the assertion is about the key.
-    const hash = offers[0].assetUrl?.split('/')[3];
+    const file = offers[0].assetUrl?.split('/')[3] ?? '';
+    const hash = file.replace(/\.png$/, '');
     expect(offers[0]).toMatchObject({
-      assetUrl: `/assets/${campaign}/${hash}`,
-      thumbnailUrl: `/assets/${campaign}/${hash?.replace(/\.png$/, '')}.thumb.webp`,
+      assetUrl: `/assets/${campaign}/${file}`,
+      thumbnailUrl: `/assets/${campaign}/${hash}.thumb.webp`,
     });
     expect(offers[1]).toMatchObject({
-      assetUrl: `/assets/${shelf}/${hash}`,
-      thumbnailUrl: `/assets/${shelf}/${hash?.replace(/\.png$/, '')}.thumb.webp`,
+      assetUrl: `/assets/${shelf}/${file}`,
+      thumbnailUrl: `/assets/${shelf}/${hash}.thumb.webp`,
     });
 
     // The Container facet narrows the asset pickers to one, counting what it narrows to.

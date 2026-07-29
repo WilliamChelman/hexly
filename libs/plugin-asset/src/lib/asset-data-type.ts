@@ -44,6 +44,9 @@ export const ASSET_HUE_FACET_KEY = 'hue';
  */
 export const IMAGE_KIND_FIELD_FILTER: FieldFilter = { key: ASSET_KIND_FACET_KEY, op: 'eq', value: 'image' };
 
+/** The same filter as the `key:op:value` token the wire and the asset pickers speak (ADR-0065). */
+export const IMAGE_KIND_FIELD_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILTER.op}:${IMAGE_KIND_FIELD_FILTER.value}`;
+
 /** A fresh, empty asset-ref — a placeholder the mint path always overwrites with the stored bytes' ref. */
 export function emptyAssetValue(): AssetValue {
   return { hash: '', ext: '', mime: '', size: 0, stats: null };
