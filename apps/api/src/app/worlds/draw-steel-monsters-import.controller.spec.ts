@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 import { unzipSync } from 'fflate';
 import request from 'supertest';
 import { eq } from 'drizzle-orm';
-import { HEXLY_SOURCE_KEY } from '@hexly/domain';
+import { CompendiumPackSummary, HEXLY_SOURCE_KEY, ImportRunSummary } from '@hexly/domain';
 import { DS_MONSTER, DS_STAT_BLOCK_KEY } from '@hexly/plugin-draw-steel';
 import {
   createMonstersImporter,
@@ -31,12 +31,15 @@ import { WorldsModule } from './worlds.module';
  *
  * Since #398 it is a **Compendium Importer** (ADR-0079): the bestiary lands in its own Compendium Container,
  * and the World-scoped reads are asserted through the same endpoints a user hits, since "no exclusion
- * predicate was added" is only shown by the real read staying quiet.
+ * predicate was added" is only shown by the real read staying quiet. Since #404 it is installed by the
+ * **operator** from the admin area rather than by a World Owner from World Settings — a pack is
+ * Instance-wide, so no World is party to stocking it. The surface's own cases live in
+ * `compendium-packs.controller.spec.ts`; this is the real pack running through it.
  */
 describe('Draw Steel monsters import', () => {
   let app: INestApplication;
   let db: Db;
-  let adaId: string;
+  let tedId: string;
 
   beforeEach(async () => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
@@ -54,25 +57,37 @@ describe('Draw Steel monsters import', () => {
     // 4-tuple still in TIME_WAIT is RST as `socket hang up`.
     await app.listen(0);
 
-    adaId = await seed('ada@hexly.test', 'Ada');
+    await seed('ada@hexly.test', 'Ada');
+    tedId = await seedOperator('ted@hexly.test', 'Ted');
   });
 
   afterEach(async () => {
     await app.close();
   });
 
-  it('offers draw-steel.importer.monsters in the Importer list for a World', async () => {
+  it('is a pack the operator stocks, and is offered in no World’s Imports panel', async () => {
     const ada = await signIn('ada@hexly.test');
+    const ted = await signIn('ted@hexly.test');
     const world = await makeWorld(ada);
-    const res = await ada.get(`/worlds/${world}/importers`).expect(200);
+
     // The label is a transloco key the web panel resolves through the plugin catalogs, not literal copy (#260).
-    expect(res.body).toContainEqual({ id: MONSTERS_IMPORTER_ID, label: 'drawSteel.importer.monsters' });
+    const packs = (await ted.get('/admin/compendiums').expect(200)).body as { importer: string; label: string }[];
+    expect(packs).toContainEqual({
+      importer: MONSTERS_IMPORTER_ID,
+      label: 'drawSteel.importer.monsters',
+      run: expect.objectContaining({ status: 'idle' }),
+    });
+
+    // A World Owner's Imports panel offers non-compendium Importers and nothing else (#404).
+    const importers = (await ada.get(`/worlds/${world}/importers`).expect(200)).body as { id: string }[];
+    expect(importers.map((i) => i.id)).not.toContain(MONSTERS_IMPORTER_ID);
+    await ada.post(`/worlds/${world}/importers/${MONSTERS_IMPORTER_ID}/run`).expect(404);
   });
 
   it('imports the fixture monsters as draw-steel.type.monster Entities with stat fields and provenance', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
-    await runImport(ada, world);
+    await runImport();
 
     // The pack lands in its own Compendium, not in the World the run was asked from (ADR-0079).
     const pack = compendium();
@@ -131,7 +146,7 @@ describe('Draw Steel monsters import', () => {
   it("records the Compendium's Importer, pinned rev and attribution on install", async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
-    await runImport(ada, world);
+    await runImport();
 
     const pack = compendium();
     // The Container is a Compendium, named by the Importer's declaration — not a World wearing a flag.
@@ -157,7 +172,7 @@ describe('Draw Steel monsters import', () => {
       .post('/entities')
       .send({ name: 'Goblin Warren', types: ['core.type.note'], worldId: world })
       .expect(201);
-    await runImport(ada, world);
+    await runImport();
     // The pack really is installed, so a quiet World is exclusion and not a failed import.
     expect((await ada.get(`/entities?worldId=${compendium().id}`).expect(200)).body.items).toHaveLength(2);
 
@@ -193,7 +208,7 @@ describe('Draw Steel monsters import', () => {
       .post('/entities')
       .send({ name: 'Grix the Turncoat', types: [DS_MONSTER], worldId: world })
       .expect(201);
-    await runImport(ada, world);
+    await runImport();
 
     const list = await ada.get(`/entities?worldId=${world}`).expect(200);
     expect((list.body.items as { name: string }[]).map((e) => e.name)).toEqual(['Grix the Turncoat']);
@@ -204,20 +219,20 @@ describe('Draw Steel monsters import', () => {
 
   it('refuses every write to a Compendium Entry — World Owner, Contributor and operator alike', async () => {
     const bob = await seed('bob@hexly.test', 'Bob');
-    await seedOperator('ted@hexly.test', 'Ted');
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     await ada.post(`/worlds/${world}/members`).send({ userId: bob, role: 'contributor' }).expect(200);
-    await runImport(ada, world);
+    await runImport();
     const goblin = await entityByName(ada, compendium().id, 'Goblin Warrior');
 
+    const ted = await signIn('ted@hexly.test');
     const refused = { save: 403, rename: 403, visibility: 403, grant: 403, coOwner: 403, delete: 403 };
-    // Ada holds every Right the model can confer here: she owns the World the run was asked from, and
-    // the install left her the entry's own `owner` grant. The seal refuses her all the same (ADR-0079).
+    // Ada owns Worlds and may adopt out of the shelf; she may not edit it. The seal is not a Right.
     expect(await writeStatuses(ada, goblin.id, bob)).toEqual(refused);
-    // The operator's Superadmin bypass short-circuits every access predicate to match-all, and is
-    // refused by the very same check — the seal is not a Right, so no Right outranks it.
-    expect(await writeStatuses(await signIn('ted@hexly.test'), goblin.id, bob)).toEqual(refused);
+    // The operator installed the pack, so the install left *them* the entry's own `owner` grant, and
+    // the Superadmin bypass short-circuits every access predicate to match-all besides. Refused by the
+    // very same check — no Right outranks the seal (ADR-0079).
+    expect(await writeStatuses(ted, goblin.id, bob)).toEqual(refused);
     // A Contributor is refused *through the seal*, not by unreachability. Nothing in the World's
     // membership confers standing on the shelf — Collaboration is World-only (ADR-0078) — but a
     // Compendium is Instance-wide with no members, so being signed in is standing enough to read it
@@ -227,22 +242,23 @@ describe('Draw Steel monsters import', () => {
     // Nothing landed: the entry is still exactly what the Importer produced, unshared and ungranted.
     const after = (await ada.get(`/entities/${goblin.id}`).expect(200)).body;
     expect(after).toMatchObject({ name: 'Goblin Warrior', visibility: 'private', document: goblin.detail.document });
-    expect((await ada.get(`/entities/${goblin.id}/grants`).expect(200)).body).toEqual([]);
-    expect((await ada.get(`/entities/${goblin.id}/owners`).expect(200)).body).toEqual([adaId]);
+    // Read through the operator, who holds the entry's `owner` grant — the sharing surfaces are
+    // Owner-only reads, and the install is what conferred that.
+    expect((await ted.get(`/entities/${goblin.id}/grants`).expect(200)).body).toEqual([]);
+    expect((await ted.get(`/entities/${goblin.id}/owners`).expect(200)).body).toEqual([tedId]);
   });
 
   it('still lets the reconcile write and delete what no user may touch', async () => {
     const ada = await signIn('ada@hexly.test');
-    const world = await makeWorld(ada);
-    await runImport(ada, world);
+    await runImport();
     const packId = compendium().id;
     const goblin = await entityByName(ada, packId, 'Goblin Warrior');
     await ada.patch(`/entities/${goblin.id}`).send({ name: 'My Goblin' }).expect(403);
 
     // The exception that proves the rule: the reconcile is the Compendium's producer, and writes
     // through the system path — no `userId`, so it never reaches the choke point the seal sits at.
-    expect(await runImport(ada, world)).toMatchObject({ status: 'succeeded', updated: 2 });
-    await ada.delete(`/worlds/${world}/importers/${MONSTERS_IMPORTER_ID}`).expect(204);
+    expect(await runImport()).toMatchObject({ status: 'succeeded', updated: 2 });
+    await removePack();
     expect((await ada.get(`/entities?worldId=${packId}`).expect(200)).body.items).toEqual([]);
   });
 
@@ -254,7 +270,7 @@ describe('Draw Steel monsters import', () => {
       .post('/entities')
       .send({ name: 'Grix the Turncoat', types: [DS_MONSTER], worldId: world })
       .expect(201);
-    await runImport(ada, world);
+    await runImport();
 
     await ada
       .put(`/entities/${mine.body.id}`)
@@ -277,7 +293,7 @@ describe('Draw Steel monsters import', () => {
       .post('/entities')
       .send({ name: 'Goblin Warren', types: ['core.type.note'], worldId: world })
       .expect(201);
-    await runImport(ada, world);
+    await runImport();
     const names = async (query: string) =>
       ((await ada.get(`/entities?${query}`).expect(200)).body.items as { name: string }[]).map((e) => e.name);
 
@@ -290,11 +306,10 @@ describe('Draw Steel monsters import', () => {
 
   it('reimports in place, keeping each entry id and re-recording the revision', async () => {
     const ada = await signIn('ada@hexly.test');
-    const world = await makeWorld(ada);
-    await runImport(ada, world);
+    await runImport();
     const before = await idsByName(ada, compendium().id);
 
-    const again = await runImport(ada, world);
+    const again = await runImport();
     // Identity-preserving upsert (ADR-0060): the second run updates, never recreates.
     expect(again).toMatchObject({ status: 'succeeded', created: 0, updated: 2, deleted: 0 });
     expect(await idsByName(ada, compendium().id)).toEqual(before);
@@ -303,11 +318,10 @@ describe('Draw Steel monsters import', () => {
 
   it('removes the Compendium, deleting its entries and the record of its install', async () => {
     const ada = await signIn('ada@hexly.test');
-    const world = await makeWorld(ada);
-    await runImport(ada, world);
+    await runImport();
     const packId = compendium().id;
 
-    await ada.delete(`/worlds/${world}/importers/${MONSTERS_IMPORTER_ID}`).expect(204);
+    await removePack();
 
     expect((await ada.get(`/entities?worldId=${packId}`).expect(200)).body.items).toEqual([]);
     // Uninstalled, not left behind empty at a revision nothing reflects.
@@ -316,8 +330,7 @@ describe('Draw Steel monsters import', () => {
   });
 
   it('lands a fetch failure as a failed run', async () => {
-    const ada = await signIn('ada@hexly.test');
-    const world = await makeWorld(ada);
+    const ted = await signIn('ted@hexly.test');
     app.get(ImporterRegistry).register(
       createMonstersImporter({
         fetchMonsters: async () => {
@@ -326,11 +339,8 @@ describe('Draw Steel monsters import', () => {
       }),
     );
 
-    await ada
-      .post(`/worlds/${world}/importers/${MONSTERS_IMPORTER_ID}/run`)
-      .send({ visibility: 'private' })
-      .expect(202);
-    const done = await pollUntilDone(ada, world);
+    await ted.post(`/admin/compendiums/${MONSTERS_IMPORTER_ID}/run`).expect(202);
+    const done = await pollUntilDone(ted);
     expect(done.status).toBe('failed');
     expect(done.error).toContain('codeload unreachable');
     // A run that never fetched never learned a revision, so it installed nothing to misreport one.
@@ -338,16 +348,16 @@ describe('Draw Steel monsters import', () => {
 
     // Re-running the failed run fixes it (ADR-0060) — the interesting half here, since the failure left
     // no Compendium at all, so the recovery run has to mint one rather than reconcile into one.
-    const recovered = await runImport(ada, world);
+    const recovered = await runImport();
     expect(recovered).toMatchObject({ status: 'succeeded', created: 2 });
     expect(compendium().rev).toBe(MONSTERS_REV);
   });
 
-  it('refuses a second run of the same pack from another World while one is in flight', async () => {
-    const ada = await signIn('ada@hexly.test');
-    const [alpha, beta] = [await makeWorld(ada), await makeWorld(ada)];
-    // A Compendium is Instance-wide, so "one reconcile at a time" has to mean one per *pack*, not one
-    // per World — else two Worlds interleave two reconciles into one Container (ADR-0079).
+  it('serializes on the pack itself, so a second operator session cannot interleave a run', async () => {
+    const ted = await signIn('ted@hexly.test');
+    const alsoTed = await signIn('ted@hexly.test');
+    // A Compendium is Instance-wide, so "one reconcile at a time" means one per *pack* — the Importer's
+    // own id, not a World's, is what the hold is taken on (ADR-0079).
     let release = () => undefined as void;
     const held = new Promise<void>((resolve) => (release = resolve));
     app.get(ImporterRegistry).register(
@@ -359,20 +369,17 @@ describe('Draw Steel monsters import', () => {
       }),
     );
 
-    await ada
-      .post(`/worlds/${alpha}/importers/${MONSTERS_IMPORTER_ID}/run`)
-      .send({ visibility: 'private' })
-      .expect(202);
-    await ada.post(`/worlds/${beta}/importers/${MONSTERS_IMPORTER_ID}/run`).send({ visibility: 'private' }).expect(409);
-    // Removing it from a third angle is refused for the same reason: it would drop the Container out
-    // from under the insert still running.
-    await ada.delete(`/worlds/${beta}/importers/${MONSTERS_IMPORTER_ID}`).expect(409);
+    await ted.post(`/admin/compendiums/${MONSTERS_IMPORTER_ID}/run`).expect(202);
+    await alsoTed.post(`/admin/compendiums/${MONSTERS_IMPORTER_ID}/run`).expect(409);
+    // Removing it is refused for the same reason: it would drop the Container out from under the
+    // insert still running.
+    await alsoTed.delete(`/admin/compendiums/${MONSTERS_IMPORTER_ID}`).expect(409);
 
     release();
-    await pollUntilDone(ada, alpha);
-    // The hold is released however the run ends, so the pack is runnable again from either World.
-    await ada.post(`/worlds/${beta}/importers/${MONSTERS_IMPORTER_ID}/run`).send({ visibility: 'private' }).expect(202);
-    expect(await pollUntilDone(ada, beta)).toMatchObject({ status: 'succeeded' });
+    expect(await pollUntilDone(ted)).toMatchObject({ status: 'succeeded' });
+    // The hold is released however the run ends, so the pack is runnable again.
+    await alsoTed.post(`/admin/compendiums/${MONSTERS_IMPORTER_ID}/run`).expect(202);
+    expect(await pollUntilDone(alsoTed)).toMatchObject({ status: 'succeeded' });
   });
 
   // ---- harness -------------------------------------------------------------
@@ -398,17 +405,25 @@ describe('Draw Steel monsters import', () => {
     return (await owner.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body.id;
   }
 
-  /** Run the pack over the committed fixtures — no network — and wait for the reconcile to finish. */
-  async function runImport(agent: Agent, worldId: string): Promise<Record<string, string>> {
+  /**
+   * Install the pack over the committed fixtures — no network — as the operator, and wait for the
+   * reconcile to finish. Signs the operator in per call so a test that only cares about *what landed*
+   * does not have to hold an agent it never uses again.
+   */
+  async function runImport(): Promise<ImportRunSummary> {
     // Override the boot-time codeload port with the fixture-backed one.
     app.get(ImporterRegistry).register(createMonstersImporter(fixtureFetchPort()));
-    await agent
-      .post(`/worlds/${worldId}/importers/${MONSTERS_IMPORTER_ID}/run`)
-      .send({ visibility: 'private' })
-      .expect(202);
-    const done = await pollUntilDone(agent, worldId);
+    const ted = await signIn('ted@hexly.test');
+    await ted.post(`/admin/compendiums/${MONSTERS_IMPORTER_ID}/run`).expect(202);
+    const done = await pollUntilDone(ted);
     expect(done, `the import run did not succeed: ${JSON.stringify(done)}`).toMatchObject({ status: 'succeeded' });
     return done;
+  }
+
+  /** Uninstall the pack the way the operator's panel does. */
+  async function removePack(): Promise<void> {
+    const ted = await signIn('ted@hexly.test');
+    await ted.delete(`/admin/compendiums/${MONSTERS_IMPORTER_ID}`).expect(204);
   }
 
   /** The Compendium the Importer installed — its Container identity row joined to its satellite. */
@@ -448,10 +463,12 @@ describe('Draw Steel monsters import', () => {
     return Object.fromEntries((list.body.items as { id: string; name: string }[]).map((e) => [e.name, e.id]));
   }
 
-  async function pollUntilDone(agent: Agent, worldId: string): Promise<Record<string, string>> {
+  /** Follow the pack's run the way the operator's panel does — off the list, which is the poll target. */
+  async function pollUntilDone(operator: Agent): Promise<ImportRunSummary> {
     for (let attempt = 0; attempt < 50; attempt++) {
-      const { body } = await agent.get(`/worlds/${worldId}/import/status`).expect(200);
-      if (body.status !== 'running') return body;
+      const packs = (await operator.get('/admin/compendiums').expect(200)).body as CompendiumPackSummary[];
+      const run = packs.find((p) => p.importer === MONSTERS_IMPORTER_ID)?.run;
+      if (run && run.status !== 'running') return run;
     }
     throw new Error('the import run never left the running state');
   }

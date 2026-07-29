@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { compendiumRailLink, enterEntities, entitiesRailLink, expect, test } from './fixtures';
+import { compendiumRailLink, enterEntities, entitiesRailLink, expect, installMonsterPack, test } from './fixtures';
 
 /**
  * **Adoption** (ADR-0079, #403) as a user meets it — the two journeys the whole Compendium arc is
@@ -9,16 +9,6 @@ import { compendiumRailLink, enterEntities, entitiesRailLink, expect, test } fro
  * The pack is the Draw Steel monsters Importer with its codeload fetch port swapped for the committed
  * Ajax + Goblin fixtures under the e2e opt-in, so the run stays offline.
  */
-
-/** Install the pack through the ordinary import surface, and wait for the reconcile to land. */
-async function installMonsters(page: Page, worldSeg: string): Promise<void> {
-  await page.goto(`/w/${worldSeg}/settings`);
-  await page.getByTestId('settings-nav-imports').click();
-  await page.getByTestId('importer-run-draw-steel.importer.monsters').click();
-  await expect(page.getByTestId('importer-status-draw-steel.importer.monsters')).toContainText('2 entities', {
-    timeout: 15_000,
-  });
-}
 
 /**
  * The id behind the one card named `name` on the browse currently open. Both browses render the same
@@ -42,9 +32,13 @@ async function openEntities(page: Page): Promise<void> {
   await page.waitForURL(/\/entities$/);
 }
 
-test('browse the Compendium, adopt an entry, and the copy is an ordinary Entity of the World', async ({ page }) => {
+test('browse the Compendium, adopt an entry, and the copy is an ordinary Entity of the World', async ({
+  page,
+  browser,
+}) => {
+  // Stocked once by the operator, for the whole Instance (#404) — an adopter never installs a pack.
+  await installMonsterPack(browser);
   const worldSeg = await enterEntities(page);
-  await installMonsters(page, worldSeg);
 
   await openCompendium(page);
   const entryId = await cardId(page, 'Goblin Warrior');
@@ -74,9 +68,9 @@ test('browse the Compendium, adopt an entry, and the copy is an ordinary Entity 
   expect(await cardId(page, 'Goblin Warrior')).toBe(entryId);
 });
 
-test('the mention picker offers the adopted Goblin and never the Compendium Entry', async ({ page }) => {
+test('the mention picker offers the adopted Goblin and never the Compendium Entry', async ({ page, browser }) => {
+  await installMonsterPack(browser);
   const worldSeg = await enterEntities(page);
-  await installMonsters(page, worldSeg);
 
   await openCompendium(page);
   const entryId = await cardId(page, 'Goblin Warrior');

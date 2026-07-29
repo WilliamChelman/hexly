@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import { unzipSync } from 'fflate';
 import request from 'supertest';
-import { EntityDocument, EntitySummary, HEXLY_SOURCE_KEY, LinkedEntity } from '@hexly/domain';
+import { CompendiumPackSummary, EntityDocument, EntitySummary, HEXLY_SOURCE_KEY, LinkedEntity } from '@hexly/domain';
 import { tiptapContent } from '@hexly/plugin-content';
 import { DS_MONSTER, DS_STAT_BLOCK_KEY } from '@hexly/plugin-draw-steel';
 import { createMonstersImporter, MONSTERS_IMPORTER_ID } from '@hexly/plugin-draw-steel/server';
@@ -21,7 +21,7 @@ import { WorldsModule } from './worlds.module';
  * **Adoption** (#403, ADR-0079): `POST /entities/:id/adopt` copies a **Compendium Entry** into a World as
  * an ordinary, editable Entity — the one way compendium content enters a world.
  *
- * Driven against the *real* Draw Steel pack, installed through the ordinary import endpoint with its
+ * Driven against the *real* Draw Steel pack, installed by the operator (#404) with its
  * fetch port backed by the committed fixtures, so the entry being adopted carries a real `hexly.source`
  * stamp, a real provenance row and a real stat block. A hand-seeded Container would prove the copy has
  * no stamp by never having minted one — which is the whole condition this ticket rests on.
@@ -53,6 +53,8 @@ describe('Adoption', () => {
 
     adaId = await seed('ada@hexly.test', 'Ada');
     bobId = await seed('bob@hexly.test', 'Bob');
+    // The operator: a pack is stocked from the admin area alone (#404).
+    await app.get(AuthService).seedUser('ted@hexly.test', 'correct horse', 'Ted', { isSuperadmin: true });
   });
 
   afterEach(async () => {
@@ -62,7 +64,7 @@ describe('Adoption', () => {
   it('copies the entry into the World the request names, verbatim and unstamped', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
-    await runImport(ada, world);
+    await installPack();
     const goblin = await entityByName(ada, pack(), 'Goblin Warrior');
 
     const copy = (await ada.post(`/entities/${goblin.id}/adopt`).send({ worldId: world }).expect(201)).body;
@@ -93,7 +95,7 @@ describe('Adoption', () => {
   it('hands the adopter a full citizen of their World', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
-    await runImport(ada, world);
+    await installPack();
     const goblin = await entityByName(ada, pack(), 'Goblin Warrior');
     const copy = (await ada.post(`/entities/${goblin.id}/adopt`).send({ worldId: world }).expect(201)).body;
 
@@ -124,7 +126,7 @@ describe('Adoption', () => {
     const bob = await signIn('bob@hexly.test');
     const world = await makeWorld(ada);
     await ada.post(`/worlds/${world}/members`).send({ userId: bobId, role: 'contributor' }).expect(200);
-    await runImport(ada, world);
+    await installPack();
     const goblin = await entityByName(ada, pack(), 'Goblin Warrior');
 
     const copy = (await bob.post(`/entities/${goblin.id}/adopt`).send({ worldId: world }).expect(201)).body;
@@ -141,7 +143,7 @@ describe('Adoption', () => {
   it('adopts twice when asked twice, knowingly', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
-    await runImport(ada, world);
+    await installPack();
     const goblin = await entityByName(ada, pack(), 'Goblin Warrior');
 
     const first = (await ada.post(`/entities/${goblin.id}/adopt`).send({ worldId: world }).expect(201)).body;
@@ -156,7 +158,7 @@ describe('Adoption', () => {
   it('leaves the entry, and everything already pointing at it, exactly where they were', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
-    await runImport(ada, world);
+    await installPack();
     const goblin = await entityByName(ada, pack(), 'Goblin Warrior');
     // A link forged directly against a known id — ADR-0079 accepts these rather than gating a write on
     // what its prose links. It is the case an adoption must be shown not to rewrite.
@@ -178,15 +180,15 @@ describe('Adoption', () => {
   it('survives the pack being removed, because it has nothing tying it to one', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
-    await runImport(ada, world);
+    await installPack();
     const packId = pack();
     const goblin = await entityByName(ada, packId, 'Goblin Warrior');
     const copy = (await ada.post(`/entities/${goblin.id}/adopt`).send({ worldId: world }).expect(201)).body;
 
-    await ada.delete(`/worlds/${world}/importers/${MONSTERS_IMPORTER_ID}`).expect(204);
+    await removePack();
 
-    // The removal works off the provenance index, and the copy carries no `hexly.source` row to be found
-    // by — so uninstalling Draw Steel cannot gut a dungeon. Free, given the strip; verified, not built for.
+    // The removal works off the provenance index, and the copy carries no `hexly.source` row to be
+    // found by. Free, given the strip; verified, not built for.
     expect((await ada.get(`/entities?worldId=${packId}`).expect(200)).body.items).toEqual([]);
     expect((await ada.get(`/entities/${copy.id}`).expect(200)).body).toMatchObject({ name: 'Goblin Warrior' });
     expect(await names(ada, `worldId=${world}`)).toEqual(['Goblin Warrior']);
@@ -195,7 +197,7 @@ describe('Adoption', () => {
   it('can only ever land in a World, and only from the shelf', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
-    await runImport(ada, world);
+    await installPack();
     const goblin = await entityByName(ada, pack(), 'Goblin Warrior');
 
     // A Compendium is no one's adoption target: the create seam resolves from `worlds`, and a Compendium
@@ -239,23 +241,29 @@ describe('Adoption', () => {
     ).body.id;
   }
 
-  /** Run the pack over the committed fixtures — no network — and wait for the reconcile to finish. */
-  async function runImport(agent: Agent, worldId: string): Promise<void> {
+  /**
+   * Install the pack as the operator does (#404), over the committed fixtures — no network — and wait
+   * for the reconcile to finish. No World is party to it: a pack is Instance-wide.
+   */
+  async function installPack(): Promise<void> {
     app.get(ImporterRegistry).register(createMonstersImporter(fixtureFetchPort()));
-    await agent
-      .post(`/worlds/${worldId}/importers/${MONSTERS_IMPORTER_ID}/run`)
-      .send({ visibility: 'private' })
-      .expect(202);
+    const ted = await signIn('ted@hexly.test');
+    await ted.post(`/admin/compendiums/${MONSTERS_IMPORTER_ID}/run`).expect(202);
     for (let attempt = 0; attempt < 50; attempt++) {
-      const { body } = await agent.get(`/worlds/${worldId}/import/status`).expect(200);
-      if (body.status !== 'running') {
-        expect(body, `the import run did not succeed: ${JSON.stringify(body)}`).toMatchObject({
-          status: 'succeeded',
-        });
+      const packs = (await ted.get('/admin/compendiums').expect(200)).body as CompendiumPackSummary[];
+      const run = packs.find((p) => p.importer === MONSTERS_IMPORTER_ID)?.run;
+      if (run && run.status !== 'running') {
+        expect(run, `the import run did not succeed: ${JSON.stringify(run)}`).toMatchObject({ status: 'succeeded' });
         return;
       }
     }
     throw new Error('the import run never left the running state');
+  }
+
+  /** Uninstall the pack the way the operator's panel does. */
+  async function removePack(): Promise<void> {
+    const ted = await signIn('ted@hexly.test');
+    await ted.delete(`/admin/compendiums/${MONSTERS_IMPORTER_ID}`).expect(204);
   }
 
   /** The installed Compendium's Container id — where the entries live, and no World's. */

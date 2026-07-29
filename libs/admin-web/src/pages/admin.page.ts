@@ -7,23 +7,38 @@ import { switchMap, takeWhile, timer } from 'rxjs';
 import { ToasterService } from '@hexly/web-core';
 import { EyebrowComponent, PanelComponent, ButtonComponent } from '@hexly/web-ui';
 import { AdminClient } from '../services/admin.client';
+import { CompendiumPacksPanelComponent } from './compendium-packs-panel.component';
 
 /** How often a running Reindex is polled. */
 const REINDEX_POLL_MS = 1000;
 
 /**
- * The Superadmin repair surface (ADR-0046): the Reindex, which recomputes every Entity's
- * document-derived state. The walk outlives the request that starts it, so the panel follows it by
- * polling; the server is the source of truth for whether one is running.
+ * The operator's surface (ADR-0047): the **Compendium packs** the Instance's shelf is stocked from
+ * (ADR-0079, #404), and the Reindex, which recomputes every Entity's document-derived state
+ * (ADR-0046). Both are Instance-wide and Superadmin-only, which is why they share a page — pack
+ * management sits here for the same reason plugin enablement is Instance Configuration (ADR-0052).
+ *
+ * The Reindex walk outlives the request that starts it, so the page follows it by polling; the server
+ * is the source of truth for whether one is running. The pack panel owns its own run the same way.
  */
 @Component({
   selector: 'app-admin',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, EyebrowComponent, PanelComponent, ButtonComponent],
+  imports: [TranslocoPipe, EyebrowComponent, PanelComponent, ButtonComponent, CompendiumPacksPanelComponent],
   template: `
     <section class="admin">
       <span appEyebrow>{{ 'admin.heading' | transloco }}</span>
       <h1 class="admin-heading">{{ 'admin.heading' | transloco }}</h1>
+
+      <h2 class="admin-heading text-xl">
+        {{ 'admin.packs.heading' | transloco }}
+      </h2>
+      <div appPanel class="admin-panel">
+        <p class="admin-subhead">
+          {{ 'admin.packs.description' | transloco }}
+        </p>
+        <app-compendium-packs />
+      </div>
 
       <h2 class="admin-heading text-xl">
         {{ 'admin.reindex.heading' | transloco }}

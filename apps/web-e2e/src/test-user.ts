@@ -19,3 +19,16 @@ export const TEST_GRANTEE = {
   password: 'hexly-e2e-grantee',
   displayName: 'Grantee Gwen',
 } as const;
+
+/**
+ * The **operator** — a Superadmin the suite signs in as only to reach the admin area (ADR-0047).
+ * Compendium packs are stocked there and nowhere else (#404), so a spec that needs an installed pack
+ * borrows this standing for the install and goes back to {@link TEST_USER} for everything after it.
+ * Deliberately a *third* account: making the login user a Superadmin would quietly hand every other
+ * spec a bypass over every access predicate.
+ */
+export const TEST_OPERATOR = {
+  email: 'operator@hexly.test',
+  password: 'hexly-e2e-operator',
+  displayName: 'Operator Odile',
+} as const;

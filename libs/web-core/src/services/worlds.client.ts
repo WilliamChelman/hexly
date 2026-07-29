@@ -16,7 +16,6 @@ import {
   UpdateWorldFieldRequest,
   UserDefinedType,
   VaultImportOptions,
-  Visibility,
   WorldDetail,
   WorldGraph,
   WorldMember,
@@ -252,9 +251,9 @@ export class WorldsClient {
     return this.http.get<ImporterSummary[]>(`/api/worlds/${id}/importers`);
   }
 
-  /** Run (or reimport) an Importer, landing its Entities at the chosen Visibility; returns at once (202), then poll {@link importStatus}. */
-  runImport(id: string, importerId: string, visibility: Visibility): Observable<ImportRunSummary> {
-    return this.http.post<ImportRunSummary>(`/api/worlds/${id}/importers/${importerId}/run`, { visibility });
+  /** Run (or reimport) an Importer; returns at once (202), then poll {@link importStatus}. No body: a run has nothing to choose (ADR-0079). */
+  runImport(id: string, importerId: string): Observable<ImportRunSummary> {
+    return this.http.post<ImportRunSummary>(`/api/worlds/${id}/importers/${importerId}/run`, {});
   }
 
   /** Where this World's one import run stands — the poll target while a reconcile is in flight, plus the last finished run. */

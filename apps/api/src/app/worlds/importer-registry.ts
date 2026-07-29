@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { compendiumDeclarationSchema, Importer, importerIdSchema, ImporterSummary } from '@hexly/domain';
+import { compendiumDeclarationSchema, Importer, importerIdSchema } from '@hexly/domain';
 import { HEXLY_CONFIG, HexlyConfig } from '../config';
 import { enabledPluginImporters } from '../entities/bundled-plugins';
 
@@ -33,8 +33,13 @@ export class ImporterRegistry {
     return this.byId.get(id);
   }
 
-  /** Every registered Importer as an {@link ImporterSummary} — the list surface's payload; label defaults to the id. */
-  list(): ImporterSummary[] {
-    return [...this.byId.values()].map((importer) => ({ id: importer.id, label: importer.label ?? importer.id }));
+  /**
+   * Every registered Importer, in registration order. Returned whole rather than pre-filtered: what
+   * splits them is the {@link Importer.compendium} declaration each carries, and the two surfaces that
+   * read this — the World's Imports panel and the operator's pack panel — each keep their own half of
+   * that rule (ADR-0079).
+   */
+  all(): readonly Importer[] {
+    return [...this.byId.values()];
   }
 }

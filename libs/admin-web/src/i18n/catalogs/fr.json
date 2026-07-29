@@ -1,6 +1,25 @@
 {
   "tabTitle": "Admin — Hexly",
-  "heading": "Réparation de l'instance",
+  "heading": "Administration de l'instance",
+  "packs": {
+    "heading": "Packs de compendium",
+    "description": "Du matériel de référence publié, installé une seule fois pour toute l'instance. Chaque monde peut parcourir un pack installé et en adopter le contenu ; le supprimer efface ses entrées et laisse les copies adoptées intactes.",
+    "empty": "Aucun pack disponible. Activez un plugin qui en publie un.",
+    "install": "Installer",
+    "reimport": "Réinstaller",
+    "remove": "Supprimer",
+    "running": "Installation en cours…",
+    "notInstalled": "Non installé",
+    "installed": "Révision {{rev}} · {{count}} entrées · {{date}}",
+    "lastRunFailed": "La dernière installation a échoué. Réessayez.",
+    "imported": "{count, plural, one {# entrée installée} other {# entrées installées}}.",
+    "removed": "Pack supprimé.",
+    "loadError": "Impossible de charger les packs de compendium.",
+    "statusError": "Suivi de l'installation perdu. Rechargez pour voir où elle en est.",
+    "runError": "L'installation ne s'est pas terminée. Veuillez réessayer.",
+    "runningError": "Ce pack est déjà en cours d'installation.",
+    "removeError": "Impossible de supprimer ce pack. Veuillez réessayer."
+  },
   "reindex": {
     "heading": "Réparation",
     "description": "Recalcule le texte de recherche, les Descripteurs de lien et les liens de chaque Entité à partir de son contenu. Peut être lancé à tout moment sans risque.",

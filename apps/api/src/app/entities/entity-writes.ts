@@ -84,24 +84,24 @@ export interface InsertEntityInput {
   tags: readonly string[];
   document: EntityDocument;
   /**
-   * The Entity's initial Visibility; defaults to `private`. The reconcile sets it from the run's
-   * chosen visibility so an imported set can land `shared` in one pass (ADR-0060); a plain create
-   * omits it and starts private like any hand-authored Entity.
+   * The Entity's initial Visibility; defaults to `private`. The vault import sets it so a whole
+   * imported vault can land `shared` in one pass (ADR-0033); everything else omits it and starts
+   * private like any hand-authored Entity.
    */
   visibility?: Visibility;
 }
 
 /**
  * The fields an import reconcile overwrites onto an existing Entity, reusing its id (ADR-0060). Owner,
- * grants, and `createdAt` are left untouched — an imported set is a managed reference library whose
- * identity survives reimport, not its authored edits.
+ * grants, Visibility, and `createdAt` are left untouched — an imported set is a managed reference
+ * library whose identity survives reimport, not its authored edits. Visibility joined that list when
+ * the run stopped taking one (ADR-0079): a reconcile has no exposure to impose.
  */
 export interface ImportOverwrite {
   name: string;
   types: readonly string[];
   tags: readonly string[];
   document: EntityDocument;
-  visibility: Visibility;
 }
 
 /** A stored `entities` row. */
@@ -233,9 +233,9 @@ export class EntityWrites {
 
   /**
    * Overwrite an imported Entity in place, reusing its id (ADR-0060) — a **system write** the import
-   * reconcile drives once the World's Owner gate has run. Identity-preserving: the id, owner grants,
-   * and `createdAt` are kept, so a pre-existing inbound Entity Link still resolves; the document,
-   * types, tags, and visibility are replaced wholesale and the derived indexes (`hexly.source`
+   * reconcile drives once its surface's gate has run. Identity-preserving: the id, owner grants,
+   * Visibility, and `createdAt` are kept, so a pre-existing inbound Entity Link still resolves; the
+   * document, types, and tags are replaced wholesale and the derived indexes (`hexly.source`
    * included) re-materialised, so a user's authored edits are *not* preserved across a reimport.
    * Bumps `seq` and nudges. A row that vanished between plan and apply is a silent no-op — the next
    * (idempotent) run reconciles it.
@@ -259,7 +259,6 @@ export class EntityWrites {
           name: input.name,
           types: [...input.types],
           tags: [...input.tags],
-          visibility: input.visibility,
           document: JSON.stringify(input.document),
           contentText: derived.searchText,
           thumbnailEntityId: derived.thumbnailEntityId,

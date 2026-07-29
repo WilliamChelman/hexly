@@ -80,14 +80,27 @@ describe('World importers', () => {
     await app.close();
   });
 
-  it('lists the Importers a World offers', async () => {
+  it('lists the Importers a World offers, and no pack among them', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
 
     const res = await ada.get(`/worlds/${world}/importers`).expect(200);
-    // The bundled `draw-steel.importer.monsters` Importer is also registered at boot, so assert the stub is offered
-    // rather than that it is the only entry.
     expect(res.body).toContainEqual({ id: STUB_ID, label: 'Stub Importer' });
+    // The bundled `draw-steel.importer.monsters` Importer is registered at boot too, but it is a
+    // **Compendium Importer**: a pack is Instance-wide, so it is stocked from the admin area and never
+    // offered here (ADR-0079, #404).
+    expect((res.body as { id: string }[]).map((i) => i.id)).not.toContain('draw-steel.importer.monsters');
+  });
+
+  it('refuses to run or remove a pack from a World, the way it refuses an Importer that does not exist', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    const packId = 'test.importer.pack';
+    app.get(ImporterRegistry).register({ ...stub, id: packId, compendium: { name: 'Stub Pack' } });
+
+    // Not merely unlisted: a World Owner who knows the id still cannot stock the Instance's shelf.
+    await ada.post(`/worlds/${world}/importers/${packId}/run`).expect(404);
+    await ada.delete(`/worlds/${world}/importers/${packId}`).expect(404);
   });
 
   it('runs an Importer, stamps hexly.source, populates the provenance index, and reports the summary', async () => {
@@ -95,10 +108,7 @@ describe('World importers', () => {
     const world = await makeWorld(ada);
     production = { rev: 'rev-1', records: [record('goblin', 'Goblin'), record('spider', 'Spider')] };
 
-    const started = await ada
-      .post(`/worlds/${world}/importers/${STUB_ID}/run`)
-      .send({ visibility: 'private' })
-      .expect(202);
+    const started = await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
     expect(started.body).toMatchObject({ importer: STUB_ID, status: 'running' });
 
     const done = await pollUntilDone(ada, world);
@@ -121,7 +131,7 @@ describe('World importers', () => {
     const world = await makeWorld(ada);
     production = { rev: 'rev-1', records: [record('goblin', 'Goblin')] };
 
-    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
     await pollUntilDone(ada, world);
 
     // The declaration is what redirects a run (ADR-0079); without one the Entity lands in the World the
@@ -132,16 +142,22 @@ describe('World importers', () => {
     expect(db.select().from(containers).where(eq(containers.kind, 'compendium')).all()).toEqual([]);
   });
 
-  it('honours the chosen visibility', async () => {
+  it('lands and reimports at the default Visibility, having none to choose (ADR-0079)', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     production = { rev: 'rev-1', records: [record('goblin', 'Goblin')] };
 
-    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'shared' }).expect(202);
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
     await pollUntilDone(ada, world);
-
     const goblin = await entityByName(ada, world, 'Goblin');
-    expect(goblin.detail.visibility).toBe('shared');
+    expect(goblin.detail.visibility).toBe('private');
+
+    // A reimport has no exposure to impose either, so an Owner's later choice is not undone by one.
+    await ada.patch(`/entities/${goblin.id}`).send({ visibility: 'shared' }).expect(200);
+    production = { rev: 'rev-2', records: [record('goblin', 'Goblin')] };
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
+    await pollUntilDone(ada, world);
+    expect((await entityByName(ada, world, 'Goblin')).detail.visibility).toBe('shared');
   });
 
   it('reimports idempotently: same ids, a vanished sourceId deleted, an inbound link still resolves', async () => {
@@ -149,7 +165,7 @@ describe('World importers', () => {
     const world = await makeWorld(ada);
 
     production = { rev: 'rev-1', records: [record('goblin', 'Goblin'), record('spider', 'Spider')] };
-    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
     await pollUntilDone(ada, world);
 
     const goblinBefore = (await entityByName(ada, world, 'Goblin')).id;
@@ -160,7 +176,7 @@ describe('World importers', () => {
 
     // Reimport: goblin renamed and still present, spider vanished, an orc added.
     production = { rev: 'rev-2', records: [record('goblin', 'Hobgoblin'), record('orc', 'Orc')] };
-    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
     const done = await pollUntilDone(ada, world);
     expect(done).toMatchObject({ status: 'succeeded', created: 1, updated: 1, deleted: 1, skipped: [] });
 
@@ -185,7 +201,7 @@ describe('World importers', () => {
     // The second Record has a blank name — ill-shaped, so it is skipped, not fatal.
     production = { rev: 'rev-1', records: [record('goblin', 'Goblin'), record('void', '   ')] };
 
-    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
     const done = await pollUntilDone(ada, world);
 
     expect(done).toMatchObject({ status: 'succeeded', created: 1 });
@@ -197,7 +213,7 @@ describe('World importers', () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     production = { rev: 'rev-1', records: [record('goblin', 'Goblin')] };
-    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
     await pollUntilDone(ada, world);
 
     const chronicle = await makeEntity(ada, world, 'Chronicle');
@@ -219,7 +235,7 @@ describe('World importers', () => {
     expect(before.find((e: { id: string }) => e.id === STUB_ID).lastImported).toBeUndefined();
 
     production = { rev: 'rev-7', records: [record('goblin', 'Goblin'), record('spider', 'Spider')] };
-    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
     await pollUntilDone(ada, world);
 
     // The panel can now show "N Entities at rev-7" without an in-process job — it survives a restart.
@@ -233,7 +249,7 @@ describe('World importers', () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     production = { rev: 'rev-1', records: [record('goblin', 'Goblin')] };
-    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
     await pollUntilDone(ada, world);
     const goblin = await entityByName(ada, world, 'Goblin');
 
@@ -263,7 +279,7 @@ describe('World importers', () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     production = { rev: 'rev-1', records: [record('goblin', 'Goblin')] };
-    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
     await pollUntilDone(ada, world);
     const goblin = await entityByName(ada, world, 'Goblin');
 
@@ -294,7 +310,7 @@ describe('World importers', () => {
     gate = new Promise<void>(() => undefined);
     production = { rev: 'rev-1', records: [record('goblin', 'Goblin')] };
 
-    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
     const removed = await ada.delete(`/worlds/${world}/importers/${STUB_ID}`).expect(409);
     expect(removed.body.code).toBe('import-running');
   });
@@ -306,11 +322,8 @@ describe('World importers', () => {
     gate = new Promise<void>(() => undefined);
     production = { rev: 'rev-1', records: [record('goblin', 'Goblin')] };
 
-    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
-    const second = await ada
-      .post(`/worlds/${world}/importers/${STUB_ID}/run`)
-      .send({ visibility: 'private' })
-      .expect(409);
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
+    const second = await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(409);
     expect(second.body.code).toBe('import-running');
   });
 
@@ -321,7 +334,7 @@ describe('World importers', () => {
     gate = new Promise<void>((resolve) => (release = resolve));
     production = { rev: 'rev-1', records: [record('goblin', 'Goblin')] };
 
-    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(202);
+    await ada.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(202);
     const running = await ada.get(`/worlds/${world}/import/status`).expect(200);
     expect(running.body.status).toBe('running');
 
@@ -333,7 +346,7 @@ describe('World importers', () => {
   it('404s an unknown Importer', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
-    await ada.post(`/worlds/${world}/importers/nope.missing/run`).send({ visibility: 'private' }).expect(404);
+    await ada.post(`/worlds/${world}/importers/nope.missing/run`).expect(404);
     await ada.delete(`/worlds/${world}/importers/nope.missing`).expect(404);
   });
 
@@ -346,13 +359,13 @@ describe('World importers', () => {
 
     // Reachable but not an Owner → 403 across the whole surface.
     await bob.get(`/worlds/${world}/importers`).expect(403);
-    await bob.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(403);
+    await bob.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(403);
     await bob.get(`/worlds/${world}/import/status`).expect(403);
     await bob.delete(`/worlds/${world}/importers/${STUB_ID}`).expect(403);
 
     // A stranger cannot reach the World at all → 404 (unreachable ≡ missing).
     await carol.get(`/worlds/${world}/importers`).expect(404);
-    await carol.post(`/worlds/${world}/importers/${STUB_ID}/run`).send({ visibility: 'private' }).expect(404);
+    await carol.post(`/worlds/${world}/importers/${STUB_ID}/run`).expect(404);
     await carol.get(`/worlds/${world}/import/status`).expect(404);
     await carol.delete(`/worlds/${world}/importers/${STUB_ID}`).expect(404);
   });

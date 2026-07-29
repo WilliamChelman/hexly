@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { authFileFor } from './src/auth-file';
-import { TEST_GRANTEE, TEST_USER } from './src/test-user';
+import { TEST_GRANTEE, TEST_OPERATOR, TEST_USER } from './src/test-user';
 
 // `__dirname` (not `import.meta`) because Playwright loads this config as CommonJS.
 const workspaceRoot = join(__dirname, '..', '..');
@@ -80,6 +80,10 @@ function server(
       E2E_GRANTEE_EMAIL: TEST_GRANTEE.email,
       E2E_GRANTEE_PASSWORD: TEST_GRANTEE.password,
       E2E_GRANTEE_NAME: TEST_GRANTEE.displayName,
+      // The operator (ADR-0047): the only standing that may stock a compendium pack (#404).
+      E2E_OPERATOR_EMAIL: TEST_OPERATOR.email,
+      E2E_OPERATOR_PASSWORD: TEST_OPERATOR.password,
+      E2E_OPERATOR_NAME: TEST_OPERATOR.displayName,
       ...(opts.instanceSubdir ? { E2E_INSTANCE_DIR: join(workspaceRoot, 'tmp', opts.instanceSubdir) } : {}),
       ...(opts.configYaml ? { E2E_CONFIG_YAML: opts.configYaml } : {}),
       // The Sole User's shape: Superadmin holding every Instance Role (ADR-0071).

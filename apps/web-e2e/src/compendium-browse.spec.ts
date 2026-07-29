@@ -1,4 +1,4 @@
-import { compendiumRailLink, enterEntities, expect, test } from './fixtures';
+import { compendiumRailLink, enterEntities, expect, installMonsterPack, test } from './fixtures';
 
 /**
  * The Compendium browse (ADR-0079, #401) as a user meets it: the rail's **Compendium** destination, the
@@ -15,16 +15,11 @@ import { compendiumRailLink, enterEntities, expect, test } from './fixtures';
  */
 test('the Compendium destination lists an installed pack, opens an entry read-only under the browsing World, and states the pack’s terms', async ({
   page,
+  browser,
 }) => {
+  // Stocked once by the operator, for the whole Instance (#404) — the browsing user never installs it.
+  await installMonsterPack(browser);
   const worldSeg = await enterEntities(page);
-
-  // Install the pack through the ordinary import surface, and wait for the reconcile to land.
-  await page.goto(`/w/${worldSeg}/settings`);
-  await page.getByTestId('settings-nav-imports').click();
-  await page.getByTestId('importer-run-draw-steel.importer.monsters').click();
-  await expect(page.getByTestId('importer-status-draw-steel.importer.monsters')).toContainText('2 entities', {
-    timeout: 15_000,
-  });
 
   // The rail's Compendium destination sits between Entities and Assets, and the World it carries is the
   // one being browsed from — not the pack's Container, which is in no World at all.
