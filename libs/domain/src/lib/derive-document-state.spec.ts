@@ -22,6 +22,7 @@ const BOARD = defineStructuredDataType({
     board.tiles.map((tile) => ({
       targetKind: 'entity' as const,
       targetId: tile.entityId,
+      targetContainerId: null,
       descriptor: null,
       decor: false,
     })),
@@ -39,6 +40,7 @@ const LINKS = defineStructuredDataType({
     links.map((l) => ({
       targetKind: 'entity' as const,
       targetId: l.entityId,
+      targetContainerId: null,
       descriptor: l.descriptor ?? null,
       decor: false,
     })),
@@ -66,12 +68,28 @@ const BYTES = defineStructuredDataType({
   harvestAssetRef: (ref) => (ref.hash ? { hash: ref.hash, ext: ref.ext } : null),
 });
 
-const DATA_TYPES = structuredDataTypeSet([BOARD, LINKS, PROSE, STATBLOCK, BYTES]);
+/** A structured data-type harvesting `asset` edges, each naming the Container its URL named (ADR-0080). */
+const PICTURES = defineStructuredDataType({
+  id: 'test.datatype.pictures',
+  valueSchema: z.array(z.object({ containerId: z.string(), hash: z.string() })),
+  empty: () => [],
+  harvestEdges: (pictures) =>
+    pictures.map((p) => ({
+      targetKind: 'asset' as const,
+      targetId: p.hash,
+      targetContainerId: p.containerId,
+      descriptor: null,
+      decor: true,
+    })),
+});
+
+const DATA_TYPES = structuredDataTypeSet([BOARD, LINKS, PROSE, STATBLOCK, BYTES, PICTURES]);
 const boardField = field('board', 'test.datatype.board');
 const linksField = field('links', 'test.datatype.links');
 const proseField = field('prose', 'test.datatype.prose');
 const statField = field('stats', 'test.datatype.stat-block');
 const bytesField = field('bytes', 'test.datatype.bytes');
+const picturesField = field('pictures', 'test.datatype.pictures');
 
 const derive = (doc: EntityDocument, fields: readonly Field[] = [], dataTypes = DATA_TYPES) =>
   deriveDocumentState(doc, fields, dataTypes);
@@ -86,8 +104,8 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
           linksField,
         ]).edges,
       ).toEqual([
-        { targetKind: 'entity', targetId: 'mira', descriptor: 'spouse', decor: false },
-        { targetKind: 'entity', targetId: 'mira', descriptor: 'rival', decor: false },
+        { targetKind: 'entity', targetId: 'mira', targetContainerId: null, descriptor: 'spouse', decor: false },
+        { targetKind: 'entity', targetId: 'mira', targetContainerId: null, descriptor: 'rival', decor: false },
       ]);
     });
 
@@ -102,8 +120,28 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
           [linksField],
         ).edges,
       ).toEqual([
-        { targetKind: 'entity', targetId: 'mira', descriptor: 'Spouse', decor: false },
-        { targetKind: 'entity', targetId: 'mira', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'mira', targetContainerId: null, descriptor: 'Spouse', decor: false },
+        { targetKind: 'entity', targetId: 'mira', targetContainerId: null, descriptor: null, decor: false },
+      ]);
+    });
+
+    /**
+     * A hash names bytes, not an Asset (ADR-0080): the same bytes held by two Containers are two Assets, so
+     * a document drawing on both expresses two edges — folding them would credit one Container's picture
+     * with the other's usage.
+     */
+    it('keeps the same hash from two Containers as two edges, and folds a repeat within one', () => {
+      const hash = 'a'.repeat(64);
+      const doc: EntityDocument = {
+        pictures: [
+          { containerId: 'shelf-9', hash },
+          { containerId: 'world-1', hash },
+          { containerId: 'shelf-9', hash },
+        ],
+      };
+      expect(derive(doc, [picturesField]).edges).toEqual([
+        { targetKind: 'asset', targetId: hash, targetContainerId: 'shelf-9', descriptor: null, decor: true },
+        { targetKind: 'asset', targetId: hash, targetContainerId: 'world-1', descriptor: null, decor: true },
       ]);
     });
   });
@@ -114,7 +152,7 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
     it('emits an edge per Entity-Link Field value, resolved against the Entity fields', () => {
       const doc: EntityDocument = { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } };
       expect(derive(doc, [lair]).edges).toEqual([
-        { targetKind: 'entity', targetId: 'whisperwood', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'whisperwood', targetContainerId: null, descriptor: null, decor: false },
       ]);
     });
 
@@ -129,8 +167,8 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
         board: { tiles: [{ entityId: 'riverbend' }, { entityId: 'harbour' }] },
       };
       expect(derive(doc, [lair, boardField]).edges).toEqual([
-        { targetKind: 'entity', targetId: 'riverbend', descriptor: null, decor: false },
-        { targetKind: 'entity', targetId: 'harbour', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'riverbend', targetContainerId: null, descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'harbour', targetContainerId: null, descriptor: null, decor: false },
       ]);
     });
 
@@ -146,8 +184,8 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
     it('marks a `decor` Field’s edge as decor and a plain link’s as semantic', () => {
       const doc: EntityDocument = { lair: { entityId: 'riverbend' }, portrait: { entityId: 'cover-art' } };
       expect(derive(doc, [lair, portrait]).edges).toEqual([
-        { targetKind: 'entity', targetId: 'riverbend', descriptor: null, decor: false },
-        { targetKind: 'entity', targetId: 'cover-art', descriptor: null, decor: true },
+        { targetKind: 'entity', targetId: 'riverbend', targetContainerId: null, descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'cover-art', targetContainerId: null, descriptor: null, decor: true },
       ]);
     });
 
@@ -156,7 +194,7 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
       // to link wins, so the target is not subdued as decor. `LINKS` harvests semantic edges.
       const doc: EntityDocument = { portrait: { entityId: 'mira' }, links: [{ entityId: 'mira' }] };
       expect(derive(doc, [portrait, linksField]).edges).toEqual([
-        { targetKind: 'entity', targetId: 'mira', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'mira', targetContainerId: null, descriptor: null, decor: false },
       ]);
     });
   });
@@ -166,8 +204,8 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
 
     it('takes the edges the data-type harvests from its own value', () => {
       expect(derive(board(), [boardField]).edges).toEqual([
-        { targetKind: 'entity', targetId: 'riverbend', descriptor: null, decor: false },
-        { targetKind: 'entity', targetId: 'harbour', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'riverbend', targetContainerId: null, descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'harbour', targetContainerId: null, descriptor: null, decor: false },
       ]);
     });
 
@@ -291,7 +329,9 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
         DATA_TYPES,
         { thumbnailFieldId: THUMB },
       ).edges;
-      expect(edges).toEqual([{ targetKind: 'entity', targetId: 'portrait-1', descriptor: null, decor: false }]);
+      expect(edges).toEqual([
+        { targetKind: 'entity', targetId: 'portrait-1', targetContainerId: null, descriptor: null, decor: false },
+      ]);
     });
   });
 
@@ -317,7 +357,9 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
       };
       const state = derive(doc, [proseField, linksField, statField]);
       expect(state.searchText).toBe('The keep at Riverbend.');
-      expect(state.edges).toEqual([{ targetKind: 'entity', targetId: 'mira', descriptor: 'Spouse', decor: false }]);
+      expect(state.edges).toEqual([
+        { targetKind: 'entity', targetId: 'mira', targetContainerId: null, descriptor: 'Spouse', decor: false },
+      ]);
       expect(state.descriptors).toEqual(['spouse']);
       expect(state.fieldFacets).toContainEqual({ key: 'cr', value: '5', num: 5 });
     });

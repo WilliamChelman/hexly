@@ -50,9 +50,15 @@ describe('the core.datatype.hex-grid Structured Data Type (ADR-0050)', () => {
 
     expect(edges).toEqual(
       expect.arrayContaining([
-        { targetKind: 'entity', targetId: 'harbour', descriptor: null, decor: false },
-        { targetKind: 'entity', targetId: 'riverbend', descriptor: null, decor: false },
-        { targetKind: 'entity', targetId: 'kingdom-of-avalon', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'harbour', targetContainerId: null, descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'riverbend', targetContainerId: null, descriptor: null, decor: false },
+        {
+          targetKind: 'entity',
+          targetId: 'kingdom-of-avalon',
+          targetContainerId: null,
+          descriptor: null,
+          decor: false,
+        },
       ]),
     );
     // A Label carries no link, so it contributes no edge — three placements, three edges.

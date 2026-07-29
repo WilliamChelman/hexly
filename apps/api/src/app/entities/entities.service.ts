@@ -60,6 +60,7 @@ import { AssetBytesRegistry } from './asset-bytes-registry';
 import { AclWriter, EntityWrites, InsertEntityInput } from './entity-writes';
 import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
+import { edgeTargetContainerId } from './utils/asset-edge-target';
 import { linkedEntity } from './utils/linked-entity';
 
 /** Per-entity Public Link table for the shared get/mint/revoke helpers. */
@@ -584,15 +585,17 @@ export class EntitiesService {
    *
    * Asset edges surface here now (ADR-0069) — the "stored but surface-less" special case retired: an
    * `asset` edge keys on the content `hash`, so `edgeAsset` resolves it to the Asset's wrapper Entity
-   * (in the edge's World) exactly as {@link inbound} resolves a viewed Asset's hash. A deleted Asset
-   * leaves the edge dangling, like any unresolved target. They are decor by construction, so the
-   * relation surface hides them by default and the reveal shows them.
+   * in {@link edgeTargetContainerId} — the Container the *URL* named (ADR-0080), which is the Entity's
+   * own only when the picture came from home — exactly as {@link inbound} resolves a viewed Asset's
+   * hash. A deleted Asset leaves the edge dangling, like any unresolved target. They are decor by
+   * construction, so the relation surface hides them by default and the reveal shows them.
    */
   private outbound(access: EntityAccess, id: string): OutboundReference[] {
     // Resolve each target's Thumbnail exactly as a list does (ADR-0066), so a link list reads visually.
     const { ownAsset, fieldAsset, fieldKind, columns: thumbnailColumns } = thumbnailJoin();
-    // The resolver for `asset` edges: hash + World → the Asset's wrapper Entity id. Its `entityId` is
-    // the target for an asset edge; an `entity` edge names its target id directly (COALESCE below).
+    // The resolver for `asset` edges: hash + the Container the URL named → the Asset's wrapper Entity id.
+    // Its `entityId` is the target for an asset edge; an `entity` edge names its target id directly
+    // (COALESCE below).
     const edgeAsset = alias(assetIndex, 'edge_asset');
     const targetEntityId = sql`coalesce(${edgeAsset.entityId}, ${entityEdges.targetId})`;
     return (
@@ -615,7 +618,7 @@ export class EntitiesService {
           and(
             eq(entityEdges.targetKind, 'asset'),
             eq(edgeAsset.hash, entityEdges.targetId),
-            eq(edgeAsset.containerId, entityEdges.containerId),
+            sql`${edgeAsset.containerId} = ${edgeTargetContainerId}`,
           ),
         )
         .leftJoin(entities, and(sql`${entities.id} = ${targetEntityId}`, access.filter))
@@ -664,11 +667,12 @@ export class EntitiesService {
    * elements harvest as `(targetKind: 'asset', targetId: hash)`: the harvest never resolved a hash to the
    * Asset's Entity id, so the resolution happens here, at read time — the referencing document holds the
    * capability URL, not the id, so re-uploading identical bytes (same hash) heals every reference for free
-   * and deleting the Asset leaves them dangling. The hash edges are World-scoped, since identical bytes in
-   * two Worlds share a hash but not an Entity.
+   * and deleting the Asset leaves them dangling. The hash edges are Container-scoped, since identical bytes
+   * in two Containers share a hash but not an Entity — and the Container matched is the one the referencing
+   * URL *named* (ADR-0080), so usage counts the Entities drawing on this Asset from elsewhere too.
    */
   private inbound(access: EntityAccess, id: string): InboundReference[] {
-    // The Asset's content hash + World, when `id` is an Asset — its asset edges key on the hash, not the id.
+    // The Asset's content hash + Container, when `id` is an Asset — its edges key on the hash, not the id.
     const asset = this.db
       .select({ hash: assetIndex.hash, containerId: assetIndex.containerId })
       .from(assetIndex)
@@ -680,7 +684,7 @@ export class EntitiesService {
         ? and(
             eq(entityEdges.targetKind, 'asset'),
             eq(entityEdges.targetId, asset.hash),
-            eq(entityEdges.containerId, asset.containerId),
+            sql`${edgeTargetContainerId} = ${asset.containerId}`,
           )
         : undefined,
     );
