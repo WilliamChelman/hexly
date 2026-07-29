@@ -125,6 +125,17 @@ export const createEntityRequestSchema = z.object({
 
 export type CreateEntityRequest = z.infer<typeof createEntityRequestSchema>;
 
+/**
+ * POST /entities/:id/adopt (CONTEXT.md → Adoption): the target World, everything else being read off
+ * the entry. Required rather than defaulted like a create's, because every surface offering Adoption is
+ * already read under a World — the `:worldId` of the **Compendium browse** (ADR-0079).
+ */
+export const adoptEntityRequestSchema = z.object({
+  worldId: z.string().min(1),
+});
+
+export type AdoptEntityRequest = z.infer<typeof adoptEntityRequestSchema>;
+
 /** PUT /entities/:id: stale `version` is rejected with 409. */
 export const saveEntityRequestSchema = z.object({
   document: entityDocumentSchema,

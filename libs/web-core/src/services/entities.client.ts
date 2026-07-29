@@ -163,6 +163,15 @@ export class EntitiesClient {
     });
   }
 
+  /**
+   * **Adopt** a **Compendium Entry** into `worldId` (CONTEXT.md → Adoption). Not written through the
+   * follow store: nothing can be watching an Entity that did not exist a moment ago, and the entry it
+   * was copied from is untouched.
+   */
+  adopt(id: string, worldId: string): Observable<EntityDetail> {
+    return this.http.post<EntityDetail>(`/api/entities/${id}/adopt`, { worldId });
+  }
+
   /** Raw read — the store's own refetch source (the store seeds its held from it directly). */
   private read(id: string): Observable<EntityDetail> {
     return this.http.get<EntityDetail>(`/api/entities/${id}`);

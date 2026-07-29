@@ -33,6 +33,10 @@
     "emptyHint": "An operator installs a Compendium for the whole instance.",
     "noMatchTitle": "Nothing in the Compendium matches your search.",
     "noMatchHint": "Try a different name, Compendium, or word.",
+    "adopt": "Adopt",
+    "adoptHint": "Copy this into your world, yours to edit",
+    "adopted": "Adopted “{{name}}” into your world.",
+    "adoptError": "Couldn't adopt this. Please try again.",
     "credits": "Reference material from",
     "page": {
       "tabTitle": "Hexly — Compendium",

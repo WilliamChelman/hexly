@@ -31,6 +31,8 @@ export interface EntityCardVm {
   thumbnailUrl?: string;
   /** **Missing Bytes** on this Entity's own bytes (#325) — its resolved URL is known to 404, so the sigil wins. */
   assetBytesMissing?: boolean;
+  /** **Sealed** (CONTEXT.md), and so a **Compendium Entry** — what the **Adopt** action hangs off. */
+  sealed?: boolean;
 }
 
 /**
@@ -118,6 +120,23 @@ export interface EntityCardVm {
             <span class="meta text-2xs text-ink-muted">{{
               'entityBrowser.edited' | transloco: { date: (card().updatedAt | hexlyDate) }
             }}</span>
+            <!-- **Adopt** (ADR-0079), offered outright rather than on hover like the actions beside it:
+                 taking an entry into a World is the reason the Compendium browse exists. -->
+            @if (canAdopt()) {
+              <span class="relative z-10 ml-auto flex">
+                <button
+                  type="button"
+                  appButton
+                  variant="ghost"
+                  size="sm"
+                  [attr.data-testid]="'adopt-' + card().id"
+                  [attr.title]="'compendium.adoptHint' | transloco"
+                  (click)="adopt.emit()"
+                >
+                  {{ 'compendium.adopt' | transloco }}
+                </button>
+              </span>
+            }
             <!-- Rename gates on the edit verb (substance), delete on the delete verb
                  (ADR-0039): a reader never sees an action the server would 403. -->
             <span
@@ -180,6 +199,8 @@ export class EntityCardComponent {
   readonly commitRename = output<string>();
   readonly cancelRename = output<void>();
   readonly remove = output<void>();
+  /** **Adopt** this entry into the browsing World; the parent owns the call and the outcome (ADR-0079). */
+  readonly adopt = output<void>();
 
   private readonly types = inject(TypeRegistry);
   private readonly transloco = inject(TranslocoService);
@@ -196,4 +217,6 @@ export class EntityCardComponent {
   /** Rename is a substance edit; delete the lifecycle verb (ADR-0039). Absent Rights → hidden (fail-closed). */
   protected readonly canRename = computed(() => !!this.card().rights?.includes('edit'));
   protected readonly canDelete = computed(() => !!this.card().rights?.includes('delete'));
+  /** Sealed is the whole condition: adoption's gate is on the *target* World, which the card cannot see. */
+  protected readonly canAdopt = computed(() => !!this.card().sealed);
 }

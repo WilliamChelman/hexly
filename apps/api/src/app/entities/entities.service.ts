@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  AdoptEntityRequest,
   ApiError,
   assetThumbnailUrl,
   CreateEntityRequest,
@@ -762,6 +763,33 @@ export class EntitiesService {
       document: doc,
     });
     return detailOf(row, doc);
+  }
+
+  /**
+   * **Adoption** (CONTEXT.md → Adoption): copy a **Compendium Entry** into a World. `null` when the
+   * entry is unreachable, like every other read.
+   *
+   * Routed through {@link create} rather than `writes.insert` because that seam already *is* every
+   * property Adoption needs: a World target (a Compendium has no `worlds` row to resolve), the
+   * create-Entity gate a Contributor passes, `private` and owned by the adopter — and the reserved
+   * `hexly.*` strip, which is what leaves the copy with no `hexly.source`. That last one is load-bearing:
+   * a copy keeping the stamp would read as **Sealed** and be a delete candidate on the next reconcile
+   * through its colliding `sourceId` (ADR-0079).
+   */
+  adopt(userId: string, id: string, req: AdoptEntityRequest): EntityDetail | null {
+    const decision = entityAccess(this.db, userId).decide(id);
+    if (!decision?.canRead) return null;
+    // `sealed` is the location fact the seal reads, already resolved here — so adoption mints no
+    // predicate of its own to ask "is this on the shelf?" (ADR-0079).
+    if (!decision.sealed) throw new BadRequestException();
+    const source = toDetail(decision.row);
+    return this.create(userId, {
+      worldId: req.worldId,
+      name: source.name,
+      types: [...source.types],
+      tags: [...source.tags],
+      document: source.document,
+    });
   }
 
   /**

@@ -149,7 +149,7 @@ An **Importer** that declares its output to be reference material, so it reconci
 _Avoid_: Seeder, pack loader, content importer
 
 **Adoption**:
-Copying a **Compendium Entry** into a **World** as an ordinary, editable **Entity** — same name, same Types, same values, no **Import Source** and no record of origin. The one way compendium content enters a world, which is what makes a World's Entities exactly the ones its authors chose (ADR-0079).
+Copying a **Compendium Entry** into a **World** as an ordinary, editable **Entity** — same name verbatim, same Types, same values, `private` and owned by the adopter, with no **Import Source** and no record of origin. The one way compendium content enters a world, which is what makes a World's Entities exactly the ones its authors chose (ADR-0079). It is the ordinary Entity create with the entry as its seed, so it asks only for the right to create Entities in the target World — a **Contributor** may adopt — and drops the provenance by the strip that create already does. Inbound links to the entry are never repointed, asking twice adopts twice with nothing flagging it, and the copy is frozen at the revision adopted, permanently.
 _Avoid_: Fork, clone, instantiate, import (the **Importer**'s word), copy (the mechanism, not the act)
 
 ## Language

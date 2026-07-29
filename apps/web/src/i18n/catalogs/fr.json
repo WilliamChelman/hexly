@@ -33,6 +33,10 @@
     "emptyHint": "Un opérateur installe un Compendium pour toute l'instance.",
     "noMatchTitle": "Aucun élément du Compendium ne correspond à votre recherche.",
     "noMatchHint": "Essayez un autre nom, un autre Compendium ou un autre mot.",
+    "adopt": "Adopter",
+    "adoptHint": "Copier dans votre monde, à vous de le modifier",
+    "adopted": "« {{name}} » a été adopté dans votre monde.",
+    "adoptError": "Impossible d'adopter cet élément. Veuillez réessayer.",
     "credits": "Matériel de référence issu de",
     "page": {
       "tabTitle": "Hexly — Compendium",

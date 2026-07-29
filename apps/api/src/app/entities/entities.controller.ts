@@ -17,6 +17,7 @@ import {
 import {
   addGrantRequestSchema,
   addOwnerRequestSchema,
+  adoptEntityRequestSchema,
   AuthUser,
   createEntityRequestSchema,
   EntityDetail,
@@ -115,6 +116,18 @@ export class EntitiesController {
     const parsed = createEntityRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     return this.entities.create(user.id, parsed.data);
+  }
+
+  // **Adoption** (ADR-0079): the copy lands in the World the body names, so it is a create — 201.
+  // Unreachable entry is a 404 like any read; an Entity outside a Compendium a 400, there being no
+  // such act as adopting one.
+  @Post(':id/adopt')
+  adopt(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): EntityDetail {
+    const parsed = adoptEntityRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    const adopted = this.entities.adopt(user.id, id, parsed.data);
+    if (!adopted) throw new NotFoundException();
+    return adopted;
   }
 
   // Before `:id` so literal path isn't captured. Owner's `::` Link Descriptor vocabulary (#96).
