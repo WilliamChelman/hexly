@@ -40,13 +40,15 @@ interface TermRow {
           {{ compendium()?.name ?? ('compendium.page.heading' | transloco) }}
         </h1>
       </div>
-      <a
-        pageHeaderActions
-        class="font-sans text-xs text-accent-strong hover:underline"
-        data-testid="compendium-back"
-        [routerLink]="browseRoute()"
-        >{{ 'compendium.page.backToBrowse' | transloco }}</a
-      >
+      @if (browseRoute(); as browse) {
+        <a
+          pageHeaderActions
+          class="font-sans text-xs text-accent-strong hover:underline"
+          data-testid="compendium-back"
+          [routerLink]="browse"
+          >{{ 'compendium.page.backToBrowse' | transloco }}</a
+        >
+      }
     </app-page-header>
 
     <main class="max-w-[48rem] mx-auto py-8 px-6">
@@ -115,10 +117,14 @@ export class CompendiumPage {
       .filter((term): term is TermRow => !!term.value);
   });
 
-  /** Back to the browse this page hangs off, in the World it was browsed from. */
-  protected readonly browseRoute = computed(() =>
-    worldCompendiumRoute(this.activeWorld.worldId() ?? '', this.activeWorld.name() ?? undefined),
-  );
+  /**
+   * Back to the browse this page hangs off, in the World it was browsed from — absent for the anonymous
+   * reader a Mount cascaded read to (ADR-0080), who has no World to go back to.
+   */
+  protected readonly browseRoute = computed(() => {
+    const worldId = this.activeWorld.worldId();
+    return worldId ? worldCompendiumRoute(worldId, this.activeWorld.name() ?? undefined) : null;
+  });
 
   constructor() {
     // The tab names the Compendium, not the destination — this page is meant to be sent to someone

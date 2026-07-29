@@ -1,11 +1,12 @@
-import { expect, installMonsterPack, segRe, test, type Page } from './fixtures';
+import { addWorldMember, expect, installMonsterPack, segRe, signInGrantee, test, type Page } from './fixtures';
 
 /**
- * A World declares the Containers it draws from (#408, ADR-0080), end to end. The rules — Own-only,
- * the Compendium exception, idempotence, the refusals — are pinned at the HTTP seam in
- * `world-mounts.controller.spec.ts`. What only a browser shows is the surface itself: that a World
+ * A World declares the Containers it draws from, and draws on them (#408, #410, ADR-0080), end to end.
+ * The rules — Own-only, the Compendium exception, idempotence, the refusals, the whole shape of the
+ * read cascade — are pinned at the HTTP seam in `world-mounts.controller.spec.ts` and
+ * `mount-cascade.controller.spec.ts`. What only a browser shows is the surface itself: that a World
  * Owner can find the pane, see what is mounted in the order they set, add from an offer, reorder, and
- * withdraw one — and that the declaration survives a reload.
+ * withdraw one; and that a player of the campaign then really lands on a shelf Entity's page.
  */
 
 /**
@@ -102,4 +103,58 @@ test('mounting changes nothing about what the World holds', async ({ page, brows
   // entries' worth of shelf, and the Entity Browser still says this World is empty.
   await page.goto(`/w/${campaign}/entities`);
   await expect(page.getByTestId('empty')).toBeVisible();
+});
+
+test('a player of the campaign lands on the shelf Entity’s own page, and an anonymous reader on the pack’s', async ({
+  page,
+  browser,
+}) => {
+  await installMonsterPack(browser);
+  const pack = (await (await page.request.get('/api/compendiums')).json())[0].id as string;
+
+  const shelf = await createWorld(page, 'The Lit Shelf');
+  const campaign = await createWorld(page, 'The Drawing Campaign');
+
+  // One `shared` painting on the shelf, seeded over the API — this spec is about who reaches it, and
+  // authoring it through the editor would say nothing the other specs do not.
+  const painting = (
+    await (
+      await page.request.post('/api/entities', {
+        data: { name: 'Sunset over Aldermoor', types: ['core.type.note'], worldId: shelf },
+      })
+    ).json()
+  ).id as string;
+  await page.request.patch(`/api/entities/${painting}`, { data: { visibility: 'shared' } });
+  await addWorldMember(page, campaign, 'viewer');
+
+  // The player has never heard of the shelf, so the painting is not there to open — Entity URLs are
+  // World-scoped (ADR-0028), and this one names a World they cannot reach.
+  const player = await signInGrantee(browser);
+  await player.goto(`/entities/${painting}`);
+  await expect(player.getByTestId('error-home')).toBeVisible();
+
+  await page.goto(`/w/${campaign}/settings`);
+  await page.getByTestId('settings-nav-mounts').click();
+  await mount(page, shelf);
+  await mount(page, pack);
+
+  // One hop later the same URL opens, at the content's own World: following a link into a Mount
+  // leaves your World, honestly and visibly.
+  await player.goto(`/entities/${painting}`);
+  await player.waitForURL(new RegExp(`/w/${segRe(shelf)}/entities/`));
+  await expect(player.getByTestId('title')).toHaveText('Sunset over Aldermoor');
+  await player.context().close();
+
+  // And the reader with no account at all: the campaign's Public Link cascades to the pack it mounts,
+  // so the terms that pack publishes under open to them too (ADR-0080).
+  const token = (await (await page.request.post(`/api/worlds/${campaign}/link`)).json()).token as string;
+  const anonContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const visitor = await anonContext.newPage();
+  await visitor.goto(`/public/w/${token}/compendium/${pack}`);
+  await expect(visitor.getByTestId('compendium-name')).toHaveText('Draw Steel: Monsters');
+  await expect(visitor.getByTestId('compendium-publisher')).toHaveText('MCDM Productions, LLC');
+  await expect(visitor.getByTestId('compendium-license')).toHaveText('Draw Steel Creator License');
+  // Nothing offers them a way into a World they have no standing in.
+  await expect(visitor.getByTestId('compendium-back')).toHaveCount(0);
+  await anonContext.close();
 });

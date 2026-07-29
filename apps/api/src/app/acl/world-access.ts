@@ -2,6 +2,7 @@ import { WorldVerb } from '@hexly/domain';
 import { and, eq, getTableColumns, inArray, sql, SQLWrapper } from 'drizzle-orm';
 import { Db } from '../db/db';
 import { containers, entities, entityGrants, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
+import { mountedIntoReachOf } from './mount-reach';
 import { isSuperadmin } from './owner-set';
 
 /** A Superadmin reaches and manages every World (ADR-0037, #163): predicates short-circuit here. */
@@ -18,15 +19,22 @@ const MATCH_ALL = sql`1`;
  */
 
 /**
- * The World reachability rule (ADR-0024, ADR-0037): derived, not stored — the caller has a member
- * row OR any row in an Entity's ACE set inside the World. So a departed member who kept Entities,
- * and a grantee navigating to what they were given, both keep minimal reachability (#161).
- * Unreachable is indistinguishable from nonexistent (ADR-0004).
+ * The World reachability rule (ADR-0024, ADR-0037, ADR-0080): derived, not stored — the caller has a
+ * member row, OR any row in an Entity's ACE set inside the World, OR reaches it through a **Mount**.
+ * So a departed member who kept Entities, and a grantee navigating to what they were given, both keep
+ * minimal reachability (#161). Unreachable is indistinguishable from nonexistent (ADR-0004).
+ *
+ * The third disjunct is ADR-0080's, and the first time reading a Container depends on another
+ * Container's configuration: a World kept to be drawn from opens to whoever reads the campaigns
+ * drawing on it, which is what makes a mounted Entity's own page openable at all — Entity URLs are
+ * World-scoped (ADR-0028), so following a link into a Mount lands at the content's home. Read alone:
+ * `owner` and `contributor` stay membership's, so a Mount never confers a write.
  */
 function reachableBy(userId: string, worldRef: SQLWrapper) {
   return sql`(EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${worldRef} AND ${worldMembers.userId} = ${userId})
     OR EXISTS (SELECT 1 FROM ${entities} JOIN ${entityGrants} ON ${entityGrants.entityId} = ${entities.id}
-               WHERE ${entities.containerId} = ${worldRef} AND ${entityGrants.userId} = ${userId}))`;
+               WHERE ${entities.containerId} = ${worldRef} AND ${entityGrants.userId} = ${userId})
+    OR ${mountedIntoReachOf(userId, worldRef)})`;
 }
 
 /** The World management rule (ADR-0037): the caller holds the `owner` role. */

@@ -47,13 +47,15 @@ export class PublicLinksService {
   }
 
   /**
-   * One `shared` Entity's read-only body behind a World Public Link — scoped to the token's World
-   * *and* `shared`. A `private` or out-of-World id yields null (→ 404).
+   * One Entity's read-only body behind a World Public Link — the token's World's `shared` surface plus
+   * what its **Mounts** republish (ADR-0080), so a Board's shelf art and a mounted pack's entries open
+   * to the account-less reader the session was shared with. A `private` Entity, or one in neither the
+   * World nor a Mount, yields null (→ 404).
    */
   readWorldEntity(token: string, id: string): EntityDetail | null {
     const worldId = this.resolveWorldToken(token);
     if (!worldId) return null;
-    return this.entities.loadSharedInWorld(worldId, id);
+    return this.entities.loadThroughWorldLink(worldId, id);
   }
 
   /** A World Public Link token → its World id, or null if the token doesn't resolve. */
