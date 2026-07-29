@@ -4,8 +4,6 @@
  * (CONTEXT.md → Asset).
  */
 
-import * as z from 'zod';
-
 /** Where an Asset's bytes are served from. `ext` carries its own leading dot (`'.png'`). */
 export function assetUrl(worldId: string, hash: string, ext: string): string {
   return `/assets/${worldId}/${hash}${ext}`;
@@ -37,45 +35,6 @@ export const THUMBNAIL_SUFFIX = '.thumb.webp';
 export function assetThumbnailUrl(worldId: string, hash: string): string {
   return `/assets/${worldId}/${hash}${THUMBNAIL_SUFFIX}`;
 }
-
-/**
- * A stored World Asset as the browser sees it: the served capability {@link assetUrl} an author
- * references (from Content, or a Board Image element — #269), plus the metadata a picker shows. The
- * `url` is the only load-bearing field a reference stores; the rest label the row in a chooser.
- */
-export interface AssetSummary {
-  /** The served capability URL — the string an Image element or Content `src` holds. */
-  readonly url: string;
-  /**
-   * The served thumbnail URL (ADR-0065) — the lightweight image a grid renders so it never downloads raw
-   * bytes. Falls back to the original on the serving route when no thumbnail was minted, so it is always
-   * safe to use as a tile `src`; a reference still stores {@link url}, the full-resolution capability URL.
-   */
-  readonly thumbnailUrl: string;
-  /** The human-readable name the Asset was uploaded/imported under, for display in a picker. */
-  readonly originalFilename: string;
-  /** The Asset's content type (`image/png`, `application/pdf`, …). */
-  readonly mime: string;
-  /** The Asset's size in bytes. */
-  readonly size: number;
-}
-
-/**
- * The Board image picker's search query (#281, ADR-0065): the subset of the Entity list contract the
- * picker speaks against `GET /worlds/:id/assets(/facets)` — an FTS `q` and repeated `field` facet tokens
- * (`orientation:eq:landscape`). The server pins the asset type + image kind on top, so these are only the
- * caller-controlled axes. `field` normalises the query-string's one-or-many shape to an array, matching
- * the Entity list schema so the two search surfaces stay one contract.
- */
-export const assetSearchQuerySchema = z.object({
-  q: z.string().optional(),
-  field: z
-    .union([z.string(), z.array(z.string())])
-    .transform((v) => (Array.isArray(v) ? v : [v]))
-    .optional(),
-});
-
-export type AssetSearchQuery = z.infer<typeof assetSearchQuerySchema>;
 
 /**
  * The Container and content `hash` an {@link assetUrl} names — everything it takes to reach exactly one

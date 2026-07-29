@@ -97,7 +97,10 @@ test('browse the Library, adopt an entry, and the copy is an ordinary Entity of 
   expect(await cardId(page, 'Goblin Warrior')).toBe(entryId);
 });
 
-test('the mention picker offers the adopted Goblin and never the Compendium Entry', async ({ page, browser }) => {
+test('the mention picker offers the adopted Goblin ahead of the entry it was copied from', async ({
+  page,
+  browser,
+}) => {
   await installMonsterPack(browser);
   await enterWorldMountingThePack(page);
 
@@ -117,10 +120,14 @@ test('the mention picker offers the adopted Goblin and never the Compendium Entr
   await page.keyboard.type('@Goblin');
   await expect(page.getByTestId('entity-picker')).toBeVisible();
 
-  // The seal, as a user meets it: a link-target read never returns a Compendium Entry, so the picker
-  // offers the World's own Goblin — the one adoption made — and the shelf's not at all (ADR-0079).
-  await expect(page.getByTestId(`entity-picker-option-${copyId}`)).toBeVisible();
-  await expect(page.getByTestId(`entity-picker-option-${entryId}`)).toHaveCount(0);
+  // What Adoption bought, as a user meets it: the World's own Goblin — the one Adoption made — ranks
+  // above the pack's, so `@Goblin` reaches the copy first. The entry is offered at all only because this
+  // World **Mounts** the pack (ADR-0080); to a World that does not, it is as unreachable as ADR-0079's
+  // seal ever made it, which is what `mounts.spec.ts` pins.
+  await expect(page.locator('[data-testid^="entity-picker-option-"]').first()).toHaveAttribute(
+    'data-testid',
+    `entity-picker-option-${copyId}`,
+  );
 
   // And choosing it links the copy, not the entry.
   await page.getByTestId(`entity-picker-option-${copyId}`).click();

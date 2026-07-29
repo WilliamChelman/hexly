@@ -1,8 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { AssetSummary, EntityFacets, FacetCount, FieldFacet } from '@hexly/domain';
-import { assetValueUrl, ASSET_KIND_FACET_KEY, readAssetValue } from '@hexly/plugin-asset';
-import { AssetsClient, AssetSearchParams } from '@hexly/web-core';
+import { ENTITY_LIST_MAX_LIMIT, EntityFacets, EntitySummary, FacetCount, FieldFacet } from '@hexly/domain';
+import {
+  assetValueUrl,
+  ASSET_KIND_FACET_KEY,
+  CORE_ASSET_TYPE_ID,
+  IMAGE_KIND_FIELD_TOKEN,
+  readAssetValue,
+} from '@hexly/plugin-asset';
+import { AssetsClient, EntitiesClient } from '@hexly/web-core';
+import { ContainerChipsComponent } from '@hexly/web-entity';
 import { ButtonComponent, DialogComponent, DialogRef, InputComponent } from '@hexly/web-ui';
 
 /** What the picker is launched with: the World whose Assets it uploads into and searches. */
@@ -13,24 +20,34 @@ export interface ImagePickerData {
 /** An empty Facet snapshot — the rail's resting state before the first counts land. */
 const NO_FACETS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] };
 
+/** An Asset the grid can actually offer: one whose own bytes resolved to a capability URL to place. */
+type PlaceableAsset = EntitySummary & { readonly assetUrl: string };
+
+const isPlaceable = (e: EntitySummary): e is PlaceableAsset => !!e.assetUrl;
+
 /**
  * The **Image** source chooser (#269, #281): the one dialog the Image Tool opens to obtain an Asset URL
  * before an Image element lands. Two paths to the same result — **upload a file** (mints a new World Asset
- * in one step) or **pick an existing** World Asset — both {@link DialogRef.close close} the dialog with the
+ * in one step) or **pick an existing** Asset — both {@link DialogRef.close close} the dialog with the
  * served capability URL. Cancelling (Escape, backdrop, the Cancel button) closes with `undefined`, and no
  * element is placed.
  *
- * The pick path reuses the one entity-search machinery, pinned server-side to the asset type + image kind
- * (ADR-0065): it searches Assets by name (FTS `q`) and filters by image Facets (orientation, hue) — the
- * same contract as the Asset Browser — rather than listing every upload and filtering mimes client-side, so
- * picking art on an image-heavy World is fast. The picker is stateless beyond its in-flight upload, query,
- * active Facets and the fetched results; the placement itself lives in {@link BoardImagePlacement}, so this
- * component only turns a user's choice into a URL.
+ * The pick path is a **link-target read** (ADR-0079, #416): a Board Image is not a link — it is a
+ * capability URL, decor by construction (ADR-0069) — but it asks the question every link picker asks,
+ * *what may this point at?*, so it asks it through the same read rather than a listing seam of its own
+ * that would have to learn Mount scope twice. Preset to the asset type + image kind (ADR-0065), it
+ * searches by name (FTS `q`) and narrows by image Facets (orientation, hue) — and, in a World that
+ * **Mounts** a shelf of art, offers that shelf's images beside this World's own, the World's own ranked
+ * first, narrowable to one Container (ADR-0080). Each tile's URL is resolved against *its own* Container,
+ * so a placed shelf image renders for every reader of the World it landed in.
+ *
+ * The picker is stateless beyond its in-flight upload, query, active Facets and the fetched results; the
+ * placement itself lives in {@link BoardImagePlacement}, so this component only turns a choice into a URL.
  */
 @Component({
   selector: 'app-board-image-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogComponent, ButtonComponent, InputComponent, TranslocoPipe],
+  imports: [ContainerChipsComponent, DialogComponent, ButtonComponent, InputComponent, TranslocoPipe],
   template: `
     <app-dialog open align="top" [heading]="'board.imagePicker.title' | transloco" (closed)="cancel()">
       <div class="flex flex-col gap-4">
@@ -58,7 +75,7 @@ const NO_FACETS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] 
           }
         </div>
 
-        <!-- Pick: search + Facets over the World's image Assets (same contract as the Asset Browser). -->
+        <!-- Pick: the link-target read over this World's image Assets and any Mounted shelf's (ADR-0080). -->
         <div class="flex flex-col gap-2">
           <span class="text-sm text-ink-strong">{{ 'board.imagePicker.existing' | transloco }}</span>
           <input
@@ -69,6 +86,9 @@ const NO_FACETS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] 
             [value]="query()"
             (input)="query.set($any($event.target).value)"
           />
+
+          <!-- The **Container** facet: only where this World Mounts a shelf the read reached (ADR-0080). -->
+          <app-container-chips testid="image" [containers]="containers()" [(selected)]="container" />
 
           <!-- Image Facets (orientation, hue) — the pinned kind axis is hidden, it is never a choice here. -->
           @for (facet of facetGroups(); track facet.key) {
@@ -98,15 +118,16 @@ const NO_FACETS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] 
               </p>
             } @else {
               <div class="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto" role="list">
-                @for (asset of list; track asset.url) {
+                @for (asset of list; track asset.id) {
                   <button
                     type="button"
                     role="listitem"
                     class="asset-tile"
-                    [title]="asset.originalFilename"
-                    [attr.aria-label]="asset.originalFilename"
+                    [title]="asset.name"
+                    [attr.aria-label]="asset.name"
                     data-testid="image-asset-choice"
-                    (click)="choose(asset.url)"
+                    [attr.data-asset-id]="asset.id"
+                    (click)="choose(asset.assetUrl)"
                   >
                     <!-- The thumbnail (ADR-0065), so the grid never downloads raw bytes; it falls back to
                          the original on the serving route when no thumb was minted. -->
@@ -142,6 +163,7 @@ const NO_FACETS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] 
 export class BoardImagePickerComponent {
   private readonly ref = inject<DialogRef<ImagePickerData, string>>(DialogRef);
   private readonly assetsClient = inject(AssetsClient);
+  private readonly entitiesClient = inject(EntitiesClient);
   private readonly i18n = inject(TranslocoService);
 
   /** In-flight upload guard: disables the file input and shows the uploading hint. */
@@ -154,29 +176,40 @@ export class BoardImagePickerComponent {
   /** The active image Facet selections, keyed by dimension (`orientation`/`hue`) → chosen values (OR within). */
   protected readonly activeFacets = signal<Record<string, readonly string[]>>({});
 
+  /** The Container narrowed to, if any — this World, or one Shelf it Mounts (ADR-0080). */
+  protected readonly container = signal<string | undefined>(undefined);
+
   /** The matched image Assets, or null while the current search is in flight. */
-  protected readonly assets = signal<AssetSummary[] | null>(null);
+  protected readonly assets = signal<PlaceableAsset[] | null>(null);
   /** The live Facet counts; the pinned `kind` dimension is dropped — it is never a picker choice. */
   private readonly facetCounts = signal<EntityFacets>(NO_FACETS);
   protected readonly facetGroups = computed<readonly FieldFacet[]>(() =>
     this.facetCounts().fields.filter((f) => f.key !== ASSET_KIND_FACET_KEY),
   );
+  /** The **Container** facet's live values — this World and the Shelves it Mounts that still hold a match. */
+  protected readonly containers = computed<readonly FacetCount[]>(() => this.facetCounts().container ?? []);
   /** Whether any search is narrowing the set — the empty state then reads "no matches", not "no images". */
   protected readonly hasFilters = computed(
-    () => this.query().trim() !== '' || Object.values(this.activeFacets()).some((v) => v.length > 0),
+    () =>
+      this.query().trim() !== '' || !!this.container() || Object.values(this.activeFacets()).some((v) => v.length > 0),
   );
 
   constructor() {
-    // Search + count through the one entity-search machinery whenever the query or Facets change (ADR-0065).
-    // onCleanup cancels superseded requests. A failure (incl. a 403 for a Viewer who can't enumerate — board
-    // review) leaves an empty grid, which reads the same as a World with no matching images; upload still works.
+    // Search + count through the one link-target read whenever the query, the Facets or the Container
+    // narrowing change (ADR-0065, ADR-0080). Both off the same read, so the rail can never annotate a grid
+    // it disagrees with. onCleanup cancels superseded requests; a failed search leaves an empty grid, which
+    // reads the same as a World with no matching images, and upload still works.
     effect((onCleanup) => {
-      const params: AssetSearchParams = { q: this.query().trim() || undefined, field: this.fieldTokens() };
-      const search = this.assetsClient.search(this.ref.data.worldId, params).subscribe({
-        next: (list) => this.assets.set(list),
+      const params = this.read();
+      // Unpaginated, as this grid has always been: the Facets are what keep the set small, and the cap is
+      // the shared list ceiling so an image-heavy World never floods it in one read.
+      const search = this.entitiesClient.list({ ...params, thumbnails: true, limit: ENTITY_LIST_MAX_LIMIT }).subscribe({
+        // Only what can actually be placed: a wrapper carrying no resolvable bytes has no URL for an
+        // Image element to hold, so it is dropped forward-only rather than offered as a dead tile.
+        next: (page) => this.assets.set(page.items.filter(isPlaceable)),
         error: () => this.assets.set([]),
       });
-      const facets = this.assetsClient.facets(this.ref.data.worldId, params).subscribe({
+      const facets = this.entitiesClient.facets(params).subscribe({
         next: (counts) => this.facetCounts.set(counts),
         error: () => undefined, // a failed count leaves the last-good rail rather than blanking it
       });
@@ -185,6 +218,24 @@ export class BoardImagePickerComponent {
         facets.unsubscribe();
       });
     });
+  }
+
+  /**
+   * The one read behind the grid and its rail. A **link-target read** (ADR-0079) preset to the asset type
+   * and image kind: the type pin is also what lifts the hidden-from-default-listing exclusion Assets carry
+   * (ADR-0065), so they surface here exactly as they always have. Naming the World is what widens it to
+   * what that World **Mounts** — resolved server-side, so this picker cannot widen its own scope.
+   */
+  private read() {
+    const container = this.container();
+    return {
+      q: this.query().trim() || undefined,
+      worldId: this.ref.data.worldId,
+      type: [CORE_ASSET_TYPE_ID],
+      field: [IMAGE_KIND_FIELD_TOKEN, ...this.fieldTokens()],
+      container: container ? [container] : undefined,
+      read: 'link-target' as const,
+    };
   }
 
   /** A harvested dimension carries an i18n key the active Locale translates (ADR-0055); fall back to its key. */

@@ -1,13 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  AssetSummary,
   CreateWorldRequest,
   DEFAULT_WORLD_KIND,
-  ENTITY_LIST_MAX_LIMIT,
   EntityDetail,
-  EntityFacets,
-  EntityType,
-  FieldFilter,
   InboundLinkCount,
   MemberRole,
   PublicLink,
@@ -17,11 +12,9 @@ import {
   WorldSummary,
   WorldThemeSource,
 } from '@hexly/domain';
-import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_FILTER } from '@hexly/plugin-asset';
 import { and, asc, count, eq, inArray, isNotNull, ne } from 'drizzle-orm';
 import { AssetsService } from '../assets/assets.service';
 import { AssetMintService } from '../assets/asset-mint.service';
-import { EntitiesService } from '../entities/entities.service';
 import { AclSetResult, gate, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
 import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
@@ -31,12 +24,6 @@ import { NudgeBus } from '../events/nudge-bus';
 import { ContainerLinksService } from './container-links.service';
 import { WorldWrites } from './world-writes';
 import { INITIAL_SEQ, containers, entities, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
-
-/** The picker's search inputs (#281): the FTS `q` and any active image Field facets, both pinned to image kind. */
-export interface AssetSearchOptions {
-  readonly q?: string;
-  readonly fields?: readonly FieldFilter[];
-}
 
 /** World Public Link table for the shared get/mint/revoke helpers. */
 const WORLD_LINK: PublicLinkTable = {
@@ -57,7 +44,6 @@ export class WorldsService {
     @Inject(DB) private readonly db: Db,
     private readonly assets: AssetsService,
     private readonly assetMint: AssetMintService,
-    private readonly entities: EntitiesService,
     private readonly bus: NudgeBus,
     private readonly writes: WorldWrites,
     private readonly links: ContainerLinksService,
@@ -406,55 +392,6 @@ export class WorldsService {
       .all();
     for (const e of shared) this.bus.emitEntityChange(e.id);
     return { status: 'ok', value: null };
-  }
-
-  /**
-   * Search the World's image Assets for the Board image picker (#269, #281, ADR-0034, ADR-0065): the
-   * picker offers the *same* search + Facets as the Asset Browser, pinned to the asset type + image kind,
-   * so picking art on an image-heavy World is fast. It reuses the one entity-search machinery — the FTS
-   * `q` and Field facets go through {@link EntitiesService.list} pinned to `core.type.asset` +
-   * {@link IMAGE_KIND_FIELD_FILTER}, and each match is dressed as an {@link AssetSummary} (capability URL +
-   * thumbnail) — rather than listing every upload and filtering mimes client-side.
-   *
-   * Contributor-gated (owner ∨ contributor ∨ Superadmin), the same standing {@link uploadAsset} requires —
-   * the picker is an editing surface, and the guard-less serving route (ADR-0034) makes any listed URL
-   * fetchable, so a World Viewer must not enumerate Assets (board review). The reader-scoped entity search
-   * then keeps a private Asset "only in its uploader's picker" (ADR-0065). Unreachable → 404,
-   * reachable-but-not-contributor → 403.
-   */
-  searchAssets(userId: string, id: string, opts: AssetSearchOptions): AssetSummary[] | 'not-found' | 'forbidden' {
-    const meta = worldAccess(this.db, userId).decideMeta(id);
-    if (!meta?.reachable) return 'not-found';
-    if (!meta.canContribute) return 'forbidden';
-    const { items } = this.entities.list(userId, {
-      offset: 0,
-      // A picker is unpaginated; the facet drill-down is what keeps the set small. The cap is the shared
-      // list ceiling, so an image-heavy World never floods the grid in one read.
-      limit: ENTITY_LIST_MAX_LIMIT,
-      containerIds: [id],
-      type: [CORE_ASSET_TYPE_ID as EntityType],
-      q: opts.q,
-      fields: [IMAGE_KIND_FIELD_FILTER, ...(opts.fields ?? [])],
-    });
-    return this.assets.summariesFor(id, items);
-  }
-
-  /**
-   * The Facet counts for the Board image picker's rail (#281, ADR-0065): the same drill-down counts the
-   * Asset Browser shows, pinned to `core.type.asset` + {@link IMAGE_KIND_FIELD_FILTER}, so the picker
-   * offers only image Facets (orientation, hue). Reuses {@link EntitiesService.facets}; same gate as
-   * {@link searchAssets}. Unreachable → 404, reachable-but-not-contributor → 403.
-   */
-  assetFacets(userId: string, id: string, opts: AssetSearchOptions): EntityFacets | 'not-found' | 'forbidden' {
-    const meta = worldAccess(this.db, userId).decideMeta(id);
-    if (!meta?.reachable) return 'not-found';
-    if (!meta.canContribute) return 'forbidden';
-    return this.entities.facets(userId, {
-      containerIds: [id],
-      type: [CORE_ASSET_TYPE_ID as EntityType],
-      q: opts.q,
-      fields: [IMAGE_KIND_FIELD_FILTER, ...(opts.fields ?? [])],
-    });
   }
 
   /**

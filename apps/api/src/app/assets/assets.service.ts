@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
-import { AssetSummary, assetUrl, EntityDocument, entityDocumentSchema, THUMBNAIL_SUFFIX } from '@hexly/domain';
-import { assetSummaryOf, readAssetValue } from '@hexly/plugin-asset';
+import { assetUrl, EntityDocument, entityDocumentSchema, THUMBNAIL_SUFFIX } from '@hexly/domain';
+import { readAssetValue } from '@hexly/plugin-asset';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { assetIndex, entities, entityEdges } from '../db/schema';
@@ -191,36 +191,15 @@ export class AssetsService implements OnModuleInit {
     for (const { containerId, name, value } of [...this.assetEntities(worldId), ...this.foreignAssets(worldId)]) {
       const found = this.read(containerId, value.hash + value.ext);
       if (found) {
-        // One home for the served-URL + `name + ext` derivation: the picker's {@link assetSummaryOf}.
-        const summary = assetSummaryOf(containerId, name, value);
-        out.push({ servedUrl: summary.url, originalFilename: summary.originalFilename, bytes: found.bytes });
+        // The served URL an exported document references — keyed by the Asset's *own* Container, which
+        // is what its URL was written with (#407, #415) — and the human-readable `name + ext` the zip
+        // writes it under; the Entity's name is the filename stem at mint, so a rename renames the file.
+        out.push({
+          servedUrl: assetUrl(containerId, value.hash, value.ext),
+          originalFilename: `${name}${value.ext}`,
+          bytes: found.bytes,
+        });
       }
-    }
-    return out;
-  }
-
-  /**
-   * Turn already-matched Asset Entities into {@link AssetSummary}s — the picker source (#269, ADR-0065,
-   * #281). The Board image picker searches through the one entity-search machinery (pinned to the asset
-   * type + image kind), which yields ordered `{ id, name }` rows; this reads each one's asset-ref off its
-   * document to attach the capability URL, thumbnail, `mime` and `size` the picker draws. Metadata only,
-   * no disk read; the caller's order is preserved (relevance under a query), and a row whose document
-   * carries no readable asset-ref (a placeholder this build cannot parse) is dropped forward-only.
-   */
-  summariesFor(worldId: string, matches: readonly { id: string; name: string }[]): AssetSummary[] {
-    if (matches.length === 0) return [];
-    const docs = new Map<string, string>();
-    for (const row of this.db
-      .select({ id: entities.id, document: entities.document })
-      .from(entities)
-      .where(inArray(entities.id, [...new Set(matches.map((m) => m.id))]))
-      .all())
-      docs.set(row.id, row.document);
-    const out: AssetSummary[] = [];
-    for (const match of matches) {
-      const raw = docs.get(match.id);
-      const value = raw ? assetRefOf(raw) : null;
-      if (value) out.push(assetSummaryOf(worldId, match.name, value));
     }
     return out;
   }

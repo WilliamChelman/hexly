@@ -936,8 +936,8 @@ describe('Vault import endpoint', () => {
     const world = await ada.get(`/worlds/${res.body.worldId}`).expect(200);
     expect(world.body.entityCount).toBe(2);
     // The unreferenced Asset is browsable in the picker; `.obsidian` config produced nothing.
-    const assets = await ada.get(`/worlds/${res.body.worldId}/assets`).expect(200);
-    expect(assets.body).toHaveLength(1);
+    const assets = await ada.get(`/entities?worldId=${res.body.worldId}&type=core.type.asset`).expect(200);
+    expect(assets.body.items).toHaveLength(1);
     const list = await ada.get(`/entities?worldId=${res.body.worldId}`).expect(200);
     const names = list.body.items.map((e: { name: string }) => e.name);
     expect(names).not.toContain('app');
@@ -1039,22 +1039,18 @@ describe('Vault import endpoint', () => {
     const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
     const worldId = res.body.worldId;
 
-    // Both unreferenced binaries minted; the picker lists them as Assets.
+    // Both unreferenced binaries minted; the picker offers them as Assets. Assets are hidden from the
+    // default listing (ADR-0065/#278), so the picker's own type pin is what selects them into view.
     expect(res.body.assetsStored).toBe(2);
-    const assets = (await ada.get(`/worlds/${worldId}/assets`).expect(200)).body as {
-      thumbnailUrl: string;
-      originalFilename: string;
-    }[];
-    expect(assets.map((a) => a.originalFilename).sort()).toEqual(['orphan.png', 'other.png']);
+    const assets = (await ada.get('/entities').query({ worldId, type: 'core.type.asset', thumbnails: '1' }).expect(200))
+      .body.items as { name: string; id: string; thumbnailUrl: string }[];
+    expect(assets.map((a) => a.name).sort()).toEqual(['orphan', 'other']);
 
     // The parseable PNG carries populated stats and serves a thumbnail — extraction ran inline at mint.
-    // Assets are hidden from the default listing (ADR-0065/#278), so select the asset type explicitly.
-    const assetList = await ada.get('/entities').query({ worldId, type: 'core.type.asset' }).expect(200);
-    const orphanId = assetList.body.items.find((e: { name: string }) => e.name === 'orphan').id;
-    const orphan = await ada.get(`/entities/${orphanId}`).expect(200);
+    const orphanRow = assets.find((a) => a.name === 'orphan')!;
+    const orphan = await ada.get(`/entities/${orphanRow.id}`).expect(200);
     expect(orphan.body.document['core.field.asset'].stats).not.toBeNull();
-    const orphanThumb = assets.find((a) => a.originalFilename === 'orphan.png')!.thumbnailUrl;
-    await request(app.getHttpServer()).get(orphanThumb).expect(200);
+    await request(app.getHttpServer()).get(orphanRow.thumbnailUrl).expect(200);
   });
 
   it('dedups identical binaries in the zip to one Asset — the path-sorted first name wins (ADR-0065)', async () => {
@@ -1070,12 +1066,11 @@ describe('Vault import endpoint', () => {
     const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     expect(res.body.assetsStored).toBe(1);
-    const assets = (await ada.get(`/worlds/${res.body.worldId}/assets`).expect(200)).body as {
-      originalFilename: string;
-    }[];
+    const assets = (await ada.get(`/entities?worldId=${res.body.worldId}&type=core.type.asset`).expect(200)).body
+      .items as { name: string }[];
     // Path-sorted iteration means `a-folder/original.png` mints first, so its stem is the name that sticks.
     expect(assets).toHaveLength(1);
-    expect(assets[0].originalFilename).toBe('original.png');
+    expect(assets[0].name).toBe('original');
   });
 
   /** The Asset `hash`es every Entity in `worldId` references, via the derived edge index. */

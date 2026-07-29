@@ -397,6 +397,13 @@ export interface EntitySummary {
    */
   readonly thumbnailUrl?: string;
   /**
+   * The served **capability URL** of this Entity's *own* bytes (ADR-0034), on the same `thumbnails=1`
+   * opt-in and the same index join — the full-resolution address a Board **Image** stores, where
+   * {@link thumbnailUrl} is the tile a grid draws. Keyed off the Entity's *own* Container, never the
+   * reading World's (ADR-0080), so art placed from a mounted Shelf renders for every reader.
+   */
+  readonly assetUrl?: string;
+  /**
    * Set when this Entity's own bytes are absent from the resolved Assets root (#325, ADR-0034). Computed per
    * read, so restoring the file clears it with no Reindex; absent for an Entity that owns no bytes.
    */

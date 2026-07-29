@@ -3,6 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { EntitySummary, FacetCount } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { ButtonComponent, InputComponent } from '@hexly/web-ui';
+import { ContainerChipsComponent } from './container-chips.component';
 
 /**
  * The shared server-side Entity picker (ADR-0025): a search box over the `list({ q })` read,
@@ -22,7 +23,7 @@ import { ButtonComponent, InputComponent } from '@hexly/web-ui';
 @Component({
   selector: 'app-entity-search-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, InputComponent, TranslocoPipe],
+  imports: [ButtonComponent, ContainerChipsComponent, InputComponent, TranslocoPipe],
   template: `
     <div class="rounded-md border border-line bg-surface p-1 shadow-2" [attr.data-testid]="testid() + '-menu'">
       <input
@@ -33,36 +34,16 @@ import { ButtonComponent, InputComponent } from '@hexly/web-ui';
         [value]="query()"
         (input)="queryChange.emit($any($event.target).value)"
       />
-      <!-- The **Container** facet (ADR-0080): present only where this World Mounts something the read
-           reached, so a picker that offers one Container's Entities shows no chip to narrow by. Counts
-           come off the same read the options do, so a chip can never disagree with the list. -->
-      @if (containers().length > 1) {
-        <div class="mb-1 flex flex-wrap gap-1" [attr.data-testid]="testid() + '-containers'">
-          <button
-            type="button"
-            appButton
-            [variant]="container() ? 'ghost' : 'default'"
-            size="sm"
-            [attr.data-testid]="testid() + '-container-all'"
-            (click)="container.set(undefined)"
-          >
-            {{ 'collab.entitySearchPicker.allContainers' | transloco }}
-          </button>
-          @for (c of containers(); track c.value) {
-            <button
-              type="button"
-              appButton
-              [variant]="container() === c.value ? 'default' : 'ghost'"
-              size="sm"
-              [attr.data-testid]="testid() + '-container-' + c.value"
-              (click)="container.set(c.value)"
-            >
-              {{ c.label ?? c.value }}
-              <span class="font-mono text-2xs text-ink-muted">({{ c.count }})</span>
-            </button>
-          }
-        </div>
-      }
+      <!-- The **Container** facet (ADR-0080), shared with the asset pickers: present only where this
+           World Mounts something the read reached, so a picker that offers one Container's Entities shows
+           no chip to narrow by. Counts come off the same read the options do, so a chip can never
+           disagree with the list. -->
+      <app-container-chips
+        class="mb-1 block"
+        [testid]="testid()"
+        [containers]="containers()"
+        [(selected)]="container"
+      />
       <!-- Only the option list scrolls; a projected footer (create rows) stays pinned. -->
       <div class="max-h-56 overflow-auto">
         @for (e of options(); track e.id) {

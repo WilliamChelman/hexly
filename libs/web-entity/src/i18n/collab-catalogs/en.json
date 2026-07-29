@@ -64,7 +64,9 @@
   },
   "entitySearchPicker": {
     "searchPlaceholder": "Search entities…",
-    "empty": "No matching entities",
-    "allContainers": "All"
+    "empty": "No matching entities"
+  },
+  "containerChips": {
+    "all": "All"
   }
 }

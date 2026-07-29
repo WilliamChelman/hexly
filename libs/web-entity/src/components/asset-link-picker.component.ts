@@ -1,11 +1,9 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { EntityLinkValue, EntitySummary } from '@hexly/domain';
-import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_FILTER } from '@hexly/plugin-asset';
+import { EntityLinkValue, EntitySummary, FacetCount } from '@hexly/domain';
+import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_TOKEN } from '@hexly/plugin-asset';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
-
-/** The image-kind `key:op:value` facet token the picker AND-s into its entity-search (ADR-0065/0066). */
-const IMAGE_KIND_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILTER.op}:${IMAGE_KIND_FIELD_FILTER.value}`;
+import { ContainerChipsComponent } from './container-chips.component';
 
 /**
  * The **pick-or-upload** affordance the core entityLink control grows whenever a Field's `targetTypes`
@@ -23,7 +21,7 @@ const IMAGE_KIND_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILT
 @Component({
   selector: 'app-asset-link-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe],
+  imports: [ContainerChipsComponent, TranslocoPipe],
   template: `
     <div class="flex flex-col gap-2" data-testid="asset-link-control">
       <!-- Current value: a preview tile + its last-known name, so a deleted/hidden target stays legible. -->
@@ -91,6 +89,9 @@ const IMAGE_KIND_TOKEN = `${IMAGE_KIND_FIELD_FILTER.key}:${IMAGE_KIND_FIELD_FILT
               [value]="query()"
               (input)="query.set($any($event.target).value)"
             />
+            <!-- The **Container** facet (ADR-0080): a World that Mounts a shelf is offered its art here
+                 too, and these chips narrow to one shelf. Nothing Mounted, nothing to narrow, no chips. -->
+            <app-container-chips testid="asset-link" [containers]="containers()" [(selected)]="container" />
             @if (results().length > 0) {
               <div class="grid max-h-56 grid-cols-3 gap-2 overflow-y-auto" role="list">
                 @for (asset of results(); track asset.id) {
@@ -152,21 +153,34 @@ export class AssetLinkPickerComponent {
 
   /** The matched image Assets (id + thumbnail), empty while the panel is closed. */
   protected readonly results = signal<EntitySummary[]>([]);
+  /** The **Container** facet's live values — this World and the ones it Mounts that still hold a match. */
+  protected readonly containers = signal<readonly FacetCount[]>([]);
+  /** The Container the user narrowed to, if any — one Shelf, or one pack (ADR-0080). */
+  protected readonly container = signal<string | undefined>(undefined);
   /** The current value's resolved thumbnail URL, or `undefined` for a dangling/non-image/loading target. */
   protected readonly currentThumb = signal<string | undefined>(undefined);
 
   constructor() {
     // Resolve the current value's preview tile whenever the link changes (ADR-0066): one read by id with
     // thumbnails=1. A dangling/non-image target resolves to no thumbnailUrl and falls back to the placeholder.
+    // No World scope: "resolve exactly this id" is no browse, and naming one would blank the preview of a
+    // link the picker itself offered from a Mounted Shelf (ADR-0080).
     effect((onCleanup) => {
       const current = this.value();
       this.currentThumb.set(undefined);
       if (!current) return;
-      const sub = this.entities.list({ ids: [current.entityId], thumbnails: true, worldId: this.worldId() }).subscribe({
+      const sub = this.entities.list({ ids: [current.entityId], thumbnails: true }).subscribe({
         next: (page) => this.currentThumb.set(page.items[0]?.thumbnailUrl),
         error: () => this.currentThumb.set(undefined),
       });
       onCleanup(() => sub.unsubscribe());
+    });
+
+    // A narrowing the World outlives would silently answer the next search from a Container the user
+    // cannot see chosen: a new World is a new set of Containers, so the selection goes with it.
+    effect(() => {
+      this.worldId();
+      untracked(() => this.container.set(undefined));
     });
 
     // Search image Assets through the one entity-search machinery whenever the panel is open and the query
@@ -177,23 +191,45 @@ export class AssetLinkPickerComponent {
         this.results.set([]);
         return;
       }
-      const sub = this.entities
-        .list({
-          q: this.query().trim(),
-          worldId: this.worldId(),
-          type: [CORE_ASSET_TYPE_ID],
-          field: [IMAGE_KIND_TOKEN],
-          thumbnails: true,
-          // Designating a Thumbnail is pointing at an Entity, so the search is a link-target read like
-          // any other Entity Link Field picker's (ADR-0079); resolving the *current* value above is not.
-          read: 'link-target',
-        })
-        .subscribe({
-          next: (page) => this.results.set(page.items),
-          error: () => this.results.set([]),
-        });
+      const sub = this.entities.list({ ...this.read(), thumbnails: true }).subscribe({
+        next: (page) => this.results.set(page.items),
+        error: () => this.results.set([]),
+      });
       onCleanup(() => sub.unsubscribe());
     });
+
+    // The Container facet's counts, off the same read the tiles come from — its own selection dropped, as
+    // every drill-down facet's is, so the chip you are standing on keeps its siblings to move to.
+    effect((onCleanup) => {
+      if (!this.picking()) {
+        this.containers.set([]);
+        return;
+      }
+      const sub = this.entities.facets({ ...this.read(), container: undefined }).subscribe({
+        next: (facets) => this.containers.set(facets.container ?? []),
+        error: () => this.containers.set([]),
+      });
+      onCleanup(() => sub.unsubscribe());
+    });
+  }
+
+  /**
+   * The one read behind both the tiles and the chips annotating them, so the two cannot disagree.
+   * Designating a Thumbnail is pointing at an Entity, so this is a **link-target read** like every other
+   * Entity Link Field picker's (ADR-0079) — which is what offers a mounted Shelf's art beside this
+   * World's own, the World's own first (ADR-0080). Resolving the *current* value is not: that is an id
+   * lookup, and it reads through no scope at all.
+   */
+  private read() {
+    const container = this.container();
+    return {
+      q: this.query().trim(),
+      worldId: this.worldId(),
+      type: [CORE_ASSET_TYPE_ID],
+      field: [IMAGE_KIND_FIELD_TOKEN],
+      container: container ? [container] : undefined,
+      read: 'link-target' as const,
+    };
   }
 
   /** Commit a picked image Asset as the link — its id plus a name snapshot (the dangling fallback). */
