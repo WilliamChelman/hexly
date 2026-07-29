@@ -359,7 +359,8 @@
     "deleteCount": "This permanently destroys {count, plural, one {# entity} other {# entities}}. This cannot be undone.",
     "deleteConfirmPrompt": "Type {{name}} to confirm.",
     "deleteConfirmLabel": "Type the world name to confirm deletion",
-    "deleteError": "Couldn't delete that world. Please try again."
+    "deleteError": "Couldn't delete that world. Please try again.",
+    "shelves": "Shelves"
   },
   "worldDashboard": {
     "tabTitle": "Hexly — Dashboard",
@@ -622,6 +623,18 @@
       "display": "The Ninefold Road",
       "body": "Three days east of the river, the road forks at a broken milestone."
     }
+  },
+  "worldKind": {
+    "heading": "Campaign or shelf",
+    "subhead": "What this world is kept for. A shelf is one you draw from rather than play in — where reusable material lives: art, tracks, a homebrew bestiary.",
+    "campaign": "Campaign",
+    "shelf": "Shelf",
+    "hint": {
+      "campaign": "A world you play in.",
+      "shelf": "A world you draw from."
+    },
+    "note": "It is a label and nothing more: the world index groups by it, and nothing else anywhere reads it. A shelf keeps its members, its dashboard, its theme, its public link and its place in the world switcher, exactly as a campaign does.",
+    "saveError": "Couldn't save that. Please try again."
   },
   "imports": {
     "heading": "Imports",

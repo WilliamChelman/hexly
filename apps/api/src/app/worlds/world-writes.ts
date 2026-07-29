@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { FieldSchema, MemberRole, UserDefinedType, WorldTheme } from '@hexly/domain';
+import { FieldSchema, MemberRole, UserDefinedType, WorldKind, WorldTheme } from '@hexly/domain';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import {
@@ -89,17 +89,22 @@ export class WorldWrites {
    * write dedups to nothing. Safe because `better-sqlite3` is synchronous and the read rode the
    * same transaction.
    */
-  update(row: WorldRow, patch: { name?: string; pinnedEntityIds?: string[]; theme?: WorldTheme | null }): WorldRow {
+  update(
+    row: WorldRow,
+    patch: { name?: string; pinnedEntityIds?: string[]; theme?: WorldTheme | null; kind?: WorldKind },
+  ): WorldRow {
     const next: WorldRow = {
       ...row,
       ...(patch.name !== undefined ? { name: patch.name } : {}),
       ...(patch.pinnedEntityIds !== undefined ? { pinnedEntityIds: patch.pinnedEntityIds } : {}),
       ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
+      ...(patch.kind !== undefined ? { kind: patch.kind } : {}),
       updatedAt: Date.now(),
       seq: row.seq + 1,
     };
     return this.transact(() => {
-      // Identity and freshness on the Container, pins and Theme on the satellite (ADR-0078).
+      // Identity and freshness on the Container, pins, Theme and campaign-or-Shelf on the satellite
+      // (ADR-0078, ADR-0080).
       this.db
         .update(containers)
         .set({ name: next.name, updatedAt: next.updatedAt, seq: next.seq })
@@ -107,7 +112,7 @@ export class WorldWrites {
         .run();
       this.db
         .update(worlds)
-        .set({ pinnedEntityIds: next.pinnedEntityIds, theme: next.theme })
+        .set({ pinnedEntityIds: next.pinnedEntityIds, theme: next.theme, kind: next.kind })
         .where(eq(worlds.id, row.id))
         .run();
       // Rename, pin reorder and a Theme edit all ride this one world-detail nudge — a theme edit bumps

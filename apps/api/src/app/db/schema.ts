@@ -1,4 +1,4 @@
-import { EdgeTargetKind, FieldSchema, ViewPlacement, WorldTheme } from '@hexly/domain';
+import { DEFAULT_WORLD_KIND, EdgeTargetKind, FieldSchema, ViewPlacement, WorldKind, WorldTheme } from '@hexly/domain';
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 // Keep in sync by hand with the `CREATE TABLE` DDL in `./db.ts`; column changes
@@ -166,6 +166,10 @@ export const worlds = sqliteTable('worlds', {
   id: text('id')
     .primaryKey()
     .references(() => containers.id, { onDelete: 'cascade' }),
+  // Campaign-or-Shelf (ADR-0080): a label the World Index groups by and that **no read filters on**.
+  // Deliberately not the {@link containers} `kind` beside it — that one says which satellite completes
+  // the row, this one says what the World is kept for, and a Shelf is a World in every other respect.
+  kind: text('kind').$type<WorldKind>().notNull().default(DEFAULT_WORLD_KIND),
   // Owner-curated Dashboard pins: an ordered JSON array of Entity ids, one shared
   // set per World. References, not enforced FKs — stale or inaccessible ids are
   // filtered per-viewer on read, never pruned on delete.
@@ -178,8 +182,11 @@ export const worlds = sqliteTable('worlds', {
 /**
  * A whole stored World: its {@link containers} identity row joined to its {@link worlds} satellite.
  * The two are keyed by the same id, so the join reads as one flat row.
+ *
+ * The Container's own `kind` is dropped: it is `'world'` for every row here by construction, and the
+ * `kind` a World *has* is the satellite's campaign-or-Shelf label (ADR-0080).
  */
-export type WorldRow = typeof containers.$inferSelect & Omit<typeof worlds.$inferSelect, 'id'>;
+export type WorldRow = Omit<typeof containers.$inferSelect, 'kind'> & Omit<typeof worlds.$inferSelect, 'id'>;
 
 /**
  * A **Compendium** (ADR-0079): the Container kind holding one installed pack of published reference

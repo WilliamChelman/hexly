@@ -105,6 +105,17 @@ describe('WorldSettings', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-theme"]')).toBeNull();
   });
 
+  it('offers campaign-or-Shelf to a caller who may manage the World, and to no one else (ADR-0080)', () => {
+    pin(['manage']);
+    const fixture = TestBed.createComponent(WorldSettingsPage);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-kind"]')).not.toBeNull();
+
+    pin(['read', 'create-entity']);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-kind"]')).toBeNull();
+  });
+
   it('keeps the open section through a World refresh, so saving a Theme does not close the pane', async () => {
     pin(['manage']);
     const fixture = TestBed.createComponent(WorldSettingsPage);

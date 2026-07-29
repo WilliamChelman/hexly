@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   AssetSummary,
   CreateWorldRequest,
+  DEFAULT_WORLD_KIND,
   ENTITY_LIST_MAX_LIMIT,
   EntityDetail,
   EntityFacets,
@@ -73,6 +74,9 @@ export class WorldsService {
       .select({
         id: containers.id,
         name: containers.name,
+        // Campaign-or-Shelf rides the listing so the World Index can group by it (ADR-0080). It is
+        // carried, never filtered on: the WHERE below is reachability and nothing else.
+        kind: worlds.kind,
         createdAt: containers.createdAt,
         updatedAt: containers.updatedAt,
       })
@@ -133,6 +137,9 @@ export class WorldsService {
     return {
       id: worldId,
       name: req.name,
+      // A new World is a campaign unless said otherwise (ADR-0080) — the column's own default,
+      // echoed here rather than re-read.
+      kind: DEFAULT_WORLD_KIND,
       // The creator is the sole initial Owner, so full Rights.
       owners: [ownerId],
       rights: worldRightsOf({ isOwner: true, canContribute: true }),
@@ -167,8 +174,8 @@ export class WorldsService {
 
   /**
    * Update a World's Owner-curated fields (Owner only): `name`, the ordered
-   * `pinnedEntityIds`, and/or the World Theme. Forbidden if not an Owner, null if
-   * not found; an absent field is left untouched, and a `null` Theme clears it.
+   * `pinnedEntityIds`, the World Theme, and/or campaign-or-Shelf (ADR-0080). Forbidden if not an
+   * Owner, null if not found; an absent field is left untouched, and a `null` Theme clears it.
    * Pins are stored verbatim (references, not FKs); the Theme arrives already
    * canonicalised by its schema, the write choke point (ADR-0076).
    * ponytail: stale pin ids filtered on read, not pruned on delete.
@@ -484,6 +491,7 @@ export class WorldsService {
     return {
       id: world.id,
       name: world.name,
+      kind: world.kind,
       owners,
       rights: worldRightsOf({ isOwner: !!meta?.isOwner, canContribute: !!meta?.canContribute }),
       entityCount,

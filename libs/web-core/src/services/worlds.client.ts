@@ -18,6 +18,7 @@ import {
   VaultImportOptions,
   WorldDetail,
   WorldGraph,
+  WorldKind,
   WorldMember,
   WorldNudge,
   WorldSummary,
@@ -152,6 +153,15 @@ export class WorldsClient {
   setTheme(id: string, theme: WorldThemeInput | null): Observable<WorldDetail> {
     // Write-through, as {@link rename} — the saved Theme fans out and this tab's own echo dedups.
     return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { theme }).pipe(tap((d) => this.store.merge(d)));
+  }
+
+  /**
+   * Label the World a campaign or a **Shelf** (ADR-0080). Owner-gated server-side. Nothing else
+   * changes: the label is what the World Index groups by, and no read filters on it.
+   */
+  setKind(id: string, kind: WorldKind): Observable<WorldDetail> {
+    // Write-through, as {@link rename} — the relabelled World fans out and this tab's echo dedups.
+    return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { kind }).pipe(tap((d) => this.store.merge(d)));
   }
 
   /**
