@@ -227,20 +227,66 @@ describe('World Graph', () => {
     expect(edges).toEqual([{ source: ealdred, target: portrait, descriptor: null, decor: true }]);
   });
 
-  /** An identical hash in another World shares no Entity, so its asset edge never leaks across. */
-  it('resolves an asset edge only within its own World', async () => {
+  /**
+   * A hash names bytes, not an Asset: an identical hash in another World shares no Entity, and a URL
+   * naming *this* World reaches only this World's Assets (ADR-0080). A hash alone never crosses.
+   */
+  it('resolves an asset edge against the World its URL names, not any World holding the bytes', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     const elsewhere = await makeWorld(ada, 'Thornwood');
     const ealdred = await makeEntity(ada, world, 'Ealdred');
     const hash = 'b'.repeat(64);
-    // The Asset Entity for this hash lives in the *other* World.
+    // The Asset Entity for this hash lives in the *other* World; the URL names this one.
     mintAsset(elsewhere, hash, 'Portrait');
     await illustrate(ada, ealdred, assetUrl(world, hash, '.png'));
 
     const { nodes, edges } = await graphOf(ada, world);
     expect(names(nodes)).toEqual(['Ealdred']);
     expect(edges).toEqual([]);
+  });
+
+  /**
+   * An image whose URL points at another Container's bytes *renders* — the byte route is unauthenticated
+   * and takes the Container from the path — so the graph draws it too, or it would quietly disagree with
+   * the page (ADR-0080). The Asset is a node of this picture although it is not this World's Entity.
+   */
+  describe('An image drawn from another Container', () => {
+    it('draws the edge, with that Container’s Asset as its far end', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const board = await makeEntity(ada, world, 'Mood Board');
+      const hash = 'c'.repeat(64);
+      const portrait = mintAsset(shelf, hash, 'Shelf Portrait');
+
+      await illustrate(ada, board, assetUrl(shelf, hash, '.png'));
+
+      const { nodes, edges } = await graphOf(ada, world);
+      expect(names(nodes)).toEqual(['Mood Board', 'Shelf Portrait']);
+      expect(drawn({ nodes, edges })).toEqual(['Mood Board → Shelf Portrait']);
+      // Decor by construction, wherever the bytes live — the client's reveal governs it as ever (ADR-0069).
+      expect(edges).toEqual([{ source: board, target: portrait, descriptor: null, decor: true }]);
+    });
+
+    /** Both endpoints stay access-filtered: an Asset the viewer cannot read is no node and so no edge. */
+    it('draws nothing for a viewer who cannot read the Asset’s Container', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const bob = await signIn('bob@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      await addMember(ada, world, bobId);
+      const board = await makeEntity(ada, world, 'Mood Board');
+      await share(ada, board);
+      const hash = 'c'.repeat(64);
+      mintAsset(shelf, hash, 'Shelf Portrait');
+
+      await illustrate(ada, board, assetUrl(shelf, hash, '.png'));
+
+      const { nodes, edges } = await graphOf(bob, world);
+      expect(names(nodes)).toEqual(['Mood Board']);
+      expect(edges).toEqual([]);
+    });
   });
 
   /**

@@ -360,7 +360,8 @@ export const assetIndex = sqliteTable(
  *
  * `targetId` deliberately carries **no FK**: a link to a missing or unreadable Entity is a valid
  * document, so it is unconstrained text resolved opportunistically on read. `containerId` is
- * denormalized off the source so the World Graph's edge fetch is one indexed lookup.
+ * denormalized off the source so the World Graph's edge fetch is one indexed lookup; `targetContainerId`
+ * is the *target's*, which an asset URL names for itself (ADR-0080).
  */
 export const entityEdges = sqliteTable(
   'entity_edges',
@@ -374,6 +375,11 @@ export const entityEdges = sqliteTable(
     targetKind: text('target_kind').$type<EdgeTargetKind>().notNull(),
     // An `entityId`, or an Asset `hash`. Dangling-allowed, so no FK.
     targetId: text('target_id').notNull(),
+    // The Container the target lives in, on an `asset` edge alone — read off the `/assets/<containerId>/…`
+    // URL the document was written with, never assumed to be the source's (ADR-0080). NULL on an `entity`
+    // edge and on a row predating this column; both resolve against `containerId`, which is what a World
+    // that draws on nothing has always meant. Dangling-allowed, so no FK.
+    targetContainerId: text('target_container_id'),
     // The Link Descriptor, on `content → entity` edges alone. Two descriptors to the same
     // target are two edges ("spouse" *and* "rival" between one pair).
     descriptor: text('descriptor'),

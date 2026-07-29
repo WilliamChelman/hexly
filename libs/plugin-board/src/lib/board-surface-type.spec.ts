@@ -87,10 +87,10 @@ describe('the core.datatype.board-surface Structured Data Type (ADR-0050, #263)'
 
       // Embeds and Text Block links are always semantic (ADR-0069) — curatorial acts and authored meaning.
       expect(edges).toEqual([
-        { targetKind: 'entity', targetId: 'riverbend', descriptor: null, decor: false },
-        { targetKind: 'entity', targetId: 'the-keep', descriptor: null, decor: false },
-        { targetKind: 'entity', targetId: 'avalon', descriptor: null, decor: false },
-        { targetKind: 'entity', targetId: 'the-whisperwood', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'riverbend', targetContainerId: null, descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'the-keep', targetContainerId: null, descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'avalon', targetContainerId: null, descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'the-whisperwood', targetContainerId: null, descriptor: null, decor: false },
       ]);
     });
 
@@ -103,8 +103,25 @@ describe('the core.datatype.board-surface Structured Data Type (ADR-0050, #263)'
       // A Board Image is a capability-URL reference — decor by construction (ADR-0069). The Embed's entity
       // edge is semantic and rides alongside, order-preserved.
       expect(edges).toEqual([
-        { targetKind: 'asset', targetId: hash, descriptor: null, decor: true },
-        { targetKind: 'entity', targetId: 'riverbend', descriptor: null, decor: false },
+        { targetKind: 'asset', targetId: hash, targetContainerId: 'world-1', descriptor: null, decor: true },
+        { targetKind: 'entity', targetId: 'riverbend', targetContainerId: null, descriptor: null, decor: false },
+      ]);
+    });
+
+    /**
+     * The Container comes from the URL (ADR-0080): a Board placing a shelf's picture points at the shelf's
+     * Asset, so what the reader sees rendered and what References counts are the same thing. Two Containers
+     * holding identical bytes stay two Assets — the hash alone never crosses.
+     */
+    it('harvests an Image drawn from another Container as an edge into that Container', () => {
+      const hash = 'a'.repeat(64);
+      const edges = BOARD_SURFACE_DATA_TYPE.harvestEdges?.(
+        surface([image('i1', `/assets/shelf-9/${hash}.png`), image('i2', `/assets/world-1/${hash}.png`)]),
+      );
+
+      expect(edges).toEqual([
+        { targetKind: 'asset', targetId: hash, targetContainerId: 'shelf-9', descriptor: null, decor: true },
+        { targetKind: 'asset', targetId: hash, targetContainerId: 'world-1', descriptor: null, decor: true },
       ]);
     });
 

@@ -107,6 +107,7 @@ describe('plugin enablement — uniform absence on the server', () => {
       expect(state.edges).toContainEqual({
         targetKind: 'entity',
         targetId: 'ashford-note',
+        targetContainerId: null,
         descriptor: null,
         decor: false,
       });

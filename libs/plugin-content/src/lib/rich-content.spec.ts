@@ -32,16 +32,16 @@ describe('core.datatype.rich-content data-type (ADR-0051)', () => {
     it('reads a content entityLink as a semantic edge to that Entity, carrying its Link Descriptor', () => {
       // A prose Entity Link is always semantic (ADR-0069): authored meaning, never decor.
       expect(harvest(prose({ entityId: 'mira', label: 'Mira', descriptor: 'spouse' }))).toEqual([
-        { targetKind: 'entity', targetId: 'mira', descriptor: 'spouse', decor: false },
+        { targetKind: 'entity', targetId: 'mira', targetContainerId: null, descriptor: 'spouse', decor: false },
       ]);
     });
 
     it('trims the authored descriptor and treats a blank one as none', () => {
       expect(harvest(prose({ entityId: 'mira', descriptor: '  Capital Of  ' }))).toEqual([
-        { targetKind: 'entity', targetId: 'mira', descriptor: 'Capital Of', decor: false },
+        { targetKind: 'entity', targetId: 'mira', targetContainerId: null, descriptor: 'Capital Of', decor: false },
       ]);
       expect(harvest(prose({ entityId: 'mira', descriptor: '  ' }))).toEqual([
-        { targetKind: 'entity', targetId: 'mira', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'mira', targetContainerId: null, descriptor: null, decor: false },
       ]);
     });
 
@@ -60,7 +60,24 @@ describe('core.datatype.rich-content data-type (ADR-0051)', () => {
           { type: 'image', attrs: { src: 'https://example.test/cat.png' } },
         ],
       });
-      expect(harvest(value)).toEqual([{ targetKind: 'asset', targetId: hash, descriptor: null, decor: true }]);
+      expect(harvest(value)).toEqual([
+        { targetKind: 'asset', targetId: hash, targetContainerId: 'world-1', descriptor: null, decor: true },
+      ]);
+    });
+
+    /**
+     * The edge names the Container the *URL* names (ADR-0080), so a picture drawn from a shelf counts as
+     * usage of the shelf's Asset — the bytes and their meaning cross the boundary together, or neither does.
+     */
+    it('reads an image at another Container’s Asset URL as an edge into that Container', () => {
+      const hash = 'a'.repeat(64);
+      const value = tiptapContent({
+        type: 'doc',
+        content: [{ type: 'image', attrs: { src: `/assets/shelf-9/${hash}.png` } }],
+      });
+      expect(harvest(value)).toEqual([
+        { targetKind: 'asset', targetId: hash, targetContainerId: 'shelf-9', descriptor: null, decor: true },
+      ]);
     });
 
     it('finds links nested deep in the document tree', () => {
@@ -83,7 +100,9 @@ describe('core.datatype.rich-content data-type (ADR-0051)', () => {
           },
         ],
       });
-      expect(harvest(value)).toEqual([{ targetKind: 'entity', targetId: 'e1', descriptor: 'liege', decor: false }]);
+      expect(harvest(value)).toEqual([
+        { targetKind: 'entity', targetId: 'e1', targetContainerId: null, descriptor: 'liege', decor: false },
+      ]);
     });
 
     it('reads no edges under a format tag this build cannot walk', () => {

@@ -10,7 +10,7 @@
 
 import * as z from 'zod';
 import {
-  assetHashFromUrl,
+  assetEdgeFromUrl,
   defineField,
   defineStructuredDataType,
   descriptorSchema,
@@ -79,17 +79,17 @@ export const richContentBase = {
         edges.push({
           targetKind: 'entity',
           targetId: entityId,
+          targetContainerId: null,
           descriptor: descriptorSchema.safeParse(node.attrs?.['descriptor']).data ?? null,
           decor: false,
         });
         return;
       }
       if (node.type === 'image') {
-        // A prose image is a capability-URL reference — decor by construction (ADR-0069): a byte-serving
-        // URL is presentation, never a worldbuilding relation.
+        // A prose image is a capability-URL reference, harvested by what its URL names (ADR-0069/0080).
         const src = node.attrs?.['src'];
-        const hash = typeof src === 'string' ? assetHashFromUrl(src) : null;
-        if (hash) edges.push({ targetKind: 'asset', targetId: hash, descriptor: null, decor: true });
+        const edge = typeof src === 'string' ? assetEdgeFromUrl(src) : null;
+        if (edge) edges.push(edge);
       }
     });
     return edges;

@@ -1,0 +1,1 @@
+ALTER TABLE `entity_edges` ADD `target_container_id` text;

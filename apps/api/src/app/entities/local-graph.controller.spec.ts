@@ -138,6 +138,25 @@ describe('Local Graph', () => {
     expect(drawn(two)).toEqual(['Ealdred → Mira', 'Ealdred → Portrait', 'Mira → Portrait']);
   });
 
+  /**
+   * An image drawn from another Container harvests an edge into it (ADR-0080), and that edge is decor —
+   * so depth never reaches through it. Which is the guarantee that matters: expanding a shelf image would
+   * walk out into every other World using it, showing other campaigns' shapes in this Panel.
+   */
+  it('never reaches an Asset in another Container, however deep the walk', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    const shelf = await makeWorld(ada, 'The Shelf');
+    const ealdred = await makeEntity(ada, world, 'Ealdred');
+    const hash = 'b'.repeat(64);
+    mintAsset(shelf, hash, 'Shelf Portrait');
+    await save(ada, ealdred, [{ type: 'image', attrs: { src: assetUrl(shelf, hash, '.png') } }]);
+
+    const deep = await graphOf(ada, ealdred, LOCAL_GRAPH_MAX_DEPTH);
+    expect(names(deep.nodes)).toEqual(['Ealdred']);
+    expect(deep.edges).toEqual([]);
+  });
+
   it('never crosses an Entity the viewer cannot read', async () => {
     const ada = await signIn('ada@hexly.test');
     const bob = await signIn('bob@hexly.test');

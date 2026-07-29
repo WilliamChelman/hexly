@@ -77,14 +77,30 @@ export const assetSearchQuerySchema = z.object({
 
 export type AssetSearchQuery = z.infer<typeof assetSearchQuerySchema>;
 
-/** A sha256 digest, lowercase base-16 — the content address an Asset is stored and served under. */
-const ASSET_URL = /^\/assets\/[^/]+\/([0-9a-f]{64})(\.[^/.]+)?$/;
+/**
+ * The Container and content `hash` an {@link assetUrl} names — everything it takes to reach exactly one
+ * Asset, since identical bytes in two Containers share a hash but not an Entity.
+ */
+export interface AssetUrlRef {
+  /** The **Container** whose bytes the URL serves — read off its own path segment. */
+  readonly containerId: string;
+  /** The content address the bytes are stored under. */
+  readonly hash: string;
+}
+
+/** A Container segment, then a sha256 digest in lowercase base-16 — the content address an Asset is served under. */
+const ASSET_URL = /^\/assets\/([^/]+)\/([0-9a-f]{64})(\.[^/.]+)?$/;
 
 /**
- * The Asset `hash` an {@link assetUrl} names, or `null` for anything else — an
- * external `https:` image, a `data:` URI, or a vault-relative `src` not yet
- * rewritten by the import. Those reference no Asset, so they are no edge.
+ * The Asset an {@link assetUrl} names, or `null` for anything else — an external `https:` image, a
+ * `data:` URI, or a vault-relative `src` not yet rewritten by the import. Those reference no Asset, so
+ * they are no edge.
+ *
+ * The **Container comes from the URL**, never from the referencing Entity's own (ADR-0080): the byte
+ * route is unauthenticated and takes the Container from the path, so a document may legitimately carry
+ * another Container's URL — and an edge names what the URL names.
  */
-export function assetHashFromUrl(src: string): string | null {
-  return ASSET_URL.exec(src)?.[1] ?? null;
+export function assetRefFromUrl(src: string): AssetUrlRef | null {
+  const match = ASSET_URL.exec(src);
+  return match ? { containerId: match[1], hash: match[2] } : null;
 }
