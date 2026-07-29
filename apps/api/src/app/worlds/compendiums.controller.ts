@@ -13,9 +13,9 @@ import { compendiumById, listCompendiums } from './compendiums';
  * Instance-wide with no members, no roles and no public link (ADR-0078), so there is nothing per-caller
  * to resolve, and the same answer for every signed-in caller is what makes the shelf a shelf.
  *
- * The Compendium browse names its Containers from that list rather than riding single-Container
- * scoping, because the read is *about* compendium content (ADR-0079). Each row also carries the pack's
- * pinned `rev` and its attribution, which is where a pack's own page reads its terms from (#402).
+ * Each row carries the pack's pinned `rev` and its attribution, which is where a pack's own page reads
+ * its terms from (#402). The list itself is the operator's view of the shelf: a **Library** names its
+ * Containers from the World's **Mounts**, not from what happens to be installed (ADR-0080).
  */
 @Controller('compendiums')
 export class CompendiumsController {

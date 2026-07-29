@@ -14,16 +14,19 @@ import { CompendiumWrites } from './compendium-writes';
 import { WorldsModule } from './worlds.module';
 
 /**
- * The **Compendium browse** (#401, ADR-0079): the Entity Browser preset that unions every installed
- * pack. Asserted at the HTTP seam, since what is interesting here is what an ordinary signed-in caller
- * can see — the browse exists to make reference material reachable, and reachability is the one thing a
- * service-shaped test would not prove.
+ * The **Library**'s read (#412, ADR-0079's Compendium browse generalised by ADR-0080): the Entity
+ * Browser preset to a set of Containers, unioning them behind a **Container** facet. Asserted at the
+ * HTTP seam, since what is interesting here is what an ordinary signed-in caller can see — the surface
+ * exists to make foreign content reachable, and reachability is the one thing a service-shaped test
+ * would not prove. Which Containers the Library names is the World's **Mount** set, gathered by the
+ * page from `/worlds/:id/mounts` and pinned in `world-mounts.controller.spec.ts`; what those ids then
+ * read is this file's business.
  *
  * Packs are seeded through `CompendiumWrites` + the import insert rather than by running an Importer:
- * this is about the read, and two packs are needed to have a Compendium facet worth narrowing. The real
- * Importer's end of it lives in `draw-steel-monsters-import.controller.spec.ts`.
+ * this is about the read, and two Containers are needed to have a Container facet worth narrowing. The
+ * real Importer's end of it lives in `draw-steel-monsters-import.controller.spec.ts`.
  */
-describe('The Compendium browse', () => {
+describe('The Library’s read', () => {
   let app: INestApplication;
   let db: Db;
 
@@ -82,33 +85,70 @@ describe('The Compendium browse', () => {
     expect(packs[1].attribution).toEqual({});
   });
 
-  it('unions every installed pack, and the Compendium facet narrows to one', async () => {
+  it('unions every Container in its scope, and the Container facet narrows to one', async () => {
     await seed('bob@hexly.test', 'Bob');
     const bob = await signIn('bob@hexly.test');
 
-    // The browse names its Containers explicitly — the read is *about* compendium content, so it says
+    // The Library names its Containers explicitly — the read is *about* foreign content, so it says
     // which Containers rather than riding the single-Container scoping a World read uses.
     const scope = `containerId=${monsters}&containerId=${treasures}`;
     expect(await names(bob, scope)).toEqual(['Ajax the Invincible', 'Goblin Warrior', 'Sword of Dawn']);
 
-    // The Compendium facet: one value per pack, named and counted.
+    // The Container facet: one value per Container, named and counted.
     const facets = await facetsOf(bob, scope);
-    expect(facets.compendium).toEqual([
+    expect(facets.container).toEqual([
       { value: monsters, count: 2, label: 'Draw Steel: Monsters' },
       { value: treasures, count: 1, label: 'Draw Steel: Treasures' },
     ]);
 
-    // Narrowing to one pack narrows the list...
-    expect(await names(bob, `${scope}&compendium=${monsters}`)).toEqual(['Ajax the Invincible', 'Goblin Warrior']);
+    // Narrowing to one Container narrows the list...
+    expect(await names(bob, `${scope}&container=${monsters}`)).toEqual(['Ajax the Invincible', 'Goblin Warrior']);
     // ...and every sibling category counts under it...
-    const narrowed = await facetsOf(bob, `${scope}&compendium=${monsters}`);
+    const narrowed = await facetsOf(bob, `${scope}&container=${monsters}`);
     expect(valuesOf(narrowed, 'role')).toEqual(['brute', 'harrier']);
-    // ...while the Compendium facet itself still counts over the whole scope, so the pack just
+    // ...while the Container facet itself still counts over the whole scope, so the Container just
     // deselected is still there to click back on (drill-down, exactly as Type and Tag do).
-    expect(narrowed.compendium?.map((v) => v.value)).toEqual([monsters, treasures]);
+    expect(narrowed.container?.map((v) => v.value)).toEqual([monsters, treasures]);
   });
 
-  it("offers the packs' own dimensions as Facets, not just Type and Tag", async () => {
+  /**
+   * The Container facet reads in the Owner's **Mount** order (ADR-0080). The count knows nothing about
+   * Mounts: it reads back the order the request named its Containers in, and the Library names them in
+   * Mount order — which is why "Treasures before Monsters" here is not the alphabetical answer.
+   */
+  it('reads the Container facet in the order the scope named its Containers, not by name', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const reversed = await facetsOf(ada, `containerId=${treasures}&containerId=${monsters}`);
+    expect(reversed.container?.map((v) => v.value)).toEqual([treasures, monsters]);
+    const forwards = await facetsOf(ada, `containerId=${monsters}&containerId=${treasures}`);
+    expect(forwards.container?.map((v) => v.value)).toEqual([monsters, treasures]);
+  });
+
+  /**
+   * A **Compendium** is one value the Container facet takes and a **Shelf** is another (ADR-0080): the
+   * Library is not a pack browser, so a mounted World's Entities stand in the same list, under the same
+   * facet, told apart only by which Container they name.
+   */
+  it('stands a mounted World’s Entities beside a pack’s, in one list under one facet', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const shelf = (await ada.post('/worlds').send({ name: 'The Art Shelf' }).expect(201)).body.id;
+    await ada
+      .post('/entities')
+      .send({ name: 'Sunset over Aldermoor', types: [DS_MONSTER], worldId: shelf })
+      .expect(201);
+
+    const scope = `containerId=${shelf}&containerId=${monsters}`;
+    expect(await names(ada, scope)).toEqual(['Ajax the Invincible', 'Goblin Warrior', 'Sunset over Aldermoor']);
+    expect((await facetsOf(ada, scope)).container).toEqual([
+      { value: shelf, count: 1, label: 'The Art Shelf' },
+      { value: monsters, count: 2, label: 'Draw Steel: Monsters' },
+    ]);
+    // And an unmounted Container is simply not in the scope, so nothing of it can be listed — which is
+    // the whole of "and nothing from an unmounted one" (#412).
+    expect(await names(ada, scope)).not.toContain('Sword of Dawn');
+  });
+
+  it("offers the Containers' own dimensions as Facets, not just Type and Tag", async () => {
     const ada = await signIn('ada@hexly.test');
     const facets = await facetsOf(ada, `containerId=${monsters}&containerId=${treasures}`);
 
@@ -122,13 +162,13 @@ describe('The Compendium browse', () => {
     ]);
   });
 
-  it('reads across packs by full text, and is not fooled by a Container it was not given', async () => {
+  it('reads across Containers by full text, and is not fooled by one it was not given', async () => {
     const ada = await signIn('ada@hexly.test');
-    // Search behaves as it does anywhere else — the browse is the Entity Browser, preset.
+    // Search behaves as it does anywhere else — the Library is the Entity Browser, preset.
     expect(await names(ada, `containerId=${monsters}&containerId=${treasures}&q=sword`)).toEqual(['Sword of Dawn']);
     // The facet selection narrows *within* the scope and can never widen it: naming a Container the
-    // browse was not scoped to reaches nothing, rather than escaping into it.
-    expect(await names(ada, `containerId=${monsters}&compendium=${treasures}`)).toEqual([]);
+    // Library was not scoped to reaches nothing, rather than escaping into it.
+    expect(await names(ada, `containerId=${monsters}&container=${treasures}`)).toEqual([]);
   });
 
   it('opens an entry at its own URL, read-only, for a caller who owns nothing', async () => {

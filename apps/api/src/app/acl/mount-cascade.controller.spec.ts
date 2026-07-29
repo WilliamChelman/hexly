@@ -231,8 +231,12 @@ describe('A Mount cascades read', () => {
     await bob.delete(`/entities/${sunset}`).expect(403);
     // Nor does mounting a World make its Owner-only surfaces the reader's, or make it authorable: the
     // create resolves a World the caller may author in, and answers a mounted one as it always answered
-    // a merely-readable one.
-    await bob.get(`/worlds/${shelf}/mounts`).expect(403);
+    // a merely-readable one. Reading *what* a World draws from is any reader's, since that is what the
+    // Library is (#412); arranging it is the Owner's, and that is where the line sits.
+    await bob.get(`/worlds/${shelf}/mounts`).expect(200);
+    await bob.get(`/worlds/${shelf}/mount-candidates`).expect(403);
+    await bob.post(`/worlds/${shelf}/mounts`).send({ containerId: pack }).expect(403);
+    await bob.patch(`/worlds/${shelf}/mounts`).send({ containerIds: [] }).expect(403);
     await bob
       .post('/entities')
       .send({ name: 'Interloper', types: ['core.type.note'], worldId: shelf })

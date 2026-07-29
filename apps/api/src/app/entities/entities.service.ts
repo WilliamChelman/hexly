@@ -97,17 +97,20 @@ export interface ListOptions {
   readonly fields?: readonly FieldFilter[];
   /**
    * The **Container** scope: which Containers this read is about. One id for every World-scoped read
-   * (the Entity Browser, the Dashboard, a Facet count); the whole shelf for the Compendium browse,
-   * which names its Containers explicitly because the read is *about* compendium content (ADR-0079).
-   * Empty or absent means unscoped — the Command Palette's cross-Container reach.
+   * (the Entity Browser, the Dashboard, a Facet count); the World's whole **Mount** set for the
+   * **Library**, which names its Containers explicitly because the read is *about* foreign content
+   * (ADR-0079, ADR-0080). Empty or absent means unscoped — the Command Palette's cross-Container reach.
+   *
+   * Ordered, and the order is read back: the **Container** facet lists its values in it, which is how
+   * the Owner's Mount order reaches the rail without the facet count knowing what a Mount is.
    */
   readonly containerIds?: readonly string[];
   /**
-   * Facet: restrict to any of these **Compendiums** (OR within category). A narrowing *within*
+   * Facet: restrict to any of these **Containers** (OR within category). A narrowing *within*
    * {@link containerIds}, not a redefinition of it — both predicates AND, so naming a Container the
-   * scope excludes reaches nothing — which is what lets the Compendium facet drill down like Type or Tag.
+   * scope excludes reaches nothing — which is what lets the Container facet drill down like Type or Tag.
    */
-  readonly compendium?: readonly string[];
+  readonly container?: readonly string[];
   /** Which kind of read this is (ADR-0079): a link-target read drops every Compendium Entry. */
   readonly read?: EntityRead;
   /** Attach the caller's Rights to each summary — opt-in, the Entity Browser sets it. */
@@ -135,7 +138,7 @@ export interface ListOptions {
 export type FacetOptions = Pick<
   ListOptions,
   | 'containerIds'
-  | 'compendium'
+  | 'container'
   | 'read'
   | 'q'
   | 'type'
@@ -329,23 +332,27 @@ export class EntitiesService {
       tag: this.countJsonArray({ ...scoped, tags: undefined }, entities.tags, filter),
       // Field facets by presence in the result set — no longer gated on the active Type (ADR-0054, #231).
       fields: this.countFieldFacets(scoped, filter),
-      // The Compendium facet, by presence too (ADR-0079): a read scoped to one Container has nothing to
-      // narrow, so only a cross-Container read — the Compendium browse — carries the category at all.
+      // The Container facet, by presence too (ADR-0079, ADR-0080): a read scoped to one Container has
+      // nothing to narrow, so only a cross-Container read — the Library — carries the category at all.
       ...((opts.containerIds?.length ?? 0) > 1
-        ? { compendium: this.countContainers({ ...scoped, compendium: undefined }, filter) }
+        ? { container: this.countContainers({ ...scoped, container: undefined }, filter) }
         : {}),
     };
   }
 
   /**
-   * The **Compendium** facet's values: one per Container in the scope that still holds a matching
-   * Entity, labelled with the pack's name. Counted like every other category — drilled down (its own
+   * The **Container** facet's values: one per Container in the scope that still holds a matching
+   * Entity, labelled with its authored name. Counted like every other category — drilled down (its own
    * selection dropped by the caller) and under every sibling constraint — so the rail can never
    * annotate a list it disagrees with.
+   *
+   * Ordered by the scope's own order rather than by name or count: the **Library** names its
+   * Containers in the Owner's **Mount** order (ADR-0080), and reading the request's order back is what
+   * carries that here without this count knowing a Mount exists.
    */
   private countContainers(opts: FacetOptions, filter: SQL): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
-    return this.db
+    const rows = this.db
       .select({
         value: entities.containerId,
         count: sql<number>`count(*)`.as('count'),
@@ -356,8 +363,11 @@ export class EntitiesService {
       .innerJoin(containers, eq(containers.id, entities.containerId))
       .where(facetWhere(opts, match, filter))
       .groupBy(entities.containerId)
-      .orderBy(asc(containers.name))
       .all();
+    // Total, not a tiebreak: the scope is a `WHERE` and the `GROUP BY` yields each Container once, so
+    // every row has a distinct index in it.
+    const scope = opts.containerIds ?? [];
+    return rows.sort((a, b) => scope.indexOf(a.value) - scope.indexOf(b.value));
   }
 
   /**
@@ -1279,9 +1289,9 @@ function filters(opts: FilterOptions) {
   // The one Container predicate, whether the read names one Container or the whole shelf (ADR-0078).
   // `entities.container_id` is indexed, so the set form costs no more than the single one did.
   if (opts.containerIds?.length) predicates.push(inArray(entities.containerId, [...opts.containerIds]));
-  // The Compendium facet's selection: a second predicate on the same column, deliberately — the scope
+  // The Container facet's selection: a second predicate on the same column, deliberately — the scope
   // above says what the read is about, this says what the user narrowed it to, and they AND.
-  if (opts.compendium?.length) predicates.push(inArray(entities.containerId, [...opts.compendium]));
+  if (opts.container?.length) predicates.push(inArray(entities.containerId, [...opts.container]));
   // The only narrowing the Compendium adds to any read (ADR-0079); it sits here so `list` and `facets`
   // share it and a picker's rail cannot count what its options exclude.
   if (opts.read === 'link-target') predicates.push(sql`NOT ${inACompendium()}`);

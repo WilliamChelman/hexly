@@ -359,11 +359,13 @@ export class WorldsController {
     this.typeResult(this.fields.delete(user.id, id, fieldId));
   }
 
-  // Below: the World's **Mounts** (ADR-0080) — the Containers it draws from. World-Owner-gated in the
-  // service like `/owners` and `/members`, but deliberately *not* Collaboration-gated: a Sole User on
-  // the Desktop App mounts with no sharing concepts in sight (ADR-0071). Every route answers with the
-  // whole ordered list, so a client never has to reassemble it from a partial response.
+  // Below: the World's **Mounts** (ADR-0080) — the Containers it draws from. Arranging them is
+  // World-Owner-gated in the service like `/owners` and `/members`, but deliberately *not*
+  // Collaboration-gated: a Sole User on the Desktop App mounts with no sharing concepts in sight
+  // (ADR-0071). Every route answers with the whole ordered list, so a client never has to reassemble
+  // it from a partial response.
 
+  // Read by every reader of the World, not just its Owners: this is the **Library**'s scope (#412).
   @Get(':id/mounts')
   mountsOf(@CurrentUser() user: AuthUser, @Param('id') id: string): Mount[] {
     return mountResponse(this.mounts.list(user.id, id));

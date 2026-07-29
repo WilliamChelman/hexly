@@ -19,30 +19,37 @@
     "noMatchHint": "Try a different name, kind, or Tag.",
     "missing": "File missing"
   },
-  "compendium": {
-    "tabTitle": "Hexly — Compendium",
-    "eyebrow": "Compendium",
-    "heading": "Reference material",
-    "subheading": "Read-only, shared across this instance.",
-    "loadErrorTitle": "Couldn't load the Compendium.",
+  "library": {
+    "tabTitle": "Hexly — Library",
+    "eyebrow": "Library",
+    "heading": "What this world draws on",
+    "subheading": "Read here, edited where it lives.",
+    "loadErrorTitle": "Couldn't load the Library.",
     "loadErrorHint": "Something went wrong. Please try again in a moment.",
     "loadMore": "Load more",
     "loadingMore": "Loading…",
     "loadMoreError": "Couldn't load more. Please try again.",
-    "emptyTitle": "No reference material is installed.",
-    "emptyHint": "An operator installs a Compendium for the whole instance.",
-    "noMatchTitle": "Nothing in the Compendium matches your search.",
-    "noMatchHint": "Try a different name, Compendium, or word.",
+    "emptyTitle": "Nothing to show from what this world draws on.",
+    "emptyHint": "The containers it mounts hold nothing you can read yet.",
+    "noMountsTitle": "This world draws on nothing yet.",
+    "noMountsHint": "An owner mounts a world or a compendium in World Settings.",
+    "noMatchTitle": "Nothing in the Library matches your search.",
+    "noMatchHint": "Try a different name, container, or word.",
+    "credits": "Reference material from"
+  },
+  "compendium": {
+    "eyebrow": "Compendium",
+    "loadErrorTitle": "Couldn't load the Compendium.",
+    "loadErrorHint": "Something went wrong. Please try again in a moment.",
     "adopt": "Adopt",
     "adoptHint": "Copy this into your world, yours to edit",
     "adopted": "Adopted “{{name}}” into your world.",
     "adoptError": "Couldn't adopt this. Please try again.",
-    "credits": "Reference material from",
     "page": {
       "tabTitle": "Hexly — Compendium",
       "tabTitleNamed": "Hexly — {{name}}",
       "heading": "Compendium",
-      "backToBrowse": "Back to the Compendium",
+      "backToLibrary": "Back to the Library",
       "revision": "Revision {{rev}}",
       "publisher": "Publisher",
       "license": "License",
@@ -99,7 +106,7 @@
       "shared": "Shared",
       "rangeMin": "{{field}} minimum",
       "rangeMax": "{{field}} maximum",
-      "compendium": "Compendium"
+      "container": "Container"
     }
   },
   "entityTags": {
@@ -293,7 +300,7 @@
     "worlds": "Worlds",
     "dashboard": "Dashboard",
     "entities": "Entities",
-    "compendium": "Compendium",
+    "library": "Library",
     "assets": "Assets",
     "graph": "Graph",
     "styleguide": "Styleguide",

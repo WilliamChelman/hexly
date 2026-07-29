@@ -11,7 +11,7 @@ import {
   CompendiumsClient,
   TitleService,
   idFromSegment,
-  worldCompendiumRoute,
+  worldLibraryRoute,
 } from '@hexly/web-core';
 import { EyebrowComponent, PageHeaderComponent, PanelComponent } from '@hexly/web-ui';
 import { EmptyStateComponent } from '../entity-browser/components/empty-state.component';
@@ -46,7 +46,7 @@ interface TermRow {
           class="font-sans text-xs text-accent-strong hover:underline"
           data-testid="compendium-back"
           [routerLink]="browse"
-          >{{ 'compendium.page.backToBrowse' | transloco }}</a
+          >{{ 'compendium.page.backToLibrary' | transloco }}</a
         >
       }
     </app-page-header>
@@ -118,12 +118,12 @@ export class CompendiumPage {
   });
 
   /**
-   * Back to the browse this page hangs off, in the World it was browsed from — absent for the anonymous
-   * reader a Mount cascaded read to (ADR-0080), who has no World to go back to.
+   * Back to the **Library** that credited this pack, in the World it was reached from — absent for the
+   * anonymous reader a Mount cascaded read to (ADR-0080), who has no World to go back to.
    */
   protected readonly browseRoute = computed(() => {
     const worldId = this.activeWorld.worldId();
-    return worldId ? worldCompendiumRoute(worldId, this.activeWorld.name() ?? undefined) : null;
+    return worldId ? worldLibraryRoute(worldId, this.activeWorld.name() ?? undefined) : null;
   });
 
   constructor() {

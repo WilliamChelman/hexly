@@ -3,7 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import {
   ActiveWorld,
   worldAssetsRoute,
-  worldCompendiumRoute,
+  worldLibraryRoute,
   worldDashboardRoute,
   worldGraphRoute,
   worldRoute,
@@ -49,21 +49,21 @@ export class WorldPage {
           labelKey: 'nav.dashboard',
           exact: true,
         },
-        // The pair re-picked together (#393 left the choice to this ticket): `library` goes to the
-        // Compendium, which is the reference shelf that word leans at, and the author's own work to its own.
+        // The pair that reads as a sentence (ADR-0080): what this World's authors made, beside what it
+        // draws on. `library` lands on the reference surface, which is the word it always leaned at.
         {
           link: worldRoute(worldId, name),
           testid: 'nav-entities',
           icon: 'entities',
           labelKey: 'nav.entities',
         },
-        // The Compendium browse (ADR-0079): Instance-wide and readable by every signed-in caller, so no
-        // rights gate — and no read of *this* World, whose id names the Adoption target (#403).
+        // The Library (ADR-0080): a read of what this World Mounts, so every reader of the World gets
+        // it — no rights gate. Empty where nothing is mounted, which is a thing to be told, not hidden.
         {
-          link: worldCompendiumRoute(worldId, name),
-          testid: 'nav-compendium',
+          link: worldLibraryRoute(worldId, name),
+          testid: 'nav-library',
           icon: 'library',
-          labelKey: 'nav.compendium',
+          labelKey: 'nav.library',
         },
         // The Asset Browser (ADR-0065): a read of the World's media, so every reader gets it — the
         // reader-scoped list shows an owner their private uploads and a Viewer only what is shared.

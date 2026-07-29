@@ -16,9 +16,10 @@ import { WorldsModule } from './worlds.module';
  * throughout, as the Adoption spec establishes: what makes a Mount a Mount is what a caller may
  * declare and what they are refused, and a service-shaped test would prove neither.
  *
- * Nothing reads a Mount yet — this ticket is the declaration and the surface that makes it — so the
- * last case here is the one that matters most: every reading surface answers exactly as it did before,
- * mounted or not.
+ * This file is the declaration and the surface that makes it; what a Mount then *grants* lives in
+ * `mount-cascade.controller.spec.ts` and what it *lists* in `library-browse.controller.spec.ts`. The
+ * last case here is the one that matters most either way: every container-scoped reading surface
+ * answers exactly as it did before, mounted or not.
  */
 describe('A World’s Mounts', () => {
   let app: INestApplication;
@@ -208,16 +209,25 @@ describe('A World’s Mounts', () => {
     await ada.delete(`/worlds/${pack}/mounts/${shelf}`).expect(404);
   });
 
-  it('is the World Owner’s alone to see and to set', async () => {
+  it('is the World Owner’s alone to arrange, and every reader’s to see (#412)', async () => {
     const ada = await signIn('ada@hexly.test');
     await ada.post(`/worlds/${campaign}/members`).send({ userId: bobId, role: 'viewer' });
+    await mount(ada, campaign, shelf);
 
     const bob = await signIn('bob@hexly.test');
-    // Reachable but not an Owner: 403, so the refusal is honest rather than pretending it is missing.
-    await bob.get(`/worlds/${campaign}/mounts`).expect(403);
+    // A Viewer reads the list: it is what the **Library** is, and the cascade has already handed them
+    // the content, so naming the Containers it came out of discloses nothing they cannot open.
+    expect(await mountsOf(bob, campaign)).toEqual([{ containerId: shelf, name: 'The Art Shelf', kind: 'world' }]);
+    // Arranging it stays the Owner's. Reachable but not an Owner: 403, so the refusal is honest rather
+    // than pretending the World is missing.
     await bob.get(`/worlds/${campaign}/mount-candidates`).expect(403);
     await bob.post(`/worlds/${campaign}/mounts`).send({ containerId: pack }).expect(403);
-    // Unreachable is 404 all the way down.
+    await bob
+      .patch(`/worlds/${campaign}/mounts`)
+      .send({ containerIds: [shelf] })
+      .expect(403);
+    await bob.delete(`/worlds/${campaign}/mounts/${shelf}`).expect(403);
+    // Unreachable is 404 all the way down, the read included — existence never leaks (ADR-0004).
     const cara = await seed('cara@hexly.test', 'Cara');
     expect(cara).toBeTruthy();
     await (await signIn('cara@hexly.test')).get(`/worlds/${campaign}/mounts`).expect(404);

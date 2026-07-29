@@ -98,19 +98,18 @@ export const appRoutes: Route[] = [
         title: 'entityBrowser.tabTitle',
       },
       {
-        // The Compendium browse (ADR-0079, #401): the Entity Browser preset to the installed packs —
-        // reference material, Instance-wide, unioned behind a Compendium facet. The `:worldId` above
-        // names the adoption target rather than the content's home, which is what makes this a World
-        // route at all: nothing here lives in that World.
-        path: 'compendium',
+        // The Library (ADR-0080, #412): the Entity Browser preset to what this World **Mounts** — every
+        // Container it draws from, unioned behind a Container facet, of which ADR-0079's installed packs
+        // are one kind. Nothing here lives in the `:worldId` above, which names whose Mounts these are
+        // and the Adoption target; that is what makes a read of foreign content a World route at all.
+        path: 'library',
         pathMatch: 'full',
-        loadComponent: () =>
-          import('./pages/compendium-browser/compendium-browser.page').then((m) => m.CompendiumBrowserPage),
-        title: 'compendium.tabTitle',
+        loadComponent: () => import('./pages/library/library.page').then((m) => m.LibraryPage),
+        title: 'library.tabTitle',
       },
       {
-        // The Compendium page (ADR-0061, #402): one installed pack's own terms, nested under the browse
-        // it is reached from and readable by anyone signed in, like the entries themselves (ADR-0078).
+        // The Compendium page (ADR-0061, #402): one installed pack's own terms, reached from the
+        // Library that credits it and readable by anyone signed in, like the entries (ADR-0078).
         path: 'compendium/:compendiumId',
         pathMatch: 'full',
         loadComponent: () => import('./pages/compendium-page/compendium.page').then((m) => m.CompendiumPage),

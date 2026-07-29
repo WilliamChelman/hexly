@@ -46,9 +46,9 @@ export function mountResponse<T>(result: MountResult<T>): T {
  * so mounting one grants nothing (ADR-0079).
  *
  * Every route resolves its *mounting* Container through `worlds`, which is the whole of "a Compendium
- * may not mount": a pack's id is not a World here, so it 404s with no rule naming the case. The
- * surface is World-Owner-gated like `/owners` and `/members`, and deliberately not Collaboration-gated
- * (ADR-0071).
+ * may not mount": a pack's id is not a World here, so it 404s with no rule naming the case. Arranging
+ * Mounts is World-Owner-gated like `/owners` and `/members`; {@link list} alone answers any reader,
+ * for the **Library**. Deliberately not Collaboration-gated throughout (ADR-0071).
  */
 @Injectable()
 export class WorldMountsService {
@@ -58,10 +58,16 @@ export class WorldMountsService {
     private readonly links: ContainerLinksService,
   ) {}
 
-  /** The World's Mounts in the Owner-arranged order. Owner-gated; unreachable → 404, non-Owner → 403. */
+  /**
+   * The World's Mounts in the Owner-arranged order. The one route here that is *not* Owner-gated: any
+   * reader of the World gets it, because this is what the **Library** reads (ADR-0080) and the Mount
+   * cascade has already handed those readers the content itself — naming the Containers it came out of
+   * discloses nothing they cannot open. Arranging the list stays the Owner's. Unreachable → 404.
+   */
   list(userId: string, worldId: string): MountResult<Mount[]> {
-    const gate = this.gateOwner(userId, worldId);
-    return gate ?? { status: 'ok', value: this.mounts(worldId) };
+    const meta = worldAccess(this.db, userId).decideMeta(worldId);
+    if (!meta?.reachable) return { status: 'not-found' };
+    return { status: 'ok', value: this.mounts(worldId) };
   }
 
   /**

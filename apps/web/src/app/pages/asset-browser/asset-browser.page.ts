@@ -27,7 +27,7 @@ import {
 } from '../entity-browser/components/facet-rail.component';
 import { fieldTokens, fieldsFromTokens, pruneField } from '../entity-browser/components/field-facet-url';
 
-const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [], fields: {}, compendium: [] };
+const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [], fields: {}, container: [] };
 const NO_FACET_COUNTS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] };
 
 // A bounded first page, like the Entity Browser, so a media-heavy World loads fast.
@@ -286,7 +286,7 @@ export class AssetBrowserPage {
           tag: f.tag,
           visibility: f.visibility,
           fields: fieldsFromTokens(f.field),
-          compendium: [],
+          container: [],
         });
       });
 

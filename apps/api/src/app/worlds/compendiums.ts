@@ -29,7 +29,7 @@ function selectCompendium(db: Db) {
 /**
  * Every installed Compendium, by name. Unguarded for the same reason {@link selectCompendium} is:
  * Instance-wide with no members means one answer for every caller — the entries' own reachability rule,
- * one level up. The **Compendium browse** names its Containers from this list (ADR-0079).
+ * one level up. What a **World** draws from is its **Mount** set rather than this list (ADR-0080).
  */
 export function listCompendiums(db: Db): CompendiumSummary[] {
   return selectCompendium(db).orderBy(asc(containers.name)).all().map(toCompendiumSummary);
