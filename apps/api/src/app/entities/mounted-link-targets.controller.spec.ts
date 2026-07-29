@@ -143,11 +143,12 @@ describe('Every link picker offers what the World Mounts', () => {
     await mount(campaign, pack);
 
     // The facet a widened read grows: one row per Container still holding an answer, labelled with the
-    // Container's own name — so the rail reads "The Art Shelf", not a uuid.
+    // Container's own name — so the rail reads "The Art Shelf", not a uuid — the World's own first,
+    // then the Mounts in the Owner's order (ADR-0080), as the Library reads them.
     expect(await containerFacet(ada, `worldId=${campaign}&q=goblin`)).toEqual([
       { value: campaign, label: 'Aldermoor', count: 1 },
-      { value: pack, label: 'Draw Steel: Monsters', count: 1 },
       { value: shelf, label: 'The Art Shelf', count: 1 },
+      { value: pack, label: 'Draw Steel: Monsters', count: 1 },
     ]);
 
     // Selecting one narrows the list to that Container — one pack, or one shelf — and the count it was

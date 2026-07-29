@@ -414,10 +414,13 @@ export class EntitiesService {
   private mountScope<T extends FacetOptions>(opts: T): T {
     if (opts.read !== 'link-target' || !opts.containerIds?.length) return opts;
     const scope = new Set(opts.containerIds);
+    // Ordered by position, so the widened scope carries the Owner's Mount order (ADR-0080) — the
+    // Container facet reads it back, as the Library does.
     const rows = this.db
       .select({ id: containerMounts.mountedContainerId })
       .from(containerMounts)
       .where(inArray(containerMounts.containerId, [...scope]))
+      .orderBy(containerMounts.position)
       .all();
     // A Set both dedups two Worlds mounting one Container and drops a scope member back out of it.
     const mounted = new Set(rows.map((row) => row.id));
