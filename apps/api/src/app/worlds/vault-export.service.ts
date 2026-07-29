@@ -19,6 +19,10 @@ export type ExportResult = { filename: string; zip: Buffer } | 'not-found' | 'fo
  * to frontmatter — resolved off the type/data-type registry the API composes; the serializer itself
  * (`@hexly/obsidian`) imports no content plugin. Owner-only: entities are stored under the World Owner's
  * id, so a member's owner-scoped read returns nothing anyway (ADR-0004, ADR-0024).
+ *
+ * A World that **Mounts** is not self-contained, so the export is not identity: the foreign _bytes_ its
+ * documents draw on are flattened into the archive while its Entity Links are not, because a broken
+ * picture reads as data loss and a link to a missing note reads as a promotable stub (ADR-0080).
  */
 @Injectable()
 export class VaultExportService {
@@ -41,7 +45,8 @@ export class VaultExportService {
 
     // Assets go under `assets/<originalFilename>` (human-readable, not the content hash), basename
     // only: two assets sharing a filename across folders collide, and uniquePath suffixes the later
-    // ones. srcMap points each doc's capability-URL src at its own copy.
+    // ones. srcMap points each doc's capability-URL src at its own copy — a Mounted Container's included,
+    // exportAssets having flattened those bytes in beside the World's own.
     const srcMap = new Map<string, string>();
     for (const asset of this.assets.exportAssets(worldId)) {
       const zipPath = uniquePath(files, posix.join('assets', posix.basename(asset.originalFilename)));
@@ -72,7 +77,8 @@ export class VaultExportService {
   ): string {
     const context: VaultExportContext = {
       // A wikilink's label refreshes to its target's CURRENT name so a post-import rename round-trips;
-      // a target outside this World keeps its stored label (undefined → the converter leaves it).
+      // a target outside this World keeps its stored label (undefined → the converter leaves it), which is
+      // the whole of how a link into a Mounted Container degrades (ADR-0073).
       entityName: (id) => nameById.get(id),
       // An image's capability-URL src repoints at its exported `assets/<name>` copy; an external src is
       // absent from the map and passes through untouched.
