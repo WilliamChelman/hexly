@@ -1,5 +1,5 @@
-import { and, asc, eq, sql } from 'drizzle-orm';
-import { LinkedEntity, WorldGraph, WorldGraphEdge } from '@hexly/domain';
+import { and, asc, eq, ne, sql } from 'drizzle-orm';
+import { WorldGraph, WorldGraphEdge, WorldGraphNode } from '@hexly/domain';
 import { EntityAccess } from '../../acl/entity-access';
 import { Db } from '../../db/db';
 import { assetIndex, entities, entityEdges } from '../../db/schema';
@@ -17,12 +17,21 @@ export function worldGraphRead(db: Db, access: EntityAccess, worldId: string): W
   const own = graphNodes(db, access, worldId);
   const entityEdgeRows = entityGraphEdges(db, worldId);
   const assetEdgeRows = assetGraphEdges(db, access, worldId);
-  const nodes = [...own, ...foreignAssetNodes(own, assetEdgeRows)];
-  // `edges ⊆ nodes × nodes`. Sieving against the node set drops, for free, targets the viewer cannot read,
-  // deleted ones (an edge row survives its target, ADR-0046), and Entity Links leaving the World.
+  const away = [...linkedTargets(db, access, worldId), ...assetEdgeRows.map(assetTarget)];
+  const nodes = [...own, ...foreignNodes(worldId, away)];
+  // `edges ⊆ nodes × nodes`. Sieving against the node set drops, for free, targets the viewer cannot read
+  // and deleted ones (an edge row survives its target, ADR-0046).
   const nodeIds = new Set(nodes.map((n) => n.id));
   const edges = [...entityEdgeRows, ...assetEdgeRows.map(toEdge)];
   return { nodes, edges: edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target)) };
+}
+
+/**
+ * The ids the Local Graph's walk must not cross — the **Foreign nodes** (ADR-0080). Read back off the
+ * payload rather than passed beside it, so the mark and the rule cannot drift apart.
+ */
+export function foreignNodeIds(graph: WorldGraph): ReadonlySet<string> {
+  return new Set(graph.nodes.flatMap((n) => (n.foreignContainerId ? [n.id] : [])));
 }
 
 /**
@@ -34,7 +43,7 @@ export function worldGraphRead(db: Db, access: EntityAccess, worldId: string): W
  * An Entity {@link linkedEntity} cannot resolve — one whose stored types are malformed — is
  * dropped rather than thrown on, so one bad row cannot 500 a whole World's graph.
  */
-function graphNodes(db: Db, access: EntityAccess, worldId: string): LinkedEntity[] {
+function graphNodes(db: Db, access: EntityAccess, worldId: string): WorldGraphNode[] {
   return db
     .select({ id: entities.id, name: entities.name, types: entities.types })
     .from(entities)
@@ -44,22 +53,29 @@ function graphNodes(db: Db, access: EntityAccess, worldId: string): LinkedEntity
     .flatMap((row) => linkedEntity(row.id, row.name, row.types) ?? []);
 }
 
+/** A link target resolved to the row a node would be drawn from — the Container included, which is the whole question. */
+interface TargetRow {
+  readonly id: string;
+  readonly name: string;
+  readonly types: unknown;
+  readonly containerId: string;
+}
+
 /**
- * The Assets this World's documents draw from **another Container**, as nodes of this graph — access-
- * filtered per viewer exactly as the World's own are, appended after them.
+ * The **Foreign nodes** of this graph: every link target living in another Container, deduped and appended
+ * after the World's own — drawn rather than dropped, since a shelf's image already renders on the page
+ * (ADR-0080).
  *
- * They are nodes because such a picture *renders*: the byte route is unauthenticated and takes the
- * Container from the path, so dropping its edge would leave the graph disagreeing with the page (ADR-0080).
- * Assets only — an **Entity Link** leaving the Container is a Foreign node, marked and never expanded (#413).
+ * `foreignContainerId` is the mark, what a click navigates by, and what makes the node terminal to a walk.
  */
-function foreignAssetNodes(own: readonly LinkedEntity[], assetEdgeRows: readonly AssetEdgeRow[]): LinkedEntity[] {
-  const seen = new Set(own.map((n) => n.id));
-  const foreign: LinkedEntity[] = [];
-  for (const row of assetEdgeRows) {
-    if (seen.has(row.target)) continue;
-    seen.add(row.target);
-    const node = linkedEntity(row.target, row.name, row.types);
-    if (node) foreign.push(node);
+function foreignNodes(worldId: string, targets: readonly TargetRow[]): WorldGraphNode[] {
+  const seen = new Set<string>();
+  const foreign: WorldGraphNode[] = [];
+  for (const row of targets) {
+    if (row.containerId === worldId || seen.has(row.id)) continue;
+    seen.add(row.id);
+    const node = linkedEntity(row.id, row.name, row.types);
+    if (node) foreign.push({ ...node, foreignContainerId: row.containerId });
   }
   return foreign.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }
@@ -84,10 +100,38 @@ function entityGraphEdges(db: Db, worldId: string): WorldGraphEdge[] {
     .all();
 }
 
+/**
+ * The Entities this World's `entity` edges point at **outside** it — one row per Foreign target, resolved
+ * under the read filter exactly as the World's own nodes are, so one the viewer cannot read is no node and
+ * so (by the sieve) no edge.
+ *
+ * A second query rather than a join onto {@link entityGraphEdges}: the edge read is served whole by
+ * `idx_entity_edges_container`, and a World's own links — nearly all of them — need no target row at all.
+ */
+function linkedTargets(db: Db, access: EntityAccess, worldId: string): TargetRow[] {
+  return db
+    .selectDistinct({
+      id: entities.id,
+      name: entities.name,
+      types: entities.types,
+      containerId: entities.containerId,
+    })
+    .from(entityEdges)
+    .innerJoin(entities, and(eq(entities.id, entityEdges.targetId), ne(entities.containerId, worldId), access.filter))
+    .where(and(eq(entityEdges.containerId, worldId), eq(entityEdges.targetKind, 'entity')))
+    .all();
+}
+
 /** An `asset` edge with its resolved Asset carried alongside, so a foreign one can become a node. */
 interface AssetEdgeRow extends WorldGraphEdge {
   readonly name: string;
   readonly types: unknown;
+  readonly targetContainerId: string;
+}
+
+/** The Asset's own columns, as {@link foreignNodes} reads any link target. */
+function assetTarget(row: AssetEdgeRow): TargetRow {
+  return { id: row.target, name: row.name, types: row.types, containerId: row.targetContainerId };
 }
 
 /** The edge alone — the Asset's columns ride the row for the node set, never the payload. */
@@ -104,7 +148,7 @@ function toEdge({ source, target, descriptor, decor }: AssetEdgeRow): WorldGraph
  * is the source's own whenever the picture came from home. A hash alone still never crosses — identical
  * bytes in two Containers share a hash but not an Entity, and each URL names exactly one of them.
  *
- * The Asset's own row rides along under the read filter, so {@link foreignAssetNodes} needs no second
+ * The Asset's own row rides along under the read filter, so {@link foreignNodes} needs no second
  * query keyed on however many Assets the World's documents happen to draw from.
  */
 function assetGraphEdges(db: Db, access: EntityAccess, worldId: string): AssetEdgeRow[] {
@@ -116,6 +160,7 @@ function assetGraphEdges(db: Db, access: EntityAccess, worldId: string): AssetEd
       decor: entityEdges.decor,
       name: entities.name,
       types: entities.types,
+      targetContainerId: entities.containerId,
     })
     .from(entityEdges)
     .innerJoin(

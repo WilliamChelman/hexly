@@ -5,8 +5,7 @@
  */
 
 import * as z from 'zod';
-import { LinkedEntity } from './entity-edges';
-import { WorldGraphEdge } from './world-graph';
+import { WorldGraphEdge, WorldGraphNode } from './world-graph';
 
 /** One hop: the centre and what it links to directly — the depth a panel opens at. */
 export const LOCAL_GRAPH_DEFAULT_DEPTH = 1;
@@ -35,11 +34,14 @@ export type LocalGraphQuery = z.infer<typeof localGraphQuerySchema>;
  * One Entity's neighbourhood, in the {@link WorldGraph} shape so one renderer draws both (ADR-0072).
  * The walk crosses **semantic** edges only (ADR-0069), which is what makes the result connected — decor
  * edges between included nodes are still carried, flagged, for the client's reveal.
+ *
+ * A **Foreign node** is where the walk stops: it is drawn at the hop that reached it and never expanded
+ * (ADR-0080), so no depth leaks the shape of the Worlds on the far side of the boundary.
  */
 export interface LocalGraph {
   readonly center: string;
   /** The *resolved* hop bound — clamped, so the reader's control shows what was actually walked. */
   readonly depth: number;
-  readonly nodes: readonly LinkedEntity[];
+  readonly nodes: readonly WorldGraphNode[];
   readonly edges: readonly WorldGraphEdge[];
 }

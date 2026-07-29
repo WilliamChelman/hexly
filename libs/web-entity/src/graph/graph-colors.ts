@@ -1,5 +1,6 @@
-import { LinkedEntity } from '@hexly/domain';
+import { WorldGraphNode } from '@hexly/domain';
 import { designTokenStyle, readDesignToken } from '@hexly/web-styles';
+import { FOREIGN_ALPHA_SCALE } from './foreign-node';
 import { GENERIC_TYPE_DEFINITION, TypeDefinition } from '../models/type-definition';
 import { typeColorToken } from '../models/type-tone';
 
@@ -47,12 +48,19 @@ export function graphColors(defs: readonly TypeDefinition[]): GraphColors {
   };
 }
 
-/** One RGBA quad per point, by point index; a node's colour is its type's registered hue. */
-export function pointColors(nodes: readonly LinkedEntity[], colors: GraphColors): Float32Array {
+/**
+ * One RGBA quad per point, by point index; a node's colour is its type's registered hue.
+ *
+ * A **Foreign node** keeps that hue and gives up alpha ({@link FOREIGN_ALPHA_SCALE}) — drawn as living in
+ * another Container (ADR-0080).
+ */
+export function pointColors(nodes: readonly WorldGraphNode[], colors: GraphColors): Float32Array {
   const buffer = new Float32Array(nodes.length * 4);
   for (let i = 0; i < nodes.length; i++) {
     // Colour by the node's primary type (`types[0]`); an unregistered or absent one takes the fallback.
-    buffer.set(colors.byType.get(nodes[i].types[0]) ?? colors.node, i * 4);
+    const rgba = colors.byType.get(nodes[i].types[0]) ?? colors.node;
+    buffer.set(rgba, i * 4);
+    if (nodes[i].foreignContainerId) buffer[i * 4 + 3] = rgba[3] * FOREIGN_ALPHA_SCALE;
   }
   return buffer;
 }

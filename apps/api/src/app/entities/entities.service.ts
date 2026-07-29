@@ -21,6 +21,7 @@ import {
   FieldFacet,
   FieldFilter,
   InboundReference,
+  NamedContainer,
   OutboundReference,
   typesSchema,
   Visibility,
@@ -578,10 +579,11 @@ export class EntitiesService {
    */
   references(userId: string, id: string): EntityReferences | null {
     const access = entityAccess(this.db, userId);
-    if (!access.decideMeta(id)?.canRead) return null;
+    const meta = access.decideMeta(id);
+    if (!meta?.canRead) return null;
     return {
       references: this.outbound(access, id),
-      referencedBy: this.inbound(access, id),
+      referencedBy: this.inbound(access, id, meta.containerId),
     };
   }
 
@@ -677,8 +679,11 @@ export class EntitiesService {
    * and deleting the Asset leaves them dangling. The hash edges are Container-scoped, since identical bytes
    * in two Containers share a hash but not an Entity — and the Container matched is the one the referencing
    * URL *named* (ADR-0080), so usage counts the Entities drawing on this Asset from elsewhere too.
+   *
+   * Usage is Container-blind, so a shelf Entity's list names every World drawing on it (ADR-0080).
+   * `containerId` is this Entity's own — the only thing that makes a row foreign.
    */
-  private inbound(access: EntityAccess, id: string): InboundReference[] {
+  private inbound(access: EntityAccess, id: string, containerId: string): InboundReference[] {
     // The Asset's content hash + Container, when `id` is an Asset — its edges key on the hash, not the id.
     const asset = this.db
       .select({ hash: assetIndex.hash, containerId: assetIndex.containerId })
@@ -706,10 +711,14 @@ export class EntitiesService {
           name: entities.name,
           types: entities.types,
           containerId: entities.containerId,
+          // The source's Container, named — read for every row and kept only for a foreign one, as
+          // `countContainers` reads it for the Facet rail: one join beats a second query per World.
+          containerName: containers.name,
           ...thumbnailColumns,
         })
         .from(entityEdges)
         .innerJoin(entities, and(eq(entities.id, entityEdges.sourceEntityId), access.filter))
+        .innerJoin(containers, eq(containers.id, entities.containerId))
         .leftJoin(ownAsset, eq(ownAsset.entityId, entities.id))
         .leftJoin(
           fieldKind,
@@ -728,7 +737,12 @@ export class EntitiesService {
         // dangle: a row whose source has no drawable type drops out entirely.
         .flatMap((row) => {
           const source = linkedEntity(row.sourceId, row.name, row.types, resolveThumbnailUrl(row, row.containerId));
-          return source ? [{ descriptor: row.descriptor, source, decor: row.decor }] : [];
+          if (!source) return [];
+          const foreign =
+            row.containerId === containerId
+              ? {}
+              : { foreignContainer: { id: row.containerId, name: row.containerName } };
+          return [{ descriptor: row.descriptor, source, decor: row.decor, ...foreign }];
         })
     );
   }
@@ -1421,6 +1435,11 @@ function resolveThumbnailUrl(row: ThumbnailRow, containerId: string): string | u
   if (row.fieldAssetHash) return assetThumbnailUrl(row.fieldAssetContainerId ?? containerId, row.fieldAssetHash);
   if (row.ownAssetHash) return assetThumbnailUrl(containerId, row.ownAssetHash);
   return undefined;
+}
+
+/** One usage row's Container, named — the shape a foreign backlink reports its World in (ADR-0080). */
+function namedContainer(row: { containerId: string; containerName: string }): NamedContainer {
+  return { id: row.containerId, name: row.containerName };
 }
 
 type SummaryRow = Omit<typeof entities.$inferSelect, 'document'>;

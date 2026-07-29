@@ -110,10 +110,12 @@ describe('entityAccess', () => {
   describe('decideMeta (blob-free owner/link gate)', () => {
     it('agrees with decide on reachability and ownership without loading the document', () => {
       const access = entityAccess(db, eOwner);
-      expect(access.decideMeta(priv)).toEqual({ canRead: true, isOwner: true });
+      // The Container rides along, so a caller that must tell home content from foreign needs no second read.
+      expect(access.decideMeta(priv)).toEqual({ canRead: true, isOwner: true, containerId: worldId });
       expect(entityAccess(db, wContrib).decideMeta(priv)).toEqual({
         canRead: false,
         isOwner: false,
+        containerId: worldId,
       });
     });
 
@@ -132,11 +134,13 @@ describe('entityAccess', () => {
       expect(entityAccess(db, outsider).decideMeta(shared)).toEqual({
         canRead: false,
         isOwner: false,
+        containerId: worldId,
       });
       // And the branch genuinely works — a member of THIS World does read the shared Entity.
       expect(entityAccess(db, wContrib).decideMeta(shared)).toEqual({
         canRead: true,
         isOwner: false,
+        containerId: worldId,
       });
     });
   });

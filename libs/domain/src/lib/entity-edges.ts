@@ -87,6 +87,12 @@ export interface OutboundReference {
   readonly decor: boolean;
 }
 
+/** A **Container** named rather than merely identified — what a surface reporting on another one shows. */
+export interface NamedContainer {
+  readonly id: string;
+  readonly name: string;
+}
+
 /**
  * One link *to* this Entity (*Referenced by*). `source` is never null: the list is filtered by
  * the viewer's access to the source, so an edge the viewer may not read is absent, not dangling.
@@ -100,6 +106,12 @@ export interface InboundReference {
    * feeds, ADR-0065) count every Entity that merely displays it.
    */
   readonly decor: boolean;
+  /**
+   * The **Container** the source lives in, present only when that is not this Entity's own — usage that
+   * came from elsewhere (ADR-0080). Named, not merely identified: this is the surface that answers "may I
+   * delete this image?" for a shelf Entity, and the answer is a list of Worlds, which an id is not.
+   */
+  readonly foreignContainer?: NamedContainer;
 }
 
 /** `GET /entities/:id/references`: both directions of one Entity's links, resolved per viewer. */

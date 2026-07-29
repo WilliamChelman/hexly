@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { LinkedEntity } from '@hexly/domain';
+import { LinkedEntity, NamedContainer } from '@hexly/domain';
 
 /**
  * One row of the References Panel: an Entity at the far end of a link, plus the Link Descriptor
@@ -47,6 +47,17 @@ import { LinkedEntity } from '@hexly/domain';
         >{{ 'fields.entityLink.dangling' | transloco }}</span
       >
     }
+    @if (foreignContainer(); as container) {
+      <!-- Usage that came from another Container (ADR-0080), named: a shelf Entity's list is how its
+           keeper answers "may I delete this?", and "three Worlds" is the answer, not "three links". -->
+      <span
+        data-testid="reference-foreign-container"
+        [attr.data-container-id]="container.id"
+        [attr.title]="'fields.links.foreignContainer' | transloco: { name: container.name }"
+        class="shrink-0 max-w-28 truncate rounded-full bg-surface-sunken px-1.5 text-[0.65rem] font-semibold leading-tight text-ink-faint"
+        >{{ container.name }}</span
+      >
+    }
     @if (decor()) {
       <!-- The decor mark: what distinguishes a mere thumbnail/prose image from a semantic mention. -->
       <span
@@ -72,4 +83,9 @@ export class ReferenceRowComponent {
   readonly descriptor = input.required<string | null>();
   /** A Decor Link (ADR-0069) — draws the presentation mark. Defaults off for a plain semantic row. */
   readonly decor = input<boolean>(false);
+  /**
+   * The **Container** this row's link was made in, when that is not the open Entity's own (ADR-0080) —
+   * drawn as a named mark. Absent for everything at home, which is nearly every row.
+   */
+  readonly foreignContainer = input<NamedContainer | undefined>(undefined);
 }
