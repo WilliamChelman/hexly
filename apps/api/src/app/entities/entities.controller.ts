@@ -79,7 +79,7 @@ export class EntitiesController {
       field,
       worldId,
       containerId,
-      compendium,
+      container,
       read,
       rights,
       thumbnails,
@@ -101,7 +101,7 @@ export class EntitiesController {
       // A malformed `field` token is dropped, not 400'd, so a stale URL degrades to no-filter.
       fields: parseFieldFilters(field),
       containerIds: containerScope(worldId, containerId),
-      compendium,
+      container,
       // Which read this is (ADR-0079); the pickers that need a link target are the ones that say so.
       read,
       withRights: rights,
@@ -148,7 +148,7 @@ export class EntitiesController {
   facets(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityFacets {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { q, type, tag, visibility, field, worldId, containerId, compendium, read, includeHidden } = parsed.data;
+    const { q, type, tag, visibility, field, worldId, containerId, container, read, includeHidden } = parsed.data;
     return this.entities.facets(user.id, {
       q,
       type,
@@ -156,7 +156,7 @@ export class EntitiesController {
       visibility,
       fields: parseFieldFilters(field),
       containerIds: containerScope(worldId, containerId),
-      compendium,
+      container,
       // Threaded for the same reason `includeHidden` is: a rail must never count what its list excludes.
       read,
       // Threaded so a rail can never annotate a list it disagrees with about hidden types (ADR-0065).

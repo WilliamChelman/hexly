@@ -1,11 +1,13 @@
 import {
   MONSTER_PACK_INSTALL,
   MONSTER_PACK_STATUS,
-  compendiumRailLink,
   enterEntities,
   entitiesRailLink,
   entityIdFromUrl,
   expect,
+  installedPackId,
+  libraryRailLink,
+  mountContainer,
   openEntityActions,
   test,
 } from '../fixtures';
@@ -124,16 +126,18 @@ test('Collaboration off: user management is unreachable by route, rail or Palett
   await expect(page.locator('.toast', { hasText: 'Reindexed' })).toBeVisible();
 });
 
-test('Collaboration off: the Compendium is stocked and browsed unchanged', async ({ page }) => {
-  // The shelf and the sharing switch are independent (ADR-0079, story 39). This account is Sole-User
-  // shaped, so it is its own operator — which is what makes the distinction invisible on a
-  // single-user Instance, rather than absent from it.
+test('Collaboration off: a pack is stocked, Mounted and read through the Library unchanged', async ({ page }) => {
+  // The shelf and the sharing switch are independent (ADR-0079, story 39), and so is Mounting: a Sole
+  // User declares what a World draws from with no sharing concepts in sight (ADR-0071, ADR-0080). This
+  // account is its own operator, which is what makes the distinction invisible on a single-user
+  // Instance rather than absent from it.
   await page.goto('/admin');
   await page.getByTestId(MONSTER_PACK_INSTALL).click();
   await expect(page.getByTestId(MONSTER_PACK_STATUS)).toContainText('2 entries', { timeout: 15_000 });
 
   const worldSeg = await enterEntities(page);
-  await compendiumRailLink(page).click();
-  await expect(page).toHaveURL(new RegExp(`/w/${worldSeg}/compendium$`));
+  await mountContainer(page, worldSeg, await installedPackId(page));
+  await libraryRailLink(page).click();
+  await expect(page).toHaveURL(new RegExp(`/w/${worldSeg}/library$`));
   await expect(page.getByText('Goblin Warrior', { exact: true })).toBeVisible();
 });

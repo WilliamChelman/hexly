@@ -19,30 +19,37 @@
     "noMatchHint": "Essayez un autre nom, type ou étiquette.",
     "missing": "Fichier absent"
   },
-  "compendium": {
-    "tabTitle": "Hexly — Compendium",
-    "eyebrow": "Compendium",
-    "heading": "Matériel de référence",
-    "subheading": "En lecture seule, partagé par toute l'instance.",
-    "loadErrorTitle": "Impossible de charger le Compendium.",
+  "library": {
+    "tabTitle": "Hexly — Bibliothèque",
+    "eyebrow": "Bibliothèque",
+    "heading": "Ce dont ce monde se sert",
+    "subheading": "Consulté ici, modifié là où il se trouve.",
+    "loadErrorTitle": "Impossible de charger la Bibliothèque.",
     "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",
     "loadMore": "Charger plus",
     "loadingMore": "Chargement…",
     "loadMoreError": "Impossible de charger plus. Veuillez réessayer.",
-    "emptyTitle": "Aucun matériel de référence n'est installé.",
-    "emptyHint": "Un opérateur installe un Compendium pour toute l'instance.",
-    "noMatchTitle": "Aucun élément du Compendium ne correspond à votre recherche.",
-    "noMatchHint": "Essayez un autre nom, un autre Compendium ou un autre mot.",
+    "emptyTitle": "Rien à montrer de ce dont ce monde se sert.",
+    "emptyHint": "Les conteneurs qu'il monte ne contiennent encore rien que vous puissiez lire.",
+    "noMountsTitle": "Ce monde ne se sert encore de rien.",
+    "noMountsHint": "Un propriétaire monte un monde ou un compendium dans les paramètres du monde.",
+    "noMatchTitle": "Aucun élément de la Bibliothèque ne correspond à votre recherche.",
+    "noMatchHint": "Essayez un autre nom, un autre conteneur ou un autre mot.",
+    "credits": "Matériel de référence issu de"
+  },
+  "compendium": {
+    "eyebrow": "Compendium",
+    "loadErrorTitle": "Impossible de charger le Compendium.",
+    "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",
     "adopt": "Adopter",
     "adoptHint": "Copier dans votre monde, à vous de le modifier",
     "adopted": "« {{name}} » a été adopté dans votre monde.",
     "adoptError": "Impossible d'adopter cet élément. Veuillez réessayer.",
-    "credits": "Matériel de référence issu de",
     "page": {
       "tabTitle": "Hexly — Compendium",
       "tabTitleNamed": "Hexly — {{name}}",
       "heading": "Compendium",
-      "backToBrowse": "Retour au Compendium",
+      "backToLibrary": "Retour à la Bibliothèque",
       "revision": "Révision {{rev}}",
       "publisher": "Éditeur",
       "license": "Licence",
@@ -99,7 +106,7 @@
       "shared": "Partagé",
       "rangeMin": "{{field}} minimum",
       "rangeMax": "{{field}} maximum",
-      "compendium": "Compendium"
+      "container": "Conteneur"
     }
   },
   "entityTags": {
@@ -293,7 +300,7 @@
     "worlds": "Mondes",
     "dashboard": "Tableau de bord",
     "entities": "Entités",
-    "compendium": "Compendium",
+    "library": "Bibliothèque",
     "assets": "Ressources",
     "graph": "Graphe",
     "styleguide": "Guide de style",

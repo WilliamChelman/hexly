@@ -1,14 +1,34 @@
 import type { Page } from '@playwright/test';
-import { compendiumRailLink, enterEntities, entitiesRailLink, expect, installMonsterPack, test } from './fixtures';
+import {
+  enterEntities,
+  entitiesRailLink,
+  expect,
+  installMonsterPack,
+  installedPackId,
+  libraryRailLink,
+  mountContainer,
+  test,
+  unmountContainer,
+} from './fixtures';
 
 /**
  * **Adoption** (ADR-0079, #403) as a user meets it — the two journeys the whole Compendium arc is
  * meant to end in, and the only ones held at this seam (ADR-0009): everything about what a copy *is*
  * lives in `compendium-adoption.controller.spec.ts`.
  *
+ * Adoption runs from the **Library** now (ADR-0080, #412), so each journey Mounts the pack first —
+ * nothing is mounted automatically, and an unmounted pack is not there to adopt from.
+ *
  * The pack is the Draw Steel monsters Importer with its codeload fetch port swapped for the committed
  * Ajax + Goblin fixtures under the e2e opt-in, so the run stays offline.
  */
+
+/** A Mount outlives the between-spec reset (ADR-0009), so a spec that declares one withdraws it. */
+const mounted: Array<[world: string, container: string]> = [];
+
+test.afterEach(async ({ page }) => {
+  for (const [world, container] of mounted.splice(0)) await unmountContainer(page, world, container);
+});
 
 /**
  * The id behind the one card named `name` on the browse currently open. Both browses render the same
@@ -22,9 +42,18 @@ async function cardId(page: Page, name: string): Promise<string> {
 }
 
 /** Both browses render `app-entity-card`, so a spec must land on the destination before reading one. */
-async function openCompendium(page: Page): Promise<void> {
-  await compendiumRailLink(page).click();
-  await page.waitForURL(/\/compendium$/);
+async function openLibrary(page: Page): Promise<void> {
+  await libraryRailLink(page).click();
+  await page.waitForURL(/\/library$/);
+}
+
+/** Enter a World and declare the installed pack one of the Containers it draws from (ADR-0080). */
+async function enterWorldMountingThePack(page: Page): Promise<string> {
+  const pack = await installedPackId(page);
+  const worldSeg = await enterEntities(page);
+  await mountContainer(page, worldSeg, pack);
+  mounted.push([worldSeg, pack]);
+  return worldSeg;
 }
 
 async function openEntities(page: Page): Promise<void> {
@@ -32,15 +61,15 @@ async function openEntities(page: Page): Promise<void> {
   await page.waitForURL(/\/entities$/);
 }
 
-test('browse the Compendium, adopt an entry, and the copy is an ordinary Entity of the World', async ({
+test('browse the Library, adopt an entry, and the copy is an ordinary Entity of the World', async ({
   page,
   browser,
 }) => {
   // Stocked once by the operator, for the whole Instance (#404) — an adopter never installs a pack.
   await installMonsterPack(browser);
-  const worldSeg = await enterEntities(page);
+  await enterWorldMountingThePack(page);
 
-  await openCompendium(page);
+  await openLibrary(page);
   const entryId = await cardId(page, 'Goblin Warrior');
   await page.getByTestId(`adopt-${entryId}`).click();
   await expect(page.locator('.toast', { hasText: 'Adopted' })).toBeVisible();
@@ -64,15 +93,15 @@ test('browse the Compendium, adopt an entry, and the copy is an ordinary Entity 
   await expect(page.getByTestId(`open-${copyId}`)).toBeVisible();
   await expect(page.locator('app-entity-card').filter({ hasText: 'Grix the Turncoat' })).toHaveCount(1);
   // And the pack's own Goblin is still on the shelf, unrenamed — nothing was moved out of it.
-  await openCompendium(page);
+  await openLibrary(page);
   expect(await cardId(page, 'Goblin Warrior')).toBe(entryId);
 });
 
 test('the mention picker offers the adopted Goblin and never the Compendium Entry', async ({ page, browser }) => {
   await installMonsterPack(browser);
-  const worldSeg = await enterEntities(page);
+  await enterWorldMountingThePack(page);
 
-  await openCompendium(page);
+  await openLibrary(page);
   const entryId = await cardId(page, 'Goblin Warrior');
   await page.getByTestId(`adopt-${entryId}`).click();
   await expect(page.locator('.toast', { hasText: 'Adopted' })).toBeVisible();

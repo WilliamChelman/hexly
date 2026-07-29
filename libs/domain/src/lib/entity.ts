@@ -128,7 +128,7 @@ export type CreateEntityRequest = z.infer<typeof createEntityRequestSchema>;
 /**
  * POST /entities/:id/adopt (CONTEXT.md → Adoption): the target World, everything else being read off
  * the entry. Required rather than defaulted like a create's, because every surface offering Adoption is
- * already read under a World — the `:worldId` of the **Compendium browse** (ADR-0079).
+ * already read under a World — the `:worldId` of the **Library** (ADR-0079, ADR-0080).
  */
 export const adoptEntityRequestSchema = z.object({
   worldId: z.string().min(1),
@@ -264,17 +264,19 @@ export const entityListQuerySchema = z.object({
     .optional(),
   worldId: z.string().min(1).optional(),
   // The **Container** scope, repeatable — how a read that spans Containers names them (ADR-0079): the
-  // Compendium browse lists every installed pack, so it says which ones rather than riding the
-  // single-Container scoping every World read uses. `worldId` above is that same scope under the name a
-  // World-scoped caller knows it by; both fold into one predicate server-side.
+  // **Library** lists every Container its World **Mounts**, so it says which ones rather than riding
+  // the single-Container scoping every World read uses. `worldId` above is that same scope under the
+  // name a World-scoped caller knows it by; both fold into one predicate server-side. The order is
+  // significant — the Container facet reads back in it, which is how the Owner's Mount order reaches
+  // the rail (ADR-0080).
   containerId: z
     .union([z.string(), z.array(z.string())])
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
-  // Facet: the **Compendium** facet's selection — a narrowing *within* the scope above, so it drills
+  // Facet: the **Container** facet's selection — a narrowing *within* the scope above, so it drills
   // down like Type or Tag (dropped when counting its own values) rather than redefining what the read
   // is about. Nothing outside the scope can be reached by naming it here: both predicates AND.
-  compendium: z
+  container: z
     .union([z.string(), z.array(z.string())])
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
@@ -358,11 +360,14 @@ export interface EntityFacets {
   readonly visibility: readonly FacetCount[];
   readonly fields: readonly FieldFacet[];
   /**
-   * The **Compendium** facet (ADR-0079): which pack each entry came from, `value` the Container id and
-   * `label` its name. Surfaced *by presence* like a Field facet — a read that names a single Container
-   * has nothing to narrow, so only a cross-Container read (the Compendium browse) carries it.
+   * The **Container** facet (ADR-0079's Pack facet, widened by ADR-0080): which Container each entry
+   * came from, `value` the Container id and `label` its name — an installed **Compendium** is one
+   * value it takes, a mounted **Shelf** another. Surfaced *by presence* like a Field facet — a read
+   * that names a single Container has nothing to narrow, so only a cross-Container read (the
+   * **Library**) carries it — and ordered as the read named its Containers, which is the **Library**'s
+   * Mount order.
    */
-  readonly compendium?: readonly FacetCount[];
+  readonly container?: readonly FacetCount[];
 }
 
 /** What `GET /entities` lists; body fetched only on open. */

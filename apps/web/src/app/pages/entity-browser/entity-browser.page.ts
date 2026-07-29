@@ -26,9 +26,9 @@ const NO_FACETS: ActiveFacets = {
   tag: [],
   visibility: [],
   fields: {},
-  // Never filled here: the server offers the Compendium facet only where a read spans more than one
-  // Container, and the Entity Browser is scoped to one World (ADR-0079).
-  compendium: [],
+  // Never filled here: the server offers the Container facet only where a read spans more than one
+  // Container, and the Entity Browser is scoped to one World — a Mounted one included (ADR-0080).
+  container: [],
 };
 
 const NO_FACET_COUNTS: EntityFacets = {
@@ -245,7 +245,7 @@ export class EntityBrowserPage {
           tag: f.tag,
           visibility: f.visibility,
           fields: fieldsFromTokens(f.field),
-          compendium: [],
+          container: [],
         });
       });
 
