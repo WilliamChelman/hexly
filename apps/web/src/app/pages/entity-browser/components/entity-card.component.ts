@@ -31,10 +31,7 @@ export interface EntityCardVm {
   thumbnailUrl?: string;
   /** **Missing Bytes** on this Entity's own bytes (#325) — its resolved URL is known to 404, so the sigil wins. */
   assetBytesMissing?: boolean;
-  /**
-   * Whether this is a **Compendium Entry** (CONTEXT.md → Sealed) — what the **Adopt** action hangs off
-   * (ADR-0079). Never set on a World's own Entity, so the Entity Browser's card is unchanged by it.
-   */
+  /** **Sealed** (CONTEXT.md), and so a **Compendium Entry** — what the **Adopt** action hangs off. */
   sealed?: boolean;
 }
 
@@ -123,9 +120,8 @@ export interface EntityCardVm {
             <span class="meta text-2xs text-ink-muted">{{
               'entityBrowser.edited' | transloco: { date: (card().updatedAt | hexlyDate) }
             }}</span>
-            <!-- **Adopt** (ADR-0079): offered outright rather than on hover like the actions beside
-                 it, because taking an entry into a World is the reason the Compendium browse exists.
-                 Gated on the entry being Sealed, so a World's own card never grows a second action. -->
+            <!-- **Adopt** (ADR-0079), offered outright rather than on hover like the actions beside it:
+                 taking an entry into a World is the reason the Compendium browse exists. -->
             @if (canAdopt()) {
               <span class="relative z-10 ml-auto flex">
                 <button
@@ -203,7 +199,7 @@ export class EntityCardComponent {
   readonly commitRename = output<string>();
   readonly cancelRename = output<void>();
   readonly remove = output<void>();
-  /** **Adopt** this entry into the browsing World (ADR-0079); the parent owns the call and the outcome. */
+  /** **Adopt** this entry into the browsing World; the parent owns the call and the outcome (ADR-0079). */
   readonly adopt = output<void>();
 
   private readonly types = inject(TypeRegistry);
@@ -221,10 +217,6 @@ export class EntityCardComponent {
   /** Rename is a substance edit; delete the lifecycle verb (ADR-0039). Absent Rights → hidden (fail-closed). */
   protected readonly canRename = computed(() => !!this.card().rights?.includes('edit'));
   protected readonly canDelete = computed(() => !!this.card().rights?.includes('delete'));
-  /**
-   * **Adoption** asks only for the right to create Entities in the *target* World (ADR-0079), which is
-   * a standing on the World this card is browsed from and not on the entry — so the Rights the entry
-   * reports (`read` alone, always) cannot gate it, and being Sealed is the whole condition.
-   */
+  /** Sealed is the whole condition: adoption's gate is on the *target* World, which the card cannot see. */
   protected readonly canAdopt = computed(() => !!this.card().sealed);
 }

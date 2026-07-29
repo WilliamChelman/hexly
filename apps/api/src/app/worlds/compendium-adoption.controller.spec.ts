@@ -133,8 +133,8 @@ describe('Adoption', () => {
     expect(copy.worldId).toBe(world);
     expect((await bob.get(`/entities/${copy.id}/owners`).expect(200)).body).toEqual([bobId]);
     // A Viewer may not: the create seam's own gate is what says so, with no rule of adoption's own.
-    const carol = await seed('carol@hexly.test', 'Carol');
-    await ada.post(`/worlds/${world}/members`).send({ userId: carol, role: 'viewer' }).expect(200);
+    const carolId = await seed('carol@hexly.test', 'Carol');
+    await ada.post(`/worlds/${world}/members`).send({ userId: carolId, role: 'viewer' }).expect(200);
     await (await signIn('carol@hexly.test')).post(`/entities/${goblin.id}/adopt`).send({ worldId: world }).expect(404);
   });
 

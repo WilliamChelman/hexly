@@ -126,13 +126,9 @@ export const createEntityRequestSchema = z.object({
 export type CreateEntityRequest = z.infer<typeof createEntityRequestSchema>;
 
 /**
- * POST /entities/:id/adopt: **Adoption** (CONTEXT.md → Adoption, ADR-0079) — copy a **Compendium
- * Entry** into a World as an ordinary, editable Entity. The body carries the target alone; everything
- * else about the copy is read off the entry.
- *
- * The World is required rather than defaulted to the caller's oldest, unlike a create's: adoption is
- * always asked for from a surface that already names one — the `:worldId` the **Compendium browse** was
- * read under, which is the adoption target and not the content's home.
+ * POST /entities/:id/adopt (CONTEXT.md → Adoption): the target World, everything else being read off
+ * the entry. Required rather than defaulted like a create's, because every surface offering Adoption is
+ * already read under a World — the `:worldId` of the **Compendium browse** (ADR-0079).
  */
 export const adoptEntityRequestSchema = z.object({
   worldId: z.string().min(1),

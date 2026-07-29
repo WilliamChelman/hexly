@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
@@ -142,6 +142,7 @@ export class CompendiumBrowserPage {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
+  private readonly destroyRef = inject(DestroyRef);
 
   /** The adoption target, not the content's home — what an entry's link carries (#403). */
   protected readonly worldId = this.activeWorld.worldId;
@@ -260,19 +261,18 @@ export class CompendiumBrowserPage {
   }
 
   /**
-   * **Adopt** an entry into the World this browse is read under (ADR-0079) — the `:worldId` names the
-   * adoption target, not the content's home.
-   *
-   * The browse deliberately stays put and reports in a toast: adopting is shopping, several entries at a
-   * time, and asking twice adopts twice with nothing on screen claiming otherwise — there is no "already
-   * adopted" indicator, knowingly. So no button is disabled and no card changes.
+   * **Adopt** an entry into the World this browse is read under (ADR-0079). The list is left exactly as
+   * it was and a toast reports instead: asking twice adopts twice, so nothing here may disable a button
+   * or mark a card — there is no "already adopted" indicator, knowingly.
    */
   protected adopt(card: EntityCardVm): void {
     const worldId = this.worldId();
     if (!worldId) return;
     this.entitiesClient
       .adopt(card.id, worldId)
-      .pipe(this.shell.withLoading('subtle'))
+      // Not one tracked subscription like the reads below: two adoptions of one entry are a legitimate
+      // ask, so a second must not cancel the first.
+      .pipe(this.shell.withLoading('subtle'), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (copy) =>
           this.toaster.show(this.transloco.translate('compendium.adopted', { name: copy.name }), 'success'),

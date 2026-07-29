@@ -51,8 +51,6 @@ export class MockEntitiesClient {
         tags?: readonly string[],
       ) => Observable<EntityDetail>
     >();
-  /** **Adoption** (ADR-0079): copy a Compendium Entry into a World, returning the copy. */
-  adopt = vi.fn<(id: string, worldId: string) => Observable<EntityDetail>>();
   load = vi.fn<(id: string) => Observable<EntityDetail>>();
   listDescriptors = vi.fn<() => Observable<string[]>>();
   // Defaults to an empty vocabulary so a spec that drives the tag input (EntityTags.suggest)

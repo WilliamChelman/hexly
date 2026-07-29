@@ -118,15 +118,9 @@ export class EntitiesController {
     return this.entities.create(user.id, parsed.data);
   }
 
-  /**
-   * **Adoption** (ADR-0079): copy the **Compendium Entry** `:id` into the World the body names — the
-   * `:worldId` the Compendium browse was read under, which is the adoption target rather than the
-   * content's home. Creates an Entity, so a 201 carrying the copy.
-   *
-   * Unreachable entry → 404 (existence never leaks); an Entity that is not a Compendium Entry → 400,
-   * since adoption is defined on the shelf alone. The right to create Entities in the target World is
-   * the only standing it asks for, and the create seam is what checks it.
-   */
+  // **Adoption** (ADR-0079): the copy lands in the World the body names, so it is a create — 201.
+  // Unreachable entry is a 404 like any read; an Entity outside a Compendium a 400, there being no
+  // such act as adopting one.
   @Post(':id/adopt')
   adopt(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): EntityDetail {
     const parsed = adoptEntityRequestSchema.safeParse(body);

@@ -492,39 +492,6 @@ describe('EntityHeader', () => {
     expect(worlds.setPins).toHaveBeenCalledWith('w1', ['p1']);
   });
 
-  /**
-   * **Adoption** (ADR-0079, #403): the one action a **Compendium Entry**'s page can offer, since every
-   * other write this header affords would be refused. The affordance hangs off `sealed` alone — the
-   * Rights a Sealed entry reports (`read`) speak for the entry, while adoption asks for a standing on
-   * the World it is being read under.
-   */
-  it('offers Adopt on a Sealed entry, and copies it into the World it is read under', () => {
-    const copy: EntityDetail = { ...aldermoor, id: 'm2' };
-    entities.adopt.mockReturnValue(of(copy));
-    open({ ...aldermoor, sealed: true, rights: ['read'] });
-    const fixture = TestBed.createComponent(EntityHeaderComponent);
-    fixture.detectChanges();
-    const nav = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-
-    (fixture.nativeElement.querySelector('[data-testid=adopt-entity]') as HTMLButtonElement).click();
-    fixture.detectChanges();
-
-    // The active World is the adoption target — the entry lives in a Compendium, in no World at all.
-    expect(entities.adopt).toHaveBeenCalledWith('m1', 'w1');
-    // And the user lands on the copy, which is the editable thing they asked for.
-    const route = nav.mock.calls[0][0] as string[];
-    expect(route[0]).toBe('/w');
-    expect(route.at(-1)).toContain('m2');
-  });
-
-  it('offers no Adopt on an ordinary Entity — there is nothing to adopt outside a Compendium', () => {
-    open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeaderComponent);
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.querySelector('[data-testid=adopt-entity]')).toBeNull();
-  });
-
   it('mirrors the chosen view to the URL so a refresh keeps it (#75)', () => {
     open(aldermoor);
     const fixture = TestBed.createComponent(EntityHeaderComponent);

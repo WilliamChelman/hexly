@@ -56,4 +56,21 @@ describe('EntityCard — thumbnail in the sigil slot (ADR-0066)', () => {
     expect(sigil).not.toBeNull();
     expect(sigil!.querySelector('app-icon')).not.toBeNull();
   });
+
+  /**
+   * **Adoption** (ADR-0079): the card's one Sealed-only action, gated on where the Entity lives rather
+   * than on the Rights it reports — a **Compendium Entry**'s are `read` alone, and adoption is a
+   * standing on the *target* World, which this card cannot see.
+   */
+  it('offers Adopt on a Sealed entry, whose Rights say only `read`', () => {
+    const fixture = render(card({ sealed: true }));
+
+    expect(el(fixture).querySelector('[data-testid="adopt-e1"]')).not.toBeNull();
+  });
+
+  it('offers no Adopt on a World’s own Entity, however many Rights it carries', () => {
+    const fixture = render(card({ rights: ['read', 'edit', 'delete'] }));
+
+    expect(el(fixture).querySelector('[data-testid="adopt-e1"]')).toBeNull();
+  });
 });

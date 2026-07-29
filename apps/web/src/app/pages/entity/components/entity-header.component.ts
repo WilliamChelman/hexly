@@ -10,7 +10,6 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { ActiveWorld, EntitiesClient, ToasterService, entityRoute } from '@hexly/web-core';
 import { ButtonComponent, ButtonGroupComponent, EyebrowComponent, PageHeaderComponent } from '@hexly/web-ui';
 import { EntityActionsMenuComponent } from './entity-actions-menu.component';
 import { EntityShareDialogComponent } from './entity-share-dialog.component';
@@ -99,24 +98,6 @@ import { EntityViewStore } from '../services/entity-view-store';
         </div>
       }
 
-      <!-- **Adopt** (ADR-0079): a **Compendium Entry** is read-only, so the one thing its page can
-           offer is taking a copy into the World it is being read under — the World segment in the URL,
-           which names the adoption target rather than the entry's home. A button of its own rather
-           than a row in the overflow menu, which renders nothing at all for a Sealed entry. -->
-      @if (adoptable()) {
-        <button
-          type="button"
-          appButton
-          pageHeaderActions
-          size="sm"
-          data-testid="adopt-entity"
-          [disabled]="adopting()"
-          (click)="adopt()"
-        >
-          {{ (adopting() ? 'compendium.adopting' : 'compendium.adopt') | transloco }}
-        </button>
-      }
-
       <!-- The Entity's actions — Edit types, Visibility, Pin, and Share — gathered behind one
            overflow menu. Share and Edit types are this header's dialog surfaces, so the menu emits
            and we open them. Field management moved inline to the Details View/Panel (ADR-0067). -->
@@ -136,10 +117,6 @@ export class EntityHeaderComponent {
   private readonly views = inject(ViewRegistry);
   private readonly types = inject(TypeRegistry);
   private readonly transloco = inject(TranslocoService);
-  /** The World the entry is being read under — the **Adoption** target, not a Sealed entry's home. */
-  private readonly activeWorld = inject(ActiveWorld);
-  private readonly entities = inject(EntitiesClient);
-  private readonly toaster = inject(ToasterService);
 
   /**
    * One of the primary type's chrome labels, re-derived when the primary type or the language
@@ -158,40 +135,6 @@ export class EntityHeaderComponent {
 
   /** Whether the Edit-types dialog (#189) is open — toggled by the actions menu's Edit types item. */
   protected readonly typesOpen = signal(false);
-
-  /**
-   * Whether the open Entity is a **Compendium Entry** (CONTEXT.md → Sealed) — the whole condition for
-   * offering **Adoption**, which asks for no Right on the entry itself but for the right to create
-   * Entities in the *target* World (ADR-0079). A World that can't be authored in refuses server-side.
-   */
-  protected readonly adoptable = computed(() => !!this.session.current()?.sealed);
-
-  /** In flight, so the button says so and a double-click cannot mint two copies from one intent. */
-  protected readonly adopting = signal(false);
-
-  /**
-   * Copy the open entry into the World it is being read under, and open the copy: from an entry's own
-   * page the user has already read the thing and committed to it, so landing on the editable Entity is
-   * the next thing they wanted. (The Compendium browse stays put instead — there they are still
-   * shopping.)
-   */
-  protected adopt(): void {
-    const entry = this.session.current();
-    const worldId = this.activeWorld.worldId();
-    if (!entry || !worldId || this.adopting()) return;
-    this.adopting.set(true);
-    this.entities.adopt(entry.id, worldId).subscribe({
-      next: (copy) => {
-        this.adopting.set(false);
-        this.toaster.show(this.transloco.translate('compendium.adopted', { name: copy.name }), 'success');
-        void this.router.navigate(entityRoute(worldId, copy.id, this.activeWorld.name() ?? undefined, copy.name));
-      },
-      error: () => {
-        this.adopting.set(false);
-        this.toaster.show(this.transloco.translate('compendium.adoptError'), 'error');
-      },
-    });
-  }
 
   /** Resigning can cost reach to this Entity, so drop back to the World Index. */
   protected onResigned(): void {
