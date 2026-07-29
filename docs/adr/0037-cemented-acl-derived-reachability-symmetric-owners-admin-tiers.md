@@ -57,3 +57,7 @@ The two entity-level tables above shipped separately, but they are the same shap
 - `EntitiesService`'s owner-only choke point (`ownedRow`) generalizes to the access predicate above; `WorldsService.reachableWorld` generalizes to derived reachability. Listing/facet queries must scope by the same predicate to avoid existence leaks.
 - The unauthenticated surface grows from zero to token-scoped read-only routes (world link, entity link) — each must stay read-only and revocable per ADR-0004.
 - Deferred, explicitly: link expiry, multiple concurrent links per target, per-member visibility UI beyond grants, ownership-transfer UX sugar (a transfer is add-owner + resign).
+
+## Amendment: reachability gains one indirect path (ADR-0080)
+
+The read predicate takes a third disjunct beside `grant` and `member ∧ shared`: _the caller reaches the Entity's Container, **or** reaches some World that **Mounts** it_ — one `EXISTS`, one hop, since Mounts do not chain. This is the first time reading a Container depends on another Container's configuration, which is what un-cements the "cemented" of the title. The escalation guard is that only a Container you **Own** may be mounted, so a Mount republishes nothing you do not already control. The cascade reaches anonymous **World Public Link** holders too, deliberately.

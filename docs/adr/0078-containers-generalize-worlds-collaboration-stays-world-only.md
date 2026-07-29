@@ -21,3 +21,11 @@ The migration is a backfill, not a rewrite: `worlds.id` stays the primary key an
 - **ADR-0037's reachability resolution stays World-shaped** and is untouched by this change.
 - Per-user or per-group compendium access — a homebrew shelf shared with three friends — remains reachable later as a column rename, but is explicitly not modelled now.
 - `CONTEXT.md` already listed _container_ under **World**'s `_Avoid_`. That entry now means what it says: Container is the supertype, World is one kind, and conflating them is the error it always warned about.
+
+## Amendment: a **Shelf** is a World, and a World **Mounts** what it draws from (ADR-0080)
+
+Reusable material that belongs to no campaign — art, tracks, a homebrew bestiary — is held in a **Shelf**: a World kept to be drawn from rather than played in, marked by a label on the `worlds` satellite. Not the flagged row this ADR rejected, and its own test says so: run "which surfaces must remember to exclude it?" and the answer is _none_ — a Shelf wants members, a Dashboard, a Theme, the Switcher and the create-Entity target list exactly as a campaign does. The exclusions that made the flagged Compendium a lie do not exist here, so the label groups the **World Index** and no read ever filters on it.
+
+The distinction cannot live on `containers.kind` for the reason this ADR gives — kind says which satellite completes the row, and a Shelf's satellite is `worlds`. Which is also what makes it cheap: Collaboration keys on `worlds`, so a Shelf has members and a public link _by construction_, and "per-user or per-group compendium access… reachable later as a column rename" is untouched and still unspent.
+
+What does change is the "one question with two irreconcilable answers" this ADR used to keep `worldMembers` World-shaped. ADR-0080's **Mount** cascades read, so reachability gains one indirect path — _the caller reaches C, or reaches some World W that Mounts C_ — and reading a Container now depends on another Container's configuration for the first time. The guard is that only a Container you **Own** may be mounted, so a Mount can only republish content you already control; Mounts do not chain, so the join stays bounded and cycles stay harmless.
