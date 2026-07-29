@@ -69,6 +69,8 @@ describe('Worlds endpoints', () => {
       name: 'Aldermoor',
       // Ownership is a symmetric set (ADR-0037): the creator is its sole Owner.
       owners: [expect.any(String)],
+      // A new World is a campaign unless said otherwise (ADR-0080).
+      kind: 'campaign',
       rights: ['read', 'create-entity', 'manage'],
       // No Home Entity is minted — the landing is a derived Dashboard (ADR-0043).
       entityCount: 0,
@@ -116,6 +118,8 @@ describe('Worlds endpoints', () => {
       id: expect.any(String),
       name: expect.any(String),
       owners: [expect.any(String)],
+      // Campaign-or-Shelf rides the Summary so the World Index can group by it (ADR-0080).
+      kind: 'campaign',
       rights: ['read', 'create-entity', 'manage'],
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
@@ -407,6 +411,70 @@ describe('Worlds endpoints', () => {
       .expect(403);
     // The pins stayed empty — a refused PATCH writes nothing.
     expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.pinnedEntityIds).toEqual([]);
+  });
+
+  describe('the Shelf label (ADR-0080, #409)', () => {
+    it('lets an Owner label a World a Shelf, and the label persists', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'The Art Shelf' }).expect(201);
+      // A new World is a campaign unless said otherwise.
+      expect(world.body.kind).toBe('campaign');
+
+      const patched = await ada.patch(`/worlds/${world.body.id}`).send({ kind: 'shelf' }).expect(200);
+      expect(patched.body.kind).toBe('shelf');
+
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.kind).toBe('shelf');
+      // And back again — the label is a curation, not a one-way door.
+      await ada.patch(`/worlds/${world.body.id}`).send({ kind: 'campaign' }).expect(200);
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.kind).toBe('campaign');
+    });
+
+    it('refuses a Contributor labelling a World with 403, and a value that is neither with 400', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      db.$client
+        .prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, 'contributor')`)
+        .run(world.body.id, bobId);
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      await bob.patch(`/worlds/${world.body.id}`).send({ kind: 'shelf' }).expect(403);
+      await ada.patch(`/worlds/${world.body.id}`).send({ kind: 'bestiary' }).expect(400);
+
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.kind).toBe('campaign');
+    });
+
+    /**
+     * The whole point of the label, and the thing to guard (ADR-0080): a Shelf is a World in every
+     * respect but the World Index's grouping. If a read ever starts answering differently because a
+     * World is a Shelf, this is where it shows.
+     */
+    it('withholds nothing from a Shelf: it lists, reads, keeps members, a Public Link and a Graph', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const shelf = await ada.post('/worlds').send({ name: 'The Art Shelf' }).expect(201);
+      const campaign = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      await ada.patch(`/worlds/${shelf.body.id}`).send({ kind: 'shelf' }).expect(200);
+      await ada
+        .post('/entities')
+        .send({ name: 'A tavern sketch', types: ['core.type.note'], worldId: shelf.body.id })
+        .expect(201);
+
+      // The listing carries it, beside the campaign — grouping is the client's, not the query's.
+      const listed = await ada.get('/worlds').expect(200);
+      expect(listed.body.map((w: { id: string }) => w.id).sort()).toEqual([campaign.body.id, shelf.body.id].sort());
+
+      // Collaboration, sharing and the derived views are all still the Shelf's.
+      const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      await ada.post(`/worlds/${shelf.body.id}/members`).send({ userId: bobId, role: 'viewer' }).expect(200);
+      expect((await ada.get(`/worlds/${shelf.body.id}/members`).expect(200)).body).toEqual([
+        { userId: bobId, role: 'viewer' },
+      ]);
+      expect((await ada.post(`/worlds/${shelf.body.id}/link`).expect(200)).body.token).toEqual(expect.any(String));
+      expect((await ada.get(`/worlds/${shelf.body.id}/graph`).expect(200)).body.nodes).toHaveLength(1);
+      // And its Entities answer the same World-scoped read a campaign's do.
+      const entities = await ada.get(`/entities?worldId=${shelf.body.id}`).expect(200);
+      expect(entities.body.items).toHaveLength(1);
+    });
   });
 
   describe('World Theme (ADR-0076)', () => {

@@ -16,6 +16,7 @@ describe('WorldsClient', () => {
     id: 'w1',
     name: 'Aldermoor',
     owners: ['u1'],
+    kind: 'campaign',
     rights: ['read', 'manage'],
     createdAt: 1,
     updatedAt: 1,

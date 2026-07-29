@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { Subject, of, throwError } from 'rxjs';
-import { ImportSummary, WorldSummary } from '@hexly/domain';
+import { ImportSummary, WorldKind, WorldSummary } from '@hexly/domain';
 import { AuthClient, ClientConfigStore, WorldsClient, ToasterService } from '@hexly/web-core';
 import { MockAuthClient, MockWorldsClient, mockClientConfigStore } from '@hexly/web-core/testing';
 import { TypeDefinition } from '@hexly/web-entity';
@@ -25,7 +25,7 @@ const TYPES: TypeDefinition[] = [
   },
 ];
 
-function world(id: string, name = id, ownerId = 'u1'): WorldSummary {
+function world(id: string, name = id, ownerId = 'u1', kind: WorldKind = 'campaign'): WorldSummary {
   // Rights drive the owned/member distinction now (ADR-0039): the caller (u1) owning it
   // carries `manage`; anyone else's World is reachable read-only.
   const owned = ownerId === 'u1';
@@ -33,6 +33,7 @@ function world(id: string, name = id, ownerId = 'u1'): WorldSummary {
     id,
     name,
     owners: [ownerId],
+    kind,
     rights: owned ? ['read', 'manage'] : ['read'],
     createdAt: 1,
     updatedAt: 1,
@@ -105,6 +106,50 @@ describe('WorldIndex', () => {
     );
     expect(names.join(' ')).toContain('Aldermoor');
     expect(names.join(' ')).toContain('Whisperwood');
+  });
+
+  describe('the Shelf grouping (ADR-0080, #409)', () => {
+    const ids = (el: HTMLElement, group: string) =>
+      Array.from(el.querySelectorAll(`[data-testid=${group}] [data-testid^=world-]`)).map((n) =>
+        n.getAttribute('data-testid'),
+      );
+
+    it('groups campaigns and Shelves apart', () => {
+      const el = render([
+        world('w1', 'Aldermoor'),
+        world('w2', 'The Art Shelf', 'u1', 'shelf'),
+        world('w3', 'Whisperwood'),
+      ]).nativeElement as HTMLElement;
+
+      expect(ids(el, 'worlds-campaigns')).toEqual(['world-w1', 'world-w3']);
+      expect(ids(el, 'worlds-shelves')).toEqual(['world-w2']);
+    });
+
+    it('shows no Shelves group at all to a caller with no Shelf — exactly the list they had', () => {
+      const el = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')]).nativeElement as HTMLElement;
+
+      expect($(el, '[data-testid=worlds-shelves]')).toBeNull();
+      expect(ids(el, 'worlds-campaigns')).toEqual(['world-w1', 'world-w2']);
+    });
+
+    it('drops the campaigns heading, not the row, when every World is a Shelf', () => {
+      const el = render([world('w1', 'The Art Shelf', 'u1', 'shelf')]).nativeElement as HTMLElement;
+
+      expect(el.textContent).not.toContain('Continue');
+      // The row stays: the Create card lives in it, and a caller with no campaign still needs one.
+      expect($(el, '[data-testid=worlds-campaigns] [data-testid=create-world-tile]')).not.toBeNull();
+      expect(ids(el, 'worlds-shelves')).toEqual(['world-w1']);
+    });
+
+    it('withholds nothing from a Shelf card: it opens, renames, exports and deletes like any other', () => {
+      const el = render([world('w1', 'The Art Shelf', 'u1', 'shelf')]).nativeElement as HTMLElement;
+
+      expect(($(el, '[data-testid=world-w1]') as HTMLAnchorElement).getAttribute('href')).toBe('/w/w1');
+      expect($(el, '[data-testid=rename-world-w1]')).not.toBeNull();
+      expect($(el, '[data-testid=export-world-w1]')).not.toBeNull();
+      expect($(el, '[data-testid=delete-world-w1]')).not.toBeNull();
+      expect($(el, '[data-testid=owners-world-w1]')).not.toBeNull();
+    });
   });
 
   it('distinguishes owned Worlds from member Worlds', () => {

@@ -71,10 +71,19 @@ export function worldOwnerFilter(userId: string) {
  * The one home of the whole-World read: the Container's identity columns beside the satellite's
  * own. Driven off `worlds`, never `containers` — the satellite *is* the "this is a World"
  * discriminator, so no `kind` exclusion is needed here or anywhere else (ADR-0078).
+ *
+ * The satellite's `kind` deliberately shadows the Container's in the projection: for a World row the
+ * Container's is `'world'` by construction, and the label worth carrying is campaign-or-Shelf
+ * (ADR-0080).
  */
 function selectWorld(db: Db) {
   return db
-    .select({ ...getTableColumns(containers), pinnedEntityIds: worlds.pinnedEntityIds, theme: worlds.theme })
+    .select({
+      ...getTableColumns(containers),
+      kind: worlds.kind,
+      pinnedEntityIds: worlds.pinnedEntityIds,
+      theme: worlds.theme,
+    })
     .from(worlds)
     .innerJoin(containers, eq(containers.id, worlds.id));
 }

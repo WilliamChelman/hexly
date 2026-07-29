@@ -236,8 +236,9 @@ export class WorldsController {
 
   /**
    * A partial update of the Owner-curated fields: `name` (rename), `pinnedEntityIds` (Dashboard pins,
-   * #168) and/or the World Theme (ADR-0076). Owner-gated in the service; not an Owner is a 403, no such
-   * World a 404. The schema is the Theme's write choke point, so a value that is not one is a 400 here.
+   * #168), the World Theme (ADR-0076) and/or campaign-or-Shelf (ADR-0080). Owner-gated in the service;
+   * not an Owner is a 403, no such World a 404. The schema is the Theme's write choke point, so a value
+   * that is not one is a 400 here.
    *
    * Ownership is established *before* the parse, inverting this controller's usual order: the Theme
    * schema is a colour parser over untrusted input (ADR-0076), so parsing first sells that work to any

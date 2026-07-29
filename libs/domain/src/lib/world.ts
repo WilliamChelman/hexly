@@ -20,6 +20,20 @@ export const worldSchema = z.object({
 });
 
 /**
+ * What a World is kept for (ADR-0080): a `campaign` played in, or a **Shelf** drawn from — art,
+ * tracks, a homebrew bestiary. A label and nothing more: the World Index groups by it and **no read
+ * anywhere filters on it**, so a Shelf keeps its members, Dashboard, Theme, Public Link, Switcher
+ * entry and Mounts exactly as a campaign does.
+ */
+export const worldKindSchema = z.enum(['campaign', 'shelf']);
+
+/** CONTEXT.md → Shelf. */
+export type WorldKind = z.infer<typeof worldKindSchema>;
+
+/** What a new World is unless said otherwise (ADR-0080). */
+export const DEFAULT_WORLD_KIND: WorldKind = 'campaign';
+
+/**
  * World membership roles: `owner` is the symmetric ownership set (full
  * control); `contributor` and `viewer` sit below it.
  */
@@ -94,6 +108,9 @@ export const updateWorldRequestSchema = z.object({
   // The World Theme (ADR-0076), also wholesale; `null` clears it. A schema rather than a passthrough
   // blob because this is the write choke point for untrusted input.
   theme: z.union([worldThemeSchema, z.null()]).optional(),
+  // Campaign-or-Shelf (ADR-0080). Rides the one Owner-curated patch because it is curation like the
+  // name is — a label the World Index groups by, not a capability.
+  kind: worldKindSchema.optional(),
 });
 
 export type UpdateWorldRequest = z.infer<typeof updateWorldRequestSchema>;
@@ -109,6 +126,11 @@ export interface WorldSummary {
   readonly name: string;
   /** The World's ownership set: one or more equal Owner user ids. */
   readonly owners: readonly string[];
+  /**
+   * Campaign-or-Shelf (ADR-0080): what the World Index groups by, and the only thing this label is
+   * ever read for. Always present — a World that was never labelled is a campaign.
+   */
+  readonly kind: WorldKind;
   /**
    * The caller's Rights: always present and non-empty — a reachable World
    * carries at least `read`, an Owner also `manage`.

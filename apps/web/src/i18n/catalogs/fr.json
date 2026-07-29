@@ -359,7 +359,8 @@
     "deleteCount": "Cette action détruit définitivement {count, plural, one {# entité} other {# entités}}. Elle est irréversible.",
     "deleteConfirmPrompt": "Tapez {{name}} pour confirmer.",
     "deleteConfirmLabel": "Tapez le nom du monde pour confirmer la suppression",
-    "deleteError": "Impossible de supprimer ce monde. Veuillez réessayer."
+    "deleteError": "Impossible de supprimer ce monde. Veuillez réessayer.",
+    "shelves": "Étagères"
   },
   "worldDashboard": {
     "tabTitle": "Hexly — Tableau de bord",
@@ -622,6 +623,18 @@
       "display": "La Route aux neuf détours",
       "body": "À trois jours à l’est du fleuve, la route bifurque à une borne brisée."
     }
+  },
+  "worldKind": {
+    "heading": "Campagne ou étagère",
+    "subhead": "À quoi sert ce monde. Une étagère est un monde où l'on puise plutôt qu'un monde où l'on joue — c'est là que vit le matériel réutilisable : illustrations, musiques, bestiaire maison.",
+    "campaign": "Campagne",
+    "shelf": "Étagère",
+    "hint": {
+      "campaign": "Un monde où vous jouez.",
+      "shelf": "Un monde où vous puisez."
+    },
+    "note": "Ce n'est qu'une étiquette : l'index des mondes s'en sert pour les regrouper, et rien d'autre ne la lit nulle part. Une étagère garde ses membres, son tableau de bord, son thème, son lien public et sa place dans le sélecteur de mondes, exactement comme une campagne.",
+    "saveError": "Impossible d'enregistrer. Veuillez réessayer."
   },
   "imports": {
     "heading": "Imports",
