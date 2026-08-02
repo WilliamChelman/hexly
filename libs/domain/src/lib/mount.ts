@@ -18,7 +18,8 @@ export type ContainerKind = z.infer<typeof containerKindSchema>;
 
 /**
  * One Mount as `GET /worlds/:id/mounts` lists it: the mounted Container's identity and kind, in the
- * Owner-arranged order. The mounting World is the route's own `:id`, so it is not repeated here.
+ * Owner-arranged order. The mounting World is the route's own `:id`, so it is not repeated here — and
+ * `GET /worlds/:id/mount-candidates` answers in the same shape, an add turning one into the other.
  */
 export interface Mount {
   /**
@@ -32,34 +33,20 @@ export interface Mount {
 }
 
 /**
- * A Container the caller may mount into this World, as `GET /worlds/:id/mount-candidates` offers it:
- * every installed **Compendium**, plus every World the caller **Owns**, minus what is already mounted
- * and minus the World itself. Shaped exactly like a {@link Mount} — the add control turns one into the
- * other, and nothing else distinguishes them.
- */
-export type MountCandidate = Mount;
-
-/**
  * The blast radius of an act that breaks links (ADR-0080, #414): how many links point into a Container,
- * and how many **Worlds** they come from. Three acts ask for it — unmounting a Container, deleting one,
- * and an operator removing a pack — and none of them is refused by the answer: a destructive act
- * another user's configuration could veto is worse than a dangling link.
- *
- * Read per act rather than stored, so it is never stale, and counted raw rather than per-viewer: a
- * blast radius that hid what the caller cannot read would understate the damage, and a pair of
- * numbers names no content.
+ * and how many **Worlds** they come from. Read per act rather than stored, so it is never stale, and
+ * counted raw rather than per-viewer — a count that hid what the caller cannot read would understate
+ * the damage. It never refuses the act: a destructive act another user's configuration could veto is
+ * worse than a dangling link.
  */
 export interface InboundLinkCount {
   /**
-   * Links pointing in from the Worlds outside this Container. Its own internal links are not blast
-   * radius, so they are never counted, and a **Decor Link** is — a shelf image going non-navigable is
-   * exactly the damage this number exists to state (ADR-0069).
+   * Links pointing in from the Worlds outside this Container — a **Decor Link** included, since a shelf
+   * image going non-navigable is exactly the damage this number exists to state (ADR-0069). The
+   * Container's own internal links are not blast radius, so they are never counted.
    */
   readonly links: number;
-  /**
-   * How many Worlds those links come from — the "from how many Worlds" half a delete and a pack removal
-   * state. At most 1 when the question already named a single one, as unmount's does.
-   */
+  /** How many Worlds those links come from; at most 1 where the question already named one, as unmount does. */
   readonly worlds: number;
 }
 

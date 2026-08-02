@@ -274,6 +274,13 @@
       "when": 1785333295900,
       "tag": "0038_container_mounts",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "6",
+      "when": 1785655019949,
+      "tag": "0039_inbound_edges_by_target_container",
+      "breakpoints": true
     }
   ]
 }

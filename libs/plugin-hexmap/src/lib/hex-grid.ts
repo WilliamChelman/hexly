@@ -32,8 +32,7 @@ export const HEX_GRID_DATA_TYPE = defineStructuredDataType({
     const edges: EntityEdge[] = [];
     // A Hex/Feature/Region placement is a semantic worldbuilding relation, never decor (ADR-0069).
     const link = (targetId: string | undefined) => {
-      if (targetId)
-        edges.push({ targetKind: 'entity', targetId, targetContainerId: null, descriptor: null, decor: false });
+      if (targetId) edges.push({ targetKind: 'entity', targetId, descriptor: null, decor: false });
     };
     for (const hex of Object.values(grid.hexes)) {
       link(hex.entityId);

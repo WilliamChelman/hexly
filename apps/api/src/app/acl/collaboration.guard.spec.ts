@@ -14,6 +14,8 @@ import { AuthService } from '../auth/auth.service';
 import { pinDeployment } from '../config';
 import { DB, Db, createDb } from '../db/db';
 import { EntitiesService } from '../entities/entities.service';
+import { CompendiumWrites } from '../worlds/compendium-writes';
+import { WorldWrites } from '../worlds/world-writes';
 import { WorldsService } from '../worlds/worlds.service';
 import { CollaborationGuard } from './collaboration.guard';
 import { AclSetResult } from './owner-set';
@@ -47,6 +49,7 @@ const COLLABORATION_ROUTES = [
   'GET /public/entities/:token',
   'GET /public/worlds/:token',
   'GET /public/worlds/:token/entities/:id',
+  'GET /public/worlds/:token/compendiums/:id',
   'GET /users',
   'POST /users',
   'POST /users/:id/password',
@@ -65,6 +68,8 @@ interface Fixtures {
   readonly other: string;
   readonly world: string;
   readonly entity: string;
+  /** An installed pack the World Mounts, so the public Compendium-page read has terms to answer with. */
+  readonly pack: string;
   readonly worldToken: string;
   readonly entityToken: string;
 }
@@ -80,6 +85,7 @@ function concretePath(pattern: string, f: Fixtures): string {
       if (!segment.startsWith(':')) return segment;
       if (segment === ':userId') return segments[i - 1] === 'owners' ? f.operator : f.other;
       if (segment === ':token') return segments[i - 1] === 'entities' ? f.entityToken : f.worldToken;
+      if (segments[i - 1] === 'compendiums') return f.pack;
       // Under the `/public` reader, `:id` is an Entity.
       switch (segments[1]) {
         case 'entities':
@@ -212,8 +218,14 @@ describe('Collaboration gate', () => {
     unwrap(app.get(EntitiesService).addGrant(operator, entity, other, 'viewer'));
     const worldToken = unwrap(worlds.mintLink(operator, world)).token;
     const entityToken = unwrap(app.get(EntitiesService).mintLink(operator, entity)).token;
+    // Installed and Mounted, so a pack's terms are reachable through the World link the way ADR-0080
+    // says they must be — the only standing the public Compendium read has.
+    const pack = app
+      .get(CompendiumWrites)
+      .install('draw-steel.importer.monsters', { name: 'Draw Steel: Monsters' }, '1.4.0');
+    app.get(WorldWrites).mount(world, pack);
 
-    return { agent, operator, other, world, entity, worldToken, entityToken };
+    return { agent, operator, other, world, entity, pack, worldToken, entityToken };
   }
 
   describe('with Collaboration off', () => {

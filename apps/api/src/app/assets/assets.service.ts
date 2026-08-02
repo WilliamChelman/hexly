@@ -121,7 +121,9 @@ export class AssetsService implements OnModuleInit {
    * Write `bytes` for `worldId`, content-addressed by their sha256 (ADR-0034). Idempotent: identical
    * bytes hash to the same on-disk name, so a repeat overwrites a byte-identical file — the mint path's
    * `(containerId, hash)` dedup decides whether a new Entity is minted. `filename` supplies the extension
-   * (on disk and in the URL), pinned at first store so the served URL is stable across renames (ADR-0065).
+   * (on disk and in the URL), pinned at first store so the served URL is stable across renames (ADR-0065)
+   * — and it is `''` for an extension-less upload, which still addresses a file, so a reader of `ext` must
+   * test it for absence rather than for truth.
    */
   store(worldId: string, filename: string, bytes: Uint8Array): StoredAsset {
     const hash = createHash('sha256').update(bytes).digest('hex');

@@ -1,54 +1,19 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { InboundLinkCount, Mount, MountCandidate } from '@hexly/domain';
+import { Inject, Injectable } from '@nestjs/common';
+import { InboundLinkCount, Mount } from '@hexly/domain';
 import { and, asc, eq, isNotNull, notInArray, or } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { gate } from '../acl/owner-set';
 import { worldAccess, worldOwnerFilter } from '../acl/world-access';
 import { compendiums, containerMounts, containers, worlds } from '../db/schema';
 import { ContainerLinksService } from './container-links.service';
+import { WorldRouteRefusal, WorldRouteResult } from './world-route-result';
 import { WorldWrites } from './world-writes';
 
 /**
- * The outcome of a Mount operation, mapped to HTTP by {@link mountResponse}: `not-found` = no such
- * World, or one the caller can't reach (404, ADR-0004 — existence never leaks); `forbidden` =
- * reachable but the caller may not do this (403); `invalid` = a reorder that is not a reorder (400).
- */
-export type MountResult<T> =
-  | { status: 'ok'; value: T }
-  | { status: 'not-found' }
-  | { status: 'forbidden' }
-  | { status: 'invalid' };
-
-/** The refusal arms alone — what a gate returns, and what {@link gate} already produces. */
-type MountRefusal = Extract<MountResult<never>, { status: 'not-found' | 'forbidden' }>;
-
-/** Map a {@link MountResult} to its HTTP outcome: `ok` unwraps, else the status's exception. */
-export function mountResponse<T>(result: MountResult<T>): T {
-  switch (result.status) {
-    case 'ok':
-      return result.value;
-    case 'not-found':
-      throw new NotFoundException();
-    case 'forbidden':
-      throw new ForbiddenException();
-    case 'invalid':
-      throw new BadRequestException();
-  }
-}
-
-/**
  * A World's **Mounts** (CONTEXT.md → Mount, ADR-0080): the Containers it declares it draws from, and
- * the add / reorder / unmount that maintain them.
- *
- * Ownership on the mounted side is *personal* — {@link worldOwnerFilter} carries no Superadmin bypass
- * — because the Own-only rule exists so a Mount can only republish content the caller already
- * controls. A **Compendium** is exempt: Instance-wide and already readable by every signed-in caller,
- * so mounting one grants nothing (ADR-0079).
- *
- * Every route resolves its *mounting* Container through `worlds`, which is the whole of "a Compendium
- * may not mount": a pack's id is not a World here, so it 404s with no rule naming the case. Arranging
- * Mounts is World-Owner-gated like `/owners` and `/members`; {@link list} alone answers any reader,
- * for the **Library**. Deliberately not Collaboration-gated throughout (ADR-0071).
+ * the add / reorder / unmount that maintain them. Member-gated to read and Owner-gated to arrange,
+ * every route resolving its mounting Container through `worlds` so a **Compendium**'s id simply is not
+ * one (ADR-0078). Deliberately not Collaboration-gated (ADR-0071).
  */
 @Injectable()
 export class WorldMountsService {
@@ -59,14 +24,16 @@ export class WorldMountsService {
   ) {}
 
   /**
-   * The World's Mounts in the Owner-arranged order. The one route here that is *not* Owner-gated: any
-   * reader of the World gets it, because this is what the **Library** reads (ADR-0080) and the Mount
-   * cascade has already handed those readers the content itself — naming the Containers it came out of
-   * discloses nothing they cannot open. Arranging the list stays the Owner's. Unreachable → 404.
+   * The World's Mounts in the Owner-arranged order — the one route here that is not Owner-gated, since
+   * this is what the **Library** reads (#412). Member-gated rather than reachable-gated, because the
+   * cascade is deliberately one hop (ADR-0080): a reader who reaches *this* World through someone
+   * else's Mount cannot read what it in turn draws from, so naming those Containers to them would
+   * disclose the second hop the cascade withholds. Reachable-but-not-a-member → 403, unreachable → 404.
    */
-  list(userId: string, worldId: string): MountResult<Mount[]> {
+  list(userId: string, worldId: string): WorldRouteResult<Mount[]> {
     const meta = worldAccess(this.db, userId).decideMeta(worldId);
     if (!meta?.reachable) return { status: 'not-found' };
+    if (!meta.isMember) return { status: 'forbidden' };
     return { status: 'ok', value: this.mounts(worldId) };
   }
 
@@ -75,7 +42,7 @@ export class WorldMountsService {
    * they personally Own, minus this World itself and minus what is already mounted. A Container they
    * merely read is never among them — that is the Own-only rule, offered rather than only enforced.
    */
-  candidates(userId: string, worldId: string): MountResult<MountCandidate[]> {
+  candidates(userId: string, worldId: string): WorldRouteResult<Mount[]> {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
     const taken = [worldId, ...this.mounts(worldId).map((m) => m.containerId)];
@@ -107,7 +74,7 @@ export class WorldMountsService {
    * itself — it already holds its own Entities, and "the Container or one it Mounts" would be a
    * tautology.
    */
-  add(userId: string, worldId: string, containerId: string): MountResult<Mount[]> {
+  add(userId: string, worldId: string, containerId: string): WorldRouteResult<Mount[]> {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
     const mountable = this.gateMountable(userId, worldId, containerId);
@@ -121,7 +88,7 @@ export class WorldMountsService {
    * permutation of what is mounted is a 400 — `reorderMountsRequestSchema` says why that refusal is
    * load-bearing.
    */
-  reorder(userId: string, worldId: string, containerIds: readonly string[]): MountResult<Mount[]> {
+  reorder(userId: string, worldId: string, containerIds: readonly string[]): WorldRouteResult<Mount[]> {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
     const current = this.mounts(worldId);
@@ -145,13 +112,13 @@ export class WorldMountsService {
    * question to have an answer, and `remove` is the one that decides whether it is there to drop. The
    * answer never refuses the unmount: it is a number and a confirm.
    */
-  linkCount(userId: string, worldId: string, containerId: string): MountResult<InboundLinkCount> {
+  linkCount(userId: string, worldId: string, containerId: string): WorldRouteResult<InboundLinkCount> {
     const gate = this.gateOwner(userId, worldId);
     return gate ?? { status: 'ok', value: this.links.countInbound(containerId, worldId) };
   }
 
   /** Drop one Mount and nothing else. Unmounting what is not mounted is a 404, never a silent success. */
-  remove(userId: string, worldId: string, containerId: string): MountResult<Mount[]> {
+  remove(userId: string, worldId: string, containerId: string): WorldRouteResult<Mount[]> {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
     if (!this.writes.unmount(worldId, containerId)) return { status: 'not-found' };
@@ -173,12 +140,12 @@ export class WorldMountsService {
    * The mounting side's gate — the shared owner-management gate (ADR-0037), which a Compendium's id
    * never reaches: `decideMeta` reads the `worlds` satellite, so a pack resolves to no row.
    */
-  private gateOwner(userId: string, worldId: string): MountRefusal | undefined {
+  private gateOwner(userId: string, worldId: string): WorldRouteRefusal | undefined {
     return gate(worldAccess(this.db, userId).decideMeta(worldId) ?? { reachable: false, isOwner: false });
   }
 
   /** The mounted side's gate: the Own-only rule, with the Compendium exception. */
-  private gateMountable(userId: string, worldId: string, containerId: string): MountRefusal | undefined {
+  private gateMountable(userId: string, worldId: string, containerId: string): WorldRouteRefusal | undefined {
     if (containerId === worldId) return { status: 'forbidden' };
     const compendium = this.db
       .select({ id: compendiums.id })

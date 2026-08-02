@@ -59,7 +59,7 @@ import {
       @if (visibleGraph(); as g) {
         <div pageHeaderActions class="flex items-center gap-4">
           <span class="text-sm text-ink-muted" data-testid="graph-counts">
-            {{ 'worldGraph.counts' | transloco: { nodes: g.nodes.length, edges: g.edges.length } }}
+            {{ 'worldGraph.counts' | transloco: { nodes: ownNodeCount(), edges: g.edges.length } }}
           </span>
         </div>
       }
@@ -193,6 +193,14 @@ export class WorldGraphPage {
     if (!g) return null;
     return this.showOrphans() ? g : withoutOrphans(g);
   });
+  /**
+   * The count pill's node figure: this World's own nodes, **Foreign nodes** excluded (ADR-0080). They
+   * are drawn but never counted — a World's counts stay its own, so mounting a large pack does not
+   * restate how big this World is.
+   */
+  protected readonly ownNodeCount = computed(
+    () => this.visibleGraph()?.nodes.filter((n) => !n.foreignContainerId).length ?? 0,
+  );
   /**
    * Whether the filters menu has anything to offer — its trigger stays away otherwise, the way each
    * toggle used to hide on a `0` count. Read off both counts, so a World with neither decor nor

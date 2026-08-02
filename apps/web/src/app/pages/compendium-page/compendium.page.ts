@@ -2,13 +2,14 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, injec
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { CompendiumSummary } from '@hexly/domain';
 import {
   ActiveWorld,
   AppShellStore,
   CompendiumsClient,
+  PublicClient,
   TitleService,
   idFromSegment,
   worldLibraryRoute,
@@ -26,6 +27,11 @@ interface TermRow {
  * The **Compendium page** (CONTEXT.md), `/w/:worldId/compendium/:compendiumId`: one installed
  * Compendium and the terms its content is published under, where that content is read rather than in
  * the plugin's source tree (ADR-0061).
+ *
+ * One page, two reads, told apart by the `:token` the route carries: a signed-in caller spends their
+ * session on the Instance-wide pack, and the account-less reader a **Mount** cascaded to spends the
+ * World Public Link that carried them here (ADR-0080, #410) — the same terms, reached by the standing
+ * each one actually holds.
  */
 @Component({
   selector: 'app-compendium-page',
@@ -40,12 +46,12 @@ interface TermRow {
           {{ compendium()?.name ?? ('compendium.page.heading' | transloco) }}
         </h1>
       </div>
-      @if (browseRoute(); as browse) {
+      @if (libraryRoute(); as library) {
         <a
           pageHeaderActions
           class="font-sans text-xs text-accent-strong hover:underline"
           data-testid="compendium-back"
-          [routerLink]="browse"
+          [routerLink]="library"
           >{{ 'compendium.page.backToLibrary' | transloco }}</a
         >
       }
@@ -96,6 +102,7 @@ interface TermRow {
 })
 export class CompendiumPage {
   private readonly compendiums = inject(CompendiumsClient);
+  private readonly publicLinks = inject(PublicClient);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly route = inject(ActivatedRoute);
   private readonly shell = inject(AppShellStore);
@@ -121,7 +128,7 @@ export class CompendiumPage {
    * Back to the **Library** that credited this pack, in the World it was reached from — absent for the
    * anonymous reader a Mount cascaded read to (ADR-0080), who has no World to go back to.
    */
-  protected readonly browseRoute = computed(() => {
+  protected readonly libraryRoute = computed(() => {
     const worldId = this.activeWorld.worldId();
     return worldId ? worldLibraryRoute(worldId, this.activeWorld.name() ?? undefined) : null;
   });
@@ -135,23 +142,31 @@ export class CompendiumPage {
 
     this.route.paramMap
       .pipe(
-        map((params) => idFromSegment(params.get('compendiumId') ?? '')),
+        map((params) => ({ token: params.get('token'), id: idFromSegment(params.get('compendiumId') ?? '') })),
         takeUntilDestroyed(),
       )
-      .subscribe((id) => this.load(id));
+      .subscribe(({ token, id }) => this.load(token, id));
   }
 
-  private load(id: string): void {
+  /**
+   * The pack's terms, read by the standing this reader holds: a World Public Link token where the
+   * route carries one, the signed-in Instance-wide read otherwise (ADR-0080, #410).
+   */
+  private read(token: string | null, id: string): Observable<CompendiumSummary> {
+    return token ? this.publicLinks.worldCompendium(token, id) : this.compendiums.get(id);
+  }
+
+  private load(token: string | null, id: string): void {
     this._compendium.set(null);
     this.notFound.set(false);
     this.loadError.set(false);
-    this.compendiums
-      .get(id)
+    this.read(token, id)
       .pipe(this.shell.withLoading('subtle'))
       .subscribe({
         next: (installed) => this._compendium.set(installed),
-        // An id naming no installed Compendium is ordinary here — a link kept after an operator removed
-        // it — so it is said plainly rather than toasted as a failure.
+        // An id naming no reachable Compendium is ordinary here — a link kept after an operator removed
+        // the pack, or one the token's World no longer Mounts — so it is said plainly rather than
+        // toasted as a failure.
         error: (err: unknown) =>
           err instanceof HttpErrorResponse && err.status === 404 ? this.notFound.set(true) : this.loadError.set(true),
       });

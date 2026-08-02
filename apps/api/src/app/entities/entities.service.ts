@@ -39,7 +39,7 @@ import {
 } from '@hexly/domain';
 import { and, asc, desc, eq, inArray, or, sql, SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
-import { IMAGE_KIND_FIELD_FILTER } from '@hexly/plugin-asset';
+import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_FILTER } from '@hexly/plugin-asset';
 import { AclSetResult, gate, isSuperadmin, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
 import {
   EntityAccess,
@@ -49,7 +49,8 @@ import {
   READ_ONLY_RIGHTS,
   sharedVisibility,
 } from '../acl/entity-access';
-import { canCreateEntityFilter, worldOwnerFilter } from '../acl/world-access';
+import { stillOwned } from '../acl/mount-reach';
+import { canCreateEntityFilter, worldAccess, worldOwnerFilter } from '../acl/world-access';
 import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
 import {
@@ -145,6 +146,12 @@ export interface ListOptions {
    * pickers, never by a browse: the Entity Browser's search box is part of the listing, so `q` lifts nothing.
    */
   readonly includeHidden?: boolean;
+  /**
+   * Withhold **Asset** Entities from this read (ADR-0034, ADR-0080, internal — never from the query) —
+   * the Contributor gate the retired `GET /worlds/:id/assets` carried, resolved by
+   * {@link EntitiesService.mayEnumerateAssets}.
+   */
+  readonly withoutAssets?: boolean;
 }
 
 /** The filter state a facet-count read narrows against — the list filters minus paging/ids. */
@@ -161,6 +168,7 @@ export type FacetOptions = Pick<
   | 'fields'
   | 'excludedTypes'
   | 'includeHidden'
+  | 'withoutAssets'
 >;
 
 /** Everything {@link filters} reads — shared by the paged list and the facet-count reads. */
@@ -218,6 +226,11 @@ export class EntitiesService {
     // all-punctuation) keeps the last-edited order.
     const match = opts.q ? toFtsMatch(opts.q) : null;
     opts = this.mountScope({ ...opts, excludedTypes: this.resolveExcludedTypes(opts) });
+    // The Contributor standing an asset enumeration rides (ADR-0034, ADR-0080), resolved once and only
+    // where it can bear: it withholds art from a picker's offer and the capability URL from a summary.
+    const mayEnumerateAssets =
+      (opts.read === 'link-target' || !!opts.withThumbnails) && this.mayEnumerateAssets(readerId, opts);
+    if (opts.read === 'link-target' && !mayEnumerateAssets) opts = { ...opts, withoutAssets: true };
     const w = this.config.search.weights;
     const access = entityAccess(this.db, readerId);
     // The dedup index (ADR-0065), aliased for the two thumbnail sources it answers (ADR-0066): the Entity's
@@ -307,8 +320,10 @@ export class EntitiesService {
         // The full-resolution capability URL rides the same join (ADR-0034/0065): what a Board **Image**
         // stores, where the thumbnail is what a grid draws. Own bytes only — a Thumbnail designation
         // decorates this row rather than being its content — and keyed off the row's *own* Container, so a
-        // mounted Shelf Asset places under the Shelf's and renders for every reader (ADR-0080).
-        if (assetRow.ownAssetHash && assetRow.ownAssetExt)
+        // mounted Shelf Asset places under the Shelf's and renders for every reader (ADR-0080). Gated on
+        // the standing an enumeration rides, because the byte route is guard-less (ADR-0034). Null-checked
+        // rather than truthy: an extension-less upload pins `''`, and it still addresses a file.
+        if (mayEnumerateAssets && assetRow.ownAssetHash != null && assetRow.ownAssetExt != null)
           summary = { ...summary, assetUrl: assetUrl(row.containerId, assetRow.ownAssetHash, assetRow.ownAssetExt) };
         // The missing-bytes state (#325) rides the same opt-in, so only rows that draw imagery pay the stat.
         // Own bytes only: a broken Thumbnail designation is the designated Asset's story, not this row's.
@@ -344,6 +359,10 @@ export class EntitiesService {
     // The same widening `list` applies (ADR-0080), resolved from the same signals: a rail must never
     // count what its list excludes, nor exclude what its list offers.
     opts = this.mountScope(opts);
+    // The asset gate `list` applies rides here too (ADR-0080), for the same reason: a rail must never
+    // count art the list it annotates withholds.
+    if (opts.read === 'link-target' && !this.mayEnumerateAssets(readerId, opts))
+      opts = { ...opts, withoutAssets: true };
     // The hidden-type exclusion (ADR-0065) rides every count *but* the type facet's: the type facet is the
     // opt-in surface, so a hidden type must still be counted over the full universe there — otherwise it
     // would never appear to be selected into view. Every sibling category resolves the exclusion exactly as
@@ -409,6 +428,21 @@ export class EntitiesService {
   }
 
   /**
+   * Whether this read may enumerate **Assets** and hand out their full-resolution capability URLs — the
+   * Contributor gate the retired `GET /worlds/:id/assets` carried (#269, #416), kept because the byte
+   * route is guard-less (ADR-0034), so a listed URL is fetchable and a World Viewer must not enumerate art.
+   *
+   * Resolved on the read's *own* scope rather than per row, which is what keeps a mounted Shelf's art
+   * offered to a Contributor of the mounting World (ADR-0080) — nobody holds a role on a Shelf they merely
+   * draw from. A read that names no Container names no standing, and enumerates none.
+   */
+  private mayEnumerateAssets(readerId: string, opts: FacetOptions): boolean {
+    const scope = new Set(opts.containerIds ?? []);
+    if (scope.size === 0) return false;
+    return worldAccess(this.db, readerId).contributingIn([...scope]).size === scope.size;
+  }
+
+  /**
    * Widen a **link-target read** to what its scope **Mounts** (ADR-0080, #411): every picker that asks
    * *what may this point at?* — the `@` picker, the Entity Link Field picker, the Board Embed picker,
    * the asset pickers — asks it through this one read, and the answer is the linking Container or one
@@ -418,6 +452,10 @@ export class EntitiesService {
    * `container_mounts`, and exactly one hop — Mounts do not chain (ADR-0080). A read that names no
    * Container has no Mount set to resolve and stays as it was, which is ADR-0079's sealed model, as
    * does a World that Mounts nothing.
+   *
+   * The Own-only rule rides {@link stillOwned}, the ACL cascade's own predicate: a Mount whose declarer
+   * no longer Owns what she mounted confers nothing (ADR-0080), and pointing must withdraw with reading
+   * rather than a picker offering targets from a Container the World's Owners have lost.
    */
   private mountScope<T extends FacetOptions>(opts: T): T {
     if (opts.read !== 'link-target' || !opts.containerIds?.length) return opts;
@@ -427,7 +465,7 @@ export class EntitiesService {
     const rows = this.db
       .select({ id: containerMounts.mountedContainerId })
       .from(containerMounts)
-      .where(inArray(containerMounts.containerId, [...scope]))
+      .where(and(inArray(containerMounts.containerId, [...scope]), stillOwned()))
       .orderBy(containerMounts.position)
       .all();
     // A Set both dedups two Worlds mounting one Container and drops a scope member back out of it.
@@ -492,7 +530,9 @@ export class EntitiesService {
     // Iterate the registry-ordered source set (scalar Fields, then harvested dimensions), not the index
     // keys, so the rail keeps a stable declaration order; a candidate key with no resolvable source (a
     // deleted World Field, ADR-0052/0054) isn't in the map, so it drops — it can't be labelled.
-    const byKey = this.worldTypeFields.facetSourcesByKey(opts.containerIds);
+    // The *widened* scope, matching the candidate scan above (ADR-0080): a Field defined only on a mounted
+    // Container is otherwise counted as a candidate with no source to label it, and drops off its own rail.
+    const byKey = this.worldTypeFields.facetSourcesByKey(scopedContainerIds(opts));
     return (
       [...byKey.values()]
         .filter((source) => candidates.has(source.key))
@@ -813,10 +853,7 @@ export class EntitiesService {
         .flatMap((row) => {
           const source = linkedEntity(row.sourceId, row.name, row.types, resolveThumbnailUrl(row, row.containerId));
           if (!source) return [];
-          const foreign =
-            row.containerId === containerId
-              ? {}
-              : { foreignContainer: { id: row.containerId, name: row.containerName } };
+          const foreign = row.containerId === containerId ? {} : { foreignContainer: namedContainer(row) };
           return [{ descriptor: row.descriptor, source, decor: row.decor, ...foreign }];
         })
     );
@@ -1362,6 +1399,10 @@ function filters(opts: FilterOptions) {
   // Hidden-from-default-listing exclusion (ADR-0065): drop any Entity carrying an excluded type. The
   // service resolves the set (hidden types minus selected), so this predicate names no type.
   if (opts.excludedTypes?.length) predicates.push(sql`NOT ${hasAny(entities.types, opts.excludedTypes)}`);
+  // The Contributor gate on enumerating art (ADR-0034, ADR-0080), resolved by the service on the read's
+  // scope. Its own predicate rather than a member of `excludedTypes`, which the type facet drops wholesale
+  // to count the hidden-type opt-in over the full universe — a standing must not lift with a facet.
+  if (opts.withoutAssets) predicates.push(sql`NOT ${hasAny(entities.types, [CORE_ASSET_TYPE_ID])}`);
   if (opts.visibility?.length) predicates.push(inArray(entities.visibility, [...opts.visibility]));
   if (opts.tags?.length) predicates.push(hasAny(entities.tags, opts.tags));
   if (opts.fields?.length) predicates.push(...fieldFilters(opts.fields));

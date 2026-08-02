@@ -9,7 +9,7 @@ import {
   readAssetValue,
 } from '@hexly/plugin-asset';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
-import { ContainerChipsComponent } from '@hexly/web-entity';
+import { ContainerChipsComponent, linkTargetRead } from '@hexly/web-entity';
 import { ButtonComponent, DialogComponent, DialogRef, InputComponent } from '@hexly/web-ui';
 
 /** What the picker is launched with: the World whose Assets it uploads into and searches. */
@@ -88,7 +88,7 @@ const isPlaceable = (e: EntitySummary): e is PlaceableAsset => !!e.assetUrl;
           />
 
           <!-- The **Container** facet: only where this World Mounts a shelf the read reached (ADR-0080). -->
-          <app-container-chips testid="image" [containers]="containers()" [(selected)]="container" />
+          <app-container-chips testid="image" [containers]="containers()" [(selected)]="targets.container" />
 
           <!-- Image Facets (orientation, hue) — the pinned kind axis is hidden, it is never a choice here. -->
           @for (facet of facetGroups(); track facet.key) {
@@ -176,8 +176,19 @@ export class BoardImagePickerComponent {
   /** The active image Facet selections, keyed by dimension (`orientation`/`hue`) → chosen values (OR within). */
   protected readonly activeFacets = signal<Record<string, readonly string[]>>({});
 
-  /** The Container narrowed to, if any — this World, or one Shelf it Mounts (ADR-0080). */
-  protected readonly container = signal<string | undefined>(undefined);
+  /**
+   * The one read behind the grid and its rail. A **link-target read** (ADR-0079) preset to the asset type
+   * and image kind: the type pin is also what lifts the hidden-from-default-listing exclusion Assets carry
+   * (ADR-0065), so they surface here exactly as they always have.
+   */
+  protected readonly targets = linkTargetRead(
+    () => this.ref.data.worldId,
+    () => ({
+      q: this.query().trim() || undefined,
+      type: [CORE_ASSET_TYPE_ID],
+      field: [IMAGE_KIND_FIELD_TOKEN, ...this.fieldTokens()],
+    }),
+  );
 
   /** The matched image Assets, or null while the current search is in flight. */
   protected readonly assets = signal<PlaceableAsset[] | null>(null);
@@ -191,7 +202,9 @@ export class BoardImagePickerComponent {
   /** Whether any search is narrowing the set — the empty state then reads "no matches", not "no images". */
   protected readonly hasFilters = computed(
     () =>
-      this.query().trim() !== '' || !!this.container() || Object.values(this.activeFacets()).some((v) => v.length > 0),
+      this.query().trim() !== '' ||
+      !!this.targets.container() ||
+      Object.values(this.activeFacets()).some((v) => v.length > 0),
   );
 
   constructor() {
@@ -200,7 +213,7 @@ export class BoardImagePickerComponent {
     // it disagrees with. onCleanup cancels superseded requests; a failed search leaves an empty grid, which
     // reads the same as a World with no matching images, and upload still works.
     effect((onCleanup) => {
-      const params = this.read();
+      const params = this.targets.params();
       // Unpaginated, as this grid has always been: the Facets are what keep the set small, and the cap is
       // the shared list ceiling so an image-heavy World never floods it in one read.
       const search = this.entitiesClient.list({ ...params, thumbnails: true, limit: ENTITY_LIST_MAX_LIMIT }).subscribe({
@@ -218,24 +231,6 @@ export class BoardImagePickerComponent {
         facets.unsubscribe();
       });
     });
-  }
-
-  /**
-   * The one read behind the grid and its rail. A **link-target read** (ADR-0079) preset to the asset type
-   * and image kind: the type pin is also what lifts the hidden-from-default-listing exclusion Assets carry
-   * (ADR-0065), so they surface here exactly as they always have. Naming the World is what widens it to
-   * what that World **Mounts** — resolved server-side, so this picker cannot widen its own scope.
-   */
-  private read() {
-    const container = this.container();
-    return {
-      q: this.query().trim() || undefined,
-      worldId: this.ref.data.worldId,
-      type: [CORE_ASSET_TYPE_ID],
-      field: [IMAGE_KIND_FIELD_TOKEN, ...this.fieldTokens()],
-      container: container ? [container] : undefined,
-      read: 'link-target' as const,
-    };
   }
 
   /** A harvested dimension carries an i18n key the active Locale translates (ADR-0055); fall back to its key. */

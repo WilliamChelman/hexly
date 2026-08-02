@@ -87,10 +87,10 @@ describe('the core.datatype.board-surface Structured Data Type (ADR-0050, #263)'
 
       // Embeds and Text Block links are always semantic (ADR-0069) — curatorial acts and authored meaning.
       expect(edges).toEqual([
-        { targetKind: 'entity', targetId: 'riverbend', targetContainerId: null, descriptor: null, decor: false },
-        { targetKind: 'entity', targetId: 'the-keep', targetContainerId: null, descriptor: null, decor: false },
-        { targetKind: 'entity', targetId: 'avalon', targetContainerId: null, descriptor: null, decor: false },
-        { targetKind: 'entity', targetId: 'the-whisperwood', targetContainerId: null, descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'riverbend', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'the-keep', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'avalon', descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'the-whisperwood', descriptor: null, decor: false },
       ]);
     });
 
@@ -104,7 +104,7 @@ describe('the core.datatype.board-surface Structured Data Type (ADR-0050, #263)'
       // edge is semantic and rides alongside, order-preserved.
       expect(edges).toEqual([
         { targetKind: 'asset', targetId: hash, targetContainerId: 'world-1', descriptor: null, decor: true },
-        { targetKind: 'entity', targetId: 'riverbend', targetContainerId: null, descriptor: null, decor: false },
+        { targetKind: 'entity', targetId: 'riverbend', descriptor: null, decor: false },
       ]);
     });
 

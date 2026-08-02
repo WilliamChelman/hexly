@@ -8,9 +8,13 @@ describe('Asset serving URL (ADR-0034)', () => {
     expect(assetRefFromUrl(assetUrl('world-1', HASH, '.png'))).toEqual({ containerId: 'world-1', hash: HASH });
   });
 
-  /** The Container is the URL's, not the reader's — what the URL names is what an edge harvests (ADR-0080). */
-  it('reads the Container the URL names, whoever is looking at it', () => {
-    expect(assetRefFromUrl(assetUrl('shelf-9', HASH, '.png'))).toEqual({ containerId: 'shelf-9', hash: HASH });
+  /** Identical bytes in two Containers share a hash but not an Asset, so the pair is what resolves (ADR-0080). */
+  it('tells the same bytes served from two Containers apart', () => {
+    const own = assetRefFromUrl(assetUrl('world-1', HASH, '.png'));
+    const shelf = assetRefFromUrl(assetUrl('shelf-9', HASH, '.png'));
+
+    expect(own?.hash).toBe(shelf?.hash);
+    expect(own?.containerId).not.toBe(shelf?.containerId);
   });
 
   it('reads no Asset from a URL that names none', () => {

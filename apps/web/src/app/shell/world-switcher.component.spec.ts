@@ -106,4 +106,27 @@ describe('WorldSwitcher', () => {
 
     expect(trigger(el).textContent).toContain('Worlds');
   });
+
+  it('names a World read through another World’s Mount, and offers no row for it', () => {
+    const fixture = render([world('w1', 'Aldermoor')], 'w1');
+    // The reader hops into a Shelf a campaign they read Mounts: readable, so its Detail loads, and
+    // deliberately absent from `GET /worlds` (ADR-0080).
+    TestBed.inject(ActiveWorld).set({
+      ...world('w-shelf', 'The Painted Shelf'),
+      entityCount: 0,
+      seq: 1,
+      pinnedEntityIds: [],
+    });
+    fixture.detectChanges();
+
+    // The trigger names where you are — a URL fact, not a claim of standing — so no '?' crest and no
+    // "Worlds" placeholder where a name is known.
+    expect(trigger(fixture.nativeElement).textContent).toContain('The Painted Shelf');
+
+    // And the list is left alone: a Mount widens what a World may point at, never what its readers
+    // appear to have, so there is nothing to switch *back* to here.
+    open(fixture);
+    expect(item('switcher-option-w-shelf')).toBeNull();
+    expect(item('switcher-option-w1')).not.toBeNull();
+  });
 });

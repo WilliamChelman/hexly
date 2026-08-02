@@ -48,8 +48,8 @@ import { LinkedEntity, NamedContainer } from '@hexly/domain';
       >
     }
     @if (foreignContainer(); as container) {
-      <!-- Usage that came from another Container (ADR-0080), named: a shelf Entity's list is how its
-           keeper answers "may I delete this?", and "three Worlds" is the answer, not "three links". -->
+      <!-- Usage from another Container (ADR-0080), named rather than counted: a shelf Entity's keeper
+           needs to know which Worlds use it before deleting it. -->
       <span
         data-testid="reference-foreign-container"
         [attr.data-container-id]="container.id"

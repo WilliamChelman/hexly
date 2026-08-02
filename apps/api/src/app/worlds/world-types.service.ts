@@ -8,6 +8,7 @@ import {
 import { DB, Db } from '../db/db';
 import { worldAccess } from '../acl/world-access';
 import { WorldTypeFields } from '../entities/world-type-fields';
+import { WorldRouteResult } from './world-route-result';
 import { WorldWrites } from './world-writes';
 
 /**
@@ -83,9 +84,5 @@ export class WorldTypesService {
   }
 }
 
-/** The outcome of a type mutation — the controller maps each status to its HTTP code. */
-export type TypeResult<T> =
-  | { status: 'ok'; value: T }
-  | { status: 'not-found' }
-  | { status: 'forbidden' }
-  | { status: 'conflict' };
+/** The outcome of a type mutation: the shared World-route union, under the name its callers read. */
+export type TypeResult<T> = WorldRouteResult<T>;

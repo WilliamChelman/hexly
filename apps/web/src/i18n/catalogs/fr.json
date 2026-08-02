@@ -33,6 +33,8 @@
     "emptyHint": "Les conteneurs qu'il monte ne contiennent encore rien que vous puissiez lire.",
     "noMountsTitle": "Ce monde ne se sert encore de rien.",
     "noMountsHint": "Un propriétaire monte un monde ou un compendium dans les paramètres du monde.",
+    "membersOnlyTitle": "La bibliothèque de ce monde est réservée à ses membres.",
+    "membersOnlyHint": "Ce que vous pouvez atteindre dans ce monde reste lisible, sur ses propres pages.",
     "noMatchTitle": "Aucun élément de la Bibliothèque ne correspond à votre recherche.",
     "noMatchHint": "Essayez un autre nom, un autre conteneur ou un autre mot.",
     "credits": "Matériel de référence issu de"

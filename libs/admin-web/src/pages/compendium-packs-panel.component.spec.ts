@@ -224,7 +224,7 @@ describe('CompendiumPacksPanel', () => {
     click('cancel-pack-remove');
 
     expect(admin.removePack).not.toHaveBeenCalled();
-    expect(has(`pack-remove-${PACK}`)).toBe(true);
+    expect(has('pack-remove-modal')).toBe(false);
   });
 
   it('surfaces the structured refusal when the pack is already being installed', () => {

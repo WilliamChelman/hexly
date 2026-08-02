@@ -398,6 +398,17 @@ test('a player of the campaign lands on the shelf Entity’s own page, and an an
   await player.goto(`/entities/${painting}`);
   await player.waitForURL(new RegExp(`/w/${segRe(shelf)}/entities/`));
   await expect(player.getByTestId('title')).toHaveText('Sunset over Aldermoor');
+
+  // Readable, and deliberately unlisted: a Mount widens what a World may point at, never what its
+  // readers appear to have (ADR-0080). So the Switcher names where they are — a URL fact — while
+  // `GET /worlds` keeps the shelf out of the Worlds they have.
+  await expect(player.getByTestId('switcher')).toContainText('The Lit Shelf');
+
+  // And the shelf's own Library, which is its members' read: what they have no standing for is
+  // suppressed rather than reported as a failure — nothing went wrong here.
+  await player.goto(`/w/${shelf}/library`);
+  await expect(player.getByTestId('members-only')).toBeVisible();
+  await expect(player.getByTestId('load-error')).toHaveCount(0);
   await player.context().close();
 
   // And the reader with no account at all: the campaign's Public Link cascades to the pack it mounts,

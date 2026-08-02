@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { EntitySummary, FacetCount } from '@hexly/domain';
+import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { ButtonComponent, InputComponent } from '@hexly/web-ui';
 import { ContainerChipsComponent } from './container-chips.component';
+import { containerFacet, linkTargetRead } from './link-target-read';
 
 /**
  * The shared server-side Entity picker (ADR-0025): a search box over the `list({ q })` read,
@@ -42,7 +43,7 @@ import { ContainerChipsComponent } from './container-chips.component';
         class="mb-1 block"
         [testid]="testid()"
         [containers]="containers()"
-        [(selected)]="container"
+        [(selected)]="targets.container"
       />
       <!-- Only the option list scrolls; a projected footer (create rows) stays pinned. -->
       <div class="max-h-56 overflow-auto">
@@ -95,50 +96,31 @@ export class EntitySearchPickerComponent {
   readonly pick = output<EntitySummary>();
 
   protected readonly options = signal<EntitySummary[]>([]);
+
+  protected readonly targets = linkTargetRead(
+    () => this.worldId(),
+    () => {
+      const types = this.types();
+      return {
+        q: this.query().trim(),
+        type: types?.length ? [...types] : undefined,
+        // A picker is no browse: an Embed of an Asset and a pinned Asset stay pickable by name (ADR-0065).
+        includeHidden: true,
+      };
+    },
+  );
   /** The **Container** facet's live values — this World and the ones it Mounts that still hold a match. */
-  protected readonly containers = signal<readonly FacetCount[]>([]);
-  /** The Container the user narrowed to, if any — one pack, or one Shelf (ADR-0080). */
-  protected readonly container = signal<string | undefined>(undefined);
+  protected readonly containers = containerFacet(this.targets.params);
 
   constructor() {
-    // A narrowing the query outlives would silently answer the next search from a Container the user
-    // cannot see chosen: a new World is a new set of Containers, so the selection goes with it.
-    effect(() => {
-      this.worldId();
-      untracked(() => this.container.set(undefined));
-    });
     // Search server-side as the query changes (ADR-0025). onCleanup cancels a superseded
     // request; a failed search empties the list so the picker never breaks.
     effect((onCleanup) => {
-      const sub = this.entitiesClient.list(this.read()).subscribe({
+      const sub = this.entitiesClient.list(this.targets.params()).subscribe({
         next: (page) => this.options.set(page.items),
         error: () => this.options.set([]),
       });
       onCleanup(() => sub.unsubscribe());
     });
-    // The facet counts, off the same read the options come from — its own selection dropped, as every
-    // drill-down facet's is, so the chip you are standing on keeps its siblings to move to.
-    effect((onCleanup) => {
-      const sub = this.entitiesClient.facets({ ...this.read(), container: undefined }).subscribe({
-        next: (facets) => this.containers.set(facets.container ?? []),
-        error: () => this.containers.set([]),
-      });
-      onCleanup(() => sub.unsubscribe());
-    });
-  }
-
-  /** The one read behind both the options and the chips annotating them, so the two cannot disagree. */
-  private read() {
-    const types = this.types();
-    const container = this.container();
-    return {
-      q: this.query().trim(),
-      worldId: this.worldId(),
-      type: types?.length ? [...types] : undefined,
-      container: container ? [container] : undefined,
-      read: 'link-target' as const,
-      // A picker is no browse: an Embed of an Asset and a pinned Asset stay pickable by name (ADR-0065).
-      includeHidden: true,
-    };
   }
 }

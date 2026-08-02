@@ -447,6 +447,11 @@ export const entityEdges = sqliteTable(
     index('idx_entity_edges_target').on(table.targetKind, table.targetId),
     // The World Graph's whole-World edge fetch.
     index('idx_entity_edges_container').on(table.containerId, table.targetKind),
+    // Inbound by target Container: the blast-radius count, which asks what points *into* a Container
+    // and runs in front of a confirm (#414, ADR-0080). Bare column rather than the `coalesce` every
+    // Mount-scoped read goes through, because that read also excludes the Container's own edges, under
+    // which the coalesce provably reduces to this column — see `ContainerLinksService.countInbound`.
+    index('idx_entity_edges_target_container').on(table.targetKind, table.targetContainerId, table.targetId),
   ],
 );
 

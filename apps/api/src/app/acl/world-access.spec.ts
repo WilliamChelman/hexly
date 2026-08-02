@@ -3,7 +3,16 @@ import { and, eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { WorldVerb } from '@hexly/domain';
 import { createDb, Db } from '../db/db';
-import { containers, entities, entityGrants, users, worldMembers, worlds, WORLD_CONTAINER_KIND } from '../db/schema';
+import {
+  containerMounts,
+  containers,
+  entities,
+  entityGrants,
+  users,
+  worldMembers,
+  worlds,
+  WORLD_CONTAINER_KIND,
+} from '../db/schema';
 import { canCreateEntityFilter, worldAccess, worldOwnerFilter } from './world-access';
 
 /**
@@ -77,29 +86,34 @@ describe('worldAccess', () => {
     it('agrees with the manage and contribute rules for every standing', () => {
       expect(worldAccess(db, owner).decideMeta(worldId)).toEqual({
         reachable: true,
+        isMember: true,
         isOwner: true,
         canContribute: true,
       });
       // A Contributor reaches and may contribute (author Entities/Assets) but does not own.
       expect(worldAccess(db, contributor).decideMeta(worldId)).toEqual({
         reachable: true,
+        isMember: true,
         isOwner: false,
         canContribute: true,
       });
       // A Viewer reaches but neither owns nor contributes.
       expect(worldAccess(db, viewer).decideMeta(worldId)).toEqual({
         reachable: true,
+        isMember: true,
         isOwner: false,
         canContribute: false,
       });
       // A World that exists but is unreachable: reachable false, not undefined (undefined ≡ no row).
       expect(worldAccess(db, stranger).decideMeta(worldId)).toEqual({
         reachable: false,
+        isMember: false,
         isOwner: false,
         canContribute: false,
       });
       expect(worldAccess(db, superadmin).decideMeta(worldId)).toEqual({
         reachable: true,
+        isMember: true,
         isOwner: true,
         canContribute: true,
       });
@@ -131,9 +145,11 @@ describe('worldAccess', () => {
         })
         .run();
       db.insert(entityGrants).values({ entityId, userId: exMember, role: 'owner' }).run();
-      // Reachable residue, but no member role — so neither owns nor contributes to the World.
+      // Reachable residue, but no member row — so neither owns nor contributes to the World, and the
+      // membership-facing reads (its roster, its Mounts) are closed to them.
       expect(worldAccess(db, exMember).decideMeta(worldId)).toEqual({
         reachable: true,
+        isMember: false,
         isOwner: false,
         canContribute: false,
       });
@@ -232,15 +248,8 @@ describe('worldAccess', () => {
     it('excludes a Superadmin who holds no owner row', () => expect(owned(superadmin)).toEqual([]));
   });
 
-  describe('reachFilter (read-scoped list predicate)', () => {
+  describe('reachFilter (read-scoped predicate)', () => {
     it('reaches for every member, not for a stranger', () => {
-      const reaches = (userId: string) =>
-        db
-          .select({ id: worlds.id })
-          .from(worlds)
-          .where(worldAccess(db, userId).reachFilter)
-          .all()
-          .map((r) => r.id);
       expect(reaches(owner)).toEqual([worldId]);
       expect(reaches(contributor)).toEqual([worldId]);
       expect(reaches(viewer)).toEqual([worldId]);
@@ -248,6 +257,57 @@ describe('worldAccess', () => {
       expect(reaches(superadmin)).toEqual([worldId]); // match-all
     });
   });
+
+  describe('listFilter (the World Index predicate) beside reachFilter', () => {
+    /** The Owner's own shelf, mounted into the World the others are members of. */
+    function mountShelf(): string {
+      const shelf = seedWorld();
+      db.insert(worldMembers).values({ worldId: shelf, userId: owner, role: 'owner' }).run();
+      db.insert(containerMounts).values({ containerId: worldId, mountedContainerId: shelf, position: 0 }).run();
+      return shelf;
+    }
+
+    it('leaves a mounted World readable and unlisted (ADR-0080)', () => {
+      const shelf = mountShelf();
+      // A Mount widens what a World may point at, never what its readers appear to have: the shelf's
+      // content resolves for the campaign's Viewer, and the shelf stays out of every "the Worlds you
+      // have" reading.
+      expect(reaches(viewer).sort()).toEqual([worldId, shelf].sort());
+      expect(lists(viewer)).toEqual([worldId]);
+      // Its own Owner holds a member row, so it is hers to list as it always was.
+      expect(lists(owner).sort()).toEqual([worldId, shelf].sort());
+    });
+
+    it('drops the cascade when no Owner of the mounting World still Owns the mounted Container', () => {
+      const shelf = mountShelf();
+      // The Own-only rule is what makes the cascade safe (ADR-0080), so it is asked per read: evict the
+      // Owner who declared the Mount from the mounting World and the Mount stops republishing.
+      db.delete(worldMembers)
+        .where(and(eq(worldMembers.worldId, worldId), eq(worldMembers.userId, owner)))
+        .run();
+      expect(reaches(viewer)).toEqual([worldId]);
+    });
+  });
+
+  /** What the caller may *read* — the Mount cascade included. */
+  function reaches(userId: string): string[] {
+    return db
+      .select({ id: worlds.id })
+      .from(worlds)
+      .where(worldAccess(db, userId).reachFilter)
+      .all()
+      .map((r) => r.id);
+  }
+
+  /** What the World Index *lists* — reachability minus the Mount cascade. */
+  function lists(userId: string): string[] {
+    return db
+      .select({ id: worlds.id })
+      .from(worlds)
+      .where(worldAccess(db, userId).listFilter)
+      .all()
+      .map((r) => r.id);
+  }
 
   // ── seed helpers ──────────────────────────────────────────────────────────
   function seedWorld(): string {

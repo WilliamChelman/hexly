@@ -81,6 +81,17 @@ describe('AssetsService', () => {
     expect(readdirSync(join(dir, 'world-1'))).toHaveLength(2);
   });
 
+  it('pins an empty extension for an extension-less upload, which still addresses a file', () => {
+    const stored = assets.store('world-1', 'Untitled', PNG_A);
+
+    // `''` is a value, not an absence: the bytes land under the bare hash and the capability URL reaches
+    // them, which is why every reader of `ext` tests it for absence rather than for truth (#416).
+    expect(stored.ext).toBe('');
+    expect(stored.url).toBe(`/assets/world-1/${stored.hash}`);
+    expect(existsSync(join(dir, 'world-1', stored.hash))).toBe(true);
+    expect(assets.read('world-1', stored.hash)).not.toBeNull();
+  });
+
   describe('thumbnails (a regenerable cache beside the bytes, ADR-0065)', () => {
     const THUMB = new Uint8Array([0x52, 0x49, 0x46, 0x46, 1, 2, 3]); // stand-in WebP bytes
 

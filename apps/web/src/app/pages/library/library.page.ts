@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
@@ -36,16 +37,18 @@ const SEARCH_DEBOUNCE_MS = 150;
 
 /**
  * The **Library** (`/w/:worldId/library`, ADR-0080): every Entity of every **Container** this World
- * **Mounts** — what this World draws on, beside what its authors made. The **Entity Browser** preset to
- * the Mount set, on the Asset Browser's precedent: same list, same search, same Facet rail, so there is
- * no second surface to learn. ADR-0079's Compendium browse generalises into it rather than being
- * replaced — an installed **Compendium** is one value the **Container** facet takes, a mounted **Shelf**
- * another, read in the order the Owner arranged their Mounts.
+ * **Mounts**. The **Entity Browser** preset to the Mount set, on the Asset Browser's precedent — same
+ * list, same search, same Facet rail. An installed **Compendium** is one value the **Container** facet
+ * takes, a mounted **Shelf** another, read in the Owner's Mount order (ADR-0079).
  *
  * It names its Containers explicitly, read from `/worlds/:id/mounts` before the first list, because the
- * read is *about* foreign content rather than about a World; those Containers' own dimensions (role,
- * organization, level) then arrive as Field facets by the ordinary presence rule. The `:worldId` names
- * the World whose Mounts these are and the **Adoption** target — never the content's home.
+ * read is *about* foreign content rather than about a World; those Containers' own dimensions then
+ * arrive as Field facets by the ordinary presence rule. The `:worldId` names whose Mounts these are and
+ * the **Adoption** target — never the content's home.
+ *
+ * That read is the World's members' — the cascade is one hop, so what a World reached *through* a Mount
+ * itself draws from is withheld (ADR-0080). A non-member reader is therefore shown nothing rather than a
+ * failure: they reached a World they may read, and this one surface is not theirs.
  *
  * Read-only is inherited, never special-cased: a **Compendium Entry**'s Rights are `read` alone, so the
  * shared card's own gate hides rename and delete, and its `sealed` flag is what offers **Adoption**.
@@ -73,22 +76,20 @@ const SEARCH_DEBOUNCE_MS = 150;
           {{ 'library.heading' | transloco }}
         </h1>
       </div>
-      <!-- Not "read-only", which the Compendium browse could say and this cannot: a mounted **Shelf**
-           you Own is yours to edit — at its own page, in its own Container, never here (ADR-0080). -->
+      <!-- Not "read-only": a mounted **Shelf** you Own is yours to edit, at its own page (ADR-0080). -->
       <span pageHeaderActions class="font-sans text-xs text-ink-muted" data-testid="library-subheading">{{
         'library.subheading' | transloco
       }}</span>
     </app-page-header>
 
     <main class="max-w-[72rem] mx-auto py-8 px-6">
-      <!-- The Entity Browser's own search box, verbatim (the Asset Browser's precedent): same control,
-           same copy, same behaviour — there is no second way to search. -->
+      <!-- The Entity Browser's own search box, verbatim — the Asset Browser's precedent. -->
       <app-entity-search [value]="query()" (queryChange)="onSearch($event)" />
 
-      <!-- The credit line: every mounted **Compendium** named, each linking to its **Compendium page**
-           and the terms it states (ADR-0061, #402). Names them all, whatever the Container facet
-           narrows to — the credit is the shelf's, not the result set's. A mounted World publishes under
-           no terms and has no such page, so it is credited nowhere. -->
+      <!-- The credit line: every mounted **Compendium**, linked to the **Compendium page** stating its
+           terms (ADR-0061). All of them whatever the Container facet narrows to, since the credit is
+           owed by the Mount set rather than by the result set; a mounted World states no terms, so it
+           is credited nowhere. -->
       @if (credits().length > 0) {
         <p class="font-sans text-xs text-ink-muted m-0 mb-6" data-testid="library-credits">
           {{ 'library.credits' | transloco }}
@@ -142,19 +143,27 @@ const SEARCH_DEBOUNCE_MS = 150;
               [title]="'library.loadErrorTitle' | transloco"
               [hint]="'library.loadErrorHint' | transloco"
             />
+          } @else if (membersOnly()) {
+            <!-- Ahead of every emptiness: this reader was told nothing, which is not the same as being
+                 told there is nothing (ADR-0080). -->
+            <app-empty-state
+              testid="members-only"
+              [title]="'library.membersOnlyTitle' | transloco"
+              [hint]="'library.membersOnlyHint' | transloco"
+            />
+          } @else if (loaded() && mounts().length === 0) {
+            <!-- Ahead of the search-miss branch: with nothing mounted there is nothing to search, so a
+                 query must not be told it failed (ADR-0080). -->
+            <app-empty-state
+              testid="no-mounts"
+              [title]="'library.noMountsTitle' | transloco"
+              [hint]="'library.noMountsHint' | transloco"
+            />
           } @else if (loaded() && hasFilters()) {
             <app-empty-state
               testid="no-matches"
               [title]="'library.noMatchTitle' | transloco"
               [hint]="'library.noMatchHint' | transloco"
-            />
-          } @else if (loaded() && mounts().length === 0) {
-            <!-- A World that Mounts nothing has an empty Library, and it says which emptiness this is:
-                 nothing is drawn on, rather than nothing found (ADR-0080). -->
-            <app-empty-state
-              testid="no-mounts"
-              [title]="'library.noMountsTitle' | transloco"
-              [hint]="'library.noMountsHint' | transloco"
             />
           } @else if (loaded()) {
             <app-empty-state
@@ -199,14 +208,20 @@ export class LibraryPage {
   protected readonly loadingMore = signal(false);
   protected readonly loaded = signal(false);
   /**
-   * Either read failing is one failure to the reader. Kept apart underneath because they are cleared
-   * on different beats — the list's on every refetch, the Mount set's only on a re-read of it — and a
-   * combined flag would have the refetch clear a failure it knows nothing about, leaving a World whose
-   * Mounts could not be read claiming to draw on nothing.
+   * One failure to the reader, two flags underneath: they clear on different beats — the list's on
+   * every refetch, the Mount set's only on a re-read of it — so a single flag would let a refetch
+   * clear a Mount-read failure and leave that World claiming to draw on nothing.
    */
   protected readonly loadError = computed(() => this.mountsError() || this.listError());
   private readonly mountsError = signal(false);
   private readonly listError = signal(false);
+
+  /**
+   * Whether the Mount set was withheld rather than unavailable: the read is member-gated, because the
+   * cascade is one hop and naming what *this* World draws from would disclose the second (ADR-0080).
+   * Its own state, not `loadError`: nothing went wrong, so nothing may say so.
+   */
+  protected readonly membersOnly = signal(false);
 
   /** Debounced full-text query; empty means the default last-edited view. Mirrored to the URL `q`. */
   protected readonly query = signal('');
@@ -241,9 +256,8 @@ export class LibraryPage {
       type: entry.types[0],
       tags: entry.tags,
       updatedAt: entry.updatedAt,
-      // Carried through untouched: `read` alone is what makes the card offer no rename and no delete,
-      // so a **Compendium Entry**'s read-only rendering is the seal's own doing rather than this
-      // page's, and a mounted World's Entity keeps whatever Rights its own Container grants (ADR-0079).
+      // Carried through untouched, so read-only rendering is the seal's doing and not this page's: the
+      // card's own gate reads them, and a mounted World's Entity keeps its Container's grant (ADR-0079).
       rights: entry.rights,
       // What the **Adopt** action hangs off (#403) — location, derived by the server and never stored.
       sealed: entry.sealed,
@@ -302,16 +316,20 @@ export class LibraryPage {
       if (!worldId) return;
       this.mountsSub?.unsubscribe();
       this.mountsError.set(false);
+      this.membersOnly.set(false);
       this.mountsSub = this.worldsClient
         .mounts(worldId)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: (mounts) => this.mounted.set(mounts),
-          error: () => {
+          error: (err: unknown) => {
             // Not the empty Mount set: "we could not ask" and "it draws on nothing" are different
-            // answers, and the one the ticket asks for is the second (#412).
+            // answers, and the one the ticket asks for is the second (#412). A refusal is a third:
+            // a reader who reaches this World through someone else's Mount is not a member of it, and
+            // what they have no standing for is suppressed rather than reported as a failure.
             this.mounted.set([]);
-            this.mountsError.set(true);
+            if (err instanceof HttpErrorResponse && err.status === 403) this.membersOnly.set(true);
+            else this.mountsError.set(true);
             this.loaded.set(true);
           },
         });
@@ -339,10 +357,8 @@ export class LibraryPage {
   }
 
   /**
-   * **Adopt** an entry into the World this Library is read under (ADR-0079) — the copy-it-to-change-it
-   * path, offered where the content is. The list is left exactly as it was and a toast reports instead:
-   * asking twice adopts twice, so nothing here may disable a button or mark a card — there is no
-   * "already adopted" indicator, knowingly.
+   * **Adopt** an entry into the World this Library is read under (ADR-0079). The list is left as it was
+   * and a toast reports instead: asking twice adopts twice, so nothing here may claim "already adopted".
    */
   protected adopt(card: EntityCardVm): void {
     const worldId = this.worldId();

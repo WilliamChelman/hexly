@@ -14,9 +14,13 @@ import {
 
 /**
  * The World Switcher (ADR-0028): a quick-hop dropdown at the nav-rail masthead.
- * Pure navigation — it lists every reachable World and switches by URL (the active
+ * Pure navigation — it lists the Worlds the caller has and switches by URL (the active
  * World is a URL fact, {@link ActiveWorld}), and offers a path to the World Index.
  * It does not manage Worlds: create/rename/delete live on the Index.
+ *
+ * A World reached through another World's **Mount** is readable but not listed — a Mount widens what
+ * a World may point at, never what its readers appear to have (ADR-0080) — so it names the trigger
+ * without adding a row to hop back to. Suppressed, not refused: nothing here says a thing is missing.
  */
 @Component({
   selector: 'app-world-switcher',
@@ -104,8 +108,15 @@ export class WorldSwitcherComponent {
   protected readonly worlds = this.store.worlds;
   protected readonly activeId = this.activeWorld.worldId;
 
-  /** The active World's name, or `null` outside a World (the Index). */
-  protected readonly activeName = computed(() => this.worlds().find((w) => w.id === this.activeId())?.name ?? null);
+  /**
+   * The active World's name, or `null` outside a World (the Index). Read from the *pinned* World
+   * ahead of the list, because a World reached through another World's **Mount** is readable and
+   * deliberately unlisted (ADR-0080): the trigger names where you are, which is a URL fact, not a
+   * claim of standing. The list still answers when the Detail failed to load.
+   */
+  protected readonly activeName = computed(
+    () => this.activeWorld.name() ?? this.worlds().find((w) => w.id === this.activeId())?.name ?? null,
+  );
   /** The active World's first letter for the collapsed chip; '?' when none. */
   protected readonly initial = computed(() => this.activeName()?.trim()[0]?.toUpperCase() ?? '?');
 

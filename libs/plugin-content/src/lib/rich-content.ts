@@ -79,7 +79,6 @@ export const richContentBase = {
         edges.push({
           targetKind: 'entity',
           targetId: entityId,
-          targetContainerId: null,
           descriptor: descriptorSchema.safeParse(node.attrs?.['descriptor']).data ?? null,
           decor: false,
         });

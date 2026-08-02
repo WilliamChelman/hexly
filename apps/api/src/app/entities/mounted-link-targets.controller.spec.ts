@@ -20,6 +20,8 @@ import { WorldsModule } from '../worlds/worlds.module';
 
 /** A tiny valid-enough PNG; only its bytes' identity matters for the content address. */
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+/** A second set of bytes, for an upload that must not dedup to the first (ADR-0034). */
+const OTHER_PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 4, 5, 6]);
 
 /**
  * Every link picker offers what the World **Mounts** (#411, #416, ADR-0080). The `@` mention picker, the
@@ -195,6 +197,29 @@ describe('Every link picker offers what the World Mounts', () => {
     await bob.get(`/entities/${sketch}`).expect(404);
   });
 
+  it('stops offering a mounted Container once the mounting World’s Owners no longer Own it', async () => {
+    const danId = await seed('dan@hexly.test', 'Dan');
+    await ada.post(`/worlds/${campaign}/owners`).send({ userId: danId }).expect(200);
+    // Dan reads the shelf on a standing of his own, so what the picker offers him is the Mount scope's
+    // doing rather than the cascade's — the two rules are asserted apart.
+    await ada.post(`/worlds/${shelf}/members`).send({ userId: danId, role: 'viewer' }).expect(200);
+    await mount(campaign, shelf);
+
+    const dan = await signIn('dan@hexly.test');
+    expect(await offeredIds(dan, `worldId=${campaign}`)).toContain(shelfGoblin);
+
+    // Dan evicts Ada from the campaign, which ADR-0037 expressly permits: no Owner of the campaign
+    // Owns the shelf any more, and Ada has no route left to withdraw the Mount.
+    await dan.delete(`/worlds/${campaign}/owners/${adaId}`).expect(200);
+
+    // So the Own-only rule is asked per read here too (ADR-0080): the picker offers the campaign's own
+    // and nothing off a shelf it no longer draws on, and the rail agrees, spanning one Container again.
+    expect(await offeredIds(dan, `worldId=${campaign}`)).toEqual([ownGoblin]);
+    expect(await containerFacet(dan, `worldId=${campaign}`)).toBeUndefined();
+    // The shelf's own picker is untouched — the withdrawal is the Mount's, not the Container's.
+    expect(await offeredIds(dan, `worldId=${shelf}`)).toContain(shelfGoblin);
+  });
+
   it('mints a working link to a mounted Entity, resolvable where it is used', async () => {
     await mount(campaign, shelf);
     const note = await mintEntity(campaign, 'The Tavern');
@@ -283,6 +308,76 @@ describe('Every link picker offers what the World Mounts', () => {
     expect((await assetsOffered(ada, `worldId=${campaign}`)).map((a) => a.id)).toEqual([ownArt]);
   });
 
+  it('withholds art from a Viewer’s picker and hands it to a Contributor, both sides of the Mount alike', async () => {
+    const bob = await signIn('bob@hexly.test');
+    await mount(campaign, shelf);
+
+    // The byte route is guard-less and takes its Container from the path (ADR-0034), so a listed
+    // capability URL *is* the bytes: enumerating art keeps the Contributor standing the retired
+    // `GET /worlds/:id/assets` carried, and Bob plays here rather than authoring here.
+    expect(await assetsOffered(bob, `worldId=${campaign}`)).toEqual([]);
+    expect(await containerFacet(bob, `worldId=${campaign}&type=core.type.asset`)).toEqual([]);
+    // The gate is the asset type's alone: everything else this World points at is offered as before.
+    expect(await offeredIds(bob, `worldId=${campaign}`)).toContain(shelfGoblin);
+
+    // Made a Contributor, the same read is #416's read again — this World's art first, then the
+    // shelf's, each carrying the URL a Board **Image** places (ADR-0080).
+    await ada.patch(`/worlds/${campaign}/members/${bobId}`).send({ role: 'contributor' }).expect(200);
+    const offers = await assetsOffered(bob, `worldId=${campaign}`);
+    expect(offers.map((a) => a.id)).toEqual([ownArt, shelfArt]);
+    expect(offers.map((a) => a.assetUrl)).toEqual([
+      `/assets/${campaign}/${offers[0].assetUrl?.split('/')[3]}`,
+      `/assets/${shelf}/${offers[1].assetUrl?.split('/')[3]}`,
+    ]);
+  });
+
+  it('leaves a Viewer the Asset Browser it always had, minus the full-resolution URL', async () => {
+    const bob = await signIn('bob@hexly.test');
+
+    // The **Asset Browser** is a container-scoped browse, not an editing surface: a Viewer lists what
+    // this World holds and draws each tile, exactly as before. What it no longer hands out is the
+    // full-resolution capability URL, which rides the same standing the picker's offer does (ADR-0034).
+    const listed = await summaries(bob, `worldId=${campaign}&type=core.type.asset&thumbnails=1`);
+    expect(listed.map((a) => a.id)).toEqual([ownArt]);
+    expect(listed[0].thumbnailUrl).toBeDefined();
+    expect(listed[0].assetUrl).toBeUndefined();
+  });
+
+  it('offers an extension-less upload’s tile, its extension being a value rather than an absence', async () => {
+    // An upload with no extension pins `''` (#416): the bytes are addressed by the bare hash, so the
+    // picker must offer the tile it always offered rather than reading the empty string as "no URL".
+    const plain = await upload(campaign, 'Untitled', OTHER_PNG);
+
+    const offered = (await assetsOffered(ada, `worldId=${campaign}`)).find((a) => a.id === plain);
+    expect(offered?.name).toBe('Untitled');
+    expect(offered?.assetUrl).toMatch(new RegExp(`^/assets/${campaign}/[0-9a-f]{64}$`));
+  });
+
+  it('keeps a Field defined only on a mounted Container on the rail its own list populates', async () => {
+    // A World-defined Field (ADR-0056) the shelf declares and the campaign has never heard of, carried
+    // by one of the shelf's Entities.
+    const medium = await mintField(shelf, 'medium', 'Medium');
+    const study = (
+      await ada
+        .post('/entities')
+        .send({ name: 'Harbour Study', types: ['core.type.note'], worldId: shelf, document: { [medium]: 'oil' } })
+        .expect(201)
+    ).body.id as string;
+    await share(study);
+    await mount(campaign, shelf);
+
+    // The rail is counted over the widened scope, so its sources must be resolved over the widened
+    // scope too (ADR-0080) — otherwise the Field is counted as a candidate, found unlabellable, and
+    // drops off the very rail the Entities it counted are listed under.
+    const rail = (await facets(ada, `worldId=${campaign}&read=link-target`)).fields;
+    expect(rail.find((f) => f.key === medium)).toMatchObject({
+      label: 'Medium',
+      values: [{ value: 'oil', count: 1 }],
+    });
+    // ...and narrowing by it reaches the Entity the count promised.
+    expect(await offered(ada, `worldId=${campaign}&field=${medium}:eq:oil`)).toEqual(['Harbour Study']);
+  });
+
   it('surfaces hidden-from-default-listing Assets in the pickers exactly as it always did', async () => {
     await mount(campaign, shelf);
 
@@ -350,6 +445,15 @@ describe('Every link picker offers what the World Mounts', () => {
     return id;
   }
 
+  /** A facetable **User-defined field** on `worldId` (ADR-0056); its id is the document key it lenses. */
+  async function mintField(worldId: string, segment: string, label: string): Promise<string> {
+    const res = await ada
+      .post(`/worlds/${worldId}/fields`)
+      .send({ segment, label, dataType: { kind: 'string' }, facetable: true })
+      .expect(201);
+    return res.body.id as string;
+  }
+
   async function share(id: string): Promise<void> {
     await ada.patch(`/entities/${id}`).send({ visibility: 'shared' }).expect(200);
   }
@@ -370,8 +474,8 @@ describe('Every link picker offers what the World Mounts', () => {
   }
 
   /** Mint an image Asset in `worldId` the ordinary way (ADR-0065), returning the wrapper Entity's id. */
-  async function upload(worldId: string, filename: string): Promise<string> {
-    const res = await ada.post(`/worlds/${worldId}/assets`).attach('file', PNG, filename).expect(201);
+  async function upload(worldId: string, filename: string, bytes: Buffer = PNG): Promise<string> {
+    const res = await ada.post(`/worlds/${worldId}/assets`).attach('file', bytes, filename).expect(201);
     return res.body.id as string;
   }
 

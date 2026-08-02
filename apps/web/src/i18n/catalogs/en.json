@@ -33,6 +33,8 @@
     "emptyHint": "The containers it mounts hold nothing you can read yet.",
     "noMountsTitle": "This world draws on nothing yet.",
     "noMountsHint": "An owner mounts a world or a compendium in World Settings.",
+    "membersOnlyTitle": "This world's Library is its members' to browse.",
+    "membersOnlyHint": "What you can reach in this world is still yours to read, on its own pages.",
     "noMatchTitle": "Nothing in the Library matches your search.",
     "noMatchHint": "Try a different name, container, or word.",
     "credits": "Reference material from"

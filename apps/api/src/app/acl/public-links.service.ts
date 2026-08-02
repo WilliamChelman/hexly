@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { EntityDetail, PublicWorldView } from '@hexly/domain';
-import { eq } from 'drizzle-orm';
+import { CompendiumSummary, EntityDetail, PublicWorldView } from '@hexly/domain';
+import { and, eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
-import { containers, worldLinks, worlds } from '../db/schema';
+import { containerMounts, containers, worldLinks, worlds } from '../db/schema';
 import { EntitiesService } from '../entities/entities.service';
+import { compendiumById } from '../worlds/compendiums';
 
 /**
  * The unauthenticated, read-only surface for Public Links (ADR-0037): a token resolves to exactly
@@ -56,6 +57,24 @@ export class PublicLinksService {
     const worldId = this.resolveWorldToken(token);
     if (!worldId) return null;
     return this.entities.loadThroughWorldLink(worldId, id);
+  }
+
+  /**
+   * The terms one mounted **Compendium** is published under, for the account-less reader the cascade
+   * reached (ADR-0061, ADR-0080, #410): a pack's terms must never sit behind a wall its content does
+   * not, and the token's World is what says which packs those are. A Container the token's World does
+   * not Mount — or one that is no pack at all — yields null (→ 404), so the id is an identifier here
+   * rather than a credential.
+   */
+  readCompendium(token: string, id: string): CompendiumSummary | null {
+    const worldId = this.resolveWorldToken(token);
+    if (!worldId) return null;
+    const mounted = this.db
+      .select({ id: containerMounts.mountedContainerId })
+      .from(containerMounts)
+      .where(and(eq(containerMounts.containerId, worldId), eq(containerMounts.mountedContainerId, id)))
+      .get();
+    return mounted ? (compendiumById(this.db, id) ?? null) : null;
   }
 
   /** A World Public Link token → its World id, or null if the token doesn't resolve. */

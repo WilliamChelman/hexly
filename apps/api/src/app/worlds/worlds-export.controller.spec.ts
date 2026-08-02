@@ -9,8 +9,9 @@ import { join } from 'node:path';
 import request from 'supertest';
 import { emptyEntityDocument } from '@hexly/domain';
 import { tiptapContent } from '@hexly/plugin-content';
+import { eq } from 'drizzle-orm';
 import { DB, Db, createDb } from '../db/db';
-import { worldMembers } from '../db/schema';
+import { entityEdges, worldMembers } from '../db/schema';
 import { EntitiesService } from '../entities/entities.service';
 import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthService } from '../auth/auth.service';
@@ -664,7 +665,7 @@ describe('Vault export endpoint', () => {
           }),
         },
       });
-      return { shelfId, worldId };
+      return { shelfId, worldId, shelfImage };
     }
 
     it("writes the Mounted Container's image bytes into the archive and repoints the note at them", async () => {
@@ -765,16 +766,68 @@ describe('Vault export endpoint', () => {
 
     it('leaves out a foreign image in Missing Bytes rather than failing the export', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const { worldId, shelfId } = await mountedSetup(ada);
+      const { worldId, shelfId, shelfImage } = await mountedSetup(ada);
       // The shelf's byte folder goes away under the export's feet — an unmounted volume, a relocated root.
       rmSync(join(assetsDir, shelfId), { recursive: true, force: true });
 
       const { files } = await exportZip(ada, worldId);
 
-      // The export still lands; the picture is simply absent, and the note keeps the src it had.
+      // The export still lands; the picture is simply absent, and the note names the address the bytes
+      // would have come from rather than a capability URL nothing answers.
       expect(files).not.toHaveProperty('assets/dragon.png');
       expect(files).toHaveProperty('The Lair.md');
-      expect(text(files, 'The Lair.md')).toContain(`/assets/${shelfId}`);
+      expect(text(files, 'The Lair.md')).toContain(`assets/unresolved${shelfImage.slice('/assets'.length)}`);
+      expect(text(files, 'The Lair.md')).not.toContain(shelfImage);
+    });
+
+    it('degrades an image whose Container has been deleted to an unresolved vault path (#415)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const { worldId, shelfId, shelfImage } = await mountedSetup(ada);
+      // The shelf goes away before the export, taking its Asset Entities and its dedup rows with it —
+      // so there is nothing left to flatten and nothing left to fetch.
+      await ada.delete(`/worlds/${shelfId}`).expect(204);
+
+      const { files, res } = await exportZip(ada, worldId);
+      const unresolved = `assets/unresolved${shelfImage.slice('/assets'.length)}`;
+      // The address is legible in the Markdown and restorable in place — drop the bytes into the archive
+      // at that path and the reimport mints them.
+      expect(text(files, 'The Lair.md')).toContain(unresolved);
+      expect(text(files, 'The Lair.md')).not.toContain(shelfImage);
+
+      const reimport = await ada
+        .post('/worlds/import')
+        .attach('file', Buffer.from(res.body), 'Aldermoor.zip')
+        .expect(201);
+      const reworldId = reimport.body.worldId;
+
+      // Reimported it stays unresolved rather than becoming a capability URL naming a Container that is
+      // not there: that URL would harvest an `asset` edge nothing can resolve, so the picture would be
+      // broken for good and absent from every relation surface (ADR-0080).
+      expect(await imagesOf(ada, reworldId, 'The Lair')).toEqual([unresolved]);
+      expect(db.select().from(entityEdges).where(eq(entityEdges.containerId, reworldId)).all()).toEqual(
+        expect.not.arrayContaining([expect.objectContaining({ targetKind: 'asset' })]),
+      );
+    });
+
+    it('leaves the Container’s inbound count exactly as it was — a round trip copies, never repoints', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const { worldId, shelfId } = await mountedSetup(ada);
+
+      // What the shelf's delete confirm states today: the image and the Entity Link, from the one World.
+      const before = (await ada.get(`/worlds/${shelfId}/inbound-links`).expect(200)).body;
+      expect(before).toEqual({ links: 2, worlds: 1 });
+
+      const { res } = await exportZip(ada, worldId);
+      const reworldId = (
+        await ada.post('/worlds/import').attach('file', Buffer.from(res.body), 'Aldermoor.zip').expect(201)
+      ).body.worldId;
+
+      // The reimport is a copy in a World of its own (ADR-0080: export → import is not identity) …
+      expect((await imagesOf(ada, reworldId, 'The Lair'))[0]).toContain(reworldId);
+      // … and the World that still draws on the shelf still says so. An export must never move the
+      // number a destructive confirm is read from: the picture still renders through the original edge,
+      // so a shelf reading zero would tell its owner the delete was safe when it is not (#414).
+      expect((await ada.get(`/worlds/${shelfId}/inbound-links`).expect(200)).body).toEqual(before);
     });
   });
 

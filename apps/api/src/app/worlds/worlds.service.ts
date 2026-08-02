@@ -19,7 +19,7 @@ import { AclSetResult, gate, OwnerSetResult, removeOwnerOutcome, userExists } fr
 import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
 import { loadWorld, worldAccess, worldOwnerFilter, worldRightsOf } from '../acl/world-access';
-import { sharedVisibility } from '../acl/entity-access';
+import { entityAccess, sharedVisibility } from '../acl/entity-access';
 import { NudgeBus } from '../events/nudge-bus';
 import { ContainerLinksService } from './container-links.service';
 import { WorldWrites } from './world-writes';
@@ -50,10 +50,13 @@ export class WorldsService {
   ) {}
 
   /**
-   * Every World the caller can reach: a member row (owner/contributor/viewer) OR
+   * Every World the caller has standing in: a member row (owner/contributor/viewer) OR
    * any entity grant inside the World — so an ex-member who kept Entities, or a
    * non-member grantee, keeps minimal reachability. Each World is listed once
    * however reached.
+   *
+   * A World reached only through a **Mount** is deliberately absent: a Mount widens what a World may
+   * point at, never what its readers appear to have (ADR-0080), so it stays readable and unlisted.
    */
   list(userId: string): WorldSummary[] {
     // A Superadmin's access context returns match-all, so no special case here.
@@ -71,7 +74,7 @@ export class WorldsService {
       })
       .from(worlds)
       .innerJoin(containers, eq(containers.id, worlds.id))
-      .where(access.reachFilter)
+      .where(access.listFilter)
       .orderBy(asc(containers.createdAt), asc(containers.id))
       .all();
     if (rows.length === 0) return [];
@@ -430,15 +433,23 @@ export class WorldsService {
 
   // Attach the World's Entity count, ownership set, and the caller's Rights.
   private toDetail(world: WorldRow, callerId: string): WorldDetail {
-    const [{ value: entityCount }] = this.db
-      .select({ value: count() })
-      .from(entities)
-      .where(eq(entities.containerId, world.id))
-      .all();
-    const owners = this.worldOwners(world.id);
     // Both standings come off the one meta read: the owner set can't answer `create-entity`, since a
     // Contributor holds no owner row (ADR-0073). Only reachable Worlds get here, so a miss reads empty.
     const meta = worldAccess(this.db, callerId).decideMeta(world.id);
+    // The roster and the whole-Container count are membership-facing: a reader who reaches this World
+    // without a member row — through a **Mount** (ADR-0080), or by ADR-0037's ex-member residue — gets
+    // no user-id list and a count of what they can actually open, never one that tallies others'
+    // `private` rows.
+    const owners = meta?.isMember ? this.worldOwners(world.id) : [];
+    const [{ value: entityCount }] = this.db
+      .select({ value: count() })
+      .from(entities)
+      .where(
+        meta?.isMember
+          ? eq(entities.containerId, world.id)
+          : and(eq(entities.containerId, world.id), entityAccess(this.db, callerId).filter),
+      )
+      .all();
     return {
       id: world.id,
       name: world.name,

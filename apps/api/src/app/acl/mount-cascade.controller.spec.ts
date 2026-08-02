@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
-import { EntityDetail, EntitySummary } from '@hexly/domain';
+import { EntityDetail, EntitySummary, WorldDetail } from '@hexly/domain';
 import { tiptapContent } from '@hexly/plugin-content';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
@@ -203,11 +203,17 @@ describe('A Mount cascades read', () => {
     await anon().get(`/public/worlds/${token}/entities/${sketch}`).expect(404);
 
     // A pack's terms must never sit behind a wall its content does not (ADR-0080), so the Compendium
-    // page opens to the same reader.
-    expect((await anon().get(`/compendiums/${pack}`).expect(200)).body).toMatchObject({
+    // page opens to the same reader — through the token that names the Mounts, which is the whole of
+    // their standing. The pack's own id is an identifier, never the credential: ADR-0034's
+    // possession-is-the-token is content-addressed bytes on a static route and stops there.
+    expect((await anon().get(`/public/worlds/${token}/compendiums/${pack}`).expect(200)).body).toMatchObject({
       name: 'Draw Steel: Monsters',
       rev: '1.4.0',
     });
+    await anon().get(`/compendiums/${pack}`).expect(401);
+    // A pack this World does not Mount is not this token's to state terms for.
+    const unmounted = app.get(CompendiumWrites).install('draw-steel.importer.treasures', { name: 'Homebrew' }, '0.9.0');
+    await anon().get(`/public/worlds/${token}/compendiums/${unmounted}`).expect(404);
 
     // The World's public view still lists the World's own — a Mount changes what may be reached, never
     // what a Container-scoped listing holds.
@@ -231,9 +237,10 @@ describe('A Mount cascades read', () => {
     await bob.delete(`/entities/${sunset}`).expect(403);
     // Nor does mounting a World make its Owner-only surfaces the reader's, or make it authorable: the
     // create resolves a World the caller may author in, and answers a mounted one as it always answered
-    // a merely-readable one. Reading *what* a World draws from is any reader's, since that is what the
-    // Library is (#412); arranging it is the Owner's, and that is where the line sits.
-    await bob.get(`/worlds/${shelf}/mounts`).expect(200);
+    // a merely-readable one.
+    // Even reading what the shelf itself draws from is closed to him: the cascade is one hop, so
+    // naming the shelf's own Mounts would hand him the second (#412).
+    await bob.get(`/worlds/${shelf}/mounts`).expect(403);
     await bob.get(`/worlds/${shelf}/mount-candidates`).expect(403);
     await bob.post(`/worlds/${shelf}/mounts`).send({ containerId: pack }).expect(403);
     await bob.patch(`/worlds/${shelf}/mounts`).send({ containerIds: [] }).expect(403);
@@ -269,16 +276,62 @@ describe('A Mount cascades read', () => {
     expect(await names(ada(), `worldId=${campaign}`)).toEqual(['The Tavern']);
   });
 
-  it('puts the mounted World in its new readers’ Index, since they can now open it', async () => {
+  it('leaves the mounted World out of its new readers’ Index, though they can open it', async () => {
     const bob = await signIn('bob@hexly.test');
     expect(await worldNames(bob)).toEqual(['Aldermoor']);
 
-    // Reachability is one rule, and the World Index is one of its readers (ADR-0080): a World reached
-    // through a Mount is listed, switchable and openable — read-only, like every other reach it grants.
     await mount(campaign, shelf);
-    expect(await worldNames(bob)).toEqual(['Aldermoor', 'The Art Shelf']);
-    await unmount(campaign, shelf);
+
+    // Read-only, not listed: a Mount widens what a World may point at, never what its readers appear to
+    // have (ADR-0080). The World Index, the Switcher and quick-open answer "the Worlds you have", and a
+    // shelf someone else draws on is not one of them.
     expect(await worldNames(bob)).toEqual(['Aldermoor']);
+    // The other side of the split, in the same breath: the shelf is his to open and its art his to read,
+    // which is what makes a mounted Entity's own page resolve at all (ADR-0028).
+    await bob.get(`/worlds/${shelf}`).expect(200);
+    await bob.get(`/entities/${sunset}`).expect(200);
+  });
+
+  it('tells a reader nothing about the mounted World it is not a member of', async () => {
+    const bob = await signIn('bob@hexly.test');
+    await mount(campaign, shelf);
+
+    // The roster and the Container's own count are membership-facing: Bob reads the shelf, so he gets
+    // its identity, his own Rights, and a count of what he can actually open — never Ada's user id, and
+    // never a tally that includes her `private` sketch.
+    const shelfDetail = (await bob.get(`/worlds/${shelf}`).expect(200)).body as WorldDetail;
+    expect(shelfDetail).toMatchObject({ name: 'The Art Shelf', owners: [], rights: ['read'], entityCount: 1 });
+    // Its Owner sees both, because she is in it.
+    expect((await ada().get(`/worlds/${shelf}`).expect(200)).body).toMatchObject({
+      owners: [adaId],
+      entityCount: 2,
+    });
+  });
+
+  it('stops cascading when the mounter stops Owning what they mounted', async () => {
+    // Ada mounts her shelf into her campaign, then a co-Owner evicts her from the campaign — which
+    // ADR-0037 expressly permits. She still Owns the shelf and is now a stranger to the campaign, with
+    // no route left to withdraw the Mount.
+    await ada().post(`/worlds/${campaign}/owners`).send({ userId: danId }).expect(200);
+    await mount(campaign, shelf);
+    const bob = await signIn('bob@hexly.test');
+    await bob.get(`/entities/${sunset}`).expect(200);
+
+    const dan = await signIn('dan@hexly.test');
+    await dan.delete(`/worlds/${campaign}/owners/${adaId}`).expect(200);
+
+    // So the Own-only rule is asked per read, not only when the Mount is declared (ADR-0080): no Owner
+    // of the campaign Owns the shelf any more, so it republishes nothing — to Dan's new members least
+    // of all — and Ada's art is hers again.
+    await bob.get(`/entities/${sunset}`).expect(404);
+    await bob.get(`/worlds/${shelf}`).expect(404);
+    await dan.get(`/entities/${sunset}`).expect(404);
+    // A World Public Link Dan mints reaches no further than his own members do.
+    const token = (await dan.post(`/worlds/${campaign}/link`).expect(200)).body.token as string;
+    await anon().get(`/public/worlds/${token}/entities/${sunset}`).expect(404);
+    expect(((await ada().get(`/entities/${sunset}`).expect(200)).body as EntityDetail).name).toBe(
+      'Sunset over Aldermoor',
+    );
   });
 
   // ---- harness -------------------------------------------------------------

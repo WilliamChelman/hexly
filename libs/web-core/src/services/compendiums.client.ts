@@ -16,7 +16,12 @@ import { CompendiumSummary } from '@hexly/domain';
 export class CompendiumsClient {
   private readonly http = inject(HttpClient);
 
-  /** One installed pack — the Compendium page's read. 404 when the id names no pack. */
+  /**
+   * One installed pack — the **Compendium page**'s read for a signed-in caller, whose session is the
+   * whole standing here. 404 when the id names no pack. The account-less reader a **Mount** cascaded
+   * to has no session to spend, so their read is the token-scoped one on {@link PublicClient}
+   * (ADR-0080, #410).
+   */
   get(id: string): Observable<CompendiumSummary> {
     return this.http.get<CompendiumSummary>(`/api/compendiums/${id}`);
   }

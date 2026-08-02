@@ -11,7 +11,6 @@ import {
   InboundLinkCount,
   MemberRole,
   Mount,
-  MountCandidate,
   PublicLink,
   UpdateUserDefinedTypeRequest,
   UpdateWorldFieldRequest,
@@ -62,7 +61,7 @@ export class MockWorldsClient {
   // Both default to empty, so a spec mounting the Mounts panel (ADR-0080, #408) without caring about
   // it still renders — an unmounted World is the ordinary case; override per test as needed.
   mounts = vi.fn<(id: string) => Observable<Mount[]>>(() => of<Mount[]>([]));
-  mountCandidates = vi.fn<(id: string) => Observable<MountCandidate[]>>(() => of<MountCandidate[]>([]));
+  mountCandidates = vi.fn<(id: string) => Observable<Mount[]>>(() => of<Mount[]>([]));
   addMount = vi.fn<(id: string, containerId: string) => Observable<Mount[]>>();
   reorderMounts = vi.fn<(id: string, containerIds: string[]) => Observable<Mount[]>>();
   removeMount = vi.fn<(id: string, containerId: string) => Observable<Mount[]>>();

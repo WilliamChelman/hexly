@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { of, throwError } from 'rxjs';
-import { Mount, MountCandidate } from '@hexly/domain';
+import { Mount } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
 import { MockWorldsClient } from '@hexly/web-core/testing';
 import { provideTranslocoTesting } from '../../../../../../testing/transloco-testing';
@@ -70,7 +70,7 @@ describe('WorldMountsPanel', () => {
   });
 
   it('offers exactly what the server says is mountable, and mounts the picked one', () => {
-    const candidates: MountCandidate[] = [pack, shelf];
+    const candidates: Mount[] = [pack, shelf];
     worlds.mountCandidates.mockReturnValue(of(candidates));
     worlds.addMount.mockReturnValue(of([shelf]));
     render();

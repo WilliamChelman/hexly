@@ -36,8 +36,7 @@ export const BOARD_SURFACE_DATA_TYPE = defineStructuredDataType({
     const edges: EntityEdge[] = [];
     // A Board **Embed** and a Text Block's inline Entity Link are always semantic (ADR-0069): embedding is
     // a curatorial act, a written link is authored meaning — both count as relations even against an Asset.
-    const link = (targetId: string) =>
-      edges.push({ targetKind: 'entity', targetId, targetContainerId: null, descriptor: null, decor: false });
+    const link = (targetId: string) => edges.push({ targetKind: 'entity', targetId, descriptor: null, decor: false });
     for (const element of surface.elements) {
       if (element.kind === 'embed') {
         link(element.targetEntityId);

@@ -144,13 +144,19 @@ describe('AssetLinkPicker', () => {
   });
 
   it('previews a value living in a Mounted Container — resolving it names no World (ADR-0080)', () => {
-    const { fixture } = render();
+    // Bytes served from the Shelf's own Container, as a Mounted target's are.
+    entities.list.mockImplementation((o) =>
+      of(o?.ids ? page([asset('shelf-art', 'Sunset', '/assets/shelf-9/shelf-art.thumb.webp')]) : page([])),
+    );
+    const { fixture, el } = render();
     fixture.componentInstance.value.set({ entityId: 'shelf-art', label: 'Sunset' });
     fixture.detectChanges();
 
     // "Resolve exactly this id" is no browse: naming a World would scope the lookup to it and blank the
     // preview of the very link this picker offered from a Shelf the World Mounts.
     expect(entities.list).toHaveBeenCalledWith({ ids: ['shelf-art'], thumbnails: true });
+    expect((byId(el, 'asset-link-preview') as HTMLImageElement).src).toContain('/assets/shelf-9/shelf-art.thumb.webp');
+    expect(byId(el, 'asset-link-placeholder')).toBeNull();
   });
 
   it('previews the current value as a tile and clears it on demand', () => {

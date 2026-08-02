@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { EntityDetail, EntityType, HEXLY_TYPE_KEY, VaultExportContext } from '@hexly/domain';
+import { assetRefFromUrl, EntityDetail, EntityType, HEXLY_TYPE_KEY, VaultExportContext } from '@hexly/domain';
 import { CORE_ASSET_TYPE_ID } from '@hexly/plugin-asset';
 import { entityToMarkdown } from '@hexly/obsidian';
 import { strToU8, zipSync, type Zippable } from 'fflate';
@@ -80,9 +80,10 @@ export class VaultExportService {
       // a target outside this World keeps its stored label (undefined → the converter leaves it), which is
       // the whole of how a link into a Mounted Container degrades (ADR-0073).
       entityName: (id) => nameById.get(id),
-      // An image's capability-URL src repoints at its exported `assets/<name>` copy; an external src is
-      // absent from the map and passes through untouched.
-      assetPath: (url) => srcMap.get(url),
+      // An image's capability-URL src repoints at its exported `assets/<name>` copy, or, where the bytes
+      // could not be flattened, at the unresolved address they would have come from; an external src is
+      // neither and passes through untouched.
+      assetPath: (url) => srcMap.get(url) ?? unresolvedAssetPath(url),
     };
     return entityToMarkdown({
       doc: entity.document,
@@ -95,6 +96,23 @@ export class VaultExportService {
       context,
     });
   }
+}
+
+/** Where an image whose bytes could not be flattened lands, under the address it would have come from. */
+const UNRESOLVED_ASSETS_DIR = 'assets/unresolved';
+
+/**
+ * The vault path an unflattenable capability URL degrades to — its Container deleted, its Asset Entity
+ * gone, its bytes **Missing** — or `undefined` for a src naming no Asset at all, which passes through.
+ *
+ * Writing the raw `/assets/<container>/<hash>.png` instead reimports as an `asset` edge naming a Container
+ * that need not exist: a picture broken for good, and absent from References so nothing can find it. A
+ * vault path harvests no edge, reads as unresolved, and re-resolves by restoring the bytes into the
+ * archive at that path — the image's counterpart to a link degrading to an **Unresolved Link**
+ * (ADR-0080, ADR-0073).
+ */
+function unresolvedAssetPath(url: string): string | undefined {
+  return assetRefFromUrl(url) ? posix.join(UNRESOLVED_ASSETS_DIR, url.slice('/assets/'.length)) : undefined;
 }
 
 /** A zip key not already taken in `files`: on collision, inserts ` (2)`, ` (3)`… before the extension. */

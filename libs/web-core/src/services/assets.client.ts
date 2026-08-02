@@ -8,9 +8,8 @@ import { EntityDetail } from '@hexly/domain';
  * operation, because an Asset is an Entity: {@link upload} mints (or dedups to) an **Asset Entity** from a
  * picked file in one step, returning the wrapper the caller reads the served URL off.
  *
- * *Reading* Assets is no business of this client. The asset pickers ask what every link picker asks —
- * what may this point at? — so they read through `EntitiesClient`'s one link-target read, preset to the
- * asset type, and Mount scope is resolved there once for all of them (ADR-0080, #416).
+ * Reading Assets is no business of this client: an asset picker is a **Link-target read**, so it goes
+ * through `EntitiesClient`, where Mount scope is resolved once for every picker (ADR-0080).
  */
 @Injectable({ providedIn: 'root' })
 export class AssetsClient {

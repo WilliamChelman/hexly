@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, input, OnInit, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { InboundLinkCount, Mount, MountCandidate } from '@hexly/domain';
-import { ToasterService, WorldsClient } from '@hexly/web-core';
+import { Mount } from '@hexly/domain';
+import { blastRadius, ToasterService, WorldsClient } from '@hexly/web-core';
 import { ButtonComponent, DialogComponent, SelectComponent } from '@hexly/web-ui';
 
 /**
@@ -73,13 +73,13 @@ import { ButtonComponent, DialogComponent, SelectComponent } from '@hexly/web-ui
         data-testid="unmount-modal"
       >
         <p class="text-sm text-ink-muted m-0" data-testid="unmount-count">
-          @if (unmountCount(); as count) {
+          @if (blast.count(); as count) {
             @if (count.links === 0) {
               {{ 'mounts.unmountNone' | transloco }}
             } @else {
               {{ 'mounts.unmountCount' | transloco: { count: count.links } }}
             }
-          } @else if (countFailed()) {
+          } @else if (blast.failed()) {
             {{ 'mounts.unmountCountUnknown' | transloco }}
           } @else {
             {{ 'mounts.unmountCounting' | transloco }}
@@ -164,15 +164,13 @@ export class WorldMountsPanelComponent implements OnInit {
   private readonly transloco = inject(TranslocoService);
 
   protected readonly mounts = signal<readonly Mount[]>([]);
-  protected readonly candidates = signal<readonly MountCandidate[]>([]);
+  protected readonly candidates = signal<readonly Mount[]>([]);
   /** The Container picked in the add control, or '' for the placeholder. */
   protected readonly selected = signal<string>('');
   /** The Mount whose unmount is being confirmed, or null when no confirm is open. */
   protected readonly pendingUnmount = signal<Mount | null>(null);
-  /** The open confirm's blast radius; null while it is still being read (ADR-0080, #414). */
-  protected readonly unmountCount = signal<InboundLinkCount | null>(null);
-  /** Whether that read failed — told apart from "still loading", so neither reads as zero. */
-  protected readonly countFailed = signal(false);
+  /** What the open confirm's unmount would break (ADR-0080, #414). */
+  protected readonly blast = blastRadius();
 
   ngOnInit(): void {
     this.worlds.mounts(this.id()).subscribe({
@@ -189,21 +187,10 @@ export class WorldMountsPanelComponent implements OnInit {
     this.apply(this.worlds.addMount(this.id(), containerId), 'mounts.addError', () => this.selected.set(''));
   }
 
-  /**
-   * Offer the unmount, and read what it would break while the confirm is open (ADR-0080, #414). Read
-   * here rather than with the list: a count is only true at the moment it is stated, and a co-author's
-   * save between opening the pane and pressing the button would make a listed one a lie.
-   */
+  /** Offer the unmount, and read what it would break while the confirm is open (ADR-0080, #414). */
   protected askUnmount(mount: Mount): void {
     this.pendingUnmount.set(mount);
-    this.unmountCount.set(null);
-    this.countFailed.set(false);
-    this.worlds.mountInboundLinks(this.id(), mount.containerId).subscribe({
-      next: (count) => this.unmountCount.set(count),
-      // A count that would not load degrades to a confirm without one, never to a refusal: the act is
-      // the Owner's, and the number was only ever advice (ADR-0065).
-      error: () => this.countFailed.set(true),
-    });
+    this.blast.read(this.worlds.mountInboundLinks(this.id(), mount.containerId));
   }
 
   protected cancelUnmount(): void {

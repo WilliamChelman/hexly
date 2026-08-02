@@ -7,10 +7,9 @@ import { CardRadioComponent, CardRadioGroupComponent } from '@hexly/web-ui';
 /**
  * Campaign-or-Shelf (ADR-0080): the one surface that writes the label, for a World Owner.
  *
- * A pick commits at once — there is nothing to stage, the whole edit being one of two values — and
- * the returned World is re-pinned so the World Index regroups off the same read. Deliberately says
- * what a Shelf *keeps*: the label is read by the Index's grouping and by nothing else, so an Owner
- * choosing it is not withholding anything from the World.
+ * A pick commits at once — the whole edit being one of two values, there is nothing to stage — and the
+ * returned World is re-pinned so the World Index regroups off the same read. The label is read by that
+ * grouping and by nothing else: no read filters hang off it.
  */
 @Component({
   selector: 'app-world-kind',

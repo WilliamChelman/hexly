@@ -21,10 +21,10 @@ export interface EntityEdge {
    * The **Container** the target lives in, on an `asset` edge alone — read off the
    * `/assets/<containerId>/<hash>.<ext>` URL the document was written with (ADR-0080), never assumed to be
    * the source's own. A hash names bytes, not an Asset: identical bytes in two Containers share a hash and
-   * no Entity, so the pair is what resolves. `null` on an `entity` edge, whose `targetId` is globally
+   * no Entity, so the pair is what resolves. Absent on an `entity` edge, whose `targetId` is globally
    * unique, and on a pre-ADR-0080 row Reindex has not yet rebuilt — both resolve against the source's own.
    */
-  readonly targetContainerId: string | null;
+  readonly targetContainerId?: string;
   readonly descriptor: string | null;
   /**
    * A **Decor Link** (CONTEXT.md → Decor Link, ADR-0069): the edge exists for presentation and carries

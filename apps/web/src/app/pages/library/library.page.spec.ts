@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, ParamMap, provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
@@ -12,7 +13,8 @@ import { LibraryPage } from './library.page';
 /**
  * The **Library** (#412, ADR-0080): the Entity Browser preset to what this World **Mounts**. What is
  * this page's own — rather than the Entity Browser's, already pinned in its spec — is where the scope
- * comes from: the Mount set, in the Owner's order, and the emptiness a World that mounts nothing has.
+ * comes from: the Mount set, in the Owner's order, and the three ways it can be absent — a World that
+ * mounts nothing, a read that failed, and a reader with no standing to be told.
  */
 describe('Library', () => {
   let entities: MockEntitiesClient;
@@ -72,11 +74,16 @@ describe('Library', () => {
 
     // The order is not cosmetic: the server reads it back to order the Container facet, which is how
     // the rail reads in the order the Owner arranged (ADR-0080).
-    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ containerId: ['c-pack', 'c-shelf'] }));
-    expect(entities.facets).toHaveBeenCalledWith(expect.objectContaining({ containerId: ['c-pack', 'c-shelf'] }));
-    // Never the World in the URL: that names whose Mounts these are and the Adoption target, not a
-    // Container being listed — a Mount widens what a World may point at, never what it holds.
-    expect(entities.list).not.toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1' }));
+    // The whole read, spelled out: the Containers are the only scope on the wire. The World in the URL
+    // names whose Mounts these are and the Adoption target, and rides nothing — a Mount widens what a
+    // World may point at, never what it holds.
+    expect(entities.list).toHaveBeenCalledWith({
+      limit: 50,
+      containerId: ['c-pack', 'c-shelf'],
+      rights: true,
+      thumbnails: true,
+    });
+    expect(entities.facets).toHaveBeenCalledWith({ containerId: ['c-pack', 'c-shelf'] });
   });
 
   it('shows a World that Mounts nothing an empty Library that says so, and reads nothing', () => {
@@ -92,6 +99,16 @@ describe('Library', () => {
     expect(el.querySelector('[data-testid=no-matches]')).toBeNull();
   });
 
+  it('still says it draws on nothing when a search query rides the URL', () => {
+    queryParams$.next(convertToParamMap({ q: 'goblin' }));
+    const el = renderWith([]).nativeElement as HTMLElement;
+
+    // With nothing mounted there was nothing to search, so "nothing matched your search" would name a
+    // failure that never happened (ADR-0080).
+    expect(el.querySelector('[data-testid=no-mounts]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=no-matches]')).toBeNull();
+  });
+
   it('tells a failed read of the Mount set apart from a World that Mounts nothing', () => {
     worlds.mounts.mockReturnValue(throwError(() => new Error('offline')));
     const fixture = TestBed.createComponent(LibraryPage);
@@ -102,6 +119,24 @@ describe('Library', () => {
     // what the empty Library is for (#412) — so the failure must not read as the emptiness.
     expect(el.querySelector('[data-testid=load-error]')).not.toBeNull();
     expect(el.querySelector('[data-testid=no-mounts]')).toBeNull();
+  });
+
+  it('shows a non-member reader nothing rather than a failure that never happened', () => {
+    // The Mount set is member-gated: a reader who reaches this World through someone else's Mount is
+    // refused it, because the cascade is one hop and naming these Containers would disclose the second
+    // (ADR-0080). Nothing went wrong, so nothing may say so.
+    worlds.mounts.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 403, statusText: 'Forbidden' })));
+    const fixture = TestBed.createComponent(LibraryPage);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('[data-testid=members-only]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=load-error]')).toBeNull();
+    // Nor the emptiness of a World that Mounts nothing: this reader was told nothing, which is not the
+    // same as being told there is nothing.
+    expect(el.querySelector('[data-testid=no-mounts]')).toBeNull();
+    // And nothing is read on their behalf: an empty scope would list every Entity they can reach.
+    expect(entities.list).not.toHaveBeenCalled();
   });
 
   it('credits the mounted Compendiums by name, linking each to its own Compendium page', () => {

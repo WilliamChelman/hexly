@@ -916,11 +916,21 @@ describe('Worlds endpoints', () => {
       // Minting is contributor-gated: authoring an Asset is Entity-creation-shaped.
       await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Nope.png').expect(403);
 
-      // *Reading* is not: a Viewer reads a `shared` Asset like any other Entity — they already see it on
-      // the Asset Browser and its own page — so the picker read carries no gate of its own (#416).
-      expect((await bob.get(`/entities?worldId=${world.body.id}&${PICKER_READ}`).expect(200)).body.items).toHaveLength(
-        1,
-      );
+      // And the picker asks the same standing: the byte route is guard-less (ADR-0034), so a listed
+      // capability URL *is* the bytes, and a Viewer enumerates no art through the link-target read.
+      expect((await bob.get(`/entities?worldId=${world.body.id}&${PICKER_READ}`).expect(200)).body.items).toEqual([]);
+
+      // What a Viewer keeps is the **Asset Browser** — a container-scoped browse of what this World
+      // holds, tiles and all — minus the full-resolution URL, which rides the same standing.
+      const browsed = (
+        await bob
+          .get('/entities')
+          .query({ worldId: world.body.id, type: 'core.type.asset', thumbnails: '1' })
+          .expect(200)
+      ).body.items;
+      expect(browsed).toHaveLength(1);
+      expect(browsed[0].thumbnailUrl).toBeDefined();
+      expect(browsed[0].assetUrl).toBeUndefined();
     });
 
     it('404s an unreachable World on upload, and its Assets reach no picker (existence never leaks, ADR-0004)', async () => {

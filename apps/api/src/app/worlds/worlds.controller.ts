@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   Delete,
   ForbiddenException,
@@ -11,7 +10,6 @@ import {
   Param,
   Patch,
   Post,
-  Query,
   Res,
   UploadedFile,
   UseGuards,
@@ -32,7 +30,6 @@ import {
   ImportSummary,
   InboundLinkCount,
   Mount,
-  MountCandidate,
   PublicLink,
   reorderMountsRequestSchema,
   setMemberRoleRequestSchema,
@@ -57,9 +54,10 @@ import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
 import { WorldGraphService } from './world-graph.service';
 import { WorldsService } from './worlds.service';
-import { TypeResult, WorldTypesService } from './world-types.service';
+import { WorldTypesService } from './world-types.service';
 import { WorldFieldsService } from './world-fields.service';
-import { mountResponse, WorldMountsService } from './world-mounts.service';
+import { WorldMountsService } from './world-mounts.service';
+import { worldRouteResponse } from './world-route-result';
 
 /** The subset of multer's uploaded-file shape this controller uses (no @types/multer dep). */
 interface UploadedZip {
@@ -258,7 +256,7 @@ export class WorldsController {
   createType(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): UserDefinedType {
     const parsed = createUserDefinedTypeRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return this.typeResult(this.types.create(user.id, id, parsed.data));
+    return worldRouteResponse(this.types.create(user.id, id, parsed.data));
   }
 
   // Rename / re-Field a user-defined type (#191): Owner-only. The id is immutable, so it is a path param.
@@ -271,14 +269,14 @@ export class WorldsController {
   ): UserDefinedType {
     const parsed = updateUserDefinedTypeRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return this.typeResult(this.types.update(user.id, id, typeId, parsed.data));
+    return worldRouteResponse(this.types.update(user.id, id, typeId, parsed.data));
   }
 
   // Delete a user-defined type (#191): Owner-only. Entities keep their EntityDocument (a Field is a lens).
   @Delete(':id/types/:typeId')
   @HttpCode(204)
   removeType(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('typeId') typeId: string): void {
-    this.typeResult(this.types.delete(user.id, id, typeId));
+    worldRouteResponse(this.types.delete(user.id, id, typeId));
   }
 
   // The World-defined Fields (#230, ADR-0054): the resolver and attach picker source. Reachable-gated.
@@ -295,7 +293,7 @@ export class WorldsController {
   createField(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Field {
     const parsed = createWorldFieldRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return this.typeResult(this.fields.create(user.id, id, parsed.data));
+    return worldRouteResponse(this.fields.create(user.id, id, parsed.data));
   }
 
   // Re-body a World-defined Field (#230): Owner-only. The id is immutable, so it is a path param.
@@ -308,14 +306,14 @@ export class WorldsController {
   ): Field {
     const parsed = updateWorldFieldRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return this.typeResult(this.fields.update(user.id, id, fieldId, parsed.data));
+    return worldRouteResponse(this.fields.update(user.id, id, fieldId, parsed.data));
   }
 
   // Delete a World-defined Field (#230): Owner-only. Entities referencing it degrade to plain values.
   @Delete(':id/fields/:fieldId')
   @HttpCode(204)
   removeField(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('fieldId') fieldId: string): void {
-    this.typeResult(this.fields.delete(user.id, id, fieldId));
+    worldRouteResponse(this.fields.delete(user.id, id, fieldId));
   }
 
   // Below: the World's **Mounts** (ADR-0080) — the Containers it draws from. Arranging them is
@@ -324,15 +322,15 @@ export class WorldsController {
   // (ADR-0071). Every route answers with the whole ordered list, so a client never has to reassemble
   // it from a partial response.
 
-  // Read by every reader of the World, not just its Owners: this is the **Library**'s scope (#412).
+  // Read by every *member* of the World, not just its Owners: this is the **Library**'s scope (#412).
   @Get(':id/mounts')
   mountsOf(@CurrentUser() user: AuthUser, @Param('id') id: string): Mount[] {
-    return mountResponse(this.mounts.list(user.id, id));
+    return worldRouteResponse(this.mounts.list(user.id, id));
   }
 
   @Get(':id/mount-candidates')
-  mountCandidates(@CurrentUser() user: AuthUser, @Param('id') id: string): MountCandidate[] {
-    return mountResponse(this.mounts.candidates(user.id, id));
+  mountCandidates(@CurrentUser() user: AuthUser, @Param('id') id: string): Mount[] {
+    return worldRouteResponse(this.mounts.candidates(user.id, id));
   }
 
   // Idempotent — mounting what is already mounted is the same Mount — so a 200, not a 201.
@@ -341,14 +339,14 @@ export class WorldsController {
   addMount(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Mount[] {
     const parsed = addMountRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return mountResponse(this.mounts.add(user.id, id, parsed.data.containerId));
+    return worldRouteResponse(this.mounts.add(user.id, id, parsed.data.containerId));
   }
 
   @Patch(':id/mounts')
   reorderMounts(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Mount[] {
     const parsed = reorderMountsRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return mountResponse(this.mounts.reorder(user.id, id, parsed.data.containerIds));
+    return worldRouteResponse(this.mounts.reorder(user.id, id, parsed.data.containerIds));
   }
 
   /**
@@ -362,7 +360,7 @@ export class WorldsController {
     @Param('id') id: string,
     @Param('containerId') containerId: string,
   ): InboundLinkCount {
-    return mountResponse(this.mounts.linkCount(user.id, id, containerId));
+    return worldRouteResponse(this.mounts.linkCount(user.id, id, containerId));
   }
 
   // The path param is the *mounted* Container, named as the add body names it (ADR-0080).
@@ -372,21 +370,7 @@ export class WorldsController {
     @Param('id') id: string,
     @Param('containerId') containerId: string,
   ): Mount[] {
-    return mountResponse(this.mounts.remove(user.id, id, containerId));
-  }
-
-  /** Map a {@link TypeResult} to its HTTP outcome: `ok` unwraps, else the status's exception. */
-  private typeResult<T>(result: TypeResult<T>): T {
-    switch (result.status) {
-      case 'not-found':
-        throw new NotFoundException();
-      case 'forbidden':
-        throw new ForbiddenException();
-      case 'conflict':
-        throw new ConflictException();
-      case 'ok':
-        return result.value;
-    }
+    return worldRouteResponse(this.mounts.remove(user.id, id, containerId));
   }
 
   // Below: the Collaboration layer (ADR-0071), gated per route because this controller also carries

@@ -3,8 +3,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { switchMap, takeWhile, timer } from 'rxjs';
-import { CompendiumPackSummary, ImporterErrorCode, ImportRunSummary, InboundLinkCount } from '@hexly/domain';
-import { HexlyDatePipe, ToasterService } from '@hexly/web-core';
+import { CompendiumPackSummary, ImporterErrorCode, ImportRunSummary } from '@hexly/domain';
+import { blastRadius, HexlyDatePipe, ToasterService } from '@hexly/web-core';
 import { ButtonComponent, DialogComponent } from '@hexly/web-ui';
 import { AdminClient } from '../services/admin.client';
 
@@ -98,13 +98,13 @@ const PACKS_POLL_MS = 1000;
         data-testid="pack-remove-modal"
       >
         <p class="text-sm text-ink-muted m-0" data-testid="pack-remove-links">
-          @if (removeLinks(); as blast) {
-            @if (blast.links === 0) {
+          @if (blast.count(); as count) {
+            @if (count.links === 0) {
               {{ 'admin.packs.removeLinksNone' | transloco }}
             } @else {
-              {{ 'admin.packs.removeLinks' | transloco: { links: blast.links, worlds: blast.worlds } }}
+              {{ 'admin.packs.removeLinks' | transloco: { links: count.links, worlds: count.worlds } }}
             }
-          } @else if (removeLinksFailed()) {
+          } @else if (blast.failed()) {
             {{ 'admin.packs.removeLinksUnknown' | transloco }}
           } @else {
             {{ 'admin.packs.removeLinksCounting' | transloco }}
@@ -154,10 +154,8 @@ export class CompendiumPacksPanelComponent implements OnInit {
   protected readonly packs = signal<readonly CompendiumPackSummary[]>([]);
   /** The pack whose removal is being confirmed, or null when no confirm is open. */
   protected readonly pendingRemove = signal<CompendiumPackSummary | null>(null);
-  /** The open confirm's blast radius (ADR-0080, #414); null while it is still being read. */
-  protected readonly removeLinks = signal<InboundLinkCount | null>(null);
-  /** Whether that read failed — told apart from "still loading", so neither reads as zero. */
-  protected readonly removeLinksFailed = signal(false);
+  /** What the open confirm's removal would break in the Worlds drawing on the pack (ADR-0080, #414). */
+  protected readonly blast = blastRadius();
 
   ngOnInit(): void {
     this.reload((packs) => {
@@ -181,19 +179,13 @@ export class CompendiumPacksPanelComponent implements OnInit {
   }
 
   /**
-   * Offer the removal, and read what it would break in the Worlds drawing on the pack while the
-   * confirm is open (ADR-0080, #414). Read here rather than with the list: the list is a poll target,
-   * and a count re-read every second is a count nobody asked for.
+   * Offer the removal, and read what it would break while the confirm is open (ADR-0080, #414). Read
+   * here rather than with the list: the list is a poll target, and a count re-read every second is a
+   * count nobody asked for.
    */
   protected askRemove(pack: CompendiumPackSummary): void {
     this.pendingRemove.set(pack);
-    this.removeLinks.set(null);
-    this.removeLinksFailed.set(false);
-    this.admin.packInboundLinks(pack.importer).subscribe({
-      next: (blast) => this.removeLinks.set(blast),
-      // A count that would not load degrades to a confirm without one, never to a refusal.
-      error: () => this.removeLinksFailed.set(true),
-    });
+    this.blast.read(this.admin.packInboundLinks(pack.importer));
   }
 
   protected cancelRemove(): void {

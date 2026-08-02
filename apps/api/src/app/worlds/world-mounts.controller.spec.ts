@@ -209,15 +209,22 @@ describe('A World’s Mounts', () => {
     await ada.delete(`/worlds/${pack}/mounts/${shelf}`).expect(404);
   });
 
-  it('is the World Owner’s alone to arrange, and every reader’s to see (#412)', async () => {
+  it('is the World Owner’s alone to arrange, and every member’s to see (#412)', async () => {
     const ada = await signIn('ada@hexly.test');
     await ada.post(`/worlds/${campaign}/members`).send({ userId: bobId, role: 'viewer' });
     await mount(ada, campaign, shelf);
 
     const bob = await signIn('bob@hexly.test');
-    // A Viewer reads the list: it is what the **Library** is, and the cascade has already handed them
-    // the content, so naming the Containers it came out of discloses nothing they cannot open.
+    // A Viewer of this World reads the list: it is what the **Library** is, and a member reads what
+    // the World they are in draws from.
     expect(await mountsOf(bob, campaign)).toEqual([{ containerId: shelf, name: 'The Art Shelf', kind: 'world' }]);
+    // Not so a reader who reaches the campaign only *through* someone else's Mount — the cascade is
+    // deliberately one hop (ADR-0080), so the list would hand them the second. Reachable, so 403.
+    const second = await mintWorld(ada, 'Second Campaign');
+    await mount(ada, second, campaign);
+    const mallory = await seed('mallory@hexly.test', 'Mallory');
+    await ada.post(`/worlds/${second}/members`).send({ userId: mallory, role: 'viewer' }).expect(200);
+    await (await signIn('mallory@hexly.test')).get(`/worlds/${campaign}/mounts`).expect(403);
     // Arranging it stays the Owner's. Reachable but not an Owner: 403, so the refusal is honest rather
     // than pretending the World is missing.
     await bob.get(`/worlds/${campaign}/mount-candidates`).expect(403);

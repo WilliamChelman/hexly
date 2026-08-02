@@ -49,16 +49,15 @@ export class WorldPage {
           labelKey: 'nav.dashboard',
           exact: true,
         },
-        // The pair that reads as a sentence (ADR-0080): what this World's authors made, beside what it
-        // draws on. `library` lands on the reference surface, which is the word it always leaned at.
+        // Entities beside Library (ADR-0080): what this World's authors made, beside what it draws on.
         {
           link: worldRoute(worldId, name),
           testid: 'nav-entities',
           icon: 'entities',
           labelKey: 'nav.entities',
         },
-        // The Library (ADR-0080): a read of what this World Mounts, so every reader of the World gets
-        // it — no rights gate. Empty where nothing is mounted, which is a thing to be told, not hidden.
+        // The Library (ADR-0080) is a read of what this World Mounts, so every reader gets it — no
+        // rights gate, and it is shown even where nothing is mounted.
         {
           link: worldLibraryRoute(worldId, name),
           testid: 'nav-library',

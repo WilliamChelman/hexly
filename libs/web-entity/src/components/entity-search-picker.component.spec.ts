@@ -31,7 +31,7 @@ const page = (items: EntitySummary[]): EntityPage => ({
   imports: [EntitySearchPickerComponent],
   template: `<app-entity-search-picker
     testid="pin-picker"
-    [worldId]="worldId"
+    [worldId]="worldId()"
     [query]="query()"
     (queryChange)="query.set($event)"
     (pick)="picked = $event"
@@ -39,7 +39,7 @@ const page = (items: EntitySummary[]): EntityPage => ({
 })
 class Host {
   readonly query = signal('');
-  worldId: string | undefined = undefined;
+  readonly worldId = signal<string | undefined>(undefined);
   picked: EntitySummary | null = null;
 }
 
@@ -80,7 +80,7 @@ describe('EntitySearchPicker', () => {
 
   it('scopes the search to the World when a worldId is given', () => {
     const fixture = TestBed.createComponent(Host);
-    fixture.componentInstance.worldId = 'w1';
+    fixture.componentInstance.worldId.set('w1');
     fixture.detectChanges();
 
     expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1' }));
@@ -145,6 +145,26 @@ describe('EntitySearchPicker', () => {
       byId(el, 'pin-picker-container-all')?.click();
       fixture.detectChanges();
       expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ container: undefined }));
+    });
+
+    /**
+     * A narrowing the World outlives would silently answer the next search from a Container the user
+     * cannot see chosen — a new World is a new set of Containers (ADR-0080).
+     */
+    it('drops the narrowing when the World changes', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.componentInstance.worldId.set('w1');
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      byId(el, 'pin-picker-container-shelf')?.click();
+      fixture.detectChanges();
+      expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ container: ['shelf'] }));
+
+      fixture.componentInstance.worldId.set('w2');
+      fixture.detectChanges();
+
+      expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ worldId: 'w2', container: undefined }));
     });
 
     it('offers no chip at all where the read spans one Container, there being nothing to narrow', () => {

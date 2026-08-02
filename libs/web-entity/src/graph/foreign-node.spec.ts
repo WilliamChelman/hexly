@@ -1,6 +1,6 @@
 import { EntityType, WorldGraphNode } from '@hexly/domain';
 import { describe, expect, it } from 'vitest';
-import { FOREIGN_ALPHA_SCALE, FOREIGN_MARK, nodeLabel } from './foreign-node';
+import { nodeLabel } from './foreign-node';
 import { GraphColors, pointColors } from './graph-colors';
 
 const NOTE = 'core.type.note' as EntityType;
@@ -25,16 +25,19 @@ const COLORS: GraphColors = {
 
 /** A **Foreign node** is drawn and marked (ADR-0080), never passed off as one of this World's own. */
 describe('the Foreign node mark', () => {
+  // The mark and the scale are spelled out rather than read back off the constants under test: derived
+  // expectations hold for an empty mark and a scale of 1, which is a Foreign node passed off as a home one.
   it('marks a foreign label and leaves a home one exactly as it was', () => {
     expect(nodeLabel(node('ealdred', 'Ealdred'))).toBe('Ealdred');
-    expect(nodeLabel(node('goblin', 'Marauder Goblin', 'w-shelf'))).toBe(`${FOREIGN_MARK} Marauder Goblin`);
+    expect(nodeLabel(node('goblin', 'Marauder Goblin', 'w-shelf'))).toBe('↗ Marauder Goblin');
   });
 
-  it('keeps the Entity Type’s hue and scales its alpha', () => {
+  it('keeps the Entity Type’s hue and dims the alpha', () => {
     const colors = pointColors([node('ealdred', 'Ealdred'), node('goblin', 'Marauder Goblin', 'w-shelf')], COLORS);
 
     expect([...colors.slice(0, 4)]).toEqual([0.25, 0.5, 0.75, 0.5]);
     expect([...colors.slice(4, 7)]).toEqual([0.25, 0.5, 0.75]);
-    expect(colors[7]).toBeCloseTo(0.5 * FOREIGN_ALPHA_SCALE);
+    expect(colors[7]).toBeCloseTo(0.225);
+    expect(colors[7]).toBeLessThan(colors[3]);
   });
 });

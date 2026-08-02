@@ -5,6 +5,7 @@ import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import {
   AuthClient,
+  blastRadius,
   ClientConfigStore,
   WorldStore,
   WorldsClient,
@@ -13,7 +14,7 @@ import {
   worldRoute,
   worldSettingsRoute,
 } from '@hexly/web-core';
-import { ImportSummary, InboundLinkCount } from '@hexly/domain';
+import { ImportSummary } from '@hexly/domain';
 import { ENTITY_TYPES } from '@hexly/web-entity';
 import {
   ButtonComponent,
@@ -365,13 +366,13 @@ import {
              point in with, and how many they come from. A second line rather than a second dialog —
              the entity count is what goes, this is what breaks. -->
         <p class="text-sm text-ink-muted m-0" data-testid="delete-links">
-          @if (deleteLinks(); as blast) {
-            @if (blast.links === 0) {
+          @if (blast.count(); as count) {
+            @if (count.links === 0) {
               {{ 'worldIndex.deleteLinksNone' | transloco }}
             } @else {
-              {{ 'worldIndex.deleteLinks' | transloco: { links: blast.links, worlds: blast.worlds } }}
+              {{ 'worldIndex.deleteLinks' | transloco: { links: count.links, worlds: count.worlds } }}
             }
-          } @else if (deleteLinksFailed()) {
+          } @else if (blast.failed()) {
             {{ 'worldIndex.deleteLinksUnknown' | transloco }}
           } @else {
             {{ 'worldIndex.deleteLinksCounting' | transloco }}
@@ -603,10 +604,8 @@ export class WorldsPage {
     name: string;
   } | null>(null);
   protected readonly deleteCount = signal<number | null>(null);
-  /** The open confirm's blast radius (ADR-0080, #414); null while it is still being read. */
-  protected readonly deleteLinks = signal<InboundLinkCount | null>(null);
-  /** Whether that read failed — told apart from "still loading", so neither reads as zero. */
-  protected readonly deleteLinksFailed = signal(false);
+  /** What the open confirm's delete would break beyond the World (ADR-0080, #414). */
+  protected readonly blast = blastRadius();
   protected readonly confirmText = signal('');
   protected readonly canConfirmDelete = computed(() => this.confirmText() === this.pendingDelete()?.name);
 
@@ -656,8 +655,6 @@ export class WorldsPage {
   protected askDelete(id: string, name: string): void {
     this.pendingDelete.set({ id, name });
     this.deleteCount.set(null);
-    this.deleteLinks.set(null);
-    this.deleteLinksFailed.set(false);
     this.confirmText.set('');
     this.worldsClient.get(id).subscribe({
       next: (world) => this.deleteCount.set(world.entityCount),
@@ -666,12 +663,7 @@ export class WorldsPage {
         this.toaster.show(this.transloco.translate('worldIndex.deleteError'), 'error');
       },
     });
-    this.worldsClient.inboundLinks(id).subscribe({
-      next: (blast) => this.deleteLinks.set(blast),
-      // A count that would not load degrades to a confirm without one, never to a refusal: a delete
-      // no configuration may veto is the whole posture (ADR-0080).
-      error: () => this.deleteLinksFailed.set(true),
-    });
+    this.blast.read(this.worldsClient.inboundLinks(id));
   }
 
   protected cancelDelete(): void {

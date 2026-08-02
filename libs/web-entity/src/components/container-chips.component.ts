@@ -46,7 +46,7 @@ import { ButtonComponent } from '@hexly/web-ui';
 })
 export class ContainerChipsComponent {
   /** Prefix for the chip `data-testid`s, per embedding surface — the picker's own. */
-  readonly testid = input('entity-picker');
+  readonly testid = input.required<string>();
   /** The Container facet's live values, off the same read the options come from. */
   readonly containers = input<readonly FacetCount[]>([]);
   /** The Container narrowed to, if any — one pack, or one Shelf; `undefined` is "All". */

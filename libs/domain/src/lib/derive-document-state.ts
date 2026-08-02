@@ -125,7 +125,6 @@ export function deriveDocumentState(
       addEdge({
         targetKind: 'entity',
         targetId: value.entityId,
-        targetContainerId: null,
         descriptor: null,
         decor: decorFieldIds.has(key),
       });

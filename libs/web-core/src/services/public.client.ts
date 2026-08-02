@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, defer, finalize } from 'rxjs';
-import { EntityDetail, EntityNudge, PublicWorldView, StaleNudge } from '@hexly/domain';
+import { CompendiumSummary, EntityDetail, EntityNudge, PublicWorldView, StaleNudge } from '@hexly/domain';
 import { NudgeBusClient } from './nudge-bus.client';
 import { WORLD_NUDGE_DEBOUNCE_MS } from './worlds.client';
 import { ENTITY_NUDGE_DEBOUNCE_MS } from './entities.client';
@@ -35,6 +35,15 @@ export class PublicClient {
   /** One `shared` Entity's read-only body, scoped to a World Public Link's World. */
   worldEntity(token: string, id: string): Observable<EntityDetail> {
     return this.http.get<EntityDetail>(`/api/public/worlds/${token}/entities/${id}`);
+  }
+
+  /**
+   * One mounted **Compendium**'s terms, scoped to a World Public Link's **Mounts** (ADR-0080, #410):
+   * the token is the account-less reader's whole standing, so a pack's terms never sit behind a wall
+   * its content does not. A Container this token's World does not Mount is a 404.
+   */
+  worldCompendium(token: string, id: string): Observable<CompendiumSummary> {
+    return this.http.get<CompendiumSummary>(`/api/public/worlds/${token}/compendiums/${id}`);
   }
 
   /**

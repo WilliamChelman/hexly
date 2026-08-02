@@ -13,7 +13,6 @@ import {
   InboundLinkCount,
   MemberRole,
   Mount,
-  MountCandidate,
   PublicLink,
   UpdateUserDefinedTypeRequest,
   UpdateWorldFieldRequest,
@@ -240,8 +239,8 @@ export class WorldsClient {
   }
 
   /** The Containers the caller may mount here: every installed Compendium plus every World they Own. */
-  mountCandidates(id: string): Observable<MountCandidate[]> {
-    return this.http.get<MountCandidate[]>(`/api/worlds/${id}/mount-candidates`);
+  mountCandidates(id: string): Observable<Mount[]> {
+    return this.http.get<Mount[]>(`/api/worlds/${id}/mount-candidates`);
   }
 
   /** Declare one more Container this World draws from; returns the updated list. Idempotent (200). */

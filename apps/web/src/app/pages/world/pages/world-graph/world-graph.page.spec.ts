@@ -80,6 +80,27 @@ describe('WorldGraphPage', () => {
     edges: [{ source: 'ealdred', target: 'goblin', descriptor: 'hunts', decor: false }],
   };
 
+  /**
+   * A **Foreign node** is drawn, never counted (#406, ADR-0080): mounting a two-thousand-entry pack
+   * must not restate how big this campaign is.
+   */
+  it('counts this World’s own Entities and leaves the Foreign ones out', () => {
+    const { fixture } = open({
+      nodes: [
+        { id: 'ealdred', name: 'Ealdred', types: [NOTE] },
+        { id: 'moorwatch', name: 'Moorwatch', types: [NOTE] },
+        { id: 'goblin', name: 'Marauder Goblin', types: [NOTE], foreignContainerId: 'w-shelf' },
+      ],
+      edges: [
+        { source: 'ealdred', target: 'moorwatch', descriptor: null, decor: false },
+        { source: 'ealdred', target: 'goblin', descriptor: 'hunts', decor: false },
+      ],
+    });
+
+    const counts = (fixture.nativeElement as HTMLElement).querySelector('[data-testid=graph-counts]');
+    expect(counts?.textContent?.trim()).toBe('2 entities · 2 links');
+  });
+
   it('opens the World’s own Entity under the World on screen', () => {
     open(LINKED_TO_A_SHELF).click('ealdred');
 
