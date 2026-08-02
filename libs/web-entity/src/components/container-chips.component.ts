@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, model } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, model } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { FacetCount } from '@hexly/domain';
 import { ButtonComponent } from '@hexly/web-ui';
@@ -9,13 +9,19 @@ import { ButtonComponent } from '@hexly/web-ui';
  * to put the category in. Renders nothing below two Containers, the server's own by-presence rule, so a
  * World that Mounts nothing shows no chip and every picker looks exactly as it did. The consumer owns
  * both the counts and the options, so these cannot annotate a list they disagree with.
+ *
+ * The one thing they do add is the narrowing itself: counts are grouped over the *filtered* result set,
+ * so refining a search until only one Container still matches drops the chosen one out of the facet —
+ * and the strip must not vanish with it, or the read stays narrowed to a Container with no chip to see
+ * it by and no "All" to leave it by. A chosen Container therefore always keeps a chip, at the count the
+ * list actually shows.
  */
 @Component({
   selector: 'app-container-chips',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ButtonComponent, TranslocoPipe],
   template: `
-    @if (containers().length > 1) {
+    @if (chips().length > 1 || selected() !== undefined) {
       <div class="flex flex-wrap gap-1" [attr.data-testid]="testid() + '-containers'">
         <button
           type="button"
@@ -27,7 +33,7 @@ import { ButtonComponent } from '@hexly/web-ui';
         >
           {{ 'collab.containerChips.all' | transloco }}
         </button>
-        @for (c of containers(); track c.value) {
+        @for (c of chips(); track c.value) {
           <button
             type="button"
             appButton
@@ -51,4 +57,16 @@ export class ContainerChipsComponent {
   readonly containers = input<readonly FacetCount[]>([]);
   /** The Container narrowed to, if any — one pack, or one Shelf; `undefined` is "All". */
   readonly selected = model<string | undefined>(undefined);
+
+  /** Names seen for a Container, so a narrowing the facet has stopped counting still names itself. */
+  private readonly names = new Map<string, string>();
+
+  /** The facet's own values, plus the narrowing in force when the facet no longer counts it. */
+  protected readonly chips = computed<readonly FacetCount[]>(() => {
+    const counted = this.containers();
+    for (const c of counted) if (c.label) this.names.set(c.value, c.label);
+    const picked = this.selected();
+    if (picked === undefined || counted.some((c) => c.value === picked)) return counted;
+    return [...counted, { value: picked, label: this.names.get(picked), count: 0 }];
+  });
 }

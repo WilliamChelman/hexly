@@ -108,6 +108,14 @@ export const appRoutes: Route[] = [
         title: 'library.tabTitle',
       },
       {
+        // ADR-0079's Compendium browse generalised into the Library above (ADR-0080), so the path it
+        // was reached by stays a door: a bookmark or a shared link lands where the surface went rather
+        // than on the error page.
+        path: 'compendium',
+        pathMatch: 'full',
+        redirectTo: 'library',
+      },
+      {
         // The Compendium page (ADR-0061, #402): one installed pack's own terms, reached from the
         // Library that credits it and readable by anyone signed in, like the entries (ADR-0078).
         path: 'compendium/:compendiumId',

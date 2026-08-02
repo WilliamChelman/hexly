@@ -294,17 +294,29 @@ describe('A Mount cascades read', () => {
 
   it('tells a reader nothing about the mounted World it is not a member of', async () => {
     const bob = await signIn('bob@hexly.test');
+    // The Owner's Dashboard pins both her paintings, one of them the `private` sketch.
+    await ada()
+      .patch(`/worlds/${shelf}`)
+      .send({ pinnedEntityIds: [sunset, sketch] })
+      .expect(200);
     await mount(campaign, shelf);
 
-    // The roster and the Container's own count are membership-facing: Bob reads the shelf, so he gets
-    // its identity, his own Rights, and a count of what he can actually open — never Ada's user id, and
-    // never a tally that includes her `private` sketch.
+    // The roster, the Container's own count and its pin set are membership-facing: Bob reads the shelf,
+    // so he gets its identity, his own Rights, a count of what he can actually open and pins he can
+    // actually follow — never Ada's user id, and never her `private` sketch by tally or by id.
     const shelfDetail = (await bob.get(`/worlds/${shelf}`).expect(200)).body as WorldDetail;
-    expect(shelfDetail).toMatchObject({ name: 'The Art Shelf', owners: [], rights: ['read'], entityCount: 1 });
-    // Its Owner sees both, because she is in it.
+    expect(shelfDetail).toMatchObject({
+      name: 'The Art Shelf',
+      owners: [],
+      rights: ['read'],
+      entityCount: 1,
+      pinnedEntityIds: [sunset],
+    });
+    // Its Owner sees all three, because she is in it — and in the order she curated.
     expect((await ada().get(`/worlds/${shelf}`).expect(200)).body).toMatchObject({
       owners: [adaId],
       entityCount: 2,
+      pinnedEntityIds: [sunset, sketch],
     });
   });
 

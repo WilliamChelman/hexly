@@ -171,6 +171,26 @@ describe('WorldDashboard', () => {
     expect(activeWorldSet).toHaveBeenCalledWith(worldDetail(['p1', 'e1']));
   });
 
+  /**
+   * A pin is stored verbatim and resolved by an unscoped `ids` read, so it is the World's own content
+   * rather than a link out of it — none of the surfaces ADR-0080 widens. A mounted Shelf's Entity must
+   * not become pinnable to a World's Dashboard.
+   */
+  it('keeps the pin picker same-World, offering nothing this World merely Mounts', () => {
+    world.set(worldDetail(['p1']));
+    const el = render({
+      recents: [summary('e1', 'New pin')],
+      pinResolve: [summary('p1', 'Riverbend')],
+    });
+
+    ($(el, '[data-testid=add-pin]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1', container: ['w1'] }));
+    // The Container facet is how a widened read annotates itself; a sealed one has nothing to narrow.
+    expect($(el, '[data-testid=pin-picker-containers]')).toBeNull();
+  });
+
   it('does not re-pin an Entity that is already pinned', () => {
     world.set(worldDetail(['p1']));
     const el = render({

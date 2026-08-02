@@ -17,7 +17,8 @@ import { containerFacet, linkTargetRead } from './link-target-read';
  * read** here rather than once per consumer (ADR-0079), which covers the **Entity Link** Field picker,
  * the Board **Embed** picker and a broken link's relink popover together. Naming a {@link worldId} is
  * what widens it, too: the server answers with that World's Entities *and* the ones in the Containers
- * it **Mounts**, the World's own ranked first (ADR-0080).
+ * it **Mounts**, the World's own ranked first (ADR-0080) — for the surfaces that ADR names, which is
+ * what {@link includeMounts} lets a consumer outside them say.
  *
  * ponytail: no debounce — small owner lists, fine until list sizes force it.
  */
@@ -89,6 +90,13 @@ export class EntitySearchPickerComponent {
   readonly worldId = input<string | undefined>(undefined);
   /** Constrain results to these Entity Types — e.g. an Entity-Link Field's target-type constraint. */
   readonly types = input<readonly string[] | undefined>(undefined);
+  /**
+   * Whether this picker may offer what the World **Mounts**. On by default, those being the surfaces
+   * ADR-0080 widens — the `@` picker, the Entity Link Field picker, the Board Embed picker. A consumer
+   * whose pick is stored as the World's own rather than as a link — the Dashboard's Pinned Entities —
+   * declares itself out, and gets no Container chips either, there being one Container to narrow to.
+   */
+  readonly includeMounts = input(true);
 
   /** Every raw keystroke; the consumer commits it back to {@link query}. */
   readonly queryChange = output<string>();
@@ -108,9 +116,10 @@ export class EntitySearchPickerComponent {
         includeHidden: true,
       };
     },
+    () => this.includeMounts(),
   );
   /** The **Container** facet's live values — this World and the ones it Mounts that still hold a match. */
-  protected readonly containers = containerFacet(this.targets.params);
+  protected readonly containers = containerFacet(this.targets.params, () => this.includeMounts());
 
   constructor() {
     // Search server-side as the query changes (ADR-0025). onCleanup cancels a superseded

@@ -668,6 +668,58 @@ describe('Vault export endpoint', () => {
       return { shelfId, worldId, shelfImage };
     }
 
+    /**
+     * A Board in the campaign whose **Image** element displays the shelf's art (ADR-0080, #416). The other
+     * half of what a Mount lends its documents, and the half no `toMarkdown` ever sees: the surface projects
+     * to **frontmatter**, so its capability URL rides the YAML rather than a prose src.
+     */
+    function shelfArtOnBoard(worldId: string, shelfImage: string): void {
+      const entities = app.get(EntitiesService);
+      const board = entities.create(adaId, { types: ['core.type.board'], name: 'The Table', worldId, tags: [] });
+      entities.save(adaId, board.id, {
+        version: board.version,
+        tags: [],
+        descriptors: [],
+        document: {
+          'core.field.content': tiptapContent({ type: 'doc', content: [] }),
+          'core.field.surface': {
+            elements: [
+              {
+                id: 'element-1',
+                kind: 'image',
+                assetUrl: shelfImage,
+                position: { x: 0, y: 0 },
+                size: { width: 320, height: 240 },
+                z: 0,
+                lockRatio: false,
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    /** The `assetUrl` of the one Image element on a Board surface value, however that value was read. */
+    function boardImageUrl(surface: unknown): string {
+      const elements = (surface as { elements: { assetUrl?: string }[] }).elements;
+      return String(elements[0].assetUrl);
+    }
+
+    it('repoints a Board Image at the exported copy, though its surface rides the frontmatter (#416)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const { worldId, shelfId, shelfImage } = await mountedSetup(ada);
+      shelfArtOnBoard(worldId, shelfImage);
+
+      const { files } = await exportZip(ada, worldId);
+
+      // The bytes are flattened once and BOTH references point at that copy — a frontmatter-projected
+      // surface is a document too, so leaving its URL abroad would ship bytes nothing references.
+      expect(files['assets/dragon.png']).toEqual(DRAGON);
+      const table = text(files, 'The Table.md');
+      expect(boardImageUrl(frontmatter(table)['core.field.surface'])).toBe('assets/dragon.png');
+      expect(table).not.toContain(`/assets/${shelfId}`);
+    });
+
     it("writes the Mounted Container's image bytes into the archive and repoints the note at them", async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const { worldId, shelfId } = await mountedSetup(ada);
@@ -827,6 +879,44 @@ describe('Vault export endpoint', () => {
       // … and the World that still draws on the shelf still says so. An export must never move the
       // number a destructive confirm is read from: the picture still renders through the original edge,
       // so a shelf reading zero would tell its owner the delete was safe when it is not (#414).
+      expect((await ada.get(`/worlds/${shelfId}/inbound-links`).expect(200)).body).toEqual(before);
+    });
+
+    it('holds that invariant for a Board too: the surface copies its art, and the Container never moves', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const { worldId, shelfId, shelfImage } = await mountedSetup(ada);
+      shelfArtOnBoard(worldId, shelfImage);
+
+      // The note's image and Entity Link, plus the Board's Image — three links from the one World.
+      const before = (await ada.get(`/worlds/${shelfId}/inbound-links`).expect(200)).body;
+      expect(before).toEqual({ links: 3, worlds: 1 });
+
+      const { res } = await exportZip(ada, worldId);
+      const reworldId = (
+        await ada.post('/worlds/import').attach('file', Buffer.from(res.body), 'Aldermoor.zip').expect(201)
+      ).body.worldId;
+
+      // The reimported Board draws on the archive's own copy, scoped to the World it landed in …
+      const entities = app.get(EntitiesService);
+      const reboard = entities.listByWorld(adaId, reworldId).find((e) => e.name === 'The Table');
+      const reimportedUrl = boardImageUrl(reboard?.document['core.field.surface']);
+      expect(reimportedUrl).toMatch(new RegExp(`^/assets/${reworldId}/[0-9a-f]{64}\\.png$`));
+      expect(reimportedUrl).not.toContain(shelfId);
+      expect(new Uint8Array((await request(app.getHttpServer()).get(reimportedUrl).expect(200)).body)).toEqual(DRAGON);
+
+      // … the flattened bytes are actually referenced, not an orphan Asset: every `asset` edge the new
+      // World harvests names the new World's own Container.
+      const assetEdges = db
+        .select()
+        .from(entityEdges)
+        .where(eq(entityEdges.containerId, reworldId))
+        .all()
+        .filter((edge) => edge.targetKind === 'asset');
+      expect(assetEdges).not.toHaveLength(0);
+      expect(assetEdges.map((edge) => edge.targetContainerId)).toEqual(assetEdges.map(() => reworldId));
+
+      // … and the shelf's delete confirm still reads exactly what it read: a round trip copies, never
+      // repoints, whichever slot the reference rode in (#414, ADR-0080).
       expect((await ada.get(`/worlds/${shelfId}/inbound-links`).expect(200)).body).toEqual(before);
     });
   });

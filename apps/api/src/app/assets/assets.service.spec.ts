@@ -115,6 +115,16 @@ describe('AssetsService', () => {
     it('still 404s a thumbnail request whose source Asset does not exist', () => {
       expect(assets.read('world-1', `${'a'.repeat(64)}.thumb.webp`)).toBeNull();
     });
+
+    it('never falls back to a non-image original, whose thumbnail address would else serve it whole', () => {
+      // A PDF gets no thumbnail (nothing extracts one), and the byte route is guard-less by design
+      // (ADR-0034): a fallback here would hand the whole document out at an address a list offers every
+      // reader, undoing the Contributor gate on the full-resolution URL beside it (ADR-0080).
+      const doc = assets.store('world-1', 'Rules.pdf', PNG_A);
+      expect(assets.read('world-1', `${doc.hash}.thumb.webp`)).toBeNull();
+      // The original's own address is untouched — the withholding is the thumbnail route's alone.
+      expect(assets.read('world-1', `${doc.hash}.pdf`)?.mime).toBe('application/pdf');
+    });
   });
 
   describe('exportAssets (the vault export source, ADR-0033/ADR-0065)', () => {

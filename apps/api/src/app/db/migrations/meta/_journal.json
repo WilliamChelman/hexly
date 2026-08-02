@@ -281,6 +281,13 @@
       "when": 1785655019949,
       "tag": "0039_inbound_edges_by_target_container",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1785668757908,
+      "tag": "0040_legacy_asset_edges_name_their_container",
+      "breakpoints": true
     }
   ]
 }

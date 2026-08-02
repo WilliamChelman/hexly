@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { EntityFacets, EntityReferences, EntitySummary, FacetCount } from '@hexly/domain';
+import { ENTITY_LIST_DEFAULT_LIMIT, EntityFacets, EntityReferences, EntitySummary, FacetCount } from '@hexly/domain';
 import { tiptapContent } from '@hexly/plugin-content';
 import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthModule } from '../auth/auth.module';
@@ -22,6 +22,8 @@ import { WorldsModule } from '../worlds/worlds.module';
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 /** A second set of bytes, for an upload that must not dedup to the first (ADR-0034). */
 const OTHER_PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 4, 5, 6]);
+/** A non-image Asset's bytes — nothing mints a thumbnail for these, which is the point. */
+const PDF = Buffer.from('%PDF-1.4 a rules document');
 
 /**
  * Every link picker offers what the World **Mounts** (#411, #416, ADR-0080). The `@` mention picker, the
@@ -333,14 +335,82 @@ describe('Every link picker offers what the World Mounts', () => {
 
   it('leaves a Viewer the Asset Browser it always had, minus the full-resolution URL', async () => {
     const bob = await signIn('bob@hexly.test');
+    // A non-image Asset beside the painting: the one an unguarded thumbnail fallback used to serve whole.
+    const rules = await upload(campaign, 'Rules.pdf', PDF);
 
     // The **Asset Browser** is a container-scoped browse, not an editing surface: a Viewer lists what
     // this World holds and draws each tile, exactly as before. What it no longer hands out is the
     // full-resolution capability URL, which rides the same standing the picker's offer does (ADR-0034).
     const listed = await summaries(bob, `worldId=${campaign}&type=core.type.asset&thumbnails=1`);
-    expect(listed.map((a) => a.id)).toEqual([ownArt]);
-    expect(listed[0].thumbnailUrl).toBeDefined();
-    expect(listed[0].assetUrl).toBeUndefined();
+    expect(listed.map((a) => a.id).sort()).toEqual([ownArt, rules].sort());
+    const painting = listed.find((a) => a.id === ownArt);
+    const pdf = listed.find((a) => a.id === rules);
+    expect(painting?.thumbnailUrl).toBeDefined();
+    expect(painting?.assetUrl).toBeUndefined();
+    expect(pdf?.assetUrl).toBeUndefined();
+    // A non-image carries no tile URL either: its thumbnail is one nothing ever minted, so the tile
+    // degrades to the type icon rather than to a broken picture (ADR-0065).
+    expect(pdf?.thumbnailUrl).toBeUndefined();
+
+    // And withholding the URL withholds the *bytes*, which is the whole of why it is withheld. The
+    // Contributor still has the address, and it still serves — the byte route is guard-less by design
+    // (ADR-0034) — but the thumbnail address the Viewer's own tile would have drawn from reaches
+    // nothing, where it used to hand back the document at full resolution.
+    const url = (await summaries(ada, `worldId=${campaign}&type=core.type.asset&thumbnails=1`)).find(
+      (a) => a.id === rules,
+    )?.assetUrl;
+    expect(url).toMatch(new RegExp(`^/assets/${campaign}/[0-9a-f]{64}\\.pdf$`));
+    await request(app.getHttpServer())
+      .get(url ?? '')
+      .expect(200);
+    await request(app.getHttpServer())
+      .get(`${(url ?? '').replace(/\.pdf$/, '')}.thumb.webp`)
+      .expect(404);
+  });
+
+  it('widens only through a Container the caller has standing in, never someone else’s Mount list', async () => {
+    await seed('cara@hexly.test', 'Cara');
+    const cara = await signIn('cara@hexly.test');
+    await mount(campaign, pack);
+
+    // A **Compendium** entry is readable to every signed-in caller (ADR-0079), so the widening is the
+    // only thing between Cara and the campaign's Mount list: naming someone else's World as the scope
+    // must not tell her which packs it draws on — that is exactly what `GET /worlds/:id/mounts` refuses
+    // to name to a caller who is not a member, the second hop the cascade withholds (ADR-0080, #412).
+    expect(await offered(cara, `worldId=${campaign}&q=goblin`)).toEqual([]);
+    expect(await containerFacet(cara, `worldId=${campaign}&q=goblin`)).toBeUndefined();
+
+    // Nor does reaching a Container *through* the cascade widen a read scoped to it: Bob reads the shelf
+    // only because the campaign Mounts it, and what the shelf itself draws on is one hop further than he
+    // goes — the read agreeing with the route that answers the same question.
+    const bob = await signIn('bob@hexly.test');
+    await mount(campaign, shelf);
+    await mount(shelf, pack);
+    expect(await offered(bob, `worldId=${shelf}&q=goblin`)).toEqual(['Goblin King']);
+    await bob.get(`/worlds/${shelf}/mounts`).expect(403);
+    // Ada is a member of both, so hers is the widened read throughout.
+    expect(await offered(ada, `worldId=${shelf}&q=goblin`)).toEqual(['Goblin King', 'Goblin Warrior']);
+  });
+
+  it('stops counting a mounted Container the page has no room for, rather than a chip beside no rows', async () => {
+    await mount(campaign, shelf);
+    // With room to spare the rail names both, and the list beside it does hold the shelf's rows.
+    expect((await containerFacet(ada, `worldId=${campaign}`))?.map((c) => c.value)).toEqual([campaign, shelf]);
+
+    // A World whose own Entities fill a page on their own. Mounted content sorts after every one of
+    // them, so none of it is on the page — and the rail says so by not counting it, rather than
+    // advertising a Container the list beside it has nothing from (ADR-0080).
+    seedNotes(campaign, ENTITY_LIST_DEFAULT_LIMIT);
+    const page = await summaries(ada, `worldId=${campaign}&read=link-target`);
+    expect(page).toHaveLength(ENTITY_LIST_DEFAULT_LIMIT);
+    expect(page.every((e) => e.worldId === campaign)).toBe(true);
+    expect((await containerFacet(ada, `worldId=${campaign}`))?.map((c) => c.value)).toEqual([campaign]);
+
+    // Narrowing the search is how a user reaches the shelf again — no picker pages, so the ceiling is
+    // the whole of what it can show: fewer of the World's own match, the page has room, and the chip
+    // comes back with the rows it counts.
+    expect((await containerFacet(ada, `worldId=${campaign}&q=goblin`))?.map((c) => c.value)).toEqual([campaign, shelf]);
+    expect(await offered(ada, `worldId=${campaign}&q=goblin`)).toEqual(['Goblin King', 'Goblin King']);
   });
 
   it('offers an extension-less upload’s tile, its extension being a value rather than an absence', async () => {
@@ -489,6 +559,20 @@ describe('Every link picker offers what the World Mounts', () => {
 
   async function summaries(agent: Agent, query: string): Promise<EntitySummary[]> {
     return (await agent.get(`/entities?${query}`).expect(200)).body.items;
+  }
+
+  /** A page's worth of the World's own, landed the system way — no page of HTTP to fill a page of rows. */
+  function seedNotes(containerId: string, howMany: number): void {
+    for (let i = 0; i < howMany; i++)
+      app.get(EntitiesService).importEntity({
+        ownerId: adaId,
+        containerId,
+        id: randomUUID(),
+        name: `Field Note ${i}`,
+        types: ['core.type.note'],
+        tags: [],
+        document: {},
+      });
   }
 
   /** A navigation read's answer, by name — sorted, since a navigation read's order is not this file's subject. */

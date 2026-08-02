@@ -84,6 +84,20 @@ describe('appRoutes structure (ADR-0028)', () => {
     expect((settingsPage as { name: string }).name).toMatch(/WorldSettingsPage$/);
   }, 20_000);
 
+  /**
+   * ADR-0079's Compendium browse became the Library (ADR-0080, #412). `compendium/:compendiumId` is a
+   * two-segment full match, so a bare `/w/:worldId/compendium` matched nothing and fell to the wildcard.
+   */
+  it('keeps the old Compendium browse path a door into the Library it became', () => {
+    const parent = appRoutes.find((r) => r.path === 'w/:worldId');
+    const compendium = parent?.children?.find((c) => c.path === 'compendium');
+
+    expect(compendium?.redirectTo).toBe('library');
+    expect(compendium?.pathMatch).toBe('full');
+    // Still its own route, so a pack page is not swallowed by the redirect.
+    expect(parent?.children?.find((c) => c.path === 'compendium/:compendiumId')?.loadComponent).toBeDefined();
+  });
+
   it('redirects the root to the World Index and renders the error page for unmatched URLs', () => {
     const root = appRoutes.find((r) => r.path === '');
     expect(root?.redirectTo).toBe('worlds');

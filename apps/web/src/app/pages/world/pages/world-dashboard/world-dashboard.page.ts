@@ -159,8 +159,11 @@ const MAPS_LIMIT = 8;
 
             @if (pinPickerOpen()) {
               <div class="mb-4 max-w-sm">
+                <!-- A pin is stored verbatim and resolved by an id read, so it is the World's own
+                     content, not a link out of it: none of the surfaces ADR-0080 widens. -->
                 <app-entity-search-picker
                   testid="pin-picker"
+                  [includeMounts]="false"
                   [worldId]="activeWorldId() ?? undefined"
                   [query]="pinQuery()"
                   (queryChange)="pinQuery.set($event)"
@@ -266,7 +269,7 @@ export class WorldDashboardPage {
   private readonly types = inject(TypeRegistry);
 
   protected readonly worldName = this.activeWorld.name;
-  /** Scopes the pin picker so pins stay same-World. */
+  /** Scopes the pin picker so pins stay same-World — a Mount widens what a World points at, not what it pins. */
   protected readonly activeWorldId = this.activeWorld.worldId;
   protected readonly recents = signal<EntitySummary[]>([]);
   protected readonly maps = signal<EntitySummary[]>([]);

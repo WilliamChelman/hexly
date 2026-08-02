@@ -6,6 +6,7 @@ import {
   assetUrl,
   CreateEntityRequest,
   emptyEntityDocument,
+  ENTITY_LIST_DEFAULT_LIMIT,
   entityDocumentSchema,
   EntityDetail,
   EntityDocument,
@@ -65,6 +66,7 @@ import {
   entityLinks,
   worlds,
 } from '../db/schema';
+import { isImageExt } from '../assets/assets.service';
 import { HEXLY_CONFIG, HexlyConfig } from '../config';
 import { inACompendium } from '../worlds/compendiums';
 import { AssetBytesRegistry } from './asset-bytes-registry';
@@ -225,7 +227,7 @@ export class EntitiesService {
     // A text query becomes an FTS5 MATCH ranked by bm25; absent (or
     // all-punctuation) keeps the last-edited order.
     const match = opts.q ? toFtsMatch(opts.q) : null;
-    opts = this.mountScope({ ...opts, excludedTypes: this.resolveExcludedTypes(opts) });
+    opts = this.mountScope(readerId, { ...opts, excludedTypes: this.resolveExcludedTypes(opts) });
     // The Contributor standing an asset enumeration rides (ADR-0034, ADR-0080), resolved once and only
     // where it can bear: it withholds art from a picker's offer and the capability URL from a summary.
     const mayEnumerateAssets =
@@ -358,7 +360,7 @@ export class EntitiesService {
     const { filter } = entityAccess(this.db, readerId);
     // The same widening `list` applies (ADR-0080), resolved from the same signals: a rail must never
     // count what its list excludes, nor exclude what its list offers.
-    opts = this.mountScope(opts);
+    opts = this.mountScope(readerId, opts);
     // The asset gate `list` applies rides here too (ADR-0080), for the same reason: a rail must never
     // count art the list it annotates withholds.
     if (opts.read === 'link-target' && !this.mayEnumerateAssets(readerId, opts))
@@ -392,6 +394,9 @@ export class EntitiesService {
    * Ordered by the scope's own order rather than by name or count: the **Library** names its
    * Containers in the Owner's **Mount** order (ADR-0080), and reading the request's order back is what
    * carries that here without this count knowing a Mount exists.
+   *
+   * A widened read's Mounts then pass {@link mountedWithinReach}, which is where this category answers
+   * for the one sort key that can bury a whole Container.
    */
   private countContainers(opts: FacetOptions, filter: SQL): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
@@ -412,7 +417,50 @@ export class EntitiesService {
     // every row has a distinct index in it. The widened form keeps the World's own Containers first,
     // then Mounts in the Owner's order (ADR-0080).
     const scope = scopedContainerIds(opts);
-    return rows.sort((a, b) => scope.indexOf(a.value) - scope.indexOf(b.value));
+    return this.mountedWithinReach(
+      opts,
+      filter,
+      rows.sort((a, b) => scope.indexOf(a.value) - scope.indexOf(b.value)),
+    );
+  }
+
+  /**
+   * Drop the **mounted** Containers from the Container facet once the World's own rows fill a page
+   * (ADR-0080). {@link mountedLast} is the outermost sort key, so mounted rows only ever begin where the
+   * World's own run out — past that point a mounted chip would stand on the rail beside no rows at all,
+   * which is the one thing every facet here is built not to do.
+   *
+   * The consequence is chosen, not worked around: no picker pages, so a World whose own Entities fill a
+   * page puts what it Mounts out of the picker's reach entirely. **Narrowing the search is how a user
+   * gets there** — fewer of the World's own match, the page has room again, and the chip returns with
+   * the rows. The rail is therefore not a route to mounted content, only an honest report of what is on
+   * the page beside it.
+   *
+   * Counts are never trimmed, only dropped: a chip that stays still names exactly what narrowing to it
+   * yields, which is what every other category here promises. And the ceiling is the *default* page
+   * (ADR-0018), a facet read carrying no page of its own — so a picker asking for a larger one gets a
+   * rail that is merely cautious, never one that over-promises.
+   */
+  private mountedWithinReach(opts: FacetOptions, filter: SQL, counted: FacetCount[]): FacetCount[] {
+    const mounted = new Set(opts.mountedContainerIds ?? []);
+    if (mounted.size === 0) return counted;
+    const own = this.countMatching({ ...opts, mountedContainerIds: undefined }, filter);
+    return own < ENTITY_LIST_DEFAULT_LIMIT ? counted : counted.filter((c) => !mounted.has(c.value));
+  }
+
+  /**
+   * How many Entities `opts` reaches, off the same predicates the list reads with — through
+   * {@link facetWhere}, so a total can never disagree with the page it is measuring.
+   */
+  private countMatching(opts: FacetOptions, filter: SQL): number {
+    const match = opts.q ? toFtsMatch(opts.q) : null;
+    return (
+      this.db
+        .select({ value: sql<number>`count(*)` })
+        .from(entities)
+        .where(facetWhere(opts, match, filter))
+        .get()?.value ?? 0
+    );
   }
 
   /**
@@ -456,16 +504,23 @@ export class EntitiesService {
    * The Own-only rule rides {@link stillOwned}, the ACL cascade's own predicate: a Mount whose declarer
    * no longer Owns what she mounted confers nothing (ADR-0080), and pointing must withdraw with reading
    * rather than a picker offering targets from a Container the World's Owners have lost.
+   *
+   * The *mounting* side is gated on membership rather than reachability, which is `WorldMountsService`'s
+   * own rule for naming a World's Mounts: the cascade is one hop, so widening a read scoped to someone
+   * else's Container would disclose the second hop it withholds (ADR-0080, #412).
    */
-  private mountScope<T extends FacetOptions>(opts: T): T {
+  private mountScope<T extends FacetOptions>(readerId: string, opts: T): T {
     if (opts.read !== 'link-target' || !opts.containerIds?.length) return opts;
     const scope = new Set(opts.containerIds);
+    const access = worldAccess(this.db, readerId);
+    const standing = [...scope].filter((id) => access.decideMeta(id)?.isMember);
+    if (standing.length === 0) return opts;
     // Ordered by position, so the widened scope carries the Owner's Mount order (ADR-0080) — the
     // Container facet reads it back, as the Library does.
     const rows = this.db
       .select({ id: containerMounts.mountedContainerId })
       .from(containerMounts)
-      .where(and(inArray(containerMounts.containerId, [...scope]), stillOwned()))
+      .where(and(inArray(containerMounts.containerId, standing), stillOwned()))
       .orderBy(containerMounts.position)
       .all();
     // A Set both dedups two Worlds mounting one Container and drops a scope member back out of it.
@@ -1567,10 +1622,17 @@ interface ThumbnailRow {
  * Field's designated image beats the Entity's own bytes; neither resolves → `undefined`. The field
  * target's URL keys off *its* Container (an entity-link stays in-Container, so it equals the subject's,
  * but the resolved index is authoritative); own bytes key off the subject's Container.
+ *
+ * Own bytes emit a URL only for a *picture* ({@link isImageExt}), the same test the thumbnail route
+ * answers with (ADR-0034, ADR-0065): extraction dispatches on the mime the extension pins, so a
+ * non-image never had a thumbnail minted and its address is not one a grid may draw. A PDF or an
+ * extension-less upload therefore carries no `thumbnailUrl` and degrades to its type icon, where before
+ * it drew a broken `<img>` — or, worse, the original bytes the route used to hand back. The designated
+ * branch needs no such test: `fieldKind` already gates it to an image-kind Asset.
  */
 function resolveThumbnailUrl(row: ThumbnailRow, containerId: string): string | undefined {
   if (row.fieldAssetHash) return assetThumbnailUrl(row.fieldAssetContainerId ?? containerId, row.fieldAssetHash);
-  if (row.ownAssetHash) return assetThumbnailUrl(containerId, row.ownAssetHash);
+  if (row.ownAssetHash && isImageExt(row.ownAssetExt ?? '')) return assetThumbnailUrl(containerId, row.ownAssetHash);
   return undefined;
 }
 

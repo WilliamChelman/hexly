@@ -30,7 +30,7 @@ import { ButtonComponent, DialogComponent, SelectComponent } from '@hexly/web-ui
           <button
             appButton
             size="sm"
-            [disabled]="i === 0"
+            [disabled]="i === 0 || writing()"
             [attr.aria-label]="'mounts.moveUpLabel' | transloco: { name: mount.name }"
             [attr.data-testid]="'mount-up-' + mount.containerId"
             (click)="move(i, -1)"
@@ -40,7 +40,7 @@ import { ButtonComponent, DialogComponent, SelectComponent } from '@hexly/web-ui
           <button
             appButton
             size="sm"
-            [disabled]="i === mounts().length - 1"
+            [disabled]="i === mounts().length - 1 || writing()"
             [attr.aria-label]="'mounts.moveDownLabel' | transloco: { name: mount.name }"
             [attr.data-testid]="'mount-down-' + mount.containerId"
             (click)="move(i, 1)"
@@ -112,7 +112,13 @@ import { ButtonComponent, DialogComponent, SelectComponent } from '@hexly/web-ui
             </option>
           }
         </select>
-        <button appButton variant="primary" data-testid="mount-add" [disabled]="!selected()" (click)="add()">
+        <button
+          appButton
+          variant="primary"
+          data-testid="mount-add"
+          [disabled]="!selected() || writing()"
+          (click)="add()"
+        >
           {{ 'mounts.add' | transloco }}
         </button>
       </div>
@@ -171,6 +177,13 @@ export class WorldMountsPanelComponent implements OnInit {
   protected readonly pendingUnmount = signal<Mount | null>(null);
   /** What the open confirm's unmount would break (ADR-0080, #414). */
   protected readonly blast = blastRadius();
+  /**
+   * Whether a write is still in flight. Every write answers with the whole ordered list, so the list a
+   * second click would compute its new order from is the *stale* one until that answer lands — a rapid
+   * second arrow would send the order the first one already sent and be swallowed by the server's
+   * unchanged-order short-circuit. The controls say so rather than accepting a click they will lose.
+   */
+  protected readonly writing = signal(false);
 
   ngOnInit(): void {
     this.worlds.mounts(this.id()).subscribe({
@@ -183,7 +196,7 @@ export class WorldMountsPanelComponent implements OnInit {
   /** Declare one more Container this World draws from. Idempotent server-side, so a double-add is safe. */
   protected add(): void {
     const containerId = this.selected();
-    if (!containerId) return;
+    if (!containerId || this.writing()) return;
     this.apply(this.worlds.addMount(this.id(), containerId), 'mounts.addError', () => this.selected.set(''));
   }
 
@@ -213,6 +226,7 @@ export class WorldMountsPanelComponent implements OnInit {
    * disabled arrows are the affordance rather than the rule.
    */
   protected move(index: number, delta: number): void {
+    if (this.writing()) return;
     const order = this.mounts().map((m) => m.containerId);
     const target = index + delta;
     if (target < 0 || target >= order.length) return;
@@ -225,13 +239,18 @@ export class WorldMountsPanelComponent implements OnInit {
    * is exactly what is not yet mounted. A refusal toasts and leaves the list as the server last said.
    */
   private apply(op$: Observable<Mount[]>, errorKey: string, onOk?: () => void): void {
+    this.writing.set(true);
     op$.subscribe({
       next: (mounts) => {
+        this.writing.set(false);
         this.mounts.set(mounts);
         onOk?.();
         this.loadCandidates();
       },
-      error: () => this.error(errorKey),
+      error: () => {
+        this.writing.set(false);
+        this.error(errorKey);
+      },
     });
   }
 

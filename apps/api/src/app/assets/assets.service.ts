@@ -39,6 +39,17 @@ export function mimeForExt(ext: string): string {
 }
 
 /**
+ * Whether an Asset's pinned extension addresses a *picture* — the one signal the thumbnail route and the
+ * thumbnail URL a list emits both ask, so a URL is offered exactly where it resolves (ADR-0065). The
+ * extension rather than the harvested `kind` (ADR-0055): the serving route sees a path and nothing else,
+ * and a second signal there would be a second answer. An extension-less upload (`''`, #416) reads as no
+ * picture — its bytes are addressed, but nothing says they may be drawn.
+ */
+export function isImageExt(ext: string): boolean {
+  return mimeForExt(ext).startsWith('image/');
+}
+
+/**
  * One Asset as the Vault export writes it: the capability URL its docs reference (the key the export's
  * `srcMap` repoints), the human-readable `name + ext` the zip entry takes, and the bytes themselves.
  */
@@ -151,9 +162,9 @@ export class AssetsService implements OnModuleInit {
    * `\`, or `..` slipped through URL decoding) are rejected as not-found rather than allowed
    * to escape the Asset root.
    *
-   * A thumbnail request (`<hash>${THUMBNAIL_SUFFIX}`) whose thumbnail was never minted — a non-image, or
-   * an upload sharp could not parse — falls back to the original bytes (ADR-0065), so a grid pointed at
-   * the thumbnail URL always renders something rather than 404ing.
+   * A thumbnail request (`<hash>${THUMBNAIL_SUFFIX}`) whose thumbnail was never minted — an image sharp
+   * could not parse — falls back to the original bytes (ADR-0065), so a grid pointed at the thumbnail
+   * URL renders something rather than 404ing.
    */
   read(worldId: string, file: string): { bytes: Buffer; mime: string } | null {
     if (basename(worldId) !== worldId || basename(file) !== file) return null;
@@ -164,8 +175,14 @@ export class AssetsService implements OnModuleInit {
 
   /**
    * The original bytes a missing thumbnail request falls back to (ADR-0065): for a `<hash>${THUMBNAIL_SUFFIX}`
-   * path, the one stored `<hash>.<ext>` sibling. Null for any other missing file, so a genuine miss stays a
-   * 404.
+   * path, the one stored `<hash>.<ext>` sibling — and only when that sibling is itself a picture. Null for
+   * any other missing file, so a genuine miss stays a 404.
+   *
+   * The image test is a *withholding*, not a nicety (ADR-0034, ADR-0080): the byte route is guard-less by
+   * design, so a fallback that served a PDF, an archive or an audio file wholesale would hand every
+   * non-image Asset's original out at its thumbnail address — which is the one address a list offers a
+   * caller the Contributor gate withholds the full-resolution URL from. A PDF returned as a thumbnail is
+   * useless as a picture anyway, so nothing that renders is lost.
    */
   private originalForThumbnail(worldId: string, file: string): { bytes: Buffer; mime: string } | null {
     if (!file.endsWith(THUMBNAIL_SUFFIX)) return null;
@@ -174,7 +191,7 @@ export class AssetsService implements OnModuleInit {
     const worldDir = join(this.dir, worldId);
     if (!existsSync(worldDir)) return null;
     const original = readdirSync(worldDir).find((f) => f.startsWith(`${hash}.`) && !f.endsWith(THUMBNAIL_SUFFIX));
-    if (!original) return null;
+    if (!original || !isImageExt(extname(original))) return null;
     return { bytes: readFileSync(join(worldDir, original)), mime: mimeForExt(extname(original)) };
   }
 

@@ -32,6 +32,7 @@ const page = (items: EntitySummary[]): EntityPage => ({
   template: `<app-entity-search-picker
     testid="pin-picker"
     [worldId]="worldId()"
+    [includeMounts]="includeMounts()"
     [query]="query()"
     (queryChange)="query.set($event)"
     (pick)="picked = $event"
@@ -40,6 +41,7 @@ const page = (items: EntitySummary[]): EntityPage => ({
 class Host {
   readonly query = signal('');
   readonly worldId = signal<string | undefined>(undefined);
+  readonly includeMounts = signal(true);
   picked: EntitySummary | null = null;
 }
 
@@ -167,12 +169,60 @@ describe('EntitySearchPicker', () => {
       expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ worldId: 'w2', container: undefined }));
     });
 
+    /**
+     * The server counts Containers over the *filtered* result set, so refining a search until only one
+     * Container still matches drops the chosen one out of the facet — while the read stays narrowed to
+     * it. The way out of a narrowing must never leave the screen before the narrowing does.
+     */
+    it('keeps the way out of a narrowing on screen once the facet counts one Container', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      byId(el, 'pin-picker-container-shelf')?.click();
+      fixture.detectChanges();
+
+      entities.facets.mockImplementation(() =>
+        of({
+          type: [],
+          tag: [],
+          visibility: [],
+          fields: [],
+          container: [{ value: 'w1', label: 'Aldermoor', count: 1 }],
+        }),
+      );
+      const search = byId(el, 'pin-picker-search') as HTMLInputElement;
+      search.value = 'river';
+      search.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ container: ['shelf'] }));
+      expect(byId(el, 'pin-picker-container-all')).not.toBeNull();
+      expect(byId(el, 'pin-picker-container-shelf')).not.toBeNull();
+    });
+
     it('offers no chip at all where the read spans one Container, there being nothing to narrow', () => {
       entities.facets.mockImplementation(() => of({ type: [], tag: [], visibility: [], fields: [] }));
       const fixture = TestBed.createComponent(Host);
       fixture.detectChanges();
 
       expect(byId(fixture.nativeElement as HTMLElement, 'pin-picker-containers')).toBeNull();
+    });
+
+    /**
+     * ADR-0080 enumerates what widens — the `@` picker, the Entity Link Field picker, the Board Embed
+     * picker, the asset and Board image pickers. A consumer outside that list keeps the sealed scope, so
+     * it offers no mounted Container to narrow to and counts none either.
+     */
+    it('offers this World alone to a consumer that declines the Mount-widened scope', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.componentInstance.worldId.set('w1');
+      fixture.componentInstance.includeMounts.set(false);
+      fixture.detectChanges();
+
+      expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ worldId: 'w1', container: ['w1'] }));
+      expect(byId(fixture.nativeElement as HTMLElement, 'pin-picker-containers')).toBeNull();
+      expect(entities.facets).not.toHaveBeenCalled();
     });
   });
 

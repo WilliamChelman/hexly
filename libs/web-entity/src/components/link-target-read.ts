@@ -22,10 +22,17 @@ export interface LinkTargetRead {
  * server answers with that World's Entities *and* the ones in the Containers it **Mounts**, the World's
  * own ranked first, narrowable to one of them (ADR-0080). Resolved server-side, so no picker can widen
  * its own scope.
+ *
+ * `includeMounts` is how a surface the ADR does not widen declines it — the widening is enumerated
+ * there (the `@` picker, the Entity Link Field picker, the Board Embed picker, the asset and Board image
+ * pickers), and a pick stored as the World's own is not among them. It narrows to the World's own
+ * Container rather than asking a different read, since the scope and the narrowing AND server-side: the
+ * link-target read's own Asset gate and ranking are unchanged, only its reach.
  */
 export function linkTargetRead(
   worldId: () => string | undefined,
   narrowing: () => LinkTargetNarrowing,
+  includeMounts: () => boolean = () => true,
 ): LinkTargetRead {
   const container = signal<string | undefined>(undefined);
   // A narrowing the World outlives would silently answer the next search from a Container the user
@@ -35,8 +42,9 @@ export function linkTargetRead(
     untracked(() => container.set(undefined));
   });
   const params = computed<EntityFacetParams>(() => {
-    const picked = container();
-    return { ...narrowing(), worldId: worldId(), container: picked ? [picked] : undefined, read: 'link-target' };
+    const world = worldId();
+    const picked = includeMounts() ? container() : world;
+    return { ...narrowing(), worldId: world, container: picked ? [picked] : undefined, read: 'link-target' };
   });
   return { container, params };
 }

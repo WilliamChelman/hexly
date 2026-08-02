@@ -1,4 +1,4 @@
-import { Signal, signal } from '@angular/core';
+import { DestroyRef, Signal, inject, signal } from '@angular/core';
 import { Observable, Subscription } from 'rxjs';
 import { InboundLinkCount } from '@hexly/domain';
 
@@ -22,11 +22,18 @@ export interface BlastRadius {
   read(count$: Observable<InboundLinkCount>): void;
 }
 
-/** @see BlastRadius */
+/**
+ * @see BlastRadius
+ *
+ * Injection-context only: every surface holds one as a component field, so the read is torn down with
+ * the component — navigating away from an open confirm must not leave a request writing into the
+ * signals of a destroyed one.
+ */
 export function blastRadius(): BlastRadius {
   const count = signal<InboundLinkCount | null>(null);
   const failed = signal(false);
   let inFlight: Subscription | undefined;
+  inject(DestroyRef).onDestroy(() => inFlight?.unsubscribe());
   return {
     count: count.asReadonly(),
     failed: failed.asReadonly(),

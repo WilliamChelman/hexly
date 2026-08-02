@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { EntityType, WorldDetail, WorldGraph } from '@hexly/domain';
+import { EntityType, Mount, WorldDetail, WorldGraph } from '@hexly/domain';
 import { ActiveWorld, entityRoute } from '@hexly/web-core';
 import { GraphCanvasComponent } from '@hexly/web-entity';
 import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
@@ -57,11 +57,20 @@ describe('WorldGraphPage', () => {
     navigate = spyOnNavigate();
   });
 
-  /** Mount the page and answer its one fetch with `graph`, returning the mounted canvas's click output. */
-  function open(graph: WorldGraph): { fixture: ComponentFixture<WorldGraphPage>; click: (id: string) => void } {
+  /**
+   * Mount the page, answer its graph fetch, and answer the Mount read it makes when the payload holds a
+   * **Foreign node** — matched rather than expected, since a World with none has nothing to place and
+   * asks nothing. Returns the mounted canvas's click output.
+   */
+  function open(
+    graph: WorldGraph,
+    mounts: Mount[] = [],
+  ): { fixture: ComponentFixture<WorldGraphPage>; click: (id: string) => void } {
     const fixture = TestBed.createComponent(WorldGraphPage);
     fixture.detectChanges();
-    TestBed.inject(HttpTestingController).expectOne('/api/worlds/w1/graph').flush(graph);
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('/api/worlds/w1/graph').flush(graph);
+    http.match('/api/worlds/w1/mounts').forEach((req) => req.flush(mounts));
     fixture.detectChanges();
     const canvas = fixture.debugElement.children
       .flatMap((child) => child.queryAll((node) => node.componentInstance instanceof GraphCanvasComponent))
@@ -79,6 +88,19 @@ describe('WorldGraphPage', () => {
     ],
     edges: [{ source: 'ealdred', target: 'goblin', descriptor: 'hunts', decor: false }],
   };
+
+  /** A **Shelf** is a World (ADR-0080) — the one kind of Container that may stand in a `:worldId` segment. */
+  const SHELF: Mount = { containerId: 'w-shelf', name: 'The Long Shelf', kind: 'world' };
+
+  const LINKED_TO_A_PACK: WorldGraph = {
+    nodes: [
+      { id: 'ealdred', name: 'Ealdred', types: [NOTE] },
+      { id: 'ogre', name: 'Ogre', types: [NOTE], foreignContainerId: 'c-bestiary' },
+    ],
+    edges: [{ source: 'ealdred', target: 'ogre', descriptor: 'fears', decor: false }],
+  };
+
+  const BESTIARY: Mount = { containerId: 'c-bestiary', name: 'Bestiary', kind: 'compendium' };
 
   /**
    * A **Foreign node** is drawn, never counted (#406, ADR-0080): mounting a two-thousand-entry pack
@@ -102,7 +124,7 @@ describe('WorldGraphPage', () => {
   });
 
   it('opens the World’s own Entity under the World on screen', () => {
-    open(LINKED_TO_A_SHELF).click('ealdred');
+    open(LINKED_TO_A_SHELF, [SHELF]).click('ealdred');
 
     expect(navigate).toHaveBeenCalledWith(entityRoute('w1', 'ealdred', 'Aldermoor', 'Ealdred'));
   });
@@ -112,8 +134,31 @@ describe('WorldGraphPage', () => {
    * Aldermoor's shell, which then resolved the Entity and disagreed with the rail around it.
    */
   it('opens a Foreign node under the Container it lives in, never the World on screen', () => {
-    open(LINKED_TO_A_SHELF).click('goblin');
+    open(LINKED_TO_A_SHELF, [SHELF]).click('goblin');
 
     expect(navigate).toHaveBeenCalledWith(entityRoute('w-shelf', 'goblin', undefined, 'Marauder Goblin'));
+  });
+
+  /**
+   * The other half of the same question (#406): a **Compendium** is not a World (ADR-0079), so its id in
+   * the `:worldId` segment activates a World shell with no World behind it — dead rail, no Settings, a
+   * `?` in the Switcher. A **Sealed** entry opens under the World reading it, as the Library's cards and
+   * Quick Open open one.
+   */
+  it('opens a Compendium-homed Foreign node under the World on screen, never under the pack', () => {
+    open(LINKED_TO_A_PACK, [BESTIARY]).click('ogre');
+
+    expect(navigate).toHaveBeenCalledWith(entityRoute('w1', 'ogre', 'Aldermoor', 'Ogre'));
+  });
+
+  /**
+   * **Adoption** copies links verbatim (ADR-0080), so a Foreign node can name a Container this World does
+   * not Mount and nothing on screen can say what kind it is. The World on screen keeps the segment, where
+   * `reconcileWorldSegment` corrects it for a target that turns out to have a World of its own.
+   */
+  it('keeps the World on screen for a Foreign node in a Container this World does not Mount', () => {
+    open(LINKED_TO_A_SHELF).click('goblin');
+
+    expect(navigate).toHaveBeenCalledWith(entityRoute('w1', 'goblin', 'Aldermoor', 'Marauder Goblin'));
   });
 });

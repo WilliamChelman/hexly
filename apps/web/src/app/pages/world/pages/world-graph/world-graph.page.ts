@@ -207,6 +207,13 @@ export class WorldGraphPage {
    * orphans shows a bare graph.
    */
   protected readonly hasFilters = computed(() => this.decorCount() > 0 || this.orphanCount() > 0);
+  /**
+   * The Containers this World **Mounts** that are themselves Worlds (ADR-0080). A Foreign node carries a
+   * raw Container id and the payload never says which kind it is, so this answers the one question a
+   * click has: only a World may stand in a `:worldId` segment (ADR-0028). Empty until read — and read
+   * only where there is a Foreign node to place.
+   */
+  private readonly mountedWorlds = signal<ReadonlySet<string>>(new Set());
   /** Gates the empty state on a resolved read, so it never flashes before the payload lands. */
   protected readonly isEmpty = computed(() => this.graph()?.nodes.length === 0);
   /** Every node is an orphan and the toggle is off — a whole World hidden, not an empty one. */
@@ -219,22 +226,45 @@ export class WorldGraphPage {
     const worldId = this.activeWorld.worldId();
     if (!worldId) return; // activeWorldGuard pins it before this page renders.
     this.worlds.graph(worldId).subscribe({
-      next: (graph) => this.graph.set(graph),
+      next: (graph) => {
+        this.graph.set(graph);
+        if (graph.nodes.some((n) => n.foreignContainerId)) this.readMounts(worldId);
+      },
       error: () => this.toaster.show(this.transloco.translate('worldGraph.loadError'), 'error'),
     });
   }
 
   /**
-   * Open the clicked node. Entity URLs are World-scoped (ADR-0028), so a **Foreign node** routes to *its
-   * own* Container — this page's World would be the wrong shell around it (ADR-0080).
+   * The Mount set, read for its `kind` alone (ADR-0080). Failure is silent, refusal included — the read
+   * is member-gated, and a reader here through someone else's Mount is no member: every Foreign node then
+   * opens under the World on screen, which costs a redirect hop and never a broken route.
+   */
+  private readMounts(worldId: string): void {
+    this.worlds.mounts(worldId).subscribe({
+      next: (mounts) =>
+        this.mountedWorlds.set(new Set(mounts.filter((m) => m.kind === 'world').map((m) => m.containerId))),
+      error: () => undefined,
+    });
+  }
+
+  /**
+   * Open the clicked node. Entity URLs are World-scoped (ADR-0028), so a **Foreign node** in a mounted
+   * World routes to *that* World — this page's would be the wrong shell around it (ADR-0080).
+   *
+   * A **Compendium** is no World, and neither is a Container this World does not Mount — **Adoption**
+   * copies links verbatim, so those exist. Their entries open under the World on screen, the way the
+   * Library's cards and Quick Open open a **Sealed** one (ADR-0079): the segment is navigation context,
+   * and `reconcileWorldSegment` corrects it for a target that has a World of its own.
    */
   protected openEntity({ id, newTab }: GraphOpen): void {
     const node = this.graph()?.nodes.find((n) => n.id === id);
-    const home = node?.foreignContainerId ?? this.activeWorld.worldId();
+    const foreign = node?.foreignContainerId;
+    const worldId = this.activeWorld.worldId();
+    const home = foreign && this.mountedWorlds().has(foreign) ? foreign : worldId;
     if (!home) return;
-    // Only this World's own name is known here; a Foreign one goes by bare id and `activeWorldGuard`
+    // Only this World's own name is known here; a Foreign World goes by bare id and `activeWorldGuard`
     // heals the slug once the route lands.
-    const containerName = node?.foreignContainerId ? undefined : (this.worldName() ?? undefined);
+    const containerName = home === worldId ? (this.worldName() ?? undefined) : undefined;
     openEntityRoute(this.router, entityRoute(home, id, containerName, node?.name), newTab);
   }
 }

@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { Mount } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
 import { MockWorldsClient } from '@hexly/web-core/testing';
@@ -108,6 +108,49 @@ describe('WorldMountsPanel', () => {
       'mount-c-pack',
       'mount-c-shelf',
     ]);
+  });
+
+  /**
+   * A reorder computes its new order from the list the *server* last answered with, so a second arrow
+   * pressed before that answer lands would re-send the order the first one already sent — swallowed by
+   * the server's unchanged-order short-circuit, and lost. The arrows say so instead.
+   */
+  it('does not accept a second reorder while the first is still in flight', () => {
+    const other: Mount = { containerId: 'c-other', name: 'Shared Music', kind: 'world' };
+    worlds.mounts.mockReturnValue(of([shelf, pack, other]));
+    const reordered = new Subject<Mount[]>();
+    worlds.reorderMounts.mockReturnValue(reordered);
+    render();
+
+    click('mount-down-c-shelf');
+    expect((el('mount-down-c-shelf') as HTMLButtonElement).disabled).toBe(true);
+
+    click('mount-down-c-shelf');
+    expect(worlds.reorderMounts).toHaveBeenCalledTimes(1);
+
+    reordered.next([pack, shelf, other]);
+    fixture.detectChanges();
+
+    // The answer is the whole new order, so the next move reads a list that is no longer stale.
+    expect((el('mount-down-c-shelf') as HTMLButtonElement).disabled).toBe(false);
+    click('mount-down-c-shelf');
+    expect(worlds.reorderMounts).toHaveBeenLastCalledWith('w1', ['c-pack', 'c-other', 'c-shelf']);
+  });
+
+  it('does not accept a second add while the first is still in flight', () => {
+    worlds.mountCandidates.mockReturnValue(of([shelf]));
+    worlds.addMount.mockReturnValue(new Subject<Mount[]>());
+    render();
+
+    (el('mount-add-select') as HTMLSelectElement).value = 'c-shelf';
+    el('mount-add-select').dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    click('mount-add');
+    expect((el('mount-add') as HTMLButtonElement).disabled).toBe(true);
+    click('mount-add');
+
+    expect(worlds.addMount).toHaveBeenCalledTimes(1);
   });
 
   it('states how many links point into a Container before unmounting it, then unmounts', () => {

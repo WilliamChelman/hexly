@@ -457,7 +457,10 @@ export class WorldsService {
       owners,
       rights: worldRightsOf({ isOwner: !!meta?.isOwner, canContribute: !!meta?.canContribute }),
       entityCount,
-      pinnedEntityIds: world.pinnedEntityIds ?? [],
+      // The pin set is redacted on the same line, and for the same reason: a pinned id is an Entity's
+      // existence, so handing a Mount reader ids they cannot open — `private` ones among them — would
+      // name what the count above deliberately does not tally (ADR-0080).
+      pinnedEntityIds: meta?.isMember ? (world.pinnedEntityIds ?? []) : this.readablePins(callerId, world),
       // Omitted rather than null when the World carries none, so "no Theme" is one shape everywhere.
       ...(world.theme ? { theme: world.theme } : {}),
       // The freshness key a live-follower holds and compares each nudge against (ADR-0045).
@@ -465,6 +468,25 @@ export class WorldsService {
       createdAt: world.createdAt,
       updatedAt: world.updatedAt,
     };
+  }
+
+  /**
+   * The World's pins narrowed to what this caller may actually open — the non-member form of the pin
+   * set (ADR-0080). The Owner's curated order is kept, so the Dashboard a Mount reader gets is the
+   * Owner's minus the cards that were never theirs.
+   */
+  private readablePins(callerId: string, world: WorldRow): string[] {
+    const pins = world.pinnedEntityIds ?? [];
+    if (pins.length === 0) return [];
+    const readable = new Set(
+      this.db
+        .select({ id: entities.id })
+        .from(entities)
+        .where(and(inArray(entities.id, [...pins]), entityAccess(this.db, callerId).filter))
+        .all()
+        .map((r) => r.id),
+    );
+    return pins.filter((id) => readable.has(id));
   }
 
   /** The World's Owner user ids: `world_members` rows with role 'owner', ordered stably. */

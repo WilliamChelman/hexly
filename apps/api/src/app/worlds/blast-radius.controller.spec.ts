@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
+import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import {
   assetUrl,
@@ -16,12 +19,15 @@ import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
 import { ConfigModule } from '../config/config.module';
 import { DB, Db, createDb } from '../db/db';
-import { assetIndex, entities } from '../db/schema';
+import { assetIndex, entities, entityEdges } from '../db/schema';
 import { EntitiesModule } from '../entities/entities.module';
 import { ImporterRegistry } from './importer-registry';
 import { WorldsModule } from './worlds.module';
 
 const PACK_ID = 'test.importer.pack';
+
+/** The upgrade backfill under test — replayed by hand, since a fresh test DB ran it over empty tables. */
+const LEGACY_EDGE_BACKFILL = '0040_legacy_asset_edges_name_their_container.sql';
 
 /**
  * The blast radius of the three acts that break links (#414, ADR-0080): unmounting a Container,
@@ -140,6 +146,90 @@ describe('The blast radius of breaking links', () => {
 
     // A **Decor Link** counts (ADR-0069): "every player's Board shows dangling art" is precisely the
     // damage the number exists to state, and it is invisible on the relation surfaces.
+    expect(await mountLinks(ada, campaign, shelf)).toEqual({ links: 1, worlds: 1 });
+  });
+
+  /**
+   * The same claim for an Instance that *upgraded* into ADR-0080 rather than being born there. Migration
+   * 0036 added `target_container_id` nullable with nothing to fill it, so every image embedded before the
+   * upgrade harvested a row that names no Container — and a count that skips those is the number a
+   * confirm shows the Owner about to delete the Container the art lives in.
+   *
+   * Seeded on the current schema and replayed by hand, as the 0031 round-trip is (db.spec.ts): the
+   * backfill is data-only, so the pre-migration schema is this one and only the rows differ.
+   */
+  it('counts the images an upgraded Instance harvested before an edge could name its Container', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const hash = 'c'.repeat(64);
+    mintAsset(shelf, hash, 'Tavern Interior');
+    // The same bytes uploaded into the campaign too — identical hash, its own Asset (ADR-0034). It is
+    // what a hash-only backfill would resolve the shelf's art to, and it must not.
+    const twin = mintAsset(campaign, hash, 'Tavern Interior');
+    const tavern = await mintEntity(ada, campaign, 'The Tavern');
+    await illustrate(ada, tavern, assetUrl(shelf, hash, '.png'));
+    legacy();
+
+    // The upgraded state, before the backfill: the edge is there, the picture renders, and the count
+    // that answers "what breaks if this goes?" says nothing does.
+    expect(await mountLinks(ada, campaign, shelf)).toEqual({ links: 0, worlds: 0 });
+
+    applyMigration(LEGACY_EDGE_BACKFILL);
+
+    expect(await mountLinks(ada, campaign, shelf)).toEqual({ links: 1, worlds: 1 });
+    expect(await inboundLinks(ada, shelf)).toEqual({ links: 1, worlds: 1 });
+    // Named off the URL the document was written with, never off the hash: the campaign's own twin
+    // holds the same bytes and is not what the picture points at.
+    expect(assetEdgeTargets()).toEqual([shelf]);
+    expect(twin).not.toBe(shelf);
+  });
+
+  it('leaves an upgraded row alone when no Container the Instance holds is the one the URL named', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const hash = 'd'.repeat(64);
+    const tavern = await mintEntity(ada, campaign, 'The Tavern');
+    await illustrate(ada, tavern, assetUrl('a-container-that-went-away', hash, '.png'));
+    legacy();
+
+    applyMigration(LEGACY_EDGE_BACKFILL);
+
+    // NULL, not the source's own Container: a guess would make the campaign's own confirm claim a link
+    // it does not have, and mis-attribution is worse than the dangling row it replaces (ADR-0080).
+    expect(assetEdgeTargets()).toEqual([null]);
+    expect(await inboundLinks(ada, campaign)).toEqual({ links: 0, worlds: 0 });
+  });
+
+  it('splits an upgraded row that stood for the same bytes in two Containers, one Asset each', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const hash = 'f'.repeat(64);
+    mintAsset(shelf, hash, 'Tavern Interior');
+    mintAsset(campaign, hash, 'Tavern Interior');
+    const tavern = await mintEntity(ada, campaign, 'The Tavern');
+    // Both URLs in one document. Before 0036 an edge deduped on the bare hash, so the two Assets these
+    // name collapsed into one row — and one row cannot carry two answers.
+    await illustrate(ada, tavern, assetUrl(shelf, hash, '.png'), assetUrl(campaign, hash, '.png'));
+    legacy();
+    expect(assetEdgeTargets()).toEqual([null]);
+
+    applyMigration(LEGACY_EDGE_BACKFILL);
+
+    expect(assetEdgeTargets().sort()).toEqual([campaign, shelf].sort());
+    // The shelf's half is blast radius; the campaign's own is not, which is the point of splitting them.
+    expect(await mountLinks(ada, campaign, shelf)).toEqual({ links: 1, worlds: 1 });
+  });
+
+  it('re-runs over an already-backfilled Instance without moving a row or minting one', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const hash = 'e'.repeat(64);
+    mintAsset(shelf, hash, 'Tavern Interior');
+    const tavern = await mintEntity(ada, campaign, 'The Tavern');
+    await illustrate(ada, tavern, assetUrl(shelf, hash, '.png'));
+
+    // Never legacy: a row this build stamped at save time is already correct, and the backfill is run
+    // twice on top of it — once for the row it must not touch, once for the ledger it cannot re-read.
+    applyMigration(LEGACY_EDGE_BACKFILL);
+    applyMigration(LEGACY_EDGE_BACKFILL);
+
+    expect(assetEdgeTargets()).toEqual([shelf]);
     expect(await mountLinks(ada, campaign, shelf)).toEqual({ links: 1, worlds: 1 });
   });
 
@@ -335,13 +425,13 @@ describe('The blast radius of breaking links', () => {
     await owner.put(`/entities/${id}`).send({ document, version: current.version, tags: [] }).expect(200);
   }
 
-  /** Save `id`'s RichContent as prose holding one `image` — which harvests as a Decor asset edge. */
-  async function illustrate(owner: Agent, id: string, src: string): Promise<void> {
+  /** Save `id`'s RichContent as prose holding one `image` per URL — each harvests as a Decor asset edge. */
+  async function illustrate(owner: Agent, id: string, ...srcs: string[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityDocument = {
       'core.field.content': tiptapContent({
         type: 'doc',
-        content: [{ type: 'paragraph', content: [{ type: 'image', attrs: { src } }] }],
+        content: [{ type: 'paragraph', content: srcs.map((src) => ({ type: 'image', attrs: { src } })) }],
       }),
     };
     await owner.put(`/entities/${id}`).send({ document, version: current.version, tags: [] }).expect(200);
@@ -351,7 +441,7 @@ describe('The blast radius of breaking links', () => {
    * Seed an Asset Entity and its `(containerId, hash)` dedup-index row — the shape mint-and-dedup
    * leaves behind (ADR-0065), written straight to the DB so this spec need not carry the upload path.
    */
-  function mintAsset(containerId: string, hash: string, name: string): void {
+  function mintAsset(containerId: string, hash: string, name: string): string {
     const id = randomUUID();
     const now = Date.now();
     db.insert(entities)
@@ -372,6 +462,37 @@ describe('The blast radius of breaking links', () => {
       })
       .run();
     db.insert(assetIndex).values({ entityId: id, containerId, hash, ext: '.png' }).run();
+    return id;
+  }
+
+  /**
+   * Rewind every asset edge to the shape migration 0036 left an upgraded Instance in: harvested from a
+   * document that already named another Container, stored with nothing saying so — and deduped on the
+   * bare hash, so two Containers' worth of the same bytes collapse into the one row they used to be.
+   */
+  function legacy(): void {
+    db.$client.exec(`
+      DELETE FROM entity_edges WHERE target_kind = 'asset' AND rowid NOT IN (
+        SELECT min(rowid) FROM entity_edges WHERE target_kind = 'asset'
+        GROUP BY source_entity_id, target_id, descriptor
+      );
+      UPDATE entity_edges SET target_container_id = NULL WHERE target_kind = 'asset';
+    `);
+  }
+
+  /** Apply one migration file to the live connection (`--> statement-breakpoint` is a comment). */
+  function applyMigration(file: string): void {
+    db.$client.exec(readFileSync(resolve(__dirname, '..', 'db', 'migrations', file), 'utf8'));
+  }
+
+  /** The Container every stored asset edge names, `null` where none is known. */
+  function assetEdgeTargets(): (string | null)[] {
+    return db
+      .select({ targetContainerId: entityEdges.targetContainerId })
+      .from(entityEdges)
+      .where(eq(entityEdges.targetKind, 'asset'))
+      .all()
+      .map((row) => row.targetContainerId);
   }
 
   /** The status a call lands on, so a count's refusal can be compared with its act's. */
