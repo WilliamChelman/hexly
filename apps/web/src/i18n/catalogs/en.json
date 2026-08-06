@@ -84,6 +84,7 @@
     "renameLabel": "New name",
     "searchLabel": "Search entities",
     "searchPlaceholder": "Search by name, tag, or content…",
+    "suggestionsLabel": "Filter suggestions",
     "creating": "Creating…",
     "edited": "Edited {{date}}",
     "loadErrorTitle": "Couldn't load your entities.",

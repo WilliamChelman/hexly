@@ -8,6 +8,7 @@ import {
   EntityPage,
   EntitySummary,
   EntityType,
+  FacetKeySet,
   FieldFilter,
   parseFacetQuery,
   Visibility,
@@ -95,7 +96,14 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
     </app-page-header>
 
     <main class="max-w-[72rem] mx-auto py-8 px-6">
-      <app-entity-search [value]="rawQuery()" (queryChange)="onSearch($event)" />
+      <!-- The box offers the whole vocabulary on the dollar (ADR-0082): keys off the registry, values
+           off the Facet read this page already runs. -->
+      <app-entity-search
+        [value]="rawQuery()"
+        [keys]="facetKeys()"
+        [facets]="facetCounts()"
+        (queryChange)="onSearch($event)"
+      />
       <!-- A Facet Token naming a key nothing answers to is *said*, never quietly searched for (ADR-0082). -->
       @if (unknownFacetKeys().length > 0) {
         <p data-testid="unknown-facet" role="status" class="-mt-6 mb-8 font-sans text-sm text-ink-faint">
@@ -216,13 +224,16 @@ export class EntityBrowserPage {
   private readonly typed = new Subject<string>();
 
   /**
-   * What the box means: its **Facet Tokens** as structured filters and the free text left over. The key
-   * set comes from the client registry, synchronously, minus `in` — a browse scoped to one **Container**
-   * has nothing to narrow, so `$in:` is reported as a miss rather than dropped (ADR-0082).
+   * This surface's vocabulary, from the client registry, synchronously — minus `in`: a browse scoped to
+   * one **Container** has nothing to narrow, so `$in:` is reported as a miss rather than dropped
+   * (ADR-0082). One set, read twice: the parser resolves against it and the box offers it on `$`.
    */
-  protected readonly parsedQuery = computed(() =>
-    parseFacetQuery(this.rawQuery(), { reserved: ['type', 'tag', 'visibility'], fields: this.types.facetKeys() }),
-  );
+  protected readonly facetKeys = computed<FacetKeySet>(() => ({
+    reserved: ['type', 'tag', 'visibility'],
+    fields: this.types.facetKeys(),
+  }));
+  /** What the box means: its **Facet Tokens** as structured filters and the free text left over. */
+  protected readonly parsedQuery = computed(() => parseFacetQuery(this.rawQuery(), this.facetKeys()));
   /** The residual full-text query — what the wire's `q` carries, as against the URL's raw string. */
   private readonly searchText = computed(() => this.parsedQuery().text);
   /** Whether the box holds anything at all to search or filter by — blanks are not a query. */

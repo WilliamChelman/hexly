@@ -30,6 +30,11 @@ const RESERVED: Readonly<Record<string, FacetTokenCategory>> = {
 /** Every reserved name, the default offer for a surface whose key set names none. */
 export const RESERVED_FACET_NAMES: readonly string[] = Object.keys(RESERVED);
 
+/** The category a reserved name filters, or `undefined` for any other key — a Facet key of its own. */
+export function facetCategoryOf(name: string): FacetTokenCategory | undefined {
+  return RESERVED[name];
+}
+
 /**
  * One surface's Facet vocabulary. `reserved` is the subset of {@link RESERVED_FACET_NAMES} this surface
  * can actually apply — the Entity Browser is scoped to one World, so it offers no `in` and reports one

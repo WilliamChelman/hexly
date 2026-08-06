@@ -4,6 +4,7 @@ export * from './container-chips.component';
 export * from './details-panel.component';
 export * from './entity-link-picker.component';
 export * from './entity-search-picker.component';
+export * from './facet-search-input.component';
 export * from './grant-set.component';
 export * from './link-target-read';
 // `local-graph-panel.component` is deliberately absent: it is reached only through its Panel's
