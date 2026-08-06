@@ -7,6 +7,7 @@ import {
   facetSuggestAt,
   facetValueSuggestions,
   facetValuesFor,
+  resolvesFacetKey,
 } from './facet-suggest';
 
 describe('facetSuggestAt (ADR-0082)', () => {
@@ -61,6 +62,17 @@ describe('facetSuggestAt (ADR-0082)', () => {
     expect(facetSuggestAt('$type:npc $ta', 13)).toEqual({ stage: 'key', prefix: 'ta', start: 11, end: 13 });
   });
 
+  /** The parser reads that `$` as part of the value being quoted, and so must the list. */
+  it('reads a `$` inside an open quote as the value it is, not a token of its own', () => {
+    expect(facetSuggestAt('$tag:"sea $to', 13)).toEqual({
+      stage: 'value',
+      key: 'tag',
+      prefix: 'sea $to',
+      start: 5,
+      end: 13,
+    });
+  });
+
   it('ignores whatever follows the caret — the reader is typing here', () => {
     expect(facetSuggestAt('$ta orc', 3)).toEqual({ stage: 'key', prefix: 'ta', start: 1, end: 3 });
   });
@@ -93,6 +105,22 @@ describe('facetKeySuggestions (ADR-0082)', () => {
 
   it('offers every reserved name where a surface names no subset', () => {
     expect(facetKeySuggestions({}, 'i')).toEqual(['in', 'visibility']);
+  });
+});
+
+describe('resolvesFacetKey (ADR-0082)', () => {
+  it('answers for the names this surface can apply, and for nothing else', () => {
+    const keys: FacetKeySet = { reserved: ['type', 'tag'], fields: ['region'] };
+
+    expect(resolvesFacetKey(keys, 'type')).toBe(true);
+    expect(resolvesFacetKey(keys, 'region')).toBe(true);
+    // Excluded reserved names and unknown keys alike are misses, whatever the Facet read carries.
+    expect(resolvesFacetKey(keys, 'in')).toBe(false);
+    expect(resolvesFacetKey(keys, 'domain')).toBe(false);
+  });
+
+  it('takes every reserved name where a surface names no subset', () => {
+    expect(resolvesFacetKey({ fields: [] }, 'in')).toBe(true);
   });
 });
 

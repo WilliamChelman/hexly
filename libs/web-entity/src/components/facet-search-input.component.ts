@@ -8,8 +8,15 @@ import {
   facetSuggestAt,
   facetValueSuggestions,
   facetValuesFor,
+  resolvesFacetKey,
 } from '@hexly/domain';
 import { ListboxComponent, ListboxController, ListboxOptionComponent } from '@hexly/web-ui';
+
+/** Keys that move the caret without the list's help — after one, what it was completing may be stale. */
+const CARET_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'Home', 'End']);
+
+/** {@link ListboxComponent}'s own default width, for a box measured before it has been laid out. */
+const FALLBACK_WIDTH = 256;
 
 /** One offered row: what it reads as, what accepting it inserts, and — on a value — its live count. */
 interface FacetSuggestion {
@@ -56,6 +63,7 @@ interface FacetSuggestion {
       [value]="value()"
       (input)="onInput($any($event.target).value)"
       (keydown)="onBoxKeyDown($event)"
+      (click)="refresh()"
       (blur)="close()"
     />
     @if (visible()) {
@@ -112,7 +120,7 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
 
   private readonly box = viewChild.required<ElementRef<HTMLInputElement>>('box');
   /** The list hangs off the box and matches its width, measured when it opens. */
-  protected readonly boxWidth = signal(256);
+  protected readonly boxWidth = signal(FALLBACK_WIDTH);
   /** The token the open list is completing, so accepting one replaces exactly what was typed. */
   private context: FacetSuggestContext | null = null;
 
@@ -133,13 +141,18 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
       this.close();
       return;
     }
-    if (!this.onKeyDown(event)) return;
+    if (!this.onKeyDown(event)) {
+      // A caret the list did not move leaves it looking at a token the caret may have left; shut it
+      // rather than let the next Enter edit the wrong slice.
+      if (CARET_KEYS.has(event.key)) this.close();
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
   }
 
-  /** Accept the highlighted row. A key just completed opens its value stage straight away; a completed
-   * value asked its whole question, so the list stays shut until the next keystroke. */
+  /** Accept the highlighted row. A completed key opens its value stage straight away; a completed value
+   * leaves the list shut until the next keystroke. */
   protected override select(item: FacetSuggestion): void {
     const stage = this.context?.stage;
     super.select(item);
@@ -147,7 +160,7 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
   }
 
   /** Re-read the caret and offer what belongs there, or close where nothing does. */
-  private refresh(): void {
+  protected refresh(): void {
     const el = this.box().nativeElement;
     this.context = facetSuggestAt(el.value, el.selectionStart ?? el.value.length);
     const items = this.context ? this.suggestionsFor(this.context) : [];
@@ -155,7 +168,7 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
       this.close();
       return;
     }
-    this.boxWidth.set(el.getBoundingClientRect().width || 256);
+    this.boxWidth.set(el.getBoundingClientRect().width || FALLBACK_WIDTH);
     this.open({ items, command: (item) => this.accept(item), clientRect: () => el.getBoundingClientRect() });
   }
 
@@ -166,7 +179,10 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
         label: key,
         choice: key,
       }));
-    return facetValueSuggestions(facetValuesFor(this.facets(), context.key ?? ''), context.prefix).map((value) => ({
+    // The value stage answers only for a key this surface can apply: the Facet read suggests values, and
+    // is never allowed to widen the vocabulary the registry defines (ADR-0082).
+    if (!resolvesFacetKey(this.keys(), context.key)) return [];
+    return facetValueSuggestions(facetValuesFor(this.facets(), context.key), context.prefix).map((value) => ({
       id: 'value-' + value.value,
       // A Container is named on screen and addressed by id, as it is in the rail (ADR-0080).
       label: value.label ?? value.value,

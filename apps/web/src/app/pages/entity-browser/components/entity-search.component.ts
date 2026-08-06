@@ -22,7 +22,7 @@ import { FacetSearchInputComponent } from '@hexly/web-entity';
     <app-icon
       name="label"
       [size]="18"
-      class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none z-10"
+      class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none"
     />
     <app-facet-search-input
       testid="entity-search"

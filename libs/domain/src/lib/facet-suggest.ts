@@ -5,67 +5,77 @@
  *
  * Two stages, two sources, and the difference is load-bearing: **keys resolve synchronously** off the
  * client registry, while the Facet read feeds **values and counts only**, so a late response can make a
- * filter easier to type but can never change what one means. Everything here is pure text arithmetic —
- * the component owns the box and the keyboard, this owns what the box would say.
+ * filter easier to type but can never change what one means. The grammar itself stays in `facet-token.ts`:
+ * this reads a token only as far as the caret, which the parser — reading whole tokens — cannot answer.
  */
 
 import { EntityFacets, FacetCount } from './entity';
-import { facetCategoryOf, FacetKeySet, RESERVED_FACET_NAMES } from './facet-token';
-
-/** Which half of the vocabulary is being typed: the key, or one of its values. */
-export type FacetSuggestStage = 'key' | 'value';
+import { facetCategoryOf, FacetKeySet, RESERVED_FACET_NAMES, startsFacetToken } from './facet-token';
 
 /**
- * The token the caret stands in, as far as the caret. `start`/`end` bound the slice an accepted
- * suggestion replaces — for a value opened with a quote, `start` is the quote itself, so completing it
- * replaces rather than nests.
+ * The token the caret stands in, as far as the caret: which half of the vocabulary is being typed, and
+ * the slice `start`/`end` an accepted suggestion replaces — for a value opened with a quote, `start` is
+ * the quote itself, so completing it replaces rather than nests. A `key` exists on the value stage
+ * alone, which is why the two stages are separate shapes rather than one with an optional field.
  */
-export interface FacetSuggestContext {
-  readonly stage: FacetSuggestStage;
-  /** The key already typed, on the value stage — what the caller looks its values up by. */
-  readonly key?: string;
+export type FacetSuggestContext = FacetKeyContext | FacetValueContext;
+
+interface FacetSuggestSlice {
   /** What has been typed of the key or value so far; the list narrows on it. */
   readonly prefix: string;
   readonly start: number;
   readonly end: number;
 }
 
+export interface FacetKeyContext extends FacetSuggestSlice {
+  readonly stage: 'key';
+}
+
+export interface FacetValueContext extends FacetSuggestSlice {
+  readonly stage: 'value';
+  /** The key already typed — what the caller looks its values up by. */
+  readonly key: string;
+}
+
 /**
  * The suggestion context at `caret`, or `null` where the caret stands in plain text. Only the text
- * **before** the caret is read: the reader is typing here, and whatever follows is theirs to keep.
+ * **before** the caret is read, so what follows it is left alone.
  */
 export function facetSuggestAt(raw: string, caret: number): FacetSuggestContext | null {
-  const start = tokenStart(raw, caret);
-  if (start === null) return null;
+  // Scanned forwards, token by token, exactly as the parser reads the same string — a `$` inside an
+  // open quote (`$tag:"sea $to`) belongs to the value being typed, and starts nothing of its own.
+  let i = 0;
+  while (i < caret) {
+    if (!startsFacetToken(raw, i)) {
+      i++;
+      continue;
+    }
+    const scanned = scanToken(raw, i, caret);
+    if ('stage' in scanned) return scanned;
+    i = scanned.end;
+  }
+  return null;
+}
+
+/** Where a token that closed before the caret gave out, so the scan resumes past it. */
+interface TokenEnd {
+  readonly end: number;
+}
+
+/** Read the token at `start` as far as `caret`: the context the caret stands in, or where it ended. */
+function scanToken(raw: string, start: number, caret: number): FacetSuggestContext | TokenEnd {
   // Past the `-` that negates and the `$` that marks (ADR-0082: every token carries the `$`).
   const keyStart = start + (raw[start] === '-' ? 2 : 1);
   let i = keyStart;
   while (i < caret && raw[i] !== ':' && !isSpace(raw[i])) i++;
   if (i >= caret) return { stage: 'key', prefix: raw.slice(keyStart, caret), start: keyStart, end: caret };
   // A space before the colon ends the token: a `$` with no colon is a name, not yet a filter.
-  if (raw[i] !== ':') return null;
-  const key = raw.slice(keyStart, i);
-  return valueContext(raw, caret, key, i + 1);
+  if (raw[i] !== ':') return { end: i };
+  return scanValues(raw, caret, raw.slice(keyStart, i), i + 1);
 }
 
-/**
- * Where the last token before `caret` begins, or `null` — a `$` mid-word starts nothing. Scanned
- * forwards rather than back from the caret, because a quoted value holds spaces (`$tag:"sea of `) and a
- * space is therefore no proof the token ended; the walk from here decides that.
- */
-function tokenStart(raw: string, caret: number): number | null {
-  let start: number | null = null;
-  for (let i = 0; i < caret; i++) {
-    if (raw[i] !== '$') continue;
-    const negated = raw[i - 1] === '-';
-    const from = negated ? i - 1 : i;
-    if (from === 0 || isSpace(raw[from - 1])) start = from;
-  }
-  return start;
-}
-
-/** Walk the values from the colon to the caret, so the suggestion replaces the segment being typed. */
-function valueContext(raw: string, caret: number, key: string, from: number): FacetSuggestContext | null {
+/** Walk the values from the colon to the caret, so a suggestion replaces the segment being typed. */
+function scanValues(raw: string, caret: number, key: string, from: number): FacetValueContext | TokenEnd {
   let segment = from;
   let i = from;
   while (i < caret) {
@@ -74,9 +84,9 @@ function valueContext(raw: string, caret: number, key: string, from: number): Fa
       // An unclosed quote is a value still being typed — spaces and all, since it is what closes it.
       if (close < 0 || close >= caret) break;
       i = close + 1;
-      if (raw[i] !== ',') return null;
+      if (raw[i] !== ',') return { end: i };
     }
-    if (isSpace(raw[i])) return null;
+    if (isSpace(raw[i])) return { end: i };
     if (raw[i] === ',') segment = i + 1;
     i++;
   }
@@ -93,6 +103,15 @@ export function facetKeySuggestions(keys: FacetKeySet, prefix: string): readonly
   const reserved = keys.reserved ?? RESERVED_FACET_NAMES;
   const all = [...reserved, ...(keys.fields ?? []).filter((key) => !reserved.includes(key))];
   return rank(all, prefix, (key) => key);
+}
+
+/**
+ * Whether this surface can apply `key` at all. The value stage is gated on it, so the Facet read never
+ * leaks a key into the vocabulary: `EntityFacets.fields` is surfaced by presence (#231) and can carry
+ * keys this registry lacks, which would offer counted values for a key the surface reports as a miss.
+ */
+export function resolvesFacetKey(keys: FacetKeySet, key: string): boolean {
+  return (keys.reserved ?? RESERVED_FACET_NAMES).includes(key) || (keys.fields ?? []).includes(key);
 }
 
 /** One key's live values, or none — a key the read does not carry simply suggests nothing. */
@@ -143,7 +162,7 @@ export function applyFacetSuggestion(
 
 /** Quoted only where bare would mean something else: a space or comma would end it, `>=`/`<=` would
  * read as a bound (ADR-0082). */
-export function quoteFacetValue(value: string): string {
+function quoteFacetValue(value: string): string {
   return /^$|[\s,]|^[<>]=/.test(value) ? `"${value}"` : value;
 }
 

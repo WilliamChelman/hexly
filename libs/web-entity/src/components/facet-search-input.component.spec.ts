@@ -37,8 +37,10 @@ class Host {
   readonly facets = signal<EntityFacets | null>(FACETS);
   readonly emitted: string[] = [];
 
+  /** Controlled, as every consumer is: the box's own keystroke comes straight back as its value. */
   onQuery(text: string): void {
     this.emitted.push(text);
+    this.value.set(text);
   }
 }
 
@@ -140,6 +142,23 @@ describe('FacetSearchInput (ADR-0082)', () => {
       expect(rows()).toEqual([]);
     });
 
+    /**
+     * The Facet read is surfaced by presence (#231), so it can carry a key this surface's registry does
+     * not name — and the vocabulary is the registry's alone (ADR-0082). A key the page reports as a miss
+     * must not quietly grow a counted value list.
+     */
+    it('offers no values for a key this surface cannot apply, whatever the read carries', () => {
+      const { fixture, type, rows } = render();
+      fixture.componentInstance.keys.set({ reserved: ['type'], fields: [] });
+      fixture.detectChanges();
+
+      type('$region:');
+      expect(rows()).toEqual([]);
+
+      type('$type:n');
+      expect(rows()).toEqual(['npc4', 'note2']);
+    });
+
     it('inserts the stored value verbatim, in the case it is stored in', () => {
       const { fixture, box, type, press } = render();
 
@@ -192,15 +211,37 @@ describe('FacetSearchInput (ADR-0082)', () => {
     });
 
     it('dismisses the list on Escape and leaves the surface under it open', () => {
-      const { fixture, type, rows, press } = render();
+      const { fixture, box, type, rows, press } = render();
+      const seen: string[] = [];
+      const listener = (event: Event) => seen.push((event as KeyboardEvent).key);
+      window.addEventListener('keydown', listener);
 
-      type('$type:');
-      const escape = press('Escape');
+      try {
+        type('$type:');
+        const escape = press('Escape');
+
+        expect(rows()).toEqual([]);
+        // Neither half of the surface's Escape reaches it: the native `<dialog>` cancel is prevented and
+        // the app's window-level dispatcher never sees the key — so only the list closes.
+        expect(escape.defaultPrevented).toBe(true);
+        expect(seen).toEqual([]);
+        // The box keeps what was typed; dismissing a list is not clearing a query.
+        expect(box.value).toBe('$type:');
+        expect(fixture.componentInstance.emitted.at(-1)).toBe('$type:');
+      } finally {
+        window.removeEventListener('keydown', listener);
+      }
+    });
+
+    /** A caret the list did not move can leave the token it was completing, so it shuts rather than act
+     * on a slice the caret has left. */
+    it('shuts when the caret walks out from under it', () => {
+      const { type, rows, press } = render();
+
+      type('$type:n');
+      press('ArrowLeft');
 
       expect(rows()).toEqual([]);
-      // The native default is prevented too, so a `<dialog>` holding the box does not close with the list.
-      expect(escape.defaultPrevented).toBe(true);
-      expect(fixture.componentInstance.emitted.at(-1)).toBe('$type:');
     });
 
     /**

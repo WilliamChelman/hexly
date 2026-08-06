@@ -92,7 +92,7 @@ export function parseFacetQuery(raw: string, keys: FacetKeySet): ParsedFacetQuer
   // Start of the pending run of plain text, flushed whenever a token is lifted out.
   let plain = 0;
   while (i < raw.length) {
-    const token = startsToken(raw, i) ? readToken(raw, i) : null;
+    const token = startsFacetToken(raw, i) ? readToken(raw, i) : null;
     if (!token) {
       i++;
       continue;
@@ -122,8 +122,11 @@ export function parseFacetQuery(raw: string, keys: FacetKeySet): ParsedFacetQuer
   };
 }
 
-/** A token begins at `$` (or the `-` that negates it) standing at a word boundary — nowhere else. */
-function startsToken(raw: string, i: number): boolean {
+/**
+ * A token begins at `$` (or the `-` that negates it) standing at a word boundary — nowhere else.
+ * Exported so the typeahead reads the same boundary the parser does, rather than a second opinion of it.
+ */
+export function startsFacetToken(raw: string, i: number): boolean {
   if (i > 0 && !/\s/.test(raw[i - 1])) return false;
   return raw[i] === '$' || (raw[i] === '-' && raw[i + 1] === '$');
 }
