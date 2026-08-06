@@ -80,25 +80,18 @@ interface FacetToken {
 }
 
 export function parseFacetQuery(raw: string, keys: FacetKeySet): ParsedFacetQuery {
-  const reserved = new Set(keys.reserved ?? RESERVED_FACET_NAMES);
-  const fieldKeys = new Set(keys.fields ?? []);
+  const { reserved, fieldKeys } = vocabulary(keys);
   const include = emptyValues();
   const exclude = emptyValues();
   const fields: FieldFilter[] = [];
   const unresolvedKeys: string[] = [];
   const text: string[] = [];
 
-  let i = 0;
   // Start of the pending run of plain text, flushed whenever a token is lifted out.
   let plain = 0;
-  while (i < raw.length) {
-    const token = startsToken(raw, i) ? readToken(raw, i) : null;
-    if (!token) {
-      i++;
-      continue;
-    }
-    text.push(raw.slice(plain, i));
-    i = plain = token.end;
+  for (const token of scanTokens(raw)) {
+    text.push(raw.slice(plain, token.start));
+    plain = token.end;
     // Reserved names win at resolution (ADR-0082), so a World Field labelled "Type" does not take
     // `$type` and is addressed by its full key.
     const category = reserved.has(token.key) ? RESERVED[token.key] : undefined;
@@ -132,28 +125,16 @@ export type FacetTokenTarget =
   | { readonly field: string; readonly value: string };
 
 /**
- * Take the token that named `target` out of the box (ADR-0082). The one rail→text write in the design,
- * and always a deletion: a rail row the text owns is clicked off by deleting the text that named it,
- * so everything applied stays reversible where it was named.
- *
- * Both polarities go: a value the box happens to name twice, `$tag:draft` and `-$tag:draft`, is one row
- * with one visual state, so one click leaves neither behind. Everything else the caller typed — their
- * spacing, their prose, a second token naming another value of the same Facet — is left exactly as
- * written; only the removed token's own separator goes with it.
+ * Take the token that named `target` out of the box (ADR-0082): the one rail→text write in the design,
+ * and always a deletion, so everything applied stays reversible where it was named. Both polarities go
+ * at once — a value is one rail row whichever way the box named it — and nothing else the caller typed
+ * moves, only the removed token's own separator going with it.
  */
 export function removeFacetToken(raw: string, keys: FacetKeySet, target: FacetTokenTarget): string {
-  const reserved = new Set(keys.reserved ?? RESERVED_FACET_NAMES);
-  const fieldKeys = new Set(keys.fields ?? []);
-  const cuts: { from: number; to: number }[] = [];
+  const { reserved, fieldKeys } = vocabulary(keys);
+  const cuts: Cut[] = [];
 
-  let i = 0;
-  while (i < raw.length) {
-    const token = startsToken(raw, i) ? readToken(raw, i) : null;
-    if (!token) {
-      i++;
-      continue;
-    }
-    i = token.end;
+  for (const token of scanTokens(raw)) {
     if (!addresses(token, target, reserved, fieldKeys)) continue;
     const named = token.segments.filter((segment) => names(segment, target));
     if (named.length === 0) continue;
@@ -181,8 +162,14 @@ function names(segment: ValueSegment, target: FacetTokenTarget): boolean {
   return segment.value === target.value;
 }
 
+/** A half-open span of the box to delete. */
+interface Cut {
+  readonly from: number;
+  readonly to: number;
+}
+
 /** A whole token takes one adjoining run of whitespace with it — after it, or else before it. */
-function withSeparator(raw: string, from: number, to: number): { from: number; to: number } {
+function withSeparator(raw: string, from: number, to: number): Cut {
   let end = to;
   while (/\s/.test(raw[end] ?? '')) end++;
   if (end > to) return { from, to: end };
@@ -207,6 +194,26 @@ function applyCuts(raw: string, cuts: readonly { from: number; to: number }[]): 
     at = Math.max(at, cut.to);
   }
   return out + raw.slice(at);
+}
+
+/** One surface's vocabulary as sets — the reserved names it offers, and its Facet keys. */
+function vocabulary(keys: FacetKeySet): { reserved: ReadonlySet<string>; fieldKeys: ReadonlySet<string> } {
+  return { reserved: new Set(keys.reserved ?? RESERVED_FACET_NAMES), fieldKeys: new Set(keys.fields ?? []) };
+}
+
+/** Every whole token in the box, left to right. The one walk of the grammar: reading a box and editing
+ * one must not drift apart. */
+function* scanTokens(raw: string): Generator<FacetToken> {
+  let i = 0;
+  while (i < raw.length) {
+    const token = startsToken(raw, i) ? readToken(raw, i) : null;
+    if (!token) {
+      i++;
+      continue;
+    }
+    i = token.end;
+    yield token;
+  }
 }
 
 /** A token begins at `$` (or the `-` that negates it) standing at a word boundary — nowhere else. */

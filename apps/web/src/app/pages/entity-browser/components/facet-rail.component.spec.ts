@@ -499,6 +499,13 @@ describe('FacetRail — a value the text owns (#425)', () => {
     // Same state, two sources — and the rail says which is which.
     expect(typed?.hasAttribute('data-query-owned')).toBe(true);
     expect(clicked?.hasAttribute('data-query-owned')).toBe(false);
+    // Visibly, not only to a test hook: the typed row is outlined, and carries the dollar it was named
+    // with. The row's own styling survives the outline, so nothing shifts as the text takes a value over.
+    expect(typed?.className).toContain('border-dashed');
+    expect(typed?.className).toContain('rounded-sm');
+    expect(typed?.textContent).toContain('$');
+    expect(clicked?.className).not.toContain('border-dashed');
+    expect(clicked?.textContent).not.toContain('$');
   });
 
   it('says what clicking a query-owned row does, rather than repeating the row’s label', () => {

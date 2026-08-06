@@ -64,15 +64,19 @@ export interface ActiveFacets {
 export type FacetCategory = 'type' | 'tag' | 'visibility' | 'container';
 
 /**
- * The displayed values a **Facet Token** put in force — the ones the *text* owns (ADR-0082, #425), in
- * either polarity, a value having one visual state whichever way it was named. A row named here renders
- * as query-owned, because clicking it takes the token out of the box rather than toggling the rail's own
- * store. Absent on every surface with no token parse behind it.
+ * The displayed values the *text* owns, in either polarity — a value has one visual state whichever way
+ * it was named (ADR-0082). Empty wherever no **Facet Token** parse stands behind the rail.
  */
 export interface QueryOwnedFacets {
   readonly categories?: Partial<Record<FacetCategory, readonly string[]>>;
   /** Per Facet key, the values a token named — never a bound, which is no row to click off. */
   readonly fields?: Readonly<Record<string, readonly string[]>>;
+}
+
+/** The outline that tells a typed value from a clicked one; transparent otherwise, so a row neither
+ * shifts nor resizes as the text takes it over. One rule, worn by both of a row's controls. */
+function queryOwnedOutline(queryOwned: boolean): string {
+  return queryOwned ? 'border border-dashed border-accent' : 'border border-transparent';
 }
 
 /** Which half of a value's polarity a click addressed (ADR-0081). */
@@ -118,7 +122,7 @@ export interface FieldRangeChange {
           | transloco: { value: label() }
       "
       class="shrink-0 w-6 flex items-center justify-center rounded-sm font-sans text-sm text-ink-faint hover:bg-surface-sunken aria-pressed:bg-danger-soft aria-pressed:text-danger"
-      [class]="queryOwned() ? 'border border-dashed border-accent' : 'border border-transparent'"
+      [class]="outline(queryOwned())"
       (click)="press.emit()"
     >
       <span aria-hidden="true">−</span>
@@ -133,6 +137,8 @@ export class FacetExcludeToggleComponent {
   /** The row's rendered label — the exclude control names itself with it, the include one carries it. */
   readonly label = input.required<string>();
   readonly press = output<void>();
+
+  protected readonly outline = queryOwnedOutline;
 }
 
 /**
@@ -183,7 +189,7 @@ export class FacetExcludeToggleComponent {
                     row.queryOwned ? ('entityBrowser.facets.removeTyped' | transloco: { value: row.label }) : null
                   "
                   class="flex-1 min-w-0 flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
-                  [class]="queryOwnedClass(row.queryOwned)"
+                  [class]="outline(row.queryOwned)"
                   (click)="toggled.emit({ category: group.category, value: row.value, polarity: 'include' })"
                 >
                   <span class="min-w-0 flex items-baseline gap-1">
@@ -253,7 +259,7 @@ export class FacetExcludeToggleComponent {
                       row.queryOwned ? ('entityBrowser.facets.removeTyped' | transloco: { value: row.label }) : null
                     "
                     class="flex-1 min-w-0 flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
-                    [class]="queryOwnedClass(row.queryOwned)"
+                    [class]="outline(row.queryOwned)"
                     (click)="
                       fieldValueToggled.emit({
                         key: field.key,
@@ -328,11 +334,7 @@ export class FacetRailComponent {
   readonly fieldRangeChanged = output<FieldRangeChange>();
   readonly clearAll = output<void>();
 
-  /** The dashed outline that tells a typed value from a clicked one; transparent otherwise, so a row
-   * neither shifts nor resizes when the text takes it over. */
-  protected queryOwnedClass(queryOwned: boolean): string {
-    return queryOwned ? 'border border-dashed border-accent' : 'border border-transparent';
-  }
+  protected readonly outline = queryOwnedOutline;
 
   protected emitRange(key: string, bound: 'gte' | 'lte', event: Event): void {
     this.fieldRangeChanged.emit({

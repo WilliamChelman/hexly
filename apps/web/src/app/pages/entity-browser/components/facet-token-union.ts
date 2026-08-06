@@ -36,9 +36,8 @@ export function unionFacets(parsed: ParsedFacetQuery, rail: ActiveFacets): Activ
 }
 
 /**
- * Which of the rendered values the **text** owns (ADR-0082, #425) — the half of the union the rail
- * marks as query-owned, and the half a click deletes a token for rather than toggling. Either polarity
- * counts: a value has one visual state whichever way the box named it.
+ * Which of the union's values came from the text (ADR-0082) — either polarity, a value having one
+ * visual state whichever way the box named it.
  */
 export function queryOwnedFacets(parsed: ParsedFacetQuery): QueryOwnedFacets {
   const categories: Partial<Record<FacetTokenCategory, readonly string[]>> = {};

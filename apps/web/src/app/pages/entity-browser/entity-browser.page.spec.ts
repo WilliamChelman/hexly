@@ -1728,6 +1728,32 @@ describe('EntityBrowser', () => {
         expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
       });
 
+      /** The click deletes the token, and only the token: a value the rail was already holding was
+       * merely masked by the text (ADR-0082), so it stays in force and one more click releases it. */
+      it('leaves a rail selection the text was masking in force, released by a second click', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+        search(fixture, '$tag:draft');
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+
+        // The box lost its token; the earlier click is still the rail's, and still lit.
+        expect(searchBox(el).value).toBe('');
+        expect(facet(el, 'facet-tag-draft')?.hasAttribute('data-query-owned')).toBe(false);
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('false');
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+
       it('leaves a rail-sourced selection toggling as it always did, box untouched', () => {
         withCounts();
         const fixture = renderWith([summary({ id: 'm1' })]);

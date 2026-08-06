@@ -321,15 +321,7 @@ export class EntityBrowserPage {
     this.typed.pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed()).subscribe((raw) => {
       // Kept verbatim, untrimmed: a trailing space is inside a `$tag:"sea of ` still being typed, and
       // the box must go on holding exactly what was typed (ADR-0082). The parser trims the residual.
-      this.rawQuery.set(raw);
-      // Mirror to the URL: merge keeps the World scope, replaceUrl avoids a
-      // history entry per keystroke.
-      this.router.navigate([], {
-        relativeTo: this.route,
-        queryParams: { q: raw || null },
-        queryParamsHandling: 'merge',
-        replaceUrl: true,
-      });
+      this.setQuery(raw);
     });
 
     // Refetch page one whenever the World, query, or Facets change — covers a
@@ -381,13 +373,18 @@ export class EntityBrowserPage {
   }
 
   /**
-   * The one rail→text write in the design, and always a deletion (ADR-0082, #425): a click on a row the
-   * text owns takes the token that named it out of the box, and nothing else of what was typed. Either
-   * control does it — a typed value is one visual state, so there is one thing to release — and the
-   * rail store stays out of it, the value never having been clicked into it.
+   * The one rail→text write in the design, and always a deletion (ADR-0082): a click on a row the text
+   * owns takes the token that named it out of the box, whichever of the row's two controls was pressed.
+   * The rail store is left alone — a value it holds from an earlier click was only being masked by the
+   * text, and stays in force, one more click from release.
    */
   private dropToken(target: FacetTokenTarget): void {
-    const raw = removeFacetToken(this.rawQuery(), this.facetKeys(), target);
+    this.setQuery(removeFacetToken(this.rawQuery(), this.facetKeys(), target));
+  }
+
+  /** Commit the text store: the box's raw string, mirrored to the URL's `q`. Merge keeps the World
+   * scope; replaceUrl avoids a history entry per keystroke. */
+  private setQuery(raw: string): void {
     this.rawQuery.set(raw);
     this.router.navigate([], {
       relativeTo: this.route,
