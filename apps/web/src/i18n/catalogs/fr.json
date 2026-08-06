@@ -108,7 +108,8 @@
       "shared": "Partagé",
       "rangeMin": "{{field}} minimum",
       "rangeMax": "{{field}} maximum",
-      "container": "Conteneur"
+      "container": "Conteneur",
+      "excludeValue": "Exclure {{value}}"
     }
   },
   "entityTags": {

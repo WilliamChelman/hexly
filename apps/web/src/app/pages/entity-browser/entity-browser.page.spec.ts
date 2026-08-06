@@ -899,6 +899,9 @@ describe('EntityBrowser', () => {
             tag: null,
             visibility: null,
             field: null,
+            excludeType: null,
+            excludeTag: null,
+            excludeVisibility: null,
           },
         }),
       );
@@ -1124,6 +1127,247 @@ describe('EntityBrowser', () => {
           type: ['test.type.beast'],
           field: ['alignment:eq:lawful-good'],
         });
+      });
+    });
+
+    /**
+     * Exclusion reaches the reader (ADR-0081, #422): a second toggle per row, riding the `exclude*`
+     * params #421 put on the wire, with the two polarities releasing each other.
+     */
+    describe('Excluding a value (#422)', () => {
+      const withCounts = () =>
+        client.facets.mockReturnValue(
+          of({
+            type: [
+              { value: 'core.type.note', count: 3 },
+              { value: 'core.type.hex-map', count: 1 },
+            ],
+            tag: [
+              { value: 'draft', count: 2 },
+              { value: 'secret', count: 1 },
+            ],
+            visibility: [],
+            fields: [],
+          }),
+        );
+
+      /** Render with counts on screen and the next list read stubbed, ready for a toggle. */
+      function ready() {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'n1' })]);
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+        return { fixture, el: fixture.nativeElement as HTMLElement };
+      }
+
+      it('excluding a Tag sends excludeTag and mirrors it to the URL', () => {
+        const { fixture, el } = ready();
+
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          excludeTag: ['draft'],
+        });
+        // The counts drill down against the exclusion too, or the rail would annotate a list it disagrees with.
+        expect(client.facets).toHaveBeenLastCalledWith({ worldId: 'w1', excludeTag: ['draft'] });
+        expect(navigate).toHaveBeenLastCalledWith(
+          [],
+          expect.objectContaining({ queryParams: expect.objectContaining({ excludeTag: ['draft'] }) }),
+        );
+      });
+
+      it('clicking the exclude toggle again restores the excluded Entities', () => {
+        const { fixture, el } = ready();
+
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+        expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+        expect(navigate).toHaveBeenLastCalledWith(
+          [],
+          expect.objectContaining({ queryParams: expect.objectContaining({ excludeTag: null }) }),
+        );
+      });
+
+      /** Read Notes without Maps crowding them out. */
+      it('excludes an Entity Type the same way', () => {
+        const { fixture, el } = ready();
+
+        facet(el, 'facet-exclude-type-core.type.hex-map')?.click();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          excludeType: ['core.type.hex-map'],
+        });
+      });
+
+      it('accumulates exclusions — hide drafts and secrets in one browse', () => {
+        const { fixture, el } = ready();
+
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+        facet(el, 'facet-exclude-tag-secret')?.click();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          excludeTag: ['draft', 'secret'],
+        });
+      });
+
+      it('releases the exclusion when include is pressed, and the inclusion when exclude is', () => {
+        const { fixture, el } = ready();
+
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        // Include on an excluded value: the exclusion goes, the inclusion arrives — never both.
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          tag: ['draft'],
+        });
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+        expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('false');
+
+        // And back the other way.
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          excludeTag: ['draft'],
+        });
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('false');
+        expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+      });
+
+      it('excludes a Field value through the `field` param’s own `neq` op', () => {
+        client.facets.mockReturnValue(
+          of({
+            type: [],
+            tag: [],
+            visibility: [],
+            fields: [
+              {
+                key: 'alignment',
+                label: 'Alignment',
+                dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
+                values: [{ value: 'chaotic-evil', count: 1 }],
+              },
+            ],
+          }),
+        );
+        const fixture = renderWith([summary({ id: 'n1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        facet(el, 'facet-exclude-field-alignment-chaotic-evil')?.click();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          field: ['alignment:neq:chaotic-evil'],
+        });
+      });
+
+      /** A refresh, or a shared link, reproduces the browse. */
+      it('seeds exclusions from the URL into the first fetch and lights their controls', () => {
+        withCounts();
+        queryParams$.next(convertToParamMap({ excludeTag: ['draft', 'secret'], excludeType: 'core.type.hex-map' }));
+        client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
+        const fixture = TestBed.createComponent(EntityBrowserPage);
+        fixture.detectChanges();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          excludeTag: ['draft', 'secret'],
+          excludeType: ['core.type.hex-map'],
+        });
+        // One request on load — the seeded browse is the first one, not a correction of an empty one.
+        expect(client.list).toHaveBeenCalledTimes(1);
+        const el = fixture.nativeElement as HTMLElement;
+        expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+        expect(facet(el, 'facet-exclude-type-core.type.hex-map')?.getAttribute('aria-pressed')).toBe('true');
+      });
+
+      it('offers Clear all for an exclusion alone, and clears both polarities', () => {
+        const { fixture, el } = ready();
+
+        facet(el, 'facet-tag-secret')?.click();
+        fixture.detectChanges();
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+        expect(facet(el, 'facet-clear')).not.toBeNull();
+
+        facet(el, 'facet-clear')?.click();
+        fixture.detectChanges();
+
+        expect(navigate).toHaveBeenLastCalledWith(
+          [],
+          expect.objectContaining({
+            queryParams: {
+              q: null,
+              type: null,
+              tag: null,
+              visibility: null,
+              field: null,
+              excludeType: null,
+              excludeTag: null,
+              excludeVisibility: null,
+            },
+          }),
+        );
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+
+      /** Or the exclusion is a one-way door: the row is gone and there is nothing left to click off. */
+      it('keeps an excluded Tag listed once the drill-down stops counting it, still clickable off', () => {
+        const { fixture, el } = ready();
+
+        // The server drops `draft` from the counts (say a Type selection shares no Entity with it).
+        client.facets.mockReturnValue(
+          of({ type: [{ value: 'core.type.note', count: 3 }], tag: [], visibility: [], fields: [] }),
+        );
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        const excluded = facet(el, 'facet-exclude-tag-draft');
+        expect(excluded).not.toBeNull();
+        expect(excluded?.getAttribute('aria-pressed')).toBe('true');
+        expect(facet(el, 'facet-tag-draft')?.querySelector('span.tabular-nums')?.textContent?.trim()).toBe('0');
+
+        excluded?.click();
+        fixture.detectChanges();
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
       });
     });
   });
