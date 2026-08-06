@@ -1569,6 +1569,39 @@ describe('EntityBrowser', () => {
         expect(searchBox(fixture.nativeElement).value).toBe('orc $tag:fantasy');
       });
 
+      /** Reversing a typed Facet is the box's job until #425; the rail must not write a copy the union
+       * then hides, or backspacing the token would leave a filter nobody clicked. */
+      it('writes nothing when a rail row the text owns is clicked', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:draft');
+        const calls = client.list.mock.calls.length;
+        navigate.mockClear();
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        expect(navigate).not.toHaveBeenCalled();
+        expect(client.list.mock.calls.length).toBe(calls);
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+      });
+
+      it('counts a box of blanks as no query at all', () => {
+        withCounts();
+        const fixture = renderWith([]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '   ');
+
+        // Nothing is being searched for: the plain empty state, and nothing to clear.
+        expect(el.querySelector('[data-testid=empty]')).not.toBeNull();
+        expect(el.querySelector('[data-testid=no-matches]')).toBeNull();
+        expect(facet(el, 'facet-clear')).toBeNull();
+      });
+
       it('clears a typed Facet with Clear all, box and all', () => {
         withCounts();
         const fixture = renderWith([summary({ id: 'm1' })]);

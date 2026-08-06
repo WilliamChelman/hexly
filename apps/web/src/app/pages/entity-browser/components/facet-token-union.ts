@@ -1,6 +1,12 @@
-import { FacetTokenCategory, FieldFilter, ParsedFacetQuery } from '@hexly/domain';
+import { FacetTokenCategory, FacetTokenValues, FieldFilter, ParsedFacetQuery } from '@hexly/domain';
 import { ActiveFacets, FieldSelection } from './facet-rail.component';
-import { pruneField } from './field-facet-url';
+import { foldFieldFilters, pruneField } from './field-facet-url';
+
+/** The categories both stores speak, in the rail's own order. */
+const CATEGORIES = ['type', 'tag', 'visibility', 'container'] as const satisfies readonly FacetTokenCategory[];
+
+/** A rail store's values for one polarity — `container` and the excluding half are both optional there. */
+type RailValues = Partial<Record<FacetTokenCategory, readonly string[]>>;
 
 /**
  * The one filter state, `parse(text) ∪ railState` (ADR-0082). A typed Facet lives in the text and a
@@ -12,22 +18,19 @@ import { pruneField } from './field-facet-url';
  * and each value keeps exactly one visual state.
  */
 export function unionFacets(parsed: ParsedFacetQuery, rail: ActiveFacets): ActiveFacets {
-  const railExcluded = rail.excluded ?? {};
-  const merge = (category: FacetTokenCategory, own: readonly string[], railValues: readonly string[] = []) => {
-    const named = new Set([...parsed.include[category], ...parsed.exclude[category]]);
-    return [...own, ...railValues.filter((value) => !named.has(value))];
+  const merge = (typed: FacetTokenValues, clicked: RailValues): Record<FacetTokenCategory, readonly string[]> => {
+    const merged: Record<FacetTokenCategory, readonly string[]> = { type: [], tag: [], visibility: [], container: [] };
+    for (const category of CATEGORIES) {
+      // Either polarity in the text takes the value off the rail: the contradiction is settled here.
+      const named = new Set([...parsed.include[category], ...parsed.exclude[category]]);
+      merged[category] = [...typed[category], ...(clicked[category] ?? []).filter((value) => !named.has(value))];
+    }
+    return merged;
   };
+
   return {
-    type: merge('type', parsed.include.type, rail.type),
-    tag: merge('tag', parsed.include.tag, rail.tag),
-    visibility: merge('visibility', parsed.include.visibility, rail.visibility),
-    container: merge('container', parsed.include.container, rail.container),
-    excluded: {
-      type: merge('type', parsed.exclude.type, railExcluded.type),
-      tag: merge('tag', parsed.exclude.tag, railExcluded.tag),
-      visibility: merge('visibility', parsed.exclude.visibility, railExcluded.visibility),
-      container: merge('container', parsed.exclude.container, railExcluded.container),
-    },
+    ...merge(parsed.include, rail),
+    excluded: merge(parsed.exclude, rail.excluded ?? {}),
     fields: unionFields(parsed.fields, rail.fields),
   };
 }
@@ -38,17 +41,10 @@ function unionFields(
   parsed: readonly FieldFilter[],
   rail: Readonly<Record<string, FieldSelection>>,
 ): Record<string, FieldSelection> {
-  const typed = new Map<string, FieldSelection>();
-  for (const filter of parsed) {
-    const sel = typed.get(filter.key) ?? {};
-    if (filter.op === 'eq') typed.set(filter.key, { ...sel, values: [...(sel.values ?? []), filter.value] });
-    else if (filter.op === 'neq') typed.set(filter.key, { ...sel, excluded: [...(sel.excluded ?? []), filter.value] });
-    else typed.set(filter.key, { ...sel, [filter.op]: filter.value });
-  }
-
+  const typed = foldFieldFilters(parsed);
   const fields: Record<string, FieldSelection> = {};
-  for (const key of new Set([...Object.keys(rail), ...typed.keys()])) {
-    const text = typed.get(key) ?? {};
+  for (const key of new Set([...Object.keys(rail), ...Object.keys(typed)])) {
+    const text = typed[key] ?? {};
     const clicked = rail[key] ?? {};
     const named = new Set([...(text.values ?? []), ...(text.excluded ?? [])]);
     const keep = (values: readonly string[] | undefined) => (values ?? []).filter((value) => !named.has(value));

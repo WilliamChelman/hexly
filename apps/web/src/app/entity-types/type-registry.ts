@@ -220,10 +220,8 @@ export class TypeRegistry implements EntityTypes {
 
   /**
    * Every **Facet** key a Facet Token may name (ADR-0082): each facetable scalar Field's id, then the
-   * dimensions the enabled **Structured Data Types** harvest (ADR-0055) — the same two sources, in the
-   * same order, the server's facet read draws its keys from. Read **synchronously** off the registry,
-   * never from the facet read: a parser that changed its mind when a network read landed would rewrite
-   * results while they were being read.
+   * dimensions this build's **Structured Data Types** harvest — the same two sources, in the same order,
+   * the server's facet read draws its keys from (ADR-0055).
    */
   facetKeys(): string[] {
     const keys = new Set<string>();

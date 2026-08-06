@@ -3,7 +3,15 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityFacets, EntityPage, EntitySummary, EntityType, parseFacetQuery, Visibility } from '@hexly/domain';
+import {
+  EntityFacets,
+  EntityPage,
+  EntitySummary,
+  EntityType,
+  FieldFilter,
+  parseFacetQuery,
+  Visibility,
+} from '@hexly/domain';
 import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, AppShellStore } from '@hexly/web-core';
 import { ButtonComponent, DialogService, EyebrowComponent, PageHeaderComponent } from '@hexly/web-ui';
 import { NewEntityButtonComponent } from '../../entity-types/new-entity-button.component';
@@ -13,6 +21,7 @@ import { EntitySearchComponent } from './components/entity-search.component';
 import { EmptyStateComponent } from './components/empty-state.component';
 import {
   ActiveFacets,
+  FacetCategory,
   FacetRailComponent,
   FacetToggle,
   FieldRangeChange,
@@ -141,7 +150,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
               [title]="'entityBrowser.loadErrorTitle' | transloco"
               [hint]="'entityBrowser.loadErrorHint' | transloco"
             />
-          } @else if (loaded() && rawQuery()) {
+          } @else if (loaded() && hasQuery()) {
             <app-empty-state
               testid="no-matches"
               [title]="'entityBrowser.noMatchTitle' | transloco"
@@ -199,9 +208,8 @@ export class EntityBrowserPage {
   protected readonly renamingId = signal<string | null>(null);
 
   /**
-   * The **text store** (ADR-0082): the box exactly as it was typed, debounced. Never rewritten here —
-   * it is parsed, not absorbed — so backspace fixes a typo'd `$tag:fantsy` the way backspace always
-   * works. Source of truth for the URL `q` mirror, which carries this *raw* string; the wire carries
+   * The **text store** (ADR-0082): the box exactly as it was typed, debounced and never rewritten here.
+   * Source of truth for the URL `q` mirror, which carries this *raw* string; the wire carries
    * {@link searchText}, the residual after every token is lifted out.
    */
   protected readonly rawQuery = signal('');
@@ -209,14 +217,16 @@ export class EntityBrowserPage {
 
   /**
    * What the box means: its **Facet Tokens** as structured filters and the free text left over. The key
-   * set comes from the client registry, synchronously, minus `in` — the Entity Browser reads one World,
-   * so it has no **Container** facet to narrow and says so rather than dropping the token (ADR-0082).
+   * set comes from the client registry, synchronously, minus `in` — a browse scoped to one **Container**
+   * has nothing to narrow, so `$in:` is reported as a miss rather than dropped (ADR-0082).
    */
   protected readonly parsedQuery = computed(() =>
     parseFacetQuery(this.rawQuery(), { reserved: ['type', 'tag', 'visibility'], fields: this.types.facetKeys() }),
   );
   /** The residual full-text query — what the wire's `q` carries, as against the URL's raw string. */
   private readonly searchText = computed(() => this.parsedQuery().text);
+  /** Whether the box holds anything at all to search or filter by — blanks are not a query. */
+  protected readonly hasQuery = computed(() => this.rawQuery().trim() !== '');
   /** The `$` names nothing here answers to, reported on the surface (ADR-0082). */
   protected readonly unknownFacetKeys = computed(() => this.parsedQuery().unresolvedKeys);
 
@@ -236,7 +246,7 @@ export class EntityBrowserPage {
   protected readonly hasFilters = computed(() => {
     const f = this.activeFacets();
     return (
-      this.rawQuery() !== '' ||
+      this.hasQuery() ||
       f.type.length > 0 ||
       f.tag.length > 0 ||
       f.visibility.length > 0 ||
@@ -329,6 +339,7 @@ export class EntityBrowserPage {
   /** Toggle one category value in the polarity the pressed control names; the other is released.
    * Against the rail store alone — a clicked Facet lives in the rail, and never writes text (ADR-0082). */
   protected toggleFacet({ category, value, polarity }: FacetToggle): void {
+    if (this.namedInText(category, value)) return;
     const current = this.railFacets();
     const next = togglePolarity(current[category], current.excluded?.[category] ?? [], value, polarity);
     this.applyFacets({
@@ -341,6 +352,7 @@ export class EntityBrowserPage {
   /** Toggle one enum/list/string Field-facet value: `eq` membership (OR within the Field), or its
    * `neq` veto. As in a category, pressing either polarity releases the other. */
   protected toggleFieldValue({ key, value, polarity }: FieldValueToggle): void {
+    if (this.fieldNamedInText(key, (f) => (f.op === 'eq' || f.op === 'neq') && f.value === value)) return;
     const current = this.railFacets();
     const sel = current.fields[key] ?? {};
     const next = togglePolarity(sel.values ?? [], sel.excluded ?? [], value, polarity);
@@ -349,12 +361,29 @@ export class EntityBrowserPage {
 
   /** Set (or clear) one bound of a number/date Field range. */
   protected changeFieldRange({ key, bound, value }: FieldRangeChange): void {
+    if (this.fieldNamedInText(key, (f) => f.op === bound)) return;
     const current = this.railFacets();
     const sel = current.fields[key] ?? {};
     this.setFieldSelection(current, key, {
       ...sel,
       [bound]: value || undefined,
     });
+  }
+
+  /**
+   * Whether the text already names this value, in either polarity — in which case the rail must not
+   * write it: the text owns it, the union would hide the rail's copy, and backspacing the token later
+   * would leave a filter nobody clicked. Reversing a typed Facet is the box's job until #425 makes the
+   * rail row delete the token that named it (ADR-0082).
+   */
+  private namedInText(category: FacetCategory, value: string): boolean {
+    const parsed = this.parsedQuery();
+    return parsed.include[category].includes(value) || parsed.exclude[category].includes(value);
+  }
+
+  /** The same rule for a Facet key's rail controls — a typed value, or a typed bound. */
+  private fieldNamedInText(key: string, matches: (filter: FieldFilter) => boolean): boolean {
+    return this.parsedQuery().fields.some((f) => f.key === key && matches(f));
   }
 
   /** Fold a Field selection back into the active facets, pruning it away once empty. */
