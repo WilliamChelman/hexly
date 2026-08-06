@@ -137,11 +137,11 @@ An **Entity** that lives in a **Compendium** — defined by that location alone,
 _Avoid_: Compendium Entity (it is an Entity, in a place), record, item, stat block, monster (one pack's content)
 
 **Sealed**:
-The state of a **Compendium Entry**: read-only to everyone, the operator included. A seal on _writing_, not on _reading_ — the **Command Palette** and full-text search still find it, ranked below authored Entities, and its own page opens to anyone who can reach it. One structural refusal at the entity write choke point, on ADR-0068's precedent. The seal is not a **Right** and no Right outranks it, but a sealed Entity's Rights report `read` alone, so nothing offers an affordance the write choke point would refuse. Sealing once also forbade being pointed at; that half is now the **Mount** scope, which is a property of the pointing World rather than of the entry (ADR-0080).
+The state of a **Compendium Entry**: read-only to everyone, the operator included. A seal on _writing_, not on _reading_ — the **Command Palette** and full-text search still find it, ranked below authored Entities, and its own page opens to anyone who can reach it; the Palette finds it where the reader's World **Mounts** its Compendium. One structural refusal at the entity write choke point, on ADR-0068's precedent. The seal is not a **Right** and no Right outranks it, but a sealed Entity's Rights report `read` alone, so nothing offers an affordance the write choke point would refuse. Sealing once also forbade being pointed at; that half is now the **Mount** scope, which is a property of the pointing World rather than of the entry (ADR-0080).
 _Avoid_: Locked, frozen, immutable, protected; read-only (the whole of it now), hidden (it is findable), unlinkable (that is the Mount scope's business)
 
 **Link-target read**:
-A read asking _"what may this point at?"_ — the `@` mention picker, the **Entity Link** Field picker, the Board **Embed** picker, the asset and Board **Image** pickers, and the **Vault** import's wikilink name-resolution. It returns only Entities in the current **Container** or one it **Mounts**, ranked with the World's own first; that scope is the whole rule, and an unmounted Container is unreachable by it whatever its kind. Its opposite is a **navigation read** — the **Command Palette**, full-text search, an id resolution, an Entity's own page — which returns anything the caller can reach, so it needs no rule of its own. Those that query the Entity list declare which kind they are, so the rule is one rule and not five; the Vault import's resolution reads only the vault it is importing (ADR-0079, ADR-0080).
+A read asking _"what may this point at?"_ — the `@` mention picker, the **Entity Link** Field picker, the Board **Embed** picker, the asset and Board **Image** pickers, and the **Vault** import's wikilink name-resolution. It returns only Entities in the current **Container** or one it **Mounts**, ranked with the World's own first; that scope is the whole rule, and an unmounted Container is unreachable by it whatever its kind. Its opposite is a **navigation read** — the **Command Palette**, full-text search, an id resolution, an Entity's own page — which returns anything the caller can reach, so it needs no rule of its own. That the Palette looks only in the reader's **World** and its **Mounts** is a choice about where a reader is likely to be going, not a rule about what it may return: the same reach as a link-target read, arrived at from the opposite direction. Those that query the Entity list declare which kind they are, so the rule is one rule and not five; the Vault import's resolution reads only the vault it is importing (ADR-0079, ADR-0080).
 _Avoid_: Picker read, link read, mention search; filtered read (it is a kind of read, not a filter on one)
 
 **Compendium Importer**:
@@ -363,7 +363,7 @@ _Avoid_: Region legend, layers, list
 ## Command Palette
 
 **Command Palette**:
-A Cmd/Ctrl+K overlay, reachable from anywhere, for finding Entities and Worlds and invoking Commands — the one cross-cutting search-and-act surface.
+A Cmd/Ctrl+K overlay, reachable from anywhere, for finding Entities and Worlds and invoking Commands — the one cross-cutting search-and-act surface. Worlds and Commands answer from anywhere; Entities answer from the **World** the reader is in and the **Containers** it **Mounts**, and outside a World it offers none, a reader with no World in view having no Entities in view either. Narrowed by **Facet Tokens** like any other Entity search.
 _Avoid_: Quick open, search bar, spotlight
 
 **Command**:
@@ -391,7 +391,7 @@ _Avoid_: Outcome, score, value
 ## Entity Browser
 
 **Entity Browser**:
-The durable, in-World surface listing a single **World**'s Entities as a card grid, found by **Facets** and a full-text query — labelled **Entities** in the nav rail. Scoped to one **Container**, so it never shows an Entity from another, a **Mount**ed one included — distinct from the **Library** (what this World draws from), the Command Palette (global, transient), and the World Index (lists Worlds).
+The durable, in-World surface listing a single **World**'s Entities as a card grid, found by **Facets** and a full-text query — labelled **Entities** in the nav rail. Scoped to one **Container**, so it never shows an Entity from another, a **Mount**ed one included — distinct from the **Library** (what this World draws from), the Command Palette (transient, and reaching what the World **Mounts** too), and the World Index (lists Worlds).
 _Avoid_: Entity list, library (that is the sibling surface listing this World's **Mounts**), catalog, explorer; fuzzy search (the query is full-text, ranked)
 
 **Asset Browser**:
@@ -399,8 +399,13 @@ The **Entity Browser** preset to the asset type, presented as thumbnail tiles wi
 _Avoid_: Media library, gallery, asset manager, file manager
 
 **Facet**:
-A filterable dimension of the Entities a browse lists — a **World**'s, or the **Library**'s — with its distinct values and counts — Type, Tag, and Visibility always, plus facetable **Fields**, harvested dimensions, and, in the Library, the **Container** itself, surfaced _by presence_. Values within one Facet OR; across Facets AND.
+A filterable dimension of the Entities a browse lists — a **World**'s, or the **Library**'s — with its distinct values and counts — Type, Tag, and Visibility always, plus facetable **Fields**, harvested dimensions, and, in the Library, the **Container** itself, surfaced _by presence_. A value is neutral, **included**, or **excluded**: included values within one Facet OR, and Facets AND, while an exclusion **vetoes** — it outranks any inclusion of the same value, and exclusions accumulate. An Entity carrying no value at all for a Facet is untouched by its exclusions, so excluding a Challenge Rating never hides the Notes that have none. A value you have chosen is always listed, whatever its count, so a choice can always be undone where it was made.
 _Avoid_: Filter, dimension, aspect; Pack facet (it is the **Container** facet, and a **Compendium** is one value it takes)
+
+**Facet Token**:
+A **Facet** named inline rather than clicked — `$` then the Facet's name, a colon, and a value (`$type:npc`, `$tag:"sea of storms"`), with a leading `-` to exclude. Typed into any Entity search box, so a reader narrows from the keyboard where there is no room for a rail. The `$` is what tells a Facet from prose: a session title carrying a colon is still text to search for, and a name that answers to nothing says so rather than quietly becoming a search term. Everything else in the box is the full-text query.
+Where a Facet is named is where it lives — a typed one lives in the text, a clicked one lives in the rail — so typing never rewrites the box and clicking never fills it. Naming one both ways is the text's to settle; clicking off a typed one takes it out of the text that named it.
+_Avoid_: Search operator, query syntax, filter token, facet syntax; Inline Facet (it is a **Facet**, named a second way, not a kind of its own); sigil (what **Command Prefix** is not called either)
 
 ## Dock
 
