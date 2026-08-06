@@ -84,6 +84,7 @@
     "renameLabel": "Nouveau nom",
     "searchLabel": "Rechercher des entités",
     "searchPlaceholder": "Rechercher par nom, étiquette ou contenu…",
+    "suggestionsLabel": "Suggestions de filtres",
     "creating": "Création…",
     "edited": "Modifié le {{date}}",
     "loadErrorTitle": "Impossible de charger vos entités.",

@@ -30,6 +30,11 @@ const RESERVED: Readonly<Record<string, FacetTokenCategory>> = {
 /** Every reserved name, the default offer for a surface whose key set names none. */
 export const RESERVED_FACET_NAMES: readonly string[] = Object.keys(RESERVED);
 
+/** The category a reserved name filters, or `undefined` for any other key — a Facet key of its own. */
+export function facetCategoryOf(name: string): FacetTokenCategory | undefined {
+  return RESERVED[name];
+}
+
 /**
  * One surface's Facet vocabulary. `reserved` is the subset of {@link RESERVED_FACET_NAMES} this surface
  * can actually apply — the Entity Browser is scoped to one World, so it offers no `in` and reports one
@@ -206,7 +211,7 @@ function vocabulary(keys: FacetKeySet): { reserved: ReadonlySet<string>; fieldKe
 function* scanTokens(raw: string): Generator<FacetToken> {
   let i = 0;
   while (i < raw.length) {
-    const token = startsToken(raw, i) ? readToken(raw, i) : null;
+    const token = startsFacetToken(raw, i) ? readToken(raw, i) : null;
     if (!token) {
       i++;
       continue;
@@ -216,8 +221,11 @@ function* scanTokens(raw: string): Generator<FacetToken> {
   }
 }
 
-/** A token begins at `$` (or the `-` that negates it) standing at a word boundary — nowhere else. */
-function startsToken(raw: string, i: number): boolean {
+/**
+ * A token begins at `$` (or the `-` that negates it) standing at a word boundary — nowhere else.
+ * Exported so the typeahead reads the same boundary the parser does, rather than a second opinion of it.
+ */
+export function startsFacetToken(raw: string, i: number): boolean {
   if (i > 0 && !/\s/.test(raw[i - 1])) return false;
   return raw[i] === '$' || (raw[i] === '-' && raw[i + 1] === '$');
 }

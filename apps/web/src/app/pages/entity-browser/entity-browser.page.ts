@@ -98,7 +98,14 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
     </app-page-header>
 
     <main class="max-w-[72rem] mx-auto py-8 px-6">
-      <app-entity-search [value]="rawQuery()" (queryChange)="onSearch($event)" />
+      <!-- The box offers the whole vocabulary on the dollar (ADR-0082): keys off the registry, values
+           off the Facet read this page already runs. -->
+      <app-entity-search
+        [value]="rawQuery()"
+        [keys]="facetKeys()"
+        [facets]="facetCounts()"
+        (queryChange)="onSearch($event)"
+      />
       <!-- A Facet Token naming a key nothing answers to is *said*, never quietly searched for (ADR-0082). -->
       @if (unknownFacetKeys().length > 0) {
         <p data-testid="unknown-facet" role="status" class="-mt-6 mb-8 font-sans text-sm text-ink-faint">
@@ -220,11 +227,12 @@ export class EntityBrowserPage {
   private readonly typed = new Subject<string>();
 
   /**
-   * This surface's Facet vocabulary, read from the client registry, synchronously, minus `in` — a
-   * browse scoped to one **Container** has nothing to narrow, so `$in:` is reported as a miss rather
-   * than dropped (ADR-0082). The same set parses the box and finds the token a rail click deletes.
+   * This surface's Facet vocabulary, from the client registry, synchronously — minus `in`: a browse
+   * scoped to one **Container** has nothing to narrow, so `$in:` is reported as a miss rather than
+   * dropped (ADR-0082). One set, read thrice: the parser resolves against it, the box offers it on
+   * `$`, and a rail click finds the token it deletes by it.
    */
-  private readonly facetKeys = computed<FacetKeySet>(() => ({
+  protected readonly facetKeys = computed<FacetKeySet>(() => ({
     reserved: ['type', 'tag', 'visibility'],
     fields: this.types.facetKeys(),
   }));
