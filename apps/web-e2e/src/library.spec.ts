@@ -108,6 +108,24 @@ test('the Library lists what this World Mounts, credits the pack it draws from, 
   await expect(goblin).toBeVisible();
   await expect(painting).toBeVisible();
 
+  // And a Container is nameable inline as well as clickable (ADR-0082, #428) — the Library is the one
+  // browse whose read spans many Containers, so `$in:` has something to narrow here and nowhere else.
+  const search = page.getByTestId('entity-search');
+  await search.fill(`$in:${pack}`);
+  await search.press('Escape'); // dismiss the suggestion list, not the browse
+  await expect(painting).toHaveCount(0);
+  await expect(goblin).toBeVisible();
+  // The text is never taken from the caller: the box holds exactly what was typed, and the URL's `q`
+  // carries that raw string rather than the residual the wire got.
+  await expect(search).toHaveValue(`$in:${pack}`);
+  await expect(page).toHaveURL(new RegExp(`[?&]q=`));
+  // The rail says which store the row came from — and clicking the row the text owns deletes that
+  // exact token, which is where a typed Facet is reversed.
+  await expect(page.getByTestId(`facet-container-${pack}`)).toHaveAttribute('data-query-owned', '');
+  await page.getByTestId(`facet-container-${pack}`).click();
+  await expect(search).toHaveValue('');
+  await expect(painting).toBeVisible();
+
   // The rest of the rail behaves the same way too. Role is the pack's own dimension, harvested from
   // its stat block (ADR-0055) — findable by what a monster is, not by remembering its name.
   await page.getByTestId('facet-field-role-harrier').click();

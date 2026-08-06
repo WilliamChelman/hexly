@@ -154,6 +154,22 @@ test('the Asset Browser excludes a Tag: the tagged art drops out, a reload keeps
   // counts it, so the same control is still there to click off.
   await page.getByTestId('facet-exclude-tag-used').click();
   await expect(tile).toHaveCount(1);
+
+  // The same veto, named inline instead (ADR-0082, #428): the Asset Browser's box speaks the Facets
+  // its rail offers, and a typed filter is reversed where it was named.
+  const search = page.getByTestId('entity-search');
+  await search.fill('-$tag:used');
+  await search.press('Escape'); // dismiss the suggestion list, not the browse
+  await expect(tile).toHaveCount(0);
+  // The text is never taken from the caller: the box holds exactly what was typed.
+  await expect(search).toHaveValue('-$tag:used');
+  await expect(page.getByTestId('facet-tag-used')).toHaveAttribute('data-query-owned', '');
+
+  // Clicking the row the text owns takes its token out of the box — the one rail→text write, and a
+  // deletion of text the caller typed themselves.
+  await page.getByTestId('facet-tag-used').click();
+  await expect(search).toHaveValue('');
+  await expect(tile).toHaveCount(1);
 });
 
 /**

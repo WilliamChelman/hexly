@@ -4,7 +4,17 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityFacets, EntitySummary, EntityType, Mount } from '@hexly/domain';
+import {
+  EntityFacets,
+  EntitySummary,
+  EntityType,
+  FacetKeySet,
+  FacetTokenTarget,
+  FieldFilter,
+  Mount,
+  parseFacetQuery,
+  removeFacetToken,
+} from '@hexly/domain';
 import {
   ActiveWorld,
   AppShellStore,
@@ -20,6 +30,7 @@ import { EntitySearchComponent } from '../entity-browser/components/entity-searc
 import { EmptyStateComponent } from '../entity-browser/components/empty-state.component';
 import {
   ActiveFacets,
+  FacetCategory,
   FacetRailComponent,
   FacetToggle,
   FieldRangeChange,
@@ -28,6 +39,8 @@ import {
   togglePolarity,
 } from '../entity-browser/components/facet-rail.component';
 import { fieldTokens, fieldsFromTokens, pruneField } from '../entity-browser/components/field-facet-url';
+import { queryOwnedFacets, unionFacets } from '../entity-browser/components/facet-token-union';
+import { TypeRegistry } from '../../entity-types/type-registry';
 
 const NO_FACETS: ActiveFacets = {
   type: [],
@@ -93,8 +106,21 @@ const SEARCH_DEBOUNCE_MS = 150;
     </app-page-header>
 
     <main class="max-w-[72rem] mx-auto py-8 px-6">
-      <!-- The Entity Browser's own search box, verbatim — the Asset Browser's precedent. -->
-      <app-entity-search [value]="query()" (queryChange)="onSearch($event)" />
+      <!-- The Entity Browser's own search box, verbatim — the Asset Browser's precedent. The whole
+           vocabulary on the dollar (ADR-0082), the Container among it: this is the one browse whose read
+           spans many Containers, so a Mounted one is nameable inline as well as clickable. -->
+      <app-entity-search
+        [value]="rawQuery()"
+        [keys]="facetKeys()"
+        [facets]="facetCounts()"
+        (queryChange)="onSearch($event)"
+      />
+      <!-- A Facet Token naming a key nothing answers to is *said*, never quietly searched for (ADR-0082). -->
+      @if (unknownFacetKeys().length > 0) {
+        <p data-testid="unknown-facet" role="status" class="-mt-6 mb-8 font-sans text-sm text-ink-faint">
+          {{ 'entityBrowser.unknownFacet' | transloco: { keys: unknownFacetKeys().join(', ') } }}
+        </p>
+      }
 
       <!-- The credit line: every mounted **Compendium**, linked to the **Compendium page** stating its
            terms (ADR-0061). All of them whatever the Container facet narrows to, since the credit is
@@ -118,6 +144,7 @@ const SEARCH_DEBOUNCE_MS = 150;
         <app-facet-rail
           [facetCounts]="facetCounts()"
           [active]="activeFacets()"
+          [queryOwned]="queryOwned()"
           [canClear]="hasFilters()"
           [canExclude]="true"
           (toggled)="toggleFacet($event)"
@@ -198,6 +225,8 @@ export class LibraryPage {
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
   private readonly destroyRef = inject(DestroyRef);
+  /** The client registry a Facet Token's key resolves against, synchronously (ADR-0082). */
+  private readonly types = inject(TypeRegistry);
 
   /** Whose Mounts these are, and the Adoption target — never the content's home (ADR-0080). */
   protected readonly worldId = this.activeWorld.worldId;
@@ -234,12 +263,51 @@ export class LibraryPage {
    */
   protected readonly membersOnly = signal(false);
 
-  /** Debounced full-text query; empty means the default last-edited view. Mirrored to the URL `q`. */
-  protected readonly query = signal('');
+  /**
+   * The **text store** (ADR-0082): the box exactly as it was typed, debounced and never rewritten here.
+   * Source of truth for the URL `q` mirror, which carries this *raw* string; the wire carries
+   * {@link searchText}, the residual after every token is lifted out.
+   */
+  protected readonly rawQuery = signal('');
   private readonly typed = new Subject<string>();
 
-  /** Value-equal so the URL round-trip's echo doesn't re-trigger the fetch effect. */
-  protected readonly activeFacets = signal<ActiveFacets>(NO_FACETS, {
+  /**
+   * This surface's Facet vocabulary, from the client registry, synchronously — `in` included, and only
+   * here: the Library's read spans every Mounted **Container**, so `$in:` has something to narrow. No
+   * `visibility`, which this browse strips from its rail for the reason {@link facetCounts} gives, so a
+   * `$visibility:` token is reported as a miss rather than filtering by a word that is false of this
+   * list. One set, read thrice: the parser resolves against it, the box offers it on `$`, and a rail
+   * click finds the token it deletes by it.
+   *
+   * The registry is the *only* source, the Facet read never widening it (ADR-0082) — which bites hardest
+   * here, the read spanning Containers other Worlds own: a Field defined in a mounted pack's own World
+   * offers a rail row this box reports as a miss. The narrower vocabulary is the price of a parser that
+   * cannot change its mind when a network read lands, and the row stays clickable either way.
+   */
+  protected readonly facetKeys = computed<FacetKeySet>(() => ({
+    reserved: ['type', 'tag', 'in'],
+    fields: this.types.facetKeys(),
+  }));
+  /** What the box means: its **Facet Tokens** as structured filters and the free text left over. */
+  protected readonly parsedQuery = computed(() => parseFacetQuery(this.rawQuery(), this.facetKeys()));
+  /** Which rail rows the text owns, so they render as query-owned and click off as a token (ADR-0082). */
+  protected readonly queryOwned = computed(() => queryOwnedFacets(this.parsedQuery()));
+  /** The residual full-text query — what the wire's `q` carries, as against the URL's raw string. */
+  private readonly searchText = computed(() => this.parsedQuery().text);
+  /** Whether the box holds anything at all to search or filter by — blanks are not a query. */
+  private readonly hasQuery = computed(() => this.rawQuery().trim() !== '');
+  /** The `$` names nothing here answers to, reported on the surface (ADR-0082). */
+  protected readonly unknownFacetKeys = computed(() => this.parsedQuery().unresolvedKeys);
+
+  /** The **rail store**: what was clicked. Value-equal so the URL round-trip's echo doesn't re-trigger
+   * the fetch effect. */
+  private readonly railFacets = signal<ActiveFacets>(NO_FACETS, {
+    equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  });
+
+  /** The one filter state, `parse(text) ∪ railState` — what the rail renders and the wire carries. The
+   * same value-equality: a text edit that leaves the filters alone must not refetch on their account. */
+  protected readonly activeFacets = computed(() => unionFacets(this.parsedQuery(), this.railFacets()), {
     equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
   /**
@@ -252,7 +320,7 @@ export class LibraryPage {
   protected readonly hasFilters = computed(() => {
     const f = this.activeFacets();
     return (
-      this.query() !== '' ||
+      this.hasQuery() ||
       f.type.length > 0 ||
       f.tag.length > 0 ||
       f.container.length > 0 ||
@@ -304,8 +372,8 @@ export class LibraryPage {
         takeUntilDestroyed(),
       )
       .subscribe((f) => {
-        this.query.set(f.q);
-        this.activeFacets.set({
+        this.rawQuery.set(f.q);
+        this.railFacets.set({
           type: f.type,
           tag: f.tag,
           // Inert here: see {@link facetCounts} — the category is stripped from the counts.
@@ -322,14 +390,9 @@ export class LibraryPage {
       });
 
     this.typed.pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed()).subscribe((raw) => {
-      const q = raw.trim();
-      this.query.set(q);
-      this.router.navigate([], {
-        relativeTo: this.route,
-        queryParams: { q: q || null },
-        queryParamsHandling: 'merge',
-        replaceUrl: true,
-      });
+      // Kept verbatim, untrimmed: a trailing space is inside a `$tag:"sea of ` still being typed, and
+      // the box must go on holding exactly what was typed (ADR-0082). The parser trims the residual.
+      this.setQuery(raw);
     });
 
     // The Mount set is a property of the active World, so it is re-read when the World changes — and
@@ -360,7 +423,7 @@ export class LibraryPage {
     });
 
     effect(() => {
-      this.query(); // tracked
+      this.searchText(); // tracked
       this.activeFacets(); // tracked
       if (this.mounted() !== null) this.fetchFirstPage();
     });
@@ -399,9 +462,11 @@ export class LibraryPage {
       });
   }
 
-  /** Toggle one category value in the polarity the pressed control names; the other is released. */
+  /** Toggle one category value in the polarity the pressed control names; the other is released.
+   * Against the rail store alone — a clicked Facet lives in the rail, and never writes text (ADR-0082). */
   protected toggleFacet({ category, value, polarity }: FacetToggle): void {
-    const current = this.activeFacets();
+    if (this.namedInText(category, value)) return this.dropToken({ category, value });
+    const current = this.railFacets();
     const next = togglePolarity(current[category], current.excluded?.[category] ?? [], value, polarity);
     this.applyFacets({
       ...current,
@@ -412,16 +477,57 @@ export class LibraryPage {
 
   /** As in a category, pressing either polarity of a Field value releases the other (ADR-0081). */
   protected toggleFieldValue({ key, value, polarity }: FieldValueToggle): void {
-    const current = this.activeFacets();
+    if (this.fieldNamedInText(key, (f) => (f.op === 'eq' || f.op === 'neq') && f.value === value))
+      return this.dropToken({ field: key, value });
+    const current = this.railFacets();
     const sel = current.fields[key] ?? {};
     const next = togglePolarity(sel.values ?? [], sel.excluded ?? [], value, polarity);
     this.setFieldSelection(current, key, { ...sel, values: next.included, excluded: next.excluded });
   }
 
   protected changeFieldRange({ key, bound, value }: FieldRangeChange): void {
-    const current = this.activeFacets();
+    if (this.fieldNamedInText(key, (f) => f.op === bound)) return;
+    const current = this.railFacets();
     const sel = current.fields[key] ?? {};
     this.setFieldSelection(current, key, { ...sel, [bound]: value || undefined });
+  }
+
+  /**
+   * The one rail→text write in the design, and always a deletion (ADR-0082): a click on a row the text
+   * owns takes the token that named it out of the box, whichever of the row's two controls was pressed.
+   * The rail store is left alone — a value it holds from an earlier click was only being masked by the
+   * text, and stays in force, one more click from release.
+   */
+  private dropToken(target: FacetTokenTarget): void {
+    this.setQuery(removeFacetToken(this.rawQuery(), this.facetKeys(), target));
+  }
+
+  /** Commit the text store: the box's raw string, mirrored to the URL's `q`. Merge keeps the World
+   * scope; replaceUrl avoids a history entry per keystroke. */
+  private setQuery(raw: string): void {
+    this.rawQuery.set(raw);
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { q: raw || null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  /**
+   * Whether the text already names this value, in either polarity — in which case the rail must not
+   * write it: the text owns it, the union would hide the rail's copy, and backspacing the token later
+   * would leave a filter nobody clicked. A click on such a row deletes the token instead
+   * ({@link dropToken}), which is where a typed Facet is reversed (ADR-0082).
+   */
+  private namedInText(category: FacetCategory, value: string): boolean {
+    const parsed = this.parsedQuery();
+    return parsed.include[category].includes(value) || parsed.exclude[category].includes(value);
+  }
+
+  /** The same rule for a Facet key's rail controls — a typed value, or a typed bound. */
+  private fieldNamedInText(key: string, matches: (filter: FieldFilter) => boolean): boolean {
+    return this.parsedQuery().fields.some((f) => f.key === key && matches(f));
   }
 
   private setFieldSelection(current: ActiveFacets, key: string, sel: FieldSelection): void {
@@ -432,14 +538,16 @@ export class LibraryPage {
     this.applyFacets({ ...current, fields });
   }
 
+  /** Commit a new rail-store set: update the signal and mirror it to the URL. */
   private applyFacets(updated: ActiveFacets): void {
-    this.activeFacets.set(updated);
+    this.railFacets.set(updated);
     this.mirrorToUrl(updated);
   }
 
+  /** Clears both stores — a typed Facet is as cleared as a clicked one, and the box empties with it. */
   protected clearAll(): void {
-    this.query.set('');
-    this.activeFacets.set(NO_FACETS);
+    this.rawQuery.set('');
+    this.railFacets.set(NO_FACETS);
     this.router.navigate([], {
       relativeTo: this.route,
       // Clear all clears both polarities (ADR-0081).
@@ -527,7 +635,8 @@ export class LibraryPage {
   }
 
   private activeFilterParams(): EntityFacetParams {
-    const q = this.query();
+    // The residual text, not the raw box: the tokens have become params by here (ADR-0082).
+    const q = this.searchText();
     const f = this.activeFacets();
     const excluded = f.excluded ?? {};
     const field = fieldTokens(f.fields);
