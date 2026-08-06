@@ -70,6 +70,25 @@ describe('CommandRegistry', () => {
     ]);
   });
 
+  it('merges the Facet vocabulary of the Providers on a prefix, and offers none from another', () => {
+    // Quick Open's two Providers: the Entity one names a vocabulary, the World one has none to name
+    // (ADR-0082). A Provider on another prefix answers a different box entirely.
+    registry.register({ ...provider(''), facetKeys: () => ({ reserved: ['type'], fields: ['world.field.region'] }) });
+    registry.register({ ...provider(''), facetKeys: () => ({ reserved: ['type', 'tag'], fields: [] }) });
+    registry.register({ ...provider('>'), facetKeys: () => ({ reserved: ['visibility'], fields: [] }) });
+
+    expect(registry.facetKeys('')).toEqual({ reserved: ['type', 'tag'], fields: ['world.field.region'] });
+    expect(registry.facetKeys('>')).toEqual({ reserved: ['visibility'], fields: [] });
+  });
+
+  it('offers no vocabulary at all where no Provider names one — the Palette outside a World', () => {
+    registry.register(provider(''));
+
+    // Empty, not absent: a `$` name then resolves to nothing and is reported, rather than falling back
+    // to the reserved names the parser defaults to when a surface names none.
+    expect(registry.facetKeys('')).toEqual({ reserved: [], fields: [] });
+  });
+
   it('keeps sections in registration order as a slower provider resolves later', () => {
     const fastResults = new Subject<Command[]>();
     const slowResults = new Subject<Command[]>();

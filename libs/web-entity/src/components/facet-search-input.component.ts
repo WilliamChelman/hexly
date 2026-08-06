@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, ElementRef, input, output, signal, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  computed,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import {
   applyFacetSuggestion,
   EntityFacets,
@@ -51,15 +60,17 @@ interface FacetSuggestion {
   template: `
     <input
       #box
-      type="search"
+      [attr.type]="type()"
       [class]="inputClass()"
       [attr.data-testid]="testid()"
       [attr.aria-label]="ariaLabel()"
       [attr.placeholder]="placeholder()"
       autocomplete="off"
-      [attr.role]="visible() ? 'combobox' : null"
-      [attr.aria-expanded]="visible() ? 'true' : null"
-      [attr.aria-activedescendant]="activeItemId()"
+      [attr.role]="expanded() ? 'combobox' : null"
+      [attr.aria-expanded]="expanded() ? 'true' : null"
+      [attr.aria-autocomplete]="expanded() ? 'list' : null"
+      [attr.aria-controls]="controls()"
+      [attr.aria-activedescendant]="visible() ? activeItemId() : activeDescendant()"
       [value]="value()"
       (input)="onInput($any($event.target).value)"
       (keydown)="onBoxKeyDown($event)"
@@ -109,11 +120,22 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
   readonly facets = input<EntityFacets | null>(null);
 
   readonly testid = input('facet-search');
+  /**
+   * `text` for a consumer whose own Escape must survive: a search field clears itself on Escape in
+   * Blink and WebKit, which would eat the key before the `<dialog>` it sits in could cancel.
+   */
+  readonly type = input<'search' | 'text'>('search');
   /** Chrome the consumer owns, already translated: the input's classes and its accessible copy. */
   readonly inputClass = input('');
   readonly ariaLabel = input<string | null>(null);
   readonly placeholder = input<string | null>(null);
   readonly listLabel = input<string | null>(null);
+  /**
+   * The consumer's own listbox where it has one — the Palette's results: its id, and the option it
+   * highlights while the suggestions are shut, so one input serves two lists.
+   */
+  readonly controls = input<string | null>(null);
+  readonly activeDescendant = input<string | null>(null);
 
   /** Every raw keystroke, undebounced — an accepted suggestion emits the rewritten box the same way. */
   readonly queryChange = output<string>();
@@ -123,6 +145,13 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
   protected readonly boxWidth = signal(FALLBACK_WIDTH);
   /** The token the open list is completing, so accepting one replaces exactly what was typed. */
   private context: FacetSuggestContext | null = null;
+  /** A combobox while either list stands: this one's, or the consumer's, which outlives every close. */
+  protected readonly expanded = computed(() => this.visible() || this.controls() !== null);
+
+  /** Focus the box — the input is this component's, so a consumer that opens onto it asks for it here. */
+  focus(): void {
+    this.box().nativeElement.focus();
+  }
 
   protected onInput(text: string): void {
     this.queryChange.emit(text);
