@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
   InjectionToken,
   computed,
   effect,
@@ -16,8 +15,10 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { of, switchMap } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { parseFacetQuery } from '@hexly/domain';
 import { ShortcutService } from '@hexly/web-core';
-import { ButtonComponent, DialogComponent, InputComponent } from '@hexly/web-ui';
+import { FacetSearchInputComponent } from '@hexly/web-entity';
+import { ButtonComponent, DialogComponent } from '@hexly/web-ui';
 import { Command, CommandProvider, parseCommandQuery } from './command';
 import { CommandDirectory } from './command-directory';
 import { CommandRegistry, CommandSection } from './command-registry';
@@ -42,24 +43,34 @@ export const OPEN_COMMAND_PALETTE = 'open-command-palette';
 @Component({
   selector: 'app-command-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, DialogComponent, InputComponent, TranslocoPipe, RouterLink, NgTemplateOutlet],
+  imports: [ButtonComponent, DialogComponent, FacetSearchInputComponent, TranslocoPipe, RouterLink, NgTemplateOutlet],
   template: `
     <app-dialog [open]="open()" align="top" (closed)="onDialogClosed()">
-      <input
+      <!-- The shared box (ADR-0082), key stage only: no Facet read is passed, the Palette running none
+           of its own. A plain text field, not the box's default search one: a search field clears
+           itself on Escape, which would eat the key the overlay closes on. -->
+      <app-facet-search-input
         #search
-        appInput
-        role="combobox"
-        aria-controls="command-palette-listbox"
-        aria-autocomplete="list"
-        data-testid="command-palette-input"
-        [attr.aria-expanded]="open()"
-        [attr.aria-activedescendant]="activeItemId()"
-        [attr.aria-label]="'commandPalette.searchLabel' | transloco"
-        [attr.placeholder]="'commandPalette.placeholder' | transloco"
+        testid="command-palette-input"
+        controls="command-palette-listbox"
+        type="text"
+        inputClass="w-full py-2 px-3 text-sm text-ink-strong bg-surface-sunken border border-line-strong rounded-md shadow-inset outline-none focus:border-accent"
         [value]="text()"
-        (input)="onInput($event)"
+        [keys]="facetKeys()"
+        [activeDescendant]="activeItemId()"
+        [ariaLabel]="'commandPalette.searchLabel' | transloco"
+        [placeholder]="'commandPalette.placeholder' | transloco"
+        [listLabel]="'commandPalette.suggestionsLabel' | transloco"
+        (queryChange)="text.set($event)"
         (keydown)="onInputKeydown($event)"
       />
+      <!-- A Facet Token naming a key nothing here answers to is *said*, never quietly searched for
+           (ADR-0082). -->
+      @if (unknownFacetKeys().length > 0) {
+        <p data-testid="command-palette-unknown-facet" role="status" class="px-2 py-1 text-sm text-ink-faint">
+          {{ 'commandPalette.unknownFacet' | transloco: { keys: unknownFacetKeys().join(', ') } }}
+        </p>
+      }
       <div
         id="command-palette-listbox"
         role="listbox"
@@ -143,9 +154,7 @@ export class CommandPaletteComponent {
   private readonly shortcuts = inject(ShortcutService);
   private readonly transloco = inject(TranslocoService);
   private readonly builtIns = inject(COMMAND_PROVIDERS, { optional: true }) ?? [];
-  // read: ElementRef — #search also hosts appInput, so a bare query would
-  // resolve to the Input component instead of the native element.
-  private readonly searchInput = viewChild('search', { read: ElementRef });
+  private readonly searchInput = viewChild(FacetSearchInputComponent);
 
   protected readonly open = signal(false);
   protected readonly text = signal('');
@@ -166,6 +175,17 @@ export class CommandPaletteComponent {
       ),
     ),
     { initialValue: [] as readonly CommandSection[] },
+  );
+
+  /**
+   * The vocabulary the box offers on `$`: what the Providers on the typed prefix can apply (ADR-0082),
+   * synchronously off their own registries. Empty outside a World, where the Entity Provider is gone
+   * with its scope (ADR-0083) — pressing `$` there opens nothing.
+   */
+  protected readonly facetKeys = computed(() => this.registry.facetKeys(this.parsed().prefix));
+  /** The `$` names nothing on this prefix answers to, reported here rather than searched for as text. */
+  protected readonly unknownFacetKeys = computed(
+    () => parseFacetQuery(this.parsed().query, this.facetKeys()).unresolvedKeys,
   );
 
   protected readonly rows = computed(() =>
@@ -242,10 +262,7 @@ export class CommandPaletteComponent {
     // stale query or selection.
     effect(() => {
       if (this.open()) {
-        untracked(() => {
-          const el = this.searchInput()?.nativeElement as HTMLInputElement | undefined;
-          el?.focus();
-        });
+        untracked(() => this.searchInput()?.focus());
       } else {
         untracked(() => {
           this.text.set('');
@@ -259,10 +276,8 @@ export class CommandPaletteComponent {
     this.open.set(false);
   }
 
-  protected onInput(event: Event): void {
-    this.text.set((event.target as HTMLInputElement).value);
-  }
-
+  /** The result list's keyboard, reached only by a key the open suggestion list did not claim on the box
+   * itself (ADR-0082) — so neither list gates on the other's state. */
   protected onInputKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter') {
       const command = this.activeCommand();

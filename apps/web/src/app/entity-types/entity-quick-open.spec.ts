@@ -3,10 +3,12 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Observable, firstValueFrom, of, skip, throwError } from 'rxjs';
-import { EntitySummary, Mount } from '@hexly/domain';
+import { EntitySummary, Mount, defineField } from '@hexly/domain';
 import { ActiveWorld, EntitiesClient, WorldsClient } from '@hexly/web-core';
 import { MockEntitiesClient, MockWorldsClient } from '@hexly/web-core/testing';
 import { CommandRegistry } from '@hexly/command-palette-web';
+import { provideTranslocoTesting } from '../../testing/transloco-testing';
+import { TypeRegistry } from './type-registry';
 import { EntityQuickOpen } from './entity-quick-open';
 
 function entity(id: string, name: string, worldId = 'w1', over: Partial<EntitySummary> = {}): EntitySummary {
@@ -34,12 +36,20 @@ describe('EntityQuickOpen', () => {
   /** An installed pack and a mounted Shelf — the two kinds of Container a Mount names (ADR-0080). */
   const pack: Mount = { containerId: 'c-pack', name: 'Draw Steel: Monsters', kind: 'compendium' };
   const shelf: Mount = { containerId: 'c-shelf', name: 'The Art Shelf', kind: 'world' };
+  /** A Field the active World defines — resolvable as a Facet key only because the Palette has a World. */
+  const regionField = defineField({
+    id: 'world.field.region',
+    label: 'Region',
+    dataType: { kind: 'string' },
+    facetable: true,
+  });
 
   let entitiesClient: MockEntitiesClient;
   let worldsClient: MockWorldsClient;
   let worldId: ReturnType<typeof signal<string | null>>;
   let navigate: ReturnType<typeof vi.spyOn>;
   let registry: CommandRegistry;
+  let types: TypeRegistry;
   /** The World route's injector — this Provider's lifetime, destroyed on leaving the World scope. */
   let worldScope: EnvironmentInjector | undefined;
 
@@ -50,6 +60,9 @@ describe('EntityQuickOpen', () => {
     worldsClient = new MockWorldsClient();
     worldId = signal<string | null>(null);
     TestBed.configureTestingModule({
+      // The real TypeRegistry, whose Fields resolve a Facet Token's key (ADR-0082); its type chrome
+      // resolves through Transloco.
+      imports: [provideTranslocoTesting()],
       providers: [
         provideRouter([]),
         { provide: EntitiesClient, useValue: entitiesClient },
@@ -59,6 +72,9 @@ describe('EntityQuickOpen', () => {
     });
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     registry = TestBed.inject(CommandRegistry);
+    types = TestBed.inject(TypeRegistry);
+    // What the WorldFieldsLoader projects on entering a World (ADR-0054) — the Fields this World defines.
+    types.setWorldFields([regionField]);
   });
 
   /** Enter the World scope: what the route's providers do on activation. */
@@ -192,6 +208,94 @@ describe('EntityQuickOpen', () => {
 
     expect(command.route).toEqual(['/w', 'w1', 'entities', 'e1']);
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'e1']);
+  });
+
+  /**
+   * A **Facet Token** typed into Quick Open narrows it like any other Entity search box (ADR-0082). Read
+   * on the wire: what the params carry is what the reader sees narrowed, and the residual text is what is
+   * left to search for.
+   */
+  describe('Facet Tokens', () => {
+    beforeEach(() => {
+      entitiesClient.list.mockReturnValue(of({ items: [], nextCursor: null }));
+    });
+
+    it('lifts a token out of the box and sends it as a filter, searching for the text that is left', async () => {
+      const provider = enterWorld('w1', of([pack]));
+
+      await firstValueFrom(provider.search('orc $type:core.type.note'));
+
+      expect(entitiesClient.list).toHaveBeenCalledWith(
+        expect.objectContaining({ q: 'orc', type: ['core.type.note'], worldId: 'w1', containerId: ['c-pack'] }),
+      );
+    });
+
+    it('sends an exclusion, which vetoes', async () => {
+      const provider = enterWorld();
+
+      await firstValueFrom(provider.search('-$tag:draft'));
+
+      // Nothing left to search for: a box holding only tokens is a filter, not a query.
+      expect(entitiesClient.list).toHaveBeenCalledWith(expect.objectContaining({ q: '', excludeTag: ['draft'] }));
+    });
+
+    it('resolves a Field the active World defines — the vocabulary a World scope buys (ADR-0083)', async () => {
+      const provider = enterWorld();
+
+      await firstValueFrom(provider.search('$world.field.region:Ashfen'));
+
+      expect(entitiesClient.list).toHaveBeenCalledWith(
+        expect.objectContaining({ field: ['world.field.region:eq:Ashfen'] }),
+      );
+    });
+
+    it('offers the reserved names and the World’s own Facet keys, synchronously', () => {
+      const provider = enterWorld();
+
+      // `in` included: the scope spans the World and its Mounts, so naming one Container narrows within
+      // it — which is not true of a browse scoped to a single Container.
+      expect(provider.facetKeys()).toEqual({
+        reserved: ['type', 'tag', 'visibility', 'in'],
+        fields: ['world.field.region'],
+      });
+    });
+
+    it('narrows within the Mount scope when a Container is named, never widening it', async () => {
+      const provider = enterWorld('w1', of([pack, shelf]));
+
+      await firstValueFrom(provider.search('$in:c-pack'));
+
+      // `container`, the drill-down within the scope — not `containerId`, which *is* the scope: a token
+      // can never reach a Container the reader's World does not Mount (ADR-0083).
+      expect(entitiesClient.list).toHaveBeenCalledWith(
+        expect.objectContaining({
+          container: ['c-pack'],
+          worldId: 'w1',
+          containerId: ['c-pack', 'c-shelf'],
+        }),
+      );
+    });
+
+    it('issues no Facet read of its own — key typeahead only, whatever is typed', async () => {
+      const provider = enterWorld();
+
+      await firstValueFrom(provider.search('$type:'));
+      await firstValueFrom(provider.search('$type:core.type.note'));
+
+      // Its scope would make this several grouped counts per keystroke — the one place the otherwise
+      // free read is not free (ADR-0082).
+      expect(entitiesClient.facets).not.toHaveBeenCalled();
+    });
+
+    it('leaves a `$` name nothing answers to out of the filters, and out of the text searched for', async () => {
+      const provider = enterWorld();
+
+      await firstValueFrom(provider.search('orc $domain:material'));
+
+      // Reported by the Palette rather than silently searched for as text (ADR-0082).
+      expect(entitiesClient.list).toHaveBeenCalledWith(expect.objectContaining({ q: 'orc' }));
+      expect(entitiesClient.list).toHaveBeenCalledWith(expect.not.objectContaining({ field: expect.anything() }));
+    });
   });
 
   describe('outside a World', () => {

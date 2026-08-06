@@ -1,5 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { Observable, combineLatest, map, of, startWith, tap } from 'rxjs';
+import { FacetKeySet } from '@hexly/domain';
 import { Command, CommandProvider } from './command';
 
 export interface CommandSection {
@@ -24,6 +25,21 @@ export class CommandRegistry {
    * to the longest match without hard-coding the set (ADR-0059).
    */
   readonly prefixes = computed<readonly string[]>(() => [...new Set(this.providers().map((p) => p.prefix))]);
+
+  /**
+   * The Facet vocabulary the Providers on `prefix` can apply, merged (ADR-0082) — what the box offers on
+   * `$` and resolves a typed name against. Reads the Provider signal, so a computed caller re-reads it
+   * when a contextual Provider comes or goes with its scope (ADR-0083).
+   */
+  facetKeys(prefix: string): FacetKeySet {
+    const sets = this.providers()
+      .filter((p) => p.prefix === prefix)
+      .map((p) => p.facetKeys?.());
+    return {
+      reserved: [...new Set(sets.flatMap((keys) => keys?.reserved ?? []))],
+      fields: [...new Set(sets.flatMap((keys) => keys?.fields ?? []))],
+    };
+  }
 
   register(provider: CommandProvider): () => void {
     this.providers.update((list) => [...list, provider]);

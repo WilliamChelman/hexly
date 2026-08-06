@@ -2,6 +2,8 @@
   "searchLabel": "Search or run a command",
   "placeholder": "Search or type > for commands…",
   "empty": "No matches",
+  "suggestionsLabel": "Filter suggestions",
+  "unknownFacet": "No Facet “{{keys}}” here.",
   "entities": "Entities",
   "worlds": "Worlds",
   "commands": "Commands",

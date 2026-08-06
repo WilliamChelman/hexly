@@ -2,7 +2,14 @@ import { DestroyRef, Injectable, effect, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { Observable, Subject, Subscription, map, of, shareReplay } from 'rxjs';
-import { EntitySummary } from '@hexly/domain';
+import {
+  EntitySummary,
+  EntityType,
+  FacetKeySet,
+  RESERVED_FACET_NAMES,
+  Visibility,
+  parseFacetQuery,
+} from '@hexly/domain';
 import {
   ActiveWorld,
   EntitiesClient,
@@ -12,6 +19,7 @@ import {
   entityRoute,
 } from '@hexly/web-core';
 import { Command, CommandProvider, CommandRegistry } from '@hexly/command-palette-web';
+import { TypeRegistry } from './type-registry';
 
 /**
  * The empty-prefix Quick Open Provider (ADR-0032, CONTEXT.md → Command Palette): matches Entities
@@ -29,6 +37,7 @@ export class EntityQuickOpen implements CommandProvider {
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly worldsClient = inject(WorldsClient);
   private readonly activeWorld = inject(ActiveWorld);
+  private readonly types = inject(TypeRegistry);
   private readonly registry = inject(CommandRegistry);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -46,6 +55,11 @@ export class EntityQuickOpen implements CommandProvider {
   private mountsSub?: Subscription;
 
   private readonly query$ = new Subject<string>();
+  /**
+   * What the box means as of the last keystroke (ADR-0082), read again in {@link scope} — after the
+   * trailing debounce has chosen its keystroke, so the params belong to the query being sent.
+   */
+  private parsed = parseFacetQuery('', { reserved: [], fields: [] });
   /**
    * Owned here rather than left inside the stream: it keys on the query alone, and a World switch is a
    * different set of answers under the same words (the route — and so this Provider — survives one).
@@ -95,21 +109,60 @@ export class EntityQuickOpen implements CommandProvider {
     });
   }
 
+  /**
+   * The Facet vocabulary the Palette offers on `$` and resolves a typed name against (ADR-0082), read
+   * synchronously off the client registry — the active World's own Fields included, the Palette having
+   * a World to be scoped to (ADR-0083). All four reserved names: `in` narrows within a scope that spans
+   * the World *and* its Mounts, so naming one Container is meaningful here as it is not on a browse.
+   */
+  facetKeys(): FacetKeySet {
+    return { reserved: RESERVED_FACET_NAMES, fields: this.types.facetKeys() };
+  }
+
   search(query: string): Observable<readonly Command[]> {
     const q = query.trim();
     // No World, no scope — and an unscoped read is the global search ADR-0083 removes, so it is never
     // made. Reachable only between `clearActiveWorld` unpinning and this Provider's own destruction.
     if (!q || !this.activeWorld.worldId()) return of([]);
+    // The raw string keys the debounce and the memo — two boxes differing only in a token are two
+    // different searches — while the params below are taken from its parse.
+    this.parsed = parseFacetQuery(q, this.facetKeys());
     this.query$.next(q);
     return this.commands$;
   }
 
-  /** The read's scope: the reader's World, plus the Containers it Mounts (ADR-0083). */
+  /** The read's scope: the reader's World, plus the Containers it Mounts (ADR-0083), narrowed by
+   * whatever the box's **Facet Tokens** name. */
   private scope(): EntityListParams {
     const worldId = this.activeWorld.worldId() ?? undefined;
     return {
       ...(worldId ? { worldId } : {}),
       ...(this.mountedContainerIds.length ? { containerId: this.mountedContainerIds } : {}),
+      ...this.filters(),
+    };
+  }
+
+  /**
+   * The parsed box as wire params (ADR-0082). `q` is the **residual** free text — the tokens have become
+   * params by here — so it replaces the raw string the search stream carries. A named Container rides
+   * `container`, the drill-down *within* the scope, never `containerId`: a token narrows the Palette's
+   * preset and can never widen it (ADR-0083).
+   */
+  private filters(): EntityListParams {
+    const { include, exclude, fields } = this.parsed;
+    return {
+      q: this.parsed.text,
+      ...(include.type.length ? { type: [...include.type] as EntityType[] } : {}),
+      ...(include.tag.length ? { tag: [...include.tag] } : {}),
+      ...(include.visibility.length ? { visibility: [...include.visibility] as Visibility[] } : {}),
+      ...(include.container.length ? { container: [...include.container] } : {}),
+      // The excluding half, which vetoes (ADR-0081).
+      ...(exclude.type.length ? { excludeType: [...exclude.type] as EntityType[] } : {}),
+      ...(exclude.tag.length ? { excludeTag: [...exclude.tag] } : {}),
+      ...(exclude.visibility.length ? { excludeVisibility: [...exclude.visibility] as Visibility[] } : {}),
+      ...(exclude.container.length ? { excludeContainer: [...exclude.container] } : {}),
+      // A Field's exclusion rides the same param as its includes, through the op (ADR-0081).
+      ...(fields.length ? { field: fields.map((f) => `${f.key}:${f.op}:${f.value}`) } : {}),
     };
   }
 

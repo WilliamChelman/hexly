@@ -1,4 +1,5 @@
 import { Observable } from 'rxjs';
+import { FacetKeySet } from '@hexly/domain';
 
 /**
  * A single invocable entry in the Command Palette. `run` performs it — a
@@ -28,6 +29,11 @@ export interface CommandProvider {
   /** Section heading the Palette groups this Provider's results under. */
   readonly label: string;
   search(query: string): Observable<readonly Command[]>;
+  /**
+   * The **Facet Tokens** this Provider can apply (ADR-0082), off its own registry — omitted where it
+   * filters by nothing. Read inside a computed, so a signal-backed vocabulary keeps the box current.
+   */
+  facetKeys?(): FacetKeySet;
 }
 
 /**

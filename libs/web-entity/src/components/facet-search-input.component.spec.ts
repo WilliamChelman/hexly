@@ -28,6 +28,8 @@ const FACETS: EntityFacets = {
     [value]="value()"
     [keys]="keys()"
     [facets]="facets()"
+    [controls]="controls()"
+    [activeDescendant]="activeDescendant()"
     (queryChange)="onQuery($event)"
   />`,
 })
@@ -35,6 +37,9 @@ class Host {
   readonly value = signal('');
   readonly keys = signal<FacetKeySet>(KEYS);
   readonly facets = signal<EntityFacets | null>(FACETS);
+  /** A consumer with a list of its own — the Command Palette's results (ADR-0082); none by default. */
+  readonly controls = signal<string | null>(null);
+  readonly activeDescendant = signal<string | null>(null);
   readonly emitted: string[] = [];
 
   /** Controlled, as every consumer is: the box's own keystroke comes straight back as its value. */
@@ -288,6 +293,25 @@ describe('FacetSearchInput (ADR-0082)', () => {
 
     expect(fixture.componentInstance.emitted).toEqual(['$tag:fan']);
     expect(box.value).toBe('$tag:fan');
+  });
+
+  /** The Command Palette drives its results from this same box, so the box announces whichever list is
+   * live: its own while the suggestions stand, the consumer's the rest of the time. */
+  it('announces the consumer’s own list while the suggestions are shut, and its own while they stand', () => {
+    const { fixture, box, type, press } = render();
+    fixture.componentInstance.controls.set('palette-listbox');
+    fixture.componentInstance.activeDescendant.set('palette-option-a');
+    fixture.detectChanges();
+
+    expect(box.getAttribute('role')).toBe('combobox');
+    expect(box.getAttribute('aria-controls')).toBe('palette-listbox');
+    expect(box.getAttribute('aria-activedescendant')).toBe('palette-option-a');
+
+    type('$type:');
+    expect(box.getAttribute('aria-activedescendant')).toBe('facet-suggestion-value-npc');
+
+    press('Escape');
+    expect(box.getAttribute('aria-activedescendant')).toBe('palette-option-a');
   });
 
   it('opens no list for a surface that names no vocabulary — the plain box it replaces', () => {

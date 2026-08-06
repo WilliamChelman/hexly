@@ -2,6 +2,8 @@
   "searchLabel": "Rechercher ou exécuter une commande",
   "placeholder": "Rechercher ou taper > pour les commandes…",
   "empty": "Aucun résultat",
+  "suggestionsLabel": "Suggestions de filtres",
+  "unknownFacet": "Aucune facette « {{keys}} » ici.",
   "entities": "Entités",
   "worlds": "Mondes",
   "commands": "Commandes",
