@@ -22,6 +22,9 @@ export function fieldTokens(fields: Readonly<Record<string, FieldSelection>>): s
 export function fieldsFromTokens(tokens: readonly string[]): Record<string, FieldSelection> {
   const out: Record<string, { values: string[]; gte?: string; lte?: string }> = {};
   for (const f of parseFieldFilters(tokens)) {
+    // The rail has no control for an exclusion yet (ADR-0081, #422), so `neq` is left out rather than
+    // falling through to `lte` — a bound is not what it says.
+    if (f.op === 'neq') continue;
     const sel = (out[f.key] ??= { values: [] });
     if (f.op === 'eq') sel.values.push(f.value);
     else if (f.op === 'gte') sel.gte = f.value;
