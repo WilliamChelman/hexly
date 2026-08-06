@@ -107,8 +107,7 @@ export class EntitiesController {
       excludeTag,
       excludeVisibility,
       excludeContainer,
-      // A malformed `field` token is dropped, not 400'd, so a stale URL degrades to no-filter — which is
-      // what lets `neq` reach an older build as no-filter rather than as a broken browse (ADR-0081).
+      // A malformed `field` token is dropped, not 400'd, so a stale URL degrades to no-filter.
       fields: parseFieldFilters(field),
       containerIds: containerScope(worldId, containerId),
       container,
@@ -179,8 +178,8 @@ export class EntitiesController {
       type,
       tags: tag,
       visibility,
-      // Threaded like the includes: each category drops its own *both* ways before counting, and keeps
-      // every sibling's (ADR-0081) — so an exclusion never zeroes the row it was made in.
+      // Threaded like the includes; the drill-down that drops each category's own polarities is the
+      // service's (ADR-0081).
       excludeType,
       excludeTag,
       excludeVisibility,

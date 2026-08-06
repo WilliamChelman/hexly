@@ -391,10 +391,8 @@ export class EntitiesService {
     // results it annotates: a name search leaves the exclusion standing on both sides.
     const scoped: FacetOptions = { ...opts, excludedTypes: this.resolveExcludedTypes(opts) };
     return {
-      // Drop a category's own selection — in **both polarities** (ADR-0081) — before counting it
-      // (drill-down): keeping its excludes applied would zero every excluded value, `GROUP BY` would omit
-      // it, the row would leave the rail, and the exclusion would be unreversible by clicking. No
-      // hidden-type exclusion on the type facet.
+      // Drop a category's own selection before counting it (drill-down), in **both polarities**, which is
+      // what keeps an exclusion reversible by clicking (ADR-0081). No hidden-type exclusion on the type facet.
       type: this.countJsonArray(
         { ...opts, type: undefined, excludeType: undefined, excludedTypes: [] },
         entities.types,
@@ -1615,11 +1613,7 @@ function facetWhere(opts: FacetOptions, match: string | null, filter: SQL) {
  * `json_each` unrolls the stored array so `value IN (...)` tests array membership.
  */
 function hasAny(column: typeof entities.types | typeof entities.tags, values: readonly string[]) {
-  const list = sql.join(
-    values.map((v) => sql`${v}`),
-    sql`, `,
-  );
-  return sql`EXISTS (SELECT 1 FROM json_each(${column}) WHERE value IN (${list}))`;
+  return sql`EXISTS (SELECT 1 FROM json_each(${column}) WHERE value IN (${valueList(values)}))`;
 }
 
 /**
