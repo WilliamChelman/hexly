@@ -12,6 +12,7 @@ import {
 import { NavRailStore } from '../../shell/nav-rail.store';
 import { WorldTypesLoader } from '../../entity-types/world-types-loader';
 import { WorldFieldsLoader } from '../../entity-types/world-fields-loader';
+import { EntityQuickOpen } from '../../entity-types/entity-quick-open';
 
 /**
  * The World scope's layout: owner of the `w/:worldId` subtree. The World — not the nav
@@ -33,6 +34,9 @@ export class WorldPage {
     // World is open (#191, #230) — injecting them here is what brings the reactive loaders to life.
     inject(WorldTypesLoader);
     inject(WorldFieldsLoader);
+    // Likewise the route's own Entity Quick Open (ADR-0083): injecting it here is what puts Entities in
+    // the Command Palette for as long as a World is open, and what takes them out on leaving.
+    inject(EntityQuickOpen);
 
     effect(() => {
       const worldId = activeWorld.worldId();

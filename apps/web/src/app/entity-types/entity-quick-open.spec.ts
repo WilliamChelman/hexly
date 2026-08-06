@@ -1,12 +1,15 @@
+import { EnvironmentInjector, createEnvironmentInjector, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { firstValueFrom, of } from 'rxjs';
-import { EntitySummary } from '@hexly/domain';
-import { EntitiesClient } from '@hexly/web-core';
-import { MockEntitiesClient } from '@hexly/web-core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Observable, firstValueFrom, of, skip, throwError } from 'rxjs';
+import { EntitySummary, Mount } from '@hexly/domain';
+import { ActiveWorld, EntitiesClient, WorldsClient } from '@hexly/web-core';
+import { MockEntitiesClient, MockWorldsClient } from '@hexly/web-core/testing';
+import { CommandRegistry } from '@hexly/command-palette-web';
 import { EntityQuickOpen } from './entity-quick-open';
 
-function entity(id: string, name: string, worldId = 'w1'): EntitySummary {
+function entity(id: string, name: string, worldId = 'w1', over: Partial<EntitySummary> = {}): EntitySummary {
   return {
     id,
     name,
@@ -17,32 +20,70 @@ function entity(id: string, name: string, worldId = 'w1'): EntitySummary {
     version: 1,
     createdAt: 1,
     updatedAt: 1,
+    ...over,
   };
 }
 
+/**
+ * Quick Open searches the World the reader is in and the **Containers** it **Mounts** (ADR-0083), and
+ * exists only under the `/w/:worldId` lifetime — so the Palette outside a World offers Worlds and
+ * Commands and no Entities. Both are read here rather than in an e2e: the scope is on the wire and the
+ * absence is a registration, and both are fully observable at this seam.
+ */
 describe('EntityQuickOpen', () => {
+  /** An installed pack and a mounted Shelf — the two kinds of Container a Mount names (ADR-0080). */
+  const pack: Mount = { containerId: 'c-pack', name: 'Draw Steel: Monsters', kind: 'compendium' };
+  const shelf: Mount = { containerId: 'c-shelf', name: 'The Art Shelf', kind: 'world' };
+
   let entitiesClient: MockEntitiesClient;
+  let worldsClient: MockWorldsClient;
+  let worldId: ReturnType<typeof signal<string | null>>;
   let navigate: ReturnType<typeof vi.spyOn>;
-  let provider: EntityQuickOpen;
+  let registry: CommandRegistry;
+  /** The World route's injector — this Provider's lifetime, destroyed on leaving the World scope. */
+  let worldScope: EnvironmentInjector | undefined;
 
   beforeEach(() => {
+    // Left to the TestBed's own reset, which destroys the injectors it parents.
+    worldScope = undefined;
     entitiesClient = new MockEntitiesClient();
+    worldsClient = new MockWorldsClient();
+    worldId = signal<string | null>(null);
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), { provide: EntitiesClient, useValue: entitiesClient }],
+      providers: [
+        provideRouter([]),
+        { provide: EntitiesClient, useValue: entitiesClient },
+        { provide: WorldsClient, useValue: worldsClient },
+        { provide: ActiveWorld, useValue: { worldId } },
+      ],
     });
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    provider = TestBed.inject(EntityQuickOpen);
+    registry = TestBed.inject(CommandRegistry);
   });
+
+  /** Enter the World scope: what the route's providers do on activation. */
+  function enterWorld(id = 'w1', mounts: Observable<Mount[]> = of([])): EntityQuickOpen {
+    worldsClient.mounts.mockReturnValue(mounts);
+    worldId.set(id);
+    worldScope ??= createEnvironmentInjector([EntityQuickOpen], TestBed.inject(EnvironmentInjector));
+    const provider = worldScope.get(EntityQuickOpen);
+    TestBed.flushEffects(); // the World-change effect -> the Mount read
+    return provider;
+  }
 
   it('answers the empty (Quick Open) prefix', () => {
-    expect(provider.prefix).toBe('');
+    expect(enterWorld().prefix).toBe('');
   });
 
-  it('searches globally — not scoped to any World — opting into thumbnails and hidden types', async () => {
+  it('scopes the search to the reader’s World and what it Mounts, opting into thumbnails and hidden types', async () => {
+    const provider = enterWorld('w1', of([pack, shelf]));
     entitiesClient.list.mockReturnValue(of({ items: [entity('e1', 'Aldermoor')], nextCursor: null }));
 
     const commands = await firstValueFrom(provider.search('alder'));
 
+    // The World rides `worldId` and its Mounts ride `containerId` — the same scope under the two names
+    // the wire knows it by (ADR-0080). An Entity in an unrelated World is out of scope server-side and
+    // never reaches the Palette.
     // includeHidden: Quick Open matches an Asset by name like any Entity (ADR-0065), unlike a browse —
     // the server ranks those matches last, so they never crowd the top of the palette.
     expect(entitiesClient.list).toHaveBeenCalledWith({
@@ -50,11 +91,56 @@ describe('EntityQuickOpen', () => {
       limit: 20,
       includeHidden: true,
       thumbnails: true,
+      worldId: 'w1',
+      containerId: ['c-pack', 'c-shelf'],
     });
     expect(commands).toEqual([expect.objectContaining({ id: 'e1', label: 'Aldermoor' })]);
   });
 
+  it('searches the World alone where it Mounts nothing', async () => {
+    const provider = enterWorld('w1', of([]));
+    entitiesClient.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+    await firstValueFrom(provider.search('alder'));
+
+    expect(entitiesClient.list).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1' }));
+    expect(entitiesClient.list).toHaveBeenCalledWith(expect.not.objectContaining({ containerId: expect.anything() }));
+  });
+
+  it('searches the World alone when the Mount set is withheld — a reader here through someone else’s Mount', async () => {
+    const provider = enterWorld(
+      'w1',
+      throwError(() => new HttpErrorResponse({ status: 403 })),
+    );
+    entitiesClient.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+    await firstValueFrom(provider.search('alder'));
+
+    // Silent: nothing went wrong for this reader, and an overlay is no place to say so.
+    expect(entitiesClient.list).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1' }));
+  });
+
+  it('re-reads the Mount set on a World switch — the route survives one', async () => {
+    const provider = enterWorld('w1', of([pack]));
+    entitiesClient.list.mockReturnValue(of({ items: [entity('e1', 'Aldermoor')], nextCursor: null }));
+    await firstValueFrom(provider.search('alder'));
+
+    worldsClient.mounts.mockReturnValue(of([shelf]));
+    worldId.set('w2');
+    TestBed.flushEffects();
+    entitiesClient.list.mockReturnValue(of({ items: [entity('e2', 'Goblin King', 'w2')], nextCursor: null }));
+    // skip(1): the last results are replayed until the new search lands (stale-while-revalidate).
+    const commands = await firstValueFrom(provider.search('goblin').pipe(skip(1)));
+
+    expect(worldsClient.mounts).toHaveBeenCalledWith('w2');
+    expect(entitiesClient.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ q: 'goblin', worldId: 'w2', containerId: ['c-shelf'] }),
+    );
+    expect(commands).toEqual([expect.objectContaining({ id: 'e2' })]);
+  });
+
   it("threads the summary's resolved thumbnailUrl onto the command", async () => {
+    const provider = enterWorld();
     entitiesClient.list.mockReturnValue(
       of({ items: [{ ...entity('e1', 'Aldermoor'), thumbnailUrl: '/api/assets/a1/thumb' }], nextCursor: null }),
     );
@@ -65,6 +151,7 @@ describe('EntityQuickOpen', () => {
   });
 
   it('leaves thumbnailUrl undefined when the summary carries none', async () => {
+    const provider = enterWorld();
     entitiesClient.list.mockReturnValue(of({ items: [entity('e1', 'Aldermoor')], nextCursor: null }));
 
     const [command] = await firstValueFrom(provider.search('alder'));
@@ -73,6 +160,8 @@ describe('EntityQuickOpen', () => {
   });
 
   it('skips the request for a blank query', async () => {
+    const provider = enterWorld();
+
     const commands = await firstValueFrom(provider.search('  '));
 
     expect(entitiesClient.list).not.toHaveBeenCalled();
@@ -80,11 +169,55 @@ describe('EntityQuickOpen', () => {
   });
 
   it("navigates to the matched Entity's own World when picked", async () => {
-    entitiesClient.list.mockReturnValue(of({ items: [entity('e1', 'Aldermoor', 'w9')], nextCursor: null }));
+    const provider = enterWorld('w1', of([shelf]));
+    // An Entity of a Mounted World has a World of its own and opens under it (ADR-0080).
+    entitiesClient.list.mockReturnValue(of({ items: [entity('e1', 'Aldermoor', 'c-shelf')], nextCursor: null }));
 
     const [command] = await firstValueFrom(provider.search('alder'));
     command.run();
 
-    expect(navigate).toHaveBeenCalledWith(['/w', 'w9', 'entities', 'e1']);
+    expect(navigate).toHaveBeenCalledWith(['/w', 'c-shelf', 'entities', 'e1']);
+  });
+
+  it('opens a Compendium Entry from a Mounted Compendium under the reader’s World', async () => {
+    const provider = enterWorld('w1', of([pack]));
+    // A **Sealed** entry has no World of its own (ADR-0079), so the segment is navigation context: the
+    // World it is read from, and the one an **Adoption** would copy it into.
+    entitiesClient.list.mockReturnValue(
+      of({ items: [entity('e1', 'Goblin Warrior', 'c-pack', { sealed: true })], nextCursor: null }),
+    );
+
+    const [command] = await firstValueFrom(provider.search('goblin'));
+    command.run();
+
+    expect(command.route).toEqual(['/w', 'w1', 'entities', 'e1']);
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'e1']);
+  });
+
+  describe('outside a World', () => {
+    it('offers the Palette no Entity section at all — the Provider is gone with its scope', async () => {
+      enterWorld();
+      expect(registry.prefixes()).toEqual(['']);
+
+      // Leaving the World scope destroys the route's injector; `clearActiveWorld` unpins the World.
+      worldScope?.destroy();
+      worldScope = undefined;
+      worldId.set(null);
+
+      expect(registry.prefixes()).toEqual([]);
+      await expect(firstValueFrom(registry.search('', 'alder'))).resolves.toEqual([]);
+      expect(entitiesClient.list).not.toHaveBeenCalled();
+    });
+
+    it('never searches unscoped while the World is unpinned', async () => {
+      const provider = enterWorld();
+      worldId.set(null);
+
+      const commands = await firstValueFrom(provider.search('alder'));
+
+      // An unscoped read is the global search ADR-0083 removes; it is never made.
+      expect(entitiesClient.list).not.toHaveBeenCalled();
+      expect(commands).toEqual([]);
+    });
   });
 });

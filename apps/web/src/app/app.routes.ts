@@ -12,6 +12,7 @@ import {
   activeWorldGuard,
   clearActiveWorld,
 } from '@hexly/web-core';
+import { EntityQuickOpen } from './entity-types/entity-quick-open';
 
 // `title` values are transloco keys, resolved by TranslationTitleStrategy.
 export const appRoutes: Route[] = [
@@ -72,6 +73,10 @@ export const appRoutes: Route[] = [
     path: 'w/:worldId',
     canActivate: [authGuard, activeWorldGuard],
     canDeactivate: [clearActiveWorld],
+    // Entity Quick Open is this scope's, not the app's (ADR-0083): the Palette searches the World the
+    // reader is in and what it Mounts, so the Provider injects the active World and dies with the
+    // scope — outside it the Palette offers Worlds and Commands and no Entities. WorldPage injects it.
+    providers: [EntityQuickOpen],
     loadComponent: () => import('./pages/world/world.page').then((m) => m.WorldPage),
     children: [
       {
