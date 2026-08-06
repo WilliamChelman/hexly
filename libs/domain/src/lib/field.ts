@@ -476,15 +476,20 @@ export function entityLinkConstraints(
   return out;
 }
 
-/** The comparison a {@link FieldFilter} applies: `eq` membership, or a `gte`/`lte` range bound. */
-export type FieldFilterOp = 'eq' | 'gte' | 'lte';
+/**
+ * The comparison a {@link FieldFilter} applies: `eq` membership, `neq` exclusion, or a `gte`/`lte`
+ * range bound. Field exclusion is a fourth op rather than a second param because this grammar already
+ * carries its own operator, and an older build drops an unrecognised one rather than 400ing (ADR-0081).
+ */
+export type FieldFilterOp = 'eq' | 'neq' | 'gte' | 'lte';
 
-const FIELD_FILTER_OPS: ReadonlySet<string> = new Set<FieldFilterOp>(['eq', 'gte', 'lte']);
+const FIELD_FILTER_OPS: ReadonlySet<string> = new Set<FieldFilterOp>(['eq', 'neq', 'gte', 'lte']);
 
 /**
  * One filter-by-Field constraint (ADR-0048): the EntityDocument `key`, an `op`, and the compared `value`.
  * `eq` on the same key OR together (enum/list membership); `gte`/`lte` on the same key form a range;
- * different keys AND. Wire form is `key:op:value`.
+ * different keys AND. `neq` **vetoes** — it beats any `eq` on the same value and accumulates with its
+ * peers, and an Entity carrying no value for the key survives it (ADR-0081). Wire form is `key:op:value`.
  */
 export interface FieldFilter {
   readonly key: string;

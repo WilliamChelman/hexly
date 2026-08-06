@@ -76,6 +76,10 @@ export class EntitiesController {
       type,
       tag,
       visibility,
+      excludeType,
+      excludeTag,
+      excludeVisibility,
+      excludeContainer,
       field,
       worldId,
       containerId,
@@ -98,7 +102,13 @@ export class EntitiesController {
       type,
       tags: tag,
       visibility,
-      // A malformed `field` token is dropped, not 400'd, so a stale URL degrades to no-filter.
+      // The excluding half of each category (ADR-0081) — a veto, resolved in the service beside the include.
+      excludeType,
+      excludeTag,
+      excludeVisibility,
+      excludeContainer,
+      // A malformed `field` token is dropped, not 400'd, so a stale URL degrades to no-filter — which is
+      // what lets `neq` reach an older build as no-filter rather than as a broken browse (ADR-0081).
       fields: parseFieldFilters(field),
       containerIds: containerScope(worldId, containerId),
       container,
@@ -148,12 +158,33 @@ export class EntitiesController {
   facets(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityFacets {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { q, type, tag, visibility, field, worldId, containerId, container, read, includeHidden } = parsed.data;
+    const {
+      q,
+      type,
+      tag,
+      visibility,
+      excludeType,
+      excludeTag,
+      excludeVisibility,
+      excludeContainer,
+      field,
+      worldId,
+      containerId,
+      container,
+      read,
+      includeHidden,
+    } = parsed.data;
     return this.entities.facets(user.id, {
       q,
       type,
       tags: tag,
       visibility,
+      // Threaded like the includes: each category drops its own *both* ways before counting, and keeps
+      // every sibling's (ADR-0081) — so an exclusion never zeroes the row it was made in.
+      excludeType,
+      excludeTag,
+      excludeVisibility,
+      excludeContainer,
       fields: parseFieldFilters(field),
       containerIds: containerScope(worldId, containerId),
       container,

@@ -583,6 +583,15 @@ describe('parseFieldFilter (`key:op:value`)', () => {
     });
   });
 
+  // Field exclusion is a fourth op in this grammar, not a second param (ADR-0081, #421).
+  it('parses `neq`, the excluding op', () => {
+    expect(parseFieldFilter('size:neq:large')).toEqual({
+      key: 'size',
+      op: 'neq',
+      value: 'large',
+    });
+  });
+
   it('returns null for a malformed token so a stale URL is dropped, never a 400', () => {
     expect(parseFieldFilter('cr:5')).toBeNull(); // no op
     expect(parseFieldFilter('cr:between:5')).toBeNull(); // unknown op

@@ -38,7 +38,7 @@ import {
   validateFields,
   visibilitySchema,
 } from '@hexly/domain';
-import { and, asc, desc, eq, inArray, or, sql, SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, notInArray, or, sql, SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_FILTER } from '@hexly/plugin-asset';
 import { AclSetResult, gate, isSuperadmin, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
@@ -98,8 +98,21 @@ export interface ListOptions {
   readonly tags?: readonly string[];
   /** Facet: restrict to any of these Visibilities (OR within category). */
   readonly visibility?: readonly Visibility[];
+  /**
+   * Facet: the excluding half of Type, Tag and Visibility (ADR-0081). An exclusion **vetoes** — it AND-s
+   * with its peers *and* with the include above, so naming one value both ways yields nothing — and it is
+   * a not-exists test, so an Entity carrying no value at all for the category survives it.
+   *
+   * Distinct from {@link excludedTypes}, which is the server's own hidden-type rule and never a caller's.
+   */
+  readonly excludeType?: readonly EntityType[];
+  /** Facet: exclude entities carrying any of these Tags (see {@link excludeType}). */
+  readonly excludeTag?: readonly string[];
+  /** Facet: exclude these Visibilities (see {@link excludeType}). */
+  readonly excludeVisibility?: readonly Visibility[];
   /** Filter-by-Field (ADR-0048, #188): each constraint matches a facetable Field value — eq
-   * membership (enum/list/string) or a gte/lte range (number/date). Same key OR / range, diff key AND. */
+   * membership (enum/list/string), a neq exclusion (ADR-0081), or a gte/lte range (number/date).
+   * Same key OR / range, diff key AND; a neq vetoes its key's includes and spares an Entity with no value. */
   readonly fields?: readonly FieldFilter[];
   /**
    * The **Container** scope: which Containers this read is about. One id for every World-scoped read
@@ -124,6 +137,8 @@ export interface ListOptions {
    * scope excludes reaches nothing — which is what lets the Container facet drill down like Type or Tag.
    */
   readonly container?: readonly string[];
+  /** Facet: exclude these **Containers** (see {@link excludeType}) — a narrowing within the scope, never past it. */
+  readonly excludeContainer?: readonly string[];
   /**
    * Which kind of read this is (ADR-0079): a link-target read asks *what may this point at?*, so it
    * offers its scope plus what that scope **Mounts** and nothing else (ADR-0080).
@@ -167,6 +182,10 @@ export type FacetOptions = Pick<
   | 'type'
   | 'tags'
   | 'visibility'
+  | 'excludeType'
+  | 'excludeTag'
+  | 'excludeVisibility'
+  | 'excludeContainer'
   | 'fields'
   | 'excludedTypes'
   | 'includeHidden'
@@ -372,16 +391,29 @@ export class EntitiesService {
     // results it annotates: a name search leaves the exclusion standing on both sides.
     const scoped: FacetOptions = { ...opts, excludedTypes: this.resolveExcludedTypes(opts) };
     return {
-      // Drop a category's own selection before counting it (drill-down). No hidden-type exclusion here.
-      type: this.countJsonArray({ ...opts, type: undefined, excludedTypes: [] }, entities.types, filter),
-      visibility: this.countColumn({ ...scoped, visibility: undefined }, entities.visibility, filter),
-      tag: this.countJsonArray({ ...scoped, tags: undefined }, entities.tags, filter),
+      // Drop a category's own selection — in **both polarities** (ADR-0081) — before counting it
+      // (drill-down): keeping its excludes applied would zero every excluded value, `GROUP BY` would omit
+      // it, the row would leave the rail, and the exclusion would be unreversible by clicking. No
+      // hidden-type exclusion on the type facet.
+      type: this.countJsonArray(
+        { ...opts, type: undefined, excludeType: undefined, excludedTypes: [] },
+        entities.types,
+        filter,
+      ),
+      visibility: this.countColumn(
+        { ...scoped, visibility: undefined, excludeVisibility: undefined },
+        entities.visibility,
+        filter,
+      ),
+      tag: this.countJsonArray({ ...scoped, tags: undefined, excludeTag: undefined }, entities.tags, filter),
       // Field facets by presence in the result set — no longer gated on the active Type (ADR-0054, #231).
       fields: this.countFieldFacets(scoped, filter),
       // The Container facet, by presence too (ADR-0079, ADR-0080): a read that spans one Container has
       // nothing to narrow, so only a cross-Container one carries the category — the Library, and a
       // link-target read in a World that Mounts, where it narrows to one pack or one shelf.
-      ...(scopeSize(opts) > 1 ? { container: this.countContainers({ ...scoped, container: undefined }, filter) } : {}),
+      ...(scopeSize(opts) > 1
+        ? { container: this.countContainers({ ...scoped, container: undefined, excludeContainer: undefined }, filter) }
+        : {}),
     };
   }
 
@@ -593,7 +625,8 @@ export class EntitiesService {
         .filter((source) => candidates.has(source.key))
         .map((source): FieldFacet => {
           const values = this.countFieldValues(
-            // Drill-down: drop this Field's own filters, keep every sibling constraint.
+            // Drill-down: drop this Field's own filters — both polarities, since a `neq` is one of them
+            // (ADR-0081) — and keep every sibling constraint.
             { ...opts, fields: (opts.fields ?? []).filter((ff) => ff.key !== source.key) },
             source.key,
             filter,
@@ -1460,6 +1493,13 @@ function filters(opts: FilterOptions) {
   if (opts.withoutAssets) predicates.push(sql`NOT ${hasAny(entities.types, [CORE_ASSET_TYPE_ID])}`);
   if (opts.visibility?.length) predicates.push(inArray(entities.visibility, [...opts.visibility]));
   if (opts.tags?.length) predicates.push(hasAny(entities.tags, opts.tags));
+  // The excluding half of each category (ADR-0081), a predicate of its own beside the include rather than
+  // a resolution between them: both stand, so naming one value both ways is the contradiction it reads as.
+  // A not-exists over the multi-valued columns, which is what leaves an Entity carrying nothing untouched.
+  if (opts.excludeType?.length) predicates.push(sql`NOT ${hasAny(entities.types, opts.excludeType)}`);
+  if (opts.excludeTag?.length) predicates.push(sql`NOT ${hasAny(entities.tags, opts.excludeTag)}`);
+  if (opts.excludeVisibility?.length) predicates.push(notInArray(entities.visibility, [...opts.excludeVisibility]));
+  if (opts.excludeContainer?.length) predicates.push(notInArray(entities.containerId, [...opts.excludeContainer]));
   if (opts.fields?.length) predicates.push(...fieldFilters(opts.fields));
   // The one Container predicate, whether the read names one Container or the whole shelf (ADR-0078) —
   // plus, for a link-target read, the Containers that scope Mounts (ADR-0080), because a Mount widens
@@ -1500,6 +1540,10 @@ function scopeSize(opts: FacetOptions): number {
  * `entity_field_facets` index per key — so different keys AND, matching the universal facets. A
  * range on a `number` Field compares the numeric `num` column; a date/string compares `value`
  * lexically (ISO dates sort correctly as text).
+ *
+ * `neq` (ADR-0081) emits a second, separate `NOT EXISTS` per key rather than joining the group above:
+ * that is what makes it veto its own key's includes instead of being weighed against them, and what
+ * leaves an Entity with no row for the key — a Note that never had a Challenge Rating — untouched.
  */
 function fieldFilters(fields: readonly FieldFilter[]): SQL[] {
   const byKey = new Map<string, FieldFilter[]>();
@@ -1512,23 +1556,30 @@ function fieldFilters(fields: readonly FieldFilter[]): SQL[] {
   for (const [key, group] of byKey) {
     const conds: SQL[] = [];
     const eqValues = group.filter((f) => f.op === 'eq').map((f) => f.value);
-    if (eqValues.length) {
-      const list = sql.join(
-        eqValues.map((v) => sql`${v}`),
-        sql`, `,
-      );
-      conds.push(sql`f.value IN (${list})`);
-    }
+    if (eqValues.length) conds.push(sql`f.value IN (${valueList(eqValues)})`);
     for (const f of group) {
       if (f.op === 'gte') conds.push(rangeBound(f.value, '>='));
       if (f.op === 'lte') conds.push(rangeBound(f.value, '<='));
     }
-    if (conds.length === 0) continue;
-    predicates.push(
-      sql`EXISTS (SELECT 1 FROM ${entityFieldFacets} f WHERE f.entity_id = ${entities.id} AND f.key = ${key} AND ${and(...conds)})`,
-    );
+    if (conds.length) predicates.push(fieldFacetExists(key, and(...conds)));
+    // Exclusions accumulate: any one of them carried is enough to veto, so they share one NOT EXISTS.
+    const neqValues = group.filter((f) => f.op === 'neq').map((f) => f.value);
+    if (neqValues.length) predicates.push(sql`NOT ${fieldFacetExists(key, sql`f.value IN (${valueList(neqValues)})`)}`);
   }
   return predicates;
+}
+
+/** One `EXISTS` over the denormalised `entity_field_facets` index, `cond` applied to the `f` rows of `key`. */
+function fieldFacetExists(key: string, cond: SQL | undefined): SQL {
+  return sql`EXISTS (SELECT 1 FROM ${entityFieldFacets} f WHERE f.entity_id = ${entities.id} AND f.key = ${key} AND ${cond})`;
+}
+
+/** A bound `IN (...)` list — never interpolated, so an arbitrary Field value stays a parameter. */
+function valueList(values: readonly string[]): SQL {
+  return sql.join(
+    values.map((v) => sql`${v}`),
+    sql`, `,
+  );
 }
 
 /**

@@ -70,6 +70,42 @@ describe('entityListQuerySchema Facet params (#155)', () => {
     expect(parsed.visibility).toBeUndefined();
   });
 
+  // The excluding half of each category (ADR-0081, #421).
+  it('normalizes and keeps the exclude* twins like their positive halves', () => {
+    const single = entityListQuerySchema.parse({
+      excludeType: 'core.type.note',
+      excludeTag: 'deity',
+      excludeVisibility: 'shared',
+      excludeContainer: 'world-1',
+    });
+    expect(single.excludeType).toEqual(['core.type.note']);
+    expect(single.excludeTag).toEqual(['deity']);
+    expect(single.excludeVisibility).toEqual(['shared']);
+    expect(single.excludeContainer).toEqual(['world-1']);
+
+    const repeated = entityListQuerySchema.parse({
+      excludeType: ['core.type.note', 'dnd.type.monster'],
+      excludeTag: ['deity', 'ruined'],
+      excludeContainer: ['world-1', 'world-2'],
+    });
+    expect(repeated.excludeType).toEqual(['core.type.note', 'dnd.type.monster']);
+    expect(repeated.excludeTag).toEqual(['deity', 'ruined']);
+    expect(repeated.excludeContainer).toEqual(['world-1', 'world-2']);
+  });
+
+  it('carries the same per-value validation on an exclusion as on an inclusion (ADR-0081)', () => {
+    expect(() => entityListQuerySchema.parse({ excludeType: 'spreadsheet' })).toThrow();
+    expect(() => entityListQuerySchema.parse({ excludeVisibility: 'public' })).toThrow();
+  });
+
+  it('leaves the exclude* params undefined when absent', () => {
+    const parsed = entityListQuerySchema.parse({});
+    expect(parsed.excludeType).toBeUndefined();
+    expect(parsed.excludeTag).toBeUndefined();
+    expect(parsed.excludeVisibility).toBeUndefined();
+    expect(parsed.excludeContainer).toBeUndefined();
+  });
+
   // The hidden-from-default-listing opt-in (ADR-0065): absent reads false, so a browse that says nothing
   // keeps the exclusion — the safe default for any surface that forgets to ask.
   it('reads includeHidden as a boolean flag, false when absent', () => {
