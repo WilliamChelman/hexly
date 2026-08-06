@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { EntityType, Field, isStructuredDataType } from '@hexly/domain';
+import { EntityType, Field, isFacetableField, isStructuredDataType } from '@hexly/domain';
 import {
   CORE_VIEW_DETAILS,
   EntityTypes,
@@ -216,6 +216,21 @@ export class TypeRegistry implements EntityTypes {
    */
   availableFields(): Field[] {
     return [...this.worldFields(), ...this.plugins.fields.filter((field) => this.plugins.isFieldActive(field.id))];
+  }
+
+  /**
+   * Every **Facet** key a Facet Token may name (ADR-0082): each facetable scalar Field's id, then the
+   * dimensions the enabled **Structured Data Types** harvest (ADR-0055) — the same two sources, in the
+   * same order, the server's facet read draws its keys from. Read **synchronously** off the registry,
+   * never from the facet read: a parser that changed its mind when a network read landed would rewrite
+   * results while they were being read.
+   */
+  facetKeys(): string[] {
+    const keys = new Set<string>();
+    for (const field of this.availableFields()) if (isFacetableField(field)) keys.add(field.id);
+    for (const dataType of this.plugins.structuredDataTypes.values())
+      for (const dimension of dataType.facetDimensions ?? []) keys.add(dimension.key);
+    return [...keys];
   }
 
   /**

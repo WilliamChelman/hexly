@@ -10,6 +10,7 @@ import { DialogRef, DialogService } from '@hexly/web-ui';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntityBrowserPage } from './entity-browser.page';
+import { TypeRegistry } from '../../entity-types/type-registry';
 
 describe('EntityBrowser', () => {
   let client: MockEntitiesClient;
@@ -1367,6 +1368,218 @@ describe('EntityBrowser', () => {
 
         excluded?.click();
         fixture.detectChanges();
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+    });
+
+    /**
+     * A Facet named inline rather than clicked (ADR-0082, #424). Two stores, one rule: filter state is
+     * `parse(text) ∪ railState`, the rail renders the union, and where both name a value the text wins.
+     * The grammar itself is the domain parser's spec; these are the browser's wiring and that rule.
+     */
+    describe('Facet Tokens (#424)', () => {
+      const withCounts = () =>
+        client.facets.mockReturnValue(
+          of({
+            type: [{ value: 'core.type.note', count: 3 }],
+            tag: [
+              { value: 'draft', count: 2 },
+              { value: 'fantasy', count: 1 },
+            ],
+            visibility: [],
+            fields: [],
+          }),
+        );
+
+      /** A facetable World Field, so `$test.field.cr:` resolves off the client registry, synchronously. */
+      const withWorldField = () =>
+        TestBed.inject(TypeRegistry).setWorldFields([
+          { id: 'test.field.cr', label: 'CR', dataType: { kind: 'number' }, required: false, facetable: true },
+        ]);
+
+      it('applies $type:npc, and leaves the box holding exactly what was typed', () => {
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$type:core.type.note');
+
+        // The token became a param; nothing of it reached the full-text `q`.
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          type: ['core.type.note'],
+        });
+        expect(searchBox(fixture.nativeElement).value).toBe('$type:core.type.note');
+        // The URL's `q` carries the raw string, so the link reproduces the box, not the residual.
+        expect(navigate).toHaveBeenCalledWith(
+          [],
+          expect.objectContaining({ queryParams: { q: '$type:core.type.note' } }),
+        );
+      });
+
+      it('reads a mixed box as both filters and a search', () => {
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, 'orc $tag:fantasy $type:core.type.note');
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          q: 'orc',
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          type: ['core.type.note'],
+          tag: ['fantasy'],
+        });
+      });
+
+      it('excludes with a leading dash, onto the same exclude params the rail uses', () => {
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '-$tag:draft');
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          excludeTag: ['draft'],
+        });
+      });
+
+      it('maps a comparison onto the `field` param’s bound, off a key the registry knows', () => {
+        withWorldField();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$test.field.cr:>=5');
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          field: ['test.field.cr:gte:5'],
+        });
+      });
+
+      it('says a $ name nothing answers to, and never searches for it', () => {
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, 'orc $domain:material');
+
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid=unknown-facet]')?.textContent).toContain('domain');
+        expect(client.list).toHaveBeenLastCalledWith({
+          q: 'orc',
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+        });
+      });
+
+      it('shows a typed value in the rail, lit, beside a clicked one', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        facet(el, 'facet-type-core.type.note')?.click();
+        fixture.detectChanges();
+        search(fixture, '$tag:fantasy');
+
+        // The union: the clicked Type and the typed Tag, both in force and both lit.
+        expect(facet(el, 'facet-tag-fantasy')?.getAttribute('aria-pressed')).toBe('true');
+        expect(facet(el, 'facet-type-core.type.note')?.getAttribute('aria-pressed')).toBe('true');
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          type: ['core.type.note'],
+          tag: ['fantasy'],
+        });
+      });
+
+      it('lets the text win a value the rail also names, dropping the rail’s entry', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        // Clicked as an exclusion, then typed as an inclusion: one value, one visual state.
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+        search(fixture, '$tag:draft');
+
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+        expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('false');
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          tag: ['draft'],
+        });
+      });
+
+      it('never writes the rail’s selections into the box, nor the box’s into the rail’s params', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:fantasy');
+        facet(el, 'facet-type-core.type.note')?.click();
+        fixture.detectChanges();
+
+        // Clicking left the box alone, and the rail's URL mirror carries no typed Tag.
+        expect(searchBox(el).value).toBe('$tag:fantasy');
+        expect(navigate).toHaveBeenLastCalledWith(
+          [],
+          expect.objectContaining({ queryParams: expect.objectContaining({ type: ['core.type.note'], tag: null }) }),
+        );
+      });
+
+      it('reproduces both stores from a shared link', () => {
+        withCounts();
+        queryParams$.next(convertToParamMap({ q: 'orc $tag:fantasy', type: 'core.type.note' }));
+        client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
+        const fixture = TestBed.createComponent(EntityBrowserPage);
+        fixture.detectChanges();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenCalledWith({
+          q: 'orc',
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          type: ['core.type.note'],
+          tag: ['fantasy'],
+        });
+        // One request on load, and the box holds the raw string the link carried.
+        expect(client.list).toHaveBeenCalledTimes(1);
+        expect(searchBox(fixture.nativeElement).value).toBe('orc $tag:fantasy');
+      });
+
+      it('clears a typed Facet with Clear all, box and all', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:fantasy');
+        facet(el, 'facet-clear')?.click();
+        fixture.detectChanges();
+
+        expect(searchBox(el).value).toBe('');
         expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
       });
     });

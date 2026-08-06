@@ -3,7 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityFacets, EntityPage, EntitySummary, EntityType, Visibility } from '@hexly/domain';
+import { EntityFacets, EntityPage, EntitySummary, EntityType, parseFacetQuery, Visibility } from '@hexly/domain';
 import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, AppShellStore } from '@hexly/web-core';
 import { ButtonComponent, DialogService, EyebrowComponent, PageHeaderComponent } from '@hexly/web-ui';
 import { NewEntityButtonComponent } from '../../entity-types/new-entity-button.component';
@@ -21,6 +21,8 @@ import {
   togglePolarity,
 } from './components/facet-rail.component';
 import { fieldTokens, fieldsFromTokens, pruneField } from './components/field-facet-url';
+import { unionFacets } from './components/facet-token-union';
+import { TypeRegistry } from '../../entity-types/type-registry';
 
 const NO_FACETS: ActiveFacets = {
   type: [],
@@ -84,7 +86,13 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
     </app-page-header>
 
     <main class="max-w-[72rem] mx-auto py-8 px-6">
-      <app-entity-search [value]="query()" (queryChange)="onSearch($event)" />
+      <app-entity-search [value]="rawQuery()" (queryChange)="onSearch($event)" />
+      <!-- A Facet Token naming a key nothing answers to is *said*, never quietly searched for (ADR-0082). -->
+      @if (unknownFacetKeys().length > 0) {
+        <p data-testid="unknown-facet" role="status" class="-mt-6 mb-8 font-sans text-sm text-ink-faint">
+          {{ 'entityBrowser.unknownFacet' | transloco: { keys: unknownFacetKeys().join(', ') } }}
+        </p>
+      }
       <div class="grid grid-cols-1 lg:grid-cols-[14rem_1fr] gap-8 items-start">
         <app-facet-rail
           [facetCounts]="facetCounts()"
@@ -133,7 +141,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
               [title]="'entityBrowser.loadErrorTitle' | transloco"
               [hint]="'entityBrowser.loadErrorHint' | transloco"
             />
-          } @else if (loaded() && query()) {
+          } @else if (loaded() && rawQuery()) {
             <app-empty-state
               testid="no-matches"
               [title]="'entityBrowser.noMatchTitle' | transloco"
@@ -160,6 +168,8 @@ export class EntityBrowserPage {
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
   private readonly dialogs = inject(DialogService);
+  /** The client registry a Facet Token's key resolves against, synchronously (ADR-0082). */
+  private readonly types = inject(TypeRegistry);
 
   protected readonly worldId = this.activeWorld.worldId;
 
@@ -188,14 +198,37 @@ export class EntityBrowserPage {
   protected readonly loadError = signal(false);
   protected readonly renamingId = signal<string | null>(null);
 
-  /** Debounced full-text query; empty means the default last-edited view.
-   * Source of truth for the URL `q` mirror. */
-  protected readonly query = signal('');
+  /**
+   * The **text store** (ADR-0082): the box exactly as it was typed, debounced. Never rewritten here —
+   * it is parsed, not absorbed — so backspace fixes a typo'd `$tag:fantsy` the way backspace always
+   * works. Source of truth for the URL `q` mirror, which carries this *raw* string; the wire carries
+   * {@link searchText}, the residual after every token is lifted out.
+   */
+  protected readonly rawQuery = signal('');
   private readonly typed = new Subject<string>();
 
-  /** Value-equal so the URL round-trip's echo (a fresh object, same values)
-   * doesn't re-trigger the fetch effect — one refetch per toggle. */
-  protected readonly activeFacets = signal<ActiveFacets>(NO_FACETS, {
+  /**
+   * What the box means: its **Facet Tokens** as structured filters and the free text left over. The key
+   * set comes from the client registry, synchronously, minus `in` — the Entity Browser reads one World,
+   * so it has no **Container** facet to narrow and says so rather than dropping the token (ADR-0082).
+   */
+  protected readonly parsedQuery = computed(() =>
+    parseFacetQuery(this.rawQuery(), { reserved: ['type', 'tag', 'visibility'], fields: this.types.facetKeys() }),
+  );
+  /** The residual full-text query — what the wire's `q` carries, as against the URL's raw string. */
+  private readonly searchText = computed(() => this.parsedQuery().text);
+  /** The `$` names nothing here answers to, reported on the surface (ADR-0082). */
+  protected readonly unknownFacetKeys = computed(() => this.parsedQuery().unresolvedKeys);
+
+  /** The **rail store**: what was clicked. Value-equal so the URL round-trip's echo (a fresh object,
+   * same values) doesn't re-trigger the fetch effect — one refetch per toggle. */
+  private readonly railFacets = signal<ActiveFacets>(NO_FACETS, {
+    equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  });
+
+  /** The one filter state, `parse(text) ∪ railState` — what the rail renders and the wire carries. The
+   * same value-equality: a text edit that leaves the filters alone must not refetch on their account. */
+  protected readonly activeFacets = computed(() => unionFacets(this.parsedQuery(), this.railFacets()), {
     equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
   protected readonly facetCounts = signal<EntityFacets>(NO_FACET_COUNTS);
@@ -203,7 +236,7 @@ export class EntityBrowserPage {
   protected readonly hasFilters = computed(() => {
     const f = this.activeFacets();
     return (
-      this.query() !== '' ||
+      this.rawQuery() !== '' ||
       f.type.length > 0 ||
       f.tag.length > 0 ||
       f.visibility.length > 0 ||
@@ -250,8 +283,8 @@ export class EntityBrowserPage {
         takeUntilDestroyed(),
       )
       .subscribe((f) => {
-        this.query.set(f.q);
-        this.activeFacets.set({
+        this.rawQuery.set(f.q);
+        this.railFacets.set({
           type: f.type,
           tag: f.tag,
           visibility: f.visibility,
@@ -267,13 +300,14 @@ export class EntityBrowserPage {
       });
 
     this.typed.pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed()).subscribe((raw) => {
-      const q = raw.trim();
-      this.query.set(q);
+      // Kept verbatim, untrimmed: a trailing space is inside a `$tag:"sea of ` still being typed, and
+      // the box must go on holding exactly what was typed (ADR-0082). The parser trims the residual.
+      this.rawQuery.set(raw);
       // Mirror to the URL: merge keeps the World scope, replaceUrl avoids a
       // history entry per keystroke.
       this.router.navigate([], {
         relativeTo: this.route,
-        queryParams: { q: q || null },
+        queryParams: { q: raw || null },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       });
@@ -282,7 +316,7 @@ export class EntityBrowserPage {
     // Refetch page one whenever the World, query, or Facets change — covers a
     // param-only switch between Worlds (same component instance).
     effect(() => {
-      this.query(); // tracked
+      this.searchText(); // tracked
       this.activeFacets(); // tracked
       if (this.activeWorld.worldId()) this.fetchFirstPage();
     });
@@ -292,9 +326,10 @@ export class EntityBrowserPage {
     this.typed.next(value);
   }
 
-  /** Toggle one category value in the polarity the pressed control names; the other is released. */
+  /** Toggle one category value in the polarity the pressed control names; the other is released.
+   * Against the rail store alone — a clicked Facet lives in the rail, and never writes text (ADR-0082). */
   protected toggleFacet({ category, value, polarity }: FacetToggle): void {
-    const current = this.activeFacets();
+    const current = this.railFacets();
     const next = togglePolarity(current[category], current.excluded?.[category] ?? [], value, polarity);
     this.applyFacets({
       ...current,
@@ -306,7 +341,7 @@ export class EntityBrowserPage {
   /** Toggle one enum/list/string Field-facet value: `eq` membership (OR within the Field), or its
    * `neq` veto. As in a category, pressing either polarity releases the other. */
   protected toggleFieldValue({ key, value, polarity }: FieldValueToggle): void {
-    const current = this.activeFacets();
+    const current = this.railFacets();
     const sel = current.fields[key] ?? {};
     const next = togglePolarity(sel.values ?? [], sel.excluded ?? [], value, polarity);
     this.setFieldSelection(current, key, { ...sel, values: next.included, excluded: next.excluded });
@@ -314,7 +349,7 @@ export class EntityBrowserPage {
 
   /** Set (or clear) one bound of a number/date Field range. */
   protected changeFieldRange({ key, bound, value }: FieldRangeChange): void {
-    const current = this.activeFacets();
+    const current = this.railFacets();
     const sel = current.fields[key] ?? {};
     this.setFieldSelection(current, key, {
       ...sel,
@@ -331,15 +366,16 @@ export class EntityBrowserPage {
     this.applyFacets({ ...current, fields });
   }
 
-  /** Commit a new active-facet set: update the signal and mirror it to the URL. */
+  /** Commit a new rail-store set: update the signal and mirror it to the URL. */
   private applyFacets(updated: ActiveFacets): void {
-    this.activeFacets.set(updated);
+    this.railFacets.set(updated);
     this.mirrorToUrl(updated);
   }
 
+  /** Clears both stores — a typed Facet is as cleared as a clicked one, and the box empties with it. */
   protected clearAll(): void {
-    this.query.set('');
-    this.activeFacets.set(NO_FACETS);
+    this.rawQuery.set('');
+    this.railFacets.set(NO_FACETS);
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
@@ -432,7 +468,8 @@ export class EntityBrowserPage {
   }
 
   private activeFilterParams(): EntityFacetParams {
-    const q = this.query();
+    // The residual text, not the raw box: the tokens have become params by here (ADR-0082).
+    const q = this.searchText();
     const f = this.activeFacets();
     const excluded = f.excluded ?? {};
     const field = fieldTokens(f.fields);

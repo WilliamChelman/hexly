@@ -98,6 +98,7 @@
     "emptyHint": "Create your first entity to begin.",
     "noMatchTitle": "No entities match your search.",
     "noMatchHint": "Try a different name, tag, or word.",
+    "unknownFacet": "No Facet “{{keys}}” here.",
     "facets": {
       "heading": "Filters",
       "type": "Type",
