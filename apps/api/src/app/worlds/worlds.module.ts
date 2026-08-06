@@ -7,6 +7,7 @@ import { DbModule } from '../db/db.module';
 import { CompendiumPacksController } from './compendium-packs.controller';
 import { CompendiumWrites } from './compendium-writes';
 import { CompendiumsController } from './compendiums.controller';
+import { ContainerLinksService } from './container-links.service';
 import { EntitiesModule } from '../entities/entities.module';
 import { EventsModule } from '../events/events.module';
 import { ImporterRegistry } from './importer-registry';
@@ -20,6 +21,7 @@ import { WorldsController } from './worlds.controller';
 import { WorldsService } from './worlds.service';
 import { WorldTypesService } from './world-types.service';
 import { WorldFieldsService } from './world-fields.service';
+import { WorldMountsService } from './world-mounts.service';
 import { WorldWrites } from './world-writes';
 
 /**
@@ -46,8 +48,10 @@ import { WorldWrites } from './world-writes';
   controllers: [WorldsController, WorldImportersController, CompendiumsController, CompendiumPacksController],
   providers: [
     WorldsService,
+    ContainerLinksService,
     WorldTypesService,
     WorldFieldsService,
+    WorldMountsService,
     WorldWrites,
     CompendiumWrites,
     WorldGraphService,

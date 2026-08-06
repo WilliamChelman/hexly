@@ -1,8 +1,9 @@
 import { EntityVerb, GrantRole } from '@hexly/domain';
-import { and, eq, getTableColumns, sql } from 'drizzle-orm';
+import { SQL, SQLWrapper, and, eq, getTableColumns, sql } from 'drizzle-orm';
 import { Db } from '../db/db';
 import { entities, entityGrants, entityLinks, worldLinks, worldMembers } from '../db/schema';
 import { inACompendium } from '../worlds/compendiums';
+import { mountedIntoReachOf, mountedIntoWorld } from './mount-reach';
 import { isSuperadmin } from './owner-set';
 
 /** The Superadmin bypass: every predicate short-circuits to match-all. */
@@ -39,19 +40,24 @@ function isWorldOwner(userId: string) {
 }
 
 /**
- * The read predicate: `owner ∨ grant(editor|viewer) ∨ (member ∧ shared) ∨ compendium-entry`. An Entity
- * the caller can't read is indistinguishable from a missing one, so `private` never
- * leaks existence. An entity-level grant pierces `private` for exactly that user.
+ * The read predicate: `owner ∨ grant(editor|viewer) ∨ (member ∧ shared) ∨ compendium-entry ∨
+ * (mounted ∧ shared)`. An Entity the caller can't read is indistinguishable from a missing one, so
+ * `private` never leaks existence. An entity-level grant pierces `private` for exactly that user.
  *
- * The last disjunct is the **Compendium**'s own reachability rule (ADR-0078/0079): Instance-wide with
- * no members, roles or public link means there is nothing per-caller to resolve, so being signed in is
- * the standing. `worldMembers` cannot supply one — Collaboration stays World-only — and the reconcile's
- * incidental `owner` grant would reach exactly the user who ran the import. Reachability only: the
- * **seal** still refuses every write.
+ * The compendium disjunct is the **Compendium**'s own reachability rule (ADR-0078/0079): Instance-wide
+ * with no members, roles or public link means there is nothing per-caller to resolve, so being signed
+ * in is the standing. `worldMembers` cannot supply one — Collaboration stays World-only — and the
+ * reconcile's incidental `owner` grant would reach exactly the user who ran the import.
+ *
+ * The last is the **Mount** cascade (ADR-0080), on the same `shared` line the member disjunct rides —
+ * a Mount republishes what the mounted Container publishes, no more. It says nothing about a mounted
+ * **Compendium**: the disjunct before already reached every entry. Reachability only, both of them —
+ * the **seal** and the ordinary write gates refuse as before.
  */
 function canReadEntity(userId: string, superadmin: boolean) {
   if (superadmin) return MATCH_ALL;
-  return sql`(${hasGrant(userId, ['owner', 'editor', 'viewer'])} OR (${entities.visibility} = 'shared' AND ${isWorldMember(userId)}) OR ${inACompendium()})`;
+  return sql`(${hasGrant(userId, ['owner', 'editor', 'viewer'])} OR (${entities.visibility} = 'shared' AND ${isWorldMember(userId)}) OR ${inACompendium()}
+    OR (${entities.visibility} = 'shared' AND ${mountedIntoReachOf(userId, entities.containerId)}))`;
 }
 
 /**
@@ -106,9 +112,22 @@ export const sharedVisibility = eq(entities.visibility, 'shared');
 export const READ_ONLY_RIGHTS: readonly EntityVerb[] = ['read'];
 
 /**
+ * What a **World Public Link** on `worldRef` reaches: that World's own `shared` Entities, plus what its
+ * **Mounts** republish (ADR-0080) — the anonymous half of the cascade.
+ *
+ * Republished is what a mounted Container's ordinary readers read, which is why the second arm asks a
+ * different question of each kind: a World's `shared` Entities, and *every* entry of a **Compendium**,
+ * whose Instance-wide rule never consulted visibility (ADR-0079).
+ */
+export function reachedByWorldLink(worldRef: SQLWrapper): SQL {
+  return sql`((${entities.containerId} = ${worldRef} AND ${sharedVisibility})
+    OR ((${sharedVisibility} OR ${inACompendium()}) AND ${mountedIntoWorld(worldRef, entities.containerId)}))`;
+}
+
+/**
  * Whether a Public Link *token* currently grants read of Entity `id`. A token reaches
  * an Entity via a per-entity link pointing at it (pierces `private`), or via a World
- * link whose World holds it *and* it is `shared`. A revoked token reaches nothing.
+ * link that {@link reachedByWorldLink} answers for. A revoked token reaches nothing.
  */
 export function tokenReachesEntity(db: Db, token: string, id: string): boolean {
   const direct = db
@@ -120,7 +139,7 @@ export function tokenReachesEntity(db: Db, token: string, id: string): boolean {
   const viaWorld = db
     .select({ id: entities.id })
     .from(worldLinks)
-    .innerJoin(entities, and(eq(entities.containerId, worldLinks.worldId), eq(entities.id, id), sharedVisibility))
+    .innerJoin(entities, and(eq(entities.id, id), reachedByWorldLink(worldLinks.worldId)))
     .where(eq(worldLinks.id, token))
     .get();
   return !!viaWorld;
@@ -160,8 +179,11 @@ export interface EntityAccess {
   rightsOf: typeof entityRightsOf;
   /** Full single-row decision (row + standing), or undefined if no such Entity. */
   decide(id: string): EntityDecision | undefined;
-  /** Blob-free reachability + ownership (no `document`), or undefined if no such Entity. */
-  decideMeta(id: string): { canRead: boolean; isOwner: boolean } | undefined;
+  /**
+   * Blob-free reachability + ownership (no `document`), or undefined if no such Entity. The Container
+   * rides along, free on a row already read — a caller telling home content from foreign needs it (ADR-0080).
+   */
+  decideMeta(id: string): { canRead: boolean; isOwner: boolean; containerId: string } | undefined;
 }
 
 /** Resolve the Entity access context for `userId` (Superadmin resolved once). */
@@ -209,11 +231,12 @@ export function entityAccess(db: Db, userId: string): EntityAccess {
         .select({
           canRead: canReadEntity(userId, superadmin),
           isOwner: ownsEntity(userId, superadmin),
+          containerId: entities.containerId,
         })
         .from(entities)
         .where(eq(entities.id, id))
         .get();
-      return row ? { canRead: !!row.canRead, isOwner: !!row.isOwner } : undefined;
+      return row ? { canRead: !!row.canRead, isOwner: !!row.isOwner, containerId: row.containerId } : undefined;
     },
   };
 }

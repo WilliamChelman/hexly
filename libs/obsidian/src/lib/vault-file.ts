@@ -93,7 +93,7 @@ export function entityToMarkdown(input: {
     ...bodyFields.map(({ field }) => field.id),
     ...resolved.filter(({ field, dataType }) => vaultSlotOf(field, dataType) === 'omit').map(({ field }) => field.id),
   ]);
-  const frontmatter = buildFrontmatter(doc, excluded, input.frontmatter);
+  const frontmatter = buildFrontmatter(doc, excluded, input.frontmatter, context);
 
   if (!frontmatter) return body;
   const yaml = stringifyYaml(frontmatter);
@@ -110,14 +110,44 @@ function buildFrontmatter(
   doc: EntityDocument,
   excluded: ReadonlySet<string>,
   additions: Record<string, unknown>,
+  context: VaultExportContext,
 ): Record<string, unknown> | undefined {
   const meta: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(doc)) {
     if (excluded.has(key) || key.startsWith(HEXLY_METADATA_PREFIX)) continue;
-    meta[key] = value;
+    // A frontmatter Field's Assets are repointed at their exported copies exactly as a body Field's are:
+    // flattening the bytes and leaving the reference abroad would make a round trip repoint rather than
+    // copy (ADR-0080). The additions are the host's own (Tags, types) and carry none.
+    meta[key] = remapVaultAssets(value, (src) => context.assetPath(src));
   }
   Object.assign(meta, additions);
   return Object.keys(meta).length ? meta : undefined;
+}
+
+/**
+ * Rewrite every Asset reference nested anywhere in a frontmatter value, the structure otherwise untouched
+ * — the frontmatter counterpart of the src rewrite a `body` projection's converter does for itself.
+ *
+ * A frontmatter-projected Field is a document too: a Board's surface carries an Image element's capability
+ * URL, and a Text Block's prose carries image srcs, none of which any `toMarkdown` ever sees. `remap` is
+ * what keeps the walk honest — the export's `assetPath` recognises only a capability URL, the import's
+ * `storeAsset` only a path the archive actually carries, and anything else answers nullish and is left
+ * exactly as it was.
+ */
+export function remapVaultAssets<T>(value: T, remap: (src: string) => string | null | undefined): T {
+  if (typeof value === 'string') return (remap(value) ?? value) as T;
+  if (Array.isArray(value)) return value.map((item) => remapVaultAssets(item, remap)) as T;
+  if (isPlainObject(value)) {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, remapVaultAssets(item, remap)])) as T;
+  }
+  return value;
+}
+
+/** A JSON/YAML-shaped map (never a class instance), so the walk rebuilds only what it can rebuild faithfully. */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object') return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 /** A Markdown file split into its parsed frontmatter and its raw body (ADR-0051, pass 1 of import). */

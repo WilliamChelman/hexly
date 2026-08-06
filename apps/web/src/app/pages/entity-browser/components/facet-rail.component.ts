@@ -25,18 +25,19 @@ export interface ActiveFacets {
   /** The active Field filters, keyed by EntityDocument key — the contextual dimension (ADR-0048, #188). */
   readonly fields: Readonly<Record<string, FieldSelection>>;
   /**
-   * The selected **Compendiums** — Container ids (ADR-0079, #401). Only the Compendium browse fills it:
-   * the server offers the category by presence, and a browse scoped to one Container has nothing to
-   * narrow, so every other browse leaves it empty and the rail drops the section.
+   * The selected **Containers** — Container ids (ADR-0079's Pack facet, widened by ADR-0080). Only the
+   * **Library** fills it: the server offers the category by presence, and a browse scoped to one
+   * Container has nothing to narrow, so every other browse leaves it empty and the rail drops the
+   * section.
    */
-  readonly compendium: readonly string[];
+  readonly container: readonly string[];
 }
 
 /**
- * The value-toggled facet categories: the universal trio, plus the **Compendium**, which the server
+ * The value-toggled facet categories: the universal trio, plus the **Container**, which the server
  * offers only where a read spans more than one Container.
  */
-export type FacetCategory = 'type' | 'tag' | 'visibility' | 'compendium';
+export type FacetCategory = 'type' | 'tag' | 'visibility' | 'container';
 
 export interface FacetToggle {
   readonly category: FacetCategory;
@@ -185,7 +186,7 @@ export class FacetRailComponent {
     tag: [],
     visibility: [],
     fields: {},
-    compendium: [],
+    container: [],
   });
   readonly canClear = input(false);
 
@@ -238,11 +239,12 @@ export class FacetRailComponent {
         label: (v: FacetCount) => this.transloco.translate(`entityBrowser.facets.${v.value}`),
       },
       {
-        // The Compendium (ADR-0079, #401): a Container id labelled with the pack's authored name, which
-        // the server sends beside the count — nothing client-side knows what a Container is called.
-        // Absent wherever the read names a single Container, so every other browse drops the section.
-        category: 'compendium' as const,
-        rows: counts.compendium ?? [],
+        // The **Container** (ADR-0079, ADR-0080): a Container id labelled with its authored name, which
+        // the server sends beside the count — nothing client-side knows what a Container is called —
+        // and in the order the read named its Containers, which in the Library is the Owner's Mount
+        // order. Absent wherever the read names a single Container, so every other browse drops it.
+        category: 'container' as const,
+        rows: counts.container ?? [],
         label: (v: FacetCount) => v.label ?? v.value,
       },
     ];

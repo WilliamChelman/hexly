@@ -10,7 +10,9 @@ import {
   ImporterSummary,
   ImportRunSummary,
   ImportSummary,
+  InboundLinkCount,
   MemberRole,
+  Mount,
   PublicLink,
   UpdateUserDefinedTypeRequest,
   UpdateWorldFieldRequest,
@@ -18,6 +20,7 @@ import {
   VaultImportOptions,
   WorldDetail,
   WorldGraph,
+  WorldKind,
   WorldMember,
   WorldNudge,
   WorldSummary,
@@ -155,6 +158,15 @@ export class WorldsClient {
   }
 
   /**
+   * Label the World a campaign or a **Shelf** (ADR-0080). Owner-gated server-side. Nothing else
+   * changes: the label is what the World Index groups by, and no read filters on it.
+   */
+  setKind(id: string, kind: WorldKind): Observable<WorldDetail> {
+    // Write-through, as {@link rename} — the relabelled World fans out and this tab's echo dedups.
+    return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { kind }).pipe(tap((d) => this.store.merge(d)));
+  }
+
+  /**
    * The Worlds whose Theme may be copied into this one (#376), Themes and all. Owner-gated
    * server-side, which is also where *which* Worlds qualify is decided.
    *
@@ -166,6 +178,15 @@ export class WorldsClient {
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`/api/worlds/${id}`);
+  }
+
+  /**
+   * What deleting this World would break beyond it (ADR-0080, #414): the links pointing in from other
+   * Containers, and how many they come from. Read at the moment the confirm opens rather than held
+   * anywhere, so it is never a number from before someone else's save.
+   */
+  inboundLinks(id: string): Observable<InboundLinkCount> {
+    return this.http.get<InboundLinkCount>(`/api/worlds/${id}/inbound-links`);
   }
 
   /** The World's ownership set — Owner user ids. Owner-only server-side. */
@@ -204,6 +225,45 @@ export class WorldsClient {
   /** Remove a member, or leave the World yourself (pass your own id); returns the updated member set. */
   removeMember(id: string, userId: string): Observable<WorldMember[]> {
     return this.http.delete<WorldMember[]>(`/api/worlds/${id}/members/${userId}`);
+  }
+
+  /**
+   * The Containers this World draws from (CONTEXT.md → Mount, ADR-0080), in the Owner-arranged order.
+   * World-Owner-gated server-side, as the whole Mount surface is.
+   *
+   * Outside the live-follow store: a Mount is another Container's identity, which answers to no `world`
+   * nudge for this one — the panel re-reads through the write it just made instead.
+   */
+  mounts(id: string): Observable<Mount[]> {
+    return this.http.get<Mount[]>(`/api/worlds/${id}/mounts`);
+  }
+
+  /** The Containers the caller may mount here: every installed Compendium plus every World they Own. */
+  mountCandidates(id: string): Observable<Mount[]> {
+    return this.http.get<Mount[]>(`/api/worlds/${id}/mount-candidates`);
+  }
+
+  /** Declare one more Container this World draws from; returns the updated list. Idempotent (200). */
+  addMount(id: string, containerId: string): Observable<Mount[]> {
+    return this.http.post<Mount[]>(`/api/worlds/${id}/mounts`, { containerId });
+  }
+
+  /** Replace the Mount order wholesale, as {@link setPins} replaces the pins. Owner-gated server-side. */
+  reorderMounts(id: string, containerIds: string[]): Observable<Mount[]> {
+    return this.http.patch<Mount[]>(`/api/worlds/${id}/mounts`, { containerIds });
+  }
+
+  /**
+   * What unmounting this Container would break: the links from *this* World pointing into it
+   * (ADR-0080, #414). Read per act, and advisory — {@link removeMount} never consults it.
+   */
+  mountInboundLinks(id: string, containerId: string): Observable<InboundLinkCount> {
+    return this.http.get<InboundLinkCount>(`/api/worlds/${id}/mounts/${containerId}/inbound-links`);
+  }
+
+  /** Unmount one Container; returns the remaining list. */
+  removeMount(id: string, containerId: string): Observable<Mount[]> {
+    return this.http.delete<Mount[]>(`/api/worlds/${id}/mounts/${containerId}`);
   }
 
   /** The Entity Types available in a World (#191): plugin + user-defined. Reachable-gated server-side. */

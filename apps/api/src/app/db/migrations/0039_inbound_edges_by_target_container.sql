@@ -1,0 +1,1 @@
+CREATE INDEX `idx_entity_edges_target_container` ON `entity_edges` (`target_kind`,`target_container_id`,`target_id`);

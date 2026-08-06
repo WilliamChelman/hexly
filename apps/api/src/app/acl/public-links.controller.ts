@@ -1,5 +1,5 @@
 import { Controller, Get, NotFoundException, Param, UseGuards } from '@nestjs/common';
-import { EntityDetail, PublicWorldView } from '@hexly/domain';
+import { CompendiumSummary, EntityDetail, PublicWorldView } from '@hexly/domain';
 import { CollaborationGuard } from './collaboration.guard';
 import { PublicLinksService } from './public-links.service';
 
@@ -36,5 +36,13 @@ export class PublicLinksController {
     const entity = this.links.readWorldEntity(token, id);
     if (!entity) throw new NotFoundException();
     return entity;
+  }
+
+  // One mounted **Compendium**'s terms, scoped to the World Public Link's Mounts (ADR-0080, #410).
+  @Get('worlds/:token/compendiums/:id')
+  worldCompendium(@Param('token') token: string, @Param('id') id: string): CompendiumSummary {
+    const compendium = this.links.readCompendium(token, id);
+    if (!compendium) throw new NotFoundException();
+    return compendium;
   }
 }

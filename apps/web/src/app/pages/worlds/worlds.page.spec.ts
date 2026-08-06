@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { Subject, of, throwError } from 'rxjs';
-import { ImportSummary, WorldSummary } from '@hexly/domain';
+import { ImportSummary, WorldKind, WorldSummary } from '@hexly/domain';
 import { AuthClient, ClientConfigStore, WorldsClient, ToasterService } from '@hexly/web-core';
 import { MockAuthClient, MockWorldsClient, mockClientConfigStore } from '@hexly/web-core/testing';
 import { TypeDefinition } from '@hexly/web-entity';
@@ -25,7 +25,7 @@ const TYPES: TypeDefinition[] = [
   },
 ];
 
-function world(id: string, name = id, ownerId = 'u1'): WorldSummary {
+function world(id: string, name = id, ownerId = 'u1', kind: WorldKind = 'campaign'): WorldSummary {
   // Rights drive the owned/member distinction now (ADR-0039): the caller (u1) owning it
   // carries `manage`; anyone else's World is reachable read-only.
   const owned = ownerId === 'u1';
@@ -33,6 +33,7 @@ function world(id: string, name = id, ownerId = 'u1'): WorldSummary {
     id,
     name,
     owners: [ownerId],
+    kind,
     rights: owned ? ['read', 'manage'] : ['read'],
     createdAt: 1,
     updatedAt: 1,
@@ -105,6 +106,50 @@ describe('WorldIndex', () => {
     );
     expect(names.join(' ')).toContain('Aldermoor');
     expect(names.join(' ')).toContain('Whisperwood');
+  });
+
+  describe('the Shelf grouping (ADR-0080, #409)', () => {
+    const ids = (el: HTMLElement, group: string) =>
+      Array.from(el.querySelectorAll(`[data-testid=${group}] [data-testid^=world-]`)).map((n) =>
+        n.getAttribute('data-testid'),
+      );
+
+    it('groups campaigns and Shelves apart', () => {
+      const el = render([
+        world('w1', 'Aldermoor'),
+        world('w2', 'The Art Shelf', 'u1', 'shelf'),
+        world('w3', 'Whisperwood'),
+      ]).nativeElement as HTMLElement;
+
+      expect(ids(el, 'worlds-campaigns')).toEqual(['world-w1', 'world-w3']);
+      expect(ids(el, 'worlds-shelves')).toEqual(['world-w2']);
+    });
+
+    it('shows no Shelves group at all to a caller with no Shelf — exactly the list they had', () => {
+      const el = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')]).nativeElement as HTMLElement;
+
+      expect($(el, '[data-testid=worlds-shelves]')).toBeNull();
+      expect(ids(el, 'worlds-campaigns')).toEqual(['world-w1', 'world-w2']);
+    });
+
+    it('drops the campaigns heading, not the row, when every World is a Shelf', () => {
+      const el = render([world('w1', 'The Art Shelf', 'u1', 'shelf')]).nativeElement as HTMLElement;
+
+      expect(el.textContent).not.toContain('Continue');
+      // The row stays: the Create card lives in it, and a caller with no campaign still needs one.
+      expect($(el, '[data-testid=worlds-campaigns] [data-testid=create-world-tile]')).not.toBeNull();
+      expect(ids(el, 'worlds-shelves')).toEqual(['world-w1']);
+    });
+
+    it('withholds nothing from a Shelf card: it opens, renames, exports and deletes like any other', () => {
+      const el = render([world('w1', 'The Art Shelf', 'u1', 'shelf')]).nativeElement as HTMLElement;
+
+      expect(($(el, '[data-testid=world-w1]') as HTMLAnchorElement).getAttribute('href')).toBe('/w/w1');
+      expect($(el, '[data-testid=rename-world-w1]')).not.toBeNull();
+      expect($(el, '[data-testid=export-world-w1]')).not.toBeNull();
+      expect($(el, '[data-testid=delete-world-w1]')).not.toBeNull();
+      expect($(el, '[data-testid=owners-world-w1]')).not.toBeNull();
+    });
   });
 
   it('distinguishes owned Worlds from member Worlds', () => {
@@ -542,6 +587,55 @@ describe('WorldIndex', () => {
     expect(worldsClient.get).toHaveBeenCalledWith('w1');
     expect($(el, '[data-testid=delete-modal]')).not.toBeNull();
     expect($(el, '[data-testid=delete-count]')?.textContent).toContain('3');
+  });
+
+  it('states what deleting the World would break beyond it, and deletes whatever it says', () => {
+    const fixture = render([world('w1', 'Aldermoor')]);
+    const el = fixture.nativeElement as HTMLElement;
+    worldsClient.get.mockReturnValue(of({ ...world('w1', 'Aldermoor'), entityCount: 3, pinnedEntityIds: [], seq: 1 }));
+    worldsClient.inboundLinks.mockReturnValue(of({ links: 7, worlds: 2 }));
+
+    ($(el, '[data-testid=delete-world-w1]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    // Both halves of the blast radius (ADR-0080, #414): the links, and how many Worlds they come from.
+    expect(worldsClient.inboundLinks).toHaveBeenCalledWith('w1');
+    expect($(el, '[data-testid=delete-links]')?.textContent).toContain('7');
+    expect($(el, '[data-testid=delete-links]')?.textContent).toContain('2');
+    // And it refuses nothing: the confirm arms on the typed name alone, exactly as it did before.
+    const input = $(el, '[data-testid=delete-confirm-input]') as HTMLInputElement;
+    input.value = 'Aldermoor';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    worldsClient.delete.mockReturnValue(of(undefined));
+    ($(el, '[data-testid=confirm-delete]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(worldsClient.delete).toHaveBeenCalledWith('w1');
+  });
+
+  it('says nothing points into the World rather than showing a bare zero', () => {
+    const fixture = openDeleteModal('Aldermoor');
+    const el = fixture.nativeElement as HTMLElement;
+
+    // The mock's default is a Container nothing points into.
+    expect($(el, '[data-testid=delete-links]')?.textContent).toContain('Nothing outside this world points into it');
+  });
+
+  it('still deletes when the blast radius would not load', () => {
+    worldsClient.inboundLinks.mockReturnValue(throwError(() => new Error('boom')));
+    const fixture = openDeleteModal('Aldermoor');
+    const el = fixture.nativeElement as HTMLElement;
+
+    // A count is advice, never a gate — the veto is the option ADR-0080 rejects by name.
+    expect($(el, '[data-testid=delete-links]')?.textContent).toContain("Couldn't count");
+    const input = $(el, '[data-testid=delete-confirm-input]') as HTMLInputElement;
+    input.value = 'Aldermoor';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    worldsClient.delete.mockReturnValue(of(undefined));
+    ($(el, '[data-testid=confirm-delete]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(worldsClient.delete).toHaveBeenCalledWith('w1');
   });
 
   /** Open the delete modal for w1 and resolve its entity count. */

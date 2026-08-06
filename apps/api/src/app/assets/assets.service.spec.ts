@@ -81,63 +81,15 @@ describe('AssetsService', () => {
     expect(readdirSync(join(dir, 'world-1'))).toHaveLength(2);
   });
 
-  describe('summariesFor (the picker source, #269, #281, ADR-0065)', () => {
-    it('returns an empty list when the entity-search matched nothing', () => {
-      expect(assets.summariesFor('world-1', [])).toEqual([]);
-    });
+  it('pins an empty extension for an extension-less upload, which still addresses a file', () => {
+    const stored = assets.store('world-1', 'Untitled', PNG_A);
 
-    it('dresses each matched Asset Entity as an AssetSummary with its url, thumbnail, mime and size', () => {
-      const portrait = assets.store('world-1', 'Portrait.png', PNG_A);
-      seedAsset('world-1', 'asset-1', 'Portrait', portrait.hash, '.png', PNG_A.length);
-
-      const summaries = assets.summariesFor('world-1', [{ id: 'asset-1', name: 'Portrait' }]);
-      expect(summaries).toEqual([
-        {
-          url: portrait.url,
-          // The hash-derived thumbnail URL (ADR-0065); the serving route falls back to the original.
-          thumbnailUrl: `/assets/world-1/${portrait.hash}.thumb.webp`,
-          // The Entity's name (as the search returned it) + its ref's pinned extension — a rename relabels
-          // this, never the URL.
-          originalFilename: 'Portrait.png',
-          mime: 'image/png',
-          size: PNG_A.length,
-        },
-      ]);
-      // Metadata only — no hash leak to the summary.
-      expect(summaries[0]).not.toHaveProperty('hash');
-    });
-
-    it('preserves the search order the caller passed (relevance is authoritative, ADR-0065)', () => {
-      const a = assets.store('world-1', 'Portrait.png', PNG_A);
-      const b = assets.store('world-1', 'Map.png', PNG_B);
-      seedAsset('world-1', 'asset-a', 'Portrait', a.hash, '.png', PNG_A.length);
-      seedAsset('world-1', 'asset-b', 'Map', b.hash, '.png', PNG_B.length);
-
-      // Pass them B-then-A: the summaries come back in exactly that order, never re-sorted here.
-      expect(
-        assets
-          .summariesFor('world-1', [
-            { id: 'asset-b', name: 'Map' },
-            { id: 'asset-a', name: 'Portrait' },
-          ])
-          .map((s) => s.originalFilename),
-      ).toEqual(['Map.png', 'Portrait.png']);
-    });
-
-    it('drops a match whose Entity is gone (no readable asset-ref) rather than emitting a broken tile', () => {
-      const portrait = assets.store('world-1', 'Portrait.png', PNG_A);
-      seedAsset('world-1', 'asset-1', 'Portrait', portrait.hash, '.png', PNG_A.length);
-
-      // 'ghost' has no entities row, so no readable ref — it is skipped forward-only.
-      expect(
-        assets
-          .summariesFor('world-1', [
-            { id: 'ghost', name: 'Ghost' },
-            { id: 'asset-1', name: 'Portrait' },
-          ])
-          .map((s) => s.originalFilename),
-      ).toEqual(['Portrait.png']);
-    });
+    // `''` is a value, not an absence: the bytes land under the bare hash and the capability URL reaches
+    // them, which is why every reader of `ext` tests it for absence rather than for truth (#416).
+    expect(stored.ext).toBe('');
+    expect(stored.url).toBe(`/assets/world-1/${stored.hash}`);
+    expect(existsSync(join(dir, 'world-1', stored.hash))).toBe(true);
+    expect(assets.read('world-1', stored.hash)).not.toBeNull();
   });
 
   describe('thumbnails (a regenerable cache beside the bytes, ADR-0065)', () => {
@@ -163,6 +115,16 @@ describe('AssetsService', () => {
     it('still 404s a thumbnail request whose source Asset does not exist', () => {
       expect(assets.read('world-1', `${'a'.repeat(64)}.thumb.webp`)).toBeNull();
     });
+
+    it('never falls back to a non-image original, whose thumbnail address would else serve it whole', () => {
+      // A PDF gets no thumbnail (nothing extracts one), and the byte route is guard-less by design
+      // (ADR-0034): a fallback here would hand the whole document out at an address a list offers every
+      // reader, undoing the Contributor gate on the full-resolution URL beside it (ADR-0080).
+      const doc = assets.store('world-1', 'Rules.pdf', PNG_A);
+      expect(assets.read('world-1', `${doc.hash}.thumb.webp`)).toBeNull();
+      // The original's own address is untouched — the withholding is the thumbnail route's alone.
+      expect(assets.read('world-1', `${doc.hash}.pdf`)?.mime).toBe('application/pdf');
+    });
   });
 
   describe('exportAssets (the vault export source, ADR-0033/ADR-0065)', () => {
@@ -180,9 +142,111 @@ describe('AssetsService', () => {
       expect(new Uint8Array(assets.exportAssets('world-1')[0].bytes)).toEqual(PNG_A);
     });
 
-    it('skips an Asset Entity whose bytes are missing on disk rather than aborting', () => {
+    it('skips an Asset Entity in Missing Bytes rather than aborting', () => {
       seedAsset('world-1', 'asset-1', 'Ghost', 'a'.repeat(64), '.png', 3);
       expect(assets.exportAssets('world-1')).toEqual([]);
+    });
+
+    describe('the foreign bytes a document draws on (ADR-0080, #415)', () => {
+      /** The shelf `world-1` draws from, and two of its notes to source edges from. */
+      beforeEach(() => {
+        db.$client
+          .prepare("INSERT INTO containers (id, kind, name, created_at, updated_at) VALUES (?,'world',?,0,0)")
+          .run('shelf-1', 'S');
+        db.$client.prepare('INSERT INTO worlds (id) VALUES (?)').run('shelf-1');
+        for (const [id, name] of [
+          ['note-1', 'Hero'],
+          ['note-2', 'The Lair'],
+        ])
+          db.$client
+            .prepare(
+              `INSERT INTO entities (id, container_id, name, types, tags, visibility, version, seq, document, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,1,1,?,?,?)`,
+            )
+            .run(id, 'world-1', name, JSON.stringify(['core.type.note']), '[]', 'private', '{}', 0, 0);
+      });
+
+      /** The `asset` edge a prose image mints: the source's Container, and the one its URL named (#407). */
+      function seedAssetEdge(sourceEntityId: string, targetContainerId: string, hash: string): void {
+        db.$client
+          .prepare(
+            `INSERT INTO entity_edges (source_entity_id, container_id, target_kind, target_id, target_container_id, decor)
+             VALUES (?,'world-1','asset',?,?,1)`,
+          )
+          .run(sourceEntityId, hash, targetContainerId);
+      }
+
+      /** An Asset Entity on the shelf, stored and indexed there — what a mounted image resolves to. */
+      function seedShelfAsset(name: string, bytes: Uint8Array): string {
+        const stored = assets.store('shelf-1', `${name}.png`, bytes);
+        seedAsset('shelf-1', `shelf-${name}`, name, stored.hash, '.png', bytes.length);
+        return stored.hash;
+      }
+
+      it("reads the bytes from the Container the edge's URL named, not the referencing World's", () => {
+        const hash = seedShelfAsset('Portrait', PNG_A);
+        seedAssetEdge('note-1', 'shelf-1', hash);
+
+        const exported = assets.exportAssets('world-1');
+        expect(exported).toEqual([
+          { servedUrl: `/assets/shelf-1/${hash}.png`, originalFilename: 'Portrait.png', bytes: expect.any(Buffer) },
+        ]);
+        expect(new Uint8Array(exported[0].bytes)).toEqual(PNG_A);
+      });
+
+      it("writes the World's own Assets first, so what it holds is never displaced by what it draws on", () => {
+        const own = assets.store('world-1', 'Portrait.png', PNG_A);
+        seedAsset('world-1', 'asset-1', 'Portrait', own.hash, '.png', PNG_A.length);
+        // The same human-readable name on both sides — the collision the export's uniquePath resolves.
+        const foreign = seedShelfAsset('Portrait', PNG_B);
+        seedAssetEdge('note-1', 'shelf-1', foreign);
+
+        expect(assets.exportAssets('world-1').map((a) => a.servedUrl)).toEqual([
+          `/assets/world-1/${own.hash}.png`,
+          `/assets/shelf-1/${foreign}.png`,
+        ]);
+      });
+
+      it('counts a World’s own Asset once, however many of its edges point at it', () => {
+        const own = assets.store('world-1', 'Portrait.png', PNG_A);
+        seedAsset('world-1', 'asset-1', 'Portrait', own.hash, '.png', PNG_A.length);
+        seedAssetEdge('note-1', 'world-1', own.hash);
+
+        expect(assets.exportAssets('world-1')).toHaveLength(1);
+      });
+
+      it('yields one entry however many documents reference the same foreign image', () => {
+        const hash = seedShelfAsset('Portrait', PNG_A);
+        seedAssetEdge('note-1', 'shelf-1', hash);
+        seedAssetEdge('note-2', 'shelf-1', hash);
+
+        expect(assets.exportAssets('world-1')).toHaveLength(1);
+      });
+
+      it('leaves out a foreign image in Missing Bytes rather than failing the export', () => {
+        // Indexed on the shelf, but nothing on disk — an unmounted volume, a relocated Assets root.
+        seedAsset('shelf-1', 'shelf-ghost', 'Ghost', 'a'.repeat(64), '.png', 3);
+        seedAssetEdge('note-1', 'shelf-1', 'a'.repeat(64));
+
+        expect(assets.exportAssets('world-1')).toEqual([]);
+      });
+
+      it('drops an edge naming no Asset in that Container — already dangling, nothing to flatten', () => {
+        seedAssetEdge('note-1', 'shelf-1', 'b'.repeat(64));
+        expect(assets.exportAssets('world-1')).toEqual([]);
+      });
+
+      it('ignores an entity edge, whose target Container is the source’s own', () => {
+        const hash = seedShelfAsset('Portrait', PNG_A);
+        db.$client
+          .prepare(
+            `INSERT INTO entity_edges (source_entity_id, container_id, target_kind, target_id, target_container_id, decor)
+             VALUES (?,'world-1','entity',?,NULL,0)`,
+          )
+          .run('note-1', hash);
+
+        expect(assets.exportAssets('world-1')).toEqual([]);
+      });
     });
   });
 });

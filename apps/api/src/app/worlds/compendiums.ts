@@ -29,7 +29,7 @@ function selectCompendium(db: Db) {
 /**
  * Every installed Compendium, by name. Unguarded for the same reason {@link selectCompendium} is:
  * Instance-wide with no members means one answer for every caller — the entries' own reachability rule,
- * one level up. The **Compendium browse** names its Containers from this list (ADR-0079).
+ * one level up. What a **World** draws from is its **Mount** set rather than this list (ADR-0080).
  */
 export function listCompendiums(db: Db): CompendiumSummary[] {
   return selectCompendium(db).orderBy(asc(containers.name)).all().map(toCompendiumSummary);
@@ -84,8 +84,9 @@ export function isCompendiumContainer(db: Db, containerId: string): boolean {
 /**
  * The same question as a predicate over an `entities` row. Reads the satellite that *is* the
  * discriminator (ADR-0078), so it names no pack, no flag and no Entity Type — and it is one expression
- * for four readers: the reachability rule, the **Sealed** projection, the link-target exclusion (#400)
- * and the search tier that ranks the shelf below authored Entities.
+ * for four readers: the reachability rule, the **Sealed** projection, the link-target exclusion (#400,
+ * which a **Mount** is now the one exception to, ADR-0080) and the search tier that ranks the shelf
+ * below authored Entities.
  */
 export function inACompendium(): SQL {
   return sql`EXISTS (SELECT 1 FROM ${compendiums} WHERE ${compendiums.id} = ${entities.containerId})`;

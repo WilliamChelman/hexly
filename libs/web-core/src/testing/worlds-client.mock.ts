@@ -8,13 +8,16 @@ import {
   ImporterSummary,
   ImportRunSummary,
   ImportSummary,
+  InboundLinkCount,
   MemberRole,
+  Mount,
   PublicLink,
   UpdateUserDefinedTypeRequest,
   UpdateWorldFieldRequest,
   UserDefinedType,
   VaultImportOptions,
   WorldDetail,
+  WorldKind,
   WorldMember,
   WorldSummary,
   WorldThemeInput,
@@ -36,10 +39,14 @@ export class MockWorldsClient {
   rename = vi.fn<(id: string, name: string) => Observable<WorldDetail>>();
   setPins = vi.fn<(id: string, pinnedEntityIds: string[]) => Observable<WorldDetail>>();
   setTheme = vi.fn<(id: string, theme: WorldThemeInput | null) => Observable<WorldDetail>>();
+  setKind = vi.fn<(id: string, kind: WorldKind) => Observable<WorldDetail>>();
   // Defaults to nothing to copy from, so a spec mounting the Theme editor (#376) without caring
   // about it still renders; override per test as needed.
   themeSources = vi.fn<(id: string) => Observable<WorldThemeSource[]>>(() => of<WorldThemeSource[]>([]));
   delete = vi.fn<(id: string) => Observable<void>>();
+  // Defaults to a Container nothing points into (ADR-0080, #414), so a spec opening a delete or
+  // unmount confirm without caring about the blast radius still renders; override per test.
+  inboundLinks = vi.fn<(id: string) => Observable<InboundLinkCount>>(() => of({ links: 0, worlds: 0 }));
   // Defaults to an empty set so a spec that mounts the owner-set panel without
   // caring about it still renders; override per test as needed.
   owners = vi.fn<(id: string) => Observable<string[]>>(() => of<string[]>([]));
@@ -51,6 +58,16 @@ export class MockWorldsClient {
   addMember = vi.fn<(id: string, userId: string, role: MemberRole) => Observable<WorldMember[]>>();
   setMemberRole = vi.fn<(id: string, userId: string, role: MemberRole) => Observable<WorldMember[]>>();
   removeMember = vi.fn<(id: string, userId: string) => Observable<WorldMember[]>>();
+  // Both default to empty, so a spec mounting the Mounts panel (ADR-0080, #408) without caring about
+  // it still renders — an unmounted World is the ordinary case; override per test as needed.
+  mounts = vi.fn<(id: string) => Observable<Mount[]>>(() => of<Mount[]>([]));
+  mountCandidates = vi.fn<(id: string) => Observable<Mount[]>>(() => of<Mount[]>([]));
+  addMount = vi.fn<(id: string, containerId: string) => Observable<Mount[]>>();
+  reorderMounts = vi.fn<(id: string, containerIds: string[]) => Observable<Mount[]>>();
+  removeMount = vi.fn<(id: string, containerId: string) => Observable<Mount[]>>();
+  mountInboundLinks = vi.fn<(id: string, containerId: string) => Observable<InboundLinkCount>>(() =>
+    of({ links: 0, worlds: 0 }),
+  );
   // Defaults to no available Importers so a spec mounting the Imports panel (#260) without caring
   // about it still renders; override per test as needed.
   importers = vi.fn<(id: string) => Observable<ImporterSummary[]>>(() => of<ImporterSummary[]>([]));

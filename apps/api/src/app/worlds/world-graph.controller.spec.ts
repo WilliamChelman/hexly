@@ -4,7 +4,7 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
-import { assetUrl, defineField, LinkedEntity, EntityDocument, WorldGraph } from '@hexly/domain';
+import { assetUrl, defineField, LinkedEntity, EntityDocument, WorldGraph, WorldGraphNode } from '@hexly/domain';
 import { tiptapContent } from '@hexly/plugin-content';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
@@ -170,22 +170,6 @@ describe('World Graph', () => {
       expect(edges).toEqual([]);
     });
 
-    it('when the target lives in another World', async () => {
-      const ada = await signIn('ada@hexly.test');
-      const world = await makeWorld(ada);
-      const elsewhere = await makeWorld(ada, 'Thornwood');
-      const abroad = await makeEntity(ada, elsewhere, 'Far Shore');
-      const ealdred = await makeEntity(ada, world, 'Ealdred');
-      await link(ada, ealdred, [{ entityId: abroad }]);
-
-      // The edge is denormalized to its *source's* World, so it comes back in this World's fetch.
-      expect(storedEdges()).toEqual([{ source: ealdred, target: abroad, kind: 'entity' }]);
-
-      const { nodes, edges } = await graphOf(ada, world);
-      expect(names(nodes)).toEqual(['Ealdred']);
-      expect(edges).toEqual([]);
-    });
-
     /**
      * An asset edge names a content-addressed hash (ADR-0065); when no Asset Entity holds that hash
      * — never minted, or deleted — the hash resolves to no node, so the reference dangles exactly
@@ -227,20 +211,147 @@ describe('World Graph', () => {
     expect(edges).toEqual([{ source: ealdred, target: portrait, descriptor: null, decor: true }]);
   });
 
-  /** An identical hash in another World shares no Entity, so its asset edge never leaks across. */
-  it('resolves an asset edge only within its own World', async () => {
+  /**
+   * A hash names bytes, not an Asset: an identical hash in another World shares no Entity, and a URL
+   * naming *this* World reaches only this World's Assets (ADR-0080). A hash alone never crosses.
+   */
+  it('resolves an asset edge against the World its URL names, not any World holding the bytes', async () => {
     const ada = await signIn('ada@hexly.test');
     const world = await makeWorld(ada);
     const elsewhere = await makeWorld(ada, 'Thornwood');
     const ealdred = await makeEntity(ada, world, 'Ealdred');
     const hash = 'b'.repeat(64);
-    // The Asset Entity for this hash lives in the *other* World.
+    // The Asset Entity for this hash lives in the *other* World; the URL names this one.
     mintAsset(elsewhere, hash, 'Portrait');
     await illustrate(ada, ealdred, assetUrl(world, hash, '.png'));
 
     const { nodes, edges } = await graphOf(ada, world);
     expect(names(nodes)).toEqual(['Ealdred']);
     expect(edges).toEqual([]);
+  });
+
+  /**
+   * An image whose URL points at another Container's bytes *renders* — the byte route is unauthenticated
+   * and takes the Container from the path — so the graph draws it too, or it would quietly disagree with
+   * the page (ADR-0080). The Asset is a node of this picture although it is not this World's Entity.
+   */
+  describe('An image drawn from another Container', () => {
+    it('draws the edge, with that Container’s Asset as its far end', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const board = await makeEntity(ada, world, 'Mood Board');
+      const hash = 'c'.repeat(64);
+      const portrait = mintAsset(shelf, hash, 'Shelf Portrait');
+
+      await illustrate(ada, board, assetUrl(shelf, hash, '.png'));
+
+      const { nodes, edges } = await graphOf(ada, world);
+      expect(names(nodes)).toEqual(['Mood Board', 'Shelf Portrait']);
+      expect(drawn({ nodes, edges })).toEqual(['Mood Board → Shelf Portrait']);
+      // Decor by construction, wherever the bytes live — the client's reveal governs it as ever (ADR-0069).
+      expect(edges).toEqual([{ source: board, target: portrait, descriptor: null, decor: true }]);
+      // And it is a Foreign node: drawn, but marked as the shelf's rather than passed off as this World's.
+      expect(foreignNodes(nodes)).toEqual([['Shelf Portrait', shelf]]);
+    });
+
+    /**
+     * The same through a **Board**, which is the surface this is actually for: its Image elements harvest
+     * the very edge a prose image does (ADR-0069).
+     */
+    it('draws a Board’s Image of another Container’s Asset as a Foreign node', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const hash = 'd'.repeat(64);
+      const portrait = mintAsset(shelf, hash, 'Shelf Portrait');
+      const board = await makeBoard(ada, world, 'Mood Board', assetUrl(shelf, hash, '.png'));
+
+      const { nodes, edges } = await graphOf(ada, world);
+      expect(names(nodes)).toEqual(['Mood Board', 'Shelf Portrait']);
+      expect(edges).toEqual([{ source: board, target: portrait, descriptor: null, decor: true }]);
+      expect(foreignNodes(nodes)).toEqual([['Shelf Portrait', shelf]]);
+    });
+
+    /** Both endpoints stay access-filtered: an Asset the viewer cannot read is no node and so no edge. */
+    it('draws nothing for a viewer who cannot read the Asset’s Container', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const bob = await signIn('bob@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      await addMember(ada, world, bobId);
+      const board = await makeEntity(ada, world, 'Mood Board');
+      await share(ada, board);
+      const hash = 'c'.repeat(64);
+      mintAsset(shelf, hash, 'Shelf Portrait');
+
+      await illustrate(ada, board, assetUrl(shelf, hash, '.png'));
+
+      const { nodes, edges } = await graphOf(bob, world);
+      expect(names(nodes)).toEqual(['Mood Board']);
+      expect(edges).toEqual([]);
+    });
+  });
+
+  /**
+   * A link whose target lives in another Container ends in a **Foreign node** (ADR-0080): drawn, so the
+   * connection the author made is visible, and marked with where the thing actually lives, so the picture
+   * does not lie about it. The World's *own* nodes stay exactly its own Entities.
+   */
+  describe('A link leaving the World', () => {
+    it('draws its target marked with the Container it lives in', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const goblin = await makeEntity(ada, shelf, 'Marauder Goblin');
+      const ealdred = await makeEntity(ada, world, 'Ealdred');
+      await link(ada, ealdred, [{ entityId: goblin, descriptor: 'hunts' }]);
+
+      // The edge is denormalized to its *source's* World, so it comes back in this World's fetch.
+      expect(storedEdges()).toEqual([{ source: ealdred, target: goblin, kind: 'entity' }]);
+
+      const { nodes, edges } = await graphOf(ada, world);
+      expect(names(nodes)).toEqual(['Ealdred', 'Marauder Goblin']);
+      expect(edges).toEqual([{ source: ealdred, target: goblin, descriptor: 'hunts', decor: false }]);
+      // Only the shelf's Entity is marked; this World's own carry no Container at all.
+      expect(foreignNodes(nodes)).toEqual([['Marauder Goblin', shelf]]);
+    });
+
+    /** Both endpoints stay access-filtered: a Foreign node the viewer cannot read is no node, and so no edge. */
+    it('draws nothing for a viewer who cannot read the target', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const bob = await signIn('bob@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      await addMember(ada, world, bobId);
+      const goblin = await makeEntity(ada, shelf, 'Marauder Goblin');
+      const ealdred = await makeEntity(ada, world, 'Ealdred');
+      await share(ada, ealdred);
+      await link(ada, ealdred, [{ entityId: goblin, descriptor: 'hunts' }]);
+
+      const { nodes, edges } = await graphOf(bob, world);
+      expect(names(nodes)).toEqual(['Ealdred']);
+      expect(edges).toEqual([]);
+    });
+
+    /**
+     * The far side of the boundary is another World's picture. This one draws the node it points at and
+     * nothing the node itself points at — the edges read here are this World's own, by construction.
+     */
+    it('draws nothing of the far Container’s own graph', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const goblin = await makeEntity(ada, shelf, 'Marauder Goblin');
+      const queen = await makeEntity(ada, shelf, 'Goblin Queen');
+      await link(ada, goblin, [{ entityId: queen, descriptor: 'serves' }]);
+      const ealdred = await makeEntity(ada, world, 'Ealdred');
+      await link(ada, ealdred, [{ entityId: goblin, descriptor: 'hunts' }]);
+
+      const { nodes, edges } = await graphOf(ada, world);
+      expect(names(nodes)).toEqual(['Ealdred', 'Marauder Goblin']);
+      expect(drawn({ nodes, edges })).toEqual(['Ealdred —hunts→ Marauder Goblin']);
+    });
   });
 
   /**
@@ -318,6 +429,26 @@ describe('World Graph', () => {
     );
   }
 
+  /** A **Board** whose surface carries one Image element at `src` — the Asset edge a mood board mints. */
+  async function makeBoard(owner: Agent, worldId: string, name: string, src: string): Promise<string> {
+    const id = (
+      await owner
+        .post('/entities')
+        .send({ name, types: ['core.type.board'], worldId })
+        .expect(201)
+    ).body.id;
+    const geometry = { position: { x: 0, y: 0 }, size: { width: 100, height: 100 }, z: 0 };
+    await owner
+      .put(`/entities/${id}`)
+      .send({
+        document: { 'core.field.surface': { elements: [{ id: 'i1', kind: 'image', assetUrl: src, ...geometry }] } },
+        version: 1,
+        tags: [],
+      })
+      .expect(200);
+    return id;
+  }
+
   /** Save `id`'s Content as prose holding one `image` — which harvests as an Asset edge. */
   async function illustrate(owner: Agent, id: string, src: string): Promise<void> {
     await save(owner, id, [{ type: 'image', attrs: { src } }]);
@@ -392,6 +523,11 @@ describe('World Graph', () => {
 
   function names(nodes: readonly LinkedEntity[]): string[] {
     return nodes.map((n) => n.name);
+  }
+
+  /** Every **Foreign node**, by name and by the Container it is marked as living in. */
+  function foreignNodes(nodes: readonly WorldGraphNode[]): [string, string][] {
+    return nodes.flatMap((n) => (n.foreignContainerId ? [[n.name, n.foreignContainerId] as [string, string]] : []));
   }
 
   /**

@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { TranslocoService } from '@jsverse/transloco';
 import { WorldDetail, WorldVerb } from '@hexly/domain';
-import { ActiveWorld, worldCompendiumRoute, worldDashboardRoute, worldGraphRoute } from '@hexly/web-core';
+import { ActiveWorld, worldDashboardRoute, worldGraphRoute, worldLibraryRoute } from '@hexly/web-core';
 import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { NavRailStore } from '../../shell/nav-rail.store';
 import { WorldPage } from './world.page';
@@ -11,6 +12,7 @@ function world(rights: WorldVerb[]): WorldDetail {
     id: 'w1',
     name: 'Aldermoor',
     owners: ['u1'],
+    kind: 'campaign',
     rights,
     entityCount: 0,
     pinnedEntityIds: [],
@@ -35,11 +37,11 @@ describe('WorldLayout', () => {
     return TestBed.inject(NavRailStore).entries();
   }
 
-  it('fills the rail with the Dashboard, Entities, Compendium, Assets and Graph links from the active World (ADR-0041)', () => {
+  it('fills the rail with the Dashboard, Entities, Library, Assets and Graph links from the active World (ADR-0041)', () => {
     expect(railFor(world(['read'])).map((e) => e.testid)).toEqual([
       'nav-dashboard',
       'nav-entities',
-      'nav-compendium',
+      'nav-library',
       'nav-assets',
       'nav-world-graph',
     ]);
@@ -52,13 +54,23 @@ describe('WorldLayout', () => {
   });
 
   /**
-   * The Compendium is Instance-wide and belongs to no World (ADR-0078/0079), so the World in its link
-   * is the **adoption target** rather than the content's home — and, being a read any signed-in caller
-   * may make, it sits beside the Graph with no rights gate.
+   * The Library sits beside Entities: what this World draws on, beside what its authors made
+   * (ADR-0080). Its content lives in the Containers this World **Mounts**, so the World in its link is
+   * whose Mounts these are and the **Adoption** target — and, being a read of the World, it needs no
+   * rights gate.
    */
-  it('offers the Compendium to every reader, under the active World (ADR-0079)', () => {
-    const compendium = railFor(world(['read']))[2];
-    expect(compendium.link).toEqual(worldCompendiumRoute('w1', 'Aldermoor'));
+  it('offers the Library to every reader, beside Entities and under the active World (ADR-0080)', () => {
+    const entries = railFor(world(['read']));
+    expect(entries[1].testid).toBe('nav-entities');
+    expect(entries[2].testid).toBe('nav-library');
+    expect(entries[2].link).toEqual(worldLibraryRoute('w1', 'Aldermoor'));
+
+    // A destination is only there if it reads as one in both Locales (ADR-0049): the rail renders the
+    // key, so an untranslated one would ship the key itself as the label.
+    const transloco = TestBed.inject(TranslocoService);
+    expect(transloco.translate(entries[2].labelKey)).toBe('Library');
+    transloco.setActiveLang('fr');
+    expect(transloco.translate(entries[2].labelKey)).toBe('Bibliothèque');
   });
 
   it('matches the Dashboard link exactly, so it does not stay lit across the World scope', () => {
@@ -71,7 +83,7 @@ describe('WorldLayout', () => {
     expect(railFor(world(['read', 'manage'])).map((e) => e.testid)).toEqual([
       'nav-dashboard',
       'nav-entities',
-      'nav-compendium',
+      'nav-library',
       'nav-assets',
       'nav-world-graph',
       'nav-world-settings',

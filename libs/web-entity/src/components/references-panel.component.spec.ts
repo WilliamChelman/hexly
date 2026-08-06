@@ -173,6 +173,30 @@ describe('ReferencesPanel', () => {
     expect(item?.querySelector('[data-testid=reference-decor-mark]')).not.toBeNull();
   });
 
+  /**
+   * Usage crosses the Container wall (ADR-0080), so the surface that answers "may I delete this?" for a
+   * shelf Entity has to say *where from* — a list of Worlds, not a list of links. Home rows stay bare.
+   */
+  it('names the Container an inbound link came from, and marks nothing that came from home', () => {
+    const { el } = mount({
+      referencedBy: [
+        { descriptor: null, decor: false, source: { id: 'queen', name: 'Goblin Queen', types: [NOTE] } },
+        {
+          descriptor: 'raided',
+          decor: false,
+          source: { id: 'tavern', name: 'The Salted Hart', types: [NOTE] },
+          foreignContainer: { id: 'w-aldermoor', name: 'Aldermoor' },
+        },
+      ],
+    });
+
+    const [home, abroad] = Array.from(el.querySelectorAll('[data-testid=reference-in]'));
+    expect(home.querySelector('[data-testid=reference-foreign-container]')).toBeNull();
+    const mark = abroad.querySelector('[data-testid=reference-foreign-container]');
+    expect(mark?.textContent).toContain('Aldermoor');
+    expect(mark?.getAttribute('data-container-id')).toBe('w-aldermoor');
+  });
+
   /** "Nothing links here" is a claim about the edge index, not about the fetch: it must not appear before the list lands. */
   it('claims nothing until the list has landed', () => {
     session.loadDetail(noteDetail('Ealdred'));

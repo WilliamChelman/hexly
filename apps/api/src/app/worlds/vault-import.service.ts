@@ -16,7 +16,7 @@ import {
   VaultImportOptions,
   wikilinkName,
 } from '@hexly/domain';
-import { bodyToFields, splitFrontmatter } from '@hexly/obsidian';
+import { bodyToFields, remapVaultAssets, splitFrontmatter } from '@hexly/obsidian';
 import { AssetMintService } from '../assets/asset-mint.service';
 import { AssetExtraction } from '../assets/asset-extraction.service';
 import { HEXLY_CONFIG, type HexlyConfig } from '../config';
@@ -266,8 +266,14 @@ export class VaultImportService {
           // Reserved `hexly.*` frontmatter is provenance a Hexly export writes (type/sourcePath), consumed
           // here and re-derived on the next export — never stored back as author EntityDocument (ADR-0033).
           // A frontmatter key a body Field also fills is dropped: the body is authoritative for it.
+          // Its Assets resolve through the same `storeAsset` seam a body Field's do, so a Board's Image
+          // heals to a capability URL in THIS World rather than staying a vault path — or, worse, riding
+          // back in as the foreign URL it was exported from, which would repoint at that Container
+          // instead of copying it (ADR-0080).
           const passThrough = Object.fromEntries(
-            Object.entries(rest).filter(([key]) => !key.startsWith(HEXLY_METADATA_PREFIX) && !(key in bodyValues)),
+            Object.entries(rest)
+              .filter(([key]) => !key.startsWith(HEXLY_METADATA_PREFIX) && !(key in bodyValues))
+              .map(([key, value]) => [key, remapVaultAssets(value, context.storeAsset)]),
           );
           const doc: EntityDocument = {
             ...passThrough,

@@ -128,7 +128,7 @@ export type CreateEntityRequest = z.infer<typeof createEntityRequestSchema>;
 /**
  * POST /entities/:id/adopt (CONTEXT.md → Adoption): the target World, everything else being read off
  * the entry. Required rather than defaulted like a create's, because every surface offering Adoption is
- * already read under a World — the `:worldId` of the **Compendium browse** (ADR-0079).
+ * already read under a World — the `:worldId` of the **Library** (ADR-0079, ADR-0080).
  */
 export const adoptEntityRequestSchema = z.object({
   worldId: z.string().min(1),
@@ -221,9 +221,11 @@ export const ENTITY_LIST_DEFAULT_LIMIT = 50;
 export const ENTITY_LIST_MAX_LIMIT = 200;
 
 /**
- * CONTEXT.md → Link-target read. `link-target` returns no **Compendium Entry**; `navigation` does,
- * ranked below authored Entities. Declared by the surface, so one rule serves all four link-target
- * ones. Defaults to `navigation` — the seal is held by discovery, not by an invariant (ADR-0079).
+ * CONTEXT.md → Link-target read. `link-target` returns what its Container scope holds plus what that
+ * scope **Mounts**, the World's own ranked first (ADR-0080); `navigation` returns anything the caller
+ * can reach, **Compendium Entries** included and ranked below authored Entities. Declared by the
+ * surface, so one rule serves all four link-target ones. Defaults to `navigation` — the scope is held
+ * by discovery, not by an invariant (ADR-0079).
  */
 export const entityReadSchema = z.enum(['navigation', 'link-target']);
 
@@ -264,17 +266,20 @@ export const entityListQuerySchema = z.object({
     .optional(),
   worldId: z.string().min(1).optional(),
   // The **Container** scope, repeatable — how a read that spans Containers names them (ADR-0079): the
-  // Compendium browse lists every installed pack, so it says which ones rather than riding the
-  // single-Container scoping every World read uses. `worldId` above is that same scope under the name a
-  // World-scoped caller knows it by; both fold into one predicate server-side.
+  // **Library** lists every Container its World **Mounts**, so it says which ones rather than riding
+  // the single-Container scoping every World read uses. `worldId` above is that same scope under the
+  // name a World-scoped caller knows it by; both fold into one predicate server-side. The order is
+  // significant — the Container facet reads back in it, which is how the Owner's Mount order reaches
+  // the rail (ADR-0080).
   containerId: z
     .union([z.string(), z.array(z.string())])
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
-  // Facet: the **Compendium** facet's selection — a narrowing *within* the scope above, so it drills
-  // down like Type or Tag (dropped when counting its own values) rather than redefining what the read
-  // is about. Nothing outside the scope can be reached by naming it here: both predicates AND.
-  compendium: z
+  // Facet: the **Container** facet's selection — one pack, or one **Mount**ed Shelf (ADR-0080). A
+  // narrowing *within* the scope above, so it drills down like Type or Tag (dropped when counting its
+  // own values) rather than redefining what the read is about. Nothing outside the scope can be
+  // reached by naming it here: both predicates AND.
+  container: z
     .union([z.string(), z.array(z.string())])
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
@@ -358,11 +363,14 @@ export interface EntityFacets {
   readonly visibility: readonly FacetCount[];
   readonly fields: readonly FieldFacet[];
   /**
-   * The **Compendium** facet (ADR-0079): which pack each entry came from, `value` the Container id and
-   * `label` its name. Surfaced *by presence* like a Field facet — a read that names a single Container
-   * has nothing to narrow, so only a cross-Container read (the Compendium browse) carries it.
+   * The **Container** facet (ADR-0079's Pack facet, widened by ADR-0080): which Container each entry
+   * came from, `value` the Container id and `label` its name — an installed **Compendium** is one
+   * value it takes, a mounted **Shelf** another. Surfaced *by presence* like a Field facet — a read
+   * spanning a single Container has nothing to narrow, so only a cross-Container one carries it: the
+   * **Library**, ordered as the Owner arranged their Mounts, and a link-target read in a World that
+   * **Mounts**, where it narrows to one pack or one Shelf.
    */
-  readonly compendium?: readonly FacetCount[];
+  readonly container?: readonly FacetCount[];
 }
 
 /** What `GET /entities` lists; body fetched only on open. */
@@ -388,6 +396,13 @@ export interface EntitySummary {
    * the serving route when no thumbnail was minted, so it is always safe to use as a tile `src`.
    */
   readonly thumbnailUrl?: string;
+  /**
+   * The served **capability URL** of this Entity's *own* bytes (ADR-0034), on the same `thumbnails=1`
+   * opt-in and the same index join — the full-resolution address a Board **Image** stores, where
+   * {@link thumbnailUrl} is the tile a grid draws. Keyed off the Entity's *own* Container, never the
+   * reading World's (ADR-0080), so art placed from a mounted Shelf renders for every reader.
+   */
+  readonly assetUrl?: string;
   /**
    * Set when this Entity's own bytes are absent from the resolved Assets root (#325, ADR-0034). Computed per
    * read, so restoring the file clears it with no Reindex; absent for an Entity that owns no bytes.

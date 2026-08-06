@@ -2,6 +2,7 @@ import { WorldVerb } from '@hexly/domain';
 import { and, eq, getTableColumns, inArray, sql, SQLWrapper } from 'drizzle-orm';
 import { Db } from '../db/db';
 import { containers, entities, entityGrants, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
+import { mountedIntoReachOf } from './mount-reach';
 import { isSuperadmin } from './owner-set';
 
 /** A Superadmin reaches and manages every World (ADR-0037, #163): predicates short-circuit here. */
@@ -17,16 +18,35 @@ const MATCH_ALL = sql`1`;
  * strip); the composable filters pass `worlds.id` for the correlated WHERE form. One body, two refs.
  */
 
+/** The World membership rule (ADR-0037): any `world_members` row — what a Mount never confers. */
+function memberOf(userId: string, worldRef: SQLWrapper) {
+  return sql`EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${worldRef} AND ${worldMembers.userId} = ${userId})`;
+}
+
 /**
- * The World reachability rule (ADR-0024, ADR-0037): derived, not stored — the caller has a member
- * row OR any row in an Entity's ACE set inside the World. So a departed member who kept Entities,
- * and a grantee navigating to what they were given, both keep minimal reachability (#161).
- * Unreachable is indistinguishable from nonexistent (ADR-0004).
+ * Standing *in* the World (ADR-0024, ADR-0037): derived, not stored — the caller has a member row, OR
+ * any row in an Entity's ACE set inside the World. So a departed member who kept Entities, and a
+ * grantee navigating to what they were given, both keep minimal reachability (#161).
  */
-function reachableBy(userId: string, worldRef: SQLWrapper) {
-  return sql`(EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${worldRef} AND ${worldMembers.userId} = ${userId})
+function standingIn(userId: string, worldRef: SQLWrapper) {
+  return sql`(${memberOf(userId, worldRef)}
     OR EXISTS (SELECT 1 FROM ${entities} JOIN ${entityGrants} ON ${entityGrants.entityId} = ${entities.id}
                WHERE ${entities.containerId} = ${worldRef} AND ${entityGrants.userId} = ${userId}))`;
+}
+
+/**
+ * The World reachability rule (ADR-0024, ADR-0037, ADR-0080): standing in the World, OR **membership**
+ * of a World that **Mounts** it. Unreachable is indistinguishable from nonexistent (ADR-0004).
+ *
+ * The second disjunct is ADR-0080's, and the first time reading a Container depends on another
+ * Container's configuration: a World kept to be drawn from opens to whoever reads the campaigns
+ * drawing on it, which is what makes a mounted Entity's own page openable at all — Entity URLs are
+ * World-scoped (ADR-0028), so following a link into a Mount lands at the content's home. Read alone:
+ * `owner` and `contributor` stay membership's, so a Mount never confers a write. Reachable is not
+ * listed — {@link worldListFilter} is what the World Index reads.
+ */
+function reachableBy(userId: string, worldRef: SQLWrapper) {
+  return sql`(${standingIn(userId, worldRef)} OR ${mountedIntoReachOf(userId, worldRef)})`;
 }
 
 /** The World management rule (ADR-0037): the caller holds the `owner` role. */
@@ -45,6 +65,16 @@ function creatableBy(userId: string, worldRef: SQLWrapper) {
  */
 export function worldReachFilter(userId: string, superadmin: boolean) {
   return superadmin ? MATCH_ALL : reachableBy(userId, worlds.id);
+}
+
+/**
+ * The World *listing* predicate: {@link standingIn} alone, the **Mount** disjunct deliberately absent.
+ * A Mount widens what a World may point at, never what its readers appear to have (ADR-0080), so a
+ * mounted World is read-only-and-unlisted — its content resolves, and it stays out of the World Index,
+ * the Switcher and quick-open, which are the surfaces that answer "the Worlds you have".
+ */
+export function worldListFilter(userId: string, superadmin: boolean) {
+  return superadmin ? MATCH_ALL : standingIn(userId, worlds.id);
 }
 
 /**
@@ -71,10 +101,19 @@ export function worldOwnerFilter(userId: string) {
  * The one home of the whole-World read: the Container's identity columns beside the satellite's
  * own. Driven off `worlds`, never `containers` — the satellite *is* the "this is a World"
  * discriminator, so no `kind` exclusion is needed here or anywhere else (ADR-0078).
+ *
+ * The satellite's `kind` deliberately shadows the Container's in the projection: for a World row the
+ * Container's is `'world'` by construction, and the label worth carrying is campaign-or-Shelf
+ * (ADR-0080).
  */
 function selectWorld(db: Db) {
   return db
-    .select({ ...getTableColumns(containers), pinnedEntityIds: worlds.pinnedEntityIds, theme: worlds.theme })
+    .select({
+      ...getTableColumns(containers),
+      kind: worlds.kind,
+      pinnedEntityIds: worlds.pinnedEntityIds,
+      theme: worlds.theme,
+    })
     .from(worlds)
     .innerJoin(containers, eq(containers.id, worlds.id));
 }
@@ -118,8 +157,10 @@ export function worldRightsOf(a: { isOwner: boolean; canContribute: boolean }): 
 
 /** A per-request World access context (ADR-0024/0037/0039): the Superadmin bypass resolved once. */
 export interface WorldAccess {
-  /** Reachability predicate for a list/get WHERE over `worlds`. */
+  /** Reachability predicate for a single-World get WHERE over `worlds` — the **Mount** cascade included. */
   reachFilter: ReturnType<typeof worldReachFilter>;
+  /** Listing predicate for a WHERE over `worlds` — reachability minus the Mount cascade (ADR-0080). */
+  listFilter: ReturnType<typeof worldListFilter>;
   /** Whether the caller is a Superadmin — manages every World (outside the model). */
   superadmin: boolean;
   /** Project a resolved management standing to the caller's verbs. */
@@ -134,11 +175,14 @@ export interface WorldAccess {
   /** The whole World if the caller can reach `id`, else undefined (unreachable ≡ missing). */
   decide(id: string): WorldRow | undefined;
   /**
-   * Blob-free reachability + ownership + contribution in one query (no owner-set fetch), or
-   * undefined if no such World. `canContribute` is the Entity-creation standing (owner ∨
-   * contributor ∨ Superadmin) — the gate an Asset upload rides (#269, ADR-0034).
+   * Blob-free reachability + membership + ownership + contribution in one query (no owner-set fetch),
+   * or undefined if no such World. `canContribute` is the Entity-creation standing (owner ∨
+   * contributor ∨ Superadmin) — the gate an Asset upload rides (#269, ADR-0034). `isMember` is the
+   * standing a Mount never confers, so it is what the membership-facing reads gate on (ADR-0080).
    */
-  decideMeta(id: string): { reachable: boolean; isOwner: boolean; canContribute: boolean } | undefined;
+  decideMeta(
+    id: string,
+  ): { reachable: boolean; isMember: boolean; isOwner: boolean; canContribute: boolean } | undefined;
 }
 
 /** Resolve the World access context for `userId` (Superadmin resolved once). */
@@ -147,6 +191,7 @@ export function worldAccess(db: Db, userId: string): WorldAccess {
   const reachFilter = worldReachFilter(userId, superadmin);
   return {
     reachFilter,
+    listFilter: worldListFilter(userId, superadmin),
     superadmin,
     rightsOf: worldRightsOf,
     managedBy(owners) {
@@ -175,6 +220,7 @@ export function worldAccess(db: Db, userId: string): WorldAccess {
       const row = db
         .select({
           reachable: superadmin ? MATCH_ALL : reachableBy(userId, worldRef),
+          isMember: superadmin ? MATCH_ALL : memberOf(userId, worldRef),
           isOwner: superadmin ? MATCH_ALL : ownedBy(userId, worldRef),
           canContribute: superadmin ? MATCH_ALL : creatableBy(userId, worldRef),
         })
@@ -182,7 +228,12 @@ export function worldAccess(db: Db, userId: string): WorldAccess {
         .where(eq(worlds.id, id))
         .get();
       return row
-        ? { reachable: !!row.reachable, isOwner: !!row.isOwner, canContribute: !!row.canContribute }
+        ? {
+            reachable: !!row.reachable,
+            isMember: !!row.isMember,
+            isOwner: !!row.isOwner,
+            canContribute: !!row.canContribute,
+          }
         : undefined;
     },
   };

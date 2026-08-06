@@ -38,6 +38,7 @@ export * from './services/users.client';
 export * from './services/world-theme.applier';
 export * from './services/world.store';
 export * from './services/worlds.client';
+export * from './utils/blast-radius';
 export * from './utils/pretty-id';
 export * from './utils/routes';
 export * from './utils/safe';

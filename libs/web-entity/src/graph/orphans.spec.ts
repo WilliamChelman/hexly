@@ -80,6 +80,23 @@ describe('withoutDecorEdges (ADR-0069)', () => {
     expect(orphanIds(withoutDecorEdges(graph))).toEqual(new Set());
   });
 
+  /**
+   * A **Foreign node** is subject to the reveal like any other (ADR-0080): a shelf image is reached by a
+   * decor edge, so it stays behind the reveal, and a mood board's fifty borrowed pictures stay quiet.
+   * Being foreign is a mark on the node, never an exemption from a filter.
+   */
+  it('holds a Foreign node behind the decor reveal when the edge that reached it is decor', () => {
+    const graph = world(['Mood Board', 'Shelf Portrait'], ['mood board>shelf portrait!']);
+    const foreign = {
+      ...graph,
+      nodes: graph.nodes.map((n) => (n.id === 'shelf portrait' ? { ...n, foreignContainerId: 'w-shelf' } : n)),
+    };
+
+    expect(orphanIds(withoutDecorEdges(foreign))).toEqual(new Set(['mood board', 'shelf portrait']));
+    // With decor revealed it is drawn, marked, exactly as the World Graph read sent it.
+    expect(withoutOrphans(foreign).nodes.map((n) => n.foreignContainerId)).toEqual([undefined, 'w-shelf']);
+  });
+
   it('counts decor edges', () => {
     expect(decorEdgeCount(world(['A', 'B', 'C'], ['a>b', 'a>c!']))).toBe(1);
     expect(decorEdgeCount(world(['A', 'B'], ['a>b']))).toBe(0);

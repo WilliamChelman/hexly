@@ -105,6 +105,41 @@ describe('WorldSettings', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-theme"]')).toBeNull();
   });
 
+  it('offers campaign-or-Shelf to a caller who may manage the World, and to no one else (ADR-0080)', () => {
+    pin(['manage']);
+    const fixture = TestBed.createComponent(WorldSettingsPage);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-kind"]')).not.toBeNull();
+
+    pin(['read', 'create-entity']);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-kind"]')).toBeNull();
+  });
+
+  it('offers the Mounts pane to a caller who may manage the World, and to no one else', () => {
+    pin(['manage']);
+    const fixture = TestBed.createComponent(WorldSettingsPage);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-mounts"]')).not.toBeNull();
+
+    // Declaring what this World draws from is the Owner's alone (ADR-0080), like the Theme beside it.
+    pin(['read', 'create-entity']);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-mounts"]')).toBeNull();
+  });
+
+  it('opens the Mounts pane on the active World, with Collaboration off as with it on', async () => {
+    collaboration.set(false);
+    pin(['manage']);
+    await TestBed.inject(Router).navigate([], { queryParams: { section: 'mounts' } });
+    const fixture = TestBed.createComponent(WorldSettingsPage);
+    fixture.detectChanges();
+
+    // Mounting is not a sharing concept: a Sole User on the Desktop App declares one too (ADR-0071).
+    expect(fixture.componentInstance.active()).toBe('mounts');
+    expect(fixture.nativeElement.querySelector('app-world-mounts')).not.toBeNull();
+  });
+
   it('keeps the open section through a World refresh, so saving a Theme does not close the pane', async () => {
     pin(['manage']);
     const fixture = TestBed.createComponent(WorldSettingsPage);

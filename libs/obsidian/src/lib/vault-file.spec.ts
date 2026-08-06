@@ -164,6 +164,26 @@ describe('vault-file — the projection round-trip (ADR-0051)', () => {
       // The grid is not a body Field, so no marker even though a second Field exists.
       expect(md).not.toContain('hexly:field');
     });
+
+    it('repoints an Asset capability URL nested anywhere in that value at its exported copy (ADR-0080)', () => {
+      const hash = 'a'.repeat(64);
+      const url = `/assets/shelf-container/${hash}.png`;
+      const md = entityToMarkdown({
+        // A frontmatter-projected surface holds its Assets by URL, arbitrarily deep and beside plain data.
+        doc: { 'test.field.grid': { elements: [{ kind: 'image', assetUrl: url, title: 'Dragon' }], regions: [] } },
+        fields: [GRID_FIELD],
+        dataTypes: DATA_TYPES,
+        frontmatter: {},
+        context: { ...exportCtx, assetPath: (src) => (src === url ? 'assets/dragon.png' : undefined) },
+      });
+      // The URL is rewritten; every neighbouring value the context does not recognise is left alone.
+      expect(splitFrontmatter(md).frontmatter).toEqual({
+        'test.field.grid': {
+          elements: [{ kind: 'image', assetUrl: 'assets/dragon.png', title: 'Dragon' }],
+          regions: [],
+        },
+      });
+    });
   });
 
   describe('an omit Field is written nowhere', () => {

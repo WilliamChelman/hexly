@@ -66,12 +66,28 @@ const BYTES = defineStructuredDataType({
   harvestAssetRef: (ref) => (ref.hash ? { hash: ref.hash, ext: ref.ext } : null),
 });
 
-const DATA_TYPES = structuredDataTypeSet([BOARD, LINKS, PROSE, STATBLOCK, BYTES]);
+/** A structured data-type harvesting `asset` edges, each naming the Container its URL named (ADR-0080). */
+const PICTURES = defineStructuredDataType({
+  id: 'test.datatype.pictures',
+  valueSchema: z.array(z.object({ containerId: z.string(), hash: z.string() })),
+  empty: () => [],
+  harvestEdges: (pictures) =>
+    pictures.map((p) => ({
+      targetKind: 'asset' as const,
+      targetId: p.hash,
+      targetContainerId: p.containerId,
+      descriptor: null,
+      decor: true,
+    })),
+});
+
+const DATA_TYPES = structuredDataTypeSet([BOARD, LINKS, PROSE, STATBLOCK, BYTES, PICTURES]);
 const boardField = field('board', 'test.datatype.board');
 const linksField = field('links', 'test.datatype.links');
 const proseField = field('prose', 'test.datatype.prose');
 const statField = field('stats', 'test.datatype.stat-block');
 const bytesField = field('bytes', 'test.datatype.bytes');
+const picturesField = field('pictures', 'test.datatype.pictures');
 
 const derive = (doc: EntityDocument, fields: readonly Field[] = [], dataTypes = DATA_TYPES) =>
   deriveDocumentState(doc, fields, dataTypes);
@@ -104,6 +120,26 @@ describe('deriveDocumentState — the one document-derived state pass (ADR-0046,
       ).toEqual([
         { targetKind: 'entity', targetId: 'mira', descriptor: 'Spouse', decor: false },
         { targetKind: 'entity', targetId: 'mira', descriptor: null, decor: false },
+      ]);
+    });
+
+    /**
+     * A hash names bytes, not an Asset (ADR-0080): the same bytes held by two Containers are two Assets, so
+     * a document drawing on both expresses two edges — folding them would credit one Container's picture
+     * with the other's usage.
+     */
+    it('keeps the same hash from two Containers as two edges, and folds a repeat within one', () => {
+      const hash = 'a'.repeat(64);
+      const doc: EntityDocument = {
+        pictures: [
+          { containerId: 'shelf-9', hash },
+          { containerId: 'world-1', hash },
+          { containerId: 'shelf-9', hash },
+        ],
+      };
+      expect(derive(doc, [picturesField]).edges).toEqual([
+        { targetKind: 'asset', targetId: hash, targetContainerId: 'shelf-9', descriptor: null, decor: true },
+        { targetKind: 'asset', targetId: hash, targetContainerId: 'world-1', descriptor: null, decor: true },
       ]);
     });
   });

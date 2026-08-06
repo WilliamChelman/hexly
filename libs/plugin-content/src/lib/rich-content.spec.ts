@@ -60,7 +60,24 @@ describe('core.datatype.rich-content data-type (ADR-0051)', () => {
           { type: 'image', attrs: { src: 'https://example.test/cat.png' } },
         ],
       });
-      expect(harvest(value)).toEqual([{ targetKind: 'asset', targetId: hash, descriptor: null, decor: true }]);
+      expect(harvest(value)).toEqual([
+        { targetKind: 'asset', targetId: hash, targetContainerId: 'world-1', descriptor: null, decor: true },
+      ]);
+    });
+
+    /**
+     * The edge names the Container the *URL* names (ADR-0080), so a picture drawn from a shelf counts as
+     * usage of the shelf's Asset — the bytes and their meaning cross the boundary together, or neither does.
+     */
+    it('reads an image at another Container’s Asset URL as an edge into that Container', () => {
+      const hash = 'a'.repeat(64);
+      const value = tiptapContent({
+        type: 'doc',
+        content: [{ type: 'image', attrs: { src: `/assets/shelf-9/${hash}.png` } }],
+      });
+      expect(harvest(value)).toEqual([
+        { targetKind: 'asset', targetId: hash, targetContainerId: 'shelf-9', descriptor: null, decor: true },
+      ]);
     });
 
     it('finds links nested deep in the document tree', () => {

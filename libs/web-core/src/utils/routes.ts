@@ -41,18 +41,18 @@ export function worldAssetsRoute(worldId: string, worldName?: string): string[] 
 }
 
 /**
- * The Compendium browse `/w/:worldId/compendium` (ADR-0079) — the Entity Browser preset unioning every
- * installed pack. The World in the path names the **adoption target**, not the content's home: a
- * Compendium is Instance-wide and lives in no World, so the segment is the World you would adopt into.
+ * The **Library** `/w/:worldId/library` (ADR-0080) — the Entity Browser preset to what this World
+ * **Mounts**. The World in the path names the World whose Mounts are being read and the **Adoption**
+ * target, not the content's home: what the Library lists lives in other Containers entirely.
  */
-export function worldCompendiumRoute(worldId: string, worldName?: string): string[] {
-  return ['/w', segment(worldId, worldName), 'compendium'];
+export function worldLibraryRoute(worldId: string, worldName?: string): string[] {
+  return ['/w', segment(worldId, worldName), 'library'];
 }
 
 /**
  * A **Compendium page** `/w/:worldId/compendium/:compendiumId` (ADR-0079, #402) — one pack's own page,
- * stating the terms its content is published under. Nested under the browse it is reached from, and its
- * World segment means what {@link worldCompendiumRoute}'s does: the adoption target, not a home.
+ * stating the terms its content is published under. Reached from the **Library** that credits it, and
+ * its World segment means what {@link worldLibraryRoute}'s does: the Adoption target, not a home.
  */
 export function worldCompendiumPageRoute(
   worldId: string,

@@ -4,8 +4,6 @@
  * (CONTEXT.md → Asset).
  */
 
-import * as z from 'zod';
-
 /** Where an Asset's bytes are served from. `ext` carries its own leading dot (`'.png'`). */
 export function assetUrl(worldId: string, hash: string, ext: string): string {
   return `/assets/${worldId}/${hash}${ext}`;
@@ -39,52 +37,29 @@ export function assetThumbnailUrl(worldId: string, hash: string): string {
 }
 
 /**
- * A stored World Asset as the browser sees it: the served capability {@link assetUrl} an author
- * references (from Content, or a Board Image element — #269), plus the metadata a picker shows. The
- * `url` is the only load-bearing field a reference stores; the rest label the row in a chooser.
+ * The Container and content `hash` an {@link assetUrl} names — everything it takes to reach exactly one
+ * Asset, since identical bytes in two Containers share a hash but not an Entity.
  */
-export interface AssetSummary {
-  /** The served capability URL — the string an Image element or Content `src` holds. */
-  readonly url: string;
-  /**
-   * The served thumbnail URL (ADR-0065) — the lightweight image a grid renders so it never downloads raw
-   * bytes. Falls back to the original on the serving route when no thumbnail was minted, so it is always
-   * safe to use as a tile `src`; a reference still stores {@link url}, the full-resolution capability URL.
-   */
-  readonly thumbnailUrl: string;
-  /** The human-readable name the Asset was uploaded/imported under, for display in a picker. */
-  readonly originalFilename: string;
-  /** The Asset's content type (`image/png`, `application/pdf`, …). */
-  readonly mime: string;
-  /** The Asset's size in bytes. */
-  readonly size: number;
+export interface AssetUrlRef {
+  /** The **Container** whose bytes the URL serves — read off its own path segment. */
+  readonly containerId: string;
+  /** The content address the bytes are stored under. */
+  readonly hash: string;
 }
 
-/**
- * The Board image picker's search query (#281, ADR-0065): the subset of the Entity list contract the
- * picker speaks against `GET /worlds/:id/assets(/facets)` — an FTS `q` and repeated `field` facet tokens
- * (`orientation:eq:landscape`). The server pins the asset type + image kind on top, so these are only the
- * caller-controlled axes. `field` normalises the query-string's one-or-many shape to an array, matching
- * the Entity list schema so the two search surfaces stay one contract.
- */
-export const assetSearchQuerySchema = z.object({
-  q: z.string().optional(),
-  field: z
-    .union([z.string(), z.array(z.string())])
-    .transform((v) => (Array.isArray(v) ? v : [v]))
-    .optional(),
-});
-
-export type AssetSearchQuery = z.infer<typeof assetSearchQuerySchema>;
-
-/** A sha256 digest, lowercase base-16 — the content address an Asset is stored and served under. */
-const ASSET_URL = /^\/assets\/[^/]+\/([0-9a-f]{64})(\.[^/.]+)?$/;
+/** A Container segment, then a sha256 digest in lowercase base-16 — the content address an Asset is served under. */
+const ASSET_URL = /^\/assets\/([^/]+)\/([0-9a-f]{64})(\.[^/.]+)?$/;
 
 /**
- * The Asset `hash` an {@link assetUrl} names, or `null` for anything else — an
- * external `https:` image, a `data:` URI, or a vault-relative `src` not yet
- * rewritten by the import. Those reference no Asset, so they are no edge.
+ * The Asset an {@link assetUrl} names, or `null` for anything else — an external `https:` image, a
+ * `data:` URI, or a vault-relative `src` not yet rewritten by the import. Those reference no Asset, so
+ * they are no edge.
+ *
+ * The **Container comes from the URL**, never from the referencing Entity's own (ADR-0080): the byte
+ * route is unauthenticated and takes the Container from the path, so a document may legitimately carry
+ * another Container's URL — and an edge names what the URL names.
  */
-export function assetHashFromUrl(src: string): string | null {
-  return ASSET_URL.exec(src)?.[1] ?? null;
+export function assetRefFromUrl(src: string): AssetUrlRef | null {
+  const match = ASSET_URL.exec(src);
+  return match ? { containerId: match[1], hash: match[2] } : null;
 }

@@ -253,6 +253,41 @@
       "when": 1785271908948,
       "tag": "0035_compendiums_satellite",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1785330457609,
+      "tag": "0036_asset_edges_name_their_container",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1785332975330,
+      "tag": "0037_worlds_kind",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1785333295900,
+      "tag": "0038_container_mounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "6",
+      "when": 1785655019949,
+      "tag": "0039_inbound_edges_by_target_container",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1785668757908,
+      "tag": "0040_legacy_asset_edges_name_their_container",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@
  * per-viewer References an edge resolves to. The derivation itself lives in {@link deriveDocumentState}.
  */
 
+import { assetRefFromUrl } from './asset';
 import { EntityType } from './entity';
 
 /** What an edge points at: another Entity, or an Asset (CONTEXT.md → Asset). */
@@ -16,6 +17,14 @@ export interface EntityEdge {
   readonly targetKind: EdgeTargetKind;
   /** An `entityId`, or an Asset `hash`. Dangling-allowed — never a referential constraint. */
   readonly targetId: string;
+  /**
+   * The **Container** the target lives in, on an `asset` edge alone — read off the
+   * `/assets/<containerId>/<hash>.<ext>` URL the document was written with (ADR-0080), never assumed to be
+   * the source's own. A hash names bytes, not an Asset: identical bytes in two Containers share a hash and
+   * no Entity, so the pair is what resolves. Absent on an `entity` edge, whose `targetId` is globally
+   * unique, and on a pre-ADR-0080 row Reindex has not yet rebuilt — both resolve against the source's own.
+   */
+  readonly targetContainerId?: string;
   readonly descriptor: string | null;
   /**
    * A **Decor Link** (CONTEXT.md → Decor Link, ADR-0069): the edge exists for presentation and carries
@@ -26,6 +35,21 @@ export interface EntityEdge {
    * Board **Embeds** are always semantic.
    */
   readonly decor: boolean;
+}
+
+/**
+ * The edge a capability URL expresses, or `null` when `src` names no Asset (an external `https:` image, a
+ * `data:` URI, a vault-relative path the import has not rewritten). The one place a byte-serving URL
+ * becomes an edge, shared by every producer that can hold one — prose images, Board **Image** elements.
+ *
+ * Always decor (ADR-0069): a byte-serving URL is presentation, never a worldbuilding relation. Always
+ * scoped to the Container the URL *names* (ADR-0080), never the source's own.
+ */
+export function assetEdgeFromUrl(src: string): EntityEdge | null {
+  const ref = assetRefFromUrl(src);
+  return ref
+    ? { targetKind: 'asset', targetId: ref.hash, targetContainerId: ref.containerId, descriptor: null, decor: true }
+    : null;
 }
 
 /**
@@ -63,6 +87,12 @@ export interface OutboundReference {
   readonly decor: boolean;
 }
 
+/** A **Container** named rather than merely identified — what a surface reporting on another one shows. */
+export interface NamedContainer {
+  readonly id: string;
+  readonly name: string;
+}
+
 /**
  * One link *to* this Entity (*Referenced by*). `source` is never null: the list is filtered by
  * the viewer's access to the source, so an edge the viewer may not read is absent, not dangling.
@@ -76,6 +106,12 @@ export interface InboundReference {
    * feeds, ADR-0065) count every Entity that merely displays it.
    */
   readonly decor: boolean;
+  /**
+   * The **Container** the source lives in, present only when that is not this Entity's own — usage that
+   * came from elsewhere (ADR-0080). Named, not merely identified: this is the surface that answers "may I
+   * delete this image?" for a shelf Entity, and the answer is a list of Worlds, which an id is not.
+   */
+  readonly foreignContainer?: NamedContainer;
 }
 
 /** `GET /entities/:id/references`: both directions of one Entity's links, resolved per viewer. */

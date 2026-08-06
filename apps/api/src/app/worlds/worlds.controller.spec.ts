@@ -69,6 +69,8 @@ describe('Worlds endpoints', () => {
       name: 'Aldermoor',
       // Ownership is a symmetric set (ADR-0037): the creator is its sole Owner.
       owners: [expect.any(String)],
+      // A new World is a campaign unless said otherwise (ADR-0080).
+      kind: 'campaign',
       rights: ['read', 'create-entity', 'manage'],
       // No Home Entity is minted — the landing is a derived Dashboard (ADR-0043).
       entityCount: 0,
@@ -116,6 +118,8 @@ describe('Worlds endpoints', () => {
       id: expect.any(String),
       name: expect.any(String),
       owners: [expect.any(String)],
+      // Campaign-or-Shelf rides the Summary so the World Index can group by it (ADR-0080).
+      kind: 'campaign',
       rights: ['read', 'create-entity', 'manage'],
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
@@ -409,6 +413,70 @@ describe('Worlds endpoints', () => {
     expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.pinnedEntityIds).toEqual([]);
   });
 
+  describe('the Shelf label (ADR-0080, #409)', () => {
+    it('lets an Owner label a World a Shelf, and the label persists', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'The Art Shelf' }).expect(201);
+      // A new World is a campaign unless said otherwise.
+      expect(world.body.kind).toBe('campaign');
+
+      const patched = await ada.patch(`/worlds/${world.body.id}`).send({ kind: 'shelf' }).expect(200);
+      expect(patched.body.kind).toBe('shelf');
+
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.kind).toBe('shelf');
+      // And back again — the label is a curation, not a one-way door.
+      await ada.patch(`/worlds/${world.body.id}`).send({ kind: 'campaign' }).expect(200);
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.kind).toBe('campaign');
+    });
+
+    it('refuses a Contributor labelling a World with 403, and a value that is neither with 400', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      db.$client
+        .prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, 'contributor')`)
+        .run(world.body.id, bobId);
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      await bob.patch(`/worlds/${world.body.id}`).send({ kind: 'shelf' }).expect(403);
+      await ada.patch(`/worlds/${world.body.id}`).send({ kind: 'bestiary' }).expect(400);
+
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.kind).toBe('campaign');
+    });
+
+    /**
+     * The whole point of the label, and the thing to guard (ADR-0080): a Shelf is a World in every
+     * respect but the World Index's grouping. If a read ever starts answering differently because a
+     * World is a Shelf, this is where it shows.
+     */
+    it('withholds nothing from a Shelf: it lists, reads, keeps members, a Public Link and a Graph', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const shelf = await ada.post('/worlds').send({ name: 'The Art Shelf' }).expect(201);
+      const campaign = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      await ada.patch(`/worlds/${shelf.body.id}`).send({ kind: 'shelf' }).expect(200);
+      await ada
+        .post('/entities')
+        .send({ name: 'A tavern sketch', types: ['core.type.note'], worldId: shelf.body.id })
+        .expect(201);
+
+      // The listing carries it, beside the campaign — grouping is the client's, not the query's.
+      const listed = await ada.get('/worlds').expect(200);
+      expect(listed.body.map((w: { id: string }) => w.id).sort()).toEqual([campaign.body.id, shelf.body.id].sort());
+
+      // Collaboration, sharing and the derived views are all still the Shelf's.
+      const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      await ada.post(`/worlds/${shelf.body.id}/members`).send({ userId: bobId, role: 'viewer' }).expect(200);
+      expect((await ada.get(`/worlds/${shelf.body.id}/members`).expect(200)).body).toEqual([
+        { userId: bobId, role: 'viewer' },
+      ]);
+      expect((await ada.post(`/worlds/${shelf.body.id}/link`).expect(200)).body.token).toEqual(expect.any(String));
+      expect((await ada.get(`/worlds/${shelf.body.id}/graph`).expect(200)).body.nodes).toHaveLength(1);
+      // And its Entities answer the same World-scoped read a campaign's do.
+      const entities = await ada.get(`/entities?worldId=${shelf.body.id}`).expect(200);
+      expect(entities.body.items).toHaveLength(1);
+    });
+  });
+
   describe('World Theme (ADR-0076)', () => {
     /** One ColorScheme's eight anchors and three knobs (spec §1), as an Owner would send them. */
     const PALETTE = {
@@ -657,6 +725,13 @@ describe('Worlds endpoints', () => {
     /** A tiny valid-enough PNG; only its bytes' identity matters for the content address. */
     const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 
+    /**
+     * What the asset pickers see (#416): the one **link-target read**, preset to the asset type (which is
+     * also what lifts the hidden-from-default-listing exclusion, ADR-0065) with `thumbnails=1` for the tile
+     * and the capability URL it places. There is no picker listing of its own to ask any more.
+     */
+    const PICKER_READ = 'type=core.type.asset&thumbnails=1&read=link-target';
+
     /** Add `userId` to `worldId` with the given member role (Owners come from world creation). */
     function addMember(worldId: string, userId: string, role: 'contributor' | 'viewer') {
       db.$client
@@ -669,7 +744,7 @@ describe('Worlds endpoints', () => {
       const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
 
       // A fresh World carries no Assets.
-      expect((await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([]);
+      expect((await ada.get(`/entities?worldId=${world.body.id}&${PICKER_READ}`).expect(200)).body.items).toEqual([]);
 
       // The endpoint returns the wrapper Entity: named after the filename stem, carrying core.type.asset,
       // visibility `shared`, its asset-ref pinning the extension in the (stable) capability URL.
@@ -688,16 +763,21 @@ describe('Worlds endpoints', () => {
       const detail = await ada.get(`/entities/${res.body.id}`).expect(200);
       expect(detail.body.rights).toContain('manage');
 
-      // The picker surfaces the minted Asset as an AssetSummary (url + label metadata).
-      expect((await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([
-        {
-          url: `/assets/${world.body.id}/${ref.hash}.png`,
+      // The pickers surface the minted Asset through the one read: the tile to draw and the capability
+      // URL to place, both keyed off the Asset's own Container (ADR-0080).
+      const listed = (await ada.get(`/entities?worldId=${world.body.id}&${PICKER_READ}`).expect(200)).body.items;
+      expect(listed).toEqual([
+        expect.objectContaining({
+          id: res.body.id,
+          name: 'Portrait',
+          assetUrl: `/assets/${world.body.id}/${ref.hash}.png`,
           thumbnailUrl: `/assets/${world.body.id}/${ref.hash}.thumb.webp`,
-          originalFilename: 'Portrait.png',
-          mime: 'image/png',
-          size: PNG.length,
-        },
+        }),
       ]);
+      // The image-kind preset the Board Image picker AND-s on top reaches it too (ADR-0065).
+      expect(
+        (await ada.get(`/entities?worldId=${world.body.id}&${PICKER_READ}&field=kind:eq:image`).expect(200)).body.items,
+      ).toHaveLength(1);
     });
 
     it('rejects a raw API write stripping the Asset’s System-managed type, so its bytes stay reachable (ADR-0068)', async () => {
@@ -728,8 +808,10 @@ describe('Worlds endpoints', () => {
       expect(again.body.id).toBe(first.body.id);
       expect(again.body.name).toBe('Portrait');
 
-      // The picker still lists exactly one Asset.
-      expect((await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toHaveLength(1);
+      // The picker still offers exactly one Asset.
+      expect((await ada.get(`/entities?worldId=${world.body.id}&${PICKER_READ}`).expect(200)).body.items).toHaveLength(
+        1,
+      );
     });
 
     it('dedups a `shared` Asset for another Contributor, echoing the whole wrapper unchanged (ADR-0065)', async () => {
@@ -787,7 +869,8 @@ describe('Worlds endpoints', () => {
       expect(again.body.document['core.field.asset'].hash).toBe(first.body.document['core.field.asset'].hash);
 
       // Bob still cannot enumerate Ada's `private` Asset in his picker — indistinguishable from missing.
-      expect((await bob.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([]);
+      // The picker read is reader-scoped like every other Entity read, so this holds with no gate of its own.
+      expect((await bob.get(`/entities?worldId=${world.body.id}&${PICKER_READ}`).expect(200)).body.items).toEqual([]);
     });
 
     it('renaming the Asset never moves the served capability URL (extension pinned at mint, ADR-0065)', async () => {
@@ -798,10 +881,10 @@ describe('Worlds endpoints', () => {
 
       await ada.patch(`/entities/${res.body.id}`).send({ name: 'A New Name' }).expect(200);
 
-      const summaries = (await ada.get(`/worlds/${world.body.id}/assets`).expect(200)).body;
+      const offered = (await ada.get(`/entities?worldId=${world.body.id}&${PICKER_READ}`).expect(200)).body.items;
       // The URL is byte-identical; only the picker label follows the rename.
-      expect(summaries[0].url).toBe(url);
-      expect(summaries[0].originalFilename).toBe('A New Name.png');
+      expect(offered[0].assetUrl).toBe(url);
+      expect(offered[0].name).toBe('A New Name');
     });
 
     it('lets a Contributor mint an Asset (Entity-creation-shaped, not a management power)', async () => {
@@ -813,39 +896,53 @@ describe('Worlds endpoints', () => {
 
       const res = await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Map.png').expect(201);
       expect(res.body.name).toBe('Map');
-      // A Contributor may also browse the picker list (same contribute standing gates both, board review).
-      expect((await bob.get(`/worlds/${world.body.id}/assets`).expect(200)).body).toEqual([
-        {
-          url: `/assets/${world.body.id}/${res.body.document['core.field.asset'].hash}.png`,
-          thumbnailUrl: `/assets/${world.body.id}/${res.body.document['core.field.asset'].hash}.thumb.webp`,
-          originalFilename: 'Map.png',
-          mime: 'image/png',
-          size: PNG.length,
-        },
+      // And the picker offers what he minted, with the URL an Image element would place.
+      expect((await bob.get(`/entities?worldId=${world.body.id}&${PICKER_READ}`).expect(200)).body.items).toEqual([
+        expect.objectContaining({
+          name: 'Map',
+          assetUrl: `/assets/${world.body.id}/${res.body.document['core.field.asset'].hash}.png`,
+        }),
       ]);
     });
 
-    it('refuses a Viewer listing or minting Assets with 403 (reachable, but no contribute standing)', async () => {
+    it('refuses a Viewer minting an Asset with 403 (reachable, but no contribute standing)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
       const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
       addMember(world.body.id, bobId, 'viewer');
       const bob = await signIn('bob@hexly.test', 'battery staple');
+      await ada.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201);
 
-      // The picker is an editing surface and a listed URL is fetchable via the guard-less serving
-      // route, so a Viewer can neither enumerate nor mint (board review) — both are contributor-gated.
-      await bob.get(`/worlds/${world.body.id}/assets`).expect(403);
+      // Minting is contributor-gated: authoring an Asset is Entity-creation-shaped.
       await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Nope.png').expect(403);
+
+      // And the picker asks the same standing: the byte route is guard-less (ADR-0034), so a listed
+      // capability URL *is* the bytes, and a Viewer enumerates no art through the link-target read.
+      expect((await bob.get(`/entities?worldId=${world.body.id}&${PICKER_READ}`).expect(200)).body.items).toEqual([]);
+
+      // What a Viewer keeps is the **Asset Browser** — a container-scoped browse of what this World
+      // holds, tiles and all — minus the full-resolution URL, which rides the same standing.
+      const browsed = (
+        await bob
+          .get('/entities')
+          .query({ worldId: world.body.id, type: 'core.type.asset', thumbnails: '1' })
+          .expect(200)
+      ).body.items;
+      expect(browsed).toHaveLength(1);
+      expect(browsed[0].thumbnailUrl).toBeDefined();
+      expect(browsed[0].assetUrl).toBeUndefined();
     });
 
-    it('404s an unreachable World on both list and upload (existence never leaks, ADR-0004)', async () => {
+    it('404s an unreachable World on upload, and its Assets reach no picker (existence never leaks, ADR-0004)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      await ada.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Portrait.png').expect(201);
       await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
       const bob = await signIn('bob@hexly.test', 'battery staple');
 
-      await bob.get(`/worlds/${world.body.id}/assets`).expect(404);
       await bob.post(`/worlds/${world.body.id}/assets`).attach('file', PNG, 'Portrait.png').expect(404);
+      // The picker read is reader-scoped, so a World Bob cannot reach offers him nothing to point at.
+      expect((await bob.get(`/entities?worldId=${world.body.id}&${PICKER_READ}`).expect(200)).body.items).toEqual([]);
     });
 
     it('400s an upload with no file part', async () => {

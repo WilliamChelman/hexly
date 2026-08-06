@@ -84,11 +84,14 @@ export function deriveDocumentState(
   options: DeriveOptions = {},
 ): DocumentDerivedState {
   // Edges dedup on (target, descriptor). `\0` cannot occur in an id or a descriptor, so the key is
-  // unambiguous. The descriptor folds into the key but not the row: `"Spouse"` and `"spouse"` name one
-  // relationship, and the first spelling authored is the one the edge — and References panel — carries.
+  // unambiguous. The target's Container is part of the target (ADR-0080): one document may carry the same
+  // bytes from two Containers, and those are two Assets. The descriptor folds into the key but not the
+  // row: `"Spouse"` and `"spouse"` name one relationship, and the first spelling authored is the one the
+  // edge — and References panel — carries.
   const edges = new Map<string, EntityEdge>();
   const addEdge = (edge: EntityEdge) => {
-    const key = `${edge.targetKind}\0${edge.targetId}\0${edge.descriptor?.toLowerCase() ?? ''}`;
+    const target = `${edge.targetContainerId ?? ''}\0${edge.targetId}`;
+    const key = `${edge.targetKind}\0${target}\0${edge.descriptor?.toLowerCase() ?? ''}`;
     const existing = edges.get(key);
     // First spelling of a descriptor wins the row (ADR-0046). Decor is the exception: an edge is decor
     // only if *every* producer that mints it is decor, so a semantic reason to link (a prose Entity Link
@@ -119,7 +122,12 @@ export function deriveDocumentState(
   let thumbnailEntityId: string | null = null;
   for (const { key, value } of entityLinkFieldValues(fields, doc)) {
     if (value.entityId)
-      addEdge({ targetKind: 'entity', targetId: value.entityId, descriptor: null, decor: decorFieldIds.has(key) });
+      addEdge({
+        targetKind: 'entity',
+        targetId: value.entityId,
+        descriptor: null,
+        decor: decorFieldIds.has(key),
+      });
     if (key === options.thumbnailFieldId) thumbnailEntityId = value.entityId || null;
   }
   for (const field of fields) {

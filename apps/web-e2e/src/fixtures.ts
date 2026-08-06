@@ -249,6 +249,34 @@ export async function installMonsterPack(browser: Browser): Promise<void> {
 }
 
 /**
+ * The installed Draw Steel pack's Container id (#404). A pack is Instance-wide and lives in no World,
+ * so a spec that wants to **Mount** one asks the Instance which one it is.
+ */
+export async function installedPackId(page: Page): Promise<string> {
+  const packs = await (await page.request.get('/api/compendiums')).json();
+  expect(packs.length, 'no Compendium installed').toBeGreaterThan(0);
+  return packs[0].id as string;
+}
+
+/**
+ * Declare `containerId` a **Mount** of `worldId`, over the API (ADR-0080). The Owner's pane that sets
+ * this is pinned as a journey in `mounts.spec.ts`; a spec about what a Mount then *shows* wants the
+ * state, not the clicks that reach it. `worldId` may be a pretty URL segment.
+ */
+export async function mountContainer(page: Page, worldId: string, containerId: string): Promise<void> {
+  const res = await page.request.post(`/api/worlds/${idFromSegment(worldId)}/mounts`, { data: { containerId } });
+  expect(res.ok(), `could not mount ${containerId}`).toBe(true);
+}
+
+/**
+ * Withdraw a Mount again. Mounts outlive the between-spec reset, which clears Entities and not Worlds
+ * (ADR-0009), so a spec that mounts into a World it did not mint puts it back itself.
+ */
+export async function unmountContainer(page: Page, worldId: string, containerId: string): Promise<void> {
+  await page.request.delete(`/api/worlds/${idFromSegment(worldId)}/mounts/${containerId}`);
+}
+
+/**
  * Open an Entity by id through the World-agnostic `/entities/:id` link, which the redirect guard
  * heals into its canonical `/w/:worldId/entities/:id` route (ADR-0025, ADR-0042). Lets a spec that
  * seeded an Entity over the API land on its page without threading the World id through.
@@ -267,13 +295,13 @@ export function entitiesRailLink(within: Page | Locator): Locator {
 }
 
 /**
- * The rail's **Compendium** destination (ADR-0079, #401) — the browse over every installed pack, at
- * `/w/:worldId/compendium`. Exact-matched in the same shape as its neighbour: the rail's locators are
- * exact by policy, so a future page whose copy contains the word cannot turn a click into a
- * strict-mode violation.
+ * The rail's **Library** destination (ADR-0080, #412) — the browse over every Container this World
+ * Mounts, at `/w/:worldId/library`. Exact-matched in the same shape as its neighbour: the rail's
+ * locators are exact by policy, so a future page whose copy contains the word cannot turn a click into
+ * a strict-mode violation.
  */
-export function compendiumRailLink(within: Page | Locator): Locator {
-  return within.getByRole('link', { name: 'Compendium', exact: true });
+export function libraryRailLink(within: Page | Locator): Locator {
+  return within.getByRole('link', { name: 'Library', exact: true });
 }
 
 /**

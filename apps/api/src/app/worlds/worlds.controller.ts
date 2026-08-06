@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   Delete,
   ForbiddenException,
@@ -11,7 +10,6 @@ import {
   Param,
   Patch,
   Post,
-  Query,
   Res,
   UploadedFile,
   UseGuards,
@@ -20,20 +18,20 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   addMemberRequestSchema,
+  addMountRequestSchema,
   addOwnerRequestSchema,
-  AssetSummary,
-  assetSearchQuerySchema,
   AuthUser,
   EntityDetail,
-  EntityFacets,
   AvailableType,
   createUserDefinedTypeRequestSchema,
   createWorldFieldRequestSchema,
   createWorldRequestSchema,
   Field,
   ImportSummary,
-  parseFieldFilters,
+  InboundLinkCount,
+  Mount,
   PublicLink,
+  reorderMountsRequestSchema,
   setMemberRoleRequestSchema,
   updateUserDefinedTypeRequestSchema,
   updateWorldFieldRequestSchema,
@@ -56,8 +54,10 @@ import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
 import { WorldGraphService } from './world-graph.service';
 import { WorldsService } from './worlds.service';
-import { TypeResult, WorldTypesService } from './world-types.service';
+import { WorldTypesService } from './world-types.service';
 import { WorldFieldsService } from './world-fields.service';
+import { WorldMountsService } from './world-mounts.service';
+import { worldRouteResponse } from './world-route-result';
 
 /** The subset of multer's uploaded-file shape this controller uses (no @types/multer dep). */
 interface UploadedZip {
@@ -81,6 +81,7 @@ export class WorldsController {
     private readonly worlds: WorldsService,
     private readonly types: WorldTypesService,
     private readonly fields: WorldFieldsService,
+    private readonly mounts: WorldMountsService,
     private readonly importer: VaultImportService,
     private readonly exporter: VaultExportService,
     private readonly graphs: WorldGraphService,
@@ -178,43 +179,6 @@ export class WorldsController {
   }
 
   /**
-   * The Facet counts for the Board image picker's rail (#281, ADR-0065): the same drill-down counts the
-   * Asset Browser shows, pinned to the asset type + image kind. Before `:id/assets` matching so the literal
-   * `facets` segment isn't captured. Same query contract as `GET /entities/facets` (`q` + `field` tokens);
-   * a malformed `field` token is dropped, never a 400, so a stale picker URL degrades to no-filter.
-   */
-  @Get(':id/assets/facets')
-  assetFacets(@CurrentUser() user: AuthUser, @Param('id') id: string, @Query() query: unknown): EntityFacets {
-    const parsed = assetSearchQuerySchema.safeParse(query);
-    if (!parsed.success) throw new BadRequestException();
-    const { q, field } = parsed.data;
-    const result = this.worlds.assetFacets(user.id, id, { q, fields: parseFieldFilters(field) });
-    if (result === 'not-found') throw new NotFoundException();
-    if (result === 'forbidden') throw new ForbiddenException();
-    return result;
-  }
-
-  /**
-   * Search the World's image Assets, for the Board image picker (#269, #281, ADR-0034, ADR-0065): a Board
-   * Image element (and Content) references a World Asset by its capability URL. The picker offers the same
-   * search + Facets as the Asset Browser, pinned to the asset type + image kind — the FTS `q` and image
-   * Field facets (`field` tokens) go through the one entity-search machinery. Contributor-gated in the
-   * service — the picker is an editing surface and a listed URL is fetchable via the guard-less serving
-   * route, so a Viewer must not enumerate (board review): unreachable → 404, reachable-but-not-contributor
-   * → 403.
-   */
-  @Get(':id/assets')
-  assets(@CurrentUser() user: AuthUser, @Param('id') id: string, @Query() query: unknown): AssetSummary[] {
-    const parsed = assetSearchQuerySchema.safeParse(query);
-    if (!parsed.success) throw new BadRequestException();
-    const { q, field } = parsed.data;
-    const result = this.worlds.searchAssets(user.id, id, { q, fields: parseFieldFilters(field) });
-    if (result === 'not-found') throw new NotFoundException();
-    if (result === 'forbidden') throw new ForbiddenException();
-    return result;
-  }
-
-  /**
    * Upload a file, minting (or deduping to) a World Asset in one step (#269, ADR-0034, ADR-0065),
    * returning the wrapper **Asset Entity** for the author to reference. Contributor-gated in the service:
    * unreachable → 404, reachable-but-not-contributor → 403, no file → 400. Multer buffers the upload in
@@ -236,8 +200,9 @@ export class WorldsController {
 
   /**
    * A partial update of the Owner-curated fields: `name` (rename), `pinnedEntityIds` (Dashboard pins,
-   * #168) and/or the World Theme (ADR-0076). Owner-gated in the service; not an Owner is a 403, no such
-   * World a 404. The schema is the Theme's write choke point, so a value that is not one is a 400 here.
+   * #168), the World Theme (ADR-0076) and/or campaign-or-Shelf (ADR-0080). Owner-gated in the service;
+   * not an Owner is a 403, no such World a 404. The schema is the Theme's write choke point, so a value
+   * that is not one is a 400 here.
    *
    * Ownership is established *before* the parse, inverting this controller's usual order: the Theme
    * schema is a colour parser over untrusted input (ADR-0076), so parsing first sells that work to any
@@ -253,6 +218,18 @@ export class WorldsController {
     if (!parsed.success) throw new BadRequestException();
     // The service gates again; this is the ordering, not the authorisation.
     const result = this.worlds.update(user.id, id, parsed.data);
+    if (result === null) throw new NotFoundException();
+    if (result === 'forbidden') throw new ForbiddenException();
+    return result;
+  }
+
+  /**
+   * What deleting this World would break beyond it (ADR-0080, #414) — the confirm's number, read per
+   * act. Owner-gated like the delete, and never consulted by it.
+   */
+  @Get(':id/inbound-links')
+  inboundLinks(@CurrentUser() user: AuthUser, @Param('id') id: string): InboundLinkCount {
+    const result = this.worlds.inboundLinks(user.id, id);
     if (result === null) throw new NotFoundException();
     if (result === 'forbidden') throw new ForbiddenException();
     return result;
@@ -279,7 +256,7 @@ export class WorldsController {
   createType(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): UserDefinedType {
     const parsed = createUserDefinedTypeRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return this.typeResult(this.types.create(user.id, id, parsed.data));
+    return worldRouteResponse(this.types.create(user.id, id, parsed.data));
   }
 
   // Rename / re-Field a user-defined type (#191): Owner-only. The id is immutable, so it is a path param.
@@ -292,14 +269,14 @@ export class WorldsController {
   ): UserDefinedType {
     const parsed = updateUserDefinedTypeRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return this.typeResult(this.types.update(user.id, id, typeId, parsed.data));
+    return worldRouteResponse(this.types.update(user.id, id, typeId, parsed.data));
   }
 
   // Delete a user-defined type (#191): Owner-only. Entities keep their EntityDocument (a Field is a lens).
   @Delete(':id/types/:typeId')
   @HttpCode(204)
   removeType(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('typeId') typeId: string): void {
-    this.typeResult(this.types.delete(user.id, id, typeId));
+    worldRouteResponse(this.types.delete(user.id, id, typeId));
   }
 
   // The World-defined Fields (#230, ADR-0054): the resolver and attach picker source. Reachable-gated.
@@ -316,7 +293,7 @@ export class WorldsController {
   createField(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Field {
     const parsed = createWorldFieldRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return this.typeResult(this.fields.create(user.id, id, parsed.data));
+    return worldRouteResponse(this.fields.create(user.id, id, parsed.data));
   }
 
   // Re-body a World-defined Field (#230): Owner-only. The id is immutable, so it is a path param.
@@ -329,28 +306,71 @@ export class WorldsController {
   ): Field {
     const parsed = updateWorldFieldRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return this.typeResult(this.fields.update(user.id, id, fieldId, parsed.data));
+    return worldRouteResponse(this.fields.update(user.id, id, fieldId, parsed.data));
   }
 
   // Delete a World-defined Field (#230): Owner-only. Entities referencing it degrade to plain values.
   @Delete(':id/fields/:fieldId')
   @HttpCode(204)
   removeField(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('fieldId') fieldId: string): void {
-    this.typeResult(this.fields.delete(user.id, id, fieldId));
+    worldRouteResponse(this.fields.delete(user.id, id, fieldId));
   }
 
-  /** Map a {@link TypeResult} to its HTTP outcome: `ok` unwraps, else the status's exception. */
-  private typeResult<T>(result: TypeResult<T>): T {
-    switch (result.status) {
-      case 'not-found':
-        throw new NotFoundException();
-      case 'forbidden':
-        throw new ForbiddenException();
-      case 'conflict':
-        throw new ConflictException();
-      case 'ok':
-        return result.value;
-    }
+  // Below: the World's **Mounts** (ADR-0080) — the Containers it draws from. Arranging them is
+  // World-Owner-gated in the service like `/owners` and `/members`, but deliberately *not*
+  // Collaboration-gated: a Sole User on the Desktop App mounts with no sharing concepts in sight
+  // (ADR-0071). Every route answers with the whole ordered list, so a client never has to reassemble
+  // it from a partial response.
+
+  // Read by every *member* of the World, not just its Owners: this is the **Library**'s scope (#412).
+  @Get(':id/mounts')
+  mountsOf(@CurrentUser() user: AuthUser, @Param('id') id: string): Mount[] {
+    return worldRouteResponse(this.mounts.list(user.id, id));
+  }
+
+  @Get(':id/mount-candidates')
+  mountCandidates(@CurrentUser() user: AuthUser, @Param('id') id: string): Mount[] {
+    return worldRouteResponse(this.mounts.candidates(user.id, id));
+  }
+
+  // Idempotent — mounting what is already mounted is the same Mount — so a 200, not a 201.
+  @Post(':id/mounts')
+  @HttpCode(200)
+  addMount(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Mount[] {
+    const parsed = addMountRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return worldRouteResponse(this.mounts.add(user.id, id, parsed.data.containerId));
+  }
+
+  @Patch(':id/mounts')
+  reorderMounts(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Mount[] {
+    const parsed = reorderMountsRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return worldRouteResponse(this.mounts.reorder(user.id, id, parsed.data.containerIds));
+  }
+
+  /**
+   * The blast radius of dropping this Mount, read at the moment it is offered rather than stored
+   * anywhere (ADR-0080, #414). A GET beside the DELETE it precedes: the count is advice, and asking
+   * for it never commits to the act.
+   */
+  @Get(':id/mounts/:containerId/inbound-links')
+  mountInboundLinks(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('containerId') containerId: string,
+  ): InboundLinkCount {
+    return worldRouteResponse(this.mounts.linkCount(user.id, id, containerId));
+  }
+
+  // The path param is the *mounted* Container, named as the add body names it (ADR-0080).
+  @Delete(':id/mounts/:containerId')
+  removeMount(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('containerId') containerId: string,
+  ): Mount[] {
+    return worldRouteResponse(this.mounts.remove(user.id, id, containerId));
   }
 
   // Below: the Collaboration layer (ADR-0071), gated per route because this controller also carries

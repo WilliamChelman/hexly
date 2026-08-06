@@ -1,4 +1,12 @@
-import { EdgeTargetKind, FieldSchema, ViewPlacement, WorldTheme } from '@hexly/domain';
+import {
+  ContainerKind,
+  DEFAULT_WORLD_KIND,
+  EdgeTargetKind,
+  FieldSchema,
+  ViewPlacement,
+  WorldKind,
+  WorldTheme,
+} from '@hexly/domain';
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 // Keep in sync by hand with the `CREATE TABLE` DDL in `./db.ts`; column changes
@@ -129,8 +137,12 @@ export const entityGrants = sqliteTable(
   (table) => [primaryKey({ columns: [table.entityId, table.userId] })],
 );
 
-/** The kinds of Container (ADR-0078): a **World** a user authors into, or ADR-0079's **Compendium** shelf. */
-export type ContainerKind = 'world' | 'compendium';
+/**
+ * The kinds of Container (ADR-0078): a **World** a user authors into, or ADR-0079's **Compendium**
+ * shelf. Declared in `@hexly/domain` since a **Mount** names it on the wire (ADR-0080), and re-exported
+ * here so a schema reader finds the column's vocabulary beside the column.
+ */
+export type { ContainerKind };
 
 /** The {@link containers} kind every World row carries. */
 export const WORLD_CONTAINER_KIND: ContainerKind = 'world';
@@ -166,6 +178,10 @@ export const worlds = sqliteTable('worlds', {
   id: text('id')
     .primaryKey()
     .references(() => containers.id, { onDelete: 'cascade' }),
+  // Campaign-or-Shelf (ADR-0080): a label the World Index groups by and that **no read filters on**.
+  // Deliberately not the {@link containers} `kind` beside it — that one says which satellite completes
+  // the row, this one says what the World is kept for, and a Shelf is a World in every other respect.
+  kind: text('kind').$type<WorldKind>().notNull().default(DEFAULT_WORLD_KIND),
   // Owner-curated Dashboard pins: an ordered JSON array of Entity ids, one shared
   // set per World. References, not enforced FKs — stale or inaccessible ids are
   // filtered per-viewer on read, never pruned on delete.
@@ -178,8 +194,11 @@ export const worlds = sqliteTable('worlds', {
 /**
  * A whole stored World: its {@link containers} identity row joined to its {@link worlds} satellite.
  * The two are keyed by the same id, so the join reads as one flat row.
+ *
+ * The Container's own `kind` is dropped: it is `'world'` for every row here by construction, and the
+ * `kind` a World *has* is the satellite's campaign-or-Shelf label (ADR-0080).
  */
-export type WorldRow = typeof containers.$inferSelect & Omit<typeof worlds.$inferSelect, 'id'>;
+export type WorldRow = Omit<typeof containers.$inferSelect, 'kind'> & Omit<typeof worlds.$inferSelect, 'id'>;
 
 /**
  * A **Compendium** (ADR-0079): the Container kind holding one installed pack of published reference
@@ -214,6 +233,39 @@ export const compendiums = sqliteTable('compendiums', {
  * satellite, the {@link WorldRow} peer.
  */
 export type CompendiumRow = typeof containers.$inferSelect & Omit<typeof compendiums.$inferSelect, 'id'>;
+
+/**
+ * The **Mounts** a Container declares (ADR-0080): the Containers it draws from, `container_id` the
+ * mounting side and `mounted_container_id` the mounted one. The pair is the primary key, so the same
+ * Mount declared twice is one row; `position` is order alone, never identity, which is what lets a
+ * reorder rewrite it wholesale.
+ *
+ * Both columns key {@link containers} rather than {@link worlds} though only a World may mount: the
+ * generic name leaves room for a kind that does without implying one exists, and "a Compendium may not
+ * mount" is the write path's, which resolves its mounting Container through `worlds`. Both FKs cascade,
+ * so deleting either Container drops the Mount with it.
+ *
+ * No `seq` of its own — a Mount change bumps the mounting World's, so it rides that freshness key like
+ * a membership change. Written through {@link WorldWrites}.
+ */
+export const containerMounts = sqliteTable(
+  'container_mounts',
+  {
+    containerId: text('container_id')
+      .notNull()
+      .references(() => containers.id, { onDelete: 'cascade' }),
+    mountedContainerId: text('mounted_container_id')
+      .notNull()
+      .references(() => containers.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.containerId, table.mountedContainerId] }),
+    // "Who mounts this Container?" — the direction the primary key does not serve, and the one a
+    // cascade-on-delete and every read behind this ticket asks.
+    index('idx_container_mounts_mounted').on(table.mountedContainerId),
+  ],
+);
 
 /**
  * World membership: a user is an `owner` (full control — the World's ownership
@@ -360,7 +412,8 @@ export const assetIndex = sqliteTable(
  *
  * `targetId` deliberately carries **no FK**: a link to a missing or unreadable Entity is a valid
  * document, so it is unconstrained text resolved opportunistically on read. `containerId` is
- * denormalized off the source so the World Graph's edge fetch is one indexed lookup.
+ * denormalized off the source so the World Graph's edge fetch is one indexed lookup; `targetContainerId`
+ * is the *target's*, which an asset URL names for itself (ADR-0080).
  */
 export const entityEdges = sqliteTable(
   'entity_edges',
@@ -374,6 +427,11 @@ export const entityEdges = sqliteTable(
     targetKind: text('target_kind').$type<EdgeTargetKind>().notNull(),
     // An `entityId`, or an Asset `hash`. Dangling-allowed, so no FK.
     targetId: text('target_id').notNull(),
+    // The Container the target lives in, on an `asset` edge alone — read off the `/assets/<containerId>/…`
+    // URL the document was written with, never assumed to be the source's (ADR-0080). NULL on an `entity`
+    // edge and on a row predating this column; both resolve against `containerId`, which is what a World
+    // that draws on nothing has always meant. Dangling-allowed, so no FK.
+    targetContainerId: text('target_container_id'),
     // The Link Descriptor, on `content → entity` edges alone. Two descriptors to the same
     // target are two edges ("spouse" *and* "rival" between one pair).
     descriptor: text('descriptor'),
@@ -389,6 +447,11 @@ export const entityEdges = sqliteTable(
     index('idx_entity_edges_target').on(table.targetKind, table.targetId),
     // The World Graph's whole-World edge fetch.
     index('idx_entity_edges_container').on(table.containerId, table.targetKind),
+    // Inbound by target Container: the blast-radius count, which asks what points *into* a Container
+    // and runs in front of a confirm (#414, ADR-0080). Bare column rather than the `coalesce` every
+    // Mount-scoped read goes through, because that read also excludes the Container's own edges, under
+    // which the coalesce provably reduces to this column — see `ContainerLinksService.countInbound`.
+    index('idx_entity_edges_target_container').on(table.targetKind, table.targetContainerId, table.targetId),
   ],
 );
 

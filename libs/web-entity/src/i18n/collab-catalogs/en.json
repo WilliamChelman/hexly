@@ -65,5 +65,8 @@
   "entitySearchPicker": {
     "searchPlaceholder": "Search entities…",
     "empty": "No matching entities"
+  },
+  "containerChips": {
+    "all": "All"
   }
 }

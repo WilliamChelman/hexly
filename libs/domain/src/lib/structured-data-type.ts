@@ -42,6 +42,10 @@ export const vaultSlotSchema = z.enum(['body', 'frontmatter', 'omit']);
  * What a `body` projection's {@link VaultProjection.toMarkdown} may reach for while serializing, without
  * the converter itself knowing the World: the CURRENT name of a linked Entity (so a post-import rename
  * still round-trips its `[[wikilink]]`) and the exported path an Asset's capability URL was written to.
+ *
+ * `assetPath` serves the `frontmatter` slot too, where the vault layer walks the value itself: a
+ * frontmatter-projected surface carries Assets no converter ever sees, and they must be flattened like a
+ * body Field's or a round trip repoints at the Container it drew on rather than copying (ADR-0080).
  */
 export interface VaultExportContext {
   /** The linked Entity's current name, or `undefined` when it is unknown (deleted / cross-World). */

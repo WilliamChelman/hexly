@@ -5,6 +5,7 @@ import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import {
   AuthClient,
+  blastRadius,
   ClientConfigStore,
   WorldStore,
   WorldsClient,
@@ -90,6 +91,146 @@ import {
         {{ (creating() ? 'worldIndex.creating' : 'worlds.new') | transloco }}
       </button>
     </ng-template>
+    <!-- One group's row of cards, placed by the campaigns group and the Shelves group alike: the two
+         differ only in what they are handed, which is the whole of what the label does (ADR-0080). -->
+    <ng-template #worldRow let-cards let-create="create" let-testId="testId">
+      <ul class="flex gap-4 overflow-x-auto pb-3 m-0 p-0 list-none snap-x" [attr.data-testid]="testId">
+        @for (card of cards; track card.id) {
+          <li class="snap-start shrink-0 w-56">
+            <div
+              class="group relative h-44 rounded-lg border border-line bg-surface shadow-1 overflow-hidden flex flex-col transition-shadow hover:shadow-2 has-[a:focus-visible]:[outline:2px_solid_var(--color-accent)] has-[a:focus-visible]:[outline-offset:-2px]"
+            >
+              <div class="h-20 flex items-center justify-center {{ sigil(card.id) }}">
+                <span class="font-cartouche text-2xl">{{ mono(card.name) }}</span>
+              </div>
+              @if (renamingId() === card.id) {
+                <input
+                  type="text"
+                  appAutofocus
+                  class="m-3 font-display text-md text-ink-strong bg-surface-sunken border border-accent rounded-sm py-1 px-2 outline-none"
+                  [value]="card.name"
+                  [attr.data-testid]="'rename-world-input-' + card.id"
+                  [attr.aria-label]="'worldIndex.renameLabel' | transloco"
+                  (keydown.enter)="commitRename(card.id, $any($event.target).value)"
+                  (keydown.escape)="cancelRename()"
+                />
+              } @else {
+                <!-- Stretched link (inset ::after) makes the whole card open the
+                     World; action buttons sit outside the anchor, lifted with
+                     z-10, so there are no nested interactives (a11y). -->
+                <a
+                  class="flex-1 px-3 pt-2 no-underline outline-none focus-visible:shadow-none after:content-[''] after:absolute after:inset-0"
+                  [routerLink]="dashboardRoute(card.id, card.name)"
+                  [attr.data-testid]="'world-' + card.id"
+                  [attr.aria-label]="card.name"
+                >
+                  <span class="font-display text-md text-ink-strong line-clamp-2">{{ card.name }}</span>
+                </a>
+              }
+              <div class="flex items-center gap-1 px-3 pb-2">
+                <span
+                  class="text-2xs uppercase tracking-wider"
+                  [class.text-accent-strong]="card.owned"
+                  [class.text-ink-faint]="!card.owned"
+                  [attr.data-testid]="(card.owned ? 'owned-' : 'member-') + card.id"
+                  >{{ (card.owned ? 'worldIndex.owned' : 'worldIndex.member') | transloco }}</span
+                >
+                @if (card.owned) {
+                  <span
+                    class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                  >
+                    <a
+                      appButton
+                      icon
+                      variant="ghost"
+                      size="sm"
+                      [routerLink]="settingsRoute(card.id, card.name)"
+                      [attr.data-testid]="'owners-world-' + card.id"
+                      [attr.aria-label]="'collab.owners.heading' | transloco"
+                      [attr.title]="'collab.owners.heading' | transloco"
+                    >
+                      <app-icon name="user" [size]="16" />
+                    </a>
+                    <button
+                      type="button"
+                      appButton
+                      icon
+                      variant="ghost"
+                      size="sm"
+                      [disabled]="exportingId() === card.id"
+                      [attr.data-testid]="'export-world-' + card.id"
+                      [attr.aria-label]="'worlds.export' | transloco"
+                      [attr.title]="'worlds.export' | transloco"
+                      (click)="exportWorld(card.id, card.name)"
+                    >
+                      <app-icon name="download" [size]="16" />
+                    </button>
+                    <button
+                      type="button"
+                      appButton
+                      icon
+                      variant="ghost"
+                      size="sm"
+                      [attr.data-testid]="'rename-world-' + card.id"
+                      [attr.aria-label]="'worldIndex.rename' | transloco"
+                      [attr.title]="'worldIndex.rename' | transloco"
+                      (click)="startRename(card.id)"
+                    >
+                      <app-icon name="label" [size]="16" />
+                    </button>
+                    <button
+                      type="button"
+                      appButton
+                      icon
+                      variant="ghost"
+                      size="sm"
+                      danger
+                      [attr.data-testid]="'delete-world-' + card.id"
+                      [attr.aria-label]="'common.delete' | transloco"
+                      [attr.title]="'common.delete' | transloco"
+                      (click)="askDelete(card.id, card.name)"
+                    >
+                      <app-icon name="erase" [size]="16" />
+                    </button>
+                  </span>
+                } @else {
+                  <span
+                    class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                  >
+                    <button
+                      type="button"
+                      appButton
+                      variant="ghost"
+                      size="sm"
+                      danger
+                      [attr.data-testid]="'leave-world-' + card.id"
+                      [attr.title]="'collab.members.leave' | transloco"
+                      (click)="leaveWorld(card.id)"
+                    >
+                      {{ 'collab.members.leave' | transloco }}
+                    </button>
+                  </span>
+                }
+              </div>
+            </div>
+          </li>
+        }
+        @if (create && canCreateWorlds()) {
+          <li class="snap-start shrink-0 w-56">
+            <button
+              type="button"
+              class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-accent-strong hover:border-accent bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:[outline-offset:-2px]"
+              data-testid="create-world-tile"
+              [disabled]="creating()"
+              (click)="promptCreate()"
+            >
+              <app-icon name="plus" [size]="24" />
+              <span class="font-display text-md">{{ 'worlds.new' | transloco }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+    </ng-template>
     @if (cards().length > 0) {
       <header class="bg-linear-[180deg] from-surface to-bg-deep border-b border-line">
         <div class="max-w-[64rem] mx-auto px-8 py-16 flex items-end justify-between gap-8">
@@ -112,144 +253,28 @@ import {
       </header>
 
       <main class="max-w-[64rem] mx-auto px-8 py-8">
-        <h2 appEyebrow mark class="mb-3">
-          {{ 'worldIndex.continue' | transloco }}
-        </h2>
-        <ul class="flex gap-4 overflow-x-auto pb-3 m-0 p-0 list-none snap-x">
-          @for (card of sorted(); track card.id) {
-            <li class="snap-start shrink-0 w-56">
-              <div
-                class="group relative h-44 rounded-lg border border-line bg-surface shadow-1 overflow-hidden flex flex-col transition-shadow hover:shadow-2 has-[a:focus-visible]:[outline:2px_solid_var(--color-accent)] has-[a:focus-visible]:[outline-offset:-2px]"
-              >
-                <div class="h-20 flex items-center justify-center {{ sigil(card.id) }}">
-                  <span class="font-cartouche text-2xl">{{ mono(card.name) }}</span>
-                </div>
-                @if (renamingId() === card.id) {
-                  <input
-                    type="text"
-                    appAutofocus
-                    class="m-3 font-display text-md text-ink-strong bg-surface-sunken border border-accent rounded-sm py-1 px-2 outline-none"
-                    [value]="card.name"
-                    [attr.data-testid]="'rename-world-input-' + card.id"
-                    [attr.aria-label]="'worldIndex.renameLabel' | transloco"
-                    (keydown.enter)="commitRename(card.id, $any($event.target).value)"
-                    (keydown.escape)="cancelRename()"
-                  />
-                } @else {
-                  <!-- Stretched link (inset ::after) makes the whole card open the
-                       World; action buttons sit outside the anchor, lifted with
-                       z-10, so there are no nested interactives (a11y). -->
-                  <a
-                    class="flex-1 px-3 pt-2 no-underline outline-none focus-visible:shadow-none after:content-[''] after:absolute after:inset-0"
-                    [routerLink]="dashboardRoute(card.id, card.name)"
-                    [attr.data-testid]="'world-' + card.id"
-                    [attr.aria-label]="card.name"
-                  >
-                    <span class="font-display text-md text-ink-strong line-clamp-2">{{ card.name }}</span>
-                  </a>
-                }
-                <div class="flex items-center gap-1 px-3 pb-2">
-                  <span
-                    class="text-2xs uppercase tracking-wider"
-                    [class.text-accent-strong]="card.owned"
-                    [class.text-ink-faint]="!card.owned"
-                    [attr.data-testid]="(card.owned ? 'owned-' : 'member-') + card.id"
-                    >{{ (card.owned ? 'worldIndex.owned' : 'worldIndex.member') | transloco }}</span
-                  >
-                  @if (card.owned) {
-                    <span
-                      class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-                    >
-                      <a
-                        appButton
-                        icon
-                        variant="ghost"
-                        size="sm"
-                        [routerLink]="settingsRoute(card.id, card.name)"
-                        [attr.data-testid]="'owners-world-' + card.id"
-                        [attr.aria-label]="'collab.owners.heading' | transloco"
-                        [attr.title]="'collab.owners.heading' | transloco"
-                      >
-                        <app-icon name="user" [size]="16" />
-                      </a>
-                      <button
-                        type="button"
-                        appButton
-                        icon
-                        variant="ghost"
-                        size="sm"
-                        [disabled]="exportingId() === card.id"
-                        [attr.data-testid]="'export-world-' + card.id"
-                        [attr.aria-label]="'worlds.export' | transloco"
-                        [attr.title]="'worlds.export' | transloco"
-                        (click)="exportWorld(card.id, card.name)"
-                      >
-                        <app-icon name="download" [size]="16" />
-                      </button>
-                      <button
-                        type="button"
-                        appButton
-                        icon
-                        variant="ghost"
-                        size="sm"
-                        [attr.data-testid]="'rename-world-' + card.id"
-                        [attr.aria-label]="'worldIndex.rename' | transloco"
-                        [attr.title]="'worldIndex.rename' | transloco"
-                        (click)="startRename(card.id)"
-                      >
-                        <app-icon name="label" [size]="16" />
-                      </button>
-                      <button
-                        type="button"
-                        appButton
-                        icon
-                        variant="ghost"
-                        size="sm"
-                        danger
-                        [attr.data-testid]="'delete-world-' + card.id"
-                        [attr.aria-label]="'common.delete' | transloco"
-                        [attr.title]="'common.delete' | transloco"
-                        (click)="askDelete(card.id, card.name)"
-                      >
-                        <app-icon name="erase" [size]="16" />
-                      </button>
-                    </span>
-                  } @else {
-                    <span
-                      class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-                    >
-                      <button
-                        type="button"
-                        appButton
-                        variant="ghost"
-                        size="sm"
-                        danger
-                        [attr.data-testid]="'leave-world-' + card.id"
-                        [attr.title]="'collab.members.leave' | transloco"
-                        (click)="leaveWorld(card.id)"
-                      >
-                        {{ 'collab.members.leave' | transloco }}
-                      </button>
-                    </span>
-                  }
-                </div>
-              </div>
-            </li>
-          }
-          @if (canCreateWorlds()) {
-            <li class="snap-start shrink-0 w-56">
-              <button
-                type="button"
-                class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-accent-strong hover:border-accent bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:[outline-offset:-2px]"
-                [disabled]="creating()"
-                (click)="promptCreate()"
-              >
-                <app-icon name="plus" [size]="24" />
-                <span class="font-display text-md">{{ 'worlds.new' | transloco }}</span>
-              </button>
-            </li>
-          }
-        </ul>
+        <!-- The heading names campaigns, so it goes where there are none — a caller whose Worlds are
+             all Shelves keeps the row (the Create card lives in it) without a heading over nothing. -->
+        @if (campaigns().length > 0) {
+          <h2 appEyebrow mark class="mb-3">
+            {{ 'worldIndex.continue' | transloco }}
+          </h2>
+        }
+        <ng-container
+          [ngTemplateOutlet]="worldRow"
+          [ngTemplateOutletContext]="{ $implicit: campaigns(), create: true, testId: 'worlds-campaigns' }"
+        />
+        <!-- The Shelves group exists only once there is a Shelf, so a user with none sees exactly the
+             list they saw before (ADR-0080). -->
+        @if (shelves().length > 0) {
+          <h2 appEyebrow mark class="mb-3 mt-8">
+            {{ 'worldIndex.shelves' | transloco }}
+          </h2>
+          <ng-container
+            [ngTemplateOutlet]="worldRow"
+            [ngTemplateOutletContext]="{ $implicit: shelves(), create: false, testId: 'worlds-shelves' }"
+          />
+        }
       </main>
     } @else if (loadError()) {
       <main class="max-w-[60rem] mx-auto py-8 px-6">
@@ -335,6 +360,22 @@ import {
             {{ 'worldIndex.deleteCounting' | transloco }}
           } @else {
             {{ 'worldIndex.deleteCount' | transloco: { count: deleteCount() } }}
+          }
+        </p>
+        <!-- What deleting breaks *beyond* this World (ADR-0080, #414): the links other Containers
+             point in with, and how many they come from. A second line rather than a second dialog —
+             the entity count is what goes, this is what breaks. -->
+        <p class="text-sm text-ink-muted m-0" data-testid="delete-links">
+          @if (blast.count(); as count) {
+            @if (count.links === 0) {
+              {{ 'worldIndex.deleteLinksNone' | transloco }}
+            } @else {
+              {{ 'worldIndex.deleteLinks' | transloco: { links: count.links, worlds: count.worlds } }}
+            }
+          } @else if (blast.failed()) {
+            {{ 'worldIndex.deleteLinksUnknown' | transloco }}
+          } @else {
+            {{ 'worldIndex.deleteLinksCounting' | transloco }}
           }
         </p>
         <label class="flex flex-col gap-1 text-sm text-ink-muted">
@@ -507,7 +548,13 @@ export class WorldsPage {
   protected readonly cards = computed(() =>
     this.store.worlds().map((w) => ({ ...w, owned: !!w.rights?.includes('manage') })),
   );
-  protected readonly sorted = computed(() => [...this.cards()].sort((a, b) => b.updatedAt - a.updatedAt));
+  private readonly sorted = computed(() => [...this.cards()].sort((a, b) => b.updatedAt - a.updatedAt));
+  /**
+   * The two groups the Index shows (ADR-0080). Grouping is the *whole* of what the label does here:
+   * nothing is dropped, so a caller with no Shelf gets every card they had, in the order they had it.
+   */
+  protected readonly campaigns = computed(() => this.sorted().filter((card) => card.kind !== 'shelf'));
+  protected readonly shelves = computed(() => this.sorted().filter((card) => card.kind === 'shelf'));
 
   /** Display name derived from the signed-in user's email local part. */
   protected who(): string {
@@ -557,6 +604,8 @@ export class WorldsPage {
     name: string;
   } | null>(null);
   protected readonly deleteCount = signal<number | null>(null);
+  /** What the open confirm's delete would break beyond the World (ADR-0080, #414). */
+  protected readonly blast = blastRadius();
   protected readonly confirmText = signal('');
   protected readonly canConfirmDelete = computed(() => this.confirmText() === this.pendingDelete()?.name);
 
@@ -598,8 +647,11 @@ export class WorldsPage {
     });
   }
 
-  /** Open the type-to-confirm delete modal; the World Detail supplies the
-   * entity count it would destroy. */
+  /**
+   * Open the type-to-confirm delete modal. Two reads, both per act: the World Detail supplies the
+   * entity count it would destroy, and the blast radius what it would break beyond the World
+   * (ADR-0080, #414). Neither is stored, so neither can be stale by the time it is stated.
+   */
   protected askDelete(id: string, name: string): void {
     this.pendingDelete.set({ id, name });
     this.deleteCount.set(null);
@@ -611,6 +663,7 @@ export class WorldsPage {
         this.toaster.show(this.transloco.translate('worldIndex.deleteError'), 'error');
       },
     });
+    this.blast.read(this.worldsClient.inboundLinks(id));
   }
 
   protected cancelDelete(): void {

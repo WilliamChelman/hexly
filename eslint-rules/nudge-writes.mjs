@@ -127,12 +127,14 @@ const noDirectContainerWrites = chokePoint({
 });
 
 const noDirectWorldWrites = chokePoint({
-  tables: ['worlds', 'worldMembers', 'worldTypes', 'worldFields'],
-  sqlTables: ['worlds', 'world_members', 'world_types', 'world_fields'],
+  // `container_mounts` is generically named for Containers (ADR-0080) but only a World may mount, and a
+  // Mount change bumps that World's `seq` — so it is WorldWrites' table like the rest of this list.
+  tables: ['worlds', 'worldMembers', 'worldTypes', 'worldFields', 'containerMounts'],
+  sqlTables: ['worlds', 'world_members', 'world_types', 'world_fields', 'container_mounts'],
   ownerFiles: ['world-writes.ts'],
   handle: 'WorldWrites',
   entryPoints:
-    '`WorldWrites.mint`, `update`, `delete`, `membership`, `purgeMembershipsOf`, `createType`, `updateType`, `deleteType`, `createField`, `updateField`, or `deleteField`',
+    '`WorldWrites.mint`, `update`, `delete`, `membership`, `purgeMembershipsOf`, `createType`, `updateType`, `deleteType`, `createField`, `updateField`, `deleteField`, `mount`, `unmount`, or `reorderMounts`',
 });
 
 export default {

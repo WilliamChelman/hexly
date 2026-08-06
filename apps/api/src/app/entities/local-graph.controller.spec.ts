@@ -138,6 +138,88 @@ describe('Local Graph', () => {
     expect(drawn(two)).toEqual(['Ealdred → Mira', 'Ealdred → Portrait', 'Mira → Portrait']);
   });
 
+  /**
+   * An image drawn from another Container harvests an edge into it (ADR-0080), and that edge is decor —
+   * so depth never reaches through it. Which is the guarantee that matters: expanding a shelf image would
+   * walk out into every other World using it, showing other campaigns' shapes in this Panel.
+   */
+  it('never reaches an Asset in another Container, however deep the walk', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const world = await makeWorld(ada);
+    const shelf = await makeWorld(ada, 'The Shelf');
+    const ealdred = await makeEntity(ada, world, 'Ealdred');
+    const hash = 'b'.repeat(64);
+    mintAsset(shelf, hash, 'Shelf Portrait');
+    await save(ada, ealdred, [{ type: 'image', attrs: { src: assetUrl(shelf, hash, '.png') } }]);
+
+    const deep = await graphOf(ada, ealdred, LOCAL_GRAPH_MAX_DEPTH);
+    expect(names(deep.nodes)).toEqual(['Ealdred']);
+    expect(deep.edges).toEqual([]);
+  });
+
+  /**
+   * An **Entity Link** leaving the Container is semantic, so unlike the image above it *is* reached — as a
+   * **Foreign node**: drawn at the hop that found it, marked as living elsewhere, and never walked on from
+   * (ADR-0080). Terminal by rule, which is the whole point: the far side is another campaign's shape.
+   */
+  describe('A link leaving the Container', () => {
+    it('draws its target as a node marked with the Container it lives in', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const goblin = await makeEntity(ada, shelf, 'Marauder Goblin');
+      const ealdred = await makeEntity(ada, world, 'Ealdred');
+      await link(ada, ealdred, [{ entityId: goblin, descriptor: 'hunts' }]);
+
+      const graph = await graphOf(ada, ealdred);
+
+      expect(names(graph.nodes)).toEqual(['Ealdred', 'Marauder Goblin']);
+      expect(drawn(graph)).toEqual(['Ealdred —hunts→ Marauder Goblin']);
+      expect(graph.nodes.map((n) => n.foreignContainerId)).toEqual([undefined, shelf]);
+    });
+
+    /**
+     * The rule that makes a Foreign node terminal is not "the far Container's edges were never read" — it
+     * is the walk's own. Two of this World's Entities on one shelf monster are not thereby two hops apart:
+     * depth 5 from Ealdred draws the goblin and stops, leaving Mira out.
+     */
+    it('returns the Foreign node and nothing beyond it, however deep the walk', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const goblin = await makeEntity(ada, shelf, 'Marauder Goblin');
+      const queen = await makeEntity(ada, shelf, 'Goblin Queen');
+      await link(ada, goblin, [{ entityId: queen, descriptor: 'serves' }]);
+      const ealdred = await makeEntity(ada, world, 'Ealdred');
+      const mira = await makeEntity(ada, world, 'Mira');
+      await link(ada, ealdred, [{ entityId: goblin, descriptor: 'hunts' }]);
+      await link(ada, mira, [{ entityId: goblin, descriptor: 'fears' }]);
+
+      const deep = await graphOf(ada, ealdred, LOCAL_GRAPH_MAX_DEPTH);
+
+      expect(names(deep.nodes)).toEqual(['Ealdred', 'Marauder Goblin']);
+      expect(drawn(deep)).toEqual(['Ealdred —hunts→ Marauder Goblin']);
+    });
+
+    /** Access-filtered like any other endpoint: a Foreign node the viewer cannot read is simply not there. */
+    it('draws nothing for a viewer who cannot read the target', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const bob = await signIn('bob@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      await addMember(ada, world, bobId);
+      const goblin = await makeEntity(ada, shelf, 'Marauder Goblin');
+      const ealdred = await makeEntity(ada, world, 'Ealdred');
+      await share(ada, ealdred);
+      await link(ada, ealdred, [{ entityId: goblin, descriptor: 'hunts' }]);
+
+      const graph = await graphOf(bob, ealdred, 2);
+
+      expect(names(graph.nodes)).toEqual(['Ealdred']);
+      expect(graph.edges).toEqual([]);
+    });
+  });
+
   it('never crosses an Entity the viewer cannot read', async () => {
     const ada = await signIn('ada@hexly.test');
     const bob = await signIn('bob@hexly.test');

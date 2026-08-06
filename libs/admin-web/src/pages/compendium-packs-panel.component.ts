@@ -4,8 +4,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { switchMap, takeWhile, timer } from 'rxjs';
 import { CompendiumPackSummary, ImporterErrorCode, ImportRunSummary } from '@hexly/domain';
-import { HexlyDatePipe, ToasterService } from '@hexly/web-core';
-import { ButtonComponent } from '@hexly/web-ui';
+import { blastRadius, HexlyDatePipe, ToasterService } from '@hexly/web-core';
+import { ButtonComponent, DialogComponent } from '@hexly/web-ui';
 import { AdminClient } from '../services/admin.client';
 
 /** How often a running reconcile is polled — the reindex cadence (ADR-0046), one at a time per pack. */
@@ -23,7 +23,7 @@ const PACKS_POLL_MS = 1000;
 @Component({
   selector: 'app-compendium-packs',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, HexlyDatePipe, ButtonComponent],
+  imports: [TranslocoPipe, HexlyDatePipe, ButtonComponent, DialogComponent],
   template: `
     <ul class="pack-list">
       @for (pack of packs(); track pack.importer) {
@@ -76,7 +76,7 @@ const PACKS_POLL_MS = 1000;
               danger
               [attr.data-testid]="'pack-remove-' + pack.importer"
               [disabled]="pack.run.status === 'running'"
-              (click)="remove(pack.importer)"
+              (click)="askRemove(pack)"
             >
               {{ 'admin.packs.remove' | transloco }}
             </button>
@@ -86,6 +86,38 @@ const PACKS_POLL_MS = 1000;
         <li class="pack-empty">{{ 'admin.packs.empty' | transloco }}</li>
       }
     </ul>
+
+    @if (pendingRemove(); as target) {
+      <!-- The blast radius before the act (ADR-0080, #414), on the same footing a World Owner deleting
+           their own Container gets it: a pack is nobody's to protect and every mounting World's to
+           lose, so the operator is told what it costs and refused nothing. -->
+      <app-dialog
+        [open]="true"
+        [heading]="'admin.packs.removeHeading' | transloco: { name: target.label | transloco }"
+        (closed)="cancelRemove()"
+        data-testid="pack-remove-modal"
+      >
+        <p class="text-sm text-ink-muted m-0" data-testid="pack-remove-links">
+          @if (blast.count(); as count) {
+            @if (count.links === 0) {
+              {{ 'admin.packs.removeLinksNone' | transloco }}
+            } @else {
+              {{ 'admin.packs.removeLinks' | transloco: { links: count.links, worlds: count.worlds } }}
+            }
+          } @else if (blast.failed()) {
+            {{ 'admin.packs.removeLinksUnknown' | transloco }}
+          } @else {
+            {{ 'admin.packs.removeLinksCounting' | transloco }}
+          }
+        </p>
+        <button dialogFooter type="button" appButton data-testid="cancel-pack-remove" (click)="cancelRemove()">
+          {{ 'admin.packs.removeCancel' | transloco }}
+        </button>
+        <button dialogFooter type="button" appButton danger data-testid="confirm-pack-remove" (click)="confirmRemove()">
+          {{ 'admin.packs.remove' | transloco }}
+        </button>
+      </app-dialog>
+    }
   `,
   styles: `
     @reference '#app-styles.css';
@@ -120,6 +152,10 @@ export class CompendiumPacksPanelComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly packs = signal<readonly CompendiumPackSummary[]>([]);
+  /** The pack whose removal is being confirmed, or null when no confirm is open. */
+  protected readonly pendingRemove = signal<CompendiumPackSummary | null>(null);
+  /** What the open confirm's removal would break in the Worlds drawing on the pack (ADR-0080, #414). */
+  protected readonly blast = blastRadius();
 
   ngOnInit(): void {
     this.reload((packs) => {
@@ -142,9 +178,26 @@ export class CompendiumPacksPanelComponent implements OnInit {
     });
   }
 
-  /** Remove a pack; a refusal toasts and leaves the shelf where it was. */
-  protected remove(importerId: string): void {
-    this.admin.removePack(importerId).subscribe({
+  /**
+   * Offer the removal, and read what it would break while the confirm is open (ADR-0080, #414). Read
+   * here rather than with the list: the list is a poll target, and a count re-read every second is a
+   * count nobody asked for.
+   */
+  protected askRemove(pack: CompendiumPackSummary): void {
+    this.pendingRemove.set(pack);
+    this.blast.read(this.admin.packInboundLinks(pack.importer));
+  }
+
+  protected cancelRemove(): void {
+    this.pendingRemove.set(null);
+  }
+
+  /** Remove the pack, whatever the count said; a refusal toasts and leaves the shelf where it was. */
+  protected confirmRemove(): void {
+    const target = this.pendingRemove();
+    if (!target) return;
+    this.pendingRemove.set(null);
+    this.admin.removePack(target.importer).subscribe({
       next: () => {
         this.reload();
         this.toaster.show(this.transloco.translate('admin.packs.removed'), 'success');

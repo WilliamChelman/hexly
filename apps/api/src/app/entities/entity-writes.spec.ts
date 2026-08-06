@@ -553,6 +553,48 @@ describe('EntityWrites', () => {
       });
 
       /**
+       * An asset edge's target Container is derived state like the rest (ADR-0080): it comes off the
+       * `/assets/<containerId>/…` URL in the document, so a row left by the harvest that assumed the
+       * source's own Container is repaired from the document alone — no backfill, one idempotent pass.
+       */
+      it('rebuilds an asset edge’s target Container from the URL the document carries', () => {
+        const OTHER = 'world-2';
+        const hash = 'a'.repeat(64);
+        seedRaw(
+          'illustrated',
+          WORLD,
+          JSON.stringify({
+            'core.field.content': tiptapContent({
+              type: 'doc',
+              content: [{ type: 'image', attrs: { src: `/assets/${OTHER}/${hash}.png` } }],
+            }),
+          }),
+          'note',
+        );
+        // The pre-ADR-0080 row: the hash harvested, its Container left to be assumed as the source's.
+        db.insert(entityEdges)
+          .values([
+            {
+              sourceEntityId: idOf('illustrated'),
+              containerId: WORLD,
+              targetKind: 'asset',
+              targetId: hash,
+              decor: true,
+            },
+          ])
+          .run();
+
+        reindexAll();
+
+        const targets = db
+          .select({ targetId: entityEdges.targetId, targetContainerId: entityEdges.targetContainerId })
+          .from(entityEdges)
+          .where(eq(entityEdges.sourceEntityId, idOf('illustrated')))
+          .all();
+        expect(targets).toEqual([{ targetId: hash, targetContainerId: OTHER }]);
+      });
+
+      /**
        * The one write here that lands without a nudge *and* without a `seq` bump: recomputing from
        * an unchanged document writes back what it read. Only just after a deploy adds a derivation
        * does it yield new state, and that stale window closes on the reader's next navigation.

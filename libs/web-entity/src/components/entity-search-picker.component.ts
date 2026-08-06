@@ -3,6 +3,8 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { ButtonComponent, InputComponent } from '@hexly/web-ui';
+import { ContainerChipsComponent } from './container-chips.component';
+import { containerFacet, linkTargetRead } from './link-target-read';
 
 /**
  * The shared server-side Entity picker (ADR-0025): a search box over the `list({ q })` read,
@@ -13,14 +15,17 @@ import { ButtonComponent, InputComponent } from '@hexly/web-ui';
  *
  * Every consumer asks the same question — *what may this point at?* — so the read is a **link-target
  * read** here rather than once per consumer (ADR-0079), which covers the **Entity Link** Field picker,
- * the Board **Embed** picker and a broken link's relink popover together.
+ * the Board **Embed** picker and a broken link's relink popover together. Naming a {@link worldId} is
+ * what widens it, too: the server answers with that World's Entities *and* the ones in the Containers
+ * it **Mounts**, the World's own ranked first (ADR-0080) — for the surfaces that ADR names, which is
+ * what {@link includeMounts} lets a consumer outside them say.
  *
  * ponytail: no debounce — small owner lists, fine until list sizes force it.
  */
 @Component({
   selector: 'app-entity-search-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, InputComponent, TranslocoPipe],
+  imports: [ButtonComponent, ContainerChipsComponent, InputComponent, TranslocoPipe],
   template: `
     <div class="rounded-md border border-line bg-surface p-1 shadow-2" [attr.data-testid]="testid() + '-menu'">
       <input
@@ -30,6 +35,16 @@ import { ButtonComponent, InputComponent } from '@hexly/web-ui';
         [attr.placeholder]="placeholderKey() | transloco"
         [value]="query()"
         (input)="queryChange.emit($any($event.target).value)"
+      />
+      <!-- The **Container** facet (ADR-0080), shared with the asset pickers: present only where this
+           World Mounts something the read reached, so a picker that offers one Container's Entities shows
+           no chip to narrow by. Counts come off the same read the options do, so a chip can never
+           disagree with the list. -->
+      <app-container-chips
+        class="mb-1 block"
+        [testid]="testid()"
+        [containers]="containers()"
+        [(selected)]="targets.container"
       />
       <!-- Only the option list scrolls; a projected footer (create rows) stays pinned. -->
       <div class="max-h-56 overflow-auto">
@@ -68,12 +83,20 @@ export class EntitySearchPickerComponent {
   /** The controlled query — the consumer owns it so it can reset or reuse it. */
   readonly query = input('');
   /**
-   * Scope the search to one World (ADR-0024). Omitted → the caller's whole owner scope, i.e.
-   * results may come from any of the Owner's Worlds.
+   * Scope the search to one World and the Containers it **Mounts** (ADR-0024, ADR-0080). Omitted →
+   * the caller's whole owner scope, i.e. results may come from any of the Owner's Worlds — and, having
+   * named no World, no Mount set to resolve either.
    */
   readonly worldId = input<string | undefined>(undefined);
   /** Constrain results to these Entity Types — e.g. an Entity-Link Field's target-type constraint. */
   readonly types = input<readonly string[] | undefined>(undefined);
+  /**
+   * Whether this picker may offer what the World **Mounts**. On by default, those being the surfaces
+   * ADR-0080 widens — the `@` picker, the Entity Link Field picker, the Board Embed picker. A consumer
+   * whose pick is stored as the World's own rather than as a link — the Dashboard's Pinned Entities —
+   * declares itself out, and gets no Container chips either, there being one Container to narrow to.
+   */
+  readonly includeMounts = input(true);
 
   /** Every raw keystroke; the consumer commits it back to {@link query}. */
   readonly queryChange = output<string>();
@@ -82,24 +105,30 @@ export class EntitySearchPickerComponent {
 
   protected readonly options = signal<EntitySummary[]>([]);
 
+  protected readonly targets = linkTargetRead(
+    () => this.worldId(),
+    () => {
+      const types = this.types();
+      return {
+        q: this.query().trim(),
+        type: types?.length ? [...types] : undefined,
+        // A picker is no browse: an Embed of an Asset and a pinned Asset stay pickable by name (ADR-0065).
+        includeHidden: true,
+      };
+    },
+    () => this.includeMounts(),
+  );
+  /** The **Container** facet's live values — this World and the ones it Mounts that still hold a match. */
+  protected readonly containers = containerFacet(this.targets.params, () => this.includeMounts());
+
   constructor() {
     // Search server-side as the query changes (ADR-0025). onCleanup cancels a superseded
     // request; a failed search empties the list so the picker never breaks.
     effect((onCleanup) => {
-      const types = this.types();
-      const sub = this.entitiesClient
-        .list({
-          q: this.query().trim(),
-          worldId: this.worldId(),
-          type: types?.length ? [...types] : undefined,
-          read: 'link-target',
-          // A picker is no browse: an Embed of an Asset and a pinned Asset stay pickable by name (ADR-0065).
-          includeHidden: true,
-        })
-        .subscribe({
-          next: (page) => this.options.set(page.items),
-          error: () => this.options.set([]),
-        });
+      const sub = this.entitiesClient.list(this.targets.params()).subscribe({
+        next: (page) => this.options.set(page.items),
+        error: () => this.options.set([]),
+      });
       onCleanup(() => sub.unsubscribe());
     });
   }

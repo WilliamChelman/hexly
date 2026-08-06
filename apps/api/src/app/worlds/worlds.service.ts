@@ -1,12 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  AssetSummary,
   CreateWorldRequest,
-  ENTITY_LIST_MAX_LIMIT,
+  DEFAULT_WORLD_KIND,
   EntityDetail,
-  EntityFacets,
-  EntityType,
-  FieldFilter,
+  InboundLinkCount,
   MemberRole,
   PublicLink,
   UpdateWorldRequest,
@@ -15,25 +12,18 @@ import {
   WorldSummary,
   WorldThemeSource,
 } from '@hexly/domain';
-import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_FILTER } from '@hexly/plugin-asset';
 import { and, asc, count, eq, inArray, isNotNull, ne } from 'drizzle-orm';
 import { AssetsService } from '../assets/assets.service';
 import { AssetMintService } from '../assets/asset-mint.service';
-import { EntitiesService } from '../entities/entities.service';
 import { AclSetResult, gate, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
 import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
 import { loadWorld, worldAccess, worldOwnerFilter, worldRightsOf } from '../acl/world-access';
-import { sharedVisibility } from '../acl/entity-access';
+import { entityAccess, sharedVisibility } from '../acl/entity-access';
 import { NudgeBus } from '../events/nudge-bus';
+import { ContainerLinksService } from './container-links.service';
 import { WorldWrites } from './world-writes';
 import { INITIAL_SEQ, containers, entities, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
-
-/** The picker's search inputs (#281): the FTS `q` and any active image Field facets, both pinned to image kind. */
-export interface AssetSearchOptions {
-  readonly q?: string;
-  readonly fields?: readonly FieldFilter[];
-}
 
 /** World Public Link table for the shared get/mint/revoke helpers. */
 const WORLD_LINK: PublicLinkTable = {
@@ -54,16 +44,19 @@ export class WorldsService {
     @Inject(DB) private readonly db: Db,
     private readonly assets: AssetsService,
     private readonly assetMint: AssetMintService,
-    private readonly entities: EntitiesService,
     private readonly bus: NudgeBus,
     private readonly writes: WorldWrites,
+    private readonly links: ContainerLinksService,
   ) {}
 
   /**
-   * Every World the caller can reach: a member row (owner/contributor/viewer) OR
+   * Every World the caller has standing in: a member row (owner/contributor/viewer) OR
    * any entity grant inside the World — so an ex-member who kept Entities, or a
    * non-member grantee, keeps minimal reachability. Each World is listed once
    * however reached.
+   *
+   * A World reached only through a **Mount** is deliberately absent: a Mount widens what a World may
+   * point at, never what its readers appear to have (ADR-0080), so it stays readable and unlisted.
    */
   list(userId: string): WorldSummary[] {
     // A Superadmin's access context returns match-all, so no special case here.
@@ -73,12 +66,15 @@ export class WorldsService {
       .select({
         id: containers.id,
         name: containers.name,
+        // Campaign-or-Shelf rides the listing so the World Index can group by it (ADR-0080). It is
+        // carried, never filtered on: the WHERE below is reachability and nothing else.
+        kind: worlds.kind,
         createdAt: containers.createdAt,
         updatedAt: containers.updatedAt,
       })
       .from(worlds)
       .innerJoin(containers, eq(containers.id, worlds.id))
-      .where(access.reachFilter)
+      .where(access.listFilter)
       .orderBy(asc(containers.createdAt), asc(containers.id))
       .all();
     if (rows.length === 0) return [];
@@ -133,6 +129,9 @@ export class WorldsService {
     return {
       id: worldId,
       name: req.name,
+      // A new World is a campaign unless said otherwise (ADR-0080) — the column's own default,
+      // echoed here rather than re-read.
+      kind: DEFAULT_WORLD_KIND,
       // The creator is the sole initial Owner, so full Rights.
       owners: [ownerId],
       rights: worldRightsOf({ isOwner: true, canContribute: true }),
@@ -167,8 +166,8 @@ export class WorldsService {
 
   /**
    * Update a World's Owner-curated fields (Owner only): `name`, the ordered
-   * `pinnedEntityIds`, and/or the World Theme. Forbidden if not an Owner, null if
-   * not found; an absent field is left untouched, and a `null` Theme clears it.
+   * `pinnedEntityIds`, the World Theme, and/or campaign-or-Shelf (ADR-0080). Forbidden if not an
+   * Owner, null if not found; an absent field is left untouched, and a `null` Theme clears it.
    * Pins are stored verbatim (references, not FKs); the Theme arrives already
    * canonicalised by its schema, the write choke point (ADR-0076).
    * ponytail: stale pin ids filtered on read, not pruned on delete.
@@ -210,6 +209,17 @@ export class WorldsService {
       .all();
     // The column is nullable, so the type needs the narrowing the WHERE already did.
     return { status: 'ok', value: rows.filter((row): row is WorldThemeSource => !!row.theme) };
+  }
+
+  /**
+   * What deleting this World would break beyond it (ADR-0080, #414): the links pointing in from other
+   * Containers, and how many they come from. Owner-gated exactly like the delete it precedes, and
+   * advisory only — the delete never consults it, so a World nothing points into and a World fifty
+   * Worlds point into are equally deletable.
+   */
+  inboundLinks(userId: string, id: string): InboundLinkCount | 'forbidden' | null {
+    const gate = this.gateUpdate(userId, id);
+    return gate === 'ok' ? this.links.countInbound(id) : gate;
   }
 
   /**
@@ -388,55 +398,6 @@ export class WorldsService {
   }
 
   /**
-   * Search the World's image Assets for the Board image picker (#269, #281, ADR-0034, ADR-0065): the
-   * picker offers the *same* search + Facets as the Asset Browser, pinned to the asset type + image kind,
-   * so picking art on an image-heavy World is fast. It reuses the one entity-search machinery — the FTS
-   * `q` and Field facets go through {@link EntitiesService.list} pinned to `core.type.asset` +
-   * {@link IMAGE_KIND_FIELD_FILTER}, and each match is dressed as an {@link AssetSummary} (capability URL +
-   * thumbnail) — rather than listing every upload and filtering mimes client-side.
-   *
-   * Contributor-gated (owner ∨ contributor ∨ Superadmin), the same standing {@link uploadAsset} requires —
-   * the picker is an editing surface, and the guard-less serving route (ADR-0034) makes any listed URL
-   * fetchable, so a World Viewer must not enumerate Assets (board review). The reader-scoped entity search
-   * then keeps a private Asset "only in its uploader's picker" (ADR-0065). Unreachable → 404,
-   * reachable-but-not-contributor → 403.
-   */
-  searchAssets(userId: string, id: string, opts: AssetSearchOptions): AssetSummary[] | 'not-found' | 'forbidden' {
-    const meta = worldAccess(this.db, userId).decideMeta(id);
-    if (!meta?.reachable) return 'not-found';
-    if (!meta.canContribute) return 'forbidden';
-    const { items } = this.entities.list(userId, {
-      offset: 0,
-      // A picker is unpaginated; the facet drill-down is what keeps the set small. The cap is the shared
-      // list ceiling, so an image-heavy World never floods the grid in one read.
-      limit: ENTITY_LIST_MAX_LIMIT,
-      containerIds: [id],
-      type: [CORE_ASSET_TYPE_ID as EntityType],
-      q: opts.q,
-      fields: [IMAGE_KIND_FIELD_FILTER, ...(opts.fields ?? [])],
-    });
-    return this.assets.summariesFor(id, items);
-  }
-
-  /**
-   * The Facet counts for the Board image picker's rail (#281, ADR-0065): the same drill-down counts the
-   * Asset Browser shows, pinned to `core.type.asset` + {@link IMAGE_KIND_FIELD_FILTER}, so the picker
-   * offers only image Facets (orientation, hue). Reuses {@link EntitiesService.facets}; same gate as
-   * {@link searchAssets}. Unreachable → 404, reachable-but-not-contributor → 403.
-   */
-  assetFacets(userId: string, id: string, opts: AssetSearchOptions): EntityFacets | 'not-found' | 'forbidden' {
-    const meta = worldAccess(this.db, userId).decideMeta(id);
-    if (!meta?.reachable) return 'not-found';
-    if (!meta.canContribute) return 'forbidden';
-    return this.entities.facets(userId, {
-      containerIds: [id],
-      type: [CORE_ASSET_TYPE_ID as EntityType],
-      q: opts.q,
-      fields: [IMAGE_KIND_FIELD_FILTER, ...(opts.fields ?? [])],
-    });
-  }
-
-  /**
    * Mint (or dedup to) a World Asset from an upload (#269, ADR-0034, ADR-0065), returning the wrapper
    * **Asset Entity**. Contributor-gated (owner ∨ contributor ∨ Superadmin) — authoring an Asset is
    * Entity-creation-shaped, not a World management power: unreachable → 404, reachable-but-not-contributor
@@ -472,22 +433,34 @@ export class WorldsService {
 
   // Attach the World's Entity count, ownership set, and the caller's Rights.
   private toDetail(world: WorldRow, callerId: string): WorldDetail {
-    const [{ value: entityCount }] = this.db
-      .select({ value: count() })
-      .from(entities)
-      .where(eq(entities.containerId, world.id))
-      .all();
-    const owners = this.worldOwners(world.id);
     // Both standings come off the one meta read: the owner set can't answer `create-entity`, since a
     // Contributor holds no owner row (ADR-0073). Only reachable Worlds get here, so a miss reads empty.
     const meta = worldAccess(this.db, callerId).decideMeta(world.id);
+    // The roster and the whole-Container count are membership-facing: a reader who reaches this World
+    // without a member row — through a **Mount** (ADR-0080), or by ADR-0037's ex-member residue — gets
+    // no user-id list and a count of what they can actually open, never one that tallies others'
+    // `private` rows.
+    const owners = meta?.isMember ? this.worldOwners(world.id) : [];
+    const [{ value: entityCount }] = this.db
+      .select({ value: count() })
+      .from(entities)
+      .where(
+        meta?.isMember
+          ? eq(entities.containerId, world.id)
+          : and(eq(entities.containerId, world.id), entityAccess(this.db, callerId).filter),
+      )
+      .all();
     return {
       id: world.id,
       name: world.name,
+      kind: world.kind,
       owners,
       rights: worldRightsOf({ isOwner: !!meta?.isOwner, canContribute: !!meta?.canContribute }),
       entityCount,
-      pinnedEntityIds: world.pinnedEntityIds ?? [],
+      // The pin set is redacted on the same line, and for the same reason: a pinned id is an Entity's
+      // existence, so handing a Mount reader ids they cannot open — `private` ones among them — would
+      // name what the count above deliberately does not tally (ADR-0080).
+      pinnedEntityIds: meta?.isMember ? (world.pinnedEntityIds ?? []) : this.readablePins(callerId, world),
       // Omitted rather than null when the World carries none, so "no Theme" is one shape everywhere.
       ...(world.theme ? { theme: world.theme } : {}),
       // The freshness key a live-follower holds and compares each nudge against (ADR-0045).
@@ -495,6 +468,25 @@ export class WorldsService {
       createdAt: world.createdAt,
       updatedAt: world.updatedAt,
     };
+  }
+
+  /**
+   * The World's pins narrowed to what this caller may actually open — the non-member form of the pin
+   * set (ADR-0080). The Owner's curated order is kept, so the Dashboard a Mount reader gets is the
+   * Owner's minus the cards that were never theirs.
+   */
+  private readablePins(callerId: string, world: WorldRow): string[] {
+    const pins = world.pinnedEntityIds ?? [];
+    if (pins.length === 0) return [];
+    const readable = new Set(
+      this.db
+        .select({ id: entities.id })
+        .from(entities)
+        .where(and(inArray(entities.id, [...pins]), entityAccess(this.db, callerId).filter))
+        .all()
+        .map((r) => r.id),
+    );
+    return pins.filter((id) => readable.has(id));
   }
 
   /** The World's Owner user ids: `world_members` rows with role 'owner', ordered stably. */

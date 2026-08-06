@@ -19,30 +19,39 @@
     "noMatchHint": "Essayez un autre nom, type ou étiquette.",
     "missing": "Fichier absent"
   },
-  "compendium": {
-    "tabTitle": "Hexly — Compendium",
-    "eyebrow": "Compendium",
-    "heading": "Matériel de référence",
-    "subheading": "En lecture seule, partagé par toute l'instance.",
-    "loadErrorTitle": "Impossible de charger le Compendium.",
+  "library": {
+    "tabTitle": "Hexly — Bibliothèque",
+    "eyebrow": "Bibliothèque",
+    "heading": "Ce dont ce monde se sert",
+    "subheading": "Consulté ici, modifié là où il se trouve.",
+    "loadErrorTitle": "Impossible de charger la Bibliothèque.",
     "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",
     "loadMore": "Charger plus",
     "loadingMore": "Chargement…",
     "loadMoreError": "Impossible de charger plus. Veuillez réessayer.",
-    "emptyTitle": "Aucun matériel de référence n'est installé.",
-    "emptyHint": "Un opérateur installe un Compendium pour toute l'instance.",
-    "noMatchTitle": "Aucun élément du Compendium ne correspond à votre recherche.",
-    "noMatchHint": "Essayez un autre nom, un autre Compendium ou un autre mot.",
+    "emptyTitle": "Rien à montrer de ce dont ce monde se sert.",
+    "emptyHint": "Les conteneurs qu'il monte ne contiennent encore rien que vous puissiez lire.",
+    "noMountsTitle": "Ce monde ne se sert encore de rien.",
+    "noMountsHint": "Un propriétaire monte un monde ou un compendium dans les paramètres du monde.",
+    "membersOnlyTitle": "La bibliothèque de ce monde est réservée à ses membres.",
+    "membersOnlyHint": "Ce que vous pouvez atteindre dans ce monde reste lisible, sur ses propres pages.",
+    "noMatchTitle": "Aucun élément de la Bibliothèque ne correspond à votre recherche.",
+    "noMatchHint": "Essayez un autre nom, un autre conteneur ou un autre mot.",
+    "credits": "Matériel de référence issu de"
+  },
+  "compendium": {
+    "eyebrow": "Compendium",
+    "loadErrorTitle": "Impossible de charger le Compendium.",
+    "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",
     "adopt": "Adopter",
     "adoptHint": "Copier dans votre monde, à vous de le modifier",
     "adopted": "« {{name}} » a été adopté dans votre monde.",
     "adoptError": "Impossible d'adopter cet élément. Veuillez réessayer.",
-    "credits": "Matériel de référence issu de",
     "page": {
       "tabTitle": "Hexly — Compendium",
       "tabTitleNamed": "Hexly — {{name}}",
       "heading": "Compendium",
-      "backToBrowse": "Retour au Compendium",
+      "backToLibrary": "Retour à la Bibliothèque",
       "revision": "Révision {{rev}}",
       "publisher": "Éditeur",
       "license": "Licence",
@@ -99,7 +108,7 @@
       "shared": "Partagé",
       "rangeMin": "{{field}} minimum",
       "rangeMax": "{{field}} maximum",
-      "compendium": "Compendium"
+      "container": "Conteneur"
     }
   },
   "entityTags": {
@@ -293,7 +302,7 @@
     "worlds": "Mondes",
     "dashboard": "Tableau de bord",
     "entities": "Entités",
-    "compendium": "Compendium",
+    "library": "Bibliothèque",
     "assets": "Ressources",
     "graph": "Graphe",
     "styleguide": "Guide de style",
@@ -357,9 +366,14 @@
     "deleteHeading": "Supprimer le monde ?",
     "deleteCounting": "Décompte des entités…",
     "deleteCount": "Cette action détruit définitivement {count, plural, one {# entité} other {# entités}}. Elle est irréversible.",
+    "deleteLinksCounting": "Décompte de ce qui pointe vers ce monde…",
+    "deleteLinks": "{links, plural, one {# lien provenant} other {# liens provenant}} de {worlds, plural, one {# autre monde} other {# autres mondes}} pointent vers lui. Ils cesseront d'être navigables et afficheront leur dernier nom connu.",
+    "deleteLinksNone": "Rien hors de ce monde ne pointe vers lui.",
+    "deleteLinksUnknown": "Impossible de décompter ce qui pointe vers ce monde. Vous pouvez tout de même supprimer, mais à l'aveugle.",
     "deleteConfirmPrompt": "Tapez {{name}} pour confirmer.",
     "deleteConfirmLabel": "Tapez le nom du monde pour confirmer la suppression",
-    "deleteError": "Impossible de supprimer ce monde. Veuillez réessayer."
+    "deleteError": "Impossible de supprimer ce monde. Veuillez réessayer.",
+    "shelves": "Étagères"
   },
   "worldDashboard": {
     "tabTitle": "Hexly — Tableau de bord",
@@ -622,6 +636,44 @@
       "display": "La Route aux neuf détours",
       "body": "À trois jours à l’est du fleuve, la route bifurque à une borne brisée."
     }
+  },
+  "worldKind": {
+    "heading": "Campagne ou étagère",
+    "subhead": "À quoi sert ce monde. Une étagère est un monde où l'on puise plutôt qu'un monde où l'on joue — c'est là que vit le matériel réutilisable : illustrations, musiques, bestiaire maison.",
+    "campaign": "Campagne",
+    "shelf": "Étagère",
+    "hint": {
+      "campaign": "Un monde où vous jouez.",
+      "shelf": "Un monde où vous puisez."
+    },
+    "note": "Ce n'est qu'une étiquette : l'index des mondes s'en sert pour les regrouper, et rien d'autre ne la lit nulle part. Une étagère garde ses membres, son tableau de bord, son thème, son lien public et sa place dans le sélecteur de mondes, exactement comme une campagne.",
+    "saveError": "Impossible d'enregistrer. Veuillez réessayer."
+  },
+  "mounts": {
+    "heading": "Montages",
+    "subhead": "Les conteneurs dont ce monde se sert. Monter élargit ce que ce monde peut désigner — ce qu'il contient reste intact, donc ses entités, ses décomptes et son explorateur ne changent pas. Vous pouvez monter les mondes que vous possédez, ainsi que tout compendium installé.",
+    "empty": "Ce monde ne se sert encore de rien.",
+    "kind": {
+      "world": "Monde",
+      "compendium": "Compendium"
+    },
+    "unmount": "Démonter",
+    "unmountHeading": "Démonter {{name}} ?",
+    "unmountCounting": "Décompte de ce qui pointe vers ce conteneur…",
+    "unmountCount": "{count, plural, one {# lien de ce monde pointe} other {# liens de ce monde pointent}} vers ce conteneur. Ils continueront de fonctionner pour vous, et cesseront de fonctionner pour tous ceux qui lisent à travers ce monde : plus navigables, affichant leur dernier nom connu.",
+    "unmountNone": "Rien dans ce monde ne pointe vers ce conteneur : le démonter ne cassera rien.",
+    "unmountCountUnknown": "Impossible de décompter ce qui pointe vers ce conteneur. Vous pouvez tout de même démonter, mais à l'aveugle.",
+    "moveUpLabel": "Déplacer {{name}} vers le haut",
+    "moveDownLabel": "Déplacer {{name}} vers le bas",
+    "addLabel": "Conteneur à monter",
+    "addPlaceholder": "Choisir un conteneur…",
+    "add": "Monter",
+    "noCandidates": "Plus rien à monter. Vous pouvez monter les mondes que vous possédez et les compendiums installés.",
+    "loadError": "Impossible de charger ce dont ce monde se sert.",
+    "candidatesError": "Impossible de charger ce que vous pouvez monter ici.",
+    "addError": "Impossible de monter ce conteneur. Veuillez réessayer.",
+    "removeError": "Impossible de démonter ce conteneur. Veuillez réessayer.",
+    "reorderError": "Impossible de réordonner les montages. Veuillez réessayer."
   },
   "imports": {
     "heading": "Imports",

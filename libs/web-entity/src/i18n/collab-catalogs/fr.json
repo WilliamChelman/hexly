@@ -65,5 +65,8 @@
   "entitySearchPicker": {
     "searchPlaceholder": "Rechercher des entités…",
     "empty": "Aucune entité correspondante"
+  },
+  "containerChips": {
+    "all": "Tout"
   }
 }

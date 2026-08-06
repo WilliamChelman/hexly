@@ -1,15 +1,18 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { EntityDocument } from '@hexly/domain';
+import { assetThumbnailUrl, assetUrl, EntityDocument, InboundReference } from '@hexly/domain';
 import { emptyRichContent, tiptapContent } from '@hexly/plugin-content';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
 import { ConfigModule } from '../config/config.module';
 import { DB, Db, createDb } from '../db/db';
+import { assetIndex, entities, entityEdges } from '../db/schema';
 import { WorldsModule } from '../worlds/worlds.module';
 import { EntitiesModule } from './entities.module';
+import { EntityWrites } from './entity-writes';
 
 /**
  * `GET /entities/:id/references` — the read side of the Entity Link index (ADR-0046).
@@ -277,6 +280,181 @@ describe('Entity references', () => {
     await bob.get(`/entities/${secret}/references`).expect(404);
   });
 
+  /**
+   * An asset URL harvests by what it *names* (ADR-0080). The byte route is unauthenticated and takes the
+   * Container from the path, so such an image already renders; harvesting it to nothing left the page and
+   * its References disagreeing.
+   */
+  describe('An image drawn from another Container', () => {
+    const HASH = 'a'.repeat(64);
+
+    it('references that Container’s Asset, not a hash of its own', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const portrait = mintAsset(shelf, HASH, 'Shelf Portrait');
+      const board = await makeEntity(ada, world, 'Mood Board');
+
+      await illustrate(ada, board, assetUrl(shelf, HASH, '.png'));
+
+      const { references } = await referencesOf(ada, board);
+      expect(references).toEqual([
+        {
+          targetId: HASH,
+          descriptor: null,
+          // A capability-URL reference is decor by construction (ADR-0069), wherever the bytes live.
+          decor: true,
+          target: {
+            id: portrait,
+            name: 'Shelf Portrait',
+            types: ['core.type.asset'],
+            // The Thumbnail keys off the *target's* Container (ADR-0066), so the row renders from the shelf.
+            thumbnailUrl: assetThumbnailUrl(shelf, HASH),
+          },
+        },
+      ]);
+    });
+
+    /**
+     * The usage surface that answers *may I delete this picture?* must not stop at the Container wall — and
+     * a real **Board** is the surface it stops at first: its Image elements harvest the same edge prose does.
+     */
+    it('counts as usage on that Asset’s own References, naming the World it came from', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const portrait = mintAsset(shelf, HASH, 'Shelf Portrait');
+      const board = await makeBoard(ada, world, 'Mood Board', assetUrl(shelf, HASH, '.png'));
+
+      const { referencedBy } = await referencesOf(ada, portrait);
+      expect(referencedBy).toEqual([
+        {
+          descriptor: null,
+          decor: true,
+          source: { id: board, name: 'Mood Board', types: ['core.type.board'] },
+          // Named, not merely identified: "which Worlds draw on this?" is the question being answered.
+          foreignContainer: { id: world, name: 'Aldermoor' },
+        },
+      ]);
+    });
+
+    /** A hash names bytes, not an Asset: identical bytes in two Containers are two Assets, and stay so. */
+    it('resolves to the Asset of the Container its URL names, never the other holding the same bytes', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const home = mintAsset(world, HASH, 'Home Portrait');
+      const abroad = mintAsset(shelf, HASH, 'Shelf Portrait');
+      const fromHome = await makeEntity(ada, world, 'Chapter One');
+      const fromShelf = await makeEntity(ada, world, 'Mood Board');
+
+      await illustrate(ada, fromHome, assetUrl(world, HASH, '.png'));
+      await illustrate(ada, fromShelf, assetUrl(shelf, HASH, '.png'));
+
+      expect(await targetNames(ada, fromHome)).toEqual(['Home Portrait']);
+      expect(await targetNames(ada, fromShelf)).toEqual(['Shelf Portrait']);
+      // And each Asset counts only the Entity that named *it*.
+      expect(await sourceNames(ada, home)).toEqual(['Chapter One']);
+      expect(await sourceNames(ada, abroad)).toEqual(['Mood Board']);
+    });
+
+    /**
+     * The edge index is derived, droppable and recomputable from the documents (ADR-0046): a Reindex puts
+     * the same cross-Container edge back, so an existing World heals with no backfill.
+     */
+    it('comes back from the document on Reindex', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      mintAsset(shelf, HASH, 'Shelf Portrait');
+      const board = await makeEntity(ada, world, 'Mood Board');
+      await illustrate(ada, board, assetUrl(shelf, HASH, '.png'));
+
+      db.delete(entityEdges).run();
+      expect(await targetNames(ada, board)).toEqual([]);
+
+      app.get(EntityWrites).reindexChunk(null, 100);
+
+      expect(await targetNames(ada, board)).toEqual(['Shelf Portrait']);
+    });
+
+    /**
+     * Outbound is ungated and resolves under the ordinary read filter, so a foreign Asset the viewer cannot
+     * read dangles exactly as an unreadable Entity Link does — the reference is there, the thing at the end
+     * of it is not.
+     */
+    it('dangles for a viewer who cannot read the Asset’s Container', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const bob = await signIn('bob@hexly.test');
+      const world = await makeWorld(ada);
+      const shelf = await makeWorld(ada, 'The Shelf');
+      mintAsset(shelf, HASH, 'Shelf Portrait');
+      const board = await makeEntity(ada, world, 'Mood Board');
+      await addMember(ada, world, bobId);
+      await share(ada, board);
+
+      await illustrate(ada, board, assetUrl(shelf, HASH, '.png'));
+
+      const { references } = await referencesOf(bob, board);
+      expect(references).toEqual([{ targetId: HASH, descriptor: null, decor: true, target: null }]);
+    });
+  });
+
+  /**
+   * Usage is what makes a shelf auditable: without it, a Shelf is where things go to become
+   * un-deletable-with-confidence (ADR-0080). So a shelf Entity's usage names the Worlds drawing on it —
+   * every one this viewer can read, and no others, since usage has always been gated on the *source*.
+   */
+  describe('An Entity linked into from another World', () => {
+    it('names the Worlds using it, and marks nothing that lives at home', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const aldermoor = await makeWorld(ada, 'Aldermoor');
+      const thornwood = await makeWorld(ada, 'Thornwood');
+      const goblin = await makeEntity(ada, shelf, 'Marauder Goblin');
+      const queen = await makeEntity(ada, shelf, 'Goblin Queen');
+      const tavern = await makeEntity(ada, aldermoor, 'The Salted Hart');
+      const road = await makeEntity(ada, thornwood, 'The Old Road');
+      for (const [source, descriptor] of [
+        [queen, 'commands'],
+        [tavern, 'raided'],
+        [road, 'ambushed on'],
+      ] as const) {
+        await link(ada, source, [{ entityId: goblin, descriptor }]);
+      }
+
+      const { referencedBy } = await referencesOf(ada, goblin);
+
+      expect(referencedBy.map((r: InboundReference) => [r.source.name, r.foreignContainer?.name ?? 'home'])).toEqual([
+        ['Goblin Queen', 'home'],
+        ['The Old Road', 'Thornwood'],
+        ['The Salted Hart', 'Aldermoor'],
+      ]);
+      expect(referencedBy[1].foreignContainer).toEqual({ id: thornwood, name: 'Thornwood' });
+    });
+
+    it('names no World whose linking Entity this viewer cannot read', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const bob = await signIn('bob@hexly.test');
+      const shelf = await makeWorld(ada, 'The Shelf');
+      const aldermoor = await makeWorld(ada, 'Aldermoor');
+      const thornwood = await makeWorld(ada, 'Thornwood');
+      const goblin = await makeEntity(ada, shelf, 'Marauder Goblin');
+      await addMember(ada, shelf, bobId);
+      await share(ada, goblin);
+      const tavern = await makeEntity(ada, aldermoor, 'The Salted Hart');
+      await addMember(ada, aldermoor, bobId);
+      await share(ada, tavern);
+      const ledger = await makeEntity(ada, thornwood, 'Secret Ledger'); // private, in a World Bob is not in
+      await link(ada, tavern, [{ entityId: goblin }]);
+      await link(ada, ledger, [{ entityId: goblin }]);
+
+      // Ada sees both Worlds; Bob sees the one he can read into, and no trace of Thornwood.
+      expect(await sourceWorlds(ada, goblin)).toEqual(['Aldermoor', 'Thornwood']);
+      expect(await sourceWorlds(bob, goblin)).toEqual(['Aldermoor']);
+    });
+  });
+
   // ---- harness -------------------------------------------------------------
 
   async function seed(email: string, name: string): Promise<string> {
@@ -291,8 +469,8 @@ describe('Entity references', () => {
 
   type Agent = Awaited<ReturnType<typeof signIn>>;
 
-  async function makeWorld(owner: Agent): Promise<string> {
-    return (await owner.post('/worlds').send({ name: 'Aldermoor' }).expect(201)).body.id;
+  async function makeWorld(owner: Agent, name = 'Aldermoor'): Promise<string> {
+    return (await owner.post('/worlds').send({ name }).expect(201)).body.id;
   }
 
   async function makeEntity(owner: Agent, worldId: string, name: string): Promise<string> {
@@ -329,7 +507,86 @@ describe('Entity references', () => {
     await owner.put(`/entities/${id}`).send({ document, version: current.version, tags: [] }).expect(200);
   }
 
+  /** A **Board** whose surface carries one Image element at `src` — the Asset edge a mood board mints. */
+  async function makeBoard(owner: Agent, worldId: string, name: string, src: string): Promise<string> {
+    const id = (
+      await owner
+        .post('/entities')
+        .send({ name, types: ['core.type.board'], worldId })
+        .expect(201)
+    ).body.id;
+    const geometry = { position: { x: 0, y: 0 }, size: { width: 100, height: 100 }, z: 0 };
+    await owner
+      .put(`/entities/${id}`)
+      .send({
+        document: { 'core.field.surface': { elements: [{ id: 'i1', kind: 'image', assetUrl: src, ...geometry }] } },
+        version: 1,
+        tags: [],
+      })
+      .expect(200);
+    return id;
+  }
+
+  /** Save `id`'s RichContent as prose holding one `image` — which harvests as an asset edge. */
+  async function illustrate(owner: Agent, id: string, src: string): Promise<void> {
+    const current = (await owner.get(`/entities/${id}`).expect(200)).body;
+    const document: EntityDocument = {
+      'core.field.content': tiptapContent({
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'image', attrs: { src } }] }],
+      }),
+    };
+    await owner.put(`/entities/${id}`).send({ document, version: current.version, tags: [] }).expect(200);
+  }
+
+  /**
+   * Seed a `shared` Asset Entity for `hash` and its `(containerId, hash)` dedup-index row — the shape
+   * mint-and-dedup leaves behind (ADR-0065), written straight to the DB so this spec need not carry the
+   * whole upload path. The asset-ref rides the document, so a Reindex derives the same index row back.
+   * Returns the Asset's Entity id.
+   */
+  function mintAsset(containerId: string, hash: string, name: string): string {
+    const id = randomUUID();
+    const now = Date.now();
+    db.insert(entities)
+      .values({
+        id,
+        containerId,
+        name,
+        types: ['core.type.asset'],
+        tags: [],
+        visibility: 'shared',
+        version: 1,
+        document: JSON.stringify({
+          'core.field.asset': { hash, ext: '.png', mime: 'image/png', size: 1, stats: null },
+        }),
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    db.insert(assetIndex).values({ entityId: id, containerId, hash, ext: '.png' }).run();
+    return id;
+  }
+
   async function referencesOf(viewer: Agent, id: string) {
     return (await viewer.get(`/entities/${id}/references`).expect(200)).body;
+  }
+
+  /** The names at the far end of `id`'s References — a resolved target, or `'dangling'`. */
+  async function targetNames(viewer: Agent, id: string): Promise<string[]> {
+    const { references } = await referencesOf(viewer, id);
+    return references.map((r: { target: { name: string } | null }) => r.target?.name ?? 'dangling');
+  }
+
+  /** The names of the Entities using `id`. */
+  async function sourceNames(viewer: Agent, id: string): Promise<string[]> {
+    const { referencedBy } = await referencesOf(viewer, id);
+    return referencedBy.map((r: { source: { name: string } }) => r.source.name);
+  }
+
+  /** The names of the *other* Containers using `id`, deduped and sorted — the shelf-audit question. */
+  async function sourceWorlds(viewer: Agent, id: string): Promise<string[]> {
+    const rows: InboundReference[] = (await referencesOf(viewer, id)).referencedBy;
+    return [...new Set(rows.flatMap((r) => r.foreignContainer?.name ?? []))].sort();
   }
 });

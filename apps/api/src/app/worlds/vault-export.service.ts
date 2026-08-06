@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { EntityDetail, EntityType, HEXLY_TYPE_KEY, VaultExportContext } from '@hexly/domain';
+import { assetRefFromUrl, EntityDetail, EntityType, HEXLY_TYPE_KEY, VaultExportContext } from '@hexly/domain';
 import { CORE_ASSET_TYPE_ID } from '@hexly/plugin-asset';
 import { entityToMarkdown } from '@hexly/obsidian';
 import { strToU8, zipSync, type Zippable } from 'fflate';
@@ -19,6 +19,10 @@ export type ExportResult = { filename: string; zip: Buffer } | 'not-found' | 'fo
  * to frontmatter — resolved off the type/data-type registry the API composes; the serializer itself
  * (`@hexly/obsidian`) imports no content plugin. Owner-only: entities are stored under the World Owner's
  * id, so a member's owner-scoped read returns nothing anyway (ADR-0004, ADR-0024).
+ *
+ * A World that **Mounts** is not self-contained, so the export is not identity: the foreign _bytes_ its
+ * documents draw on are flattened into the archive while its Entity Links are not, because a broken
+ * picture reads as data loss and a link to a missing note reads as a promotable stub (ADR-0080).
  */
 @Injectable()
 export class VaultExportService {
@@ -41,7 +45,8 @@ export class VaultExportService {
 
     // Assets go under `assets/<originalFilename>` (human-readable, not the content hash), basename
     // only: two assets sharing a filename across folders collide, and uniquePath suffixes the later
-    // ones. srcMap points each doc's capability-URL src at its own copy.
+    // ones. srcMap points each doc's capability-URL src at its own copy — a Mounted Container's included,
+    // exportAssets having flattened those bytes in beside the World's own.
     const srcMap = new Map<string, string>();
     for (const asset of this.assets.exportAssets(worldId)) {
       const zipPath = uniquePath(files, posix.join('assets', posix.basename(asset.originalFilename)));
@@ -72,11 +77,13 @@ export class VaultExportService {
   ): string {
     const context: VaultExportContext = {
       // A wikilink's label refreshes to its target's CURRENT name so a post-import rename round-trips;
-      // a target outside this World keeps its stored label (undefined → the converter leaves it).
+      // a target outside this World keeps its stored label (undefined → the converter leaves it), which is
+      // the whole of how a link into a Mounted Container degrades (ADR-0073).
       entityName: (id) => nameById.get(id),
-      // An image's capability-URL src repoints at its exported `assets/<name>` copy; an external src is
-      // absent from the map and passes through untouched.
-      assetPath: (url) => srcMap.get(url),
+      // An image's capability-URL src repoints at its exported `assets/<name>` copy, or, where the bytes
+      // could not be flattened, at the unresolved address they would have come from; an external src is
+      // neither and passes through untouched.
+      assetPath: (url) => srcMap.get(url) ?? unresolvedAssetPath(url),
     };
     return entityToMarkdown({
       doc: entity.document,
@@ -89,6 +96,23 @@ export class VaultExportService {
       context,
     });
   }
+}
+
+/** Where an image whose bytes could not be flattened lands, under the address it would have come from. */
+const UNRESOLVED_ASSETS_DIR = 'assets/unresolved';
+
+/**
+ * The vault path an unflattenable capability URL degrades to — its Container deleted, its Asset Entity
+ * gone, its bytes **Missing** — or `undefined` for a src naming no Asset at all, which passes through.
+ *
+ * Writing the raw `/assets/<container>/<hash>.png` instead reimports as an `asset` edge naming a Container
+ * that need not exist: a picture broken for good, and absent from References so nothing can find it. A
+ * vault path harvests no edge, reads as unresolved, and re-resolves by restoring the bytes into the
+ * archive at that path — the image's counterpart to a link degrading to an **Unresolved Link**
+ * (ADR-0080, ADR-0073).
+ */
+function unresolvedAssetPath(url: string): string | undefined {
+  return assetRefFromUrl(url) ? posix.join(UNRESOLVED_ASSETS_DIR, url.slice('/assets/'.length)) : undefined;
 }
 
 /** A zip key not already taken in `files`: on collision, inserts ` (2)`, ` (3)`… before the extension. */

@@ -45,8 +45,8 @@ const INITIAL_VERSION = 1;
  */
 const MAX_BOUND_PARAMS = 32766;
 
-/** Columns bound per `entity_edges` row: source, container, kind, target, descriptor, decor. */
-const EDGE_COLUMNS = 6;
+/** Columns bound per `entity_edges` row: source, container, kind, target, target container, descriptor, decor. */
+const EDGE_COLUMNS = 7;
 /** Columns bound per `entity_descriptors` row: entity, descriptor. */
 const DESCRIPTOR_COLUMNS = 2;
 /** Columns bound per `entity_field_facets` row: entity, container, key, value, num. */
@@ -536,7 +536,8 @@ export class EntityWrites {
   /**
    * Replace the Entity's outbound edge rows with the harvested set (self-pruning). `containerId` is
    * denormalized off the source here — the one place it can be, since an edge has no other
-   * relation to a Container.
+   * relation to a Container. The *target's* Container is the harvest's, not the source's: an asset URL
+   * names the Container it serves bytes from, so an image drawn from elsewhere harvests there (ADR-0080).
    */
   private replaceEdges(id: string, containerId: string, edges: readonly EntityEdge[]): void {
     this.db.delete(entityEdges).where(eq(entityEdges.sourceEntityId, id)).run();

@@ -121,7 +121,7 @@ export interface EntityCardVm {
               'entityBrowser.edited' | transloco: { date: (card().updatedAt | hexlyDate) }
             }}</span>
             <!-- **Adopt** (ADR-0079), offered outright rather than on hover like the actions beside it:
-                 taking an entry into a World is the reason the Compendium browse exists. -->
+                 it is the one act a sealed entry affords, and the **Library** renders this same card. -->
             @if (canAdopt()) {
               <span class="relative z-10 ml-auto flex">
                 <button

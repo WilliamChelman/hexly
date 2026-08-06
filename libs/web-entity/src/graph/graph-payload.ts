@@ -1,4 +1,4 @@
-import { LinkedEntity, WorldGraph } from '@hexly/domain';
+import { WorldGraph, WorldGraphNode } from '@hexly/domain';
 
 /**
  * The {@link WorldGraph} as cosmos.gl wants it: flat, index-addressed arrays. The renderer
@@ -8,7 +8,7 @@ import { LinkedEntity, WorldGraph } from '@hexly/domain';
  */
 export interface GraphPayload {
   /** The nodes in point-index order — **not** the server's order. */
-  readonly nodes: readonly LinkedEntity[];
+  readonly nodes: readonly WorldGraphNode[];
   /** Each node's link count, by point index. */
   readonly degrees: Uint32Array;
   /** Link index pairs, two entries per link, into {@link nodes}. */
