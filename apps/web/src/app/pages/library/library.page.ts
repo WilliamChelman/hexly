@@ -278,6 +278,11 @@ export class LibraryPage {
    * `$visibility:` token is reported as a miss rather than filtering by a word that is false of this
    * list. One set, read thrice: the parser resolves against it, the box offers it on `$`, and a rail
    * click finds the token it deletes by it.
+   *
+   * The registry is the *only* source, the Facet read never widening it (ADR-0082) — which bites hardest
+   * here, the read spanning Containers other Worlds own: a Field defined in a mounted pack's own World
+   * offers a rail row this box reports as a miss. The narrower vocabulary is the price of a parser that
+   * cannot change its mind when a network read lands, and the row stays clickable either way.
    */
   protected readonly facetKeys = computed<FacetKeySet>(() => ({
     reserved: ['type', 'tag', 'in'],
