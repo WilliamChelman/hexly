@@ -5,7 +5,7 @@ import { EntityFacets } from '@hexly/domain';
 import { ClientConfigStore } from '@hexly/web-core';
 import { mockClientConfigStore } from '@hexly/web-core/testing';
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
-import { FacetRailComponent } from './facet-rail.component';
+import { ActiveFacets, FacetRailComponent } from './facet-rail.component';
 
 /** The Visibility category is gated on the Collaboration layer (ADR-0071); Type and Tag are not. */
 describe('FacetRail — the Visibility category under Collaboration (#316)', () => {
@@ -51,6 +51,134 @@ describe('FacetRail — the Visibility category under Collaboration (#316)', () 
     expect(has(fixture, 'facet-visibility-shared')).toBe(false);
     expect(has(fixture, 'facet-heading-type')).toBe(true);
     expect(has(fixture, 'facet-heading-tag')).toBe(true);
+  });
+});
+
+/**
+ * A value the caller has selected is always listed, whatever its count (ADR-0081, #420): the server
+ * still omits zero-count values, so a selection counted to zero by a sibling category would otherwise
+ * vanish from the rail while it is still filtering the list — unreversible by clicking.
+ */
+describe('FacetRail — a selected value is always listed (#420)', () => {
+  function render(counts: Partial<EntityFacets>, active: Partial<ActiveFacets>): ComponentFixture<FacetRailComponent> {
+    TestBed.configureTestingModule({
+      imports: [FacetRailComponent, provideTranslocoTesting()],
+      providers: [{ provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration: signal(true) }) }],
+    });
+    const fixture = TestBed.createComponent(FacetRailComponent);
+    fixture.componentRef.setInput('facetCounts', {
+      type: [],
+      tag: [],
+      visibility: [],
+      fields: [],
+      ...counts,
+    } satisfies EntityFacets);
+    fixture.componentRef.setInput('active', {
+      type: [],
+      tag: [],
+      visibility: [],
+      fields: {},
+      container: [],
+      ...active,
+    } satisfies ActiveFacets);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  const row = (fixture: ComponentFixture<FacetRailComponent>, tid: string) =>
+    (fixture.nativeElement as HTMLElement).querySelector(`[data-testid="${tid}"]`) as HTMLButtonElement | null;
+
+  it('lists a selected value the server dropped, active and clickable off', () => {
+    // The tag category came back without `draft` — no entity under the other active filters carries it.
+    const fixture = render({ tag: [] }, { tag: ['draft'] });
+
+    const draft = row(fixture, 'facet-tag-draft');
+    expect(draft).not.toBeNull();
+    expect(draft?.getAttribute('aria-pressed')).toBe('true');
+
+    const toggled = vi.fn();
+    fixture.componentInstance.toggled.subscribe(toggled);
+    draft?.click();
+    expect(toggled).toHaveBeenCalledWith({ category: 'tag', value: 'draft' });
+  });
+
+  it('shows the merged row its real count — zero — not a fabricated one', () => {
+    const fixture = render({ tag: [] }, { tag: ['draft'] });
+
+    expect(row(fixture, 'facet-tag-draft')?.textContent?.trim()).toContain('0');
+    expect(row(fixture, 'facet-tag-draft')?.textContent).not.toContain('1');
+  });
+
+  it('keeps an unselected zero-count value hidden — only the selection is merged in', () => {
+    const fixture = render({ tag: [{ value: 'deity', count: 2 }] }, { tag: ['draft'] });
+
+    expect(row(fixture, 'facet-tag-draft')).not.toBeNull();
+    // Nothing the server didn't send and the caller didn't select appears.
+    expect(row(fixture, 'facet-tag-ruined')).toBeNull();
+  });
+
+  it('keeps the server’s own values and their order, appending the merged selection', () => {
+    const fixture = render(
+      {
+        tag: [
+          { value: 'deity', count: 2 },
+          { value: 'ruined', count: 1 },
+        ],
+      },
+      { tag: ['draft', 'deity'] },
+    );
+
+    const labels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid^="facet-tag-"]'),
+      (el) => el.getAttribute('data-testid'),
+    );
+    // `deity` is already listed, so it is not duplicated; only the missing `draft` is appended.
+    expect(labels).toEqual(['facet-tag-deity', 'facet-tag-ruined', 'facet-tag-draft']);
+  });
+
+  it('merges a selected Field-facet value the server dropped', () => {
+    const fixture = render(
+      {
+        fields: [
+          {
+            key: 'alignment',
+            label: 'Alignment',
+            dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
+            values: [{ value: 'lawful-good', count: 1 }],
+          },
+        ],
+      },
+      { fields: { alignment: { values: ['chaotic-evil'] } } },
+    );
+
+    const dropped = row(fixture, 'facet-field-alignment-chaotic-evil');
+    expect(dropped).not.toBeNull();
+    expect(dropped?.getAttribute('aria-pressed')).toBe('true');
+    expect(dropped?.textContent).toContain('0');
+  });
+
+  it('leaves the Visibility category dropped with Collaboration off, selection or not (ADR-0071)', () => {
+    TestBed.configureTestingModule({
+      imports: [FacetRailComponent, provideTranslocoTesting()],
+      providers: [{ provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration: signal(false) }) }],
+    });
+    const fixture = TestBed.createComponent(FacetRailComponent);
+    fixture.componentRef.setInput('facetCounts', {
+      type: [],
+      tag: [],
+      visibility: [],
+      fields: [],
+    } satisfies EntityFacets);
+    fixture.componentRef.setInput('active', {
+      type: [],
+      tag: [],
+      visibility: ['private'],
+      fields: {},
+      container: [],
+    } satisfies ActiveFacets);
+    fixture.detectChanges();
+
+    expect(row(fixture, 'facet-visibility-private')).toBeNull();
   });
 });
 

@@ -217,8 +217,9 @@ export class FacetRailComponent {
     return value.label ?? value.value;
   }
 
-  /** Categories as render rows. Type/Visibility labels are translated; a Tag
-   * shows its raw text. Empty categories are dropped — no bare headings. */
+  /** Categories as render rows, each merged with what the caller has selected (ADR-0081, #420).
+   * Type/Visibility labels are translated; a Tag shows its raw text. Empty categories are dropped —
+   * no bare headings. */
   protected readonly groups = computed(() => {
     this.transloco.activeLang(); // reactive dependency: re-translate labels on switch
     const active = this.active();
@@ -226,16 +227,16 @@ export class FacetRailComponent {
     const categories = [
       {
         category: 'type' as const,
-        rows: counts.type,
+        rows: withSelection(counts.type, active.type),
         // A user-defined type's authored name; a code type's translated copy (#191).
         label: (v: FacetCount) => this.types.name(v.value),
       },
-      { category: 'tag' as const, rows: counts.tag, label: (v: FacetCount) => v.value },
+      { category: 'tag' as const, rows: withSelection(counts.tag, active.tag), label: (v: FacetCount) => v.value },
       {
         category: 'visibility' as const,
         // Nothing reads Visibility with Collaboration off (ADR-0071); emptied, the category falls to
-        // the drop-empties filter below.
-        rows: this.clientConfig.isCollaborationEnabled() ? counts.visibility : [],
+        // the drop-empties filter below — a selection can't resurrect it, so the merge stays inside the gate.
+        rows: this.clientConfig.isCollaborationEnabled() ? withSelection(counts.visibility, active.visibility) : [],
         label: (v: FacetCount) => this.transloco.translate(`entityBrowser.facets.${v.value}`),
       },
       {
@@ -244,7 +245,7 @@ export class FacetRailComponent {
         // and in the order the read named its Containers, which in the Library is the Owner's Mount
         // order. Absent wherever the read names a single Container, so every other browse drops it.
         category: 'container' as const,
-        rows: counts.container ?? [],
+        rows: withSelection(counts.container ?? [], active.container),
         label: (v: FacetCount) => v.label ?? v.value,
       },
     ];
@@ -278,7 +279,7 @@ export class FacetRailComponent {
         const range = numeric || field.dataType.kind === 'date';
         // A dimension's labelKey translates; a scalar Field's label is authored, with no key (ADR-0055).
         const label = field.labelKey ? this.transloco.translate(field.labelKey) : field.label;
-        const rows = field.values.map((v) => ({
+        const rows = withSelection(field.values, selection.values ?? []).map((v) => ({
           value: v.value,
           count: v.count,
           label: this.valueLabel(field.valuesKeyPrefix, v),
@@ -311,6 +312,19 @@ export class FacetRailComponent {
       })
       .filter((f) => f.visible);
   });
+}
+
+/**
+ * One facet's server counts with the caller's selection merged in: a value they have selected is
+ * always listed, whatever its count (ADR-0081, #420). The server still hides zero-count values, so a
+ * selection counted to zero by a sibling category comes back missing — and would vanish from the rail
+ * while it is still filtering the list, unreversible by clicking. It is appended at its real count,
+ * zero, after the values the server did send; unselected zero-count values stay hidden as before.
+ */
+function withSelection(rows: readonly FacetCount[], selected: readonly string[]): readonly FacetCount[] {
+  const listed = new Set(rows.map((r) => r.value));
+  const missing = selected.filter((v) => !listed.has(v)).map((value) => ({ value, count: 0 }));
+  return missing.length ? [...rows, ...missing] : rows;
 }
 
 /**

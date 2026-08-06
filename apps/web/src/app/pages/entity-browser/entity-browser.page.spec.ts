@@ -943,6 +943,72 @@ describe('EntityBrowser', () => {
       });
     });
 
+    /**
+     * A value the caller selected is always listed, whatever its count (ADR-0081, #420). Selecting a
+     * Tag and then a Type that shares no Entity with it counts the Tag to zero, and the server's
+     * `GROUP BY` drops it — the rail must keep the row anyway, or the only way out of an empty grid
+     * is Clear all.
+     */
+    it('keeps a selected Tag listed at zero count when a Type shares no Entity with it (#420)', () => {
+      client.facets.mockReturnValue(
+        of({
+          type: [
+            { value: 'core.type.note', count: 3 },
+            { value: 'core.type.hex-map', count: 1 },
+          ],
+          tag: [{ value: 'deity', count: 2 }],
+          visibility: [],
+          fields: [],
+        }),
+      );
+      const fixture = renderWith([summary({ id: 'n1' })]);
+      const el = fixture.nativeElement as HTMLElement;
+
+      client.list.mockReturnValue(of({ items: [summary({ id: 'n1', types: ['core.type.note'] })], nextCursor: null }));
+      facet(el, 'facet-tag-deity')?.click();
+      fixture.detectChanges();
+
+      // Now a Type no `deity` Entity carries: the grid empties and the tag counts to zero, so the
+      // server stops sending it.
+      client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+      client.facets.mockReturnValue(
+        of({
+          type: [
+            { value: 'core.type.note', count: 3 },
+            { value: 'core.type.hex-map', count: 1 },
+          ],
+          tag: [],
+          visibility: [],
+          fields: [],
+        }),
+      );
+      facet(el, 'facet-type-core.type.hex-map')?.click();
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid=entity-title]')).toBeNull();
+
+      // Still rendered, still reading as active, showing its real count rather than a fabricated one.
+      const deity = facet(el, 'facet-tag-deity');
+      expect(deity).not.toBeNull();
+      expect(deity?.getAttribute('aria-pressed')).toBe('true');
+      expect(deity?.querySelector('span.tabular-nums')?.textContent?.trim()).toBe('0');
+
+      // And clicking it off recovers the grid — no Clear all needed.
+      client.list.mockReturnValue(
+        of({ items: [summary({ id: 'm1', types: ['core.type.hex-map'] })], nextCursor: null }),
+      );
+      deity?.click();
+      fixture.detectChanges();
+
+      expect(client.list).toHaveBeenLastCalledWith({
+        limit: 50,
+        worldId: 'w1',
+        rights: true,
+        thumbnails: true,
+        type: ['core.type.hex-map'],
+      });
+      expect(el.querySelector('[data-testid=entity-title]')).not.toBeNull();
+    });
+
     describe('Field facets by presence (#188, #231)', () => {
       // A facets response carrying one enum Field facet — the server surfaces it by presence in the
       // result set, whatever types those entities hold (ADR-0054, #231).
