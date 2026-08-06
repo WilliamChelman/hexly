@@ -275,15 +275,16 @@ export class FacetRailComponent {
     return this.facetCounts()
       .fields.map((field) => {
         const selection = activeFields[field.key] ?? {};
+        const selected = selection.values ?? [];
         const numeric = field.dataType.kind === 'number';
         const range = numeric || field.dataType.kind === 'date';
         // A dimension's labelKey translates; a scalar Field's label is authored, with no key (ADR-0055).
         const label = field.labelKey ? this.transloco.translate(field.labelKey) : field.label;
-        const rows = withSelection(field.values, selection.values ?? []).map((v) => ({
+        const rows = withSelection(field.values, selected).map((v) => ({
           value: v.value,
           count: v.count,
           label: this.valueLabel(field.valuesKeyPrefix, v),
-          active: (selection.values ?? []).includes(v.value),
+          active: selected.includes(v.value),
         }));
         return {
           key: field.key,
@@ -315,11 +316,11 @@ export class FacetRailComponent {
 }
 
 /**
- * One facet's server counts with the caller's selection merged in: a value they have selected is
- * always listed, whatever its count (ADR-0081, #420). The server still hides zero-count values, so a
- * selection counted to zero by a sibling category comes back missing — and would vanish from the rail
- * while it is still filtering the list, unreversible by clicking. It is appended at its real count,
- * zero, after the values the server did send; unselected zero-count values stay hidden as before.
+ * One facet's server counts with the caller's selection merged in, so a selected value is always
+ * listed, whatever its count (ADR-0081) — the server hides zero-count values, and a selection it hid
+ * is still filtering the list. A merged row carries no server-sent `label`, so a value that renders
+ * through one (a Container, an Entity-Link Field) falls back to its raw id: a row you can click off
+ * beats a row that vanished.
  */
 function withSelection(rows: readonly FacetCount[], selected: readonly string[]): readonly FacetCount[] {
   const listed = new Set(rows.map((r) => r.value));

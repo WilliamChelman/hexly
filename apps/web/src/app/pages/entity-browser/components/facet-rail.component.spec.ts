@@ -54,16 +54,18 @@ describe('FacetRail — the Visibility category under Collaboration (#316)', () 
   });
 });
 
-/**
- * A value the caller has selected is always listed, whatever its count (ADR-0081, #420): the server
- * still omits zero-count values, so a selection counted to zero by a sibling category would otherwise
- * vanish from the rail while it is still filtering the list — unreversible by clicking.
- */
+/** A value the caller has selected is always listed, whatever its count (ADR-0081, #420). */
 describe('FacetRail — a selected value is always listed (#420)', () => {
-  function render(counts: Partial<EntityFacets>, active: Partial<ActiveFacets>): ComponentFixture<FacetRailComponent> {
+  function render(
+    counts: Partial<EntityFacets>,
+    active: Partial<ActiveFacets>,
+    collaboration = true,
+  ): ComponentFixture<FacetRailComponent> {
     TestBed.configureTestingModule({
       imports: [FacetRailComponent, provideTranslocoTesting()],
-      providers: [{ provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration: signal(true) }) }],
+      providers: [
+        { provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration: signal(collaboration) }) },
+      ],
     });
     const fixture = TestBed.createComponent(FacetRailComponent);
     fixture.componentRef.setInput('facetCounts', {
@@ -105,8 +107,7 @@ describe('FacetRail — a selected value is always listed (#420)', () => {
   it('shows the merged row its real count — zero — not a fabricated one', () => {
     const fixture = render({ tag: [] }, { tag: ['draft'] });
 
-    expect(row(fixture, 'facet-tag-draft')?.textContent?.trim()).toContain('0');
-    expect(row(fixture, 'facet-tag-draft')?.textContent).not.toContain('1');
+    expect(row(fixture, 'facet-tag-draft')?.querySelector('span.tabular-nums')?.textContent?.trim()).toBe('0');
   });
 
   it('keeps an unselected zero-count value hidden — only the selection is merged in', () => {
@@ -158,25 +159,7 @@ describe('FacetRail — a selected value is always listed (#420)', () => {
   });
 
   it('leaves the Visibility category dropped with Collaboration off, selection or not (ADR-0071)', () => {
-    TestBed.configureTestingModule({
-      imports: [FacetRailComponent, provideTranslocoTesting()],
-      providers: [{ provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration: signal(false) }) }],
-    });
-    const fixture = TestBed.createComponent(FacetRailComponent);
-    fixture.componentRef.setInput('facetCounts', {
-      type: [],
-      tag: [],
-      visibility: [],
-      fields: [],
-    } satisfies EntityFacets);
-    fixture.componentRef.setInput('active', {
-      type: [],
-      tag: [],
-      visibility: ['private'],
-      fields: {},
-      container: [],
-    } satisfies ActiveFacets);
-    fixture.detectChanges();
+    const fixture = render({}, { visibility: ['private'] }, false);
 
     expect(row(fixture, 'facet-visibility-private')).toBeNull();
   });

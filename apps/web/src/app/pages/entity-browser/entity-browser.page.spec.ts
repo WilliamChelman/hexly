@@ -943,12 +943,7 @@ describe('EntityBrowser', () => {
       });
     });
 
-    /**
-     * A value the caller selected is always listed, whatever its count (ADR-0081, #420). Selecting a
-     * Tag and then a Type that shares no Entity with it counts the Tag to zero, and the server's
-     * `GROUP BY` drops it — the rail must keep the row anyway, or the only way out of an empty grid
-     * is Clear all.
-     */
+    /** Or the only way out of the empty grid the selection caused is Clear all (ADR-0081, #420). */
     it('keeps a selected Tag listed at zero count when a Type shares no Entity with it (#420)', () => {
       client.facets.mockReturnValue(
         of({
