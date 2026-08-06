@@ -200,4 +200,157 @@ describe('AssetBrowser', () => {
     );
     expect(client.list).toHaveBeenLastCalledWith(baseRead);
   });
+
+  /**
+   * A Facet named inline rather than clicked (ADR-0082, #428). The grammar belongs to the domain
+   * parser's spec and the two-store rule to the Entity Browser's; what is this surface's own is its
+   * **vocabulary** — the harvested image dimensions, and the `$type:` it must *not* honour, the asset
+   * type being pinned here rather than a choice.
+   */
+  describe('Facet Tokens (#428)', () => {
+    const searchBox = (el: HTMLElement) => el.querySelector('[data-testid=entity-search]') as HTMLInputElement;
+
+    /** Put `q` in the box with the caret at its end, as a caller typing it would. */
+    function type(fixture: ReturnType<typeof ready>['fixture'], q: string) {
+      const box = searchBox(fixture.nativeElement);
+      box.value = q;
+      box.setSelectionRange(q.length, q.length);
+      box.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+
+    /** Type into the box and flush the 150ms debounce so the fetch fires. */
+    function search(fixture: ReturnType<typeof ready>['fixture'], q: string) {
+      vi.useFakeTimers();
+      type(fixture, q);
+      vi.advanceTimersByTime(150);
+      vi.useRealTimers();
+      fixture.detectChanges();
+    }
+
+    const rows = (el: HTMLElement) =>
+      Array.from(el.querySelectorAll('[role=option]')).map((row) =>
+        (row.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      );
+
+    it('applies a typed Tag, and leaves the box holding exactly what was typed', () => {
+      const { fixture, el } = ready();
+
+      search(fixture, '$tag:used');
+
+      expect(client.list).toHaveBeenLastCalledWith({ ...baseRead, tag: ['used'] });
+      expect(searchBox(el).value).toBe('$tag:used');
+      // The URL's `q` carries the raw string, so the link reproduces the box, not the residual.
+      expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { q: '$tag:used' } }));
+    });
+
+    it('reads a mixed box as an exclusion and a search', () => {
+      const { fixture } = ready();
+
+      search(fixture, 'banner -$tag:used');
+
+      expect(client.list).toHaveBeenLastCalledWith({ ...baseRead, q: 'banner', excludeTag: ['used'] });
+    });
+
+    it('names a harvested image dimension, onto the same `field` param the rail uses', () => {
+      const { fixture } = ready();
+
+      // `orientation` is the asset data type's own harvested dimension (ADR-0055/0065), and reaches the
+      // vocabulary through the client registry like any other Facet key.
+      search(fixture, '$orientation:landscape');
+
+      expect(client.list).toHaveBeenLastCalledWith({ ...baseRead, field: ['orientation:eq:landscape'] });
+    });
+
+    it('says a $type is not a Facet here rather than unpinning the asset type', () => {
+      const { fixture, el } = ready();
+
+      search(fixture, 'banner $type:core.type.note');
+
+      expect(el.querySelector('[data-testid=unknown-facet]')?.textContent).toContain('type');
+      // The pin stands: the list is still the asset type's, and the token never reached the wire.
+      expect(client.list).toHaveBeenLastCalledWith({ ...baseRead, q: 'banner' });
+    });
+
+    it('renders the union of the typed and the clicked, the text winning a value both name', () => {
+      const { fixture, el } = ready();
+
+      // Clicked as an exclusion, then typed as an inclusion: one value, one visual state.
+      facet(el, 'facet-exclude-tag-used')?.click();
+      fixture.detectChanges();
+      facet(el, 'facet-tag-portrait-art')?.click();
+      fixture.detectChanges();
+      search(fixture, '$tag:used');
+
+      expect(facet(el, 'facet-tag-used')?.getAttribute('aria-pressed')).toBe('true');
+      expect(facet(el, 'facet-exclude-tag-used')?.getAttribute('aria-pressed')).toBe('false');
+      expect(client.list).toHaveBeenLastCalledWith({ ...baseRead, tag: ['used', 'portrait-art'] });
+    });
+
+    it('marks the rows the text owns, and clicking one deletes exactly its token', () => {
+      const { fixture, el } = ready();
+
+      search(fixture, '$tag:used $tag:portrait-art');
+      expect(facet(el, 'facet-tag-used')?.getAttribute('data-query-owned')).toBe('');
+
+      facet(el, 'facet-tag-used')?.click();
+      fixture.detectChanges();
+
+      // Only that token left; the caller's other one stayed exactly as written.
+      expect(searchBox(el).value).toBe('$tag:portrait-art');
+      expect(client.list).toHaveBeenLastCalledWith({ ...baseRead, tag: ['portrait-art'] });
+    });
+
+    it('never writes a clicked Facet into the box, and Clear all empties both stores', () => {
+      const { fixture, el } = ready();
+
+      search(fixture, '$tag:used');
+      facet(el, 'facet-tag-portrait-art')?.click();
+      fixture.detectChanges();
+      expect(searchBox(el).value).toBe('$tag:used');
+      expect(navigate).toHaveBeenLastCalledWith(
+        [],
+        expect.objectContaining({ queryParams: expect.objectContaining({ tag: ['portrait-art'] }) }),
+      );
+
+      facet(el, 'facet-clear')?.click();
+      fixture.detectChanges();
+
+      expect(searchBox(el).value).toBe('');
+      expect(client.list).toHaveBeenLastCalledWith(baseRead);
+    });
+
+    it('reproduces both stores from a shared link', () => {
+      client.facets.mockReturnValue(of({ type: [], tag: [{ value: 'used', count: 1 }], visibility: [], fields: [] }));
+      client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
+      queryParams$.next(convertToParamMap({ q: 'banner -$tag:used', tag: 'portrait-art' }));
+      const fixture = TestBed.createComponent(AssetBrowserPage);
+      fixture.detectChanges();
+      fixture.detectChanges();
+
+      expect(client.list).toHaveBeenCalledWith({
+        ...baseRead,
+        q: 'banner',
+        tag: ['portrait-art'],
+        excludeTag: ['used'],
+      });
+      // One request on load, and the box holds the raw string the link carried.
+      expect(client.list).toHaveBeenCalledTimes(1);
+      expect(searchBox(fixture.nativeElement).value).toBe('banner -$tag:used');
+    });
+
+    it('offers this browse’s whole vocabulary on the dollar, and its Tags with their counts', () => {
+      const { fixture, el } = ready();
+
+      type(fixture, '$');
+      // The harvested image dimensions are in it; the pinned Type and the single Container are not.
+      expect(rows(el)).toEqual(expect.arrayContaining(['tag', 'visibility', 'kind', 'orientation', 'hue']));
+      expect(rows(el)).not.toContain('type');
+      expect(rows(el)).not.toContain('in');
+
+      // Stage two comes off the Facet read this page already runs, counts and all.
+      type(fixture, '$tag:');
+      expect(rows(el)).toEqual(['used2', 'portrait-art1']);
+    });
+  });
 });

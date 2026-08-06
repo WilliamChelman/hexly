@@ -9,6 +9,7 @@ import { MockEntitiesClient, MockWorldsClient } from '@hexly/web-core/testing';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { LibraryPage } from './library.page';
+import { TypeRegistry } from '../../entity-types/type-registry';
 
 /**
  * The **Library** (#412, ADR-0080): the Entity Browser preset to what this World **Mounts**. What is
@@ -363,6 +364,207 @@ describe('Library', () => {
         rights: true,
         thumbnails: true,
       });
+    });
+  });
+
+  /**
+   * A Facet named inline rather than clicked (ADR-0082, #428). The grammar belongs to the domain
+   * parser's spec and the two-store rule to the Entity Browser's; what is this surface's own is its
+   * **vocabulary** — `$in:` for a Mounted **Container**, the one browse where the category is real, and
+   * no `$visibility:`, which this browse strips from its rail and so reports as a miss.
+   */
+  describe('Facet Tokens (#428)', () => {
+    const facet = (el: HTMLElement, testid: string) => el.querySelector<HTMLElement>(`[data-testid="${testid}"]`);
+    const searchBox = (el: HTMLElement) => el.querySelector('[data-testid=entity-search]') as HTMLInputElement;
+
+    /** The list read this page always makes, minus whatever a token adds. */
+    const baseRead = { limit: 50, containerId: ['c-shelf', 'c-pack'], rights: true, thumbnails: true };
+
+    /** Both Mounts counted, with a Tag and a Container facet to name — and the next read stubbed. */
+    function ready() {
+      entities.facets.mockReturnValue(
+        of({
+          type: [{ value: 'core.type.note', count: 3 }],
+          tag: [
+            { value: 'draft', count: 2 },
+            { value: 'fantasy', count: 1 },
+          ],
+          visibility: [],
+          fields: [],
+          container: [
+            { value: 'c-shelf', count: 1, label: 'The Art Shelf' },
+            { value: 'c-pack', count: 2, label: 'Draw Steel: Monsters' },
+          ],
+        }),
+      );
+      const fixture = renderWith([shelf, pack], [summary({})]);
+      entities.list.mockReturnValue(of({ items: [], nextCursor: null }));
+      return { fixture, el: fixture.nativeElement as HTMLElement };
+    }
+
+    /** Put `q` in the box with the caret at its end, as a caller typing it would. */
+    function type(fixture: ReturnType<typeof renderWith>, q: string) {
+      const box = searchBox(fixture.nativeElement);
+      box.value = q;
+      box.setSelectionRange(q.length, q.length);
+      box.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+
+    /** Type into the box and flush the 150ms debounce so the fetch fires. */
+    function search(fixture: ReturnType<typeof renderWith>, q: string) {
+      vi.useFakeTimers();
+      type(fixture, q);
+      vi.advanceTimersByTime(150);
+      vi.useRealTimers();
+      fixture.detectChanges();
+    }
+
+    const rows = (el: HTMLElement) =>
+      Array.from(el.querySelectorAll('[role=option]')).map((row) =>
+        (row.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      );
+
+    it('narrows to a Mounted Container from the box, and leaves the box holding what was typed', () => {
+      const { fixture, el } = ready();
+
+      search(fixture, '$in:c-pack');
+
+      // The token became the same `container` param a rail click sends: it narrows *within* the scope,
+      // which still names every Mount.
+      expect(entities.list).toHaveBeenLastCalledWith({ ...baseRead, container: ['c-pack'] });
+      expect(searchBox(el).value).toBe('$in:c-pack');
+      // The URL's `q` carries the raw string, so the link reproduces the box, not the residual.
+      expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({ queryParams: { q: '$in:c-pack' } }),
+      );
+    });
+
+    it('excludes a Mounted Container with a leading dash', () => {
+      const { fixture } = ready();
+
+      search(fixture, '-$in:c-pack');
+
+      expect(entities.list).toHaveBeenLastCalledWith({ ...baseRead, excludeContainer: ['c-pack'] });
+    });
+
+    it('reads a mixed box as both filters and a search', () => {
+      const { fixture } = ready();
+
+      search(fixture, 'goblin $type:core.type.note $tag:draft');
+
+      expect(entities.list).toHaveBeenLastCalledWith({
+        ...baseRead,
+        q: 'goblin',
+        type: ['core.type.note'],
+        tag: ['draft'],
+      });
+    });
+
+    it('maps a comparison onto the `field` param’s bound, off a key the registry knows', () => {
+      TestBed.inject(TypeRegistry).setWorldFields([
+        { id: 'test.field.cr', label: 'CR', dataType: { kind: 'number' }, required: false, facetable: true },
+      ]);
+      const { fixture } = ready();
+
+      search(fixture, '$test.field.cr:>=5');
+
+      expect(entities.list).toHaveBeenLastCalledWith({ ...baseRead, field: ['test.field.cr:gte:5'] });
+    });
+
+    it('says a $ name this browse cannot apply, and never searches for it', () => {
+      const { fixture, el } = ready();
+
+      // Visibility is the owning Container's business here, so the category is stripped from the rail —
+      // and a token naming it would filter by a word that is false of this list (ADR-0079).
+      search(fixture, 'goblin $visibility:private');
+
+      expect(facet(el, 'unknown-facet')?.textContent).toContain('visibility');
+      expect(entities.list).toHaveBeenLastCalledWith({ ...baseRead, q: 'goblin' });
+    });
+
+    it('renders the union of the typed and the clicked, the text winning a value both name', () => {
+      const { fixture, el } = ready();
+
+      // Clicked as an exclusion, then typed as an inclusion: one value, one visual state.
+      facet(el, 'facet-exclude-container-c-pack')?.click();
+      fixture.detectChanges();
+      facet(el, 'facet-tag-draft')?.click();
+      fixture.detectChanges();
+      search(fixture, '$in:c-pack');
+
+      expect(facet(el, 'facet-container-c-pack')?.getAttribute('aria-pressed')).toBe('true');
+      expect(facet(el, 'facet-exclude-container-c-pack')?.getAttribute('aria-pressed')).toBe('false');
+      // The clicked Tag is untouched beside it, and both ride the wire.
+      expect(entities.list).toHaveBeenLastCalledWith({ ...baseRead, tag: ['draft'], container: ['c-pack'] });
+    });
+
+    it('marks the rows the text owns, and clicking one deletes exactly its token', () => {
+      const { fixture, el } = ready();
+
+      search(fixture, '$in:c-pack $tag:draft');
+      expect(facet(el, 'facet-container-c-pack')?.getAttribute('data-query-owned')).toBe('');
+      expect(facet(el, 'facet-tag-fantasy')?.getAttribute('data-query-owned')).toBeNull();
+
+      facet(el, 'facet-container-c-pack')?.click();
+      fixture.detectChanges();
+
+      // Only that token left; the caller's other one stayed exactly as written.
+      expect(searchBox(el).value).toBe('$tag:draft');
+      expect(entities.list).toHaveBeenLastCalledWith({ ...baseRead, tag: ['draft'] });
+    });
+
+    it('never writes a clicked Facet into the box', () => {
+      const { fixture, el } = ready();
+
+      search(fixture, '$tag:draft');
+      facet(el, 'facet-container-c-pack')?.click();
+      fixture.detectChanges();
+
+      expect(searchBox(el).value).toBe('$tag:draft');
+      expect(TestBed.inject(Router).navigate).toHaveBeenLastCalledWith(
+        [],
+        expect.objectContaining({ queryParams: expect.objectContaining({ container: ['c-pack'], tag: null }) }),
+      );
+    });
+
+    it('reproduces both stores from a shared link, and clears both with Clear all', () => {
+      entities.facets.mockReturnValue(
+        of({ type: [], tag: [{ value: 'draft', count: 1 }], visibility: [], fields: [], container: [] }),
+      );
+      worlds.mounts.mockReturnValue(of([shelf, pack]));
+      entities.list.mockReturnValue(of({ items: [], nextCursor: null }));
+      queryParams$.next(convertToParamMap({ q: 'goblin $tag:draft', container: 'c-pack' }));
+      const fixture = TestBed.createComponent(LibraryPage);
+      fixture.detectChanges();
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      expect(entities.list).toHaveBeenCalledWith({ ...baseRead, q: 'goblin', tag: ['draft'], container: ['c-pack'] });
+      // One request on load, and the box holds the raw string the link carried.
+      expect(entities.list).toHaveBeenCalledTimes(1);
+      expect(searchBox(el).value).toBe('goblin $tag:draft');
+
+      facet(el, 'facet-clear')?.click();
+      fixture.detectChanges();
+
+      expect(searchBox(el).value).toBe('');
+      expect(entities.list).toHaveBeenLastCalledWith(baseRead);
+    });
+
+    it('offers this browse’s whole vocabulary on the dollar, and its Containers with their counts', () => {
+      const { fixture, el } = ready();
+
+      type(fixture, '$');
+      // `in` is offered here and nowhere else; `visibility` is offered nowhere here.
+      expect(rows(el)).toEqual(expect.arrayContaining(['type', 'tag', 'in']));
+      expect(rows(el)).not.toContain('visibility');
+
+      // Stage two comes off the Facet read this page already runs: a Container is named on screen and
+      // addressed by id, exactly as the rail names it, and carries the count the rail shows.
+      type(fixture, '$in:');
+      expect(rows(el)).toEqual(['The Art Shelf1', 'Draw Steel: Monsters2']);
     });
   });
 
