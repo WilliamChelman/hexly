@@ -101,7 +101,7 @@ describe('FacetRail — a selected value is always listed (#420)', () => {
     const toggled = vi.fn();
     fixture.componentInstance.toggled.subscribe(toggled);
     draft?.click();
-    expect(toggled).toHaveBeenCalledWith({ category: 'tag', value: 'draft' });
+    expect(toggled).toHaveBeenCalledWith({ category: 'tag', value: 'draft', polarity: 'include' });
   });
 
   it('shows the merged row its real count — zero — not a fabricated one', () => {
@@ -162,6 +162,176 @@ describe('FacetRail — a selected value is always listed (#420)', () => {
     const fixture = render({}, { visibility: ['private'] }, false);
 
     expect(row(fixture, 'facet-visibility-private')).toBeNull();
+  });
+});
+
+/**
+ * The paired include/exclude toggles (ADR-0081, #422): every row carries both, always rendered, and
+ * pressing either releases the other — which is what makes the contradictory both-selected state
+ * unreachable from the rail rather than resolved by a rule.
+ */
+describe('FacetRail — the excluding half (#422)', () => {
+  function render(
+    counts: Partial<EntityFacets>,
+    active: Partial<ActiveFacets> = {},
+    canExclude = true,
+  ): ComponentFixture<FacetRailComponent> {
+    TestBed.configureTestingModule({
+      imports: [FacetRailComponent, provideTranslocoTesting()],
+      providers: [{ provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration: signal(true) }) }],
+    });
+    const fixture = TestBed.createComponent(FacetRailComponent);
+    fixture.componentRef.setInput('facetCounts', {
+      type: [],
+      tag: [],
+      visibility: [],
+      fields: [],
+      ...counts,
+    } satisfies EntityFacets);
+    fixture.componentRef.setInput('active', {
+      type: [],
+      tag: [],
+      visibility: [],
+      fields: {},
+      container: [],
+      ...active,
+    } satisfies ActiveFacets);
+    fixture.componentRef.setInput('canExclude', canExclude);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  const btn = (fixture: ComponentFixture<FacetRailComponent>, tid: string) =>
+    (fixture.nativeElement as HTMLElement).querySelector(`[data-testid="${tid}"]`) as HTMLButtonElement | null;
+
+  const TAGS = { tag: [{ value: 'draft', count: 2 }] };
+
+  it('renders both toggles on every row, always visible — no hover reveal', () => {
+    const fixture = render(TAGS);
+
+    const include = btn(fixture, 'facet-tag-draft');
+    const exclude = btn(fixture, 'facet-exclude-tag-draft');
+    expect(include).not.toBeNull();
+    expect(exclude).not.toBeNull();
+    // Nothing gates the exclude control on hover or focus: it is in the DOM, unconditionally styled.
+    expect(exclude?.className).not.toMatch(/hidden|invisible|opacity-0|group-hover|hover:opacity/);
+  });
+
+  it('renders no exclude control on a browse that does not carry the params yet (#423)', () => {
+    const fixture = render(TAGS, {}, false);
+
+    expect(btn(fixture, 'facet-tag-draft')).not.toBeNull();
+    // The rail never renders a lit control that is not in force.
+    expect(btn(fixture, 'facet-exclude-tag-draft')).toBeNull();
+  });
+
+  it('emits the pressed polarity, so the page knows which half a click addressed', () => {
+    const fixture = render(TAGS);
+    const toggled = vi.fn();
+    fixture.componentInstance.toggled.subscribe(toggled);
+
+    btn(fixture, 'facet-tag-draft')?.click();
+    expect(toggled).toHaveBeenLastCalledWith({ category: 'tag', value: 'draft', polarity: 'include' });
+
+    btn(fixture, 'facet-exclude-tag-draft')?.click();
+    expect(toggled).toHaveBeenLastCalledWith({ category: 'tag', value: 'draft', polarity: 'exclude' });
+  });
+
+  /** Two `aria-pressed` buttons say what is true — two independent predicates, not one tri-state. */
+  it('exposes include and exclude as two distinct aria-pressed controls with distinct names', () => {
+    const fixture = render(TAGS, { excluded: { tag: ['draft'] } });
+
+    const include = btn(fixture, 'facet-tag-draft');
+    const exclude = btn(fixture, 'facet-exclude-tag-draft');
+    expect(include?.getAttribute('aria-pressed')).toBe('false');
+    expect(exclude?.getAttribute('aria-pressed')).toBe('true');
+    // Never `mixed`: that claims *partially checked*, a different statement (ADR-0081).
+    expect(include?.getAttribute('aria-checked')).toBeNull();
+    expect(exclude?.getAttribute('aria-checked')).toBeNull();
+    // The exclude control names itself; the include one keeps the row's own label.
+    expect(exclude?.getAttribute('aria-label')).toBe('Exclude draft');
+    expect(include?.getAttribute('aria-label')).toBeNull();
+    expect(include?.textContent).toContain('draft');
+  });
+
+  it('names the exclude control in the active Locale', () => {
+    const fixture = render(TAGS);
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    expect(btn(fixture, 'facet-exclude-tag-draft')?.getAttribute('aria-label')).toBe('Exclure draft');
+  });
+
+  /** Or the exclusion would be a one-way door: no row, nothing to click off (ADR-0081). */
+  it('lists an excluded value the server dropped, at its real count, ready to click off', () => {
+    const fixture = render({ tag: [] }, { excluded: { tag: ['draft'] } });
+
+    const exclude = btn(fixture, 'facet-exclude-tag-draft');
+    expect(exclude?.getAttribute('aria-pressed')).toBe('true');
+    expect(btn(fixture, 'facet-tag-draft')?.querySelector('span.tabular-nums')?.textContent?.trim()).toBe('0');
+  });
+
+  it('lists an excluded Entity Type the server dropped', () => {
+    const fixture = render({ type: [] }, { excluded: { type: ['core.type.hex-map'] } });
+
+    expect(btn(fixture, 'facet-exclude-type-core.type.hex-map')?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('renders one row for a value named in both polarities — a contradiction only a URL can say', () => {
+    const fixture = render({ tag: [] }, { tag: ['draft'], excluded: { tag: ['draft'] } });
+
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="facet-tag-draft"]')).toHaveLength(1);
+  });
+
+  describe('Field facets', () => {
+    const FIELD = {
+      fields: [
+        {
+          key: 'alignment',
+          label: 'Alignment',
+          dataType: { kind: 'enum' as const, options: ['lawful-good', 'chaotic-evil'] },
+          values: [{ value: 'lawful-good', count: 1 }],
+        },
+      ],
+    };
+
+    it('pairs an exclude toggle with each Field value and emits its polarity', () => {
+      const fixture = render(FIELD);
+      const toggled = vi.fn();
+      fixture.componentInstance.fieldValueToggled.subscribe(toggled);
+
+      btn(fixture, 'facet-exclude-field-alignment-lawful-good')?.click();
+      expect(toggled).toHaveBeenLastCalledWith({ key: 'alignment', value: 'lawful-good', polarity: 'exclude' });
+    });
+
+    it('lists an excluded Field value the server dropped, lit on its exclude control', () => {
+      const fixture = render(FIELD, { fields: { alignment: { excluded: ['chaotic-evil'] } } });
+
+      expect(btn(fixture, 'facet-field-alignment-chaotic-evil')?.textContent).toContain('0');
+      expect(btn(fixture, 'facet-exclude-field-alignment-chaotic-evil')?.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    /** A range takes no polarity: `-cr:gte:5` is `cr:lte:4` (ADR-0081). */
+    it('offers no exclude control on a range facet', () => {
+      const fixture = render({
+        fields: [
+          {
+            key: 'cr',
+            label: 'CR',
+            dataType: { kind: 'number' },
+            values: [
+              { value: '1', count: 1 },
+              { value: '5', count: 1 },
+            ],
+          },
+        ],
+      });
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('[data-testid^="facet-exclude-field-cr"]'),
+      ).toBeNull();
+      expect(btn(fixture, 'facet-field-cr-gte')).not.toBeNull();
+    });
   });
 });
 

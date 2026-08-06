@@ -5,17 +5,35 @@ import { ClientConfigStore } from '@hexly/web-core';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /** One type's Field selection (ADR-0048, #188): eq membership for enum/list/string, or a
- * `gte`/`lte` range for number/date. Absent parts mean "unconstrained on that axis". */
+ * `gte`/`lte` range for number/date. Absent parts mean "unconstrained on that axis".
+ * `excluded` is the `neq` half (ADR-0081) — it vetoes, so it beats an `eq` on the same value.
+ * A range takes no polarity: a negated bound says nothing `gte`/`lte` cannot. */
 export interface FieldSelection {
   readonly values?: readonly string[];
+  readonly excluded?: readonly string[];
   readonly gte?: string;
   readonly lte?: string;
 }
 
-/** Whether a Field selection constrains nothing — no eq values and neither range bound. The one
- * definition of "empty" the rail's visibility and the browser's URL-pruning both read. */
+/** Whether a Field selection constrains nothing — no eq values, no exclusion, neither range bound.
+ * The one definition of "empty" the rail's visibility and the browser's URL-pruning both read. */
 export function isFieldSelectionEmpty(sel: FieldSelection): boolean {
-  return (sel.values?.length ?? 0) === 0 && !sel.gte && !sel.lte;
+  return (sel.values?.length ?? 0) === 0 && (sel.excluded?.length ?? 0) === 0 && !sel.gte && !sel.lte;
+}
+
+/** Set one value's polarity and release the other, which is what puts the both-selected
+ * contradiction out of the rail's reach (ADR-0081); pressing the lit half returns it to neutral. */
+export function togglePolarity(
+  included: readonly string[],
+  excluded: readonly string[],
+  value: string,
+  polarity: FacetPolarity,
+): { included: readonly string[]; excluded: readonly string[] } {
+  const drop = (vs: readonly string[]) => vs.filter((v) => v !== value);
+  const flip = (vs: readonly string[]) => (vs.includes(value) ? drop(vs) : [...vs, value]);
+  return polarity === 'include'
+    ? { included: flip(included), excluded: drop(excluded) }
+    : { included: drop(included), excluded: flip(excluded) };
 }
 
 export interface ActiveFacets {
@@ -31,6 +49,11 @@ export interface ActiveFacets {
    * section.
    */
   readonly container: readonly string[];
+  /**
+   * The excluding half of each value-toggled category (ADR-0081): a value here **vetoes**, whatever
+   * the includes say. Absent on a surface that offers no exclusion control yet (#423).
+   */
+  readonly excluded?: Partial<Record<FacetCategory, readonly string[]>>;
 }
 
 /**
@@ -39,15 +62,20 @@ export interface ActiveFacets {
  */
 export type FacetCategory = 'type' | 'tag' | 'visibility' | 'container';
 
+/** Which half of a value's polarity a click addressed (ADR-0081). */
+export type FacetPolarity = 'include' | 'exclude';
+
 export interface FacetToggle {
   readonly category: FacetCategory;
   readonly value: string;
+  readonly polarity: FacetPolarity;
 }
 
-/** A toggle of one enum/list/string Field-facet value (eq membership). */
+/** A toggle of one enum/list/string Field-facet value — `eq` membership, or its `neq` veto. */
 export interface FieldValueToggle {
   readonly key: string;
   readonly value: string;
+  readonly polarity: FacetPolarity;
 }
 
 /** A change to one bound of a number/date Field range; `value` empty clears that bound. */
@@ -58,6 +86,36 @@ export interface FieldRangeChange {
 }
 
 /**
+ * The small `−` beside a rail row's include toggle (ADR-0081). Its own component so a category row
+ * and a Field row cannot drift apart, and always rendered where it is offered — hover-revealing it
+ * would break touch and add a surprise tab stop.
+ */
+@Component({
+  selector: 'app-facet-exclude-toggle',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslocoPipe],
+  template: `
+    <button
+      type="button"
+      [attr.data-testid]="testid()"
+      [attr.aria-pressed]="pressed()"
+      [attr.aria-label]="'entityBrowser.facets.excludeValue' | transloco: { value: label() }"
+      class="shrink-0 w-6 flex items-center justify-center rounded-sm font-sans text-sm text-ink-faint hover:bg-surface-sunken aria-pressed:bg-danger-soft aria-pressed:text-danger"
+      (click)="press.emit()"
+    >
+      <span aria-hidden="true">−</span>
+    </button>
+  `,
+})
+export class FacetExcludeToggleComponent {
+  readonly testid = input.required<string>();
+  readonly pressed = input.required<boolean>();
+  /** The row's rendered label — the exclude control names itself with it, the include one carries it. */
+  readonly label = input.required<string>();
+  readonly press = output<void>();
+}
+
+/**
  * The Facet rail beside the Entity Browser grid. Controlled — the parent owns
  * the active selections and count data; the rail renders them and emits
  * {@link toggled}/{@link clearAll}. Clicking an active value toggles it off.
@@ -65,7 +123,7 @@ export interface FieldRangeChange {
 @Component({
   selector: 'app-facet-rail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe],
+  imports: [TranslocoPipe, FacetExcludeToggleComponent],
   host: { class: 'block' },
   template: `
     <div data-testid="facet-rail" class="rounded-sm border border-line bg-surface p-4">
@@ -95,17 +153,25 @@ export interface FieldRangeChange {
           </h3>
           <ul class="flex flex-col gap-1 m-0 p-0 list-none">
             @for (row of group.rows; track row.value) {
-              <li>
+              <li class="flex items-stretch gap-1">
                 <button
                   type="button"
                   [attr.data-testid]="'facet-' + group.category + '-' + row.value"
                   [attr.aria-pressed]="row.active"
-                  class="w-full flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
-                  (click)="toggled.emit({ category: group.category, value: row.value })"
+                  class="flex-1 min-w-0 flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
+                  (click)="toggled.emit({ category: group.category, value: row.value, polarity: 'include' })"
                 >
                   <span class="truncate">{{ row.label }}</span>
                   <span class="ml-2 text-ink-faint tabular-nums">{{ row.count }}</span>
                 </button>
+                @if (canExclude()) {
+                  <app-facet-exclude-toggle
+                    [testid]="'facet-exclude-' + group.category + '-' + row.value"
+                    [pressed]="row.excluded"
+                    [label]="row.label"
+                    (press)="toggled.emit({ category: group.category, value: row.value, polarity: 'exclude' })"
+                  />
+                }
               </li>
             }
           </ul>
@@ -145,22 +211,37 @@ export interface FieldRangeChange {
           } @else {
             <ul class="flex flex-col gap-1 m-0 p-0 list-none">
               @for (row of field.rows; track row.value) {
-                <li>
+                <li class="flex items-stretch gap-1">
                   <button
                     type="button"
                     [attr.data-testid]="'facet-field-' + field.key + '-' + row.value"
                     [attr.aria-pressed]="row.active"
-                    class="w-full flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
+                    class="flex-1 min-w-0 flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
                     (click)="
                       fieldValueToggled.emit({
                         key: field.key,
                         value: row.value,
+                        polarity: 'include',
                       })
                     "
                   >
                     <span class="truncate">{{ row.label }}</span>
                     <span class="ml-2 text-ink-faint tabular-nums">{{ row.count }}</span>
                   </button>
+                  @if (canExclude()) {
+                    <app-facet-exclude-toggle
+                      [testid]="'facet-exclude-field-' + field.key + '-' + row.value"
+                      [pressed]="row.excluded"
+                      [label]="row.label"
+                      (press)="
+                        fieldValueToggled.emit({
+                          key: field.key,
+                          value: row.value,
+                          polarity: 'exclude',
+                        })
+                      "
+                    />
+                  }
                 </li>
               }
             </ul>
@@ -189,6 +270,9 @@ export class FacetRailComponent {
     container: [],
   });
   readonly canClear = input(false);
+  /** Whether this browse offers the excluding half (ADR-0081); off by default, so a surface whose
+   * page does not carry the `exclude*` params yet (#423) renders no control it would ignore. */
+  readonly canExclude = input(false);
 
   readonly toggled = output<FacetToggle>();
   readonly fieldValueToggled = output<FieldValueToggle>();
@@ -223,20 +307,27 @@ export class FacetRailComponent {
   protected readonly groups = computed(() => {
     this.transloco.activeLang(); // reactive dependency: re-translate labels on switch
     const active = this.active();
+    const excluded = active.excluded ?? {};
     const counts = this.facetCounts();
     const categories = [
       {
         category: 'type' as const,
-        rows: withSelection(counts.type, active.type),
+        rows: withSelection(counts.type, active.type, excluded.type),
         // A user-defined type's authored name; a code type's translated copy (#191).
         label: (v: FacetCount) => this.types.name(v.value),
       },
-      { category: 'tag' as const, rows: withSelection(counts.tag, active.tag), label: (v: FacetCount) => v.value },
+      {
+        category: 'tag' as const,
+        rows: withSelection(counts.tag, active.tag, excluded.tag),
+        label: (v: FacetCount) => v.value,
+      },
       {
         category: 'visibility' as const,
         // Nothing reads Visibility with Collaboration off (ADR-0071); emptied, the category falls to
         // the drop-empties filter below — a selection can't resurrect it, so the merge stays inside the gate.
-        rows: this.clientConfig.isCollaborationEnabled() ? withSelection(counts.visibility, active.visibility) : [],
+        rows: this.clientConfig.isCollaborationEnabled()
+          ? withSelection(counts.visibility, active.visibility, excluded.visibility)
+          : [],
         label: (v: FacetCount) => this.transloco.translate(`entityBrowser.facets.${v.value}`),
       },
       {
@@ -245,7 +336,7 @@ export class FacetRailComponent {
         // and in the order the read named its Containers, which in the Library is the Owner's Mount
         // order. Absent wherever the read names a single Container, so every other browse drops it.
         category: 'container' as const,
-        rows: withSelection(counts.container ?? [], active.container),
+        rows: withSelection(counts.container ?? [], active.container, excluded.container),
         label: (v: FacetCount) => v.label ?? v.value,
       },
     ];
@@ -258,6 +349,7 @@ export class FacetRailComponent {
           count: r.count,
           label: g.label(r),
           active: active[g.category].includes(r.value),
+          excluded: (excluded[g.category] ?? []).includes(r.value),
         })),
       }));
   });
@@ -276,15 +368,17 @@ export class FacetRailComponent {
       .fields.map((field) => {
         const selection = activeFields[field.key] ?? {};
         const selected = selection.values ?? [];
+        const vetoed = selection.excluded ?? [];
         const numeric = field.dataType.kind === 'number';
         const range = numeric || field.dataType.kind === 'date';
         // A dimension's labelKey translates; a scalar Field's label is authored, with no key (ADR-0055).
         const label = field.labelKey ? this.transloco.translate(field.labelKey) : field.label;
-        const rows = withSelection(field.values, selected).map((v) => ({
+        const rows = withSelection(field.values, selected, vetoed).map((v) => ({
           value: v.value,
           count: v.count,
           label: this.valueLabel(field.valuesKeyPrefix, v),
           active: selected.includes(v.value),
+          excluded: vetoed.includes(v.value),
         }));
         return {
           key: field.key,
@@ -316,15 +410,23 @@ export class FacetRailComponent {
 }
 
 /**
- * One facet's server counts with the caller's selection merged in, so a selected value is always
- * listed, whatever its count (ADR-0081) — the server hides zero-count values, and a selection it hid
- * is still filtering the list. A merged row carries no server-sent `label`, so a value that renders
- * through one (a Container, an Entity-Link Field) falls back to its raw id: a row you can click off
- * beats a row that vanished.
+ * One facet's server counts with the caller's choice merged in, **either polarity** (ADR-0081), so a
+ * chosen value is always listed whatever its count — the server hides zero-count values, and a choice
+ * it hid is still filtering the list, which for an exclusion would be a one-way door. A merged row
+ * carries no server-sent `label`, so a value that renders through one (a Container, an Entity-Link
+ * Field) falls back to its raw id: a row you can click off beats a row that vanished.
  */
-function withSelection(rows: readonly FacetCount[], selected: readonly string[]): readonly FacetCount[] {
+function withSelection(
+  rows: readonly FacetCount[],
+  selected: readonly string[],
+  excluded: readonly string[] = [],
+): readonly FacetCount[] {
   const listed = new Set(rows.map((r) => r.value));
-  const missing = selected.filter((v) => !listed.has(v)).map((value) => ({ value, count: 0 }));
+  // The Set dedupes a value a hand-edited URL named in both polarities — a contradiction the rail
+  // makes unreachable, but one it must still render as a single row.
+  const missing = [...new Set([...selected, ...excluded])]
+    .filter((v) => !listed.has(v))
+    .map((value) => ({ value, count: 0 }));
   return missing.length ? [...rows, ...missing] : rows;
 }
 

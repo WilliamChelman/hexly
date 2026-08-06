@@ -173,6 +173,41 @@ describe('EntitiesClient', () => {
   });
 
   /**
+   * The excluding half of each category (ADR-0081), on both reads: the Facet counts drill down against
+   * every other active constraint, and an exclusion is one. A Field's exclusion needs no param — it
+   * rides `field`'s own `neq` op.
+   */
+  it('serializes the exclude* Facet params as repeats, on the list and the Facet read (#422)', () => {
+    const excluding = {
+      excludeType: ['hexmap' as const],
+      excludeTag: ['draft', 'secret'],
+      excludeVisibility: ['private' as const],
+      excludeContainer: ['c1'],
+      field: ['size:neq:large'],
+    };
+
+    client.list(excluding).subscribe();
+    const listReq = http.expectOne((r) => r.url === '/api/entities');
+    expect(listReq.request.params.getAll('excludeType')).toEqual(['hexmap']);
+    expect(listReq.request.params.getAll('excludeTag')).toEqual(['draft', 'secret']);
+    expect(listReq.request.params.getAll('excludeVisibility')).toEqual(['private']);
+    expect(listReq.request.params.getAll('excludeContainer')).toEqual(['c1']);
+    expect(listReq.request.params.getAll('field')).toEqual(['size:neq:large']);
+    listReq.flush({ items: [], nextCursor: null });
+
+    client.facets(excluding).subscribe();
+    const facetReq = http.expectOne((r) => r.url === '/api/entities/facets');
+    expect(facetReq.request.params.getAll('excludeTag')).toEqual(['draft', 'secret']);
+    facetReq.flush({ type: [], tag: [], visibility: [], fields: [] });
+
+    // A browse that excludes nothing sends none of them.
+    client.list({}).subscribe();
+    const plain = http.expectOne((r) => r.url === '/api/entities');
+    expect(plain.request.params.has('excludeTag')).toBe(false);
+    plain.flush({ items: [], nextCursor: null });
+  });
+
+  /**
    * The hidden-from-default-listing opt-in (ADR-0065), carried on both reads so a rail's counts and the
    * list they annotate can never disagree about hidden types. A browse omits it and keeps the exclusion.
    */

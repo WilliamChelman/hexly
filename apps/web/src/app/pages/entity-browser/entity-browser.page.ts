@@ -18,6 +18,7 @@ import {
   FieldRangeChange,
   FieldSelection,
   FieldValueToggle,
+  togglePolarity,
 } from './components/facet-rail.component';
 import { fieldTokens, fieldsFromTokens, pruneField } from './components/field-facet-url';
 
@@ -29,6 +30,8 @@ const NO_FACETS: ActiveFacets = {
   // Never filled here: the server offers the Container facet only where a read spans more than one
   // Container, and the Entity Browser is scoped to one World — a Mounted one included (ADR-0080).
   container: [],
+  // The excluding half (ADR-0081). No `container` for the same reason its positive twin has none.
+  excluded: { type: [], tag: [], visibility: [] },
 };
 
 const NO_FACET_COUNTS: EntityFacets = {
@@ -87,6 +90,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
           [facetCounts]="facetCounts()"
           [active]="activeFacets()"
           [canClear]="hasFilters()"
+          [canExclude]="true"
           (toggled)="toggleFacet($event)"
           (fieldValueToggled)="toggleFieldValue($event)"
           (fieldRangeChanged)="changeFieldRange($event)"
@@ -195,6 +199,7 @@ export class EntityBrowserPage {
     equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
   protected readonly facetCounts = signal<EntityFacets>(NO_FACET_COUNTS);
+  /** Both polarities count as a filter (ADR-0081), so Clear all is offered — and clears — either. */
   protected readonly hasFilters = computed(() => {
     const f = this.activeFacets();
     return (
@@ -202,7 +207,8 @@ export class EntityBrowserPage {
       f.type.length > 0 ||
       f.tag.length > 0 ||
       f.visibility.length > 0 ||
-      Object.keys(f.fields).length > 0
+      Object.keys(f.fields).length > 0 ||
+      Object.values(f.excluded ?? {}).some((values) => values.length > 0)
     );
   });
 
@@ -234,6 +240,11 @@ export class EntityBrowserPage {
           tag: params.getAll('tag'),
           visibility: params.getAll('visibility'),
           field: params.getAll('field'),
+          // The exclusions ride the URL like their positive twins (ADR-0081), so a narrowed browse
+          // survives a refresh and shares as a link.
+          excludeType: params.getAll('excludeType'),
+          excludeTag: params.getAll('excludeTag'),
+          excludeVisibility: params.getAll('excludeVisibility'),
         })),
         distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
         takeUntilDestroyed(),
@@ -244,8 +255,14 @@ export class EntityBrowserPage {
           type: f.type,
           tag: f.tag,
           visibility: f.visibility,
-          fields: fieldsFromTokens(f.field),
+          // This rail carries the exclude control, so a `neq` token is honoured rather than dropped.
+          fields: fieldsFromTokens(f.field, true),
           container: [],
+          excluded: {
+            type: f.excludeType,
+            tag: f.excludeTag,
+            visibility: f.excludeVisibility,
+          },
         });
       });
 
@@ -275,20 +292,24 @@ export class EntityBrowserPage {
     this.typed.next(value);
   }
 
-  protected toggleFacet({ category, value }: FacetToggle): void {
+  /** Toggle one category value in the polarity the pressed control names; the other is released. */
+  protected toggleFacet({ category, value, polarity }: FacetToggle): void {
     const current = this.activeFacets();
-    const values = current[category];
-    const next = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
-    this.applyFacets({ ...current, [category]: next });
+    const next = togglePolarity(current[category], current.excluded?.[category] ?? [], value, polarity);
+    this.applyFacets({
+      ...current,
+      [category]: next.included,
+      excluded: { ...current.excluded, [category]: next.excluded },
+    });
   }
 
-  /** Toggle one enum/list/string Field-facet value (eq membership, OR within the Field). */
-  protected toggleFieldValue({ key, value }: FieldValueToggle): void {
+  /** Toggle one enum/list/string Field-facet value: `eq` membership (OR within the Field), or its
+   * `neq` veto. As in a category, pressing either polarity releases the other. */
+  protected toggleFieldValue({ key, value, polarity }: FieldValueToggle): void {
     const current = this.activeFacets();
     const sel = current.fields[key] ?? {};
-    const values = sel.values ?? [];
-    const nextValues = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
-    this.setFieldSelection(current, key, { ...sel, values: nextValues });
+    const next = togglePolarity(sel.values ?? [], sel.excluded ?? [], value, polarity);
+    this.setFieldSelection(current, key, { ...sel, values: next.included, excluded: next.excluded });
   }
 
   /** Set (or clear) one bound of a number/date Field range. */
@@ -327,6 +348,10 @@ export class EntityBrowserPage {
         tag: null,
         visibility: null,
         field: null,
+        // Clear all clears both polarities (ADR-0081).
+        excludeType: null,
+        excludeTag: null,
+        excludeVisibility: null,
       },
       queryParamsHandling: 'merge',
       replaceUrl: true,
@@ -335,6 +360,7 @@ export class EntityBrowserPage {
 
   private mirrorToUrl(facets: ActiveFacets): void {
     const field = fieldTokens(facets.fields);
+    const excluded = facets.excluded ?? {};
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
@@ -342,6 +368,9 @@ export class EntityBrowserPage {
         tag: facets.tag.length ? [...facets.tag] : null,
         visibility: facets.visibility.length ? [...facets.visibility] : null,
         field: field.length ? field : null,
+        excludeType: excluded.type?.length ? [...excluded.type] : null,
+        excludeTag: excluded.tag?.length ? [...excluded.tag] : null,
+        excludeVisibility: excluded.visibility?.length ? [...excluded.visibility] : null,
       },
       queryParamsHandling: 'merge',
       replaceUrl: true,
@@ -405,6 +434,7 @@ export class EntityBrowserPage {
   private activeFilterParams(): EntityFacetParams {
     const q = this.query();
     const f = this.activeFacets();
+    const excluded = f.excluded ?? {};
     const field = fieldTokens(f.fields);
     return {
       ...(q ? { q } : {}),
@@ -412,6 +442,10 @@ export class EntityBrowserPage {
       ...(f.tag.length ? { tag: [...f.tag] } : {}),
       ...(f.visibility.length ? { visibility: [...f.visibility] as Visibility[] } : {}),
       ...(field.length ? { field } : {}),
+      // The excluding half, sent on the list and the Facet read alike (ADR-0081).
+      ...(excluded.type?.length ? { excludeType: [...excluded.type] as EntityType[] } : {}),
+      ...(excluded.tag?.length ? { excludeTag: [...excluded.tag] } : {}),
+      ...(excluded.visibility?.length ? { excludeVisibility: [...excluded.visibility] as Visibility[] } : {}),
     };
   }
 

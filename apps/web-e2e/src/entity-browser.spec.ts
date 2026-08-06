@@ -102,6 +102,47 @@ test('an owner toggles a note to shared and the Visibility facet reflects it', a
   await expect(page.getByTestId(`open-${id}`)).toBeVisible();
 });
 
+/**
+ * Exclusion end to end (ADR-0081, #422): the rail's second toggle, the `exclude*` param it rides, and
+ * the mutual release that makes the contradictory both-selected state unreachable.
+ */
+test('the rail excludes an Entity Type: the grid drops it, a refresh keeps it, include releases it', async ({
+  page,
+}) => {
+  await enterEntities(page);
+  await page.getByTestId('new-default-entity').click();
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  const noteId = entityIdFromUrl(page);
+  await entitiesRailLink(page).click();
+  const mapId = await createEntity(page, 'core.type.hex-map');
+  await entitiesRailLink(page).click();
+
+  await expect(page.getByTestId(`open-${noteId}`)).toBeVisible();
+  await expect(page.getByTestId(`open-${mapId}`)).toBeVisible();
+
+  // Read the Notes without the Maps crowding them out — one click, not one per other type.
+  await page.getByTestId('facet-exclude-type-core.type.hex-map').click();
+  await expect(page.getByTestId(`open-${mapId}`)).toHaveCount(0);
+  await expect(page.getByTestId(`open-${noteId}`)).toBeVisible();
+  await expect(page).toHaveURL(/excludeType=core\.type\.hex-map/);
+
+  // The exclusion rides the URL, so a refresh (and a shared link) reproduces the browse.
+  await page.reload();
+  await expect(page.getByTestId('facet-exclude-type-core.type.hex-map')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId(`open-${mapId}`)).toHaveCount(0);
+
+  // Pressing include releases the exclusion rather than sitting beside it.
+  await page.getByTestId('facet-type-core.type.hex-map').click();
+  await expect(page.getByTestId('facet-exclude-type-core.type.hex-map')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId(`open-${mapId}`)).toBeVisible();
+  await expect(page.getByTestId(`open-${noteId}`)).toHaveCount(0);
+
+  // Clear all clears both polarities.
+  await page.getByTestId('facet-clear').click();
+  await expect(page.getByTestId(`open-${noteId}`)).toBeVisible();
+  await expect(page.getByTestId(`open-${mapId}`)).toBeVisible();
+});
+
 test('creating a map opens the map editor, not the note view', async ({ page }) => {
   await enterEntities(page);
 
