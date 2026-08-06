@@ -175,6 +175,197 @@ describe('Library', () => {
     );
   });
 
+  /**
+   * Exclusion reaches the Library (ADR-0081, #423). Its own case rather than the Entity Browser's
+   * again: **Container** is a category only this browse has, and "everything this World Mounts except
+   * that pack" is the ask the Library exists for.
+   */
+  describe('Excluding a value (#423)', () => {
+    const facet = (el: HTMLElement, testid: string) => el.querySelector<HTMLElement>(`[data-testid="${testid}"]`);
+
+    /** Both Containers counted and on screen, with the next list read stubbed, ready for a toggle. */
+    function ready() {
+      entities.facets.mockReturnValue(
+        of({
+          type: [],
+          tag: [{ value: 'draft', count: 1 }],
+          visibility: [],
+          fields: [],
+          container: [
+            { value: 'c-shelf', count: 1, label: 'The Art Shelf' },
+            { value: 'c-pack', count: 2, label: 'Draw Steel: Monsters' },
+          ],
+        }),
+      );
+      const fixture = renderWith([shelf, pack], [summary({})]);
+      entities.list.mockReturnValue(of({ items: [], nextCursor: null }));
+      return { fixture, el: fixture.nativeElement as HTMLElement };
+    }
+
+    it('excludes one Mounted Container without narrowing the scope, and mirrors it to the URL', () => {
+      const { fixture, el } = ready();
+
+      facet(el, 'facet-exclude-container-c-pack')?.click();
+      fixture.detectChanges();
+
+      // The scope is still every Mount — the exclusion narrows *within* it, exactly as its positive
+      // twin does, so a shared link keeps meaning after another Container is mounted.
+      expect(entities.list).toHaveBeenLastCalledWith({
+        limit: 50,
+        containerId: ['c-shelf', 'c-pack'],
+        rights: true,
+        thumbnails: true,
+        excludeContainer: ['c-pack'],
+      });
+      // The counts drill down against the exclusion too, or the rail would annotate a list it disagrees with.
+      expect(entities.facets).toHaveBeenLastCalledWith({
+        containerId: ['c-shelf', 'c-pack'],
+        excludeContainer: ['c-pack'],
+      });
+      expect(TestBed.inject(Router).navigate).toHaveBeenLastCalledWith(
+        [],
+        expect.objectContaining({ queryParams: expect.objectContaining({ excludeContainer: ['c-pack'] }) }),
+      );
+    });
+
+    it('is reversible by clicking the same control', () => {
+      const { fixture, el } = ready();
+
+      facet(el, 'facet-exclude-container-c-pack')?.click();
+      fixture.detectChanges();
+      expect(facet(el, 'facet-exclude-container-c-pack')?.getAttribute('aria-pressed')).toBe('true');
+
+      facet(el, 'facet-exclude-container-c-pack')?.click();
+      fixture.detectChanges();
+
+      expect(entities.list).toHaveBeenLastCalledWith({
+        limit: 50,
+        containerId: ['c-shelf', 'c-pack'],
+        rights: true,
+        thumbnails: true,
+      });
+    });
+
+    it('releases the exclusion when include is pressed on the same Container', () => {
+      const { fixture, el } = ready();
+
+      facet(el, 'facet-exclude-container-c-pack')?.click();
+      fixture.detectChanges();
+      facet(el, 'facet-container-c-pack')?.click();
+      fixture.detectChanges();
+
+      // Never both: the contradiction stays out of the rail's reach by construction (ADR-0081).
+      expect(entities.list).toHaveBeenLastCalledWith({
+        limit: 50,
+        containerId: ['c-shelf', 'c-pack'],
+        rights: true,
+        thumbnails: true,
+        container: ['c-pack'],
+      });
+      expect(facet(el, 'facet-exclude-container-c-pack')?.getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('excludes a Tag and a Field value the same way', () => {
+      entities.facets.mockReturnValue(
+        of({
+          type: [],
+          tag: [{ value: 'draft', count: 1 }],
+          visibility: [],
+          fields: [
+            {
+              key: 'role',
+              label: 'Role',
+              dataType: { kind: 'enum' as const, options: ['harrier', 'brute'] },
+              values: [{ value: 'harrier', count: 1 }],
+            },
+          ],
+        }),
+      );
+      const fixture = renderWith([pack], [summary({})]);
+      const el = fixture.nativeElement as HTMLElement;
+      entities.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+      facet(el, 'facet-exclude-tag-draft')?.click();
+      fixture.detectChanges();
+      expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ excludeTag: ['draft'] }));
+
+      // A Field's exclusion rides the `field` param's own `neq` op rather than a param of its own.
+      facet(el, 'facet-exclude-field-role-harrier')?.click();
+      fixture.detectChanges();
+      expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ field: ['role:neq:harrier'] }));
+    });
+
+    it('seeds exclusions from the URL into the first fetch and lights their controls', () => {
+      entities.facets.mockReturnValue(
+        of({
+          type: [],
+          tag: [{ value: 'draft', count: 1 }],
+          visibility: [],
+          fields: [],
+          container: [{ value: 'c-shelf', count: 1, label: 'The Art Shelf' }],
+        }),
+      );
+      worlds.mounts.mockReturnValue(of([shelf, pack]));
+      entities.list.mockReturnValue(of({ items: [], nextCursor: null }));
+      queryParams$.next(convertToParamMap({ excludeContainer: 'c-pack', excludeTag: 'draft' }));
+      const fixture = TestBed.createComponent(LibraryPage);
+      fixture.detectChanges();
+      fixture.detectChanges();
+
+      expect(entities.list).toHaveBeenCalledWith({
+        limit: 50,
+        containerId: ['c-shelf', 'c-pack'],
+        rights: true,
+        thumbnails: true,
+        excludeContainer: ['c-pack'],
+        excludeTag: ['draft'],
+      });
+      // One request on load — the seeded browse is the first one, not a correction of an empty one.
+      expect(entities.list).toHaveBeenCalledTimes(1);
+      const el = fixture.nativeElement as HTMLElement;
+      expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+      // And the excluded Container is listed although the drill-down stopped counting it — or the
+      // exclusion would be a one-way door, with no row left to click off.
+      expect(facet(el, 'facet-exclude-container-c-pack')?.getAttribute('aria-pressed')).toBe('true');
+      expect(facet(el, 'facet-container-c-pack')?.querySelector('span.tabular-nums')?.textContent?.trim()).toBe('0');
+    });
+
+    it('offers Clear all for an exclusion alone, and clears both polarities', () => {
+      const { fixture, el } = ready();
+
+      facet(el, 'facet-container-c-shelf')?.click();
+      fixture.detectChanges();
+      facet(el, 'facet-exclude-container-c-pack')?.click();
+      fixture.detectChanges();
+      expect(facet(el, 'facet-clear')).not.toBeNull();
+
+      facet(el, 'facet-clear')?.click();
+      fixture.detectChanges();
+
+      expect(TestBed.inject(Router).navigate).toHaveBeenLastCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: {
+            q: null,
+            type: null,
+            tag: null,
+            container: null,
+            field: null,
+            excludeType: null,
+            excludeTag: null,
+            excludeContainer: null,
+          },
+        }),
+      );
+      expect(entities.list).toHaveBeenLastCalledWith({
+        limit: 50,
+        containerId: ['c-shelf', 'c-pack'],
+        rights: true,
+        thumbnails: true,
+      });
+    });
+  });
+
   it('renders its chrome and its empty Library in French when French is the active language', () => {
     const fixture = renderWith([]);
     const el = fixture.nativeElement as HTMLElement;

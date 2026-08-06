@@ -51,7 +51,8 @@ export interface ActiveFacets {
   readonly container: readonly string[];
   /**
    * The excluding half of each value-toggled category (ADR-0081): a value here **vetoes**, whatever
-   * the includes say. Absent on a surface that offers no exclusion control yet (#423).
+   * the includes say. Partial, and silent about the categories a browse pins or strips — the Asset
+   * Browser's Type, the Library's Visibility — which never reach the rail to be toggled either way.
    */
   readonly excluded?: Partial<Record<FacetCategory, readonly string[]>>;
 }
@@ -270,8 +271,9 @@ export class FacetRailComponent {
     container: [],
   });
   readonly canClear = input(false);
-  /** Whether this browse offers the excluding half (ADR-0081); off by default, so a surface whose
-   * page does not carry the `exclude*` params yet (#423) renders no control it would ignore. */
+  /** Whether this browse offers the excluding half (ADR-0081); off by default, so the rail is never
+   * given a control whose param its page does not carry. Every rail surface passes it since #423 —
+   * the shared `field` codec's `neq` guard is the same rule, on the other side of the URL. */
   readonly canExclude = input(false);
 
   readonly toggled = output<FacetToggle>();

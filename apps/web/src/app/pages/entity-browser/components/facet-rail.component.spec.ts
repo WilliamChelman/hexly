@@ -217,7 +217,7 @@ describe('FacetRail — the excluding half (#422)', () => {
     expect(exclude?.className).not.toMatch(/hidden|invisible|opacity-0|group-hover|hover:opacity/);
   });
 
-  it('renders no exclude control on a browse that does not carry the params yet (#423)', () => {
+  it('renders no exclude control on a browse that does not carry the exclude params', () => {
     const fixture = render(TAGS, {}, false);
 
     expect(btn(fixture, 'facet-tag-draft')).not.toBeNull();

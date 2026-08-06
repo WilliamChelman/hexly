@@ -24,10 +24,20 @@ import {
   FieldRangeChange,
   FieldSelection,
   FieldValueToggle,
+  togglePolarity,
 } from '../entity-browser/components/facet-rail.component';
 import { fieldTokens, fieldsFromTokens, pruneField } from '../entity-browser/components/field-facet-url';
 
-const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [], fields: {}, container: [] };
+const NO_FACETS: ActiveFacets = {
+  type: [],
+  tag: [],
+  visibility: [],
+  fields: {},
+  container: [],
+  // The excluding half (ADR-0081). No `type` for the same reason its positive twin is never filled: the
+  // asset type is pinned here, so the category never reaches the rail; no `container` — one World.
+  excluded: { tag: [], visibility: [] },
+};
 const NO_FACET_COUNTS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] };
 
 // A bounded first page, like the Entity Browser, so a media-heavy World loads fast.
@@ -107,6 +117,7 @@ const SEARCH_DEBOUNCE_MS = 150;
           [facetCounts]="facetCounts()"
           [active]="activeFacets()"
           [canClear]="hasFilters()"
+          [canExclude]="true"
           (toggled)="toggleFacet($event)"
           (fieldValueToggled)="toggleFieldValue($event)"
           (fieldRangeChanged)="changeFieldRange($event)"
@@ -255,9 +266,16 @@ export class AssetBrowserPage {
   });
   /** The rail counts with the type category stripped — the asset type is pinned, never a rail choice. */
   protected readonly facetCounts = signal<EntityFacets>(NO_FACET_COUNTS);
+  /** Both polarities count as a filter (ADR-0081), so Clear all is offered — and clears — either. */
   protected readonly hasFilters = computed(() => {
     const f = this.activeFacets();
-    return this.query() !== '' || f.tag.length > 0 || f.visibility.length > 0 || Object.keys(f.fields).length > 0;
+    return (
+      this.query() !== '' ||
+      f.tag.length > 0 ||
+      f.visibility.length > 0 ||
+      Object.keys(f.fields).length > 0 ||
+      Object.values(f.excluded ?? {}).some((values) => (values?.length ?? 0) > 0)
+    );
   });
 
   private facetsSub?: Subscription;
@@ -275,6 +293,10 @@ export class AssetBrowserPage {
           tag: params.getAll('tag'),
           visibility: params.getAll('visibility'),
           field: params.getAll('field'),
+          // The exclusions ride the URL like their positive twins (ADR-0081), so "art not already
+          // tagged as used" survives a refresh and shares as a link.
+          excludeTag: params.getAll('excludeTag'),
+          excludeVisibility: params.getAll('excludeVisibility'),
         })),
         distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
         takeUntilDestroyed(),
@@ -285,8 +307,10 @@ export class AssetBrowserPage {
           type: [],
           tag: f.tag,
           visibility: f.visibility,
-          fields: fieldsFromTokens(f.field),
+          // This rail carries the exclude control, so a `neq` token is honoured rather than dropped.
+          fields: fieldsFromTokens(f.field, true),
           container: [],
+          excluded: { tag: f.excludeTag, visibility: f.excludeVisibility },
         });
       });
 
@@ -317,19 +341,23 @@ export class AssetBrowserPage {
     return !!asset.rights?.includes('delete');
   }
 
-  protected toggleFacet({ category, value }: FacetToggle): void {
+  /** Toggle one category value in the polarity the pressed control names; the other is released. */
+  protected toggleFacet({ category, value, polarity }: FacetToggle): void {
     const current = this.activeFacets();
-    const values = current[category];
-    const next = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
-    this.applyFacets({ ...current, [category]: next });
+    const next = togglePolarity(current[category], current.excluded?.[category] ?? [], value, polarity);
+    this.applyFacets({
+      ...current,
+      [category]: next.included,
+      excluded: { ...current.excluded, [category]: next.excluded },
+    });
   }
 
-  protected toggleFieldValue({ key, value }: FieldValueToggle): void {
+  /** As in a category, pressing either polarity of a Field value releases the other (ADR-0081). */
+  protected toggleFieldValue({ key, value, polarity }: FieldValueToggle): void {
     const current = this.activeFacets();
     const sel = current.fields[key] ?? {};
-    const values = sel.values ?? [];
-    const nextValues = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
-    this.setFieldSelection(current, key, { ...sel, values: nextValues });
+    const next = togglePolarity(sel.values ?? [], sel.excluded ?? [], value, polarity);
+    this.setFieldSelection(current, key, { ...sel, values: next.included, excluded: next.excluded });
   }
 
   protected changeFieldRange({ key, bound, value }: FieldRangeChange): void {
@@ -356,7 +384,8 @@ export class AssetBrowserPage {
     this.activeFacets.set(NO_FACETS);
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { q: null, tag: null, visibility: null, field: null },
+      // Clear all clears both polarities (ADR-0081).
+      queryParams: { q: null, tag: null, visibility: null, field: null, excludeTag: null, excludeVisibility: null },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
@@ -364,12 +393,15 @@ export class AssetBrowserPage {
 
   private mirrorToUrl(facets: ActiveFacets): void {
     const field = fieldTokens(facets.fields);
+    const excluded = facets.excluded ?? {};
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
         tag: facets.tag.length ? [...facets.tag] : null,
         visibility: facets.visibility.length ? [...facets.visibility] : null,
         field: field.length ? field : null,
+        excludeTag: excluded.tag?.length ? [...excluded.tag] : null,
+        excludeVisibility: excluded.visibility?.length ? [...excluded.visibility] : null,
       },
       queryParamsHandling: 'merge',
       replaceUrl: true,
@@ -421,12 +453,16 @@ export class AssetBrowserPage {
   private activeFilterParams(): EntityFacetParams {
     const q = this.query();
     const f = this.activeFacets();
+    const excluded = f.excluded ?? {};
     const field = fieldTokens(f.fields);
     return {
       ...(q ? { q } : {}),
       ...(f.tag.length ? { tag: [...f.tag] } : {}),
       ...(f.visibility.length ? { visibility: [...f.visibility] as Visibility[] } : {}),
       ...(field.length ? { field } : {}),
+      // The excluding half, sent on the list and the Facet read alike (ADR-0081).
+      ...(excluded.tag?.length ? { excludeTag: [...excluded.tag] } : {}),
+      ...(excluded.visibility?.length ? { excludeVisibility: [...excluded.visibility] as Visibility[] } : {}),
     };
   }
 
