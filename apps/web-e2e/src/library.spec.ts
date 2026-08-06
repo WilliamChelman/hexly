@@ -92,6 +92,22 @@ test('the Library lists what this World Mounts, credits the pack it draws from, 
   await expect(goblin).toBeVisible();
   await page.getByTestId('facet-clear').click();
 
+  // And **Container** excludes like any other category (ADR-0081, #423): browse everything this World
+  // Mounts *except* one pack — one click, rather than ticking every other Container.
+  await page.getByTestId(`facet-exclude-container-${pack}`).click();
+  await expect(page).toHaveURL(new RegExp(`[?&]excludeContainer=${pack}`));
+  await expect(goblin).toHaveCount(0);
+  await expect(ajax).toHaveCount(0);
+  await expect(painting).toBeVisible();
+  // The exclusion rides the URL, so a reload (and a shared link) reproduces the browse.
+  await page.reload();
+  await expect(page.getByTestId(`facet-exclude-container-${pack}`)).toHaveAttribute('aria-pressed', 'true');
+  await expect(goblin).toHaveCount(0);
+  // Reversible by the same control — never a one-way door.
+  await page.getByTestId(`facet-exclude-container-${pack}`).click();
+  await expect(goblin).toBeVisible();
+  await expect(painting).toBeVisible();
+
   // The rest of the rail behaves the same way too. Role is the pack's own dimension, harvested from
   // its stat block (ADR-0055) — findable by what a monster is, not by remembering its name.
   await page.getByTestId('facet-field-role-harrier').click();

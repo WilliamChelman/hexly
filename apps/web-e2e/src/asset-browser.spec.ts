@@ -1,4 +1,4 @@
-import { enterEntities, expect, openEntity, test } from './fixtures';
+import { enterEntities, expect, flushSave, openEntity, test } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
 
 // A real 20×8 solid-color PNG: minting it runs sharp, so the Asset gets image Stats (a landscape
@@ -111,6 +111,48 @@ test('the Asset Browser lists uploaded media as thumbnail tiles, with upload, se
   await page.getByTestId('entity-search').fill('nonexistent-name-xyz');
   await expect(page.getByTestId('no-matches')).toBeVisible();
   await page.getByTestId('entity-search').fill('');
+  await expect(tile).toHaveCount(1);
+});
+
+/**
+ * Exclusion reaches the Asset Browser (ADR-0081, #423): the same paired toggles the Entity Browser
+ * gained, on the surface where the ask is art that is *not* already tagged as used — one click rather
+ * than ticking every other Tag. The exclusion rides the URL and the same control releases it.
+ */
+test('the Asset Browser excludes a Tag: the tagged art drops out, a reload keeps it, the same click restores it', async ({
+  page,
+}) => {
+  const worldId = idFromSegment(await enterEntities(page)); // raw id the API keys on, decoded from the pretty segment
+
+  const uploaded = await page.request.post(`/api/worlds/${worldId}/assets`, {
+    multipart: { file: { name: 'guild-banner.png', mimeType: 'image/png', buffer: PNG_20x8 } },
+  });
+  expect(uploaded.ok(), `${uploaded.status()} ${await uploaded.text()}`).toBeTruthy();
+  const assetId = (await uploaded.json()).id as string;
+
+  // Tagged through the ordinary Entity path — an Asset is an Entity, so its Tags are Entity metadata.
+  await openEntity(page, assetId);
+  await page.getByTestId('tag-input').fill('used');
+  await page.getByTestId('tag-input').press('Enter');
+  await flushSave(page);
+
+  await page.getByTestId('nav-assets').click();
+  await page.waitForURL(/\/w\/[\w-]+\/assets$/);
+  const tile = page.locator('[data-testid^="asset-tile-"]');
+  await expect(tile).toHaveCount(1);
+
+  await page.getByTestId('facet-exclude-tag-used').click();
+  await expect(tile).toHaveCount(0);
+  await expect(page).toHaveURL(/[?&]excludeTag=used/);
+
+  // The exclusion rides the URL, so a reload (and a shared link) reproduces the browse.
+  await page.reload();
+  await expect(page.getByTestId('facet-exclude-tag-used')).toHaveAttribute('aria-pressed', 'true');
+  await expect(tile).toHaveCount(0);
+
+  // And it is never a one-way door: the excluded Tag stays listed although the drill-down no longer
+  // counts it, so the same control is still there to click off.
+  await page.getByTestId('facet-exclude-tag-used').click();
   await expect(tile).toHaveCount(1);
 });
 

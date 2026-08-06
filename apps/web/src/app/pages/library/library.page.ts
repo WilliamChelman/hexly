@@ -25,10 +25,20 @@ import {
   FieldRangeChange,
   FieldSelection,
   FieldValueToggle,
+  togglePolarity,
 } from '../entity-browser/components/facet-rail.component';
 import { fieldTokens, fieldsFromTokens, pruneField } from '../entity-browser/components/field-facet-url';
 
-const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [], fields: {}, container: [] };
+const NO_FACETS: ActiveFacets = {
+  type: [],
+  tag: [],
+  visibility: [],
+  fields: {},
+  container: [],
+  // The excluding half (ADR-0081). **Container** included, and only here: this is the one browse whose
+  // read spans many Containers, so "everything this World Mounts except that pack" is sayable.
+  excluded: { type: [], tag: [], container: [] },
+};
 const NO_FACET_COUNTS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] };
 
 // A bounded first page, like the Entity Browser, so a shelf of hundreds loads fast.
@@ -109,6 +119,7 @@ const SEARCH_DEBOUNCE_MS = 150;
           [facetCounts]="facetCounts()"
           [active]="activeFacets()"
           [canClear]="hasFilters()"
+          [canExclude]="true"
           (toggled)="toggleFacet($event)"
           (fieldValueToggled)="toggleFieldValue($event)"
           (fieldRangeChanged)="changeFieldRange($event)"
@@ -237,6 +248,7 @@ export class LibraryPage {
    * caller, so the category would annotate this list with a word that is false of it (ADR-0079).
    */
   protected readonly facetCounts = signal<EntityFacets>(NO_FACET_COUNTS);
+  /** Both polarities count as a filter (ADR-0081), so Clear all is offered — and clears — either. */
   protected readonly hasFilters = computed(() => {
     const f = this.activeFacets();
     return (
@@ -244,7 +256,8 @@ export class LibraryPage {
       f.type.length > 0 ||
       f.tag.length > 0 ||
       f.container.length > 0 ||
-      Object.keys(f.fields).length > 0
+      Object.keys(f.fields).length > 0 ||
+      Object.values(f.excluded ?? {}).some((values) => (values?.length ?? 0) > 0)
     );
   });
 
@@ -281,6 +294,11 @@ export class LibraryPage {
           tag: params.getAll('tag'),
           container: params.getAll('container'),
           field: params.getAll('field'),
+          // The exclusions ride the URL like their positive twins (ADR-0081), Container among them, so a
+          // narrowed browse survives a refresh and shares as a link.
+          excludeType: params.getAll('excludeType'),
+          excludeTag: params.getAll('excludeTag'),
+          excludeContainer: params.getAll('excludeContainer'),
         })),
         distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
         takeUntilDestroyed(),
@@ -292,8 +310,14 @@ export class LibraryPage {
           tag: f.tag,
           // Inert here: see {@link facetCounts} — the category is stripped from the counts.
           visibility: [],
-          fields: fieldsFromTokens(f.field),
+          // This rail carries the exclude control, so a `neq` token is honoured rather than dropped.
+          fields: fieldsFromTokens(f.field, true),
           container: f.container,
+          excluded: {
+            type: f.excludeType,
+            tag: f.excludeTag,
+            container: f.excludeContainer,
+          },
         });
       });
 
@@ -375,19 +399,23 @@ export class LibraryPage {
       });
   }
 
-  protected toggleFacet({ category, value }: FacetToggle): void {
+  /** Toggle one category value in the polarity the pressed control names; the other is released. */
+  protected toggleFacet({ category, value, polarity }: FacetToggle): void {
     const current = this.activeFacets();
-    const values = current[category];
-    const next = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
-    this.applyFacets({ ...current, [category]: next });
+    const next = togglePolarity(current[category], current.excluded?.[category] ?? [], value, polarity);
+    this.applyFacets({
+      ...current,
+      [category]: next.included,
+      excluded: { ...current.excluded, [category]: next.excluded },
+    });
   }
 
-  protected toggleFieldValue({ key, value }: FieldValueToggle): void {
+  /** As in a category, pressing either polarity of a Field value releases the other (ADR-0081). */
+  protected toggleFieldValue({ key, value, polarity }: FieldValueToggle): void {
     const current = this.activeFacets();
     const sel = current.fields[key] ?? {};
-    const values = sel.values ?? [];
-    const nextValues = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
-    this.setFieldSelection(current, key, { ...sel, values: nextValues });
+    const next = togglePolarity(sel.values ?? [], sel.excluded ?? [], value, polarity);
+    this.setFieldSelection(current, key, { ...sel, values: next.included, excluded: next.excluded });
   }
 
   protected changeFieldRange({ key, bound, value }: FieldRangeChange): void {
@@ -414,7 +442,17 @@ export class LibraryPage {
     this.activeFacets.set(NO_FACETS);
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { q: null, type: null, tag: null, container: null, field: null },
+      // Clear all clears both polarities (ADR-0081).
+      queryParams: {
+        q: null,
+        type: null,
+        tag: null,
+        container: null,
+        field: null,
+        excludeType: null,
+        excludeTag: null,
+        excludeContainer: null,
+      },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
@@ -422,15 +460,20 @@ export class LibraryPage {
 
   private mirrorToUrl(facets: ActiveFacets): void {
     const field = fieldTokens(facets.fields);
+    const excluded = facets.excluded ?? {};
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
         type: facets.type.length ? [...facets.type] : null,
         tag: facets.tag.length ? [...facets.tag] : null,
         // Only the *selection* rides the URL, never the scope: a shared link is meant to keep meaning
-        // after another Container is mounted.
+        // after another Container is mounted. Which holds of an exclusion too — it names a Container to
+        // leave out of the Mount set, not a smaller Mount set.
         container: facets.container.length ? [...facets.container] : null,
         field: field.length ? field : null,
+        excludeType: excluded.type?.length ? [...excluded.type] : null,
+        excludeTag: excluded.tag?.length ? [...excluded.tag] : null,
+        excludeContainer: excluded.container?.length ? [...excluded.container] : null,
       },
       queryParamsHandling: 'merge',
       replaceUrl: true,
@@ -486,6 +529,7 @@ export class LibraryPage {
   private activeFilterParams(): EntityFacetParams {
     const q = this.query();
     const f = this.activeFacets();
+    const excluded = f.excluded ?? {};
     const field = fieldTokens(f.fields);
     return {
       ...(q ? { q } : {}),
@@ -493,6 +537,11 @@ export class LibraryPage {
       ...(f.tag.length ? { tag: [...f.tag] } : {}),
       ...(f.container.length ? { container: [...f.container] } : {}),
       ...(field.length ? { field } : {}),
+      // The excluding half, sent on the list and the Facet read alike (ADR-0081). `excludeContainer`
+      // narrows *within* the scope like its positive twin: `containerId` still names every Mount.
+      ...(excluded.type?.length ? { excludeType: [...excluded.type] as EntityType[] } : {}),
+      ...(excluded.tag?.length ? { excludeTag: [...excluded.tag] } : {}),
+      ...(excluded.container?.length ? { excludeContainer: [...excluded.container] } : {}),
     };
   }
 

@@ -208,7 +208,7 @@ export class EntityBrowserPage {
       f.tag.length > 0 ||
       f.visibility.length > 0 ||
       Object.keys(f.fields).length > 0 ||
-      Object.values(f.excluded ?? {}).some((values) => values.length > 0)
+      Object.values(f.excluded ?? {}).some((values) => (values?.length ?? 0) > 0)
     );
   });
 

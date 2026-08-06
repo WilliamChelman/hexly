@@ -24,7 +24,7 @@ describe('field-facet-url — the `key:op:value` round trip', () => {
   });
 
   /** The dual of "the rail never renders a lit control that is not in force": a browse with no
-   * exclude control must not filter by a veto its reader cannot release (#423). */
+   * exclude control must not filter by a veto its reader cannot release (ADR-0081). */
   it('drops a `neq` on a browse that renders no exclude control, keeping the rest of the key', () => {
     const decoded = fieldsFromTokens(['size:eq:small', 'size:neq:large']);
     expect(decoded['size']).toEqual({ values: ['small'] });
