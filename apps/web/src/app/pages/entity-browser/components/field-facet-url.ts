@@ -1,4 +1,4 @@
-import { parseFieldFilters } from '@hexly/domain';
+import { FieldFilter, parseFieldFilters } from '@hexly/domain';
 import { FieldSelection, isFieldSelectionEmpty } from './facet-rail.component';
 
 /**
@@ -28,9 +28,17 @@ export function fieldTokens(fields: Readonly<Record<string, FieldSelection>>): s
  * into `lte` either way — a bound is not what it says.
  */
 export function fieldsFromTokens(tokens: readonly string[], canExclude = false): Record<string, FieldSelection> {
+  return foldFieldFilters(parseFieldFilters(tokens).filter((f) => canExclude || f.op !== 'neq'));
+}
+
+/**
+ * Fold `key`/`op`/`value` filters into the per-key {@link FieldSelection} record — the one place the
+ * op→slot mapping lives, shared by the URL codec above and the **Facet Token** parse (ADR-0082), which
+ * speaks the same filters from a typed `$key:value`.
+ */
+export function foldFieldFilters(filters: readonly FieldFilter[]): Record<string, FieldSelection> {
   const out: Record<string, { values: string[]; excluded: string[]; gte?: string; lte?: string }> = {};
-  for (const f of parseFieldFilters(tokens)) {
-    if (f.op === 'neq' && !canExclude) continue;
+  for (const f of filters) {
     const sel = (out[f.key] ??= { values: [], excluded: [] });
     if (f.op === 'eq') sel.values.push(f.value);
     else if (f.op === 'neq') sel.excluded.push(f.value);
