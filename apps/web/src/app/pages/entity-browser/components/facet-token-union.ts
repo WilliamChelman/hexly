@@ -1,5 +1,5 @@
 import { FacetTokenCategory, FacetTokenValues, FieldFilter, ParsedFacetQuery } from '@hexly/domain';
-import { ActiveFacets, FieldSelection } from './facet-rail.component';
+import { ActiveFacets, FieldSelection, QueryOwnedFacets } from './facet-rail.component';
 import { foldFieldFilters, pruneField } from './field-facet-url';
 
 /** The categories both stores speak, in the rail's own order. */
@@ -33,6 +33,21 @@ export function unionFacets(parsed: ParsedFacetQuery, rail: ActiveFacets): Activ
     excluded: merge(parsed.exclude, rail.excluded ?? {}),
     fields: unionFields(parsed.fields, rail.fields),
   };
+}
+
+/**
+ * Which of the rendered values the **text** owns (ADR-0082, #425) — the half of the union the rail
+ * marks as query-owned, and the half a click deletes a token for rather than toggling. Either polarity
+ * counts: a value has one visual state whichever way the box named it.
+ */
+export function queryOwnedFacets(parsed: ParsedFacetQuery): QueryOwnedFacets {
+  const categories: Partial<Record<FacetTokenCategory, readonly string[]>> = {};
+  for (const category of CATEGORIES) categories[category] = [...parsed.include[category], ...parsed.exclude[category]];
+  const fields: Record<string, string[]> = {};
+  // A bound is left out: `$cr:>=5` lights no row, so there is no row to click off.
+  for (const filter of parsed.fields)
+    if (filter.op === 'eq' || filter.op === 'neq') (fields[filter.key] ??= []).push(filter.value);
+  return { categories, fields };
 }
 
 /** The Field half of the union: the same rule, per Facet key — a value the text names drops from the

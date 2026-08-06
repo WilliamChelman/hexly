@@ -5,7 +5,7 @@ import { EntityFacets } from '@hexly/domain';
 import { ClientConfigStore } from '@hexly/web-core';
 import { mockClientConfigStore } from '@hexly/web-core/testing';
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
-import { ActiveFacets, FacetRailComponent } from './facet-rail.component';
+import { ActiveFacets, FacetRailComponent, QueryOwnedFacets } from './facet-rail.component';
 
 /** The Visibility category is gated on the Collaboration layer (ADR-0071); Type and Tag are not. */
 describe('FacetRail — the Visibility category under Collaboration (#316)', () => {
@@ -440,5 +440,131 @@ describe('FacetRail — harvested dimension labels (#235)', () => {
     // Numeric dimension → range inputs; the enum scalar → value toggles.
     expect(el.querySelector('[data-testid="facet-field-fx_threat-gte"]')).not.toBeNull();
     expect(el.querySelector('[data-testid="facet-field-alignment-lawful-good"]')).not.toBeNull();
+  });
+});
+
+/**
+ * A value the *text* named renders as query-owned (ADR-0082, #425) — visibly not the same thing as a
+ * value clicked into the rail, because clicking it edits the box rather than the rail's own store.
+ */
+describe('FacetRail — a value the text owns (#425)', () => {
+  function render(
+    counts: Partial<EntityFacets>,
+    active: Partial<ActiveFacets>,
+    queryOwned: QueryOwnedFacets,
+  ): ComponentFixture<FacetRailComponent> {
+    TestBed.configureTestingModule({
+      imports: [FacetRailComponent, provideTranslocoTesting()],
+      providers: [{ provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration: signal(true) }) }],
+    });
+    const fixture = TestBed.createComponent(FacetRailComponent);
+    fixture.componentRef.setInput('facetCounts', {
+      type: [],
+      tag: [],
+      visibility: [],
+      fields: [],
+      ...counts,
+    } satisfies EntityFacets);
+    fixture.componentRef.setInput('active', {
+      type: [],
+      tag: [],
+      visibility: [],
+      fields: {},
+      container: [],
+      ...active,
+    } satisfies ActiveFacets);
+    fixture.componentRef.setInput('canExclude', true);
+    fixture.componentRef.setInput('queryOwned', queryOwned);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  const btn = (fixture: ComponentFixture<FacetRailComponent>, tid: string) =>
+    (fixture.nativeElement as HTMLElement).querySelector(`[data-testid="${tid}"]`) as HTMLButtonElement | null;
+
+  const TAGS = {
+    tag: [
+      { value: 'draft', count: 2 },
+      { value: 'fantasy', count: 1 },
+    ],
+  };
+
+  it('tells a typed value from a clicked one, both being in force', () => {
+    const fixture = render(TAGS, { tag: ['draft', 'fantasy'] }, { categories: { tag: ['draft'] } });
+
+    const typed = btn(fixture, 'facet-tag-draft');
+    const clicked = btn(fixture, 'facet-tag-fantasy');
+    expect(typed?.getAttribute('aria-pressed')).toBe('true');
+    expect(clicked?.getAttribute('aria-pressed')).toBe('true');
+    // Same state, two sources — and the rail says which is which.
+    expect(typed?.hasAttribute('data-query-owned')).toBe(true);
+    expect(clicked?.hasAttribute('data-query-owned')).toBe(false);
+  });
+
+  it('says what clicking a query-owned row does, rather than repeating the row’s label', () => {
+    const fixture = render(TAGS, { tag: ['draft'] }, { categories: { tag: ['draft'] } });
+
+    expect(btn(fixture, 'facet-tag-draft')?.getAttribute('aria-label')).toBe('Remove draft from the search box');
+    expect(btn(fixture, 'facet-tag-fantasy')?.getAttribute('aria-label')).toBeNull();
+  });
+
+  it('names the query-owned row in the active Locale', () => {
+    const fixture = render(TAGS, { tag: ['draft'] }, { categories: { tag: ['draft'] } });
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    expect(btn(fixture, 'facet-tag-draft')?.getAttribute('aria-label')).toBe('Retirer draft de la recherche');
+  });
+
+  /** A typed exclusion lights the exclude control, so that control has to say query-owned too. */
+  it('marks both of a query-owned row’s controls, whichever polarity the text named', () => {
+    const fixture = render(TAGS, { excluded: { tag: ['draft'] } }, { categories: { tag: ['draft'] } });
+
+    expect(btn(fixture, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+    expect(btn(fixture, 'facet-exclude-tag-draft')?.hasAttribute('data-query-owned')).toBe(true);
+    expect(btn(fixture, 'facet-tag-draft')?.hasAttribute('data-query-owned')).toBe(true);
+    expect(btn(fixture, 'facet-exclude-tag-draft')?.getAttribute('aria-label')).toBe(
+      'Remove draft from the search box',
+    );
+  });
+
+  it('marks a Field value the text owns, and leaves the Field’s other values alone', () => {
+    const fixture = render(
+      {
+        fields: [
+          {
+            key: 'alignment',
+            label: 'Alignment',
+            dataType: { kind: 'enum' as const, options: ['lawful-good', 'chaotic-evil'] },
+            values: [
+              { value: 'lawful-good', count: 1 },
+              { value: 'chaotic-evil', count: 1 },
+            ],
+          },
+        ],
+      },
+      { fields: { alignment: { values: ['lawful-good', 'chaotic-evil'] } } },
+      { fields: { alignment: ['lawful-good'] } },
+    );
+
+    expect(btn(fixture, 'facet-field-alignment-lawful-good')?.hasAttribute('data-query-owned')).toBe(true);
+    expect(btn(fixture, 'facet-exclude-field-alignment-lawful-good')?.hasAttribute('data-query-owned')).toBe(true);
+    expect(btn(fixture, 'facet-field-alignment-chaotic-evil')?.hasAttribute('data-query-owned')).toBe(false);
+  });
+
+  it('emits the ordinary toggle from a query-owned row — what a click means is the page’s to decide', () => {
+    const fixture = render(TAGS, { tag: ['draft'] }, { categories: { tag: ['draft'] } });
+    const toggled = vi.fn();
+    fixture.componentInstance.toggled.subscribe(toggled);
+
+    btn(fixture, 'facet-tag-draft')?.click();
+
+    expect(toggled).toHaveBeenLastCalledWith({ category: 'tag', value: 'draft', polarity: 'include' });
+  });
+
+  it('owns nothing where no text named anything — every other rail surface passes none', () => {
+    const fixture = render(TAGS, { tag: ['draft'] }, {});
+
+    expect(btn(fixture, 'facet-tag-draft')?.hasAttribute('data-query-owned')).toBe(false);
   });
 });
