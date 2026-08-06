@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FacetKeySet, parseFacetQuery } from './facet-token';
+import { FacetKeySet, parseFacetQuery, removeFacetToken } from './facet-token';
 
 describe('parseFacetQuery (ADR-0082)', () => {
   /** The Entity Browser's vocabulary: the reserved trio it can apply, plus two Facet keys. */
@@ -204,5 +204,82 @@ describe('parseFacetQuery (ADR-0082)', () => {
 
     expect(parsed.include.type).toEqual(['npc']);
     expect(parsed.include.container).toEqual(['pack-1']);
+  });
+});
+
+describe('removeFacetToken (ADR-0082)', () => {
+  const keys: FacetKeySet = {
+    reserved: ['type', 'tag', 'visibility'],
+    fields: ['challenge_rating', 'region'],
+  };
+
+  it('takes the token naming a value out, leaving every other word as typed', () => {
+    expect(
+      removeFacetToken('orc $tag:fantasy Session 4: the ambush', keys, { category: 'tag', value: 'fantasy' }),
+    ).toBe('orc Session 4: the ambush');
+  });
+
+  it('leaves a second token naming another value of the same Facet alone', () => {
+    expect(removeFacetToken('$tag:draft $tag:fantasy', keys, { category: 'tag', value: 'draft' })).toBe('$tag:fantasy');
+  });
+
+  it('takes an exclusion out, its leading dash with it', () => {
+    expect(removeFacetToken('-$tag:draft orc', keys, { category: 'tag', value: 'draft' })).toBe('orc');
+  });
+
+  it('takes a value out of a comma list and leaves the list', () => {
+    expect(removeFacetToken('$tag:a,b,c', keys, { category: 'tag', value: 'b' })).toBe('$tag:a,c');
+    expect(removeFacetToken('$tag:a,b,c', keys, { category: 'tag', value: 'a' })).toBe('$tag:b,c');
+    expect(removeFacetToken('$tag:a,b,c', keys, { category: 'tag', value: 'c' })).toBe('$tag:a,b');
+  });
+
+  it('takes a quoted value out by what it says, quotes and all', () => {
+    expect(removeFacetToken('$tag:"sea of storms",b orc', keys, { category: 'tag', value: 'sea of storms' })).toBe(
+      '$tag:b orc',
+    );
+  });
+
+  it('empties a box that held nothing else', () => {
+    expect(removeFacetToken('$tag:draft', keys, { category: 'tag', value: 'draft' })).toBe('');
+  });
+
+  it('takes out both polarities of one value, so one click leaves nothing behind', () => {
+    expect(removeFacetToken('$tag:draft -$tag:draft', keys, { category: 'tag', value: 'draft' })).toBe('');
+  });
+
+  it('addresses the Container by the name it is typed with, on a surface that offers it', () => {
+    expect(removeFacetToken('orc $in:pack-1', { fields: [] }, { category: 'container', value: 'pack-1' })).toBe('orc');
+  });
+
+  it('takes out a Facet key’s value, matched on its key', () => {
+    expect(removeFacetToken('$region:north $tag:north', keys, { field: 'region', value: 'north' })).toBe('$tag:north');
+  });
+
+  it('never mistakes a bound for a value', () => {
+    expect(
+      removeFacetToken('$challenge_rating:>=5 $challenge_rating:5', keys, { field: 'challenge_rating', value: '5' }),
+    ).toBe('$challenge_rating:>=5');
+  });
+
+  it('leaves prose that merely spells the value where it is', () => {
+    expect(removeFacetToken('fantasy $tag:fantasy', keys, { category: 'tag', value: 'fantasy' })).toBe('fantasy');
+  });
+
+  it('matches a value exactly, case included', () => {
+    expect(removeFacetToken('$tag:Draft', keys, { category: 'tag', value: 'draft' })).toBe('$tag:Draft');
+  });
+
+  it('leaves a box that never named the value untouched', () => {
+    expect(removeFacetToken('orc  hero', keys, { category: 'tag', value: 'draft' })).toBe('orc  hero');
+  });
+
+  it('takes one separating space with the token, and no more of the caller’s spacing', () => {
+    expect(removeFacetToken('orc  $tag:a  hero', keys, { category: 'tag', value: 'a' })).toBe('orc  hero');
+  });
+
+  it('leaves a key this surface does not answer to alone', () => {
+    expect(removeFacetToken('$region:north', { reserved: [], fields: [] }, { field: 'region', value: 'north' })).toBe(
+      '$region:north',
+    );
   });
 });

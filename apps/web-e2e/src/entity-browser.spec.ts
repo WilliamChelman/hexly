@@ -196,3 +196,51 @@ test('the browser’s search box keeps Assets out of the listing; the type facet
   await expect(page.getByTestId(`open-${assetId}`)).toBeVisible();
   await expect(page.getByTestId(`open-${noteId}`)).toHaveCount(0);
 });
+
+/**
+ * The **Facet Token** journey through the real stack (ADR-0082, #425): a filter lives where it was
+ * named — typed in the box, or clicked in the rail — and either is reversed there, the rail's one
+ * write into the text being the deletion of a token the reader typed themselves.
+ */
+test('a typed Facet filters, a clicked one stays out of the box, and clicking a typed value off takes its token with it', async ({
+  page,
+}) => {
+  const worldId = idFromSegment(await enterEntities(page));
+  const tagged = async (name: string, tag: string) => {
+    const created = await page.request.post('/api/entities', {
+      data: { name, types: ['core.type.note'], tags: [tag], worldId },
+    });
+    expect(created.ok(), `${created.status()} ${await created.text()}`).toBeTruthy();
+    return (await created.json()).id as string;
+  };
+  const draft = await tagged('Sunken Chapel', 'draft');
+  const fantasy = await tagged('Aldermoor Keep', 'fantasy');
+  await page.reload();
+
+  // Typed: the token filters, and the box goes on holding exactly what was typed.
+  await page.getByTestId('entity-search').fill('$tag:draft');
+  await expect(page.getByTestId(`open-${draft}`)).toBeVisible();
+  await expect(page.getByTestId(`open-${fantasy}`)).toHaveCount(0);
+  await expect(page.getByTestId('entity-search')).toHaveValue('$tag:draft');
+  // The rail says which store the row came from: this one, the text owns.
+  await expect(page.getByTestId('facet-tag-draft')).toHaveAttribute('data-query-owned', '');
+
+  // Clicked: the Facet lands in the rail's own param, and never in the box.
+  await page.getByTestId('facet-type-core.type.note').click();
+  await expect(page).toHaveURL(/type=core\.type\.note/);
+  await expect(page.getByTestId('entity-search')).toHaveValue('$tag:draft');
+  await expect(page.getByTestId('facet-type-core.type.note')).not.toHaveAttribute('data-query-owned', '');
+
+  // Excluded: the other Tag is vetoed from the rail, alongside the typed inclusion.
+  await page.getByTestId('facet-exclude-tag-fantasy').click();
+  await expect(page).toHaveURL(/excludeTag=fantasy/);
+  await expect(page.getByTestId('entity-search')).toHaveValue('$tag:draft');
+
+  // Clicked off: the typed row deletes the token that named it, and the box loses exactly that.
+  await page.getByTestId('facet-tag-draft').click();
+  await expect(page.getByTestId('entity-search')).toHaveValue('');
+  // What the rail named is still in force — only the text's own filter came undone.
+  await expect(page).toHaveURL(/excludeTag=fantasy/);
+  await expect(page.getByTestId(`open-${draft}`)).toBeVisible();
+  await expect(page.getByTestId(`open-${fantasy}`)).toHaveCount(0);
+});

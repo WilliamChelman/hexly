@@ -63,6 +63,22 @@ export interface ActiveFacets {
  */
 export type FacetCategory = 'type' | 'tag' | 'visibility' | 'container';
 
+/**
+ * The displayed values the *text* owns, in either polarity — a value has one visual state whichever way
+ * it was named (ADR-0082). Empty wherever no **Facet Token** parse stands behind the rail.
+ */
+export interface QueryOwnedFacets {
+  readonly categories?: Partial<Record<FacetCategory, readonly string[]>>;
+  /** Per Facet key, the values a token named — never a bound, which is no row to click off. */
+  readonly fields?: Readonly<Record<string, readonly string[]>>;
+}
+
+/** The outline that tells a typed value from a clicked one; transparent otherwise, so a row neither
+ * shifts nor resizes as the text takes it over. One rule, worn by both of a row's controls. */
+function queryOwnedOutline(queryOwned: boolean): string {
+  return queryOwned ? 'border border-dashed border-accent' : 'border border-transparent';
+}
+
 /** Which half of a value's polarity a click addressed (ADR-0081). */
 export type FacetPolarity = 'include' | 'exclude';
 
@@ -99,9 +115,14 @@ export interface FieldRangeChange {
     <button
       type="button"
       [attr.data-testid]="testid()"
+      [attr.data-query-owned]="queryOwned() ? '' : null"
       [attr.aria-pressed]="pressed()"
-      [attr.aria-label]="'entityBrowser.facets.excludeValue' | transloco: { value: label() }"
+      [attr.aria-label]="
+        (queryOwned() ? 'entityBrowser.facets.removeTyped' : 'entityBrowser.facets.excludeValue')
+          | transloco: { value: label() }
+      "
       class="shrink-0 w-6 flex items-center justify-center rounded-sm font-sans text-sm text-ink-faint hover:bg-surface-sunken aria-pressed:bg-danger-soft aria-pressed:text-danger"
+      [class]="outline(queryOwned())"
       (click)="press.emit()"
     >
       <span aria-hidden="true">−</span>
@@ -111,9 +132,13 @@ export interface FieldRangeChange {
 export class FacetExcludeToggleComponent {
   readonly testid = input.required<string>();
   readonly pressed = input.required<boolean>();
+  /** Whether the *text* put this value in force (ADR-0082): pressing it takes the token out of the box. */
+  readonly queryOwned = input(false);
   /** The row's rendered label — the exclude control names itself with it, the include one carries it. */
   readonly label = input.required<string>();
   readonly press = output<void>();
+
+  protected readonly outline = queryOwnedOutline;
 }
 
 /**
@@ -158,17 +183,29 @@ export class FacetExcludeToggleComponent {
                 <button
                   type="button"
                   [attr.data-testid]="'facet-' + group.category + '-' + row.value"
+                  [attr.data-query-owned]="row.queryOwned ? '' : null"
                   [attr.aria-pressed]="row.active"
+                  [attr.aria-label]="
+                    row.queryOwned ? ('entityBrowser.facets.removeTyped' | transloco: { value: row.label }) : null
+                  "
                   class="flex-1 min-w-0 flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
+                  [class]="outline(row.queryOwned)"
                   (click)="toggled.emit({ category: group.category, value: row.value, polarity: 'include' })"
                 >
-                  <span class="truncate">{{ row.label }}</span>
+                  <span class="min-w-0 flex items-baseline gap-1">
+                    <!-- The dollar the caller typed, kept beside the value it named (ADR-0082). -->
+                    @if (row.queryOwned) {
+                      <span aria-hidden="true" class="shrink-0 font-mono text-accent-strong">$</span>
+                    }
+                    <span class="truncate">{{ row.label }}</span>
+                  </span>
                   <span class="ml-2 text-ink-faint tabular-nums">{{ row.count }}</span>
                 </button>
                 @if (canExclude()) {
                   <app-facet-exclude-toggle
                     [testid]="'facet-exclude-' + group.category + '-' + row.value"
                     [pressed]="row.excluded"
+                    [queryOwned]="row.queryOwned"
                     [label]="row.label"
                     (press)="toggled.emit({ category: group.category, value: row.value, polarity: 'exclude' })"
                   />
@@ -216,8 +253,13 @@ export class FacetExcludeToggleComponent {
                   <button
                     type="button"
                     [attr.data-testid]="'facet-field-' + field.key + '-' + row.value"
+                    [attr.data-query-owned]="row.queryOwned ? '' : null"
                     [attr.aria-pressed]="row.active"
+                    [attr.aria-label]="
+                      row.queryOwned ? ('entityBrowser.facets.removeTyped' | transloco: { value: row.label }) : null
+                    "
                     class="flex-1 min-w-0 flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
+                    [class]="outline(row.queryOwned)"
                     (click)="
                       fieldValueToggled.emit({
                         key: field.key,
@@ -226,13 +268,19 @@ export class FacetExcludeToggleComponent {
                       })
                     "
                   >
-                    <span class="truncate">{{ row.label }}</span>
+                    <span class="min-w-0 flex items-baseline gap-1">
+                      @if (row.queryOwned) {
+                        <span aria-hidden="true" class="shrink-0 font-mono text-accent-strong">$</span>
+                      }
+                      <span class="truncate">{{ row.label }}</span>
+                    </span>
                     <span class="ml-2 text-ink-faint tabular-nums">{{ row.count }}</span>
                   </button>
                   @if (canExclude()) {
                     <app-facet-exclude-toggle
                       [testid]="'facet-exclude-field-' + field.key + '-' + row.value"
                       [pressed]="row.excluded"
+                      [queryOwned]="row.queryOwned"
                       [label]="row.label"
                       (press)="
                         fieldValueToggled.emit({
@@ -270,6 +318,11 @@ export class FacetRailComponent {
     fields: {},
     container: [],
   });
+  /**
+   * The displayed values a **Facet Token** put in force (ADR-0082). Rendering only: the rail emits the
+   * same toggle either way, and the page decides that a click on one of these deletes the token.
+   */
+  readonly queryOwned = input<QueryOwnedFacets>({});
   readonly canClear = input(false);
   /** Whether this browse offers the excluding half (ADR-0081); off by default, so the rail is never
    * given a control whose param its page does not carry. Every rail surface passes it since #423 —
@@ -280,6 +333,8 @@ export class FacetRailComponent {
   readonly fieldValueToggled = output<FieldValueToggle>();
   readonly fieldRangeChanged = output<FieldRangeChange>();
   readonly clearAll = output<void>();
+
+  protected readonly outline = queryOwnedOutline;
 
   protected emitRange(key: string, bound: 'gte' | 'lte', event: Event): void {
     this.fieldRangeChanged.emit({
@@ -310,6 +365,7 @@ export class FacetRailComponent {
     this.transloco.activeLang(); // reactive dependency: re-translate labels on switch
     const active = this.active();
     const excluded = active.excluded ?? {};
+    const owned = this.queryOwned().categories ?? {};
     const counts = this.facetCounts();
     const categories = [
       {
@@ -352,6 +408,7 @@ export class FacetRailComponent {
           label: g.label(r),
           active: active[g.category].includes(r.value),
           excluded: (excluded[g.category] ?? []).includes(r.value),
+          queryOwned: (owned[g.category] ?? []).includes(r.value),
         })),
       }));
   });
@@ -366,6 +423,7 @@ export class FacetRailComponent {
   protected readonly fieldFacets = computed(() => {
     this.transloco.activeLang(); // reactive dependency: re-translate labels/aria-labels on switch
     const activeFields = this.active().fields;
+    const ownedFields = this.queryOwned().fields ?? {};
     return this.facetCounts()
       .fields.map((field) => {
         const selection = activeFields[field.key] ?? {};
@@ -381,6 +439,7 @@ export class FacetRailComponent {
           label: this.valueLabel(field.valuesKeyPrefix, v),
           active: selected.includes(v.value),
           excluded: vetoed.includes(v.value),
+          queryOwned: (ownedFields[field.key] ?? []).includes(v.value),
         }));
         return {
           key: field.key,

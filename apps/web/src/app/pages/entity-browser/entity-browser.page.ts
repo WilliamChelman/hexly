@@ -8,8 +8,11 @@ import {
   EntityPage,
   EntitySummary,
   EntityType,
+  FacetKeySet,
+  FacetTokenTarget,
   FieldFilter,
   parseFacetQuery,
+  removeFacetToken,
   Visibility,
 } from '@hexly/domain';
 import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, AppShellStore } from '@hexly/web-core';
@@ -30,7 +33,7 @@ import {
   togglePolarity,
 } from './components/facet-rail.component';
 import { fieldTokens, fieldsFromTokens, pruneField } from './components/field-facet-url';
-import { unionFacets } from './components/facet-token-union';
+import { queryOwnedFacets, unionFacets } from './components/facet-token-union';
 import { TypeRegistry } from '../../entity-types/type-registry';
 
 const NO_FACETS: ActiveFacets = {
@@ -106,6 +109,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
         <app-facet-rail
           [facetCounts]="facetCounts()"
           [active]="activeFacets()"
+          [queryOwned]="queryOwned()"
           [canClear]="hasFilters()"
           [canExclude]="true"
           (toggled)="toggleFacet($event)"
@@ -216,13 +220,18 @@ export class EntityBrowserPage {
   private readonly typed = new Subject<string>();
 
   /**
-   * What the box means: its **Facet Tokens** as structured filters and the free text left over. The key
-   * set comes from the client registry, synchronously, minus `in` — a browse scoped to one **Container**
-   * has nothing to narrow, so `$in:` is reported as a miss rather than dropped (ADR-0082).
+   * This surface's Facet vocabulary, read from the client registry, synchronously, minus `in` — a
+   * browse scoped to one **Container** has nothing to narrow, so `$in:` is reported as a miss rather
+   * than dropped (ADR-0082). The same set parses the box and finds the token a rail click deletes.
    */
-  protected readonly parsedQuery = computed(() =>
-    parseFacetQuery(this.rawQuery(), { reserved: ['type', 'tag', 'visibility'], fields: this.types.facetKeys() }),
-  );
+  private readonly facetKeys = computed<FacetKeySet>(() => ({
+    reserved: ['type', 'tag', 'visibility'],
+    fields: this.types.facetKeys(),
+  }));
+  /** What the box means: its **Facet Tokens** as structured filters and the free text left over. */
+  protected readonly parsedQuery = computed(() => parseFacetQuery(this.rawQuery(), this.facetKeys()));
+  /** Which rail rows the text owns, so they render as query-owned and click off as a token (#425). */
+  protected readonly queryOwned = computed(() => queryOwnedFacets(this.parsedQuery()));
   /** The residual full-text query — what the wire's `q` carries, as against the URL's raw string. */
   private readonly searchText = computed(() => this.parsedQuery().text);
   /** Whether the box holds anything at all to search or filter by — blanks are not a query. */
@@ -312,15 +321,7 @@ export class EntityBrowserPage {
     this.typed.pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed()).subscribe((raw) => {
       // Kept verbatim, untrimmed: a trailing space is inside a `$tag:"sea of ` still being typed, and
       // the box must go on holding exactly what was typed (ADR-0082). The parser trims the residual.
-      this.rawQuery.set(raw);
-      // Mirror to the URL: merge keeps the World scope, replaceUrl avoids a
-      // history entry per keystroke.
-      this.router.navigate([], {
-        relativeTo: this.route,
-        queryParams: { q: raw || null },
-        queryParamsHandling: 'merge',
-        replaceUrl: true,
-      });
+      this.setQuery(raw);
     });
 
     // Refetch page one whenever the World, query, or Facets change — covers a
@@ -339,7 +340,7 @@ export class EntityBrowserPage {
   /** Toggle one category value in the polarity the pressed control names; the other is released.
    * Against the rail store alone — a clicked Facet lives in the rail, and never writes text (ADR-0082). */
   protected toggleFacet({ category, value, polarity }: FacetToggle): void {
-    if (this.namedInText(category, value)) return;
+    if (this.namedInText(category, value)) return this.dropToken({ category, value });
     const current = this.railFacets();
     const next = togglePolarity(current[category], current.excluded?.[category] ?? [], value, polarity);
     this.applyFacets({
@@ -352,7 +353,8 @@ export class EntityBrowserPage {
   /** Toggle one enum/list/string Field-facet value: `eq` membership (OR within the Field), or its
    * `neq` veto. As in a category, pressing either polarity releases the other. */
   protected toggleFieldValue({ key, value, polarity }: FieldValueToggle): void {
-    if (this.fieldNamedInText(key, (f) => (f.op === 'eq' || f.op === 'neq') && f.value === value)) return;
+    if (this.fieldNamedInText(key, (f) => (f.op === 'eq' || f.op === 'neq') && f.value === value))
+      return this.dropToken({ field: key, value });
     const current = this.railFacets();
     const sel = current.fields[key] ?? {};
     const next = togglePolarity(sel.values ?? [], sel.excluded ?? [], value, polarity);
@@ -371,10 +373,32 @@ export class EntityBrowserPage {
   }
 
   /**
+   * The one rail→text write in the design, and always a deletion (ADR-0082): a click on a row the text
+   * owns takes the token that named it out of the box, whichever of the row's two controls was pressed.
+   * The rail store is left alone — a value it holds from an earlier click was only being masked by the
+   * text, and stays in force, one more click from release.
+   */
+  private dropToken(target: FacetTokenTarget): void {
+    this.setQuery(removeFacetToken(this.rawQuery(), this.facetKeys(), target));
+  }
+
+  /** Commit the text store: the box's raw string, mirrored to the URL's `q`. Merge keeps the World
+   * scope; replaceUrl avoids a history entry per keystroke. */
+  private setQuery(raw: string): void {
+    this.rawQuery.set(raw);
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { q: raw || null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  /**
    * Whether the text already names this value, in either polarity — in which case the rail must not
    * write it: the text owns it, the union would hide the rail's copy, and backspacing the token later
-   * would leave a filter nobody clicked. Reversing a typed Facet is the box's job until #425 makes the
-   * rail row delete the token that named it (ADR-0082).
+   * would leave a filter nobody clicked. A click on such a row deletes the token instead
+   * ({@link dropToken}), which is where a typed Facet is reversed (ADR-0082).
    */
   private namedInText(category: FacetCategory, value: string): boolean {
     const parsed = this.parsedQuery();

@@ -1569,25 +1569,6 @@ describe('EntityBrowser', () => {
         expect(searchBox(fixture.nativeElement).value).toBe('orc $tag:fantasy');
       });
 
-      /** Reversing a typed Facet is the box's job until #425; the rail must not write a copy the union
-       * then hides, or backspacing the token would leave a filter nobody clicked. */
-      it('writes nothing when a rail row the text owns is clicked', () => {
-        withCounts();
-        const fixture = renderWith([summary({ id: 'm1' })]);
-        const el = fixture.nativeElement as HTMLElement;
-        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
-
-        search(fixture, '$tag:draft');
-        const calls = client.list.mock.calls.length;
-        navigate.mockClear();
-        facet(el, 'facet-exclude-tag-draft')?.click();
-        fixture.detectChanges();
-
-        expect(navigate).not.toHaveBeenCalled();
-        expect(client.list.mock.calls.length).toBe(calls);
-        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
-      });
-
       it('counts a box of blanks as no query at all', () => {
         withCounts();
         const fixture = renderWith([]);
@@ -1614,6 +1595,186 @@ describe('EntityBrowser', () => {
 
         expect(searchBox(el).value).toBe('');
         expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+    });
+
+    /**
+     * Everything applied is reversible where it was named (ADR-0082): a rail row the text owns renders
+     * as query-owned, and clicking it deletes *that* token from the box — the one rail→text write, and
+     * always a deletion.
+     */
+    describe('Clicking a typed value off (#425)', () => {
+      const withCounts = () =>
+        client.facets.mockReturnValue(
+          of({
+            type: [{ value: 'core.type.note', count: 3 }],
+            tag: [
+              { value: 'draft', count: 2 },
+              { value: 'fantasy', count: 1 },
+            ],
+            visibility: [],
+            fields: [
+              {
+                key: 'test.field.alignment',
+                label: 'Alignment',
+                dataType: { kind: 'enum' as const, options: ['lawful-good', 'chaotic-evil'] },
+                values: [{ value: 'lawful-good', count: 1 }],
+              },
+            ],
+          }),
+        );
+
+      /** The Field behind that facet, so `$test.field.alignment:` resolves off the client registry. */
+      const withWorldField = () =>
+        TestBed.inject(TypeRegistry).setWorldFields([
+          {
+            id: 'test.field.alignment',
+            label: 'Alignment',
+            dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
+            required: false,
+            facetable: true,
+          },
+        ]);
+
+      it('renders a typed value as query-owned, where a clicked one is not', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:draft');
+        facet(el, 'facet-type-core.type.note')?.click();
+        fixture.detectChanges();
+
+        expect(facet(el, 'facet-tag-draft')?.hasAttribute('data-query-owned')).toBe(true);
+        expect(facet(el, 'facet-type-core.type.note')?.hasAttribute('data-query-owned')).toBe(false);
+      });
+
+      it('takes that token out of the box and leaves every other word, tokens included', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, 'orc $tag:draft $tag:fantasy');
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+
+        // The second Tag token is another value of the same Facet, and is none of this click's business.
+        expect(searchBox(el).value).toBe('orc $tag:fantasy');
+        expect(client.list).toHaveBeenLastCalledWith({
+          q: 'orc',
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          tag: ['fantasy'],
+        });
+        // The URL's `q` follows the box, and the rail's own params are untouched: nothing was clicked in.
+        expect(navigate).toHaveBeenLastCalledWith(
+          [],
+          expect.objectContaining({ queryParams: { q: 'orc $tag:fantasy' } }),
+        );
+      });
+
+      it('takes out a token the text wrote as an exclusion', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '-$tag:draft');
+        expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        expect(searchBox(el).value).toBe('');
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+
+      /** Whichever half is pressed, a typed value is one state to release — the token goes, no rail
+       * entry takes its place, and the URL never grows a param nobody clicked. */
+      it('releases a typed inclusion from either of its controls, writing nothing into the rail', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:draft');
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        expect(searchBox(el).value).toBe('');
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+        expect(navigate).not.toHaveBeenCalledWith(
+          [],
+          expect.objectContaining({ queryParams: expect.objectContaining({ excludeTag: ['draft'] }) }),
+        );
+      });
+
+      it('takes out a Facet key’s token from its Field row', () => {
+        withWorldField();
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$test.field.alignment:lawful-good');
+        expect(facet(el, 'facet-field-test.field.alignment-lawful-good')?.hasAttribute('data-query-owned')).toBe(true);
+        facet(el, 'facet-field-test.field.alignment-lawful-good')?.click();
+        fixture.detectChanges();
+
+        expect(searchBox(el).value).toBe('');
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+
+      /** The click deletes the token, and only the token: a value the rail was already holding was
+       * merely masked by the text (ADR-0082), so it stays in force and one more click releases it. */
+      it('leaves a rail selection the text was masking in force, released by a second click', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+        search(fixture, '$tag:draft');
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+
+        // The box lost its token; the earlier click is still the rail's, and still lit.
+        expect(searchBox(el).value).toBe('');
+        expect(facet(el, 'facet-tag-draft')?.hasAttribute('data-query-owned')).toBe(false);
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('false');
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+
+      it('leaves a rail-sourced selection toggling as it always did, box untouched', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:draft');
+        facet(el, 'facet-type-core.type.note')?.click();
+        fixture.detectChanges();
+        facet(el, 'facet-type-core.type.note')?.click();
+        fixture.detectChanges();
+
+        expect(facet(el, 'facet-type-core.type.note')?.getAttribute('aria-pressed')).toBe('false');
+        expect(searchBox(el).value).toBe('$tag:draft');
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          tag: ['draft'],
+        });
       });
     });
   });

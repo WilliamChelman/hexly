@@ -64,36 +64,34 @@ export interface ParsedFacetQuery {
 interface ValueSegment {
   readonly value: string;
   readonly quoted: boolean;
+  /** Where the segment was written, quotes included — what {@link removeFacetToken} cuts out. */
+  readonly start: number;
+  readonly end: number;
 }
 
 interface FacetToken {
   readonly key: string;
   readonly negated: boolean;
   readonly segments: readonly ValueSegment[];
+  /** Where the token begins — at the `-` where it has one, so a cut takes the negation with it. */
+  readonly start: number;
   /** Index just past the token, where scanning resumes. */
   readonly end: number;
 }
 
 export function parseFacetQuery(raw: string, keys: FacetKeySet): ParsedFacetQuery {
-  const reserved = new Set(keys.reserved ?? RESERVED_FACET_NAMES);
-  const fieldKeys = new Set(keys.fields ?? []);
+  const { reserved, fieldKeys } = vocabulary(keys);
   const include = emptyValues();
   const exclude = emptyValues();
   const fields: FieldFilter[] = [];
   const unresolvedKeys: string[] = [];
   const text: string[] = [];
 
-  let i = 0;
   // Start of the pending run of plain text, flushed whenever a token is lifted out.
   let plain = 0;
-  while (i < raw.length) {
-    const token = startsToken(raw, i) ? readToken(raw, i) : null;
-    if (!token) {
-      i++;
-      continue;
-    }
-    text.push(raw.slice(plain, i));
-    i = plain = token.end;
+  for (const token of scanTokens(raw)) {
+    text.push(raw.slice(plain, token.start));
+    plain = token.end;
     // Reserved names win at resolution (ADR-0082), so a World Field labelled "Type" does not take
     // `$type` and is addressed by its full key.
     const category = reserved.has(token.key) ? RESERVED[token.key] : undefined;
@@ -117,6 +115,107 @@ export function parseFacetQuery(raw: string, keys: FacetKeySet): ParsedFacetQuer
   };
 }
 
+/**
+ * One value the rail displays, named the way a token names it: a reserved {@link FacetTokenCategory},
+ * or a Facet key. The value is matched **exactly, case included** — the rail's rows carry the stored
+ * value, which is what a token has to spell to have applied it.
+ */
+export type FacetTokenTarget =
+  | { readonly category: FacetTokenCategory; readonly value: string }
+  | { readonly field: string; readonly value: string };
+
+/**
+ * Take the token that named `target` out of the box (ADR-0082): the one rail→text write in the design,
+ * and always a deletion, so everything applied stays reversible where it was named. Both polarities go
+ * at once — a value is one rail row whichever way the box named it — and nothing else the caller typed
+ * moves, only the removed token's own separator going with it.
+ */
+export function removeFacetToken(raw: string, keys: FacetKeySet, target: FacetTokenTarget): string {
+  const { reserved, fieldKeys } = vocabulary(keys);
+  const cuts: Cut[] = [];
+
+  for (const token of scanTokens(raw)) {
+    if (!addresses(token, target, reserved, fieldKeys)) continue;
+    const named = token.segments.filter((segment) => names(segment, target));
+    if (named.length === 0) continue;
+    if (named.length === token.segments.length) cuts.push(withSeparator(raw, token.start, token.end));
+    // One of several values in a comma list: only that value goes, and the list closes over it.
+    else for (const segment of named) cuts.push(withComma(raw, segment.start, segment.end));
+  }
+  return applyCuts(raw, cuts);
+}
+
+/** Whether this token names the target's Facet at all — reserved names win, as they do at parse. */
+function addresses(
+  token: FacetToken,
+  target: FacetTokenTarget,
+  reserved: ReadonlySet<string>,
+  fieldKeys: ReadonlySet<string>,
+): boolean {
+  if (reserved.has(token.key)) return 'category' in target && RESERVED[token.key] === target.category;
+  return 'field' in target && fieldKeys.has(token.key) && token.key === target.field;
+}
+
+/** Whether one written value is the target's. A bound is never a value: `>=5` filters, it does not name. */
+function names(segment: ValueSegment, target: FacetTokenTarget): boolean {
+  if ('field' in target && !segment.quoted && boundOf(segment.value)) return false;
+  return segment.value === target.value;
+}
+
+/** A half-open span of the box to delete. */
+interface Cut {
+  readonly from: number;
+  readonly to: number;
+}
+
+/** A whole token takes one adjoining run of whitespace with it — after it, or else before it. */
+function withSeparator(raw: string, from: number, to: number): Cut {
+  let end = to;
+  while (/\s/.test(raw[end] ?? '')) end++;
+  if (end > to) return { from, to: end };
+  let start = from;
+  while (start > 0 && /\s/.test(raw[start - 1])) start--;
+  return { from: start, to };
+}
+
+/** A value inside a comma list takes the comma that separated it — the following one, or else the one before. */
+function withComma(raw: string, from: number, to: number): { from: number; to: number } {
+  if (raw[to] === ',') return { from, to: to + 1 };
+  if (raw[from - 1] === ',') return { from: from - 1, to };
+  return { from, to };
+}
+
+/** Apply the cuts left to right; two that meet (adjacent tokens sharing a space) merge rather than double-cut. */
+function applyCuts(raw: string, cuts: readonly { from: number; to: number }[]): string {
+  let out = '';
+  let at = 0;
+  for (const cut of cuts) {
+    if (cut.from > at) out += raw.slice(at, cut.from);
+    at = Math.max(at, cut.to);
+  }
+  return out + raw.slice(at);
+}
+
+/** One surface's vocabulary as sets — the reserved names it offers, and its Facet keys. */
+function vocabulary(keys: FacetKeySet): { reserved: ReadonlySet<string>; fieldKeys: ReadonlySet<string> } {
+  return { reserved: new Set(keys.reserved ?? RESERVED_FACET_NAMES), fieldKeys: new Set(keys.fields ?? []) };
+}
+
+/** Every whole token in the box, left to right. The one walk of the grammar: reading a box and editing
+ * one must not drift apart. */
+function* scanTokens(raw: string): Generator<FacetToken> {
+  let i = 0;
+  while (i < raw.length) {
+    const token = startsToken(raw, i) ? readToken(raw, i) : null;
+    if (!token) {
+      i++;
+      continue;
+    }
+    i = token.end;
+    yield token;
+  }
+}
+
 /** A token begins at `$` (or the `-` that negates it) standing at a word boundary — nowhere else. */
 function startsToken(raw: string, i: number): boolean {
   if (i > 0 && !/\s/.test(raw[i - 1])) return false;
@@ -137,22 +236,22 @@ function readToken(raw: string, start: number): FacetToken | null {
   const segments: ValueSegment[] = [];
   i++; // past the colon
   for (;;) {
+    const from = i;
     if (raw[i] === '"') {
       // A trailing quote may be left unclosed at end of input — the value is being typed, and there is
       // no escape character to make the closing one conditional on.
       const close = raw.indexOf('"', i + 1);
       const end = close < 0 ? raw.length : close;
-      segments.push({ value: raw.slice(i + 1, end), quoted: true });
+      segments.push({ value: raw.slice(i + 1, end), quoted: true, start: from, end: close < 0 ? end : end + 1 });
       i = close < 0 ? end : end + 1;
     } else {
-      const from = i;
       while (i < raw.length && raw[i] !== ',' && !/\s/.test(raw[i])) i++;
-      segments.push({ value: raw.slice(from, i), quoted: false });
+      segments.push({ value: raw.slice(from, i), quoted: false, start: from, end: i });
     }
     if (raw[i] !== ',') break;
     i++;
   }
-  return { key, negated, segments, end: i };
+  return { key, negated, segments, start, end: i };
 }
 
 /** A reserved token's values, each taken literally — no category takes a range on the wire. */
