@@ -592,6 +592,12 @@ describe('parseFieldFilter (`key:op:value`)', () => {
     });
   });
 
+  // A Facet Token may write a bare `>` or `<` (ADR-0082, #418), so the wire carries the strict bounds.
+  it('parses the strict bounds `gt` and `lt`', () => {
+    expect(parseFieldFilter('cr:gt:5')).toEqual({ key: 'cr', op: 'gt', value: '5' });
+    expect(parseFieldFilter('cr:lt:5')).toEqual({ key: 'cr', op: 'lt', value: '5' });
+  });
+
   it('returns null for a malformed token so a stale URL is dropped, never a 400', () => {
     expect(parseFieldFilter('cr:5')).toBeNull(); // no op
     expect(parseFieldFilter('cr:between:5')).toBeNull(); // unknown op

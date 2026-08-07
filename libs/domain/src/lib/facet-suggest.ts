@@ -87,7 +87,12 @@ function scanValues(raw: string, caret: number, key: string, from: number): Face
       if (raw[i] !== ',') return { end: i };
     }
     if (isSpace(raw[i])) return { end: i };
-    if (raw[i] === ',') segment = i + 1;
+    // A `$` after the comma opens the next token, exactly as the parser reads it — so the key stage
+    // takes over rather than the list offering values for a name.
+    if (raw[i] === ',') {
+      if (startsFacetToken(raw, i + 1)) return { end: i + 1 };
+      segment = i + 1;
+    }
     i++;
   }
   const quoted = raw[segment] === '"';
@@ -160,10 +165,10 @@ export function applyFacetSuggestion(
   };
 }
 
-/** Quoted only where bare would mean something else: a space or comma would end it, `>=`/`<=` would
- * read as a bound (ADR-0082). */
+/** Quoted only where bare would mean something else: a space or comma would end it, a leading `<`, `>`
+ * or `=` would read as a comparison, and a leading `$` would open the next token (ADR-0082). */
 function quoteFacetValue(value: string): string {
-  return /^$|[\s,]|^[<>]=/.test(value) ? `"${value}"` : value;
+  return /^$|[\s,]|^([<>=]|-?\$)/.test(value) ? `"${value}"` : value;
 }
 
 function isSpace(char: string | undefined): boolean {

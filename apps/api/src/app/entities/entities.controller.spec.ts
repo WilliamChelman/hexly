@@ -2369,6 +2369,39 @@ describe('Entities endpoints', () => {
       expect(names(range)).toEqual(['Sphinx']);
     });
 
+    it('filters the list by a strict numeric bound, which excludes the bound itself', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
+      await beast(ada, 'Sphinx', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 5 });
+      await beast(ada, 'Aboleth', { 'test.field.alignment': 'chaotic-evil', 'test.field.cr': 10 });
+
+      // cr > 5 drops the Sphinx that `gte` kept, and a string compare would drop the Aboleth's '10'.
+      const gt = await ada.get('/entities').query({ type: 'test.type.beast', field: 'test.field.cr:gt:5' }).expect(200);
+      expect(names(gt)).toEqual(['Aboleth']);
+
+      const lt = await ada.get('/entities').query({ type: 'test.type.beast', field: 'test.field.cr:lt:5' }).expect(200);
+      expect(names(lt)).toEqual(['Kobold']);
+
+      // Strict bounds AND into an open range, as the inclusive ones do.
+      const range = await ada
+        .get('/entities')
+        .query({ type: 'test.type.beast', field: ['test.field.cr:gt:1', 'test.field.cr:lt:10'] })
+        .expect(200);
+      expect(names(range)).toEqual(['Sphinx']);
+    });
+
+    it('filters the list by a strict date bound (lexical ISO compare)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await beast(ada, 'Kobold', { 'test.field.cr': 1, 'test.field.discovered': '2020-01-01' });
+      await beast(ada, 'Sphinx', { 'test.field.cr': 11, 'test.field.discovered': '2023-06-15' });
+
+      const res = await ada
+        .get('/entities')
+        .query({ type: 'test.type.beast', field: 'test.field.discovered:gt:2020-01-01' })
+        .expect(200);
+      expect(names(res)).toEqual(['Sphinx']);
+    });
+
     it('filters the list by list-membership on a list Field', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       await beast(ada, 'Kobold', {

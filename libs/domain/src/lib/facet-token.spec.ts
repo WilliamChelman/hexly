@@ -46,11 +46,40 @@ describe('parseFacetQuery (ADR-0082)', () => {
     expect(parsed.text).toBe('orc');
   });
 
-  it('parses a trailing quote left unclosed at end of input', () => {
+  it('holds a value whose quote is still open, and says so rather than filtering half of it', () => {
     const parsed = parseFacetQuery('$tag:"sea of storm', keys);
 
-    expect(parsed.include.tag).toEqual(['sea of storm']);
+    expect(parsed.include.tag).toEqual([]);
     expect(parsed.text).toBe('');
+    expect(parsed.inapplicableTokens).toEqual([{ key: 'tag', reason: 'unterminated-quote' }]);
+  });
+
+  it('applies the closed values of a list while its last quote is still open', () => {
+    const parsed = parseFacetQuery('$tag:a,"sea of storm', keys);
+
+    expect(parsed.include.tag).toEqual(['a']);
+    expect(parsed.inapplicableTokens).toEqual([]);
+  });
+
+  it('starts a new token at a $ after a comma, rather than reading one as a value', () => {
+    const parsed = parseFacetQuery('$tag:a,$tag:b orc', keys);
+
+    expect(parsed.include.tag).toEqual(['a', 'b']);
+    expect(parsed.text).toBe('orc');
+  });
+
+  it('starts a negated token at a $ after a comma', () => {
+    const parsed = parseFacetQuery('$tag:a,-$type:npc', keys);
+
+    expect(parsed.include.tag).toEqual(['a']);
+    expect(parsed.exclude.type).toEqual(['npc']);
+    expect(parsed.text).toBe('');
+  });
+
+  it('keeps a quoted $ as the value it says', () => {
+    const parsed = parseFacetQuery('$tag:a,"$tag:b"', keys);
+
+    expect(parsed.include.tag).toEqual(['a', '$tag:b']);
   });
 
   it('mixes quoted and bare segments in one comma list', () => {
@@ -77,6 +106,32 @@ describe('parseFacetQuery (ADR-0082)', () => {
     ]);
   });
 
+  it('maps a bare > onto gt and a bare < onto lt', () => {
+    const parsed = parseFacetQuery('$challenge_rating:>5 $region:<m', keys);
+
+    expect(parsed.fields).toEqual([
+      { key: 'challenge_rating', op: 'gt', value: '5' },
+      { key: 'region', op: 'lt', value: 'm' },
+    ]);
+    expect(parsed.inapplicableTokens).toEqual([]);
+  });
+
+  it('reads a written = as the membership a bare value writes, and its negation as neq', () => {
+    const parsed = parseFacetQuery('$challenge_rating:=5 -$region:=north', keys);
+
+    expect(parsed.fields).toEqual([
+      { key: 'challenge_rating', op: 'eq', value: '5' },
+      { key: 'region', op: 'neq', value: 'north' },
+    ]);
+  });
+
+  it('reports a comparison written with nothing to compare to', () => {
+    const parsed = parseFacetQuery('$challenge_rating:>=', keys);
+
+    expect(parsed.fields).toEqual([]);
+    expect(parsed.inapplicableTokens).toEqual([{ key: 'challenge_rating', reason: 'empty-value' }]);
+  });
+
   it('reads a Facet key value as eq, and its negation as neq', () => {
     const parsed = parseFacetQuery('$region:north -$region:south', keys);
 
@@ -92,11 +147,12 @@ describe('parseFacetQuery (ADR-0082)', () => {
     expect(parsed.fields).toEqual([{ key: 'region', op: 'eq', value: '>=5' }]);
   });
 
-  it('drops a negated bound — the wire has no such filter — and keeps the rest of the box', () => {
+  it('reports a negated bound — the wire has no such filter — and keeps the rest of the box', () => {
     const parsed = parseFacetQuery('orc -$challenge_rating:>=5', keys);
 
     expect(parsed.fields).toEqual([]);
     expect(parsed.text).toBe('orc');
+    expect(parsed.inapplicableTokens).toEqual([{ key: 'challenge_rating', reason: 'negated-bound' }]);
   });
 
   it('recognises $ only at a word boundary', () => {
@@ -164,11 +220,29 @@ describe('parseFacetQuery (ADR-0082)', () => {
     expect(parsed.include.tag).toEqual([]);
   });
 
-  it('applies a token with an empty value as nothing at all, and never as text', () => {
+  it('reports a token with an empty value rather than browsing as if the box were empty', () => {
     const parsed = parseFacetQuery('orc $tag:', keys);
 
     expect(parsed.include.tag).toEqual([]);
     expect(parsed.text).toBe('orc');
+    expect(parsed.inapplicableTokens).toEqual([{ key: 'tag', reason: 'empty-value' }]);
+  });
+
+  it('reports one miss per key and reason, however often it is written', () => {
+    const parsed = parseFacetQuery('$tag: $tag: -$challenge_rating:>=5 $tag:"open', keys);
+
+    expect(parsed.inapplicableTokens).toEqual([
+      { key: 'tag', reason: 'empty-value' },
+      { key: 'challenge_rating', reason: 'negated-bound' },
+      { key: 'tag', reason: 'unterminated-quote' },
+    ]);
+  });
+
+  it('reports nothing for a token that applied a filter, whatever else it wrote', () => {
+    const parsed = parseFacetQuery('$tag:a, $tag:b', keys);
+
+    expect(parsed.include.tag).toEqual(['a', 'b']);
+    expect(parsed.inapplicableTokens).toEqual([]);
   });
 
   it('lets an exclusion veto an inclusion of the same value (ADR-0081)', () => {
@@ -259,6 +333,18 @@ describe('removeFacetToken (ADR-0082)', () => {
     expect(
       removeFacetToken('$challenge_rating:>=5 $challenge_rating:5', keys, { field: 'challenge_rating', value: '5' }),
     ).toBe('$challenge_rating:>=5');
+    expect(removeFacetToken('$challenge_rating:>5', keys, { field: 'challenge_rating', value: '5' })).toBe(
+      '$challenge_rating:>5',
+    );
+  });
+
+  it('takes out a value written with its = , which is how it was applied', () => {
+    expect(removeFacetToken('orc $challenge_rating:=5', keys, { field: 'challenge_rating', value: '5' })).toBe('orc');
+  });
+
+  it('takes out a token that opened at a comma, the comma with it', () => {
+    expect(removeFacetToken('$tag:a,$tag:b orc', keys, { category: 'tag', value: 'b' })).toBe('$tag:a orc');
+    expect(removeFacetToken('$tag:a,$tag:b', keys, { category: 'tag', value: 'a' })).toBe('$tag:b');
   });
 
   it('leaves prose that merely spells the value where it is', () => {

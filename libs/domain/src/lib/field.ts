@@ -477,17 +477,18 @@ export function entityLinkConstraints(
 }
 
 /**
- * The comparison a {@link FieldFilter} applies: `eq` membership, `neq` exclusion, or a `gte`/`lte`
- * range bound. Field exclusion is a fourth op rather than a second param because this grammar already
+ * The comparison a {@link FieldFilter} applies: `eq` membership, `neq` exclusion, or one of the four
+ * range bounds. Field exclusion is a further op rather than a second param because this grammar already
  * carries its own operator, and an older build drops an unrecognised one rather than 400ing (ADR-0081).
+ * The strict bounds exist because a Facet Token may write one (`$cr:>5`, ADR-0082).
  */
-export type FieldFilterOp = 'eq' | 'neq' | 'gte' | 'lte';
+export type FieldFilterOp = 'eq' | 'neq' | 'gte' | 'lte' | 'gt' | 'lt';
 
-const FIELD_FILTER_OPS: ReadonlySet<string> = new Set<FieldFilterOp>(['eq', 'neq', 'gte', 'lte']);
+const FIELD_FILTER_OPS: ReadonlySet<string> = new Set<FieldFilterOp>(['eq', 'neq', 'gte', 'lte', 'gt', 'lt']);
 
 /**
  * One filter-by-Field constraint (ADR-0048): the EntityDocument `key`, an `op`, and the compared `value`.
- * `eq` on the same key OR together (enum/list membership); `gte`/`lte` on the same key form a range;
+ * `eq` on the same key OR together (enum/list membership); bounds on the same key AND into a range;
  * different keys AND. `neq` **vetoes** — it beats any `eq` on the same value and accumulates with its
  * peers, and an Entity carrying no value for the key survives it (ADR-0081). Wire form is `key:op:value`.
  */

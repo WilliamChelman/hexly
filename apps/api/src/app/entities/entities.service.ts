@@ -22,6 +22,7 @@ import {
   FieldError,
   FieldFacet,
   FieldFilter,
+  FieldFilterOp,
   InboundReference,
   NamedContainer,
   OutboundReference,
@@ -111,7 +112,7 @@ export interface ListOptions {
   /** Facet: exclude these Visibilities (see {@link excludeType}). */
   readonly excludeVisibility?: readonly Visibility[];
   /** Filter-by-Field (ADR-0048, #188): each constraint matches a facetable Field value — eq
-   * membership (enum/list/string), a neq exclusion (ADR-0081), or a gte/lte range (number/date).
+   * membership (enum/list/string), a neq exclusion (ADR-0081), or a range bound (number/date).
    * Same key OR / range, diff key AND; a neq vetoes its key's includes and spares an Entity with no value. */
   readonly fields?: readonly FieldFilter[];
   /**
@@ -1534,7 +1535,7 @@ function scopeSize(opts: FacetOptions): number {
 
 /**
  * Filter-by-Field predicates (ADR-0048, #188), grouped by EntityDocument key: `eq` values OR (enum/list
- * membership), `gte`/`lte` bounds AND (a range), and one `EXISTS` over the denormalised
+ * membership), range bounds AND (a range), and one `EXISTS` over the denormalised
  * `entity_field_facets` index per key — so different keys AND, matching the universal facets. A
  * range on a `number` Field compares the numeric `num` column; a date/string compares `value`
  * lexically (ISO dates sort correctly as text).
@@ -1556,8 +1557,8 @@ function fieldFilters(fields: readonly FieldFilter[]): SQL[] {
     const eqValues = group.filter((f) => f.op === 'eq').map((f) => f.value);
     if (eqValues.length) conds.push(sql`f.value IN (${valueList(eqValues)})`);
     for (const f of group) {
-      if (f.op === 'gte') conds.push(rangeBound(f.value, '>='));
-      if (f.op === 'lte') conds.push(rangeBound(f.value, '<='));
+      const bound = RANGE_BOUNDS[f.op];
+      if (bound) conds.push(rangeBound(f.value, bound));
     }
     if (conds.length) predicates.push(fieldFacetExists(key, and(...conds)));
     // Exclusions accumulate: any one of them carried is enough to veto, so they share one NOT EXISTS.
@@ -1580,13 +1581,21 @@ function valueList(values: readonly string[]): SQL {
   );
 }
 
+/** The SQL comparison each bounding op writes; `eq`/`neq` are membership and write none. */
+const RANGE_BOUNDS: Partial<Record<FieldFilterOp, '>=' | '<=' | '>' | '<'>> = {
+  gte: '>=',
+  lte: '<=',
+  gt: '>',
+  lt: '<',
+};
+
 /**
- * One `gte`/`lte` range bound. The materialised `num` column *is* the numeric-ness signal (set only
+ * One range bound. The materialised `num` column *is* the numeric-ness signal (set only
  * for a `number` Field): a row with `num` compares numerically, one without compares its `value`
  * lexically (ISO dates sort correctly as text) — so the Field's data-type need not be known at
  * filter time. A non-finite numeric bound matches no numeric row rather than binding NaN.
  */
-function rangeBound(value: string, op: '>=' | '<='): SQL {
+function rangeBound(value: string, op: '>=' | '<=' | '>' | '<'): SQL {
   const n = Number(value);
   const numeric = Number.isFinite(n) ? sql`f.num ${sql.raw(op)} ${n}` : sql`0`;
   const lexical = sql`f.value ${sql.raw(op)} ${value}`;

@@ -43,6 +43,12 @@ describe('facetSuggestAt (ADR-0082)', () => {
     expect(facetSuggestAt('$tag:a,dr', 9)).toEqual({ stage: 'value', key: 'tag', prefix: 'dr', start: 7, end: 9 });
   });
 
+  /** The parser starts a token at a `$` after a comma, and so must the list. */
+  it('offers keys where a `$` follows a comma, not the values of the key before it', () => {
+    expect(facetSuggestAt('$tag:a,$ty', 10)).toEqual({ stage: 'key', prefix: 'ty', start: 8, end: 10 });
+    expect(facetSuggestAt('$tag:a,-$ty', 11)).toEqual({ stage: 'key', prefix: 'ty', start: 9, end: 11 });
+  });
+
   it('reads an unclosed quote as a value still being typed, spaces and all', () => {
     expect(facetSuggestAt('$tag:"sea of ', 13)).toEqual({
       stage: 'value',
@@ -209,9 +215,15 @@ describe('applyFacetSuggestion (ADR-0082)', () => {
 
   it('quotes a value opening as a comparison, which unquoted would read as a bound', () => {
     const raw = '$challenge_rating:';
-    const applied = applyFacetSuggestion(raw, facetSuggestAt(raw, 18)!, '>=5');
+    for (const value of ['>=5', '>5', '=5'])
+      expect(applyFacetSuggestion(raw, facetSuggestAt(raw, 18)!, value).text).toBe(`$challenge_rating:"${value}"`);
+  });
 
-    expect(applied.text).toBe('$challenge_rating:">=5"');
+  it('quotes a value opening with a `$`, which after a comma would open a token', () => {
+    const raw = '$tag:a,';
+    const applied = applyFacetSuggestion(raw, facetSuggestAt(raw, 7)!, '$fx');
+
+    expect(applied.text).toBe('$tag:a,"$fx"');
   });
 
   it('replaces the open quote it completes rather than nesting inside it', () => {
