@@ -64,7 +64,9 @@
   },
   "entitySearchPicker": {
     "searchPlaceholder": "Search entities…",
-    "empty": "No matching entities"
+    "empty": "No matching entities",
+    "suggestionsLabel": "Filter suggestions",
+    "unknownFacet": "No Facet “{{keys}}” here."
   },
   "containerChips": {
     "all": "All"

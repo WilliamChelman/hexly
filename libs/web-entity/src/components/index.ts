@@ -12,6 +12,8 @@ export * from './link-target-read';
 // eager surface the deferral exists to keep it off.
 export * from './member-set.component';
 export * from './owner-set.component';
+export * from './picker-box-class';
+export * from './picker-facet-tokens';
 export * from './public-link.component';
 export * from './reading-surface.component';
 export * from './reference-row.component';

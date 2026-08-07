@@ -1,24 +1,54 @@
-import { EntitySummary } from '@hexly/domain';
+import { EntitySummary, FacetKeySet } from '@hexly/domain';
 import { MENTION_CREATE_DETAILS_ID, MENTION_CREATE_ID, mentionItems, parseMentionQuery } from './mention-items';
 
 const summary = (id: string, name: string): EntitySummary =>
   ({ id, name, types: ['core.type.note'], tags: [] }) as unknown as EntitySummary;
 
-describe('parseMentionQuery — the name and the Link Descriptor typed in one breath', () => {
+/** The vocabulary the host World offers a mention (ADR-0082): the reserved names, plus one Facet key. */
+const KEYS: FacetKeySet = { reserved: ['type', 'tag', 'visibility'], fields: ['dnd.cr'] };
+
+describe('parseMentionQuery — the name, its Facet Tokens, and the Link Descriptor in one breath', () => {
   it('reads a bare name, with no descriptor', () => {
-    expect(parseMentionQuery('Zorblax')).toEqual({ name: 'Zorblax', descriptor: null });
+    expect(parseMentionQuery('Zorblax', KEYS)).toMatchObject({ name: 'Zorblax', descriptor: null });
   });
 
   it('splits `Name::descriptor` at the first ::', () => {
-    expect(parseMentionQuery('Zorblax::rival')).toEqual({ name: 'Zorblax', descriptor: 'rival' });
+    expect(parseMentionQuery('Zorblax::rival', KEYS)).toMatchObject({ name: 'Zorblax', descriptor: 'rival' });
   });
 
   it('keeps multi-word names and descriptors, trimmed', () => {
-    expect(parseMentionQuery(' Jane Doe :: capital of ')).toEqual({ name: 'Jane Doe', descriptor: 'capital of' });
+    expect(parseMentionQuery(' Jane Doe :: capital of ', KEYS)).toMatchObject({
+      name: 'Jane Doe',
+      descriptor: 'capital of',
+    });
   });
 
   it('reads a trailing :: as no descriptor yet, not an empty one', () => {
-    expect(parseMentionQuery('Zorblax::')).toEqual({ name: 'Zorblax', descriptor: null });
+    expect(parseMentionQuery('Zorblax::', KEYS)).toMatchObject({ name: 'Zorblax', descriptor: null });
+  });
+
+  it('lifts a Facet Token out of the name, so the mention filters and the Create rows mint the rest', () => {
+    const parsed = parseMentionQuery('$type:core.type.npc gorb', KEYS);
+
+    expect(parsed.name).toBe('gorb');
+    expect(parsed.facets.include.type).toEqual(['core.type.npc']);
+    // The raw half is what memoises the search: two boxes spelling different tokens are two searches.
+    expect(parsed.raw).toBe('$type:core.type.npc gorb');
+  });
+
+  it('reads a token beside a descriptor, each half its own', () => {
+    const parsed = parseMentionQuery('-$tag:draft gorb::rival', KEYS);
+
+    expect(parsed).toMatchObject({ name: 'gorb', descriptor: 'rival' });
+    expect(parsed.facets.exclude.tag).toEqual(['draft']);
+  });
+
+  it('reports a $ name this World answers to nothing as a miss, filtering by nothing', () => {
+    const parsed = parseMentionQuery('$domain:sea gorb', KEYS);
+
+    expect(parsed.facets.unresolvedKeys).toEqual(['domain']);
+    expect(parsed.facets.fields).toEqual([]);
+    expect(parsed.name).toBe('gorb');
   });
 });
 

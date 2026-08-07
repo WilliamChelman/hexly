@@ -1,6 +1,6 @@
 import { computed, inject, Provider, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { Field } from '@hexly/domain';
+import { Field, isFacetableField } from '@hexly/domain';
 import { ENTITY_TYPES, EntityTypes } from '../models/entity-types';
 import { TypeDefinition, TypeLabels } from '../models/type-definition';
 
@@ -77,6 +77,11 @@ export class FakeEntityTypes implements EntityTypes {
 
   field(id: string): Field | undefined {
     return this.fieldsById.get(id);
+  }
+
+  /** The spec's facetable Fields (ADR-0082); no Structured Data Types, a fake registering no plugins. */
+  facetKeys(): string[] {
+    return [...this.fieldsById.values()].filter(isFacetableField).map((field) => field.id);
   }
 
   attachableFields(

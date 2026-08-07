@@ -2,7 +2,7 @@ import { DestroyRef, Injectable, WritableSignal, inject, signal } from '@angular
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject, firstValueFrom, map, share } from 'rxjs';
 import { ENTITY_LIST_MAX_LIMIT, EntitySummary } from '@hexly/domain';
-import { EntitiesClient, searchEntities } from '@hexly/web-core';
+import { EntitiesClient, EntityListParams, searchEntities } from '@hexly/web-core';
 
 /** A link's resolution against the owner's entities (issue #95, ADR-0023). */
 export type EntityResolution =
@@ -46,20 +46,29 @@ export class EntityNameResolver {
   private readonly searchCache = new Map<string, EntitySummary[]>();
   /** The World the next request scopes to — read back when the debounced search fires. */
   private worldId: string | undefined;
+  /**
+   * What the pending query's **Facet Tokens** mean as list params (ADR-0082), read back when the
+   * debounced search fires, as `worldId` is. Memoised beside it safely because the *raw* box keys the
+   * cache: two queries that spell the same tokens parse alike, and two that do not never share an entry.
+   */
+  private filters: EntityListParams = {};
   private readonly pickerResults$ = searchEntities(this.client, this.pickerQuery$, {
     cache: this.searchCache,
     // A link-target read (ADR-0079) in the host Entity's World — the World a mention mints into, never
     // the URL's (ADR-0073) — so typing a name reaches that World's Entities and the ones in the
-    // Containers it Mounts, which is the whole of what it may point at (ADR-0080).
-    params: () => ({ read: 'link-target', ...(this.worldId ? { worldId: this.worldId } : {}) }),
+    // Containers it Mounts, which is the whole of what it may point at (ADR-0080). The typed Facets ride
+    // here too, `q` among them: the wire carries the residual text, never the raw box (ADR-0082).
+    params: () => ({ read: 'link-target', ...(this.worldId ? { worldId: this.worldId } : {}), ...this.filters }),
   }).pipe(share());
 
   /**
-   * The Entities `query` names that this note may link — server-filtered (ADR-0025 `q`), scoped to
-   * `worldId` and what it Mounts. `@tiptap/suggestion` awaits this per keystroke; the shared
-   * search debounces the burst and a failed search yields an empty list rather than rejecting the popup.
+   * The Entities `query` names that this note may link — server-filtered (ADR-0025 `q`) under whatever
+   * `filters` its Facet Tokens named, scoped to `worldId` and what it Mounts. `@tiptap/suggestion` awaits
+   * this per keystroke; the shared search debounces the burst and a failed search yields an empty list
+   * rather than rejecting the popup. `query` is the box exactly as typed — what the memo keys on.
    */
-  search(query: string, worldId?: string): Promise<EntitySummary[]> {
+  search(query: string, worldId?: string, filters: EntityListParams = {}): Promise<EntitySummary[]> {
+    this.filters = filters;
     // A different World is a different set of answers, and the memo keys on the query alone — so drop it
     // rather than rely on one resolver only ever serving one host (the right dock shares this instance).
     if (worldId !== this.worldId) this.forgetSearches();

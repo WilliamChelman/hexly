@@ -1,21 +1,34 @@
 import { Editor, Extension } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
 import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
-import { EntitySummary } from '@hexly/domain';
+import { EntitySummary, FacetKeySet } from '@hexly/domain';
 import { EntityLinkAttrs } from '@hexly/plugin-content';
 import { EntityPickerComponent } from '../components/entity-picker.component';
 import { entityLinkNode } from './entity-link-node';
-import { MentionCreate, MentionCreateDetails, MentionItem, mentionItems, parseMentionQuery } from './mention-items';
+import {
+  MentionCreate,
+  MentionCreateDetails,
+  MentionItem,
+  MentionQuery,
+  mentionItems,
+  parseMentionQuery,
+} from './mention-items';
 import { takeMention } from './pending-mention';
 
 /** What the editor supplies the `@` trigger; each callback is deferred so the editor builds first. */
 export interface EntityMentionPorts {
   getPicker: () => EntityPickerComponent | undefined;
   /**
-   * The owner's Entities matching the typed name, server-side (ADR-0025 `q`), minus the one being
-   * written in — the host indexes the mention as prose the moment it autosaves (ADR-0035).
+   * The owner's Entities matching the typed name, server-side (ADR-0025 `q`) and narrowed by whatever
+   * **Facet Tokens** were typed with it (ADR-0082), minus the one being written in — the host indexes
+   * the mention as prose the moment it autosaves (ADR-0035).
    */
-  search: (name: string) => Promise<EntitySummary[]>;
+  search: (query: MentionQuery) => Promise<EntitySummary[]>;
+  /**
+   * This surface's Facet vocabulary, read synchronously off the client registry (ADR-0082), so
+   * `@$type:npc gorb` narrows to NPCs and a `$` name nothing answers to narrows nothing.
+   */
+  facetKeys: () => FacetKeySet;
   /**
    * Whether the caller may create Entities in the host Entity's World — the `create-entity` Right
    * (ADR-0039). False withholds both Create rows entirely (ADR-0073); picking is untouched.
@@ -36,9 +49,10 @@ export interface EntityMentionPorts {
 /**
  * The `@` trigger for inserting a Content Entity Link (ADR-0023). A non-schema extension
  * (ProseMirror plugin, no node/mark), so it stays out of {@link CONTENT_EXTENSIONS}. It
- * searches the owner's Entity summaries server-side as the user types — unfiltered by type, never the
- * host ({@link EntityMentionPorts.search}) — and a pick inserts the `entityLink` atom, snapshotting the
- * name as `label`.
+ * searches the owner's Entity summaries server-side as the user types — never the host
+ * ({@link EntityMentionPorts.search}), and unfiltered by type unless a **Facet Token** typed into the
+ * mention says otherwise (`@$type:npc gorb`, ADR-0082) — and a pick inserts the `entityLink` atom,
+ * snapshotting the name as `label`.
  *
  * The picker's last two rows mint the typed name and link it (ADR-0073): `Create "…"` in one gesture,
  * unconditionally — no Type filter and no modal, because an unfilled `required` Field no longer refuses
@@ -73,8 +87,8 @@ export function entityMention(ports: EntityMentionPorts): { extension: Extension
               return !$from.parent.type.spec.code && !$from.marks().some((m) => m.type.name === 'code');
             },
             items: async ({ query }) => {
-              const parsed = parseMentionQuery(query);
-              return mentionItems(parsed, await ports.search(parsed.name), ports.canCreate());
+              const parsed = parseMentionQuery(query, ports.facetKeys());
+              return mentionItems(parsed, await ports.search(parsed), ports.canCreate());
             },
             command: ({ editor, range, props }) => {
               if (programmatic) picked = true;

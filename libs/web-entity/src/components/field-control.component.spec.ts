@@ -4,6 +4,7 @@ import { of } from 'rxjs';
 import { EntityPage, Field, defineField } from '@hexly/domain';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { provideEntityTypesTesting } from '../testing/entity-types.fake';
 import { FieldControlComponent } from './field-control.component';
 import { WEB_ENTITY_TEST_CATALOGS } from '../i18n/test-catalogs';
 
@@ -46,6 +47,8 @@ describe('FieldControl entityLink branching (ADR-0066, #288)', () => {
       providers: [
         { provide: EntitiesClient, useValue: entities },
         { provide: AssetsClient, useValue: {} },
+        // The pickers' box reads its Facet vocabulary off the registry, synchronously (ADR-0082).
+        provideEntityTypesTesting([]),
       ],
     }).compileComponents();
   });

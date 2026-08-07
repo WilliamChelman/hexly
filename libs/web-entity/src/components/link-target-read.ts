@@ -1,5 +1,5 @@
 import { Signal, WritableSignal, computed, effect, inject, signal, untracked } from '@angular/core';
-import { FacetCount } from '@hexly/domain';
+import { EntityFacets } from '@hexly/domain';
 import { EntitiesClient, EntityFacetParams } from '@hexly/web-core';
 
 /**
@@ -50,27 +50,31 @@ export function linkTargetRead(
 }
 
 /**
- * The **Container** facet's live values behind a picker's chips, counted off the very read the options
- * come from — its own selection dropped, as every drill-down facet's is, so the chip you are
- * standing on keeps its siblings to move to. A failed count empties the chips rather than stranding a
- * stale one. `when` is the picker's own open/closed gate: a closed panel counts nothing.
+ * The **Facet read** behind a picker, counted off the very read its options come from — its own
+ * Container selection dropped, as every drill-down facet's is, so the chip you are standing on keeps
+ * its siblings to move to. A failed count leaves no facets rather than stranding a stale one. `when` is
+ * the picker's own open/closed gate: a closed panel counts nothing.
+ *
+ * One request, read twice: the **Container** facet its chips render (ADR-0080), and the values and
+ * counts its box offers a **Facet Token** (ADR-0082) — which is what makes typeahead there cost nothing
+ * new. `null` until the first response lands, which is a box with no value stage yet, not an empty one.
  */
-export function containerFacet(
+export function linkTargetFacets(
   params: Signal<EntityFacetParams>,
   when: () => boolean = () => true,
-): Signal<readonly FacetCount[]> {
+): Signal<EntityFacets | null> {
   const entities = inject(EntitiesClient);
-  const containers = signal<readonly FacetCount[]>([]);
+  const facets = signal<EntityFacets | null>(null);
   effect((onCleanup) => {
     if (!when()) {
-      containers.set([]);
+      facets.set(null);
       return;
     }
     const sub = entities.facets({ ...params(), container: undefined }).subscribe({
-      next: (facets) => containers.set(facets.container ?? []),
-      error: () => containers.set([]),
+      next: (counts) => facets.set(counts),
+      error: () => facets.set(null),
     });
     onCleanup(() => sub.unsubscribe());
   });
-  return containers.asReadonly();
+  return facets.asReadonly();
 }

@@ -41,6 +41,13 @@ export interface EntityTypes {
   /** A registered Field by id, or `undefined` for an unknown or disabled one — what labels an attached Field. */
   field(id: string): Field | undefined;
   /**
+   * Every **Facet** key a Facet Token may name (ADR-0082) — each facetable Field's id, then the
+   * dimensions this build's Structured Data Types harvest. Read **synchronously** off the registry,
+   * never off a Facet read, so a search box in a lib knows its whole vocabulary whatever the network
+   * is doing.
+   */
+  facetKeys(): string[];
+  /**
    * The registered Fields an Entity carrying `types`/`fieldIds` may still **attach directly** (ADR-0054):
    * every available Field whose `id` its effective set does not already cover — the attach picker's offer.
    */

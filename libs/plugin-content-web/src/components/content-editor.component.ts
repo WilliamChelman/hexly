@@ -19,10 +19,10 @@ import { ActivatedRoute } from '@angular/router';
 import { Editor, JSONContent } from '@tiptap/core';
 import { Observable, catchError, firstValueFrom, of } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
-import { EntitySummary } from '@hexly/domain';
+import { EntitySummary, FacetKeySet } from '@hexly/domain';
 import { RichContent, CONTENT_FIELD, tiptapContent } from '@hexly/plugin-content';
 import { ActiveWorld, EntitiesClient, ToasterService } from '@hexly/web-core';
-import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { ENTITY_SESSION, ENTITY_TYPES, VIEW_FIELD_KEY, facetTokenNarrowing } from '@hexly/web-entity';
 import { TiptapDirective } from '../directives/tiptap.directive';
 import { EntityNameResolver } from '../services/entity-name-resolver';
 import { InlineEntityCreator } from '../services/inline-entity-creator';
@@ -35,6 +35,7 @@ import { slashCommands } from '../extensions/slash-commands';
 import { SLASH_ITEMS } from '../models/slash-menu-items';
 import { EntityPickerComponent } from './entity-picker.component';
 import { entityMention } from '../extensions/entity-mention';
+import { MentionQuery } from '../extensions/mention-items';
 import { DescriptorPickerComponent } from './descriptor-picker.component';
 import { descriptorSuggestion } from '../extensions/descriptor-suggestion';
 import { LinkTextPickerComponent } from './link-text-picker.component';
@@ -266,6 +267,8 @@ export class ContentEditorComponent {
   private readonly resolver = inject(EntityNameResolver);
   // The `::` picker's vocabulary source (#96): the owner's last-saved DISTINCT descriptors.
   private readonly entities = inject(EntitiesClient);
+  // What a Facet Token in an `@` mention may name (ADR-0082) — read off the registry, synchronously.
+  private readonly types = inject(ENTITY_TYPES);
   // The `@` picker's Create rows write through this (ADR-0073); it owns the Inline Creation knobs.
   private readonly inlineCreator = inject(InlineEntityCreator);
   // The host Entity's World, pinned by the route guard — the source of the create standing those rows
@@ -461,9 +464,19 @@ export class ContentEditorComponent {
    * Scoped to the host Entity's World, so what a mention may point at and what it may create are one
    * answer (ADR-0073) — and never a Compendium Entry (ADR-0079).
    */
-  private async searchLinkTargets(name: string): Promise<EntitySummary[]> {
+  private async searchLinkTargets(query: MentionQuery): Promise<EntitySummary[]> {
     const hostId = this.session.current()?.id;
-    return (await this.resolver.search(name, this.hostWorldId())).filter((entity) => entity.id !== hostId);
+    // The raw name half memoises the search; its tokens travel as params, `q` being the residual text.
+    const matches = await this.resolver.search(query.raw, this.hostWorldId(), facetTokenNarrowing(query.facets));
+    return matches.filter((entity) => entity.id !== hostId);
+  }
+
+  /**
+   * The `@` mention's Facet vocabulary (ADR-0082) — minus `in`: a mention is scoped to the host World's
+   * link targets, and the Container it may narrow to has no control here to release it by.
+   */
+  private facetKeys(): FacetKeySet {
+    return { reserved: ['type', 'tag', 'visibility'], fields: this.types.facetKeys() };
   }
 
   /**
@@ -579,7 +592,8 @@ export class ContentEditorComponent {
 
     const mention = entityMention({
       getPicker: () => this.entityPicker(),
-      search: (name) => this.searchLinkTargets(name),
+      search: (query) => this.searchLinkTargets(query),
+      facetKeys: () => this.facetKeys(),
       canCreate: this.canCreate,
       mint: (name) => this.mint(name),
       mintWithDetails: (name) => this.mintWithDetails(name),
