@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { EntityType, Field, isFacetableField, isStructuredDataType } from '@hexly/domain';
+import { EntityType, Field, facetCategoryOf, isFacetableField, isStructuredDataType } from '@hexly/domain';
 import {
   CORE_VIEW_DETAILS,
   EntityTypes,
@@ -50,6 +50,17 @@ export class TypeRegistry implements EntityTypes {
    */
   private readonly worldFields = signal<readonly Field[]>([]);
   private readonly worldFieldsById = computed(() => new Map(this.worldFields().map((field) => [field.id, field])));
+  /** Whether a World Fields read is in flight — see {@link fieldsResolved}. */
+  private readonly awaitingWorldFields = signal(false);
+
+  /**
+   * Whether the Field vocabulary is **settled**: false from {@link awaitWorldFields} until the read
+   * answers. A **Facet Token** resolves its key here, synchronously, and a late response may never
+   * change what a filter means (ADR-0082) — so until this reads true a key this registry does not hold
+   * is *unresolved*, which is not the same as unresolvable, and no surface may report it as a miss or
+   * browse as though it had never been typed.
+   */
+  readonly fieldsResolved = computed(() => !this.awaitingWorldFields());
 
   /** Every *enabled* definition, in registration order (the bundled plugins', then World types). */
   readonly all = computed(() => this.definitions().filter((def) => this.plugins.isTypeActive(def.id)));
@@ -76,6 +87,18 @@ export class TypeRegistry implements EntityTypes {
    */
   setWorldFields(fields: readonly Field[]): void {
     this.worldFields.set(fields);
+    this.awaitingWorldFields.set(false);
+  }
+
+  /**
+   * The active World's Fields are being read; {@link setWorldFields} ends the wait. Called by
+   * {@link WorldFieldsLoader} the moment it asks, so the gap between a cold render and the response is
+   * a state a caller can see ({@link fieldsResolved}) rather than one indistinguishable from a World
+   * that defines no Fields. The Fields already held stay readable through it: they label what is on
+   * screen, and blanking them would flicker every chip that reads them.
+   */
+  awaitWorldFields(): void {
+    this.awaitingWorldFields.set(true);
   }
 
   /**
@@ -229,6 +252,17 @@ export class TypeRegistry implements EntityTypes {
     for (const dataType of this.plugins.structuredDataTypes.values())
       for (const dimension of dataType.facetDimensions ?? []) keys.add(dimension.key);
     return [...keys];
+  }
+
+  /**
+   * Whether this registry can say **yet** what `key` means as a Facet (ADR-0082). A reserved name is
+   * decided the moment it is typed — no read widens or narrows it — while a Field key is only decided
+   * once {@link fieldsResolved}: `$cr:5` on a cold load names a Field that may be about to exist, and a
+   * surface that answered it now would report a miss, and browse unfiltered, until the response corrected
+   * both. Read per key rather than wholesale, so `$type:npc` never waits on the Fields read.
+   */
+  facetKeySettled(key: string): boolean {
+    return this.fieldsResolved() || facetCategoryOf(key) !== undefined;
   }
 
   /**

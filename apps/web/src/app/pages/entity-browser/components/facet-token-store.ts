@@ -98,14 +98,37 @@ export class FacetTokenStore {
     reserved: this.categories.map((category) => TOKEN_NAME[category]),
     fields: this.types.facetKeys(),
   }));
-  /** What the box means: its **Facet Tokens** as structured filters and the free text left over. */
-  readonly parsedQuery = computed(() => parseFacetQuery(this.rawQuery(), this.facetKeys()));
+  private readonly parsed = computed(() => parseFacetQuery(this.rawQuery(), this.facetKeys()));
+  /**
+   * What the box means: its **Facet Tokens** as structured filters and the free text left over — with
+   * the **unsettled** keys held out of `unresolvedKeys`. A key the registry cannot answer for yet is
+   * *unresolved*, not unresolvable (ADR-0082), and every reader of that list treats it as the latter:
+   * stating a miss the Fields response is about to disprove is the same lie as filtering by it silently.
+   * The parser stays pure and knows nothing of it — the registry's readiness is the surface's business.
+   */
+  readonly parsedQuery = computed(() => {
+    const parsed = this.parsed();
+    const settled = parsed.unresolvedKeys.filter((key) => this.types.facetKeySettled(key));
+    return settled.length === parsed.unresolvedKeys.length ? parsed : { ...parsed, unresolvedKeys: settled };
+  });
   /** Which rail rows the text owns, so they render as query-owned and click off as a token (ADR-0082). */
   readonly queryOwned = computed(() => queryOwnedFacets(this.parsedQuery()));
   /** The residual full-text query — what the wire's `q` carries, as against the URL's raw string. */
   readonly searchText = computed(() => this.parsedQuery().text);
   /** The `$` names nothing here answers to, for the surface to report (ADR-0082). */
   readonly unknownFacetKeys = computed(() => this.parsedQuery().unresolvedKeys);
+  /**
+   * Whether the box leans on a Facet key the registry cannot answer for **yet** (ADR-0082): what this
+   * filters to is not known until the World's Fields land, so a surface **holds its read** rather than
+   * fetching every Entity and correcting itself once they do — a shared link that browses the whole
+   * World, then narrows under the reader. False as soon as the box names no such key: `$type:npc`
+   * resolves from the reserved names and browses instantly, whatever the Fields read is doing.
+   */
+  readonly filtersPending = computed(() => {
+    const parsed = this.parsed();
+    const keys = [...parsed.fields.map((f) => f.key), ...parsed.unresolvedKeys];
+    return keys.some((key) => !this.types.facetKeySettled(key));
+  });
   /** Whether the box holds anything at all to search or filter by — blanks are not a query. */
   readonly hasQuery = computed(() => this.rawQuery().trim() !== '');
 
@@ -211,7 +234,8 @@ export class FacetTokenStore {
     if (named) return this.dropToken({ field: key, op: named.op, value: named.value });
     const current = this.railFacets();
     const sel = current.fields[key] ?? {};
-    this.setFieldSelection(current, key, { ...sel, [bound]: value || undefined });
+    // The rail's inputs compare inclusively — a strict bound has no control here, only a token writes one.
+    this.setFieldSelection(current, key, { ...sel, [bound]: value ? { value, op: bound } : undefined });
   }
 
   /** Clears both stores — a typed Facet is as cleared as a clicked one, and the box empties with it. */

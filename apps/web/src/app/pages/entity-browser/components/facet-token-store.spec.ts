@@ -2,9 +2,22 @@ import { Component, inject } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, ParamMap, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
+import { Field } from '@hexly/domain';
+import { ClientConfigStore } from '@hexly/web-core';
+import { mockClientConfigStore } from '@hexly/web-core/testing';
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { FACET_CATEGORIES, FacetTokenStore } from './facet-token-store';
+
+/** This build's one Facet key, as the World's Fields project it (ADR-0054): `$cr:` resolves, and
+ * anything else this surface's reserved names do not carry is a stated miss. */
+const CR_FIELD: Field = {
+  id: 'cr',
+  label: 'CR',
+  dataType: { kind: 'number' },
+  required: false,
+  facetable: true,
+};
 
 /** The Entity Browser's shape: the universal trio, no Container. */
 @Component({
@@ -37,6 +50,7 @@ class LibraryHost {
 describe('FacetTokenStore', () => {
   let queryParams$: BehaviorSubject<ParamMap>;
   let navigate: ReturnType<typeof vi.spyOn>;
+  let registry: TypeRegistry;
 
   beforeEach(async () => {
     queryParams$ = new BehaviorSubject<ParamMap>(convertToParamMap({}));
@@ -45,12 +59,14 @@ describe('FacetTokenStore', () => {
       providers: [
         provideRouter([]),
         { provide: ActivatedRoute, useValue: { queryParamMap: queryParams$.asObservable() } },
-        // The client registry the box's Facet keys come from, synchronously (ADR-0082) — `cr` is this
-        // build's one Facet key, so `$cr:` resolves and anything else is a stated miss.
-        { provide: TypeRegistry, useValue: { facetKeys: () => ['cr'] } },
+        { provide: ClientConfigStore, useValue: mockClientConfigStore() },
       ],
     }).compileComponents();
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    // The client registry the box's Facet keys come from, synchronously (ADR-0082), with the World's
+    // Fields already landed — the cold-load case is its own describe below.
+    registry = TestBed.inject(TypeRegistry);
+    registry.setWorldFields([CR_FIELD]);
   });
 
   /** Type into the box and flush the 150ms debounce. */
@@ -183,7 +199,25 @@ describe('FacetTokenStore', () => {
       type(store, '$cr:>=5');
 
       expect(store.queryOwned().bounds).toEqual({ cr: ['gte'] });
-      expect(store.activeFacets().fields).toEqual({ cr: { values: [], gte: '5' } });
+      expect(store.activeFacets().fields).toEqual({ cr: { values: [], gte: { value: '5', op: 'gte' } } });
+    });
+
+    /** The input a bound renders in is a rendering question; whether the boundary row is in is not. */
+    it('carries a strictly-written bound to the wire strict, in the input its inclusive twin fills', () => {
+      const store = trio();
+
+      type(store, '$cr:>5');
+
+      expect(store.queryOwned().bounds).toEqual({ cr: ['gte'] });
+      expect(store.filterParams()).toEqual({ field: ['cr:gt:5'] });
+    });
+
+    it('sets the rail’s own bound inclusive, the row having no control for a strict one', () => {
+      const store = trio();
+
+      store.changeFieldRange({ key: 'cr', bound: 'gte', value: '5' });
+
+      expect(store.filterParams()).toEqual({ field: ['cr:gte:5'] });
     });
 
     it('deletes exactly that token when its bound is cleared, leaving the rest of the box', () => {
@@ -216,7 +250,9 @@ describe('FacetTokenStore', () => {
       // One Field, two owners: the text's minimum and the rail's maximum, both in force.
       expect(store.rawQuery()).toBe('$cr:>=5');
       expect(store.queryOwned().bounds).toEqual({ cr: ['gte'] });
-      expect(store.activeFacets().fields).toEqual({ cr: { values: [], gte: '5', lte: '9' } });
+      expect(store.activeFacets().fields).toEqual({
+        cr: { values: [], gte: { value: '5', op: 'gte' }, lte: { value: '9', op: 'lte' } },
+      });
       expect(store.filterParams()).toEqual({ field: ['cr:gte:5', 'cr:lte:9'] });
     });
 
@@ -227,6 +263,64 @@ describe('FacetTokenStore', () => {
       store.toggleFieldValue({ key: 'cr', value: '7', polarity: 'include' });
 
       expect(store.rawQuery()).toBe('$cr:>=5');
+    });
+  });
+
+  /**
+   * A cold load, the World's Fields still in flight (ADR-0082). The key set is read from the registry
+   * synchronously *and a late response may never change what a filter means* — so a `$key` the registry
+   * cannot answer for **yet** is unresolved, not unresolvable. It used to be reported as a miss and
+   * browsed as though it were never typed: a shared link showed the whole World, the banner said the key
+   * did not exist, and both corrected themselves when the Fields response landed.
+   */
+  describe('a key the registry cannot answer for yet', () => {
+    /** Entering a World: the loader has asked for its Fields and nothing has answered, so the registry
+     * holds none — the outer projection is what *lands*, mid-test, below. */
+    beforeEach(() => {
+      registry.setWorldFields([]);
+      registry.awaitWorldFields();
+    });
+
+    it('holds the read rather than browsing unfiltered, and states no miss', () => {
+      queryParams$.next(convertToParamMap({ q: '$cr:5' }));
+      const store = trio();
+
+      expect(store.filtersPending()).toBe(true);
+      expect(store.unknownFacetKeys()).toEqual([]);
+      // What is held back, and why: read now, these params name no Field — every Entity in the World.
+      expect(store.filterParams()).toEqual({});
+    });
+
+    it('filters by the key the Fields response names, on the first read the surface makes', () => {
+      queryParams$.next(convertToParamMap({ q: '$cr:5' }));
+      const store = trio();
+
+      registry.setWorldFields([CR_FIELD]);
+
+      expect(store.filtersPending()).toBe(false);
+      expect(store.filterParams()).toEqual({ field: ['cr:eq:5'] });
+    });
+
+    it('states the miss once the Fields answered without the key', () => {
+      queryParams$.next(convertToParamMap({ q: 'orc $domain:material' }));
+      const store = trio();
+
+      registry.setWorldFields([CR_FIELD]);
+
+      expect(store.filtersPending()).toBe(false);
+      expect(store.unknownFacetKeys()).toEqual(['domain']);
+      expect(store.filterParams()).toEqual({ q: 'orc' });
+    });
+
+    it('never waits on the Fields read for a name the reserved set decides', () => {
+      queryParams$.next(convertToParamMap({ q: '$type:core.type.note $in:pack-1' }));
+      const store = trio();
+
+      // `$type` resolves from the reserved names, and `$in` is a miss this surface can state at once —
+      // no Fields response can make a World-scoped browse able to narrow by Container.
+      expect(store.filtersPending()).toBe(false);
+      expect(store.filterParams()).toEqual({ type: ['core.type.note'] });
+      expect(store.unknownFacetKeys()).toEqual(['in']);
     });
   });
 

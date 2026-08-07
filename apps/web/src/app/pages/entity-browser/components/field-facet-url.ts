@@ -1,5 +1,11 @@
 import { FieldFilter, FieldFilterOp, parseFieldFilters } from '@hexly/domain';
-import { FieldRangeBound, FieldSelection, isFieldSelectionEmpty } from './facet-rail.component';
+import {
+  FieldBoundOp,
+  FieldRangeBound,
+  FieldRangeSelection,
+  FieldSelection,
+  isFieldSelectionEmpty,
+} from './facet-rail.component';
 
 /**
  * The **Field** Facet selections' round trip through the `field` query param, shared by every browse
@@ -15,8 +21,10 @@ export function fieldTokens(fields: Readonly<Record<string, FieldSelection>>): s
     // The excluding half rides the same param as its includes (ADR-0081): this grammar already
     // carries an operator, so a Field needs no second param to say "everything except".
     for (const v of sel.excluded ?? []) tokens.push(`${key}:neq:${v}`);
-    if (sel.gte) tokens.push(`${key}:gte:${sel.gte}`);
-    if (sel.lte) tokens.push(`${key}:lte:${sel.lte}`);
+    // A bound is written with the op it was named with: `>5` serialised as `gte` would let in exactly
+    // the row the caller asked to leave out (ADR-0082).
+    if (sel.gte) tokens.push(`${key}:${sel.gte.op}:${sel.gte.value}`);
+    if (sel.lte) tokens.push(`${key}:${sel.lte.op}:${sel.lte.value}`);
   }
   return tokens;
 }
@@ -36,13 +44,14 @@ export function fieldsFromTokens(tokens: readonly string[]): Record<string, Fiel
  * speaks the same filters from a typed `$key:value`.
  */
 export function foldFieldFilters(filters: readonly FieldFilter[]): Record<string, FieldSelection> {
-  const out: Record<string, { values: string[]; excluded: string[]; gte?: string; lte?: string }> = {};
+  const out: Record<string, MutableSelection> = {};
   for (const f of filters) {
     const sel = (out[f.key] ??= { values: [], excluded: [] });
-    const bound = boundOf(f.op);
-    if (bound) sel[bound] = f.value;
+    if (f.op === 'eq') sel.values.push(f.value);
     else if (f.op === 'neq') sel.excluded.push(f.value);
-    else sel.values.push(f.value);
+    // Everything else is a bound, and keeps the op that wrote it — the input it fills is a rendering
+    // question, which {@link boundOf} answers, and never the filter's meaning.
+    else sel[boundOf(f.op)] = { value: f.value, op: f.op };
   }
   return Object.fromEntries(Object.entries(out).map(([key, sel]) => [key, canonicalField(sel)]));
 }
@@ -53,10 +62,20 @@ export function foldFieldFilters(filters: readonly FieldFilter[]): Record<string
  * bounds, not four. One mapping, read by the fold that renders a bound and by the ownership that makes
  * it readonly — divergence there would mark one input and edit the other.
  */
+export function boundOf(op: FieldBoundOp): FieldRangeBound;
+export function boundOf(op: FieldFilterOp): FieldRangeBound | undefined;
 export function boundOf(op: FieldFilterOp): FieldRangeBound | undefined {
   if (op === 'gte' || op === 'gt') return 'gte';
   if (op === 'lte' || op === 'lt') return 'lte';
   return undefined;
+}
+
+/** A selection under construction — the fold fills it in place, {@link canonicalField} freezes it. */
+interface MutableSelection {
+  values: string[];
+  excluded: string[];
+  gte?: FieldRangeSelection;
+  lte?: FieldRangeSelection;
 }
 
 /** Drop a Field key once its selection is empty, so `hasFilters`/the URL never carry a dead entry. */
@@ -71,11 +90,9 @@ export function pruneField(sel: FieldSelection): FieldSelection | undefined {
  * refetch a second time.
  */
 function canonicalField(sel: FieldSelection): FieldSelection {
-  const out: { values: string[]; excluded?: string[]; gte?: string; lte?: string } = {
-    values: [...(sel.values ?? [])],
-  };
+  const out: Partial<MutableSelection> & { values: string[] } = { values: [...(sel.values ?? [])] };
   if (sel.excluded?.length) out.excluded = [...sel.excluded];
-  if (sel.gte) out.gte = sel.gte;
-  if (sel.lte) out.lte = sel.lte;
+  if (sel.gte) out.gte = { value: sel.gte.value, op: sel.gte.op };
+  if (sel.lte) out.lte = { value: sel.lte.value, op: sel.lte.op };
   return out;
 }

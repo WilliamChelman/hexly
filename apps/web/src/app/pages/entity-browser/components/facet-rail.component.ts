@@ -4,6 +4,20 @@ import { EntityFacets, FacetCount } from '@hexly/domain';
 import { ClientConfigStore } from '@hexly/web-core';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
+/** The ops one range bound may carry: the inclusive one a rail input sets, and the strict one only a
+ * **Facet Token** can write (`$cr:>5`, ADR-0082). */
+export type FieldBoundOp = 'gte' | 'gt' | 'lte' | 'lt';
+
+/**
+ * One bound of a range selection — the value **and how it compares**, inseparably: `>5` and `>=5` differ
+ * by exactly the boundary row, so the op travels with the value from the box to the wire rather than
+ * being guessed again where the params are built (ADR-0082).
+ */
+export interface FieldRangeSelection {
+  readonly value: string;
+  readonly op: FieldBoundOp;
+}
+
 /** One type's Field selection (ADR-0048, #188): eq membership for enum/list/string, or a
  * `gte`/`lte` range for number/date. Absent parts mean "unconstrained on that axis".
  * `excluded` is the `neq` half (ADR-0081) — it vetoes, so it beats an `eq` on the same value.
@@ -11,8 +25,9 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
 export interface FieldSelection {
   readonly values?: readonly string[];
   readonly excluded?: readonly string[];
-  readonly gte?: string;
-  readonly lte?: string;
+  /** The minimum, in the row's lower input — written `gt` where a token excluded the boundary itself. */
+  readonly gte?: FieldRangeSelection;
+  readonly lte?: FieldRangeSelection;
 }
 
 /** Whether a Field selection constrains nothing — no eq values, no exclusion, neither range bound.
@@ -485,8 +500,10 @@ export class FacetRailComponent {
           queryOwned: (ownedFields[field.key] ?? []).includes(v.value),
         }));
         const bounds = ownedBounds[field.key] ?? [];
-        const gte = selection.gte ?? '';
-        const lte = selection.lte ?? '';
+        // The input shows the compared value; its op says whether the boundary row is in, which the
+        // wire carries and the row has no control for (ADR-0082).
+        const gte = selection.gte?.value ?? '';
+        const lte = selection.lte?.value ?? '';
         return {
           key: field.key,
           label,

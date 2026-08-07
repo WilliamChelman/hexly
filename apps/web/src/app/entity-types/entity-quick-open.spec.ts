@@ -249,6 +249,40 @@ describe('EntityQuickOpen', () => {
       );
     });
 
+    /**
+     * The keys resolve synchronously off the registry, and a late response may never change what a
+     * filter means (ADR-0082) — so a box naming a Field waits for the World's Fields instead of being
+     * answered with the unfiltered list, which the cache would then hold under the narrowing query.
+     */
+    it('waits for the World’s Fields rather than answering a narrowing box unfiltered', async () => {
+      // Entering a World: the loader has asked, and nothing has answered yet.
+      types.setWorldFields([]);
+      types.awaitWorldFields();
+      const provider = enterWorld();
+
+      const commands = firstValueFrom(provider.search('$world.field.region:Ashfen'));
+      types.setWorldFields([regionField]);
+      TestBed.flushEffects();
+      await commands;
+
+      // One read, and it is the narrowed one: the unfiltered answer was never given, so nothing
+      // memoised it under the query that was meant to narrow it.
+      expect(entitiesClient.list).toHaveBeenCalledTimes(1);
+      expect(entitiesClient.list).toHaveBeenCalledWith(
+        expect.objectContaining({ field: ['world.field.region:eq:Ashfen'] }),
+      );
+    });
+
+    it('never waits on the Fields read for a box the reserved names decide', async () => {
+      types.setWorldFields([]);
+      types.awaitWorldFields();
+      const provider = enterWorld();
+
+      await firstValueFrom(provider.search('orc $type:core.type.note'));
+
+      expect(entitiesClient.list).toHaveBeenCalledWith(expect.objectContaining({ q: 'orc', type: ['core.type.note'] }));
+    });
+
     it('offers the reserved names and the World’s own Facet keys, synchronously', () => {
       const provider = enterWorld();
 

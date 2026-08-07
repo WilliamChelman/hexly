@@ -629,7 +629,7 @@ describe('FacetRail — a range bound the text owns (#430)', () => {
   const input = (fixture: ComponentFixture<FacetRailComponent>, tid: string) => el<HTMLInputElement>(fixture, tid);
 
   it('renders a text-named bound query-owned — outlined, dollared, and readonly', () => {
-    const fixture = render({ fields: { cr: { gte: '5' } } }, { bounds: { cr: ['gte'] } });
+    const fixture = render({ fields: { cr: { gte: { value: '5', op: 'gte' } } } }, { bounds: { cr: ['gte'] } });
 
     const min = input(fixture, 'facet-field-cr-gte');
     expect(min?.value).toBe('5');
@@ -641,8 +641,19 @@ describe('FacetRail — a range bound the text owns (#430)', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('$');
   });
 
+  /** The row offers two inputs, not four: `>5` fills the minimum, and its strictness rides the wire. */
+  it('renders a strictly-named minimum in the same input, unmarked — the row has no control for it', () => {
+    const fixture = render({ fields: { cr: { gte: { value: '5', op: 'gt' } } } }, { bounds: { cr: ['gte'] } });
+
+    expect(input(fixture, 'facet-field-cr-gte')?.value).toBe('5');
+    expect(input(fixture, 'facet-field-cr-gte')?.readOnly).toBe(true);
+  });
+
   it('leaves the same Field’s other bound the rail’s to edit', () => {
-    const fixture = render({ fields: { cr: { gte: '5', lte: '9' } } }, { bounds: { cr: ['gte'] } });
+    const fixture = render(
+      { fields: { cr: { gte: { value: '5', op: 'gte' }, lte: { value: '9', op: 'lte' } } } },
+      { bounds: { cr: ['gte'] } },
+    );
 
     const max = input(fixture, 'facet-field-cr-lte');
     expect(max?.value).toBe('9');
@@ -654,14 +665,17 @@ describe('FacetRail — a range bound the text owns (#430)', () => {
   });
 
   it('offers a delete control on the owned bound alone, naming the token it takes out', () => {
-    const fixture = render({ fields: { cr: { gte: '5', lte: '9' } } }, { bounds: { cr: ['gte'] } });
+    const fixture = render(
+      { fields: { cr: { gte: { value: '5', op: 'gte' }, lte: { value: '9', op: 'lte' } } } },
+      { bounds: { cr: ['gte'] } },
+    );
 
     const remove = el<HTMLButtonElement>(fixture, 'facet-field-cr-gte-remove');
     expect(remove?.getAttribute('aria-label')).toBe('Remove the CR minimum 5 from the search box');
   });
 
   it('names the delete control in the active Locale', () => {
-    const fixture = render({ fields: { cr: { lte: '9' } } }, { bounds: { cr: ['lte'] } });
+    const fixture = render({ fields: { cr: { lte: { value: '9', op: 'lte' } } } }, { bounds: { cr: ['lte'] } });
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
@@ -671,7 +685,7 @@ describe('FacetRail — a range bound the text owns (#430)', () => {
   });
 
   it('clears the bound it names, which is how the page is told to delete the token', () => {
-    const fixture = render({ fields: { cr: { gte: '5' } } }, { bounds: { cr: ['gte'] } });
+    const fixture = render({ fields: { cr: { gte: { value: '5', op: 'gte' } } } }, { bounds: { cr: ['gte'] } });
     const changed = vi.fn();
     fixture.componentInstance.fieldRangeChanged.subscribe(changed);
 
@@ -681,7 +695,7 @@ describe('FacetRail — a range bound the text owns (#430)', () => {
   });
 
   it('leaves a rail-owned range wholly editable, with no delete control on either bound', () => {
-    const fixture = render({ fields: { cr: { gte: '5' } } }, {});
+    const fixture = render({ fields: { cr: { gte: { value: '5', op: 'gte' } } } }, {});
 
     expect(input(fixture, 'facet-field-cr-gte')?.readOnly).toBe(false);
     expect(input(fixture, 'facet-field-cr-lte')?.readOnly).toBe(false);

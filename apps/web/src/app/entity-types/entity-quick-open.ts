@@ -1,7 +1,7 @@
 import { DestroyRef, Injectable, effect, inject } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { Observable, Subject, Subscription, map, of, shareReplay } from 'rxjs';
+import { Observable, Subject, Subscription, filter, map, of, shareReplay, take } from 'rxjs';
 import {
   EntitySummary,
   EntityType,
@@ -55,6 +55,10 @@ export class EntityQuickOpen implements CommandProvider {
   private mountsSub?: Subscription;
 
   private readonly query$ = new Subject<string>();
+  /** The box as of the last keystroke, so a query that waited on the registry knows it was superseded. */
+  private asked = '';
+  /** The registry's own signal that its Facet keys are settled (ADR-0082), as a stream to wait on. */
+  private readonly fieldsResolved$ = toObservable(this.types.fieldsResolved);
   /**
    * What the box means as of the last keystroke (ADR-0082), read again in {@link scope} — after the
    * trailing debounce has chosen its keystroke, so the params belong to the query being sent.
@@ -124,11 +128,32 @@ export class EntityQuickOpen implements CommandProvider {
     // No World, no scope — and an unscoped read is the global search ADR-0083 removes, so it is never
     // made. Reachable only between `clearActiveWorld` unpinning and this Provider's own destruction.
     if (!q || !this.activeWorld.worldId()) return of([]);
-    // The raw string keys the debounce and the memo — two boxes differing only in a token are two
-    // different searches — while the params below are taken from its parse.
-    this.parsed = parseFacetQuery(q, this.facetKeys());
-    this.query$.next(q);
+    this.asked = q;
+    this.ask(q);
     return this.commands$;
+  }
+
+  /**
+   * Put the box to the search stream — once the registry can answer for every `$key` it names
+   * (ADR-0082). Asked while the World's Fields are still in flight, a narrowing box would be answered
+   * with the *unfiltered* list, and that list memoised under the very query meant to narrow it, so the
+   * response would arrive too late to correct anything. A box naming no Field key never waits.
+   */
+  private ask(q: string): void {
+    // A keystroke landed while this one waited: it is the search now, and this one is abandoned.
+    if (q !== this.asked) return;
+    const parsed = parseFacetQuery(q, this.facetKeys());
+    const keys = [...parsed.fields.map((f) => f.key), ...parsed.unresolvedKeys];
+    if (keys.every((key) => this.types.facetKeySettled(key))) {
+      // The raw string keys the debounce and the memo — two boxes differing only in a token are two
+      // different searches — while the params below are taken from its parse.
+      this.parsed = parsed;
+      this.query$.next(q);
+      return;
+    }
+    this.fieldsResolved$
+      .pipe(filter(Boolean), take(1), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.ask(q));
   }
 
   /** The read's scope: the reader's World, plus the Containers it Mounts (ADR-0083), narrowed by
