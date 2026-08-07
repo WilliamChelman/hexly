@@ -363,7 +363,7 @@ _Avoid_: Region legend, layers, list
 ## Command Palette
 
 **Command Palette**:
-A Cmd/Ctrl+K overlay, reachable from anywhere, for finding Entities and Worlds and invoking Commands — the one cross-cutting search-and-act surface. Worlds and Commands answer from anywhere; Entities answer from the **World** the reader is in and the **Containers** it **Mounts**, and outside a World it offers none, a reader with no World in view having no Entities in view either. Narrowed by **Facet Tokens** like any other Entity search.
+A Cmd/Ctrl+K overlay, reachable from anywhere, for finding Entities and Worlds and invoking Commands — the one cross-cutting search-and-act surface. Worlds and Commands answer from anywhere; Entities answer from the **World** the reader is in and the **Containers** it **Mounts**, and outside a World it offers none, a reader with no World in view having no Entities in view either. Narrowed by **Facet Tokens**, but it completes a Facet's name only and never its values: it runs no **Facet** read of its own, and a token language costs a surface no request it was not already making.
 _Avoid_: Quick open, search bar, spotlight
 
 **Command**:
@@ -403,7 +403,7 @@ A filterable dimension of the Entities a browse lists — a **World**'s, or the 
 _Avoid_: Filter, dimension, aspect; Pack facet (it is the **Container** facet, and a **Compendium** is one value it takes)
 
 **Facet Token**:
-A **Facet** named inline rather than clicked — `$` then the Facet's name, a colon, and a value (`$type:npc`, `$tag:"sea of storms"`), with a leading `-` to exclude. Typed into any Entity search box, so a reader narrows from the keyboard where there is no room for a rail. The `$` is what tells a Facet from prose: a session title carrying a colon is still text to search for, and a name that answers to nothing says so rather than quietly becoming a search term. Everything else in the box is the full-text query.
+A **Facet** named inline rather than clicked — `$` then the Facet's name, a colon, and a value (`$type:npc`, `$tag:"sea of storms"`), with a leading `-` to exclude. The reserved names are `$type`, `$tag`, `$visibility` and `$in` — the **Container**'s typed name, which reads as a place where `container` reads as a word to search for — and every other Facet key is a **Field** id or a harvested dimension. A value may be compared rather than matched (`$cr:>=5`, `$cr:>5`, and `<=`/`<` likewise), which is how a range is named from the keyboard. Typed into any Entity search box, so a reader narrows from the keyboard where there is no room for a rail. The `$` is what tells a Facet from prose: a session title carrying a colon is still text to search for, and a name that answers to nothing says so rather than quietly becoming a search term — as does a token that resolves but applies nothing, an empty value or a negated bound. Everything else in the box is the full-text query.
 Where a Facet is named is where it lives — a typed one lives in the text, a clicked one lives in the rail — so typing never rewrites the box and clicking never fills it. Naming one both ways is the text's to settle; clicking off a typed one takes it out of the text that named it.
 _Avoid_: Search operator, query syntax, filter token, facet syntax; Inline Facet (it is a **Facet**, named a second way, not a kind of its own); sigil (what **Command Prefix** is not called either)
 
