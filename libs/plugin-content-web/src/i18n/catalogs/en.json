@@ -31,7 +31,9 @@
     "empty": "No matching entities",
     "create": "Create \"{{name}}\"",
     "createDetails": "Create \"{{name}}\" with details…",
-    "createError": "Could not create the entity"
+    "createError": "Could not create the entity",
+    "facetKeys": "Filter by",
+    "unknownFacet": "No Facet “{{keys}}” here."
   },
   "descriptorPicker": {
     "label": "Describe this link",

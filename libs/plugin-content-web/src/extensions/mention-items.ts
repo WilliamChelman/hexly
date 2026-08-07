@@ -1,4 +1,11 @@
-import { EntitySummary, FacetKeySet, ParsedFacetQuery, parseFacetQuery } from '@hexly/domain';
+import {
+  EntitySummary,
+  FacetKeySet,
+  ParsedFacetQuery,
+  facetKeySuggestions,
+  facetSuggestAt,
+  parseFacetQuery,
+} from '@hexly/domain';
 
 /**
  * The Create row's sentinel id — `\0`-prefixed so it can never collide with an Entity id,
@@ -8,6 +15,9 @@ export const MENTION_CREATE_ID = '\0create';
 
 /** The `Create "…" with details…` row's sentinel id — same `\0` trick, distinct row. */
 export const MENTION_CREATE_DETAILS_ID = '\0create-details';
+
+/** A Facet key row's id prefix — the same `\0` trick, one row per offered key. */
+const MENTION_FACET_KEY_PREFIX = '\0facet:';
 
 /** A row offering one of the owner's Entities, as the server's `q` search returned it. */
 export interface MentionMatch {
@@ -38,8 +48,23 @@ export interface MentionCreateDetails {
   readonly descriptor: string | null;
 }
 
+/**
+ * A Facet key on offer, and the slice of the mention query accepting it rewrites — offsets into the
+ * query, which the trigger maps onto document positions.
+ */
+export interface MentionFacetKey {
+  readonly kind: 'facet-key';
+  readonly id: string;
+  readonly key: string;
+  readonly from: number;
+  readonly to: number;
+}
+
+/** The rows one search produces: what matched, and what the typed name would mint. */
+export type MentionSearchItem = MentionMatch | MentionCreate | MentionCreateDetails;
+
 /** One row of the `@` picker's listbox. */
-export type MentionItem = MentionMatch | MentionCreate | MentionCreateDetails;
+export type MentionItem = MentionSearchItem | MentionFacetKey;
 
 /** A typed `@` query split into the name to match or mint, its Facet Tokens, and the Descriptor. */
 export interface MentionQuery {
@@ -75,6 +100,30 @@ export function parseMentionQuery(query: string, keys: FacetKeySet): MentionQuer
 }
 
 /**
+ * The Facet keys `$` reveals where the caret stands, and none anywhere else (ADR-0082) — the gesture
+ * that answers "what can I even filter by?", here as ordinary picker rows. Synchronous, off the
+ * registry the caller already holds: this surface runs no Facet read, so the key stage is the whole of
+ * its typeahead — no values, no counts.
+ *
+ * `caret` is an offset into `query`, not its length: the mention matches to the end of the line, so a
+ * caret left mid-mention has text after it that completes nothing.
+ */
+export function mentionFacetKeys(query: string, caret: number, keys: FacetKeySet): MentionFacetKey[] {
+  // Past the `::` the caret is in the Link Descriptor (ADR-0073), which names no Facet.
+  const separator = query.indexOf('::');
+  if (separator >= 0 && caret > separator) return [];
+  const context = facetSuggestAt(query, caret);
+  if (context?.stage !== 'key') return [];
+  return facetKeySuggestions(keys, context.prefix).map((key) => ({
+    kind: 'facet-key',
+    id: MENTION_FACET_KEY_PREFIX + key,
+    key,
+    from: context.start,
+    to: context.end,
+  }));
+}
+
+/**
  * The picker's rows for one query: the matches, then plain Create and Create-with-details — kept even
  * when something matches, since an existing "Jane Doe" must not block authoring a second one, and
  * ordered fast path first so Enter on a miss reaches the silent mint. Without `canCreate` both are
@@ -84,8 +133,8 @@ export function mentionItems(
   query: Pick<MentionQuery, 'name' | 'descriptor'>,
   matches: readonly EntitySummary[],
   canCreate: boolean,
-): MentionItem[] {
-  const items: MentionItem[] = matches.map((entity) => ({
+): MentionSearchItem[] {
+  const items: MentionSearchItem[] = matches.map((entity) => ({
     kind: 'entity',
     id: entity.id,
     entity,

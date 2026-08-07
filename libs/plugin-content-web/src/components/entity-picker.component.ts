@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import {
   ListboxController,
@@ -29,12 +29,30 @@ export type EntityPickerProps = ListboxProps<MentionItem>;
       <app-listbox
         appBodyPortal
         testid="entity-picker"
-        [ariaLabel]="'editor.entityPicker.label' | transloco"
+        [ariaLabel]="(offersFacetKeys() ? 'editor.entityPicker.facetKeys' : 'editor.entityPicker.label') | transloco"
         [activeItemId]="activeItemId()"
         [anchor]="anchor()!"
       >
+        <!-- A dollar-name this World answers to nothing is *said*, never quietly searched for (ADR-0082). -->
+        @if (unknownFacetKeys().length > 0) {
+          <li role="presentation" class="px-3 py-1 text-xs text-ink-faint">
+            <span role="status" data-testid="entity-picker-unknown-facet">
+              {{ 'editor.entityPicker.unknownFacet' | transloco: { keys: unknownFacetKeys().join(', ') } }}
+            </span>
+          </li>
+        }
         @for (item of items(); track item.id; let i = $index) {
-          @if (item.kind === 'entity') {
+          @if (item.kind === 'facet-key') {
+            <li
+              appListboxOption
+              [optionId]="optionId(item.id)"
+              [testid]="'entity-picker-facet-' + item.key"
+              [selected]="i === activeIndex()"
+              (pick)="select(item)"
+            >
+              <span class="font-mono text-xs">{{ item.key }}</span>
+            </li>
+          } @else if (item.kind === 'entity') {
             <li
               appListboxOption
               [optionId]="optionId(item.id)"
@@ -77,4 +95,24 @@ export type EntityPickerProps = ListboxProps<MentionItem>;
 })
 export class EntityPickerComponent extends ListboxController<MentionItem> {
   protected readonly optionIdPrefix = 'entity-opt-';
+
+  /** The `$` names typed into the mention that this World answers to nothing (ADR-0082). */
+  protected readonly unknownFacetKeys = signal<readonly string[]>([]);
+
+  /** Keys rather than Entities: the list is completing a `$` name, and says so. */
+  protected readonly offersFacetKeys = computed(() => this.items()[0]?.kind === 'facet-key');
+
+  /** Stated by the `@` trigger on every keystroke, search or no search. */
+  showUnknownFacetKeys(keys: readonly string[]): void {
+    this.unknownFacetKeys.set(keys);
+  }
+
+  /**
+   * A completed Facet key leaves the list standing — the mention is still being written, and shutting
+   * it on `$type:` would strand the author mid-token (ADR-0082).
+   */
+  protected override select(item: MentionItem): void {
+    super.select(item);
+    if (item.kind === 'facet-key') this.visible.set(true);
+  }
 }

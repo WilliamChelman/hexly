@@ -10,6 +10,7 @@ import {
   MentionCreateDetails,
   MentionItem,
   MentionQuery,
+  mentionFacetKeys,
   mentionItems,
   parseMentionQuery,
 } from './mention-items';
@@ -66,6 +67,13 @@ export interface EntityMentionPorts {
 export function entityMention(ports: EntityMentionPorts): { extension: Extension; setProgrammatic: () => void } {
   let programmatic = false;
   let picked = false;
+  // Distinct key: slashCommands already owns the default `suggestion` key, and two suggestion plugins
+  // can't share one in the same editor. Held here so the caret can be read off the plugin's own range.
+  const pluginKey = new PluginKey('entityMention');
+
+  /** State the `$` names this World answers to nothing — never a silent reinterpretation (ADR-0082). */
+  const stateMisses = (query: string) =>
+    ports.getPicker()?.showUnknownFacetKeys(parseMentionQuery(query, ports.facetKeys()).facets.unresolvedKeys);
 
   return {
     setProgrammatic: () => (programmatic = true),
@@ -75,9 +83,7 @@ export function entityMention(ports: EntityMentionPorts): { extension: Extension
         return [
           Suggestion<MentionItem, MentionItem>({
             editor: this.editor,
-            // Distinct key: slashCommands already owns the default `suggestion` key,
-            // and two suggestion plugins can't share one in the same editor.
-            pluginKey: new PluginKey('entityMention'),
+            pluginKey,
             char: '@',
             // Entity names are multi-word ("Jane Doe") — keep the query open across spaces so
             // the server search sees the full name (default stops at the first space).
@@ -86,11 +92,26 @@ export function entityMention(ports: EntityMentionPorts): { extension: Extension
               const { $from } = state.selection;
               return !$from.parent.type.spec.code && !$from.marks().some((m) => m.type.name === 'code');
             },
-            items: async ({ query }) => {
+            items: async ({ editor, query }) => {
+              // A `$` name being typed owns the list: the residual text is half a token, so Enter has
+              // to complete the key rather than search for — or mint — the fragment (ADR-0082).
+              const keys = mentionFacetKeys(query, caretIn(editor, pluginKey, query), ports.facetKeys());
+              if (keys.length > 0) return keys;
               const parsed = parseMentionQuery(query, ports.facetKeys());
               return mentionItems(parsed, await ports.search(parsed), ports.canCreate());
             },
             command: ({ editor, range, props }) => {
+              if (props.kind === 'facet-key') {
+                // Accepting a key rewrites exactly the `$…` being typed and leaves the mention open, so
+                // the value is typed straight after the colon — the mention is not picked by this.
+                const queryStart = range.from + 1; // past the `@`
+                editor
+                  .chain()
+                  .focus()
+                  .insertContentAt({ from: queryStart + props.from, to: queryStart + props.to }, props.key + ':')
+                  .run();
+                return;
+              }
               if (programmatic) picked = true;
               if (props.kind === 'entity') {
                 editor
@@ -112,8 +133,15 @@ export function entityMention(ports: EntityMentionPorts): { extension: Extension
               );
             },
             render: () => ({
-              onStart: (props: SuggestionProps<MentionItem, MentionItem>) => ports.getPicker()?.open(props),
-              onUpdate: (props: SuggestionProps<MentionItem, MentionItem>) => ports.getPicker()?.update(props),
+              onStart: (props: SuggestionProps<MentionItem, MentionItem>) => {
+                stateMisses(props.query);
+                ports.getPicker()?.open(props);
+              },
+              onUpdate: (props: SuggestionProps<MentionItem, MentionItem>) => {
+                // On the keystroke, not with the rows: a miss is stated while the search is still out.
+                stateMisses(props.query);
+                ports.getPicker()?.update(props);
+              },
               onKeyDown: (props: SuggestionKeyDownProps) => ports.getPicker()?.onKeyDown(props.event) ?? false,
               onExit: (props: SuggestionProps<MentionItem, MentionItem>) => {
                 // If /link triggered this session and the user escaped (no pick),
@@ -131,6 +159,18 @@ export function entityMention(ports: EntityMentionPorts): { extension: Extension
       },
     }),
   };
+}
+
+/**
+ * How far into the mention query the caret stands. `allowSpaces` matches to the end of the line rather
+ * than to the caret, so the query can run past it — and typeahead completes what is being typed, never
+ * what follows it. Falls back to the whole query where the plugin holds no range yet.
+ */
+function caretIn(editor: Editor, key: PluginKey, query: string): number {
+  const range = (key.getState(editor.state) as { range?: { from: number } } | undefined)?.range;
+  if (!range) return query.length;
+  // `range.from` is the `@` itself, one character wide.
+  return Math.max(0, Math.min(query.length, editor.state.selection.from - range.from - 1));
 }
 
 /** The attrs a picked or minted Entity becomes as an `entityLink` (ADR-0023). */

@@ -1,5 +1,11 @@
 import { EntitySummary, FacetKeySet } from '@hexly/domain';
-import { MENTION_CREATE_DETAILS_ID, MENTION_CREATE_ID, mentionItems, parseMentionQuery } from './mention-items';
+import {
+  MENTION_CREATE_DETAILS_ID,
+  MENTION_CREATE_ID,
+  mentionFacetKeys,
+  mentionItems,
+  parseMentionQuery,
+} from './mention-items';
 
 const summary = (id: string, name: string): EntitySummary =>
   ({ id, name, types: ['core.type.note'], tags: [] }) as unknown as EntitySummary;
@@ -49,6 +55,39 @@ describe('parseMentionQuery — the name, its Facet Tokens, and the Link Descrip
     expect(parsed.facets.unresolvedKeys).toEqual(['domain']);
     expect(parsed.facets.fields).toEqual([]);
     expect(parsed.name).toBe('gorb');
+  });
+});
+
+describe('mentionFacetKeys — what pressing `$` inside a mention offers', () => {
+  /** The keys offered for a query whose caret sits at its end, as it does while typing. */
+  const offered = (query: string, keys = KEYS) => mentionFacetKeys(query, query.length, keys).map((row) => row.key);
+
+  it('reveals the whole filter vocabulary on the dollar, reserved names and Facet keys alike', () => {
+    expect(offered('$')).toEqual(['type', 'tag', 'visibility', 'dnd.cr']);
+  });
+
+  it('narrows to what has been typed of the key, what starts with it first', () => {
+    expect(offered('gorb $t')).toEqual(['type', 'tag', 'visibility']);
+  });
+
+  it('offers nothing where the caret stands in plain text — a name is a name', () => {
+    expect(offered('gorb')).toEqual([]);
+    expect(offered('e$t')).toEqual([]);
+  });
+
+  it('offers no values after the colon: this picker runs no Facet read, so keys are all it knows', () => {
+    expect(offered('$type:')).toEqual([]);
+    expect(offered('$type:core.type.npc')).toEqual([]);
+  });
+
+  it('leaves the Link Descriptor alone — nothing past the `::` names a Facet', () => {
+    expect(offered('gorb::$t')).toEqual([]);
+  });
+
+  it('completes only what is being typed, never what the caret has already passed', () => {
+    // The mention matches to the end of the line, so `gorb` trails a caret sitting after `$t`.
+    expect(mentionFacetKeys('$t gorb', 2, KEYS).map((row) => row.key)).toEqual(['type', 'tag', 'visibility']);
+    expect(mentionFacetKeys('$t gorb', 2, KEYS)[0]).toMatchObject({ from: 1, to: 2 });
   });
 });
 
