@@ -9,6 +9,7 @@ import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginAsset } from '@hexly/plugin-asset/web';
 import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { AssetBrowserPage } from './asset-browser.page';
+import { TypeRegistry } from '../../entity-types/type-registry';
 
 /**
  * The Asset Browser's rail (ADR-0081, #423): the same paired toggles the Entity Browser gained, on the
@@ -351,6 +352,70 @@ describe('AssetBrowser', () => {
       // Stage two comes off the Facet read this page already runs, counts and all.
       type(fixture, '$tag:');
       expect(rows(el)).toEqual(['used2', 'portrait-art1']);
+    });
+
+    /**
+     * A cold load on a shared link naming a **Field** key (ADR-0082, #430): the Fields read is still in
+     * flight, so what the box filters to is not known yet. The read is held rather than made unfiltered
+     * — every Asset in the World — and corrected under the reader once the response lands.
+     */
+    describe('a Facet key the registry cannot answer for yet', () => {
+      const crField = {
+        id: 'test.field.cr',
+        label: 'CR',
+        dataType: { kind: 'number' as const },
+        required: false,
+        facetable: true,
+      };
+
+      const awaiting = () => {
+        const registry = TestBed.inject(TypeRegistry);
+        registry.setWorldFields([]);
+        registry.awaitWorldFields();
+        return registry;
+      };
+
+      const render = (q: string) => {
+        queryParams$.next(convertToParamMap({ q }));
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+        const fixture = TestBed.createComponent(AssetBrowserPage);
+        fixture.detectChanges();
+        return fixture;
+      };
+
+      it('holds the first read, then makes it once — filtered — when the Fields land', () => {
+        const registry = awaiting();
+        const fixture = render('$test.field.cr:5');
+
+        expect(client.list).not.toHaveBeenCalled();
+
+        registry.setWorldFields([crField]);
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenCalledTimes(1);
+        expect(client.list).toHaveBeenCalledWith({ ...baseRead, field: ['test.field.cr:eq:5'] });
+      });
+
+      it('browses at once when the box names no Field key', () => {
+        awaiting();
+
+        render('banner -$tag:used');
+
+        expect(client.list).toHaveBeenCalledTimes(1);
+        expect(client.list).toHaveBeenCalledWith({ ...baseRead, q: 'banner', excludeTag: ['used'] });
+      });
+
+      /** The failure path: a refused read degrades to no World Fields, so the hold always ends. */
+      it('browses when the Fields read answers without the key', () => {
+        const registry = awaiting();
+        const fixture = render('banner $test.field.cr:5');
+
+        registry.setWorldFields([]); // what a failed read degrades to
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenCalledTimes(1);
+        expect(client.list).toHaveBeenCalledWith({ ...baseRead, q: 'banner' });
+      });
     });
   });
 });

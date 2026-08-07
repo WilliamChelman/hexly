@@ -123,6 +123,15 @@ export class EntityQuickOpen implements CommandProvider {
     return { reserved: RESERVED_FACET_NAMES, fields: this.types.facetKeys() };
   }
 
+  /**
+   * Whether the registry can answer for `key` yet (ADR-0082) — the same readiness {@link ask} waits on,
+   * offered to the Palette's miss report so the two agree: a key this defers the search for is not one
+   * the banner may call unknown meanwhile.
+   */
+  facetKeySettled(key: string): boolean {
+    return this.types.facetKeySettled(key);
+  }
+
   search(query: string): Observable<readonly Command[]> {
     const q = query.trim();
     // No World, no scope — and an unscoped read is the global search ADR-0083 removes, so it is never

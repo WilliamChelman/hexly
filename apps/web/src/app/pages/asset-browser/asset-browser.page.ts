@@ -280,6 +280,11 @@ export class AssetBrowserPage {
 
   /** Fetch page one and replace the accumulated list — on load, after every filter change, and after upload/delete. */
   private fetchFirstPage(): void {
+    // A Facet key the registry cannot answer for yet: read now, these params would name no Field and
+    // browse every Asset, then correct themselves under the reader (ADR-0082). Read inside the effect
+    // above, so the read it holds is re-run the moment the Fields land — or fail, which degrades to no
+    // World Fields and settles the key as a miss.
+    if (this.filters.filtersPending()) return;
     const worldId = this.activeWorld.worldId();
     if (!worldId) return;
     this.fetchSub?.unsubscribe();

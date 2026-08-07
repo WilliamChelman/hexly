@@ -549,7 +549,7 @@ export class FacetRailComponent {
  * chosen value is always listed whatever its count — the server hides zero-count values, and a choice
  * it hid is still filtering the list, which for an exclusion would be a one-way door. A merged row
  * carries no server-sent `label`, so a value that renders through one (a Container, an Entity-Link
- * Field) falls back to its raw id: a row you can click off beats a row that vanished.
+ * Field) falls back to its raw id.
  */
 function withSelection(
   rows: readonly FacetCount[],

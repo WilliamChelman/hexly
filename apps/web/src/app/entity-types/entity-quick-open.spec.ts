@@ -294,6 +294,27 @@ describe('EntityQuickOpen', () => {
       });
     });
 
+    /**
+     * The same readiness the deferral above waits on, offered to the Palette's miss report (ADR-0082,
+     * #430) — so the banner cannot call a key unknown while this Provider is still deferring the search
+     * for it. It travels through the Provider seam: the Palette depends on no registry of the app's.
+     */
+    it('reports whether a key is settled, so the Palette’s miss report agrees with its own wait', () => {
+      types.setWorldFields([]);
+      types.awaitWorldFields();
+      const provider = enterWorld();
+
+      expect(provider.facetKeySettled('world.field.region')).toBe(false);
+      // A reserved name is decided the moment it is typed — no Fields read widens or narrows it.
+      expect(provider.facetKeySettled('type')).toBe(true);
+
+      types.setWorldFields([regionField]);
+
+      expect(provider.facetKeySettled('world.field.region')).toBe(true);
+      // Answered without it: the key is settled, and now honestly a miss.
+      expect(provider.facetKeySettled('world.field.absent')).toBe(true);
+    });
+
     it('narrows within the Mount scope when a Container is named, never widening it', async () => {
       const provider = enterWorld('w1', of([pack, shelf]));
 

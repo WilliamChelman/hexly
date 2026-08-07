@@ -115,8 +115,6 @@ export class FacetTokenStore {
   readonly queryOwned = computed(() => queryOwnedFacets(this.parsedQuery()));
   /** The residual full-text query — what the wire's `q` carries, as against the URL's raw string. */
   readonly searchText = computed(() => this.parsedQuery().text);
-  /** The `$` names nothing here answers to, for the surface to report (ADR-0082). */
-  readonly unknownFacetKeys = computed(() => this.parsedQuery().unresolvedKeys);
   /**
    * Whether the box leans on a Facet key the registry cannot answer for **yet** (ADR-0082): what this
    * filters to is not known until the World's Fields land, so a surface **holds its read** rather than

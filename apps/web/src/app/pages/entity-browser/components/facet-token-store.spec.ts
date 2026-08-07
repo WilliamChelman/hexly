@@ -148,7 +148,7 @@ describe('FacetTokenStore', () => {
     type(store, '$in:pack-1 $visibility:private');
 
     expect(store.facetKeys().reserved).toEqual(['type', 'tag', 'visibility']);
-    expect(store.unknownFacetKeys()).toEqual(['in']);
+    expect(store.parsedQuery().unresolvedKeys).toEqual(['in']);
     expect(store.filterParams()).toEqual({ visibility: ['private'] });
   });
 
@@ -158,7 +158,7 @@ describe('FacetTokenStore', () => {
     type(store, '$in:pack-1 $visibility:private');
 
     expect(store.facetKeys().reserved).toEqual(['type', 'tag', 'in']);
-    expect(store.unknownFacetKeys()).toEqual(['visibility']);
+    expect(store.parsedQuery().unresolvedKeys).toEqual(['visibility']);
     expect(store.filterParams()).toEqual({ container: ['pack-1'] });
   });
 
@@ -286,7 +286,7 @@ describe('FacetTokenStore', () => {
       const store = trio();
 
       expect(store.filtersPending()).toBe(true);
-      expect(store.unknownFacetKeys()).toEqual([]);
+      expect(store.parsedQuery().unresolvedKeys).toEqual([]);
       // What is held back, and why: read now, these params name no Field — every Entity in the World.
       expect(store.filterParams()).toEqual({});
     });
@@ -308,7 +308,7 @@ describe('FacetTokenStore', () => {
       registry.setWorldFields([CR_FIELD]);
 
       expect(store.filtersPending()).toBe(false);
-      expect(store.unknownFacetKeys()).toEqual(['domain']);
+      expect(store.parsedQuery().unresolvedKeys).toEqual(['domain']);
       expect(store.filterParams()).toEqual({ q: 'orc' });
     });
 
@@ -320,7 +320,7 @@ describe('FacetTokenStore', () => {
       // no Fields response can make a World-scoped browse able to narrow by Container.
       expect(store.filtersPending()).toBe(false);
       expect(store.filterParams()).toEqual({ type: ['core.type.note'] });
-      expect(store.unknownFacetKeys()).toEqual(['in']);
+      expect(store.parsedQuery().unresolvedKeys).toEqual(['in']);
     });
   });
 

@@ -81,6 +81,25 @@ describe('CommandRegistry', () => {
     expect(registry.facetKeys('>')).toEqual({ reserved: ['visibility'], fields: [] });
   });
 
+  it('holds a key unsettled while any Provider on the prefix is still loading its vocabulary', () => {
+    // One Provider's registry is still reading (ADR-0082): the key it is about to resolve is one this
+    // prefix *can* apply, so the whole prefix waits rather than reporting a miss it would retract.
+    registry.register({ ...provider(''), facetKeySettled: () => false });
+    registry.register(provider('')); // declares no readiness — settled by construction
+    registry.register({ ...provider('>'), facetKeySettled: () => false });
+
+    expect(registry.facetKeySettled('', 'world.field.region')).toBe(false);
+    // Another prefix answers a different box, and is not held by this one's loading Provider.
+    expect(registry.facetKeySettled('@', 'world.field.region')).toBe(true);
+  });
+
+  it('settles a key once every Provider on the prefix can answer for it', () => {
+    registry.register({ ...provider(''), facetKeySettled: (key) => key === 'type' });
+
+    expect(registry.facetKeySettled('', 'type')).toBe(true);
+    expect(registry.facetKeySettled('', 'world.field.region')).toBe(false);
+  });
+
   it('offers no vocabulary at all where no Provider names one — the Palette outside a World', () => {
     registry.register(provider(''));
 

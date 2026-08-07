@@ -34,6 +34,14 @@ export interface CommandProvider {
    * filters by nothing. Read inside a computed, so a signal-backed vocabulary keeps the box current.
    */
   facetKeys?(): FacetKeySet;
+  /**
+   * Whether this Provider can say **yet** what `key` means (ADR-0082) — omitted where its vocabulary is
+   * settled the moment it registers. A Provider reading a registry that is still loading answers false,
+   * and the Palette then holds its miss report: a key the next response is about to resolve is
+   * *unresolved*, not unresolvable, and stating a miss it will disprove is the lie ADR-0082 forbids.
+   * Read inside the same computed as {@link facetKeys}, so the report appears when the read lands.
+   */
+  facetKeySettled?(key: string): boolean;
 }
 
 /**

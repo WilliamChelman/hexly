@@ -41,6 +41,18 @@ export class CommandRegistry {
     };
   }
 
+  /**
+   * Whether every Provider on `prefix` can say yet what `key` means (ADR-0082). One Provider still
+   * loading its vocabulary holds the whole prefix's verdict: the key it is about to resolve is one this
+   * prefix *can* apply, so reporting a miss for it now would be retracted by the response. A Provider
+   * that declares no readiness is settled by construction.
+   */
+  facetKeySettled(prefix: string, key: string): boolean {
+    return this.providers()
+      .filter((p) => p.prefix === prefix)
+      .every((p) => p.facetKeySettled?.(key) ?? true);
+  }
+
   register(provider: CommandProvider): () => void {
     this.providers.update((list) => [...list, provider]);
     return () => {

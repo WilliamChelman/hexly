@@ -214,6 +214,11 @@ export class EntityBrowserPage {
 
   /** Fetch page one and replace the accumulated list — on load and after every create/rename/delete. */
   private fetchFirstPage(): void {
+    // A Facet key the registry cannot answer for yet: read now, these params would name no Field and
+    // browse the whole World, then correct themselves under the reader (ADR-0082). Read inside the
+    // effect above, so the read it holds is re-run the moment the Fields land — or fail, which degrades
+    // to no World Fields and settles the key as a miss.
+    if (this.filters.filtersPending()) return;
     const worldId = this.activeWorld.worldId();
     // Never fetch the whole owner list (every World) if the segment is somehow absent.
     if (!worldId) return;

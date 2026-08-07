@@ -188,8 +188,19 @@ export class CommandPaletteComponent {
    * with its scope (ADR-0083) — pressing `$` there opens nothing.
    */
   protected readonly facetKeys = computed(() => this.registry.facetKeys(this.parsed().prefix));
-  /** What the box's Tokens applied nothing on this prefix, reported rather than searched for as text. */
-  protected readonly facetMiss = computed(() => parseFacetQuery(this.parsed().query, this.facetKeys()));
+  /**
+   * What the box's Tokens applied nothing on this prefix, reported rather than searched for as text —
+   * with the keys no Provider here can answer for **yet** held out (ADR-0082). A Provider whose
+   * vocabulary is still loading (the Entity one, on a cold World) would otherwise have the Palette say
+   * "no such key" about a Field its own next response names; it no longer *searches* wrong, and now it
+   * no longer *says* wrong either. Its readiness arrives through the seam its key set already does.
+   */
+  protected readonly facetMiss = computed(() => {
+    const { prefix, query } = this.parsed();
+    const parsed = parseFacetQuery(query, this.facetKeys());
+    const settled = parsed.unresolvedKeys.filter((key) => this.registry.facetKeySettled(prefix, key));
+    return settled.length === parsed.unresolvedKeys.length ? parsed : { ...parsed, unresolvedKeys: settled };
+  });
 
   protected readonly rows = computed(() =>
     this.sections().flatMap((section: CommandSection) =>

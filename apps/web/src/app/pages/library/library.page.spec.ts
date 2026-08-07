@@ -566,6 +566,65 @@ describe('Library', () => {
       type(fixture, '$in:');
       expect(rows(el)).toEqual(['The Art Shelf1', 'Draw Steel: Monsters2']);
     });
+
+    /**
+     * A cold load on a shared link naming a **Field** key (ADR-0082, #430): the Fields read is still in
+     * flight, so what the box filters to is not known yet. The read is held rather than made unfiltered
+     * and corrected under the reader — and the hold ends on the response, whichever way it answers.
+     */
+    describe('a Facet key the registry cannot answer for yet', () => {
+      const crField = {
+        id: 'test.field.cr',
+        label: 'CR',
+        dataType: { kind: 'number' as const },
+        required: false,
+        facetable: true,
+      };
+
+      const awaiting = () => {
+        const registry = TestBed.inject(TypeRegistry);
+        registry.setWorldFields([]);
+        registry.awaitWorldFields();
+        return registry;
+      };
+
+      it('holds the first read, then makes it once — filtered — when the Fields land', () => {
+        const registry = awaiting();
+        queryParams$.next(convertToParamMap({ q: '$test.field.cr:5' }));
+        const { fixture } = ready();
+
+        expect(entities.list).not.toHaveBeenCalled();
+
+        registry.setWorldFields([crField]);
+        fixture.detectChanges();
+
+        expect(entities.list).toHaveBeenCalledTimes(1);
+        expect(entities.list).toHaveBeenCalledWith({ ...baseRead, field: ['test.field.cr:eq:5'] });
+      });
+
+      it('browses at once when the box names no Field key', () => {
+        awaiting();
+        queryParams$.next(convertToParamMap({ q: 'goblin $in:c-pack' }));
+        ready();
+
+        expect(entities.list).toHaveBeenCalledTimes(1);
+        expect(entities.list).toHaveBeenCalledWith({ ...baseRead, q: 'goblin', container: ['c-pack'] });
+      });
+
+      /** The failure path: a refused read degrades to no World Fields, so the hold always ends. */
+      it('browses, and states the miss, when the Fields read answers without the key', () => {
+        const registry = awaiting();
+        queryParams$.next(convertToParamMap({ q: 'goblin $test.field.cr:5' }));
+        const { fixture, el } = ready();
+
+        registry.setWorldFields([]); // what a failed read degrades to
+        fixture.detectChanges();
+
+        expect(entities.list).toHaveBeenCalledTimes(1);
+        expect(entities.list).toHaveBeenCalledWith({ ...baseRead, q: 'goblin' });
+        expect(facet(el, 'unknown-facet')?.textContent).toContain('test.field.cr');
+      });
+    });
   });
 
   it('renders its chrome and its empty Library in French when French is the active language', () => {

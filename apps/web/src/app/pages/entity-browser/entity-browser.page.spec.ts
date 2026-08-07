@@ -1625,6 +1625,111 @@ describe('EntityBrowser', () => {
         expect(searchBox(el).value).toBe('');
         expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
       });
+
+      /**
+       * A cold load on a shared link naming a **Field** key (ADR-0082, #430). The Fields read is still in
+       * flight, so the params this box means are not known yet: the page used to fetch without `field` —
+       * every Entity in the World — and correct itself when the response landed, narrowing under whoever
+       * was already reading. The read is held instead, and the hold ends on the response either way.
+       */
+      describe('a Facet key the registry cannot answer for yet', () => {
+        const crField = {
+          id: 'test.field.cr',
+          label: 'CR',
+          dataType: { kind: 'number' as const },
+          required: false,
+          facetable: true,
+        };
+
+        /** Entering a World: the loader has asked for its Fields and nothing has answered yet. */
+        const awaiting = () => {
+          const registry = TestBed.inject(TypeRegistry);
+          registry.setWorldFields([]);
+          registry.awaitWorldFields();
+          return registry;
+        };
+
+        const render = (q: string) => {
+          queryParams$.next(convertToParamMap({ q }));
+          client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+          const fixture = TestBed.createComponent(EntityBrowserPage);
+          fixture.detectChanges();
+          return fixture;
+        };
+
+        it('holds the first read, then makes it once — filtered — when the Fields land', () => {
+          const registry = awaiting();
+          const fixture = render('$test.field.cr:5');
+
+          // Nothing went out: not the list, not the Facet counts that would size the rail by it.
+          expect(client.list).not.toHaveBeenCalled();
+          expect(client.facets).not.toHaveBeenCalled();
+          // And nothing claims the World is empty while the read is held.
+          expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=empty]')).toBeNull();
+
+          registry.setWorldFields([crField]);
+          fixture.detectChanges();
+
+          expect(client.list).toHaveBeenCalledTimes(1);
+          expect(client.list).toHaveBeenCalledWith({
+            limit: 50,
+            worldId: 'w1',
+            rights: true,
+            thumbnails: true,
+            field: ['test.field.cr:eq:5'],
+          });
+        });
+
+        it('browses at once when the box names no Field key, whatever the Fields read is doing', () => {
+          awaiting();
+
+          render('orc $type:core.type.note');
+
+          // `$type` is decided by the reserved names the moment it is typed — no read widens it.
+          expect(client.list).toHaveBeenCalledTimes(1);
+          expect(client.list).toHaveBeenCalledWith({
+            q: 'orc',
+            limit: 50,
+            worldId: 'w1',
+            rights: true,
+            thumbnails: true,
+            type: ['core.type.note'],
+          });
+        });
+
+        it('browses at once on an empty box', () => {
+          awaiting();
+
+          render('');
+
+          expect(client.list).toHaveBeenCalledTimes(1);
+        });
+
+        /**
+         * The failure path the hold hangs on: a refused or broken Fields read degrades to *no* World
+         * Fields (see `world-fields-loader.spec.ts`), which settles the key — so the page browses, states
+         * the miss, and is never left at an empty grid waiting on a response that already came.
+         */
+        it('browses, and states the miss, when the Fields read answers without the key', () => {
+          const registry = awaiting();
+          const fixture = render('orc $test.field.cr:5');
+          expect(client.list).not.toHaveBeenCalled();
+
+          registry.setWorldFields([]); // what a failed read degrades to
+          fixture.detectChanges();
+
+          expect(client.list).toHaveBeenCalledTimes(1);
+          expect(client.list).toHaveBeenCalledWith({
+            q: 'orc',
+            limit: 50,
+            worldId: 'w1',
+            rights: true,
+            thumbnails: true,
+          });
+          const el = fixture.nativeElement as HTMLElement;
+          expect(el.querySelector('[data-testid=unknown-facet]')?.textContent).toContain('test.field.cr');
+        });
+      });
     });
 
     /**

@@ -1,6 +1,7 @@
 import { ShortcutService } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { UI_TEST_CATALOGS } from '@hexly/web-ui/testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
@@ -452,6 +453,50 @@ describe('CommandPalette', () => {
       typeAt(fixture, '$tag:draft');
 
       expect(fixture.nativeElement.querySelector('[data-testid="command-palette-unknown-facet"]')).toBeNull();
+    });
+
+    /**
+     * A Provider whose vocabulary is still loading — the Entity one, on a cold World (ADR-0082, #430).
+     * The Palette already defers the *search* until it can resolve the key; the banner used to run ahead
+     * of it and call the key unknown, then retract that when the response landed. The readiness arrives
+     * through the Provider, the same seam the key set does — the Palette depends on no registry of its own.
+     */
+    it('holds its miss report for a key a Provider cannot answer for yet, and states it once it can', () => {
+      const settled = signal(false);
+      const provider: CommandProvider = {
+        ...entityProvider(),
+        facetKeys: () => ({ reserved: ['type', 'tag'], fields: settled() ? ['world.field.region'] : [] }),
+        // Read inside the Palette's computed, so flipping it re-runs the report.
+        facetKeySettled: (key) => settled() || ['type', 'tag'].includes(key),
+      };
+      const fixture = open(provider);
+      const notice = () => fixture.nativeElement.querySelector('[data-testid="command-palette-unknown-facet"]');
+
+      typeAt(fixture, '$world.field.region:north');
+      expect(notice()).toBeNull();
+
+      // The Fields land, and this one is among them: still no miss, and now a resolved token.
+      settled.set(true);
+      fixture.detectChanges();
+      expect(notice()).toBeNull();
+    });
+
+    it('states the miss for a key the Provider settles without', () => {
+      const settled = signal(false);
+      const provider: CommandProvider = {
+        ...entityProvider(),
+        facetKeySettled: () => settled(),
+      };
+      const fixture = open(provider);
+      const notice = () => fixture.nativeElement.querySelector('[data-testid="command-palette-unknown-facet"]');
+
+      typeAt(fixture, 'orc $domain:material');
+      expect(notice()).toBeNull();
+
+      settled.set(true);
+      fixture.detectChanges();
+
+      expect(notice()?.textContent).toContain('domain');
     });
 
     it('keeps the box a plain text field, so Escape stays the overlay’s', () => {

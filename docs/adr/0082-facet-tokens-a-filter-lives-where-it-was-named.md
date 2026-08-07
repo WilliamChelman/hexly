@@ -174,3 +174,18 @@ resolves precedence by DOM order and needs no such gate.
   keyboard, carrying no copy and no translation scope — so it moves down to sit beside the `Listbox` it is built
   from, in `web-ui`, below every surface that adopts it. Its only domain dependency is the pure parser in
   `libs/domain`, which is platform-free and already beneath every web lib.
+- **Amended in implementation (#430): a key the registry has not read yet is _unresolved_, and a surface holds
+  its read rather than answering around it.** The key set resolves synchronously, but the World's **Fields**
+  arrive over the wire: between a cold render and that response, `$cr:5` names a key that may be about to
+  exist. Answering it then does both wrong things at once — the browse fetches with no `field` param (every
+  Entity in the World) and the banner reports a miss — and corrects both under whoever is already reading. So
+  readiness is per key (`facetKeySettled`: a reserved name is decided the moment it is typed, a Field key only
+  once the read answers), an unsettled key is held out of the reported misses, and the three browses hold the
+  first fetch itself until every key their box names is settled. The wait always ends: a refused or broken
+  Fields read degrades to _no_ World Fields, which settles the key as a genuine miss.
+- **Amended in implementation (#430): that readiness reaches the Palette through the Provider, not a registry.**
+  The Palette's miss banner parses the text past the Provider prefix and so needs the same rule, but it may not
+  reach into `web-entity` or the app's registry to get it (ADR-0032, and the move above). `CommandProvider`
+  gains an optional `facetKeySettled(key)` beside the `facetKeys()` it already answers — supplied by whoever
+  registers the Provider, defaulting to settled — and the Palette holds its report while any Provider on the
+  typed prefix is still loading its vocabulary. Same seam, same direction, no new edge.
