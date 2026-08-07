@@ -19,7 +19,10 @@ import {
   facetValuesFor,
   resolvesFacetKey,
 } from '@hexly/domain';
-import { ListboxComponent, ListboxController, ListboxOptionComponent } from '@hexly/web-ui';
+import { ListboxController } from '../utils/listbox-controller';
+import { InputComponent } from './input.component';
+import { ListboxComponent } from './listbox.component';
+import { ListboxOptionComponent } from './listbox-option.component';
 
 /** Keys that move the caret without the list's help — after one, what it was completing may be stale. */
 const CARET_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'Home', 'End']);
@@ -49,19 +52,26 @@ interface FacetSuggestion {
  *
  * Controlled, like the box it replaces: the consumer owns the text (its own debounce, its own URL
  * mirror) and receives every keystroke — including the one an accepted suggestion writes — through
- * {@link queryChange}. Chrome (classes, placeholder, labels) is the consumer's, already translated,
- * so this stays free of any one surface's copy and of a translation scope.
+ * {@link queryChange}. Its copy (placeholder, labels) is the consumer's, already translated, so this
+ * stays free of any one surface's copy and of a translation scope; its look is `appInput`'s, so no
+ * surface hands it a class string (ADR-0007).
+ *
+ * It lives in `web-ui`, beside the {@link ListboxComponent} it is built from, rather than with the
+ * Entity surfaces it was written for: it is a controlled box, a listbox and a keyboard, and its only
+ * domain dependency is the pure parser in `libs/domain`. Placing it in `web-entity` made the Command
+ * Palette depend on a feature lib whose vocabulary it explicitly does not own (ADR-0032, ADR-0082).
  */
 @Component({
   selector: 'app-facet-search-input',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ListboxComponent, ListboxOptionComponent],
+  imports: [InputComponent, ListboxComponent, ListboxOptionComponent],
   host: { class: 'block' },
   template: `
     <input
       #box
+      appInput
+      [attr.bar]="variant() === 'bar' ? '' : null"
       [attr.type]="type()"
-      [class]="inputClass()"
       [attr.data-testid]="testid()"
       [attr.aria-label]="ariaLabel()"
       [attr.placeholder]="placeholder()"
@@ -125,8 +135,9 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
    * Blink and WebKit, which would eat the key before the `<dialog>` it sits in could cancel.
    */
   readonly type = input<'search' | 'text'>('search');
-  /** Chrome the consumer owns, already translated: the input's classes and its accessible copy. */
-  readonly inputClass = input('');
+  /** Which `appInput` the box wears: the sunken well a picker sits in, or the browse surfaces' bar. */
+  readonly variant = input<'well' | 'bar'>('well');
+  /** Copy the consumer owns, already translated. */
   readonly ariaLabel = input<string | null>(null);
   readonly placeholder = input<string | null>(null);
   readonly listLabel = input<string | null>(null);
@@ -140,7 +151,8 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
   /** Every raw keystroke, undebounced — an accepted suggestion emits the rewritten box the same way. */
   readonly queryChange = output<string>();
 
-  private readonly box = viewChild.required<ElementRef<HTMLInputElement>>('box');
+  // read: ElementRef — `#box` also hosts `appInput`, so a bare query resolves to that component.
+  private readonly box = viewChild.required('box', { read: ElementRef<HTMLInputElement> });
   /** The list hangs off the box and matches its width, measured when it opens. */
   protected readonly boxWidth = signal(FALLBACK_WIDTH);
   /** The token the open list is completing, so accepting one replaces exactly what was typed. */

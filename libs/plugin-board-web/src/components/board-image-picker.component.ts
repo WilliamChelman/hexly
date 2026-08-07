@@ -9,14 +9,8 @@ import {
   readAssetValue,
 } from '@hexly/plugin-asset';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
-import {
-  ContainerChipsComponent,
-  FacetSearchInputComponent,
-  PICKER_BOX_CLASS,
-  linkTargetRead,
-  pickerFacetTokens,
-} from '@hexly/web-entity';
-import { ButtonComponent, DialogComponent, DialogRef } from '@hexly/web-ui';
+import { ContainerChipsComponent, linkTargetRead, pickerFacetTokens } from '@hexly/web-entity';
+import { ButtonComponent, DialogComponent, DialogRef, FacetSearchInputComponent } from '@hexly/web-ui';
 
 /** What the picker is launched with: the World whose Assets it uploads into and searches. */
 export interface ImagePickerData {
@@ -88,7 +82,6 @@ const isPlaceable = (e: EntitySummary): e is PlaceableAsset => !!e.assetUrl;
                counts this dialog already reads, and a token is reversed by backspacing it. -->
           <app-facet-search-input
             testid="image-search"
-            [inputClass]="boxClass"
             [value]="query()"
             [keys]="tokens.keys()"
             [facets]="facetCounts()"
@@ -200,8 +193,6 @@ export class BoardImagePickerComponent {
     () => this.query(),
     () => false,
   );
-  /** `appInput`'s well, as classes: the shared box owns its `<input>` and takes its chrome that way. */
-  protected readonly boxClass = PICKER_BOX_CLASS;
 
   /**
    * The one read behind the grid and its rail. A **link-target read** (ADR-0079) preset to the asset type

@@ -1,8 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityFacets, FacetKeySet } from '@hexly/domain';
-import { IconComponent } from '@hexly/web-ui';
-import { FacetSearchInputComponent } from '@hexly/web-entity';
+import { FacetSearchInputComponent, IconComponent } from '@hexly/web-ui';
 
 /**
  * The browse surfaces' full-text search box (#154) — the Entity Browser's, the Library's, the Asset
@@ -26,7 +25,7 @@ import { FacetSearchInputComponent } from '@hexly/web-entity';
     />
     <app-facet-search-input
       testid="entity-search"
-      inputClass="w-full pl-10 pr-3 py-2.5 font-sans text-md text-ink-strong bg-surface rounded-sm border border-line focus:border-accent outline-none placeholder:text-ink-faint"
+      variant="bar"
       [value]="value()"
       [keys]="keys()"
       [facets]="facets()"

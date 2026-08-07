@@ -2,10 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, ou
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
-import { ButtonComponent } from '@hexly/web-ui';
+import { ButtonComponent, FacetSearchInputComponent } from '@hexly/web-ui';
 import { ContainerChipsComponent } from './container-chips.component';
-import { FacetSearchInputComponent } from './facet-search-input.component';
-import { PICKER_BOX_CLASS } from './picker-box-class';
 import { pickerFacetTokens } from './picker-facet-tokens';
 import { linkTargetFacets, linkTargetRead } from './link-target-read';
 
@@ -41,7 +39,6 @@ import { linkTargetFacets, linkTargetRead } from './link-target-read';
       <app-facet-search-input
         class="mb-1"
         [testid]="testid() + '-search'"
-        [inputClass]="boxClass"
         [value]="query()"
         [keys]="tokens.keys()"
         [facets]="facets()"
@@ -125,9 +122,6 @@ export class EntitySearchPickerComponent {
   readonly pick = output<EntitySummary>();
 
   protected readonly options = signal<EntitySummary[]>([]);
-
-  /** `appInput`'s well, as classes: the shared box owns its `<input>` and takes its chrome that way. */
-  protected readonly boxClass = PICKER_BOX_CLASS;
 
   /**
    * What the box means (ADR-0082) — the filters its **Facet Tokens** name and the free text left over.

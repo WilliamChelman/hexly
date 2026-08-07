@@ -17,8 +17,7 @@ import { of, switchMap } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { parseFacetQuery } from '@hexly/domain';
 import { ShortcutService } from '@hexly/web-core';
-import { FacetSearchInputComponent } from '@hexly/web-entity';
-import { ButtonComponent, DialogComponent } from '@hexly/web-ui';
+import { ButtonComponent, DialogComponent, FacetSearchInputComponent } from '@hexly/web-ui';
 import { Command, CommandProvider, parseCommandQuery } from './command';
 import { CommandDirectory } from './command-directory';
 import { CommandRegistry, CommandSection } from './command-registry';
@@ -54,7 +53,6 @@ export const OPEN_COMMAND_PALETTE = 'open-command-palette';
         testid="command-palette-input"
         controls="command-palette-listbox"
         type="text"
-        inputClass="w-full py-2 px-3 text-sm text-ink-strong bg-surface-sunken border border-line-strong rounded-md shadow-inset outline-none focus:border-accent"
         [value]="text()"
         [keys]="facetKeys()"
         [activeDescendant]="activeItemId()"

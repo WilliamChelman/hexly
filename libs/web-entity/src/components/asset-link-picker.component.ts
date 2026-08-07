@@ -3,8 +3,8 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityLinkValue, EntitySummary } from '@hexly/domain';
 import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_TOKEN } from '@hexly/plugin-asset';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
+import { FacetSearchInputComponent } from '@hexly/web-ui';
 import { ContainerChipsComponent } from './container-chips.component';
-import { FacetSearchInputComponent } from './facet-search-input.component';
 import { pickerFacetTokens } from './picker-facet-tokens';
 import { linkTargetFacets, linkTargetRead } from './link-target-read';
 
@@ -88,7 +88,6 @@ import { linkTargetFacets, linkTargetRead } from './link-target-read';
                  are typeable here as Facet Tokens, and backspacing one reverses it. -->
             <app-facet-search-input
               testid="asset-link-search"
-              inputClass="w-full rounded-md border border-line bg-surface-sunken px-2 py-1 text-sm outline-none focus:border-accent"
               [value]="query()"
               [keys]="tokens.keys()"
               [facets]="facets()"
