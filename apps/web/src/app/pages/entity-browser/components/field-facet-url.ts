@@ -22,13 +22,12 @@ export function fieldTokens(fields: Readonly<Record<string, FieldSelection>>): s
 }
 
 /**
- * Fold the repeated `field` params back into the per-key {@link FieldSelection} record. `canExclude`
- * mirrors the rail input of the same name: a browse that renders no exclude control drops a `neq`
- * rather than filtering by a veto the reader has no way to release (ADR-0081). Never folded
- * into `lte` either way — a bound is not what it says.
+ * Fold the repeated `field` params back into the per-key {@link FieldSelection} record. A `neq` is kept
+ * as the exclusion it is — every browse driving this rail renders the exclude control (ADR-0081), so
+ * there is no reader who could not release it — and never folded into `lte`, which is not what it says.
  */
-export function fieldsFromTokens(tokens: readonly string[], canExclude = false): Record<string, FieldSelection> {
-  return foldFieldFilters(parseFieldFilters(tokens).filter((f) => canExclude || f.op !== 'neq'));
+export function fieldsFromTokens(tokens: readonly string[]): Record<string, FieldSelection> {
+  return foldFieldFilters(parseFieldFilters(tokens));
 }
 
 /**
