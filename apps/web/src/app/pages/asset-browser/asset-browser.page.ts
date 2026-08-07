@@ -1,9 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
+import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { Subscription, finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityFacets, EntityPage, EntitySummary, EntityType, Visibility } from '@hexly/domain';
+import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
 import { CORE_ASSET_TYPE_ID } from '@hexly/plugin-asset';
 import {
   AppShellStore,
@@ -13,26 +12,24 @@ import {
   ActiveWorld,
   ToasterService,
 } from '@hexly/web-core';
-import { ButtonComponent, DialogService, EyebrowComponent, IconComponent, PageHeaderComponent } from '@hexly/web-ui';
+import {
+  ButtonComponent,
+  DialogService,
+  EyebrowComponent,
+  FacetMissComponent,
+  IconComponent,
+  PageHeaderComponent,
+} from '@hexly/web-ui';
 import { DeleteEntityDialogComponent, DeleteEntityDialogData } from '../../entity-types/delete-entity-dialog.component';
 import { EntitySearchComponent } from '../entity-browser/components/entity-search.component';
 import { EmptyStateComponent } from '../entity-browser/components/empty-state.component';
-import {
-  ActiveFacets,
-  FacetRailComponent,
-  FacetToggle,
-  FieldRangeChange,
-  FieldSelection,
-  FieldValueToggle,
-} from '../entity-browser/components/facet-rail.component';
-import { fieldTokens, fieldsFromTokens, pruneField } from '../entity-browser/components/field-facet-url';
+import { FacetRailComponent } from '../entity-browser/components/facet-rail.component';
+import { FACET_CATEGORIES, FacetTokenStore } from '../entity-browser/components/facet-token-store';
 
-const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [], fields: {}, container: [] };
 const NO_FACET_COUNTS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] };
 
 // A bounded first page, like the Entity Browser, so a media-heavy World loads fast.
 const PAGE_SIZE = 50;
-const SEARCH_DEBOUNCE_MS = 150;
 
 /**
  * The Asset Browser (`/w/:worldId/assets`, ADR-0065, #282): the Entity Browser **preset to the asset
@@ -58,8 +55,13 @@ const SEARCH_DEBOUNCE_MS = 150;
     RouterLink,
     EntitySearchComponent,
     EmptyStateComponent,
+    FacetMissComponent,
     FacetRailComponent,
   ],
+  // No **Type**: it is pinned to the asset type here, so it never reaches the rail and `$type:` could
+  // only widen past the pin. No **Container** either — one World. Both are stated misses (ADR-0082).
+  providers: [{ provide: FACET_CATEGORIES, useValue: ['tag', 'visibility'] }],
+  hostDirectives: [FacetTokenStore],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <app-page-header sticky>
@@ -96,7 +98,16 @@ const SEARCH_DEBOUNCE_MS = 150;
         [disabled]="uploading()"
         (change)="onFile($event)"
       />
-      <app-entity-search [value]="query()" (queryChange)="onSearch($event)" />
+      <!-- The whole vocabulary on the dollar (ADR-0082): keys off the registry, values off the Facet
+           read this page already runs — the kind/orientation/hue dimensions among them. -->
+      <app-entity-search
+        [value]="filters.rawQuery()"
+        [keys]="filters.facetKeys()"
+        [facets]="facetCounts()"
+        (queryChange)="filters.onSearch($event)"
+      />
+      <!-- What the Tokens applied nothing for is *said*, never quietly searched for (ADR-0082). -->
+      <app-facet-miss class="-mt-6 mb-8 font-sans text-sm text-ink-faint" [parsed]="filters.parsedQuery()" />
       @if (uploadError()) {
         <p class="text-sm text-danger mb-4" data-testid="asset-upload-error">
           {{ 'assetBrowser.uploadError' | transloco }}
@@ -105,12 +116,14 @@ const SEARCH_DEBOUNCE_MS = 150;
       <div class="grid grid-cols-1 lg:grid-cols-[14rem_1fr] gap-8 items-start">
         <app-facet-rail
           [facetCounts]="facetCounts()"
-          [active]="activeFacets()"
-          [canClear]="hasFilters()"
-          (toggled)="toggleFacet($event)"
-          (fieldValueToggled)="toggleFieldValue($event)"
-          (fieldRangeChanged)="changeFieldRange($event)"
-          (clearAll)="clearAll()"
+          [active]="filters.activeFacets()"
+          [queryOwned]="filters.queryOwned()"
+          [canClear]="filters.hasFilters()"
+          [canExclude]="true"
+          (toggled)="filters.toggleFacet($event)"
+          (fieldValueToggled)="filters.toggleFieldValue($event)"
+          (fieldRangeChanged)="filters.changeFieldRange($event)"
+          (clearAll)="filters.clearAll()"
         />
         <div>
           @if (assets().length > 0) {
@@ -195,7 +208,7 @@ const SEARCH_DEBOUNCE_MS = 150;
               [title]="'assetBrowser.loadErrorTitle' | transloco"
               [hint]="'assetBrowser.loadErrorHint' | transloco"
             />
-          } @else if (loaded() && hasFilters()) {
+          } @else if (loaded() && filters.hasFilters()) {
             <app-empty-state
               testid="no-matches"
               [title]="'assetBrowser.noMatchTitle' | transloco"
@@ -225,12 +238,12 @@ export class AssetBrowserPage {
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly assetsClient = inject(AssetsClient);
   private readonly activeWorld = inject(ActiveWorld);
-  private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
   private readonly dialogs = inject(DialogService);
+  /** Both filter stores, `parse(text) ∪ railState` (ADR-0082) — the box, the rail, and their URL mirror. */
+  protected readonly filters = inject(FacetTokenStore);
 
   protected readonly worldId = this.activeWorld.worldId;
 
@@ -244,72 +257,20 @@ export class AssetBrowserPage {
   protected readonly uploading = signal(false);
   protected readonly uploadError = signal(false);
 
-  /** Debounced full-text query; empty means the default last-edited view. Mirrored to the URL `q`. */
-  protected readonly query = signal('');
-  private readonly typed = new Subject<string>();
-
-  /** Value-equal so the URL round-trip's echo doesn't re-trigger the fetch effect. The type facet is
-   * pinned to the asset type here, so it is never carried in `type`. */
-  protected readonly activeFacets = signal<ActiveFacets>(NO_FACETS, {
-    equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
-  });
   /** The rail counts with the type category stripped — the asset type is pinned, never a rail choice. */
   protected readonly facetCounts = signal<EntityFacets>(NO_FACET_COUNTS);
-  protected readonly hasFilters = computed(() => {
-    const f = this.activeFacets();
-    return this.query() !== '' || f.tag.length > 0 || f.visibility.length > 0 || Object.keys(f.fields).length > 0;
-  });
-
   private facetsSub?: Subscription;
   private fetchSub?: Subscription;
   private loadMoreSub?: Subscription;
   private shownWorldId?: string;
 
   constructor() {
-    // Seed query + Facets from the URL and follow back/forward, before the fetch effect so the first
-    // emission lands before the first fetch (one request on load).
-    this.route.queryParamMap
-      .pipe(
-        map((params) => ({
-          q: params.get('q') ?? '',
-          tag: params.getAll('tag'),
-          visibility: params.getAll('visibility'),
-          field: params.getAll('field'),
-        })),
-        distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
-        takeUntilDestroyed(),
-      )
-      .subscribe((f) => {
-        this.query.set(f.q);
-        this.activeFacets.set({
-          type: [],
-          tag: f.tag,
-          visibility: f.visibility,
-          fields: fieldsFromTokens(f.field),
-          container: [],
-        });
-      });
-
-    this.typed.pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed()).subscribe((raw) => {
-      const q = raw.trim();
-      this.query.set(q);
-      this.router.navigate([], {
-        relativeTo: this.route,
-        queryParams: { q: q || null },
-        queryParamsHandling: 'merge',
-        replaceUrl: true,
-      });
-    });
-
+    // The store seeds both filter stores from the URL in its own constructor, ahead of this effect, so
+    // the first fetch already carries them (one request on load).
     effect(() => {
-      this.query(); // tracked
-      this.activeFacets(); // tracked
+      this.filters.filterParams(); // tracked
       if (this.activeWorld.worldId()) this.fetchFirstPage();
     });
-  }
-
-  protected onSearch(value: string): void {
-    this.typed.next(value);
   }
 
   /** The delete verb gates the tile's delete action (ADR-0039); absent Rights hide it (fail-closed). */
@@ -317,73 +278,19 @@ export class AssetBrowserPage {
     return !!asset.rights?.includes('delete');
   }
 
-  protected toggleFacet({ category, value }: FacetToggle): void {
-    const current = this.activeFacets();
-    const values = current[category];
-    const next = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
-    this.applyFacets({ ...current, [category]: next });
-  }
-
-  protected toggleFieldValue({ key, value }: FieldValueToggle): void {
-    const current = this.activeFacets();
-    const sel = current.fields[key] ?? {};
-    const values = sel.values ?? [];
-    const nextValues = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
-    this.setFieldSelection(current, key, { ...sel, values: nextValues });
-  }
-
-  protected changeFieldRange({ key, bound, value }: FieldRangeChange): void {
-    const current = this.activeFacets();
-    const sel = current.fields[key] ?? {};
-    this.setFieldSelection(current, key, { ...sel, [bound]: value || undefined });
-  }
-
-  private setFieldSelection(current: ActiveFacets, key: string, sel: FieldSelection): void {
-    const fields = { ...current.fields };
-    const pruned = pruneField(sel);
-    if (pruned) fields[key] = pruned;
-    else delete fields[key];
-    this.applyFacets({ ...current, fields });
-  }
-
-  private applyFacets(updated: ActiveFacets): void {
-    this.activeFacets.set(updated);
-    this.mirrorToUrl(updated);
-  }
-
-  protected clearAll(): void {
-    this.query.set('');
-    this.activeFacets.set(NO_FACETS);
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { q: null, tag: null, visibility: null, field: null },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
-  }
-
-  private mirrorToUrl(facets: ActiveFacets): void {
-    const field = fieldTokens(facets.fields);
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: {
-        tag: facets.tag.length ? [...facets.tag] : null,
-        visibility: facets.visibility.length ? [...facets.visibility] : null,
-        field: field.length ? field : null,
-      },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
-  }
-
   /** Fetch page one and replace the accumulated list — on load, after every filter change, and after upload/delete. */
   private fetchFirstPage(): void {
+    // A Facet key the registry cannot answer for yet: read now, these params would name no Field and
+    // browse every Asset, then correct themselves under the reader (ADR-0082). Read inside the effect
+    // above, so the read it holds is re-run the moment the Fields land — or fail, which degrades to no
+    // World Fields and settles the key as a miss.
+    if (this.filters.filtersPending()) return;
     const worldId = this.activeWorld.worldId();
     if (!worldId) return;
     this.fetchSub?.unsubscribe();
     this.loadMoreSub?.unsubscribe();
     this.loadingMore.set(false);
-    const params = this.activeFilterParams();
+    const params = this.filters.filterParams();
     if (worldId !== this.shownWorldId) {
       this._assets.set([]);
       this.loaded.set(false);
@@ -418,18 +325,6 @@ export class AssetBrowserPage {
     this.fetchFacetCounts(worldId, params);
   }
 
-  private activeFilterParams(): EntityFacetParams {
-    const q = this.query();
-    const f = this.activeFacets();
-    const field = fieldTokens(f.fields);
-    return {
-      ...(q ? { q } : {}),
-      ...(f.tag.length ? { tag: [...f.tag] } : {}),
-      ...(f.visibility.length ? { visibility: [...f.visibility] as Visibility[] } : {}),
-      ...(field.length ? { field } : {}),
-    };
-  }
-
   /** Facet counts pinned to the asset type; the type category is stripped — it is pinned, never a rail choice. */
   private fetchFacetCounts(worldId: string, params: EntityFacetParams): void {
     this.facetsSub?.unsubscribe();
@@ -453,7 +348,7 @@ export class AssetBrowserPage {
         type: [CORE_ASSET_TYPE_ID as EntityType],
         rights: true,
         thumbnails: true,
-        ...this.activeFilterParams(),
+        ...this.filters.filterParams(),
       })
       .pipe(finalize(() => this.loadingMore.set(false)))
       .subscribe({

@@ -12,6 +12,12 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
  * stat-block characteristic squares) — the default padding clips it there.
  *
  *   <input appInput compact type="number" />
+ *
+ * The `bar` variant is the browse surfaces' search bar — raised rather than sunken, larger type, and
+ * the leading room an overlaid glyph needs. It is a variant here rather than a class string a caller
+ * hands the box, because a consumer cannot restyle a primitive's host from outside (ADR-0021).
+ *
+ *   <input appInput bar type="search" />
  */
 @Component({
   selector: 'input[appInput]',
@@ -25,6 +31,10 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
         border-line-strong rounded-md shadow-inset;
       /* bespoke single-prop transition on the motion tokens — stays raw. */
       transition: border-color var(--dur-fast) var(--ease-out);
+    }
+    /* Before the focus rule, which it ties on specificity: the focused border must still win. */
+    :host([bar]) {
+      @apply pl-10 pr-3 py-2.5 font-sans text-md bg-surface border-line rounded-sm shadow-none;
     }
     :host(:focus-visible) {
       @apply border-accent;

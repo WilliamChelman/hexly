@@ -1,5 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { Observable, combineLatest, map, of, startWith, tap } from 'rxjs';
+import { FacetKeySet } from '@hexly/domain';
 import { Command, CommandProvider } from './command';
 
 export interface CommandSection {
@@ -24,6 +25,33 @@ export class CommandRegistry {
    * to the longest match without hard-coding the set (ADR-0059).
    */
   readonly prefixes = computed<readonly string[]>(() => [...new Set(this.providers().map((p) => p.prefix))]);
+
+  /**
+   * The Facet vocabulary the Providers on `prefix` can apply, merged (ADR-0082) — what the box offers on
+   * `$` and resolves a typed name against. Reads the Provider signal, so a computed caller re-reads it
+   * when a contextual Provider comes or goes with its scope (ADR-0083).
+   */
+  facetKeys(prefix: string): FacetKeySet {
+    const sets = this.providers()
+      .filter((p) => p.prefix === prefix)
+      .map((p) => p.facetKeys?.());
+    return {
+      reserved: [...new Set(sets.flatMap((keys) => keys?.reserved ?? []))],
+      fields: [...new Set(sets.flatMap((keys) => keys?.fields ?? []))],
+    };
+  }
+
+  /**
+   * Whether every Provider on `prefix` can say yet what `key` means (ADR-0082). One Provider still
+   * loading its vocabulary holds the whole prefix's verdict: the key it is about to resolve is one this
+   * prefix *can* apply, so reporting a miss for it now would be retracted by the response. A Provider
+   * that declares no readiness is settled by construction.
+   */
+  facetKeySettled(prefix: string, key: string): boolean {
+    return this.providers()
+      .filter((p) => p.prefix === prefix)
+      .every((p) => p.facetKeySettled?.(key) ?? true);
+  }
 
   register(provider: CommandProvider): () => void {
     this.providers.update((list) => [...list, provider]);

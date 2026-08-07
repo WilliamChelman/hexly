@@ -1758,6 +1758,208 @@ describe('Entities endpoints', () => {
   });
 
   /**
+   * "Everything except the drafts", said on the wire (ADR-0081, #421): a Facet value is neutral,
+   * **included** or **excluded**, and an exclusion **vetoes**. Asserted at the HTTP seam because the
+   * whole point is that the params carry it — schema, predicate and drill-down in one pass.
+   */
+  describe('Facet exclusion, the excluding half of each category (ADR-0081, #421)', () => {
+    async function note(agent: Awaited<ReturnType<typeof signIn>>, name: string, worldId?: string) {
+      return (await agent.post('/entities').send({ name, types: ['core.type.note'], ...(worldId ? { worldId } : {}) }))
+        .body.id as string;
+    }
+    async function tag(agent: Awaited<ReturnType<typeof signIn>>, id: string, ...tags: string[]) {
+      await agent
+        .put(`/entities/${id}`)
+        .send({ document: { 'core.field.content': emptyRichContent() }, version: 1, tags })
+        .expect(200);
+    }
+    async function hexmap(agent: Awaited<ReturnType<typeof signIn>>, name: string, ...tags: string[]) {
+      const id = (await agent.post('/entities').send({ name, types: ['core.type.hex-map'] })).body.id as string;
+      await agent.put(`/entities/${id}`).send({ document: emptyHexmapBody, version: 1, tags }).expect(200);
+      return id;
+    }
+    function share(id: string) {
+      db.$client.prepare('UPDATE entities SET visibility = ? WHERE id = ?').run('shared', id);
+    }
+    const names = (res: { body: { items: { name: string }[] } }) => res.body.items.map((e) => e.name).sort();
+    const byValue = (facet: { value: string; count: number }[]) =>
+      [...facet].sort((a, b) => a.value.localeCompare(b.value));
+
+    /** Temple (deity), Grove (nature), Battlemap (a hex-map, tagged combat). Temple alone is shared. */
+    async function seedThree(agent: Awaited<ReturnType<typeof signIn>>) {
+      const temple = await note(agent, 'Temple');
+      await tag(agent, temple, 'deity');
+      const grove = await note(agent, 'Grove');
+      await tag(agent, grove, 'nature');
+      await hexmap(agent, 'Battlemap', 'combat');
+      share(temple);
+      return { temple, worldId: (await agent.get(`/entities/${grove}`)).body.worldId as string };
+    }
+
+    it('excludes a Type, a Tag and a Visibility, singly and repeated', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await seedThree(ada);
+
+      expect(names(await ada.get('/entities').query({ excludeType: 'core.type.hex-map' }).expect(200))).toEqual([
+        'Grove',
+        'Temple',
+      ]);
+      expect(names(await ada.get('/entities').query({ excludeTag: 'deity' }).expect(200))).toEqual([
+        'Battlemap',
+        'Grove',
+      ]);
+      expect(names(await ada.get('/entities').query({ excludeVisibility: 'shared' }).expect(200))).toEqual([
+        'Battlemap',
+        'Grove',
+      ]);
+      // Repeated: excludes accumulate within a category, so each named value is vetoed.
+      expect(
+        names(
+          await ada
+            .get('/entities')
+            .query({ excludeTag: ['deity', 'combat'] })
+            .expect(200),
+        ),
+      ).toEqual(['Grove']);
+    });
+
+    it('carries the same per-value validation as its positive twin (400, not a silent no-filter)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await ada.get('/entities').query({ excludeType: 'spreadsheet' }).expect(400);
+      await ada.get('/entities').query({ excludeVisibility: 'public' }).expect(400);
+      await ada.get('/entities/facets').query({ excludeType: 'spreadsheet' }).expect(400);
+    });
+
+    it('vetoes: naming one value both included and excluded yields nothing', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await seedThree(ada);
+
+      expect(names(await ada.get('/entities').query({ tag: 'deity', excludeTag: 'deity' }).expect(200))).toEqual([]);
+      expect(
+        names(await ada.get('/entities').query({ type: 'core.type.note', excludeType: 'core.type.note' }).expect(200)),
+      ).toEqual([]);
+      expect(
+        names(await ada.get('/entities').query({ visibility: 'shared', excludeVisibility: 'shared' }).expect(200)),
+      ).toEqual([]);
+    });
+
+    it('accumulates exclusions across categories, and beside an unrelated include', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await seedThree(ada);
+
+      // Across categories: no hex-map, nothing tagged deity — Grove alone survives both.
+      expect(
+        names(await ada.get('/entities').query({ excludeType: 'core.type.hex-map', excludeTag: 'deity' }).expect(200)),
+      ).toEqual(['Grove']);
+      // Beside an include of another category: the include narrows, the exclusion still vetoes.
+      expect(
+        names(await ada.get('/entities').query({ type: 'core.type.note', excludeTag: 'nature' }).expect(200)),
+      ).toEqual(['Temple']);
+    });
+
+    it('leaves an Entity carrying no value for the category untouched by that category’s exclusion', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await seedThree(ada);
+      await note(ada, 'Loose Leaf'); // never saved with tags — carries none at all
+
+      // Exclusion is a not-exists test, so the Entity with no Tag at all is not hidden by a Tag exclusion.
+      expect(names(await ada.get('/entities').query({ excludeTag: 'deity' }).expect(200))).toEqual([
+        'Battlemap',
+        'Grove',
+        'Loose Leaf',
+      ]);
+    });
+
+    it('counts a category with its own selection dropped in both polarities, every sibling kept', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const { worldId } = await seedThree(ada);
+
+      const res = await ada.get('/entities/facets').query({ worldId, excludeTag: 'deity' }).expect(200);
+      // The Tag facet drops its own exclusion before counting, so the excluded value is still listed —
+      // and so the exclusion is reversible by clicking it off (ADR-0081).
+      expect(byValue(res.body.tag)).toEqual([
+        { value: 'combat', count: 1 },
+        { value: 'deity', count: 1 },
+        { value: 'nature', count: 1 },
+      ]);
+      // Every sibling category keeps the exclusion: Temple is gone from the Type and Visibility counts.
+      expect(byValue(res.body.type)).toEqual([
+        { value: 'core.type.hex-map', count: 1 },
+        { value: 'core.type.note', count: 1 },
+      ]);
+      expect(byValue(res.body.visibility)).toEqual([{ value: 'private', count: 2 }]);
+    });
+
+    it('drops a Type exclusion when counting Types, and keeps it everywhere else', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const { worldId } = await seedThree(ada);
+
+      const res = await ada.get('/entities/facets').query({ worldId, excludeType: 'core.type.note' }).expect(200);
+      expect(byValue(res.body.type)).toEqual([
+        { value: 'core.type.hex-map', count: 1 },
+        { value: 'core.type.note', count: 2 },
+      ]);
+      // The Tag facet counts under the Type exclusion: only the hex-map's tag survives.
+      expect(byValue(res.body.tag)).toEqual([{ value: 'combat', count: 1 }]);
+    });
+
+    it('excludes a Container inside a cross-Container scope, and still lists it on the rail', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const here = await note(ada, 'Home Note');
+      const worldA = (await ada.get(`/entities/${here}`)).body.worldId as string;
+      const worldB = (await ada.post('/worlds').send({ name: 'Second' }).expect(201)).body.id as string;
+      await note(ada, 'Away Note', worldB);
+
+      const scope = { containerId: [worldA, worldB] };
+      expect(names(await ada.get('/entities').query(scope).expect(200))).toEqual(['Away Note', 'Home Note']);
+      expect(
+        names(
+          await ada
+            .get('/entities')
+            .query({ ...scope, excludeContainer: worldB })
+            .expect(200),
+        ),
+      ).toEqual(['Home Note']);
+
+      const facets = await ada
+        .get('/entities/facets')
+        .query({ ...scope, excludeContainer: worldB })
+        .expect(200);
+      // Drill-down: the Container facet drops its own exclusion, so the excluded Container is still
+      // there to click back on, counted over the whole scope.
+      expect((facets.body.container as { value: string; count: number }[]).map((c) => c.value).sort()).toEqual(
+        [worldA, worldB].sort(),
+      );
+      // The sibling categories keep it: only worldA's note is counted.
+      expect(byValue(facets.body.type)).toEqual([{ value: 'core.type.note', count: 1 }]);
+    });
+
+    it('leaves the envelope, the cursor and every pre-existing param untouched under an exclusion', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      for (const n of ['N1', 'N2', 'N3', 'N4', 'N5']) await tag(ada, await note(ada, n), 'keep');
+      await tag(ada, await note(ada, 'Draft'), 'draft');
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      let pages = 0;
+      do {
+        const res: { body: { items: { name: string; id: string }[]; nextCursor: string | null } } = await ada
+          .get('/entities')
+          .query({ excludeTag: 'draft', limit: 2, ...(cursor ? { cursor } : {}) })
+          .expect(200);
+        // The envelope is still exactly `{ items, nextCursor }` (ADR-0025).
+        expect(Object.keys(res.body).sort()).toEqual(['items', 'nextCursor']);
+        seen.push(...res.body.items.map((e) => e.name));
+        cursor = res.body.nextCursor;
+        pages++;
+      } while (cursor);
+
+      expect(seen.slice().sort()).toEqual(['N1', 'N2', 'N3', 'N4', 'N5']);
+      expect(pages).toBe(3); // 5 survivors at 2/page — the excluded row never enters the paging.
+    });
+  });
+
+  /**
    * The hidden-from-default-listing capability (ADR-0065) end to end. Exercised through a *test* type that
    * declares it, never the asset type: the rule is generic, and the asset type is only its first taker.
    */
@@ -2049,6 +2251,103 @@ describe('Entities endpoints', () => {
       expect(names(res)).toEqual(['Aboleth', 'Kobold', 'Sphinx']);
     });
 
+    // Field exclusion is a fourth op in this grammar, not a fifth param (ADR-0081, #421).
+    it('excludes an enum Field value with `neq`, accumulating across values', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
+      await beast(ada, 'Aboleth', { 'test.field.alignment': 'chaotic-evil', 'test.field.cr': 10 });
+      await beast(ada, 'Sphinx', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 11 });
+
+      const one = await ada
+        .get('/entities')
+        .query({ type: 'test.type.beast', field: 'test.field.alignment:neq:lawful-good' })
+        .expect(200);
+      expect(names(one)).toEqual(['Aboleth']);
+
+      // Exclusions AND with each other, so naming both values leaves nothing carrying either.
+      const both = await ada
+        .get('/entities')
+        .query({
+          type: 'test.type.beast',
+          field: ['test.field.alignment:neq:lawful-good', 'test.field.alignment:neq:chaotic-evil'],
+        })
+        .expect(200);
+      expect(names(both)).toEqual([]);
+    });
+
+    it('lets a `neq` veto an `eq` on the same key, and accumulates across keys', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
+      await beast(ada, 'Sphinx', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 11 });
+
+      // The same value included and excluded is a contradiction, and yields nothing.
+      const contradiction = await ada
+        .get('/entities')
+        .query({
+          type: 'test.type.beast',
+          field: ['test.field.alignment:eq:lawful-good', 'test.field.alignment:neq:lawful-good'],
+        })
+        .expect(200);
+      expect(names(contradiction)).toEqual([]);
+
+      // Across keys: the include narrows, the other key's exclusion vetoes on top of it.
+      const across = await ada
+        .get('/entities')
+        .query({
+          type: 'test.type.beast',
+          field: ['test.field.alignment:eq:lawful-good', 'test.field.cr:neq:11'],
+        })
+        .expect(200);
+      expect(names(across)).toEqual(['Kobold']);
+    });
+
+    it('leaves an Entity carrying no value for the key untouched by that key’s `neq` (absence survives)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
+      await beast(ada, 'Sphinx', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 11 });
+      // A plain Note: it has never had a Challenge Rating, so no exclusion of one can be about it.
+      await ada
+        .post('/entities')
+        .send({ name: 'Loose Leaf', types: ['core.type.note'] })
+        .expect(201);
+
+      // No Type narrowing — that is the caller's to state, and they have not (ADR-0081).
+      const res = await ada.get('/entities').query({ field: 'test.field.cr:neq:1' }).expect(200);
+      expect(names(res)).toEqual(['Loose Leaf', 'Sphinx']);
+    });
+
+    it('drops a Field’s own `neq` when counting it, so the exclusion stays reversible', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const kobold = await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
+      await beast(ada, 'Aboleth', { 'test.field.alignment': 'chaotic-evil', 'test.field.cr': 10 });
+      const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
+
+      const res = await ada
+        .get('/entities/facets')
+        .query({ worldId, field: 'test.field.alignment:neq:lawful-good' })
+        .expect(200);
+      const fields = res.body.fields as FieldFacetBody[];
+      // Its own facet drops both polarities, so the excluded value is still on the rail to click off...
+      expect(byValue(fields.find((f) => f.key === 'test.field.alignment')!.values)).toEqual([
+        { value: 'chaotic-evil', count: 1 },
+        { value: 'lawful-good', count: 1 },
+      ]);
+      // ...while a sibling Field counts under the exclusion: only the Aboleth's CR survives.
+      expect(byValue(fields.find((f) => f.key === 'test.field.cr')!.values)).toEqual([{ value: '10', count: 1 }]);
+    });
+
+    it('still drops an unrecognised op rather than rejecting it, so an old build degrades to no-filter', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
+      await beast(ada, 'Aboleth', { 'test.field.alignment': 'chaotic-evil', 'test.field.cr': 10 });
+
+      const res = await ada
+        .get('/entities')
+        .query({ type: 'test.type.beast', field: 'test.field.alignment:between:lawful-good' })
+        .expect(200);
+      expect(names(res)).toEqual(['Aboleth', 'Kobold']);
+    });
+
     it('filters the list by a numeric Field range, comparing as a number not a string', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
@@ -2068,6 +2367,39 @@ describe('Entities endpoints', () => {
         .query({ type: 'test.type.beast', field: ['test.field.cr:gte:5', 'test.field.cr:lte:9'] })
         .expect(200);
       expect(names(range)).toEqual(['Sphinx']);
+    });
+
+    it('filters the list by a strict numeric bound, which excludes the bound itself', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await beast(ada, 'Kobold', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 1 });
+      await beast(ada, 'Sphinx', { 'test.field.alignment': 'lawful-good', 'test.field.cr': 5 });
+      await beast(ada, 'Aboleth', { 'test.field.alignment': 'chaotic-evil', 'test.field.cr': 10 });
+
+      // cr > 5 drops the Sphinx that `gte` kept, and a string compare would drop the Aboleth's '10'.
+      const gt = await ada.get('/entities').query({ type: 'test.type.beast', field: 'test.field.cr:gt:5' }).expect(200);
+      expect(names(gt)).toEqual(['Aboleth']);
+
+      const lt = await ada.get('/entities').query({ type: 'test.type.beast', field: 'test.field.cr:lt:5' }).expect(200);
+      expect(names(lt)).toEqual(['Kobold']);
+
+      // Strict bounds AND into an open range, as the inclusive ones do.
+      const range = await ada
+        .get('/entities')
+        .query({ type: 'test.type.beast', field: ['test.field.cr:gt:1', 'test.field.cr:lt:10'] })
+        .expect(200);
+      expect(names(range)).toEqual(['Sphinx']);
+    });
+
+    it('filters the list by a strict date bound (lexical ISO compare)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await beast(ada, 'Kobold', { 'test.field.cr': 1, 'test.field.discovered': '2020-01-01' });
+      await beast(ada, 'Sphinx', { 'test.field.cr': 11, 'test.field.discovered': '2023-06-15' });
+
+      const res = await ada
+        .get('/entities')
+        .query({ type: 'test.type.beast', field: 'test.field.discovered:gt:2020-01-01' })
+        .expect(200);
+      expect(names(res)).toEqual(['Sphinx']);
     });
 
     it('filters the list by list-membership on a list Field', async () => {

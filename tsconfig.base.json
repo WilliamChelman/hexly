@@ -58,7 +58,9 @@
       "@hexly/web-entity/i18n": ["./libs/web-entity/src/i18n/index.ts"],
       "@hexly/web-entity/testing": ["./libs/web-entity/src/testing/index.ts"],
       "@hexly/web-styles": ["./libs/web-styles/src/index.ts"],
-      "@hexly/web-ui": ["./libs/web-ui/src/index.ts"]
+      "@hexly/web-ui": ["./libs/web-ui/src/index.ts"],
+      "@hexly/web-ui/i18n": ["./libs/web-ui/src/i18n/index.ts"],
+      "@hexly/web-ui/testing": ["./libs/web-ui/src/testing/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

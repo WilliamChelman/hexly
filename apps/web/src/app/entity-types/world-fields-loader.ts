@@ -1,6 +1,6 @@
 import { DestroyRef, Injectable, inject } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import { catchError, map, merge, of, Subject, switchMap } from 'rxjs';
+import { catchError, map, merge, of, Subject, switchMap, tap } from 'rxjs';
 import { ActiveWorld, Logger, WorldsClient } from '@hexly/web-core';
 import { Field } from '@hexly/domain';
 import { TypeRegistry } from './type-registry';
@@ -23,9 +23,14 @@ export class WorldFieldsLoader {
   private readonly reload$ = new Subject<void>();
 
   constructor() {
+    // The World layout injects this ahead of the browse it wraps, so the registry is *awaiting* Fields
+    // from before the first parse: a Facet key is unresolved rather than unresolvable meanwhile
+    // (ADR-0082). Said again per read below, since a World change reopens the same gap.
+    this.registry.awaitWorldFields();
     // Re-fetch on a World change *or* an explicit reload (a Field authored/edited/deleted in settings).
     merge(toObservable(this.active.worldId), this.reload$.pipe(map(() => this.active.worldId())))
       .pipe(
+        tap(() => this.registry.awaitWorldFields()),
         // A failed fetch degrades to no World Fields (core/plugin Fields still resolve), logged.
         switchMap((id) =>
           id === null

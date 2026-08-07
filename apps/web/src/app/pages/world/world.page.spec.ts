@@ -5,6 +5,7 @@ import { WorldDetail, WorldVerb } from '@hexly/domain';
 import { ActiveWorld, worldDashboardRoute, worldGraphRoute, worldLibraryRoute } from '@hexly/web-core';
 import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { NavRailStore } from '../../shell/nav-rail.store';
+import { EntityQuickOpen } from '../../entity-types/entity-quick-open';
 import { WorldPage } from './world.page';
 
 function world(rights: WorldVerb[]): WorldDetail {
@@ -26,7 +27,9 @@ describe('WorldLayout', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [WorldPage, provideTranslocoTesting()],
-      providers: [provideRouter([])],
+      // The `/w/:worldId` route provides Entity Quick Open and this layout injects it to bring it to
+      // life (ADR-0083); stubbed here — what it does once alive is its own spec's business.
+      providers: [provideRouter([]), { provide: EntityQuickOpen, useValue: {} }],
     }).compileComponents();
   });
 

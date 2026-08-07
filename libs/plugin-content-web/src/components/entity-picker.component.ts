@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { ParsedFacetQuery } from '@hexly/domain';
 import {
   ListboxController,
   ListboxProps,
@@ -7,6 +8,7 @@ import {
   ListboxEmptyComponent,
   ListboxOptionComponent,
   BodyPortalDirective,
+  FacetMissComponent,
 } from '@hexly/web-ui';
 import { MentionItem } from '../extensions/mention-items';
 
@@ -23,18 +25,44 @@ export type EntityPickerProps = ListboxProps<MentionItem>;
 @Component({
   selector: 'app-entity-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, ListboxComponent, ListboxOptionComponent, ListboxEmptyComponent, BodyPortalDirective],
+  imports: [
+    TranslocoPipe,
+    ListboxComponent,
+    ListboxOptionComponent,
+    ListboxEmptyComponent,
+    BodyPortalDirective,
+    FacetMissComponent,
+  ],
   template: `
     @if (visible()) {
       <app-listbox
         appBodyPortal
         testid="entity-picker"
-        [ariaLabel]="'editor.entityPicker.label' | transloco"
+        [ariaLabel]="(offersFacetKeys() ? 'editor.entityPicker.facetKeys' : 'editor.entityPicker.label') | transloco"
         [activeItemId]="activeItemId()"
         [anchor]="anchor()!"
       >
+        <!-- No box of its own here — the mention *is* the box — so the shared row is placed by hand, as
+             a presentational row of the list. What the Tokens applied nothing for is *said* (ADR-0082). -->
+        <li role="presentation">
+          <app-facet-miss
+            class="px-3 py-1 text-xs text-ink-faint"
+            [parsed]="facetMiss()"
+            testid="entity-picker-unknown-facet"
+          />
+        </li>
         @for (item of items(); track item.id; let i = $index) {
-          @if (item.kind === 'entity') {
+          @if (item.kind === 'facet-key') {
+            <li
+              appListboxOption
+              [optionId]="optionId(item.id)"
+              [testid]="'entity-picker-facet-' + item.key"
+              [selected]="i === activeIndex()"
+              (pick)="select(item)"
+            >
+              <span class="font-mono text-xs">{{ item.key }}</span>
+            </li>
+          } @else if (item.kind === 'entity') {
             <li
               appListboxOption
               [optionId]="optionId(item.id)"
@@ -77,4 +105,24 @@ export type EntityPickerProps = ListboxProps<MentionItem>;
 })
 export class EntityPickerComponent extends ListboxController<MentionItem> {
   protected readonly optionIdPrefix = 'entity-opt-';
+
+  /** What the `$` names typed into the mention applied nothing for (ADR-0082). */
+  protected readonly facetMiss = signal<ParsedFacetQuery | null>(null);
+
+  /** Keys rather than Entities: the list is completing a `$` name, and says so. */
+  protected readonly offersFacetKeys = computed(() => this.items()[0]?.kind === 'facet-key');
+
+  /** Stated by the `@` trigger on every keystroke, search or no search. */
+  showFacetMiss(parsed: ParsedFacetQuery | null): void {
+    this.facetMiss.set(parsed);
+  }
+
+  /**
+   * A completed Facet key leaves the list standing — the mention is still being written, and shutting
+   * it on `$type:` would strand the author mid-token (ADR-0082).
+   */
+  protected override select(item: MentionItem): void {
+    super.select(item);
+    if (item.kind === 'facet-key') this.visible.set(true);
+  }
 }

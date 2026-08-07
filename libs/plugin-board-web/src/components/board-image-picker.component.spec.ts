@@ -1,9 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
-import { EntityDetail, EntityFacets, EntityPage, EntitySummary } from '@hexly/domain';
+import { EntityDetail, EntityFacets, EntityPage, EntitySummary, Field } from '@hexly/domain';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
-import { COLLAB_TEST_CATALOGS } from '@hexly/web-entity/testing';
+import { COLLAB_TEST_CATALOGS, provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { DialogRef } from '@hexly/web-ui';
 import { BOARD_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { BoardImagePickerComponent, ImagePickerData } from './board-image-picker.component';
@@ -74,6 +74,18 @@ const FACETS: EntityFacets = {
   ],
 };
 
+/**
+ * The image dimension as this build's registry knows it (ADR-0055) — what makes `$orientation:` a Facet
+ * Token the box can resolve here, the key set being read off the registry and never off the Facet read.
+ */
+const ORIENTATION_FIELD: Field = {
+  id: 'orientation',
+  label: 'Orientation',
+  dataType: { kind: 'enum', options: ['landscape', 'portrait', 'square'] },
+  facetable: true,
+  required: false,
+};
+
 /** The wrapper Asset Entity the upload endpoint returns (ADR-0065) — the picker reads its URL off the ref. */
 const NEW_ASSET = {
   id: 'asset-new',
@@ -116,6 +128,8 @@ describe('BoardImagePicker', () => {
         { provide: DialogRef, useValue: ref },
         { provide: AssetsClient, useValue: assets },
         { provide: EntitiesClient, useValue: entities },
+        // The box reads its Facet vocabulary off the registry, synchronously (ADR-0082).
+        provideEntityTypesTesting([], [ORIENTATION_FIELD]),
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(BoardImagePickerComponent);
@@ -251,5 +265,47 @@ describe('BoardImagePicker', () => {
     (byId('image-picker-cancel') as HTMLButtonElement).click();
 
     expect(closed).toEqual([undefined]);
+  });
+
+  /**
+   * The token language reaches this picker too (ADR-0082): the image Facets it already counts are
+   * typeable as tokens beside the chips, values and counts come off that same read, and — no rail here —
+   * a filter is reversed by backspacing what named it.
+   */
+  describe('the token language', () => {
+    function typeInto(text: string) {
+      const box = byId('image-search') as HTMLInputElement;
+      box.value = text;
+      box.setSelectionRange(text.length, text.length);
+      box.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      return box;
+    }
+
+    it('narrows by a typed Facet, under the pinned image kind, the wire carrying the residual text', () => {
+      typeInto('$orientation:landscape castle');
+
+      expect(entities.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ q: 'castle', field: ['kind:eq:image', 'orientation:eq:landscape'] }),
+      );
+    });
+
+    it('offers that Facet’s values and counts off the read it already runs', () => {
+      typeInto('$orientation:');
+
+      const rows = Array.from(fixture.nativeElement.querySelectorAll('[role=option]')).map((row) =>
+        ((row as HTMLElement).textContent ?? '').replace(/\s+/g, ' ').trim(),
+      );
+      expect(rows).toEqual(['landscape1', 'portrait1']);
+    });
+
+    it('reverses the filter when the token is backspaced away', () => {
+      typeInto('$orientation:landscape castle');
+      typeInto('castle');
+
+      expect(entities.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ q: 'castle', field: ['kind:eq:image'] }),
+      );
+    });
   });
 });

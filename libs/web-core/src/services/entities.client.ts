@@ -31,7 +31,22 @@ export const ENTITY_NUDGE_DEBOUNCE_MS = 150;
 /** The subset of list params the Facet-count read narrows against — no paging. */
 export type EntityFacetParams = Pick<
   EntityListParams,
-  'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId' | 'containerId' | 'container' | 'read' | 'includeHidden'
+  | 'q'
+  | 'type'
+  | 'tag'
+  | 'visibility'
+  | 'field'
+  | 'worldId'
+  | 'containerId'
+  | 'container'
+  | 'read'
+  | 'includeHidden'
+  // The excluding half of each category (ADR-0081). On the Facet read too: the counts drill down
+  // against every other active constraint, and an exclusion is one.
+  | 'excludeType'
+  | 'excludeTag'
+  | 'excludeVisibility'
+  | 'excludeContainer'
 >;
 
 /**
@@ -270,6 +285,12 @@ function facetParams(opts: EntityFacetParams): HttpParams {
   for (const t of opts.type ?? []) params = params.append('type', t);
   for (const t of opts.tag ?? []) params = params.append('tag', t);
   for (const v of opts.visibility ?? []) params = params.append('visibility', v);
+  // Each category's excluding twin, repeating the same way (ADR-0081); a Field's exclusion instead
+  // rides `field`'s own `neq` op, so it needs no param of its own.
+  for (const t of opts.excludeType ?? []) params = params.append('excludeType', t);
+  for (const t of opts.excludeTag ?? []) params = params.append('excludeTag', t);
+  for (const v of opts.excludeVisibility ?? []) params = params.append('excludeVisibility', v);
+  for (const c of opts.excludeContainer ?? []) params = params.append('excludeContainer', c);
   // Filter-by-Field: each `key:op:value` token repeats, like the other facet params.
   for (const f of opts.field ?? []) params = params.append('field', f);
   if (opts.worldId) params = params.set('worldId', opts.worldId);

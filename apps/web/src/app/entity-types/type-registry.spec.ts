@@ -360,6 +360,27 @@ describe('TypeRegistry', () => {
       ]);
     });
 
+    /**
+     * A **Facet Token** resolves its key here, synchronously, and a late response may never change what
+     * a filter means (ADR-0082). Between entering a World and its Fields landing, the registry says so
+     * rather than answering "no such key" — which is a different thing, and one a caller acts on.
+     */
+    it('holds a Field key unsettled while the World’s Fields are in flight, a reserved name never', () => {
+      registry.awaitWorldFields();
+
+      expect(registry.fieldsResolved()).toBe(false);
+      expect(registry.facetKeySettled('world.field.element')).toBe(false);
+      // No read widens or narrows the reserved names, so `$type` is decided the moment it is typed.
+      expect(registry.facetKeySettled('type')).toBe(true);
+
+      registry.setWorldFields([element]);
+
+      expect(registry.fieldsResolved()).toBe(true);
+      expect(registry.facetKeySettled('world.field.element')).toBe(true);
+      // Settled says the registry can answer, not that the key exists: an absent one is now a real miss.
+      expect(registry.facetKeySettled('world.field.absent')).toBe(true);
+    });
+
     it('reuses one World Field across two unrelated types via instance attachment', () => {
       registry.setWorldFields([element]);
       registry.register({ ...definition('world.type.deity', []), views: [] });

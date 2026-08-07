@@ -4,7 +4,7 @@ import { ComponentRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
-import { EntityDetail } from '@hexly/domain';
+import { defineField, EntityDetail } from '@hexly/domain';
 import { RichContent, CONTENT_FORMAT, tiptapContent } from '@hexly/plugin-content';
 import { ActiveWorld } from '@hexly/web-core';
 import { Editor } from '@tiptap/core';
@@ -12,6 +12,8 @@ import { FakeEntitySession, provideFakeEntitySession } from '@hexly/web-entity/t
 import { VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { EntityNameResolver } from '../services/entity-name-resolver';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { UI_TEST_CATALOGS } from '@hexly/web-ui/testing';
+import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { ContentEditorComponent } from './content-editor.component';
 
@@ -30,6 +32,14 @@ const noteDetail = (name: string): EntityDetail => ({
   updatedAt: 1,
   rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
   document: { 'core.field.content': { format: CONTENT_FORMAT, snapshot: {} } },
+});
+
+/** A facetable Field, so the registry offers a Facet key beside the reserved names (ADR-0082). */
+const crField = defineField({
+  id: 'dnd.field.cr',
+  label: 'Challenge Rating',
+  dataType: { kind: 'number' },
+  facetable: true,
 });
 
 // Drives ContentEditor via ENTITY_SESSION — the same central store the app binds (ADR-0051): a load
@@ -85,9 +95,11 @@ describe('ContentEditor', () => {
     fragment$.next(null);
     viewFieldKey = undefined;
     await TestBed.configureTestingModule({
-      imports: [ContentEditorComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
+      imports: [ContentEditorComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS, UI_TEST_CATALOGS)],
       providers: [
         provideFakeEntitySession(),
+        // The `@` mention reads its Facet vocabulary off the registry, synchronously (ADR-0082).
+        provideEntityTypesTesting([], [crField]),
         { provide: VIEW_FIELD_KEY, useFactory: () => viewFieldKey },
         EntityNameResolver,
         provideHttpClient(),
@@ -327,8 +339,8 @@ describe('ContentEditor', () => {
     }
 
     /** Open the `@` picker on a name and let its rows settle. */
-    async function openPicker(fixture: ReturnType<typeof create>) {
-      editorOf(fixture).commands.insertContent('@Zorblax');
+    async function openPicker(fixture: ReturnType<typeof create>, typed = '@Zorblax') {
+      editorOf(fixture).commands.insertContent(typed);
       // @tiptap/suggestion resolves items() async, then fires onStart.
       await new Promise((resolve) => setTimeout(resolve));
       fixture.detectChanges();
@@ -398,7 +410,78 @@ describe('ContentEditor', () => {
 
       await openPicker(create());
 
-      expect(search).toHaveBeenCalledWith('Zorblax', 'w1');
+      // The raw name half, the host World, and what its Facet Tokens mean — none typed here (ADR-0082).
+      expect(search).toHaveBeenCalledWith('Zorblax', 'w1', { q: 'Zorblax' });
+    });
+
+    /**
+     * The token language reaches the `@` picker too (ADR-0082): the Facet filters that were only ever on
+     * the wire here are typeable, the residual text is what matches, and it is what a Create row mints —
+     * never the token that filtered.
+     */
+    it('narrows the mention by a typed Facet Token, and mints only the residual name', async () => {
+      const search = vi.fn(async () => []);
+      TestBed.overrideProvider(EntityNameResolver, { useValue: { ...stubResolver, search } });
+      pinWorld({ id: 'w1', rights: ['read', 'create-entity'] });
+      TestBed.inject(FakeEntitySession).loadDetail(note('Lady Mara'));
+
+      const picker = await openPicker(create(), '@$type:core.type.npc gorb');
+
+      expect(search).toHaveBeenCalledWith('$type:core.type.npc gorb', 'w1', {
+        q: 'gorb',
+        type: ['core.type.npc'],
+      });
+      expect(picker.querySelector('[data-testid=entity-picker-create]')?.textContent).toContain('gorb');
+    });
+
+    /**
+     * The token language reaches this surface whole (ADR-0082): the vocabulary is revealed on the
+     * dollar, off the registry and without a Facet read, and a `$` name nothing answers to is *said*.
+     */
+    describe('the Facet Tokens a mention may name (ADR-0082)', () => {
+      /** Every Facet key row the open picker offers, in the order it offers them. */
+      const keysOffered = (picker: HTMLElement) =>
+        Array.from(picker.querySelectorAll('[data-testid^=entity-picker-facet-]')).map(
+          (row) => row.textContent?.trim() ?? '',
+        );
+
+      beforeEach(() => {
+        pinWorld({ id: 'w1', rights: ['read', 'create-entity'] });
+        TestBed.inject(FakeEntitySession).loadDetail(note('Lady Mara'));
+      });
+
+      it('says a $ name this World answers to nothing, rather than quietly searching for the rest', async () => {
+        const picker = await openPicker(create(), '@$domain:sea gorb');
+
+        expect(picker.querySelector('[data-testid=entity-picker-unknown-facet]')?.textContent).toContain('domain');
+      });
+
+      it('reveals the whole filter vocabulary on the dollar — the registry’s own Facet keys included', async () => {
+        const picker = await openPicker(create(), '@$');
+
+        expect(keysOffered(picker)).toEqual(['type', 'tag', 'visibility', 'dnd.field.cr']);
+        // Keys are the whole of it here: no Facet read runs, so no values and no counts.
+        expect(picker.querySelector('[data-testid=entity-picker-create]')).toBeNull();
+      });
+
+      it('offers no key rows once the mention is back to a plain name', async () => {
+        const picker = await openPicker(create(), '@Zorblax');
+
+        expect(keysOffered(picker)).toEqual([]);
+      });
+
+      it('writes the picked key into the mention and leaves the picker standing for its value', async () => {
+        const fixture = create();
+        const picker = await openPicker(fixture, '@$ty');
+
+        (picker.querySelector('[data-testid=entity-picker-facet-type]') as HTMLElement).click();
+        await new Promise((resolve) => setTimeout(resolve));
+        fixture.detectChanges();
+
+        expect(editorOf(fixture).getText()).toContain('@$type:');
+        // The mention is still being written — shutting the list on `$type:` would strand the author.
+        expect(picker.isConnected).toBe(true);
+      });
     });
 
     it('withholds Create while no World is loaded at all', async () => {

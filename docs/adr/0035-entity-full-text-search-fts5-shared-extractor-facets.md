@@ -1,5 +1,7 @@
 # Entity search: SQLite FTS5 fed by a shared format-tagged text extractor, plus column facets
 
+> **Superseded in part by [ADR-0081](./0081-facet-values-carry-a-polarity-an-exclusion-vetoes.md):** the facet model below has one polarity — every value named is a value wanted — and now has three: a value is neutral, **included** or **excluded**, with an exclusion vetoing any inclusion of the same value. The count rule follows it, so "not its own category" now means both polarities. And "values that match nothing under the current filters are hidden" holds for _unselected_ values only — **a value the caller has selected is always listed, whatever its count**, since a selection that vanishes from the rail while still filtering the list is unreversible by clicking. The engine below is untouched: FTS5, the shared extractor, the triggers, drill-down counts, and the two reads per filter change all stand.
+
 This realizes the matching engine ADR-0025 deferred. `GET /api/entities` gains full-text search over **name, tags, and Content prose**, and faceted filtering by **type, tags, and visibility**. The wire contract (envelope, opaque cursor, `q`/`type` params) is unchanged; only the engine behind it and a new `tag`/`visibility` param arrive.
 
 ## Full-text search: FTS5 external-content table + triggers

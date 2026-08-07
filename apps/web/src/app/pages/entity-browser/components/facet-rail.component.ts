@@ -4,18 +4,51 @@ import { EntityFacets, FacetCount } from '@hexly/domain';
 import { ClientConfigStore } from '@hexly/web-core';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
-/** One type's Field selection (ADR-0048, #188): eq membership for enum/list/string, or a
- * `gte`/`lte` range for number/date. Absent parts mean "unconstrained on that axis". */
-export interface FieldSelection {
-  readonly values?: readonly string[];
-  readonly gte?: string;
-  readonly lte?: string;
+/** The ops one range bound may carry: the inclusive one a rail input sets, and the strict one only a
+ * **Facet Token** can write (`$cr:>5`, ADR-0082). */
+export type FieldBoundOp = 'gte' | 'gt' | 'lte' | 'lt';
+
+/**
+ * One bound of a range selection — the value **and how it compares**, inseparably: `>5` and `>=5` differ
+ * by exactly the boundary row, so the op travels with the value from the box to the wire rather than
+ * being guessed again where the params are built (ADR-0082).
+ */
+export interface FieldRangeSelection {
+  readonly value: string;
+  readonly op: FieldBoundOp;
 }
 
-/** Whether a Field selection constrains nothing — no eq values and neither range bound. The one
- * definition of "empty" the rail's visibility and the browser's URL-pruning both read. */
+/** One type's Field selection (ADR-0048, #188): eq membership for enum/list/string, or a
+ * `gte`/`lte` range for number/date. Absent parts mean "unconstrained on that axis".
+ * `excluded` is the `neq` half (ADR-0081) — it vetoes, so it beats an `eq` on the same value.
+ * A range takes no polarity: a negated bound says nothing `gte`/`lte` cannot. */
+export interface FieldSelection {
+  readonly values?: readonly string[];
+  readonly excluded?: readonly string[];
+  /** The minimum, in the row's lower input — written `gt` where a token excluded the boundary itself. */
+  readonly gte?: FieldRangeSelection;
+  readonly lte?: FieldRangeSelection;
+}
+
+/** Whether a Field selection constrains nothing — no eq values, no exclusion, neither range bound.
+ * The one definition of "empty" the rail's visibility and the browser's URL-pruning both read. */
 export function isFieldSelectionEmpty(sel: FieldSelection): boolean {
-  return (sel.values?.length ?? 0) === 0 && !sel.gte && !sel.lte;
+  return (sel.values?.length ?? 0) === 0 && (sel.excluded?.length ?? 0) === 0 && !sel.gte && !sel.lte;
+}
+
+/** Set one value's polarity and release the other, which is what puts the both-selected
+ * contradiction out of the rail's reach (ADR-0081); pressing the lit half returns it to neutral. */
+export function togglePolarity(
+  included: readonly string[],
+  excluded: readonly string[],
+  value: string,
+  polarity: FacetPolarity,
+): { included: readonly string[]; excluded: readonly string[] } {
+  const drop = (vs: readonly string[]) => vs.filter((v) => v !== value);
+  const flip = (vs: readonly string[]) => (vs.includes(value) ? drop(vs) : [...vs, value]);
+  return polarity === 'include'
+    ? { included: flip(included), excluded: drop(excluded) }
+    : { included: drop(included), excluded: flip(excluded) };
 }
 
 export interface ActiveFacets {
@@ -31,6 +64,12 @@ export interface ActiveFacets {
    * section.
    */
   readonly container: readonly string[];
+  /**
+   * The excluding half of each value-toggled category (ADR-0081): a value here **vetoes**, whatever
+   * the includes say. Partial, and silent about the categories a browse pins or strips — the Asset
+   * Browser's Type, the Library's Visibility — which never reach the rail to be toggled either way.
+   */
+  readonly excluded?: Partial<Record<FacetCategory, readonly string[]>>;
 }
 
 /**
@@ -39,22 +78,81 @@ export interface ActiveFacets {
  */
 export type FacetCategory = 'type' | 'tag' | 'visibility' | 'container';
 
+/**
+ * The displayed controls the *text* owns, in either polarity — a value has one visual state whichever
+ * way it was named (ADR-0082). Empty wherever no **Facet Token** parse stands behind the rail.
+ */
+export interface QueryOwnedFacets {
+  readonly categories?: Partial<Record<FacetCategory, readonly string[]>>;
+  /** Per Facet key, the values a token named. */
+  readonly fields?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Per Facet key, the range bounds a token named. Per *bound*, not per Field: a Field whose `gte` the
+   * text names and whose `lte` the rail owns is a legitimate state, and each half reads for what it is.
+   */
+  readonly bounds?: Readonly<Record<string, readonly FieldRangeBound[]>>;
+}
+
+/** Which half of a value's polarity a click addressed (ADR-0081). */
+export type FacetPolarity = 'include' | 'exclude';
+
 export interface FacetToggle {
   readonly category: FacetCategory;
   readonly value: string;
+  readonly polarity: FacetPolarity;
 }
 
-/** A toggle of one enum/list/string Field-facet value (eq membership). */
+/** A toggle of one enum/list/string Field-facet value — `eq` membership, or its `neq` veto. */
 export interface FieldValueToggle {
   readonly key: string;
   readonly value: string;
+  readonly polarity: FacetPolarity;
 }
+
+/** Which of a range row's two inputs a change addressed. */
+export type FieldRangeBound = 'gte' | 'lte';
 
 /** A change to one bound of a number/date Field range; `value` empty clears that bound. */
 export interface FieldRangeChange {
   readonly key: string;
-  readonly bound: 'gte' | 'lte';
+  readonly bound: FieldRangeBound;
   readonly value: string;
+}
+
+/**
+ * The small `−` beside a rail row's include toggle (ADR-0081). Its own component so a category row
+ * and a Field row cannot drift apart, and always rendered where it is offered — hover-revealing it
+ * would break touch and add a surprise tab stop.
+ */
+@Component({
+  selector: 'app-facet-exclude-toggle',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslocoPipe],
+  template: `
+    <button
+      type="button"
+      [attr.data-testid]="testid()"
+      [attr.data-query-owned]="queryOwned() ? '' : null"
+      [attr.aria-pressed]="pressed()"
+      [attr.aria-label]="
+        (queryOwned() ? 'entityBrowser.facets.removeTyped' : 'entityBrowser.facets.excludeValue')
+          | transloco: { value: label() }
+      "
+      class="shrink-0 w-6 flex items-center justify-center rounded-sm font-sans text-sm text-ink-faint border border-transparent hover:bg-surface-sunken aria-pressed:bg-danger-soft aria-pressed:text-danger data-query-owned:border-dashed data-query-owned:border-accent"
+      (click)="press.emit()"
+    >
+      <span aria-hidden="true">−</span>
+    </button>
+  `,
+})
+export class FacetExcludeToggleComponent {
+  readonly testid = input.required<string>();
+  readonly pressed = input.required<boolean>();
+  /** Whether the *text* put this value in force (ADR-0082): pressing it takes the token out of the box. */
+  readonly queryOwned = input(false);
+  /** The row's rendered label — the exclude control names itself with it, the include one carries it. */
+  readonly label = input.required<string>();
+  readonly press = output<void>();
 }
 
 /**
@@ -65,7 +163,7 @@ export interface FieldRangeChange {
 @Component({
   selector: 'app-facet-rail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe],
+  imports: [TranslocoPipe, FacetExcludeToggleComponent],
   host: { class: 'block' },
   template: `
     <div data-testid="facet-rail" class="rounded-sm border border-line bg-surface p-4">
@@ -95,17 +193,36 @@ export interface FieldRangeChange {
           </h3>
           <ul class="flex flex-col gap-1 m-0 p-0 list-none">
             @for (row of group.rows; track row.value) {
-              <li>
+              <li class="flex items-stretch gap-1">
                 <button
                   type="button"
                   [attr.data-testid]="'facet-' + group.category + '-' + row.value"
+                  [attr.data-query-owned]="row.queryOwned ? '' : null"
                   [attr.aria-pressed]="row.active"
-                  class="w-full flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
-                  (click)="toggled.emit({ category: group.category, value: row.value })"
+                  [attr.aria-label]="
+                    row.queryOwned ? ('entityBrowser.facets.removeTyped' | transloco: { value: row.label }) : null
+                  "
+                  class="flex-1 min-w-0 flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong border border-transparent hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong data-query-owned:border-dashed data-query-owned:border-accent"
+                  (click)="toggled.emit({ category: group.category, value: row.value, polarity: 'include' })"
                 >
-                  <span class="truncate">{{ row.label }}</span>
+                  <span class="min-w-0 flex items-baseline gap-1">
+                    <!-- The dollar the caller typed, kept beside the value it named (ADR-0082). -->
+                    @if (row.queryOwned) {
+                      <span aria-hidden="true" class="shrink-0 font-mono text-accent-strong">$</span>
+                    }
+                    <span class="truncate">{{ row.label }}</span>
+                  </span>
                   <span class="ml-2 text-ink-faint tabular-nums">{{ row.count }}</span>
                 </button>
+                @if (canExclude()) {
+                  <app-facet-exclude-toggle
+                    [testid]="'facet-exclude-' + group.category + '-' + row.value"
+                    [pressed]="row.excluded"
+                    [queryOwned]="row.queryOwned"
+                    [label]="row.label"
+                    (press)="toggled.emit({ category: group.category, value: row.value, polarity: 'exclude' })"
+                  />
+                }
               </li>
             }
           </ul>
@@ -121,46 +238,111 @@ export interface FieldRangeChange {
             {{ field.label }}
           </h3>
           @if (field.kind === 'range') {
+            <!-- Ownership is per bound (ADR-0082): a bound the text named renders query-owned — outlined,
+                 readonly, and cleared by deleting its token — while the other stays the rail's to edit. -->
             <div class="flex items-center gap-2">
-              <input
-                [type]="field.inputType"
-                [attr.data-testid]="'facet-field-' + field.key + '-gte'"
-                [attr.aria-label]="field.minLabel"
-                [value]="field.gte"
-                [attr.placeholder]="field.min"
-                class="w-full min-w-0 rounded-md border border-line bg-surface px-2 py-1 font-sans text-sm"
-                (change)="emitRange(field.key, 'gte', $event)"
-              />
+              <span class="flex-1 min-w-0 flex items-center gap-1">
+                @if (field.gteOwned) {
+                  <span aria-hidden="true" class="shrink-0 font-mono text-accent-strong">$</span>
+                }
+                <input
+                  [type]="field.inputType"
+                  [attr.data-testid]="'facet-field-' + field.key + '-gte'"
+                  [attr.data-query-owned]="field.gteOwned ? '' : null"
+                  [attr.aria-label]="field.minLabel"
+                  [readonly]="field.gteOwned"
+                  [attr.aria-readonly]="field.gteOwned ? 'true' : null"
+                  [value]="field.gte"
+                  [attr.placeholder]="field.min"
+                  class="w-full min-w-0 rounded-md border border-line bg-surface px-2 py-1 font-sans text-sm data-query-owned:border-dashed data-query-owned:border-accent"
+                  (change)="emitRange(field.key, 'gte', $event)"
+                />
+                @if (field.gteOwned) {
+                  <button
+                    type="button"
+                    [attr.data-testid]="'facet-field-' + field.key + '-gte-remove'"
+                    [attr.aria-label]="field.removeMinLabel"
+                    class="shrink-0 w-6 flex items-center justify-center rounded-sm font-sans text-sm text-ink-faint hover:bg-surface-sunken"
+                    (click)="clearRange(field.key, 'gte')"
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
+                }
+              </span>
               <span class="text-ink-faint" aria-hidden="true">–</span>
-              <input
-                [type]="field.inputType"
-                [attr.data-testid]="'facet-field-' + field.key + '-lte'"
-                [attr.aria-label]="field.maxLabel"
-                [value]="field.lte"
-                [attr.placeholder]="field.max"
-                class="w-full min-w-0 rounded-md border border-line bg-surface px-2 py-1 font-sans text-sm"
-                (change)="emitRange(field.key, 'lte', $event)"
-              />
+              <span class="flex-1 min-w-0 flex items-center gap-1">
+                @if (field.lteOwned) {
+                  <span aria-hidden="true" class="shrink-0 font-mono text-accent-strong">$</span>
+                }
+                <input
+                  [type]="field.inputType"
+                  [attr.data-testid]="'facet-field-' + field.key + '-lte'"
+                  [attr.data-query-owned]="field.lteOwned ? '' : null"
+                  [attr.aria-label]="field.maxLabel"
+                  [readonly]="field.lteOwned"
+                  [attr.aria-readonly]="field.lteOwned ? 'true' : null"
+                  [value]="field.lte"
+                  [attr.placeholder]="field.max"
+                  class="w-full min-w-0 rounded-md border border-line bg-surface px-2 py-1 font-sans text-sm data-query-owned:border-dashed data-query-owned:border-accent"
+                  (change)="emitRange(field.key, 'lte', $event)"
+                />
+                @if (field.lteOwned) {
+                  <button
+                    type="button"
+                    [attr.data-testid]="'facet-field-' + field.key + '-lte-remove'"
+                    [attr.aria-label]="field.removeMaxLabel"
+                    class="shrink-0 w-6 flex items-center justify-center rounded-sm font-sans text-sm text-ink-faint hover:bg-surface-sunken"
+                    (click)="clearRange(field.key, 'lte')"
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
+                }
+              </span>
             </div>
           } @else {
             <ul class="flex flex-col gap-1 m-0 p-0 list-none">
               @for (row of field.rows; track row.value) {
-                <li>
+                <li class="flex items-stretch gap-1">
                   <button
                     type="button"
                     [attr.data-testid]="'facet-field-' + field.key + '-' + row.value"
+                    [attr.data-query-owned]="row.queryOwned ? '' : null"
                     [attr.aria-pressed]="row.active"
-                    class="w-full flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
+                    [attr.aria-label]="
+                      row.queryOwned ? ('entityBrowser.facets.removeTyped' | transloco: { value: row.label }) : null
+                    "
+                    class="flex-1 min-w-0 flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong border border-transparent hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong data-query-owned:border-dashed data-query-owned:border-accent"
                     (click)="
                       fieldValueToggled.emit({
                         key: field.key,
                         value: row.value,
+                        polarity: 'include',
                       })
                     "
                   >
-                    <span class="truncate">{{ row.label }}</span>
+                    <span class="min-w-0 flex items-baseline gap-1">
+                      @if (row.queryOwned) {
+                        <span aria-hidden="true" class="shrink-0 font-mono text-accent-strong">$</span>
+                      }
+                      <span class="truncate">{{ row.label }}</span>
+                    </span>
                     <span class="ml-2 text-ink-faint tabular-nums">{{ row.count }}</span>
                   </button>
+                  @if (canExclude()) {
+                    <app-facet-exclude-toggle
+                      [testid]="'facet-exclude-field-' + field.key + '-' + row.value"
+                      [pressed]="row.excluded"
+                      [queryOwned]="row.queryOwned"
+                      [label]="row.label"
+                      (press)="
+                        fieldValueToggled.emit({
+                          key: field.key,
+                          value: row.value,
+                          polarity: 'exclude',
+                        })
+                      "
+                    />
+                  }
                 </li>
               }
             </ul>
@@ -188,19 +370,35 @@ export class FacetRailComponent {
     fields: {},
     container: [],
   });
+  /**
+   * The displayed controls a **Facet Token** put in force (ADR-0082). Rendering only: the rail emits the
+   * same toggle — or the same bound-cleared — either way, and the page decides that on one of these it
+   * deletes the token.
+   */
+  readonly queryOwned = input<QueryOwnedFacets>({});
   readonly canClear = input(false);
+  /** Whether this browse offers the excluding half (ADR-0081); off by default, so the rail is never
+   * given a control whose param its page does not carry. Every rail surface passes it since #423 —
+   * the shared `field` codec's `neq` guard is the same rule, on the other side of the URL. */
+  readonly canExclude = input(false);
 
   readonly toggled = output<FacetToggle>();
   readonly fieldValueToggled = output<FieldValueToggle>();
   readonly fieldRangeChanged = output<FieldRangeChange>();
   readonly clearAll = output<void>();
 
-  protected emitRange(key: string, bound: 'gte' | 'lte', event: Event): void {
+  protected emitRange(key: string, bound: FieldRangeBound, event: Event): void {
     this.fieldRangeChanged.emit({
       key,
       bound,
       value: (event.target as HTMLInputElement).value,
     });
+  }
+
+  /** Release one bound — the rail's own, or, on a bound the text owns, the token that filled it, which
+   * the page reads from the same empty change (ADR-0082). */
+  protected clearRange(key: string, bound: FieldRangeBound): void {
+    this.fieldRangeChanged.emit({ key, bound, value: '' });
   }
 
   /**
@@ -217,25 +415,34 @@ export class FacetRailComponent {
     return value.label ?? value.value;
   }
 
-  /** Categories as render rows. Type/Visibility labels are translated; a Tag
-   * shows its raw text. Empty categories are dropped — no bare headings. */
+  /** Categories as render rows, each merged with what the caller has selected (ADR-0081, #420).
+   * Type/Visibility labels are translated; a Tag shows its raw text. Empty categories are dropped —
+   * no bare headings. */
   protected readonly groups = computed(() => {
     this.transloco.activeLang(); // reactive dependency: re-translate labels on switch
     const active = this.active();
+    const excluded = active.excluded ?? {};
+    const owned = this.queryOwned().categories ?? {};
     const counts = this.facetCounts();
     const categories = [
       {
         category: 'type' as const,
-        rows: counts.type,
+        rows: withSelection(counts.type, active.type, excluded.type),
         // A user-defined type's authored name; a code type's translated copy (#191).
         label: (v: FacetCount) => this.types.name(v.value),
       },
-      { category: 'tag' as const, rows: counts.tag, label: (v: FacetCount) => v.value },
+      {
+        category: 'tag' as const,
+        rows: withSelection(counts.tag, active.tag, excluded.tag),
+        label: (v: FacetCount) => v.value,
+      },
       {
         category: 'visibility' as const,
         // Nothing reads Visibility with Collaboration off (ADR-0071); emptied, the category falls to
-        // the drop-empties filter below.
-        rows: this.clientConfig.isCollaborationEnabled() ? counts.visibility : [],
+        // the drop-empties filter below — a selection can't resurrect it, so the merge stays inside the gate.
+        rows: this.clientConfig.isCollaborationEnabled()
+          ? withSelection(counts.visibility, active.visibility, excluded.visibility)
+          : [],
         label: (v: FacetCount) => this.transloco.translate(`entityBrowser.facets.${v.value}`),
       },
       {
@@ -244,7 +451,7 @@ export class FacetRailComponent {
         // and in the order the read named its Containers, which in the Library is the Owner's Mount
         // order. Absent wherever the read names a single Container, so every other browse drops it.
         category: 'container' as const,
-        rows: counts.container ?? [],
+        rows: withSelection(counts.container ?? [], active.container, excluded.container),
         label: (v: FacetCount) => v.label ?? v.value,
       },
     ];
@@ -257,6 +464,8 @@ export class FacetRailComponent {
           count: r.count,
           label: g.label(r),
           active: active[g.category].includes(r.value),
+          excluded: (excluded[g.category] ?? []).includes(r.value),
+          queryOwned: (owned[g.category] ?? []).includes(r.value),
         })),
       }));
   });
@@ -271,19 +480,30 @@ export class FacetRailComponent {
   protected readonly fieldFacets = computed(() => {
     this.transloco.activeLang(); // reactive dependency: re-translate labels/aria-labels on switch
     const activeFields = this.active().fields;
+    const ownedFields = this.queryOwned().fields ?? {};
+    const ownedBounds = this.queryOwned().bounds ?? {};
     return this.facetCounts()
       .fields.map((field) => {
         const selection = activeFields[field.key] ?? {};
+        const selected = selection.values ?? [];
+        const vetoed = selection.excluded ?? [];
         const numeric = field.dataType.kind === 'number';
         const range = numeric || field.dataType.kind === 'date';
         // A dimension's labelKey translates; a scalar Field's label is authored, with no key (ADR-0055).
         const label = field.labelKey ? this.transloco.translate(field.labelKey) : field.label;
-        const rows = field.values.map((v) => ({
+        const rows = withSelection(field.values, selected, vetoed).map((v) => ({
           value: v.value,
           count: v.count,
           label: this.valueLabel(field.valuesKeyPrefix, v),
-          active: (selection.values ?? []).includes(v.value),
+          active: selected.includes(v.value),
+          excluded: vetoed.includes(v.value),
+          queryOwned: (ownedFields[field.key] ?? []).includes(v.value),
         }));
+        const bounds = ownedBounds[field.key] ?? [];
+        // The input shows the compared value; its op says whether the boundary row is in, which the
+        // wire carries and the row has no control for (ADR-0082).
+        const gte = selection.gte?.value ?? '';
+        const lte = selection.lte?.value ?? '';
         return {
           key: field.key,
           label,
@@ -296,8 +516,19 @@ export class FacetRailComponent {
           maxLabel: this.transloco.translate('entityBrowser.facets.rangeMax', {
             field: label,
           }),
-          gte: selection.gte ?? '',
-          lte: selection.lte ?? '',
+          // Each delete control names the token it takes out — which bound of which Field, and its value.
+          removeMinLabel: this.transloco.translate('entityBrowser.facets.removeTypedMin', {
+            field: label,
+            value: gte,
+          }),
+          removeMaxLabel: this.transloco.translate('entityBrowser.facets.removeTypedMax', {
+            field: label,
+            value: lte,
+          }),
+          gte,
+          lte,
+          gteOwned: bounds.includes('gte'),
+          lteOwned: bounds.includes('lte'),
           // Placeholder bounds hint the available span. A number range compares numerically, so its
           // min/max are the numeric extremes — not the lexical first/last of the sorted values.
           ...rangeBounds(
@@ -311,6 +542,27 @@ export class FacetRailComponent {
       })
       .filter((f) => f.visible);
   });
+}
+
+/**
+ * One facet's server counts with the caller's choice merged in, **either polarity** (ADR-0081), so a
+ * chosen value is always listed whatever its count — the server hides zero-count values, and a choice
+ * it hid is still filtering the list, which for an exclusion would be a one-way door. A merged row
+ * carries no server-sent `label`, so a value that renders through one (a Container, an Entity-Link
+ * Field) falls back to its raw id.
+ */
+function withSelection(
+  rows: readonly FacetCount[],
+  selected: readonly string[],
+  excluded: readonly string[] = [],
+): readonly FacetCount[] {
+  const listed = new Set(rows.map((r) => r.value));
+  // The Set dedupes a value a hand-edited URL named in both polarities — a contradiction the rail
+  // makes unreachable, but one it must still render as a single row.
+  const missing = [...new Set([...selected, ...excluded])]
+    .filter((v) => !listed.has(v))
+    .map((value) => ({ value, count: 0 }));
+  return missing.length ? [...rows, ...missing] : rows;
 }
 
 /**

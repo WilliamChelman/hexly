@@ -1,0 +1,9 @@
+{
+  "facetToken": {
+    "suggestionsLabel": "Suggestions de filtres",
+    "unknownFacet": "Aucune facette « {{keys}} » ici.",
+    "emptyValue": "« {{keys}} » ne nomme aucune valeur : rien n'est filtré.",
+    "unterminatedQuote": "« {{keys}} » a un guillemet encore ouvert : rien n'est filtré pour l'instant.",
+    "negatedBound": "Une borne d'intervalle ne peut pas être exclue : « {{keys}} » ne filtre rien."
+  }
+}

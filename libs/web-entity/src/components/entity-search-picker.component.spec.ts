@@ -4,6 +4,8 @@ import { of } from 'rxjs';
 import { EntityPage, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { UI_TEST_CATALOGS } from '@hexly/web-ui/testing';
+import { provideEntityTypesTesting } from '../testing/entity-types.fake';
 import { EntitySearchPickerComponent } from './entity-search-picker.component';
 import { COLLAB_TEST_CATALOGS } from '../i18n/test-catalogs';
 
@@ -33,6 +35,7 @@ const page = (items: EntitySummary[]): EntityPage => ({
     testid="pin-picker"
     [worldId]="worldId()"
     [includeMounts]="includeMounts()"
+    [types]="types()"
     [query]="query()"
     (queryChange)="query.set($event)"
     (pick)="picked = $event"
@@ -42,6 +45,7 @@ class Host {
   readonly query = signal('');
   readonly worldId = signal<string | undefined>(undefined);
   readonly includeMounts = signal(true);
+  readonly types = signal<readonly string[] | undefined>(undefined);
   picked: EntitySummary | null = null;
 }
 
@@ -61,8 +65,12 @@ describe('EntitySearchPicker', () => {
       ),
     );
     await TestBed.configureTestingModule({
-      imports: [Host, provideTranslocoTesting(COLLAB_TEST_CATALOGS)],
-      providers: [{ provide: EntitiesClient, useValue: entities }],
+      imports: [Host, provideTranslocoTesting(COLLAB_TEST_CATALOGS, UI_TEST_CATALOGS)],
+      providers: [
+        { provide: EntitiesClient, useValue: entities },
+        // The box reads its Facet vocabulary off the registry, synchronously (ADR-0082).
+        provideEntityTypesTesting([]),
+      ],
     }).compileComponents();
   });
 
@@ -250,5 +258,134 @@ describe('EntitySearchPicker', () => {
     expect(fixture.componentInstance.query()).toBe('river');
     expect(byId(el, 'pin-picker-option-n1')).not.toBeNull();
     expect(byId(el, 'pin-picker-option-n2')).toBeNull();
+  });
+
+  /**
+   * The token language, in a picker (ADR-0082). These surfaces carry no rail, so the text is the only
+   * store: a Facet is named inline, and reversed by backspacing what named it. Values and their counts
+   * come off the Facet read the Container chips already issue — no request is added per keystroke.
+   */
+  describe('the token language', () => {
+    /** The Facet read every picker already runs, here carrying values to offer as well as Containers. */
+    beforeEach(() => {
+      entities.facets.mockImplementation(() =>
+        of({
+          type: [{ value: 'core.type.npc', count: 4 }],
+          tag: [
+            { value: 'Sea of Storms', count: 3 },
+            { value: 'draft', count: 1 },
+          ],
+          visibility: [],
+          fields: [],
+        }),
+      );
+    });
+
+    function typeInto(fixture: ReturnType<typeof TestBed.createComponent<Host>>, text: string) {
+      const box = byId(fixture.nativeElement as HTMLElement, 'pin-picker-search') as HTMLInputElement;
+      box.value = text;
+      box.setSelectionRange(text.length, text.length);
+      box.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      return box;
+    }
+
+    it('narrows the read by a typed Facet, the wire carrying the residual text', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.detectChanges();
+
+      typeInto(fixture, '$type:core.type.npc riverbend');
+
+      expect(entities.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ q: 'riverbend', type: ['core.type.npc'] }),
+      );
+    });
+
+    it('reverses a filter when its token is backspaced away — no rail is needed to undo it', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.detectChanges();
+
+      typeInto(fixture, '-$tag:draft riverbend');
+      expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ excludeTag: ['draft'] }));
+
+      // The box holds exactly what was typed, so backspacing the token is all it takes.
+      typeInto(fixture, 'riverbend');
+      expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'riverbend' }));
+      expect(entities.list).not.toHaveBeenLastCalledWith(expect.objectContaining({ excludeTag: ['draft'] }));
+    });
+
+    it('offers values and their counts off the read it already runs, adding no request', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      typeInto(fixture, '$tag:');
+
+      const rows = Array.from(el.querySelectorAll('[role=option]')).map((row) =>
+        (row.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      );
+      expect(rows).toEqual(['Sea of Storms3', 'draft1']);
+      // One Facet read per read of the options, exactly as before the box could offer anything.
+      expect(entities.facets.mock.calls.length).toBe(entities.list.mock.calls.length);
+    });
+
+    it('offers the whole vocabulary on the dollar, less the Container the chips own', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      typeInto(fixture, '$');
+
+      const rows = Array.from(el.querySelectorAll('[role=option]')).map((row) => (row.textContent ?? '').trim());
+      expect(rows).toEqual(['type', 'tag', 'visibility']);
+    });
+
+    /**
+     * The wire's `type` ORs, so a token could only widen past a picker already pinned to its target
+     * types — reported as a miss instead, which is what a reader can act on.
+     */
+    it('answers to no $type where the picker is already pinned to one, and says so', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.componentInstance.types.set(['core.type.note']);
+      fixture.detectChanges();
+
+      typeInto(fixture, '$type:core.type.npc');
+
+      expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ type: ['core.type.note'] }));
+      expect(byId(fixture.nativeElement as HTMLElement, 'pin-picker-unknown-facet')?.textContent).toContain('type');
+    });
+
+    /** A token that resolved and still applied nothing is stated, never left to look like an empty box. */
+    it('says why a resolvable token filtered nothing, with its own message per reason', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      typeInto(fixture, '$tag:');
+      expect(byId(el, 'pin-picker-unknown-facet-empty-value')?.textContent).toContain('names no value');
+
+      typeInto(fixture, '$tag:"sea of ');
+      expect(byId(el, 'pin-picker-unknown-facet-unterminated-quote')?.textContent).toContain('quote still open');
+      // Half a value is not a filter: the search runs on the text alone.
+      expect(entities.list).toHaveBeenLastCalledWith(expect.not.objectContaining({ tag: expect.anything() }));
+    });
+
+    it('dismisses the suggestions on Escape without closing the picker', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      const box = typeInto(fixture, '$');
+      expect(el.querySelector('[role=option]')).not.toBeNull();
+
+      const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+      box.dispatchEvent(escape);
+      fixture.detectChanges();
+
+      expect(el.querySelector('[role=option]')).toBeNull();
+      // The dialog or popover the picker sits in never sees the key, so it stays open.
+      expect(escape.defaultPrevented).toBe(true);
+      expect(byId(el, 'pin-picker-menu')).not.toBeNull();
+    });
   });
 });
