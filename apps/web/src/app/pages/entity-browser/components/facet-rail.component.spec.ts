@@ -499,12 +499,12 @@ describe('FacetRail — a value the text owns (#425)', () => {
     // Same state, two sources — and the rail says which is which.
     expect(typed?.hasAttribute('data-query-owned')).toBe(true);
     expect(clicked?.hasAttribute('data-query-owned')).toBe(false);
-    // Visibly, not only to a test hook: the typed row is outlined, and carries the dollar it was named
-    // with. The row's own styling survives the outline, so nothing shifts as the text takes a value over.
-    expect(typed?.className).toContain('border-dashed');
+    // Visibly, not only to a test hook: the outline hangs off that same attribute as a variant utility
+    // (ADR-0021), so the two cannot drift apart, and the row's own styling survives it — nothing shifts
+    // as the text takes a value over. The typed row also carries the dollar it was named with.
+    expect(typed?.className).toContain('data-query-owned:border-dashed');
     expect(typed?.className).toContain('rounded-sm');
     expect(typed?.textContent).toContain('$');
-    expect(clicked?.className).not.toContain('border-dashed');
     expect(clicked?.textContent).not.toContain('$');
   });
 
@@ -573,5 +573,120 @@ describe('FacetRail — a value the text owns (#425)', () => {
     const fixture = render(TAGS, { tag: ['draft'] }, {});
 
     expect(btn(fixture, 'facet-tag-draft')?.hasAttribute('data-query-owned')).toBe(false);
+  });
+});
+
+/**
+ * A range **bound** the text owns (ADR-0082, #430). The row used to render the typed bound as an
+ * ordinary editable input and then refuse the edit, so the box and the input disagreed with nothing on
+ * screen saying why. It now reads as query-owned like any other, and is reversed by deleting its token.
+ * Ownership is per bound: a Field whose minimum the text names and whose maximum the rail sets is a
+ * legitimate state, and both halves have to render legibly.
+ */
+describe('FacetRail — a range bound the text owns (#430)', () => {
+  const CR = {
+    fields: [
+      {
+        key: 'cr',
+        label: 'CR',
+        dataType: { kind: 'number' as const },
+        values: [
+          { value: '1', count: 1 },
+          { value: '9', count: 1 },
+        ],
+      },
+    ],
+  };
+
+  function render(active: Partial<ActiveFacets>, queryOwned: QueryOwnedFacets): ComponentFixture<FacetRailComponent> {
+    TestBed.configureTestingModule({
+      imports: [FacetRailComponent, provideTranslocoTesting()],
+      providers: [{ provide: ClientConfigStore, useValue: mockClientConfigStore({ collaboration: signal(true) }) }],
+    });
+    const fixture = TestBed.createComponent(FacetRailComponent);
+    fixture.componentRef.setInput('facetCounts', {
+      type: [],
+      tag: [],
+      visibility: [],
+      ...CR,
+    } satisfies EntityFacets);
+    fixture.componentRef.setInput('active', {
+      type: [],
+      tag: [],
+      visibility: [],
+      fields: {},
+      container: [],
+      ...active,
+    } satisfies ActiveFacets);
+    fixture.componentRef.setInput('queryOwned', queryOwned);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  const el = <T extends HTMLElement>(fixture: ComponentFixture<FacetRailComponent>, tid: string) =>
+    (fixture.nativeElement as HTMLElement).querySelector(`[data-testid="${tid}"]`) as T | null;
+
+  const input = (fixture: ComponentFixture<FacetRailComponent>, tid: string) => el<HTMLInputElement>(fixture, tid);
+
+  it('renders a text-named bound query-owned — outlined, dollared, and readonly', () => {
+    const fixture = render({ fields: { cr: { gte: '5' } } }, { bounds: { cr: ['gte'] } });
+
+    const min = input(fixture, 'facet-field-cr-gte');
+    expect(min?.value).toBe('5');
+    expect(min?.hasAttribute('data-query-owned')).toBe(true);
+    expect(min?.className).toContain('data-query-owned:border-dashed');
+    // Not merely inert: the input says it refuses edits, and says so to a screen reader too.
+    expect(min?.readOnly).toBe(true);
+    expect(min?.getAttribute('aria-readonly')).toBe('true');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('$');
+  });
+
+  it('leaves the same Field’s other bound the rail’s to edit', () => {
+    const fixture = render({ fields: { cr: { gte: '5', lte: '9' } } }, { bounds: { cr: ['gte'] } });
+
+    const max = input(fixture, 'facet-field-cr-lte');
+    expect(max?.value).toBe('9');
+    expect(max?.hasAttribute('data-query-owned')).toBe(false);
+    expect(max?.readOnly).toBe(false);
+    expect(max?.getAttribute('aria-readonly')).toBeNull();
+    // Nothing to delete: the rail owns it, so it is cleared by emptying it.
+    expect(el(fixture, 'facet-field-cr-lte-remove')).toBeNull();
+  });
+
+  it('offers a delete control on the owned bound alone, naming the token it takes out', () => {
+    const fixture = render({ fields: { cr: { gte: '5', lte: '9' } } }, { bounds: { cr: ['gte'] } });
+
+    const remove = el<HTMLButtonElement>(fixture, 'facet-field-cr-gte-remove');
+    expect(remove?.getAttribute('aria-label')).toBe('Remove the CR minimum 5 from the search box');
+  });
+
+  it('names the delete control in the active Locale', () => {
+    const fixture = render({ fields: { cr: { lte: '9' } } }, { bounds: { cr: ['lte'] } });
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    expect(el(fixture, 'facet-field-cr-lte-remove')?.getAttribute('aria-label')).toBe(
+      'Retirer le maximum 9 de CR de la recherche',
+    );
+  });
+
+  it('clears the bound it names, which is how the page is told to delete the token', () => {
+    const fixture = render({ fields: { cr: { gte: '5' } } }, { bounds: { cr: ['gte'] } });
+    const changed = vi.fn();
+    fixture.componentInstance.fieldRangeChanged.subscribe(changed);
+
+    el<HTMLButtonElement>(fixture, 'facet-field-cr-gte-remove')?.click();
+
+    expect(changed).toHaveBeenLastCalledWith({ key: 'cr', bound: 'gte', value: '' });
+  });
+
+  it('leaves a rail-owned range wholly editable, with no delete control on either bound', () => {
+    const fixture = render({ fields: { cr: { gte: '5' } } }, {});
+
+    expect(input(fixture, 'facet-field-cr-gte')?.readOnly).toBe(false);
+    expect(input(fixture, 'facet-field-cr-lte')?.readOnly).toBe(false);
+    expect(el(fixture, 'facet-field-cr-gte-remove')).toBeNull();
+    expect(el(fixture, 'facet-field-cr-lte-remove')).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('$');
   });
 });

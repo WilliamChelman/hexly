@@ -112,7 +112,9 @@
       "rangeMax": "{{field}} maximum",
       "container": "Conteneur",
       "excludeValue": "Exclure {{value}}",
-      "removeTyped": "Retirer {{value}} de la recherche"
+      "removeTyped": "Retirer {{value}} de la recherche",
+      "removeTypedMin": "Retirer le minimum {{value}} de {{field}} de la recherche",
+      "removeTypedMax": "Retirer le maximum {{value}} de {{field}} de la recherche"
     }
   },
   "entityTags": {

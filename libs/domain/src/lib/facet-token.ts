@@ -11,7 +11,7 @@
  * rewrite results while they are being read.
  */
 
-import { FieldFilter } from './field';
+import { FieldFilter, FieldFilterOp } from './field';
 
 /** The Facet categories a reserved name addresses — the wire's words, not the typed ones. */
 export type FacetTokenCategory = 'type' | 'tag' | 'visibility' | 'container';
@@ -148,13 +148,17 @@ function report(misses: InapplicableFacetToken[], token: FacetToken, reason: Fac
 }
 
 /**
- * One value the rail displays, named the way a token names it: a reserved {@link FacetTokenCategory},
+ * One control the rail displays, named the way a token names it: a reserved {@link FacetTokenCategory},
  * or a Facet key. The value is matched **exactly, case included** — the rail's rows carry the stored
  * value, which is what a token has to spell to have applied it.
+ *
+ * A Facet key's `op` says *how* the token named it: absent (or `eq`) is the membership a row shows, and
+ * a comparison is the bound a range input shows — which is a control to reverse like any other, so it
+ * addresses the token that filled it (ADR-0082).
  */
 export type FacetTokenTarget =
   | { readonly category: FacetTokenCategory; readonly value: string }
-  | { readonly field: string; readonly value: string };
+  | { readonly field: string; readonly value: string; readonly op?: FieldFilterOp };
 
 /**
  * Take the token that named `target` out of the box (ADR-0082): the one rail→text write in the design,
@@ -189,13 +193,18 @@ function addresses(
 }
 
 /**
- * Whether one written value is the target's. A bound is never a value: `>=5` filters, it does not name.
- * An `=` writes the membership a bare value writes, so `$cr:=5` names `5` and a click still deletes it.
+ * Whether one written value is the target's, read exactly as {@link applyField} read it — a bound names
+ * only a bound target and a bare value only a membership one, so `>=5` and `5` are never each other. An
+ * `=` writes the membership a bare value writes, so `$cr:=5` names `5` and a click still deletes it.
  */
 function names(segment: ValueSegment, target: FacetTokenTarget): boolean {
-  if ('field' in target && !segment.quoted) {
-    const written = comparisonOf(segment.value);
-    if (written) return written.op === 'eq' && written.value === target.value;
+  if ('field' in target) {
+    // A quoted value is literal, as at parse: `">=5"` names a value, never a bound.
+    const written = segment.quoted ? undefined : comparisonOf(segment.value);
+    const op = target.op ?? 'eq';
+    return written
+      ? written.op === op && written.value === target.value
+      : op === 'eq' && segment.value === target.value;
   }
   return segment.value === target.value;
 }

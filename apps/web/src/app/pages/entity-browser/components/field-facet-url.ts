@@ -1,5 +1,5 @@
-import { FieldFilter, parseFieldFilters } from '@hexly/domain';
-import { FieldSelection, isFieldSelectionEmpty } from './facet-rail.component';
+import { FieldFilter, FieldFilterOp, parseFieldFilters } from '@hexly/domain';
+import { FieldRangeBound, FieldSelection, isFieldSelectionEmpty } from './facet-rail.component';
 
 /**
  * The **Field** Facet selections' round trip through the `field` query param, shared by every browse
@@ -39,12 +39,24 @@ export function foldFieldFilters(filters: readonly FieldFilter[]): Record<string
   const out: Record<string, { values: string[]; excluded: string[]; gte?: string; lte?: string }> = {};
   for (const f of filters) {
     const sel = (out[f.key] ??= { values: [], excluded: [] });
-    if (f.op === 'eq') sel.values.push(f.value);
+    const bound = boundOf(f.op);
+    if (bound) sel[bound] = f.value;
     else if (f.op === 'neq') sel.excluded.push(f.value);
-    else if (f.op === 'gte') sel.gte = f.value;
-    else sel.lte = f.value;
+    else sel.values.push(f.value);
   }
   return Object.fromEntries(Object.entries(out).map(([key, sel]) => [key, canonicalField(sel)]));
+}
+
+/**
+ * Which of a range row's two inputs an op fills, or `undefined` for a membership op, which fills
+ * neither. A strict bound (`$cr:>5`, ADR-0082) lands in its inclusive twin's input: the rail offers two
+ * bounds, not four. One mapping, read by the fold that renders a bound and by the ownership that makes
+ * it readonly — divergence there would mark one input and edit the other.
+ */
+export function boundOf(op: FieldFilterOp): FieldRangeBound | undefined {
+  if (op === 'gte' || op === 'gt') return 'gte';
+  if (op === 'lte' || op === 'lt') return 'lte';
+  return undefined;
 }
 
 /** Drop a Field key once its selection is empty, so `hasFilters`/the URL never carry a dead entry. */

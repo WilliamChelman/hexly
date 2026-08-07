@@ -1,6 +1,6 @@
 import { FacetTokenCategory, FacetTokenValues, FieldFilter, ParsedFacetQuery } from '@hexly/domain';
-import { ActiveFacets, FieldSelection, QueryOwnedFacets } from './facet-rail.component';
-import { foldFieldFilters, pruneField } from './field-facet-url';
+import { ActiveFacets, FieldRangeBound, FieldSelection, QueryOwnedFacets } from './facet-rail.component';
+import { boundOf, foldFieldFilters, pruneField } from './field-facet-url';
 
 /** The categories both stores speak, in the rail's own order. */
 const CATEGORIES = ['type', 'tag', 'visibility', 'container'] as const satisfies readonly FacetTokenCategory[];
@@ -36,17 +36,22 @@ export function unionFacets(parsed: ParsedFacetQuery, rail: ActiveFacets): Activ
 }
 
 /**
- * Which of the union's values came from the text (ADR-0082) — either polarity, a value having one
- * visual state whichever way the box named it.
+ * Which of the union's controls came from the text (ADR-0082) — either polarity, a value having one
+ * visual state whichever way the box named it, and a **bound** counted per input rather than per Field:
+ * `$cr:>=5` owns that Field's minimum and leaves its maximum the rail's to set.
  */
 export function queryOwnedFacets(parsed: ParsedFacetQuery): QueryOwnedFacets {
   const categories: Partial<Record<FacetTokenCategory, readonly string[]>> = {};
   for (const category of CATEGORIES) categories[category] = [...parsed.include[category], ...parsed.exclude[category]];
   const fields: Record<string, string[]> = {};
-  // A bound is left out: `$cr:>=5` lights no row, so there is no row to click off.
-  for (const filter of parsed.fields)
-    if (filter.op === 'eq' || filter.op === 'neq') (fields[filter.key] ??= []).push(filter.value);
-  return { categories, fields };
+  const bounds: Record<string, FieldRangeBound[]> = {};
+  for (const filter of parsed.fields) {
+    // The same op→input mapping {@link unionFields} renders through, so what is marked owned is what shows.
+    const bound = boundOf(filter.op);
+    if (!bound) (fields[filter.key] ??= []).push(filter.value);
+    else if (!(bounds[filter.key] ??= []).includes(bound)) bounds[filter.key].push(bound);
+  }
+  return { categories, fields, bounds };
 }
 
 /** The Field half of the union: the same rule, per Facet key — a value the text names drops from the

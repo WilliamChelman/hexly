@@ -64,19 +64,18 @@ export interface ActiveFacets {
 export type FacetCategory = 'type' | 'tag' | 'visibility' | 'container';
 
 /**
- * The displayed values the *text* owns, in either polarity — a value has one visual state whichever way
- * it was named (ADR-0082). Empty wherever no **Facet Token** parse stands behind the rail.
+ * The displayed controls the *text* owns, in either polarity — a value has one visual state whichever
+ * way it was named (ADR-0082). Empty wherever no **Facet Token** parse stands behind the rail.
  */
 export interface QueryOwnedFacets {
   readonly categories?: Partial<Record<FacetCategory, readonly string[]>>;
-  /** Per Facet key, the values a token named — never a bound, which is no row to click off. */
+  /** Per Facet key, the values a token named. */
   readonly fields?: Readonly<Record<string, readonly string[]>>;
-}
-
-/** The outline that tells a typed value from a clicked one; transparent otherwise, so a row neither
- * shifts nor resizes as the text takes it over. One rule, worn by both of a row's controls. */
-function queryOwnedOutline(queryOwned: boolean): string {
-  return queryOwned ? 'border border-dashed border-accent' : 'border border-transparent';
+  /**
+   * Per Facet key, the range bounds a token named. Per *bound*, not per Field: a Field whose `gte` the
+   * text names and whose `lte` the rail owns is a legitimate state, and each half reads for what it is.
+   */
+  readonly bounds?: Readonly<Record<string, readonly FieldRangeBound[]>>;
 }
 
 /** Which half of a value's polarity a click addressed (ADR-0081). */
@@ -95,10 +94,13 @@ export interface FieldValueToggle {
   readonly polarity: FacetPolarity;
 }
 
+/** Which of a range row's two inputs a change addressed. */
+export type FieldRangeBound = 'gte' | 'lte';
+
 /** A change to one bound of a number/date Field range; `value` empty clears that bound. */
 export interface FieldRangeChange {
   readonly key: string;
-  readonly bound: 'gte' | 'lte';
+  readonly bound: FieldRangeBound;
   readonly value: string;
 }
 
@@ -121,8 +123,7 @@ export interface FieldRangeChange {
         (queryOwned() ? 'entityBrowser.facets.removeTyped' : 'entityBrowser.facets.excludeValue')
           | transloco: { value: label() }
       "
-      class="shrink-0 w-6 flex items-center justify-center rounded-sm font-sans text-sm text-ink-faint hover:bg-surface-sunken aria-pressed:bg-danger-soft aria-pressed:text-danger"
-      [class]="outline(queryOwned())"
+      class="shrink-0 w-6 flex items-center justify-center rounded-sm font-sans text-sm text-ink-faint border border-transparent hover:bg-surface-sunken aria-pressed:bg-danger-soft aria-pressed:text-danger data-query-owned:border-dashed data-query-owned:border-accent"
       (click)="press.emit()"
     >
       <span aria-hidden="true">−</span>
@@ -137,8 +138,6 @@ export class FacetExcludeToggleComponent {
   /** The row's rendered label — the exclude control names itself with it, the include one carries it. */
   readonly label = input.required<string>();
   readonly press = output<void>();
-
-  protected readonly outline = queryOwnedOutline;
 }
 
 /**
@@ -188,8 +187,7 @@ export class FacetExcludeToggleComponent {
                   [attr.aria-label]="
                     row.queryOwned ? ('entityBrowser.facets.removeTyped' | transloco: { value: row.label }) : null
                   "
-                  class="flex-1 min-w-0 flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
-                  [class]="outline(row.queryOwned)"
+                  class="flex-1 min-w-0 flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong border border-transparent hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong data-query-owned:border-dashed data-query-owned:border-accent"
                   (click)="toggled.emit({ category: group.category, value: row.value, polarity: 'include' })"
                 >
                   <span class="min-w-0 flex items-baseline gap-1">
@@ -225,26 +223,66 @@ export class FacetExcludeToggleComponent {
             {{ field.label }}
           </h3>
           @if (field.kind === 'range') {
+            <!-- Ownership is per bound (ADR-0082): a bound the text named renders query-owned — outlined,
+                 readonly, and cleared by deleting its token — while the other stays the rail's to edit. -->
             <div class="flex items-center gap-2">
-              <input
-                [type]="field.inputType"
-                [attr.data-testid]="'facet-field-' + field.key + '-gte'"
-                [attr.aria-label]="field.minLabel"
-                [value]="field.gte"
-                [attr.placeholder]="field.min"
-                class="w-full min-w-0 rounded-md border border-line bg-surface px-2 py-1 font-sans text-sm"
-                (change)="emitRange(field.key, 'gte', $event)"
-              />
+              <span class="flex-1 min-w-0 flex items-center gap-1">
+                @if (field.gteOwned) {
+                  <span aria-hidden="true" class="shrink-0 font-mono text-accent-strong">$</span>
+                }
+                <input
+                  [type]="field.inputType"
+                  [attr.data-testid]="'facet-field-' + field.key + '-gte'"
+                  [attr.data-query-owned]="field.gteOwned ? '' : null"
+                  [attr.aria-label]="field.minLabel"
+                  [readonly]="field.gteOwned"
+                  [attr.aria-readonly]="field.gteOwned ? 'true' : null"
+                  [value]="field.gte"
+                  [attr.placeholder]="field.min"
+                  class="w-full min-w-0 rounded-md border border-line bg-surface px-2 py-1 font-sans text-sm data-query-owned:border-dashed data-query-owned:border-accent"
+                  (change)="emitRange(field.key, 'gte', $event)"
+                />
+                @if (field.gteOwned) {
+                  <button
+                    type="button"
+                    [attr.data-testid]="'facet-field-' + field.key + '-gte-remove'"
+                    [attr.aria-label]="field.removeMinLabel"
+                    class="shrink-0 w-6 flex items-center justify-center rounded-sm font-sans text-sm text-ink-faint hover:bg-surface-sunken"
+                    (click)="clearRange(field.key, 'gte')"
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
+                }
+              </span>
               <span class="text-ink-faint" aria-hidden="true">–</span>
-              <input
-                [type]="field.inputType"
-                [attr.data-testid]="'facet-field-' + field.key + '-lte'"
-                [attr.aria-label]="field.maxLabel"
-                [value]="field.lte"
-                [attr.placeholder]="field.max"
-                class="w-full min-w-0 rounded-md border border-line bg-surface px-2 py-1 font-sans text-sm"
-                (change)="emitRange(field.key, 'lte', $event)"
-              />
+              <span class="flex-1 min-w-0 flex items-center gap-1">
+                @if (field.lteOwned) {
+                  <span aria-hidden="true" class="shrink-0 font-mono text-accent-strong">$</span>
+                }
+                <input
+                  [type]="field.inputType"
+                  [attr.data-testid]="'facet-field-' + field.key + '-lte'"
+                  [attr.data-query-owned]="field.lteOwned ? '' : null"
+                  [attr.aria-label]="field.maxLabel"
+                  [readonly]="field.lteOwned"
+                  [attr.aria-readonly]="field.lteOwned ? 'true' : null"
+                  [value]="field.lte"
+                  [attr.placeholder]="field.max"
+                  class="w-full min-w-0 rounded-md border border-line bg-surface px-2 py-1 font-sans text-sm data-query-owned:border-dashed data-query-owned:border-accent"
+                  (change)="emitRange(field.key, 'lte', $event)"
+                />
+                @if (field.lteOwned) {
+                  <button
+                    type="button"
+                    [attr.data-testid]="'facet-field-' + field.key + '-lte-remove'"
+                    [attr.aria-label]="field.removeMaxLabel"
+                    class="shrink-0 w-6 flex items-center justify-center rounded-sm font-sans text-sm text-ink-faint hover:bg-surface-sunken"
+                    (click)="clearRange(field.key, 'lte')"
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
+                }
+              </span>
             </div>
           } @else {
             <ul class="flex flex-col gap-1 m-0 p-0 list-none">
@@ -258,8 +296,7 @@ export class FacetExcludeToggleComponent {
                     [attr.aria-label]="
                       row.queryOwned ? ('entityBrowser.facets.removeTyped' | transloco: { value: row.label }) : null
                     "
-                    class="flex-1 min-w-0 flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong"
-                    [class]="outline(row.queryOwned)"
+                    class="flex-1 min-w-0 flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong border border-transparent hover:bg-surface-sunken aria-pressed:bg-accent/15 aria-pressed:text-accent-strong data-query-owned:border-dashed data-query-owned:border-accent"
                     (click)="
                       fieldValueToggled.emit({
                         key: field.key,
@@ -319,8 +356,9 @@ export class FacetRailComponent {
     container: [],
   });
   /**
-   * The displayed values a **Facet Token** put in force (ADR-0082). Rendering only: the rail emits the
-   * same toggle either way, and the page decides that a click on one of these deletes the token.
+   * The displayed controls a **Facet Token** put in force (ADR-0082). Rendering only: the rail emits the
+   * same toggle — or the same bound-cleared — either way, and the page decides that on one of these it
+   * deletes the token.
    */
   readonly queryOwned = input<QueryOwnedFacets>({});
   readonly canClear = input(false);
@@ -334,14 +372,18 @@ export class FacetRailComponent {
   readonly fieldRangeChanged = output<FieldRangeChange>();
   readonly clearAll = output<void>();
 
-  protected readonly outline = queryOwnedOutline;
-
-  protected emitRange(key: string, bound: 'gte' | 'lte', event: Event): void {
+  protected emitRange(key: string, bound: FieldRangeBound, event: Event): void {
     this.fieldRangeChanged.emit({
       key,
       bound,
       value: (event.target as HTMLInputElement).value,
     });
+  }
+
+  /** Release one bound — the rail's own, or, on a bound the text owns, the token that filled it, which
+   * the page reads from the same empty change (ADR-0082). */
+  protected clearRange(key: string, bound: FieldRangeBound): void {
+    this.fieldRangeChanged.emit({ key, bound, value: '' });
   }
 
   /**
@@ -424,6 +466,7 @@ export class FacetRailComponent {
     this.transloco.activeLang(); // reactive dependency: re-translate labels/aria-labels on switch
     const activeFields = this.active().fields;
     const ownedFields = this.queryOwned().fields ?? {};
+    const ownedBounds = this.queryOwned().bounds ?? {};
     return this.facetCounts()
       .fields.map((field) => {
         const selection = activeFields[field.key] ?? {};
@@ -441,6 +484,9 @@ export class FacetRailComponent {
           excluded: vetoed.includes(v.value),
           queryOwned: (ownedFields[field.key] ?? []).includes(v.value),
         }));
+        const bounds = ownedBounds[field.key] ?? [];
+        const gte = selection.gte ?? '';
+        const lte = selection.lte ?? '';
         return {
           key: field.key,
           label,
@@ -453,8 +499,19 @@ export class FacetRailComponent {
           maxLabel: this.transloco.translate('entityBrowser.facets.rangeMax', {
             field: label,
           }),
-          gte: selection.gte ?? '',
-          lte: selection.lte ?? '',
+          // Each delete control names the token it takes out — which bound of which Field, and its value.
+          removeMinLabel: this.transloco.translate('entityBrowser.facets.removeTypedMin', {
+            field: label,
+            value: gte,
+          }),
+          removeMaxLabel: this.transloco.translate('entityBrowser.facets.removeTypedMax', {
+            field: label,
+            value: lte,
+          }),
+          gte,
+          lte,
+          gteOwned: bounds.includes('gte'),
+          lteOwned: bounds.includes('lte'),
           // Placeholder bounds hint the available span. A number range compares numerically, so its
           // min/max are the numeric extremes — not the lexical first/last of the sorted values.
           ...rangeBounds(

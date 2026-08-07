@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, ParamMap, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
+import { TypeRegistry } from '../../../entity-types/type-registry';
 import { FACET_CATEGORIES, FacetTokenStore } from './facet-token-store';
 
 /** The Entity Browser's shape: the universal trio, no Container. */
@@ -44,6 +45,9 @@ describe('FacetTokenStore', () => {
       providers: [
         provideRouter([]),
         { provide: ActivatedRoute, useValue: { queryParamMap: queryParams$.asObservable() } },
+        // The client registry the box's Facet keys come from, synchronously (ADR-0082) — `cr` is this
+        // build's one Facet key, so `$cr:` resolves and anything else is a stated miss.
+        { provide: TypeRegistry, useValue: { facetKeys: () => ['cr'] } },
       ],
     }).compileComponents();
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
@@ -165,6 +169,65 @@ describe('FacetTokenStore', () => {
         },
       }),
     );
+  });
+
+  /**
+   * A range **bound** the text names (ADR-0082, #430). It used to be refused — the rail rendered the
+   * typed bound as an editable input, the handler returned, and the input then showed a number the wire
+   * never carried. The bound is now query-owned per bound, and reversed by deleting its own token.
+   */
+  describe('a bound the text names', () => {
+    it('marks the named bound query-owned, and only that one', () => {
+      const store = trio();
+
+      type(store, '$cr:>=5');
+
+      expect(store.queryOwned().bounds).toEqual({ cr: ['gte'] });
+      expect(store.activeFacets().fields).toEqual({ cr: { values: [], gte: '5' } });
+    });
+
+    it('deletes exactly that token when its bound is cleared, leaving the rest of the box', () => {
+      const store = trio();
+      type(store, 'orc $cr:>=5 $tag:draft');
+
+      store.changeFieldRange({ key: 'cr', bound: 'gte', value: '' });
+
+      expect(store.rawQuery()).toBe('orc $tag:draft');
+      expect(store.queryOwned().bounds).toEqual({});
+      expect(store.filterParams()).toEqual({ q: 'orc', tag: ['draft'] });
+    });
+
+    it('takes a strictly-written bound out by what was typed, not by the input it stands in', () => {
+      const store = trio();
+      type(store, '$cr:>5');
+
+      expect(store.queryOwned().bounds).toEqual({ cr: ['gte'] });
+      store.changeFieldRange({ key: 'cr', bound: 'gte', value: '' });
+
+      expect(store.rawQuery()).toBe('');
+    });
+
+    it('leaves the same Field’s other bound the rail’s to set, and the box untouched', () => {
+      const store = trio();
+      type(store, '$cr:>=5');
+
+      store.changeFieldRange({ key: 'cr', bound: 'lte', value: '9' });
+
+      // One Field, two owners: the text's minimum and the rail's maximum, both in force.
+      expect(store.rawQuery()).toBe('$cr:>=5');
+      expect(store.queryOwned().bounds).toEqual({ cr: ['gte'] });
+      expect(store.activeFacets().fields).toEqual({ cr: { values: [], gte: '5', lte: '9' } });
+      expect(store.filterParams()).toEqual({ field: ['cr:gte:5', 'cr:lte:9'] });
+    });
+
+    it('leaves a Field value the text names deletable as before, bounds or no bounds', () => {
+      const store = trio();
+      type(store, '$cr:>=5 $cr:7');
+
+      store.toggleFieldValue({ key: 'cr', value: '7', polarity: 'include' });
+
+      expect(store.rawQuery()).toBe('$cr:>=5');
+    });
   });
 
   /** Or every toggle costs a second fetch when its own navigate round-trips back through the URL. */

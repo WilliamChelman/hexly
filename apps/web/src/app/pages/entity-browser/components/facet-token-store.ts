@@ -8,12 +8,13 @@ import {
   ActiveFacets,
   FacetCategory,
   FacetToggle,
+  FieldRangeBound,
   FieldRangeChange,
   FieldSelection,
   FieldValueToggle,
   togglePolarity,
 } from './facet-rail.component';
-import { fieldTokens, fieldsFromTokens, pruneField } from './field-facet-url';
+import { boundOf, fieldTokens, fieldsFromTokens, pruneField } from './field-facet-url';
 import { queryOwnedFacets, unionFacets } from './facet-token-union';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
@@ -202,10 +203,12 @@ export class FacetTokenStore {
     this.setFieldSelection(current, key, { ...sel, values: next.included, excluded: next.excluded });
   }
 
-  /** Set (or clear) one bound of a number/date Field range. A bound the text names is refused rather
-   * than deleted: a range renders no row, so there is nothing yet that reads as query-owned. */
+  /** Set (or clear) one bound of a number/date Field range. A bound the text named is reversed where it
+   * was named (ADR-0082): its input renders query-owned and readonly, so the change that reaches here is
+   * its delete control, and it takes that token out of the box rather than refusing an edit in silence. */
   changeFieldRange({ key, bound, value }: FieldRangeChange): void {
-    if (this.fieldNamedInText(key, (f) => f.op === bound)) return;
+    const named = this.boundNamedInText(key, bound);
+    if (named) return this.dropToken({ field: key, op: named.op, value: named.value });
     const current = this.railFacets();
     const sel = current.fields[key] ?? {};
     this.setFieldSelection(current, key, { ...sel, [bound]: value || undefined });
@@ -257,9 +260,18 @@ export class FacetTokenStore {
     return parsed.include[category].includes(value) || parsed.exclude[category].includes(value);
   }
 
-  /** The same rule for a Facet key's rail controls — a typed value, or a typed bound. */
+  /** The same rule for a Facet key's value rows. */
   private fieldNamedInText(key: string, matches: (filter: FieldFilter) => boolean): boolean {
     return this.parsedQuery().fields.some((f) => f.key === key && matches(f));
+  }
+
+  /** The token filter standing in one of a range row's two inputs, if the text named it — the last of
+   * them, since the fold that renders the input lets the last win too. */
+  private boundNamedInText(key: string, bound: FieldRangeBound): FieldFilter | undefined {
+    let named: FieldFilter | undefined;
+    for (const filter of this.parsedQuery().fields)
+      if (filter.key === key && boundOf(filter.op) === bound) named = filter;
+    return named;
   }
 
   /** Fold a Field selection back into the rail store, pruning it away once empty. */

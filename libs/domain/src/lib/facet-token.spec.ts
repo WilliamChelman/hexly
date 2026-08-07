@@ -338,6 +338,30 @@ describe('removeFacetToken (ADR-0082)', () => {
     );
   });
 
+  it('takes out the bound an `op` names, leaving the membership token beside it', () => {
+    expect(
+      removeFacetToken('$challenge_rating:>=5 $challenge_rating:5', keys, {
+        field: 'challenge_rating',
+        op: 'gte',
+        value: '5',
+      }),
+    ).toBe('$challenge_rating:5');
+  });
+
+  it('takes out a bound by the comparison it was written with, never its twin', () => {
+    const target = { field: 'challenge_rating', op: 'gt' as const, value: '5' };
+    expect(removeFacetToken('orc $challenge_rating:>5', keys, target)).toBe('orc');
+    // `>=5` is a different bound: it applies a different filter, so it is not the token asked for.
+    expect(removeFacetToken('$challenge_rating:>=5', keys, target)).toBe('$challenge_rating:>=5');
+  });
+
+  it('never takes a quoted value for a bound — it was read as a value, and is removed as one', () => {
+    expect(
+      removeFacetToken('$challenge_rating:">=5"', keys, { field: 'challenge_rating', op: 'gte', value: '5' }),
+    ).toBe('$challenge_rating:">=5"');
+    expect(removeFacetToken('$challenge_rating:">=5"', keys, { field: 'challenge_rating', value: '>=5' })).toBe('');
+  });
+
   it('takes out a value written with its = , which is how it was applied', () => {
     expect(removeFacetToken('orc $challenge_rating:=5', keys, { field: 'challenge_rating', value: '5' })).toBe('orc');
   });
