@@ -6,6 +6,7 @@ import { Editor } from '@tiptap/core';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { CONTENT_EXTENSIONS } from '../extensions/content-extensions';
 import { EntityNameResolver, EntityResolution } from '../services/entity-name-resolver';
@@ -69,6 +70,8 @@ describe('EntityLinkView', () => {
       providers: [
         { provide: EntityNameResolver, useValue: new StubResolver(resolution) },
         { provide: EntitiesClient, useValue: entities },
+        // The relink popover's box reads its Facet vocabulary off the registry (ADR-0082).
+        provideEntityTypesTesting([]),
         provideRouter([]),
       ],
     });

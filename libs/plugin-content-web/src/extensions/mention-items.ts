@@ -1,4 +1,4 @@
-import { EntitySummary } from '@hexly/domain';
+import { EntitySummary, FacetKeySet, ParsedFacetQuery, parseFacetQuery } from '@hexly/domain';
 
 /**
  * The Create row's sentinel id — `\0`-prefixed so it can never collide with an Entity id,
@@ -41,23 +41,36 @@ export interface MentionCreateDetails {
 /** One row of the `@` picker's listbox. */
 export type MentionItem = MentionMatch | MentionCreate | MentionCreateDetails;
 
-/** A typed `@` query split into the name to match or mint and the Link Descriptor riding with it. */
+/** A typed `@` query split into the name to match or mint, its Facet Tokens, and the Descriptor. */
 export interface MentionQuery {
+  /** The free text left after the tokens are lifted out — what matches, and what a Create row mints. */
   readonly name: string;
   readonly descriptor: string | null;
+  /** The name half exactly as typed, tokens included: what one search is memoised on. */
+  readonly raw: string;
+  /** The **Facet Tokens** typed into the mention (ADR-0082) — `@$type:npc gorb` filters as it matches. */
+  readonly facets: ParsedFacetQuery;
 }
 
 /**
- * Split `Zorblax::rival` into the name and the Link Descriptor typed alongside it (ADR-0073).
- * The `::` picker only arms *after* an `entityLink` exists (ADR-0023), so a descriptor typed in
- * the same breath as the mention reaches nothing else — this is where it is read.
+ * Split `Zorblax::rival` into the name and the Link Descriptor typed alongside it (ADR-0073), then read
+ * the name half for **Facet Tokens** (ADR-0082) — `@$type:npc gorb` narrows the picker to NPCs, and the
+ * Create rows mint `gorb`, never the token that filtered. The `::` picker only arms *after* an
+ * `entityLink` exists (ADR-0023), so a descriptor typed in the same breath as the mention reaches
+ * nothing else — this is where it is read.
+ *
+ * `keys` is the vocabulary this surface can apply, read synchronously off the client registry: a `$`
+ * name it does not answer to filters nothing, exactly as anywhere else.
  */
-export function parseMentionQuery(query: string): MentionQuery {
+export function parseMentionQuery(query: string, keys: FacetKeySet): MentionQuery {
   const separator = query.indexOf('::');
-  if (separator < 0) return { name: query.trim(), descriptor: null };
+  const raw = separator < 0 ? query : query.slice(0, separator);
+  const facets = parseFacetQuery(raw, keys);
   return {
-    name: query.slice(0, separator).trim(),
-    descriptor: query.slice(separator + 2).trim() || null,
+    name: facets.text,
+    descriptor: separator < 0 ? null : query.slice(separator + 2).trim() || null,
+    raw: raw.trim(),
+    facets,
   };
 }
 
@@ -68,7 +81,7 @@ export function parseMentionQuery(query: string): MentionQuery {
  * absent rather than present-and-failing (ADR-0073).
  */
 export function mentionItems(
-  query: MentionQuery,
+  query: Pick<MentionQuery, 'name' | 'descriptor'>,
   matches: readonly EntitySummary[],
   canCreate: boolean,
 ): MentionItem[] {

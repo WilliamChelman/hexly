@@ -11,6 +11,7 @@ import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { ContentEditorComponent } from '@hexly/plugin-content/editor';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '@hexly/plugin-content/testing';
 import { ASSET_FIELD_ID, AssetValue } from '@hexly/plugin-asset';
+import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { ASSET_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { AssetViewComponent } from './asset-view.component';
 
@@ -55,6 +56,8 @@ describe('AssetViewComponent', () => {
         // The reused RichContent editor's ambient dependencies (mirrors the ContentEditor spec harness):
         // EntityNameResolver over the real root EntitiesClient, backed by the testing HTTP backend.
         EntityNameResolver,
+        // The `@` mention inside that editor reads its Facet vocabulary off the registry (ADR-0082).
+        provideEntityTypesTesting([]),
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),

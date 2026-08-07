@@ -1,10 +1,13 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
-import { ButtonComponent, InputComponent } from '@hexly/web-ui';
+import { ButtonComponent } from '@hexly/web-ui';
 import { ContainerChipsComponent } from './container-chips.component';
-import { containerFacet, linkTargetRead } from './link-target-read';
+import { FacetSearchInputComponent } from './facet-search-input.component';
+import { PICKER_BOX_CLASS } from './picker-box-class';
+import { pickerFacetTokens } from './picker-facet-tokens';
+import { linkTargetFacets, linkTargetRead } from './link-target-read';
 
 /**
  * The shared server-side Entity picker (ADR-0025): a search box over the `list({ q })` read,
@@ -20,22 +23,40 @@ import { containerFacet, linkTargetRead } from './link-target-read';
  * it **Mounts**, the World's own ranked first (ADR-0080) — for the surfaces that ADR names, which is
  * what {@link includeMounts} lets a consumer outside them say.
  *
+ * The box is the shared {@link FacetSearchInputComponent} (ADR-0082), so the filters that were only ever
+ * on the wire here are typeable: `$type:npc` narrows, key typeahead comes off the registry and value
+ * typeahead off the Facet read the Container chips already issue. No rail on a picker, so the text is
+ * the only store and backspacing a token reverses it.
+ *
  * ponytail: no debounce — small owner lists, fine until list sizes force it.
  */
 @Component({
   selector: 'app-entity-search-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, ContainerChipsComponent, InputComponent, TranslocoPipe],
+  imports: [ButtonComponent, ContainerChipsComponent, FacetSearchInputComponent, TranslocoPipe],
   template: `
     <div class="rounded-md border border-line bg-surface p-1 shadow-2" [attr.data-testid]="testid() + '-menu'">
-      <input
-        appInput
+      <!-- The shared box (ADR-0082): a Facet Token filters from here, the whole vocabulary is offered on
+           the dollar, and — no rail on a picker — a filter is reversed by backspacing its token. -->
+      <app-facet-search-input
         class="mb-1"
-        [attr.data-testid]="testid() + '-search'"
-        [attr.placeholder]="placeholderKey() | transloco"
+        [testid]="testid() + '-search'"
+        [inputClass]="boxClass"
         [value]="query()"
-        (input)="queryChange.emit($any($event.target).value)"
+        [keys]="tokens.keys()"
+        [facets]="facets()"
+        [placeholder]="placeholderKey() | transloco"
+        [listLabel]="'collab.entitySearchPicker.suggestionsLabel' | transloco"
+        (queryChange)="queryChange.emit($event)"
       />
+      <!-- A dollar-name nothing here answers to is *said*, never quietly searched for (ADR-0082). -->
+      @if (tokens.parsed().unresolvedKeys.length > 0) {
+        <p class="mb-1 px-1 text-xs text-ink-faint" role="status" [attr.data-testid]="testid() + '-unknown-facet'">
+          {{
+            'collab.entitySearchPicker.unknownFacet' | transloco: { keys: tokens.parsed().unresolvedKeys.join(', ') }
+          }}
+        </p>
+      }
       <!-- The **Container** facet (ADR-0080), shared with the asset pickers: present only where this
            World Mounts something the read reached, so a picker that offers one Container's Entities shows
            no chip to narrow by. Counts come off the same read the options do, so a chip can never
@@ -105,21 +126,37 @@ export class EntitySearchPickerComponent {
 
   protected readonly options = signal<EntitySummary[]>([]);
 
+  /** `appInput`'s well, as classes: the shared box owns its `<input>` and takes its chrome that way. */
+  protected readonly boxClass = PICKER_BOX_CLASS;
+
+  /**
+   * What the box means (ADR-0082) — the filters its **Facet Tokens** name and the free text left over.
+   * `$type` drops out of the vocabulary wherever {@link types} already pins it: the wire's `type` ORs,
+   * so a token could only widen past the pin, and a stated miss beats a filter that quietly loosens one.
+   */
+  protected readonly tokens = pickerFacetTokens(
+    () => this.query(),
+    () => !this.types()?.length,
+  );
+
   protected readonly targets = linkTargetRead(
     () => this.worldId(),
     () => {
       const types = this.types();
       return {
-        q: this.query().trim(),
-        type: types?.length ? [...types] : undefined,
+        // The residual text, not the raw box: the tokens have become params by here (ADR-0082).
+        ...this.tokens.narrowing(),
+        ...(types?.length ? { type: [...types] } : {}),
         // A picker is no browse: an Embed of an Asset and a pinned Asset stay pickable by name (ADR-0065).
         includeHidden: true,
       };
     },
     () => this.includeMounts(),
   );
+  /** The one Facet read behind both the chips and the box's value typeahead — no request per keystroke. */
+  protected readonly facets = linkTargetFacets(this.targets.params, () => this.includeMounts());
   /** The **Container** facet's live values — this World and the ones it Mounts that still hold a match. */
-  protected readonly containers = containerFacet(this.targets.params, () => this.includeMounts());
+  protected readonly containers = computed(() => this.facets()?.container ?? []);
 
   constructor() {
     // Search server-side as the query changes (ADR-0025). onCleanup cancels a superseded

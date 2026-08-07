@@ -12,6 +12,7 @@ import { FakeEntitySession, provideFakeEntitySession } from '@hexly/web-entity/t
 import { VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { EntityNameResolver } from '../services/entity-name-resolver';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { ContentEditorComponent } from './content-editor.component';
 
@@ -88,6 +89,8 @@ describe('ContentEditor', () => {
       imports: [ContentEditorComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
       providers: [
         provideFakeEntitySession(),
+        // The `@` mention reads its Facet vocabulary off the registry, synchronously (ADR-0082).
+        provideEntityTypesTesting([]),
         { provide: VIEW_FIELD_KEY, useFactory: () => viewFieldKey },
         EntityNameResolver,
         provideHttpClient(),
@@ -327,8 +330,8 @@ describe('ContentEditor', () => {
     }
 
     /** Open the `@` picker on a name and let its rows settle. */
-    async function openPicker(fixture: ReturnType<typeof create>) {
-      editorOf(fixture).commands.insertContent('@Zorblax');
+    async function openPicker(fixture: ReturnType<typeof create>, typed = '@Zorblax') {
+      editorOf(fixture).commands.insertContent(typed);
       // @tiptap/suggestion resolves items() async, then fires onStart.
       await new Promise((resolve) => setTimeout(resolve));
       fixture.detectChanges();
@@ -398,7 +401,28 @@ describe('ContentEditor', () => {
 
       await openPicker(create());
 
-      expect(search).toHaveBeenCalledWith('Zorblax', 'w1');
+      // The raw name half, the host World, and what its Facet Tokens mean — none typed here (ADR-0082).
+      expect(search).toHaveBeenCalledWith('Zorblax', 'w1', { q: 'Zorblax' });
+    });
+
+    /**
+     * The token language reaches the `@` picker too (ADR-0082): the Facet filters that were only ever on
+     * the wire here are typeable, the residual text is what matches, and it is what a Create row mints —
+     * never the token that filtered.
+     */
+    it('narrows the mention by a typed Facet Token, and mints only the residual name', async () => {
+      const search = vi.fn(async () => []);
+      TestBed.overrideProvider(EntityNameResolver, { useValue: { ...stubResolver, search } });
+      pinWorld({ id: 'w1', rights: ['read', 'create-entity'] });
+      TestBed.inject(FakeEntitySession).loadDetail(note('Lady Mara'));
+
+      const picker = await openPicker(create(), '@$type:core.type.npc gorb');
+
+      expect(search).toHaveBeenCalledWith('$type:core.type.npc gorb', 'w1', {
+        q: 'gorb',
+        type: ['core.type.npc'],
+      });
+      expect(picker.querySelector('[data-testid=entity-picker-create]')?.textContent).toContain('gorb');
     });
 
     it('withholds Create while no World is loaded at all', async () => {

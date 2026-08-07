@@ -62,7 +62,9 @@
     "loading": "Chargement des images…",
     "empty": "Aucune image téléversée pour l’instant.",
     "noMatches": "Aucune image ne correspond à votre recherche.",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "suggestionsLabel": "Suggestions de filtres",
+    "unknownFacet": "Aucune facette « {{keys}} » ici."
   },
   "embedPicker": {
     "title": "Intégrer une entité",
