@@ -26,6 +26,7 @@ import { WEB_ENTITY_TRANSLATIONS, COLLAB_TRANSLATIONS } from '@hexly/web-entity/
 import { ADMIN_TRANSLATIONS } from '@hexly/admin-web/i18n';
 import { COMMAND_PALETTE_TRANSLATIONS } from '@hexly/command-palette-web/i18n';
 import { DICE_TRANSLATIONS } from '@hexly/dice-web/i18n';
+import { UI_TRANSLATIONS } from '@hexly/web-ui/i18n';
 import { ENTITY_TYPES, ENTITY_VIEW_OUTLET } from '@hexly/web-entity';
 import { EntityEmbedHostComponent } from './pages/entity/components/entity-embed-host.component';
 import { provideEntityViewChoices } from './entity-types/entity-view-choices.provider';
@@ -73,6 +74,9 @@ export const appConfig: ApplicationConfig = {
       COMMAND_PALETTE_TRANSLATIONS,
       // The dice Provider reads its section/roll/hint copy imperatively too (ADR-0049).
       DICE_TRANSLATIONS,
+      // The shared Facet box and its miss row render inside libs that provide no scope of their own —
+      // a plugin's picker, the Palette — so no pipe of web-ui's is guaranteed to trigger the load.
+      UI_TRANSLATIONS,
     ),
     // ICU MessageFormat transpiler: count-aware plural keys (e.g. the hex count)
     // resolve per the active locale's plural rules. It delegates {{…}} to the

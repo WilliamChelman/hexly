@@ -31,7 +31,6 @@ import { FacetSearchInputComponent, IconComponent } from '@hexly/web-ui';
       [facets]="facets()"
       [ariaLabel]="'entityBrowser.searchLabel' | transloco"
       [placeholder]="'entityBrowser.searchPlaceholder' | transloco"
-      [listLabel]="'entityBrowser.suggestionsLabel' | transloco"
       (queryChange)="queryChange.emit($event)"
     />
   `,

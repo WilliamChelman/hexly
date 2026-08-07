@@ -1484,6 +1484,35 @@ describe('EntityBrowser', () => {
         });
       });
 
+      /**
+       * A token whose key resolves but that applies nothing vanishes from the text like any other, so
+       * an unreported one would browse everything as if the box were empty (ADR-0082).
+       */
+      it('says why a resolvable token still filtered nothing, one message per reason', () => {
+        withWorldField();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:');
+        expect(el.querySelector('[data-testid=unknown-facet-empty-value]')?.textContent).toContain('names no value');
+
+        search(fixture, '$tag:"sea of ');
+        expect(el.querySelector('[data-testid=unknown-facet-unterminated-quote]')?.textContent).toContain(
+          'quote still open',
+        );
+
+        // No negated bound on the wire (ADR-0081), and "not >= 5" is not "<= 5".
+        search(fixture, '-$test.field.cr:>=5');
+        expect(el.querySelector('[data-testid=unknown-facet-negated-bound]')?.textContent).toContain('range bound can');
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+        });
+      });
+
       it('shows a typed value in the rail, lit, beside a clicked one', () => {
         withCounts();
         const fixture = renderWith([summary({ id: 'm1' })]);

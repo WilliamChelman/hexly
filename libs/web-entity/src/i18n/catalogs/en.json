@@ -51,9 +51,7 @@
     "uploading": "Uploading…",
     "uploadError": "Upload failed. Please try again.",
     "search": "Search images…",
-    "empty": "No images",
-    "suggestionsLabel": "Filter suggestions",
-    "unknownFacet": "No Facet “{{keys}}” here."
+    "empty": "No images"
   },
   "generic": {
     "name": "Entity",

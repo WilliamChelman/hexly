@@ -1,5 +1,6 @@
 import { ShortcutService } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { UI_TEST_CATALOGS } from '@hexly/web-ui/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
@@ -60,7 +61,7 @@ function dialogEl(fixture: ReturnType<typeof render>): HTMLDialogElement {
 describe('CommandPalette', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [CommandPaletteComponent, provideTranslocoTesting(COMMAND_PALETTE_TEST_CATALOGS)],
+      imports: [CommandPaletteComponent, provideTranslocoTesting(COMMAND_PALETTE_TEST_CATALOGS, UI_TEST_CATALOGS)],
     });
   });
 

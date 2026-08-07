@@ -17,7 +17,7 @@ import { of, switchMap } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { parseFacetQuery } from '@hexly/domain';
 import { ShortcutService } from '@hexly/web-core';
-import { ButtonComponent, DialogComponent, FacetSearchInputComponent } from '@hexly/web-ui';
+import { ButtonComponent, DialogComponent, FacetMissComponent, FacetSearchInputComponent } from '@hexly/web-ui';
 import { Command, CommandProvider, parseCommandQuery } from './command';
 import { CommandDirectory } from './command-directory';
 import { CommandRegistry, CommandSection } from './command-registry';
@@ -42,7 +42,15 @@ export const OPEN_COMMAND_PALETTE = 'open-command-palette';
 @Component({
   selector: 'app-command-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, DialogComponent, FacetSearchInputComponent, TranslocoPipe, RouterLink, NgTemplateOutlet],
+  imports: [
+    ButtonComponent,
+    DialogComponent,
+    FacetMissComponent,
+    FacetSearchInputComponent,
+    TranslocoPipe,
+    RouterLink,
+    NgTemplateOutlet,
+  ],
   template: `
     <app-dialog [open]="open()" align="top" (closed)="onDialogClosed()">
       <!-- The shared box (ADR-0082), key stage only: no Facet read is passed, the Palette running none
@@ -58,17 +66,16 @@ export const OPEN_COMMAND_PALETTE = 'open-command-palette';
         [activeDescendant]="activeItemId()"
         [ariaLabel]="'commandPalette.searchLabel' | transloco"
         [placeholder]="'commandPalette.placeholder' | transloco"
-        [listLabel]="'commandPalette.suggestionsLabel' | transloco"
         (queryChange)="text.set($event)"
         (keydown)="onInputKeydown($event)"
       />
-      <!-- A Facet Token naming a key nothing here answers to is *said*, never quietly searched for
-           (ADR-0082). -->
-      @if (unknownFacetKeys().length > 0) {
-        <p data-testid="command-palette-unknown-facet" role="status" class="px-2 py-1 text-sm text-ink-faint">
-          {{ 'commandPalette.unknownFacet' | transloco: { keys: unknownFacetKeys().join(', ') } }}
-        </p>
-      }
+      <!-- What the Tokens applied nothing for is *said*, never quietly searched for (ADR-0082). The
+           parse is of the text *past* the Provider prefix, which is the string the Providers filter by. -->
+      <app-facet-miss
+        class="px-2 py-1 text-sm text-ink-faint"
+        [parsed]="facetMiss()"
+        testid="command-palette-unknown-facet"
+      />
       <div
         id="command-palette-listbox"
         role="listbox"
@@ -181,10 +188,8 @@ export class CommandPaletteComponent {
    * with its scope (ADR-0083) — pressing `$` there opens nothing.
    */
   protected readonly facetKeys = computed(() => this.registry.facetKeys(this.parsed().prefix));
-  /** The `$` names nothing on this prefix answers to, reported here rather than searched for as text. */
-  protected readonly unknownFacetKeys = computed(
-    () => parseFacetQuery(this.parsed().query, this.facetKeys()).unresolvedKeys,
-  );
+  /** What the box's Tokens applied nothing on this prefix, reported rather than searched for as text. */
+  protected readonly facetMiss = computed(() => parseFacetQuery(this.parsed().query, this.facetKeys()));
 
   protected readonly rows = computed(() =>
     this.sections().flatMap((section: CommandSection) =>

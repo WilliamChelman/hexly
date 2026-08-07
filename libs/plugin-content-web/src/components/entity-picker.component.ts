@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { ParsedFacetQuery } from '@hexly/domain';
 import {
   ListboxController,
   ListboxProps,
@@ -7,6 +8,7 @@ import {
   ListboxEmptyComponent,
   ListboxOptionComponent,
   BodyPortalDirective,
+  FacetMissComponent,
 } from '@hexly/web-ui';
 import { MentionItem } from '../extensions/mention-items';
 
@@ -23,7 +25,14 @@ export type EntityPickerProps = ListboxProps<MentionItem>;
 @Component({
   selector: 'app-entity-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, ListboxComponent, ListboxOptionComponent, ListboxEmptyComponent, BodyPortalDirective],
+  imports: [
+    TranslocoPipe,
+    ListboxComponent,
+    ListboxOptionComponent,
+    ListboxEmptyComponent,
+    BodyPortalDirective,
+    FacetMissComponent,
+  ],
   template: `
     @if (visible()) {
       <app-listbox
@@ -33,14 +42,15 @@ export type EntityPickerProps = ListboxProps<MentionItem>;
         [activeItemId]="activeItemId()"
         [anchor]="anchor()!"
       >
-        <!-- A dollar-name this World answers to nothing is *said*, never quietly searched for (ADR-0082). -->
-        @if (unknownFacetKeys().length > 0) {
-          <li role="presentation" class="px-3 py-1 text-xs text-ink-faint">
-            <span role="status" data-testid="entity-picker-unknown-facet">
-              {{ 'editor.entityPicker.unknownFacet' | transloco: { keys: unknownFacetKeys().join(', ') } }}
-            </span>
-          </li>
-        }
+        <!-- No box of its own here — the mention *is* the box — so the shared row is placed by hand, as
+             a presentational row of the list. What the Tokens applied nothing for is *said* (ADR-0082). -->
+        <li role="presentation">
+          <app-facet-miss
+            class="px-3 py-1 text-xs text-ink-faint"
+            [parsed]="facetMiss()"
+            testid="entity-picker-unknown-facet"
+          />
+        </li>
         @for (item of items(); track item.id; let i = $index) {
           @if (item.kind === 'facet-key') {
             <li
@@ -96,15 +106,15 @@ export type EntityPickerProps = ListboxProps<MentionItem>;
 export class EntityPickerComponent extends ListboxController<MentionItem> {
   protected readonly optionIdPrefix = 'entity-opt-';
 
-  /** The `$` names typed into the mention that this World answers to nothing (ADR-0082). */
-  protected readonly unknownFacetKeys = signal<readonly string[]>([]);
+  /** What the `$` names typed into the mention applied nothing for (ADR-0082). */
+  protected readonly facetMiss = signal<ParsedFacetQuery | null>(null);
 
   /** Keys rather than Entities: the list is completing a `$` name, and says so. */
   protected readonly offersFacetKeys = computed(() => this.items()[0]?.kind === 'facet-key');
 
   /** Stated by the `@` trigger on every keystroke, search or no search. */
-  showUnknownFacetKeys(keys: readonly string[]): void {
-    this.unknownFacetKeys.set(keys);
+  showFacetMiss(parsed: ParsedFacetQuery | null): void {
+    this.facetMiss.set(parsed);
   }
 
   /**

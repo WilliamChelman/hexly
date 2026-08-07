@@ -12,7 +12,14 @@ import {
   ActiveWorld,
   ToasterService,
 } from '@hexly/web-core';
-import { ButtonComponent, DialogService, EyebrowComponent, IconComponent, PageHeaderComponent } from '@hexly/web-ui';
+import {
+  ButtonComponent,
+  DialogService,
+  EyebrowComponent,
+  FacetMissComponent,
+  IconComponent,
+  PageHeaderComponent,
+} from '@hexly/web-ui';
 import { DeleteEntityDialogComponent, DeleteEntityDialogData } from '../../entity-types/delete-entity-dialog.component';
 import { EntitySearchComponent } from '../entity-browser/components/entity-search.component';
 import { EmptyStateComponent } from '../entity-browser/components/empty-state.component';
@@ -48,6 +55,7 @@ const PAGE_SIZE = 50;
     RouterLink,
     EntitySearchComponent,
     EmptyStateComponent,
+    FacetMissComponent,
     FacetRailComponent,
   ],
   // No **Type**: it is pinned to the asset type here, so it never reaches the rail and `$type:` could
@@ -98,12 +106,8 @@ const PAGE_SIZE = 50;
         [facets]="facetCounts()"
         (queryChange)="filters.onSearch($event)"
       />
-      <!-- A Facet Token naming a key nothing answers to is *said*, never quietly searched for (ADR-0082). -->
-      @if (filters.unknownFacetKeys().length > 0) {
-        <p data-testid="unknown-facet" role="status" class="-mt-6 mb-8 font-sans text-sm text-ink-faint">
-          {{ 'entityBrowser.unknownFacet' | transloco: { keys: filters.unknownFacetKeys().join(', ') } }}
-        </p>
-      }
+      <!-- What the Tokens applied nothing for is *said*, never quietly searched for (ADR-0082). -->
+      <app-facet-miss class="-mt-6 mb-8 font-sans text-sm text-ink-faint" [parsed]="filters.parsedQuery()" />
       @if (uploadError()) {
         <p class="text-sm text-danger mb-4" data-testid="asset-upload-error">
           {{ 'assetBrowser.uploadError' | transloco }}

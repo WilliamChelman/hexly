@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, ou
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
-import { ButtonComponent, FacetSearchInputComponent } from '@hexly/web-ui';
+import { ButtonComponent, FacetMissComponent, FacetSearchInputComponent } from '@hexly/web-ui';
 import { ContainerChipsComponent } from './container-chips.component';
 import { pickerFacetTokens } from './picker-facet-tokens';
 import { linkTargetFacets, linkTargetRead } from './link-target-read';
@@ -31,7 +31,7 @@ import { linkTargetFacets, linkTargetRead } from './link-target-read';
 @Component({
   selector: 'app-entity-search-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, ContainerChipsComponent, FacetSearchInputComponent, TranslocoPipe],
+  imports: [ButtonComponent, ContainerChipsComponent, FacetMissComponent, FacetSearchInputComponent, TranslocoPipe],
   template: `
     <div class="rounded-md border border-line bg-surface p-1 shadow-2" [attr.data-testid]="testid() + '-menu'">
       <!-- The shared box (ADR-0082): a Facet Token filters from here, the whole vocabulary is offered on
@@ -43,17 +43,14 @@ import { linkTargetFacets, linkTargetRead } from './link-target-read';
         [keys]="tokens.keys()"
         [facets]="facets()"
         [placeholder]="placeholderKey() | transloco"
-        [listLabel]="'collab.entitySearchPicker.suggestionsLabel' | transloco"
         (queryChange)="queryChange.emit($event)"
       />
-      <!-- A dollar-name nothing here answers to is *said*, never quietly searched for (ADR-0082). -->
-      @if (tokens.parsed().unresolvedKeys.length > 0) {
-        <p class="mb-1 px-1 text-xs text-ink-faint" role="status" [attr.data-testid]="testid() + '-unknown-facet'">
-          {{
-            'collab.entitySearchPicker.unknownFacet' | transloco: { keys: tokens.parsed().unresolvedKeys.join(', ') }
-          }}
-        </p>
-      }
+      <!-- What the Tokens applied nothing for is *said*, never quietly searched for (ADR-0082). -->
+      <app-facet-miss
+        class="mb-1 px-1 text-xs text-ink-faint"
+        [parsed]="tokens.parsed()"
+        [testid]="testid() + '-unknown-facet'"
+      />
       <!-- The **Container** facet (ADR-0080), shared with the asset pickers: present only where this
            World Mounts something the read reached, so a picker that offers one Container's Entities shows
            no chip to narrow by. Counts come off the same read the options do, so a chip can never

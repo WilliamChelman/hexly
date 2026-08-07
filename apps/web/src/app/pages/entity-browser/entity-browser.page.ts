@@ -3,7 +3,13 @@ import { Subscription, finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityFacets, EntityPage, EntitySummary } from '@hexly/domain';
 import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, AppShellStore } from '@hexly/web-core';
-import { ButtonComponent, DialogService, EyebrowComponent, PageHeaderComponent } from '@hexly/web-ui';
+import {
+  ButtonComponent,
+  DialogService,
+  EyebrowComponent,
+  FacetMissComponent,
+  PageHeaderComponent,
+} from '@hexly/web-ui';
 import { NewEntityButtonComponent } from '../../entity-types/new-entity-button.component';
 import { DeleteEntityDialogComponent, DeleteEntityDialogData } from '../../entity-types/delete-entity-dialog.component';
 import { EntityCardComponent } from './components/entity-card.component';
@@ -43,6 +49,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
     EntityCardComponent,
     EntitySearchComponent,
     EmptyStateComponent,
+    FacetMissComponent,
     FacetRailComponent,
     NewEntityButtonComponent,
   ],
@@ -71,12 +78,8 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
         [facets]="facetCounts()"
         (queryChange)="filters.onSearch($event)"
       />
-      <!-- A Facet Token naming a key nothing answers to is *said*, never quietly searched for (ADR-0082). -->
-      @if (filters.unknownFacetKeys().length > 0) {
-        <p data-testid="unknown-facet" role="status" class="-mt-6 mb-8 font-sans text-sm text-ink-faint">
-          {{ 'entityBrowser.unknownFacet' | transloco: { keys: filters.unknownFacetKeys().join(', ') } }}
-        </p>
-      }
+      <!-- What the Tokens applied nothing for is *said*, never quietly searched for (ADR-0082). -->
+      <app-facet-miss class="-mt-6 mb-8 font-sans text-sm text-ink-faint" [parsed]="filters.parsedQuery()" />
       <div class="grid grid-cols-1 lg:grid-cols-[14rem_1fr] gap-8 items-start">
         <app-facet-rail
           [facetCounts]="facetCounts()"

@@ -10,7 +10,13 @@ import {
 } from '@hexly/plugin-asset';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
 import { ContainerChipsComponent, linkTargetRead, pickerFacetTokens } from '@hexly/web-entity';
-import { ButtonComponent, DialogComponent, DialogRef, FacetSearchInputComponent } from '@hexly/web-ui';
+import {
+  ButtonComponent,
+  DialogComponent,
+  DialogRef,
+  FacetMissComponent,
+  FacetSearchInputComponent,
+} from '@hexly/web-ui';
 
 /** What the picker is launched with: the World whose Assets it uploads into and searches. */
 export interface ImagePickerData {
@@ -47,7 +53,14 @@ const isPlaceable = (e: EntitySummary): e is PlaceableAsset => !!e.assetUrl;
 @Component({
   selector: 'app-board-image-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ContainerChipsComponent, DialogComponent, ButtonComponent, FacetSearchInputComponent, TranslocoPipe],
+  imports: [
+    ContainerChipsComponent,
+    DialogComponent,
+    ButtonComponent,
+    FacetMissComponent,
+    FacetSearchInputComponent,
+    TranslocoPipe,
+  ],
   template: `
     <app-dialog open align="top" [heading]="'board.imagePicker.title' | transloco" (closed)="cancel()">
       <div class="flex flex-col gap-4">
@@ -86,15 +99,10 @@ const isPlaceable = (e: EntitySummary): e is PlaceableAsset => !!e.assetUrl;
             [keys]="tokens.keys()"
             [facets]="facetCounts()"
             [placeholder]="'board.imagePicker.search' | transloco"
-            [listLabel]="'board.imagePicker.suggestionsLabel' | transloco"
             (queryChange)="query.set($event)"
           />
-          <!-- A dollar-name nothing here answers to is *said*, never quietly searched for (ADR-0082). -->
-          @if (tokens.parsed().unresolvedKeys.length > 0) {
-            <p class="text-xs text-ink-faint" role="status" data-testid="image-unknown-facet">
-              {{ 'board.imagePicker.unknownFacet' | transloco: { keys: tokens.parsed().unresolvedKeys.join(', ') } }}
-            </p>
-          }
+          <!-- What the Tokens applied nothing for is *said*, never quietly searched for (ADR-0082). -->
+          <app-facet-miss class="text-xs text-ink-faint" [parsed]="tokens.parsed()" testid="image-unknown-facet" />
 
           <!-- The **Container** facet: only where this World Mounts a shelf the read reached (ADR-0080). -->
           <app-container-chips testid="image" [containers]="containers()" [(selected)]="targets.container" />

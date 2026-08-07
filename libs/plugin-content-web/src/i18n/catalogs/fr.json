@@ -32,8 +32,7 @@
     "create": "Créer « {{name}} »",
     "createDetails": "Créer « {{name}} » avec des détails…",
     "createError": "Impossible de créer l'entité",
-    "facetKeys": "Filtrer par",
-    "unknownFacet": "Aucune facette « {{keys}} » ici."
+    "facetKeys": "Filtrer par"
   },
   "descriptorPicker": {
     "label": "Décrire ce lien",

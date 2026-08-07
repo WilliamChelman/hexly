@@ -1,6 +1,8 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { EntityFacets, FacetKeySet } from '@hexly/domain';
+import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { UI_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { FacetSearchInputComponent } from './facet-search-input.component';
 
 /** The Entity Browser's vocabulary in miniature: the reserved trio it can apply, plus two Facet keys. */
@@ -51,7 +53,9 @@ class Host {
 
 describe('FacetSearchInput (ADR-0082)', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [Host] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [Host, provideTranslocoTesting(UI_TEST_CATALOGS)],
+    }).compileComponents();
   });
 
   function render() {

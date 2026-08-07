@@ -73,7 +73,7 @@ export function entityMention(ports: EntityMentionPorts): { extension: Extension
 
   /** State the `$` names this World answers to nothing — never a silent reinterpretation (ADR-0082). */
   const stateMisses = (query: string) =>
-    ports.getPicker()?.showUnknownFacetKeys(parseMentionQuery(query, ports.facetKeys()).facets.unresolvedKeys);
+    ports.getPicker()?.showFacetMiss(parseMentionQuery(query, ports.facetKeys()).facets);
 
   return {
     setProgrammatic: () => (programmatic = true),

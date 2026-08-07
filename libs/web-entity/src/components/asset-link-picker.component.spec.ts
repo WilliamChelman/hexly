@@ -4,6 +4,7 @@ import { of, throwError } from 'rxjs';
 import { EntityDetail, EntityLinkValue, EntityPage, EntitySummary } from '@hexly/domain';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { UI_TEST_CATALOGS } from '@hexly/web-ui/testing';
 import { provideEntityTypesTesting } from '../testing/entity-types.fake';
 import { AssetLinkPickerComponent } from './asset-link-picker.component';
 import { COLLAB_TEST_CATALOGS, WEB_ENTITY_TEST_CATALOGS } from '../i18n/test-catalogs';
@@ -68,7 +69,7 @@ describe('AssetLinkPicker', () => {
       return of(page([asset('img-1', 'Castle'), asset('img-2', 'Forest')]));
     });
     await TestBed.configureTestingModule({
-      imports: [Host, provideTranslocoTesting(WEB_ENTITY_TEST_CATALOGS, COLLAB_TEST_CATALOGS)],
+      imports: [Host, provideTranslocoTesting(WEB_ENTITY_TEST_CATALOGS, COLLAB_TEST_CATALOGS, UI_TEST_CATALOGS)],
       providers: [
         { provide: EntitiesClient, useValue: entities },
         { provide: AssetsClient, useValue: assets },

@@ -4,6 +4,7 @@ import { of } from 'rxjs';
 import { EntityPage, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { UI_TEST_CATALOGS } from '@hexly/web-ui/testing';
 import { provideEntityTypesTesting } from '../testing/entity-types.fake';
 import { EntitySearchPickerComponent } from './entity-search-picker.component';
 import { COLLAB_TEST_CATALOGS } from '../i18n/test-catalogs';
@@ -64,7 +65,7 @@ describe('EntitySearchPicker', () => {
       ),
     );
     await TestBed.configureTestingModule({
-      imports: [Host, provideTranslocoTesting(COLLAB_TEST_CATALOGS)],
+      imports: [Host, provideTranslocoTesting(COLLAB_TEST_CATALOGS, UI_TEST_CATALOGS)],
       providers: [
         { provide: EntitiesClient, useValue: entities },
         // The box reads its Facet vocabulary off the registry, synchronously (ADR-0082).
@@ -352,6 +353,21 @@ describe('EntitySearchPicker', () => {
 
       expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ type: ['core.type.note'] }));
       expect(byId(fixture.nativeElement as HTMLElement, 'pin-picker-unknown-facet')?.textContent).toContain('type');
+    });
+
+    /** A token that resolved and still applied nothing is stated, never left to look like an empty box. */
+    it('says why a resolvable token filtered nothing, with its own message per reason', () => {
+      const fixture = TestBed.createComponent(Host);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      typeInto(fixture, '$tag:');
+      expect(byId(el, 'pin-picker-unknown-facet-empty-value')?.textContent).toContain('names no value');
+
+      typeInto(fixture, '$tag:"sea of ');
+      expect(byId(el, 'pin-picker-unknown-facet-unterminated-quote')?.textContent).toContain('quote still open');
+      // Half a value is not a filter: the search runs on the text alone.
+      expect(entities.list).toHaveBeenLastCalledWith(expect.not.objectContaining({ tag: expect.anything() }));
     });
 
     it('dismisses the suggestions on Escape without closing the picker', () => {

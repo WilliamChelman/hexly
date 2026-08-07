@@ -84,7 +84,6 @@
     "renameLabel": "Nouveau nom",
     "searchLabel": "Rechercher des entités",
     "searchPlaceholder": "Rechercher par nom, étiquette ou contenu…",
-    "suggestionsLabel": "Suggestions de filtres",
     "creating": "Création…",
     "edited": "Modifié le {{date}}",
     "loadErrorTitle": "Impossible de charger vos entités.",
@@ -99,7 +98,6 @@
     "emptyHint": "Créez votre première entité pour commencer.",
     "noMatchTitle": "Aucune entité ne correspond à votre recherche.",
     "noMatchHint": "Essayez un autre nom, une étiquette ou un mot.",
-    "unknownFacet": "Aucune facette « {{keys}} » ici.",
     "facets": {
       "heading": "Filtres",
       "type": "Type",

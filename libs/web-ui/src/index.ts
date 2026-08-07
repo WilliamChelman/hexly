@@ -11,6 +11,7 @@ export * from './components/dialog.component';
 export * from './components/dialog.service';
 export * from './components/dot.component';
 export * from './components/eyebrow.component';
+export * from './components/facet-miss.component';
 export * from './components/facet-search-input.component';
 export * from './components/field.component';
 export * from './components/icon-button.component';

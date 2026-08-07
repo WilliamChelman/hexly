@@ -1,14 +1,12 @@
 /**
  * **Facet Tokens** (CONTEXT.md → Facet Token, ADR-0082): a Facet named inline in an Entity search box
- * — `$type:npc`, `-$tag:draft`, `$cr:>=5` — rather than clicked in a rail. One pure function turns the
- * raw box string into the residual full-text query plus the structured filter params that already
- * exist; everything the grammar does not claim stays text, so a search for "Session 4: the ambush" is
- * still a search for that text.
+ * — `$type:npc`, `-$tag:draft`, `$cr:>=5` — rather than clicked in a rail. {@link parseFacetQuery} turns
+ * the raw box into the residual full-text query plus the filter params the wire already speaks;
+ * everything the grammar does not claim stays text.
  *
- * It takes its key set as an argument, so no surface's vocabulary is hard-coded here and the Palette's
- * smaller one needs no special case. The caller reads that set **synchronously** from its client
- * registry, never from the Facet read: a parser that changes its mind when a network read lands would
- * rewrite results while they are being read.
+ * The key set is an argument, so no surface's vocabulary is hard-coded here. The caller reads it
+ * **synchronously** from its client registry, never from the Facet read: a parser that changed its mind
+ * when a network read landed would rewrite results while they are being read.
  */
 
 import { FieldFilter, FieldFilterOp } from './field';
@@ -282,13 +280,13 @@ export function startsFacetToken(raw: string, i: number): boolean {
  */
 function readToken(raw: string, start: number): FacetToken | null {
   const negated = raw[start] === '-';
-  let i = start + (negated ? 2 : 1); // past the `-` and the `$`
+  let i = start + (negated ? 2 : 1);
   const keyStart = i;
   while (i < raw.length && raw[i] !== ':' && !/\s/.test(raw[i])) i++;
   if (raw[i] !== ':' || i === keyStart) return null;
   const key = raw.slice(keyStart, i);
   const segments: ValueSegment[] = [];
-  i++; // past the colon
+  i++;
   for (;;) {
     const from = i;
     if (raw[i] === '"') {

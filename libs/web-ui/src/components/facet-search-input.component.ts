@@ -19,6 +19,7 @@ import {
   facetValuesFor,
   resolvesFacetKey,
 } from '@hexly/domain';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { ListboxController } from '../utils/listbox-controller';
 import { InputComponent } from './input.component';
 import { ListboxComponent } from './listbox.component';
@@ -40,31 +41,27 @@ interface FacetSuggestion {
 
 /**
  * The shared Entity search box (ADR-0082): the input, the two-stage **Facet Token** suggestion list,
- * and the keyboard that drives it — built once here, and adopted by every surface that searches
- * Entities, so the behaviour is not re-implemented six times.
+ * and the keyboard that drives it, adopted by every surface that searches Entities.
  *
- * **Stage one, keys**, comes off {@link keys} — the surface's vocabulary, read synchronously from its
- * client registry — so pressing `$` reveals the entire filter vocabulary in one list whatever the
- * network is doing. **Stage two, values**, comes off {@link facets}: the Facet read the surface
- * *already* runs, so a value suggestion costs no request and carries the count the rail shows. A
- * surface that names no keys and passes no read simply never opens the list, which is how the box
- * degrades to the plain one it replaces.
+ * The two stages have two sources, and the difference is load-bearing: **keys** come off {@link keys},
+ * read synchronously from the client registry, so `$` reveals the whole vocabulary whatever the network
+ * is doing; **values** come off {@link facets}, the Facet read the surface already runs, so a suggestion
+ * costs no request. A surface naming no keys and passing no read never opens the list, which is how the
+ * box degrades to the plain one it replaces.
  *
- * Controlled, like the box it replaces: the consumer owns the text (its own debounce, its own URL
- * mirror) and receives every keystroke — including the one an accepted suggestion writes — through
- * {@link queryChange}. Its copy (placeholder, labels) is the consumer's, already translated, so this
- * stays free of any one surface's copy and of a translation scope; its look is `appInput`'s, so no
- * surface hands it a class string (ADR-0007).
+ * Controlled: the consumer owns the text — its debounce, its URL mirror — and receives every keystroke,
+ * the one an accepted suggestion writes included, through {@link queryChange}. Copy that names *this*
+ * surface (placeholder, aria-label) is the consumer's, already translated; copy that names the **grammar**
+ * is this lib's (ADR-0049), the six surfaces stating it identically. Its look is `appInput`'s (ADR-0007).
  *
- * It lives in `web-ui`, beside the {@link ListboxComponent} it is built from, rather than with the
- * Entity surfaces it was written for: it is a controlled box, a listbox and a keyboard, and its only
- * domain dependency is the pure parser in `libs/domain`. Placing it in `web-entity` made the Command
- * Palette depend on a feature lib whose vocabulary it explicitly does not own (ADR-0032, ADR-0082).
+ * It lives in `web-ui`, not with the Entity surfaces it was written for: it is a box, a listbox and a
+ * keyboard, its only domain dependency being the pure parser. In `web-entity` it made the Command Palette
+ * depend on a feature lib whose vocabulary it explicitly does not own (ADR-0032, ADR-0082).
  */
 @Component({
   selector: 'app-facet-search-input',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [InputComponent, ListboxComponent, ListboxOptionComponent],
+  imports: [InputComponent, ListboxComponent, ListboxOptionComponent, TranslocoPipe],
   host: { class: 'block' },
   template: `
     <input
@@ -90,7 +87,7 @@ interface FacetSuggestion {
     @if (visible()) {
       <app-listbox
         [testid]="testid() + '-suggestions'"
-        [ariaLabel]="listLabel()"
+        [ariaLabel]="'ui.facetToken.suggestionsLabel' | transloco"
         [activeItemId]="activeItemId()"
         [anchor]="anchor()!"
         [width]="boxWidth()"
@@ -137,10 +134,9 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
   readonly type = input<'search' | 'text'>('search');
   /** Which `appInput` the box wears: the sunken well a picker sits in, or the browse surfaces' bar. */
   readonly variant = input<'well' | 'bar'>('well');
-  /** Copy the consumer owns, already translated. */
+  /** Copy naming this surface's content, already translated — the list's own label is this lib's. */
   readonly ariaLabel = input<string | null>(null);
   readonly placeholder = input<string | null>(null);
-  readonly listLabel = input<string | null>(null);
   /**
    * The consumer's own listbox where it has one — the Palette's results: its id, and the option it
    * highlights while the suggestions are shut, so one input serves two lists.

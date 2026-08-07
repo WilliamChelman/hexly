@@ -32,8 +32,7 @@
     "create": "Create \"{{name}}\"",
     "createDetails": "Create \"{{name}}\" with details…",
     "createError": "Could not create the entity",
-    "facetKeys": "Filter by",
-    "unknownFacet": "No Facet “{{keys}}” here."
+    "facetKeys": "Filter by"
   },
   "descriptorPicker": {
     "label": "Describe this link",

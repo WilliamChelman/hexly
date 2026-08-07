@@ -12,6 +12,7 @@ import { FakeEntitySession, provideFakeEntitySession } from '@hexly/web-entity/t
 import { VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { EntityNameResolver } from '../services/entity-name-resolver';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { UI_TEST_CATALOGS } from '@hexly/web-ui/testing';
 import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { ContentEditorComponent } from './content-editor.component';
@@ -94,7 +95,7 @@ describe('ContentEditor', () => {
     fragment$.next(null);
     viewFieldKey = undefined;
     await TestBed.configureTestingModule({
-      imports: [ContentEditorComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
+      imports: [ContentEditorComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS, UI_TEST_CATALOGS)],
       providers: [
         provideFakeEntitySession(),
         // The `@` mention reads its Facet vocabulary off the registry, synchronously (ADR-0082).

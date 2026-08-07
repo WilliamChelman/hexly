@@ -64,9 +64,7 @@
   },
   "entitySearchPicker": {
     "searchPlaceholder": "Rechercher des entités…",
-    "empty": "Aucune entité correspondante",
-    "suggestionsLabel": "Suggestions de filtres",
-    "unknownFacet": "Aucune facette « {{keys}} » ici."
+    "empty": "Aucune entité correspondante"
   },
   "containerChips": {
     "all": "Tout"

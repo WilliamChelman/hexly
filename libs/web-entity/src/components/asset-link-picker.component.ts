@@ -3,7 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityLinkValue, EntitySummary } from '@hexly/domain';
 import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_TOKEN } from '@hexly/plugin-asset';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
-import { FacetSearchInputComponent } from '@hexly/web-ui';
+import { FacetMissComponent, FacetSearchInputComponent } from '@hexly/web-ui';
 import { ContainerChipsComponent } from './container-chips.component';
 import { pickerFacetTokens } from './picker-facet-tokens';
 import { linkTargetFacets, linkTargetRead } from './link-target-read';
@@ -24,7 +24,7 @@ import { linkTargetFacets, linkTargetRead } from './link-target-read';
 @Component({
   selector: 'app-asset-link-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ContainerChipsComponent, FacetSearchInputComponent, TranslocoPipe],
+  imports: [ContainerChipsComponent, FacetMissComponent, FacetSearchInputComponent, TranslocoPipe],
   template: `
     <div class="flex flex-col gap-2" data-testid="asset-link-control">
       <!-- Current value: a preview tile + its last-known name, so a deleted/hidden target stays legible. -->
@@ -92,15 +92,14 @@ import { linkTargetFacets, linkTargetRead } from './link-target-read';
               [keys]="tokens.keys()"
               [facets]="facets()"
               [placeholder]="'fields.assetLink.search' | transloco"
-              [listLabel]="'fields.assetLink.suggestionsLabel' | transloco"
               (queryChange)="query.set($event)"
             />
-            <!-- A dollar-name nothing here answers to is *said*, never quietly searched for (ADR-0082). -->
-            @if (tokens.parsed().unresolvedKeys.length > 0) {
-              <p class="text-xs text-ink-faint" role="status" data-testid="asset-link-unknown-facet">
-                {{ 'fields.assetLink.unknownFacet' | transloco: { keys: tokens.parsed().unresolvedKeys.join(', ') } }}
-              </p>
-            }
+            <!-- What the Tokens applied nothing for is *said*, never quietly searched for (ADR-0082). -->
+            <app-facet-miss
+              class="text-xs text-ink-faint"
+              [parsed]="tokens.parsed()"
+              testid="asset-link-unknown-facet"
+            />
             <!-- The **Container** facet (ADR-0080): a World that Mounts a shelf is offered its art here
                  too, and these chips narrow to one shelf. Nothing Mounted, nothing to narrow, no chips. -->
             <app-container-chips testid="asset-link" [containers]="containers()" [(selected)]="targets.container" />

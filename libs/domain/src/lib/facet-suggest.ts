@@ -1,12 +1,11 @@
 /**
- * What a search box may **offer** where the caret stands (ADR-0082). Pressing `$` reveals the entire
- * filter vocabulary in one list — the single gesture that answers "what can I even filter by?" — and
- * after the key's colon the same list offers that Facet's values with their counts.
+ * What a search box may **offer** where the caret stands (ADR-0082): `$` reveals the whole filter
+ * vocabulary, and after the key's colon the same list offers that Facet's values with their counts.
  *
  * Two stages, two sources, and the difference is load-bearing: **keys resolve synchronously** off the
  * client registry, while the Facet read feeds **values and counts only**, so a late response can make a
- * filter easier to type but can never change what one means. The grammar itself stays in `facet-token.ts`:
- * this reads a token only as far as the caret, which the parser — reading whole tokens — cannot answer.
+ * filter easier to type but never changes what one means. The grammar stays in `facet-token.ts`; this
+ * reads a token only as far as the caret, which the parser — reading whole tokens — cannot answer.
  */
 
 import { EntityFacets, FacetCount } from './entity';

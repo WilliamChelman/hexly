@@ -62,9 +62,7 @@
     "loading": "Loading images…",
     "empty": "No images uploaded yet.",
     "noMatches": "No images match your search.",
-    "cancel": "Cancel",
-    "suggestionsLabel": "Filter suggestions",
-    "unknownFacet": "No Facet “{{keys}}” here."
+    "cancel": "Cancel"
   },
   "embedPicker": {
     "title": "Embed an entity",

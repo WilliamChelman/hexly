@@ -14,7 +14,7 @@ import {
   WorldsClient,
   worldCompendiumPageRoute,
 } from '@hexly/web-core';
-import { EyebrowComponent, ButtonComponent, PageHeaderComponent } from '@hexly/web-ui';
+import { EyebrowComponent, ButtonComponent, FacetMissComponent, PageHeaderComponent } from '@hexly/web-ui';
 import { EntityCardComponent, EntityCardVm } from '../entity-browser/components/entity-card.component';
 import { EntitySearchComponent } from '../entity-browser/components/entity-search.component';
 import { EmptyStateComponent } from '../entity-browser/components/empty-state.component';
@@ -55,18 +55,14 @@ const PAGE_SIZE = 50;
     EntityCardComponent,
     EntitySearchComponent,
     EmptyStateComponent,
+    FacetMissComponent,
     FacetRailComponent,
     RouterLink,
   ],
-  // The **Container** is a category here, and only here: this is the one browse whose read spans many
-  // Containers, so a Mounted one is nameable (`$in:`) as well as clickable, and "everything this World
-  // Mounts except that pack" is sayable. No **Visibility**, for the reason {@link facetCounts} gives —
-  // a `$visibility:` token is a stated miss rather than a filter by a word that is false of this list.
-  //
-  // The Facet key half of that vocabulary is the client registry's alone (ADR-0082), which bites hardest
-  // here, the read spanning Containers other Worlds own: a Field defined in a mounted pack's own World
-  // offers a rail row this box reports as a miss. The price of a parser that cannot change its mind when
-  // a network read lands; the row stays clickable either way.
+  // Container is a category here and only here: this is the one browse whose read spans many, so a
+  // Mounted one is nameable (`$in:`) as well as clickable. No Visibility, for the reason
+  // {@link facetCounts} gives. A Field defined in a mounted pack's own World is not in this client's
+  // registry, so `$`-naming it is a stated miss (ADR-0082); its rail row stays clickable.
   providers: [{ provide: FACET_CATEGORIES, useValue: ['type', 'tag', 'container'] }],
   hostDirectives: [FacetTokenStore],
   host: { class: 'block min-h-full bg-surface-sunken' },
@@ -94,12 +90,8 @@ const PAGE_SIZE = 50;
         [facets]="facetCounts()"
         (queryChange)="filters.onSearch($event)"
       />
-      <!-- A Facet Token naming a key nothing answers to is *said*, never quietly searched for (ADR-0082). -->
-      @if (filters.unknownFacetKeys().length > 0) {
-        <p data-testid="unknown-facet" role="status" class="-mt-6 mb-8 font-sans text-sm text-ink-faint">
-          {{ 'entityBrowser.unknownFacet' | transloco: { keys: filters.unknownFacetKeys().join(', ') } }}
-        </p>
-      }
+      <!-- What the Tokens applied nothing for is *said*, never quietly searched for (ADR-0082). -->
+      <app-facet-miss class="-mt-6 mb-8 font-sans text-sm text-ink-faint" [parsed]="filters.parsedQuery()" />
 
       <!-- The credit line: every mounted **Compendium**, linked to the **Compendium page** stating its
            terms (ADR-0061). All of them whatever the Container facet narrows to, since the credit is

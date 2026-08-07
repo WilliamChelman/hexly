@@ -51,9 +51,7 @@
     "uploading": "Téléversement…",
     "uploadError": "Échec du téléversement. Veuillez réessayer.",
     "search": "Rechercher des images…",
-    "empty": "Aucune image",
-    "suggestionsLabel": "Suggestions de filtres",
-    "unknownFacet": "Aucune facette « {{keys}} » ici."
+    "empty": "Aucune image"
   },
   "generic": {
     "name": "Entité",
