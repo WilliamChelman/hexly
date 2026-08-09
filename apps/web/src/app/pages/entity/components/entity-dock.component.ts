@@ -169,7 +169,7 @@ export class EntityDockComponent {
 
   /**
    * The Panels the current View offers: the universal set merged with the active View's declared
-   * Panels, kept through the page's {@link PANEL_FILTER} (a Public Link page drops References), then
+   * Panels, kept through the page's {@link PANEL_FILTER} (a general drop-by-identity seam), then
    * minus any write-gated Panel a read-only viewer may not have (ADR-0037).
    */
   private readonly availablePanels = computed<readonly PanelDefinition[]>(() => {
@@ -189,7 +189,7 @@ export class EntityDockComponent {
     // The Local Graph Panel is a toggle away, so its graph is warmed while the reader reads rather
     // than on the click (GraphWarmPool). Gated on the Panel being offered here: the warm-up holds a
     // live WebGL context for as long as the page does, which a surface that cannot open the Panel
-    // (a Public Link page, ADR-0072) must not pay. `warmUp` is idempotent, so re-runs are free.
+    // (ADR-0072) must not pay. `warmUp` is idempotent, so re-runs are free.
     effect(() => {
       if (this.availablePanels().some((panel) => panel.id === CORE_PANEL_LOCAL_GRAPH)) this.graphPool.warmUp();
     });

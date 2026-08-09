@@ -48,20 +48,6 @@
     "leave": "Quitter",
     "leaveError": "Impossible de quitter ce monde. Veuillez réessayer."
   },
-  "publicLink": {
-    "worldHeading": "Lien public",
-    "worldSubhead": "Toute personne disposant de ce lien peut lire les entités partagées de ce monde — sans compte.",
-    "entityHeading": "Lien public",
-    "entitySubhead": "Toute personne disposant de ce lien peut lire cette entité — sans compte. Il fonctionne même lorsque l’entité est privée.",
-    "create": "Créer un lien public",
-    "copy": "Copier",
-    "revoke": "Révoquer",
-    "copied": "Lien copié dans le presse-papiers.",
-    "copyError": "Impossible de copier le lien.",
-    "loadError": "Impossible de charger le lien public.",
-    "mintError": "Impossible de créer le lien public. Veuillez réessayer.",
-    "revokeError": "Impossible de révoquer le lien public. Veuillez réessayer."
-  },
   "entitySearchPicker": {
     "searchPlaceholder": "Rechercher des entités…",
     "empty": "Aucune entité correspondante"

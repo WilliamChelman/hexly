@@ -181,10 +181,10 @@ export class EntitySession implements EntitySessionPort {
   );
 
   /**
-   * The open Entity's id, or `null` with none open / a public reader. Drives live-follow:
-   * the reconciler switches its server subscription to this id.
+   * The open Entity's id, or `null` with none open. Drives live-follow: the reconciler switches its
+   * server subscription to this id.
    */
-  private readonly _followedId = computed(() => (this.externallyDriven ? null : (this._current()?.id ?? null)));
+  private readonly _followedId = computed(() => this._current()?.id ?? null);
 
   /**
    * Route load in flight. `current` still holds the previous Entity until the new
@@ -276,20 +276,7 @@ export class EntitySession implements EntitySessionPort {
   }
 
   /** {@link watchRoute}: the caller passes its ActivatedRoute in — a route-scoped service would get the root injector's route. */
-  /**
-   * A Public Link page fetches its Entity through the token-scoped public read
-   * surface and {@link adopt}s it directly. Marking the session externally driven
-   * makes {@link watchRoute} a no-op, so the reused {@link EntityPage} can't
-   * *also* fire an authenticated `/api/entities/:id` load.
-   */
-  private externallyDriven = false;
-  markExternallyDriven(): void {
-    this.externallyDriven = true;
-  }
-
   watchRoute(route: ActivatedRoute): void {
-    // A public reader already has its Entity — never fire an authenticated load over it.
-    if (this.externallyDriven) return;
     route.paramMap
       .pipe(
         map((params) => params.get('id')),

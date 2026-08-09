@@ -125,7 +125,7 @@ describe('PreferencesSync (ADR-0038)', () => {
     req.flush({});
   });
 
-  it('persists nothing while anonymous — public-link viewers stay local-only', () => {
+  it('persists nothing while signed out — the choice stays local-only (ADR-0014)', () => {
     locale.set('fr');
     colorScheme.set('dark');
     TestBed.flushEffects();

@@ -1,7 +1,7 @@
 /**
  * The Content plugin's Angular half (ADR-0051): its one composition entry point,
- * {@link providePluginContent} (the twin of `providePluginHexmap`), plus the light symbols the app and
- * the Public Link page bind eagerly — the shared {@link EntityNameResolver}. The editor drives the
+ * {@link providePluginContent} (the twin of `providePluginHexmap`), plus the light symbols the app
+ * binds eagerly — the shared {@link EntityNameResolver}. The editor drives the
  * host's central store through `@hexly/web-entity`'s `ENTITY_SESSION`, the same seam the Hex Map plugin
  * uses; it declares no port of its own.
  *

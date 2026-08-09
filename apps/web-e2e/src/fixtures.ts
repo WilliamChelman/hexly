@@ -168,6 +168,34 @@ export async function openEntityActions(page: Page): Promise<void> {
   await page.getByTestId('entity-actions').click();
 }
 
+/**
+ * Set the open Entity's Visibility rung through the header actions menu (ADR-0084): `open` reaches any
+ * signed-in caller on the Instance, `shared` reaches one only through an Open World. Waits for the PATCH.
+ */
+export async function setEntityVisibility(page: Page, rung: 'private' | 'shared' | 'open'): Promise<void> {
+  await openEntityActions(page);
+  const patched = page.waitForResponse(
+    (r) => /\/api\/entities\/[\w-]+$/.test(r.url()) && r.request().method() === 'PATCH' && r.ok(),
+  );
+  await page.getByTestId(`visibility-set-${rung}`).click();
+  await patched;
+  await page.keyboard.press('Escape');
+}
+
+/**
+ * Mark a World Open, or close it again (ADR-0084) — the successor to the World Public Link — from its
+ * Settings sharing pane. Waits for the PATCH. `worldSeg` may be a pretty URL segment.
+ */
+export async function setWorldOpen(page: Page, worldSeg: string, open: boolean): Promise<void> {
+  await page.goto(`/w/${worldSeg}/settings`);
+  await page.getByTestId('settings-nav-sharing').click();
+  const patched = page.waitForResponse(
+    (r) => /\/api\/worlds\/[\w-]+$/.test(r.url()) && r.request().method() === 'PATCH' && r.ok(),
+  );
+  await page.getByTestId(open ? 'world-open-open' : 'world-open-closed').click();
+  await patched;
+}
+
 /** Grant the second seeded user a role on the open Entity, through the header's Share dialog (ADR-0037). */
 export async function shareOpenEntity(page: Page, role: 'editor' | 'viewer'): Promise<void> {
   await openEntityActions(page);

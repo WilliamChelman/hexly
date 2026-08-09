@@ -16,7 +16,7 @@ import {
 /**
  * The header's account control (ADR-0015): a trigger opening a CDK menu with the
  * global, account-independent preferences — ColorScheme and language — plus the session
- * action. Offered to everyone, anonymous public-link viewers included (ADR-0014);
+ * action. The preferences are resolved on the device, independent of any account (ADR-0014);
  * the session row is Sign out when authenticated, Login otherwise.
  *
  * The desktop profile keeps the preferences and drops both the session row and the identity (ADR-0071):

@@ -20,8 +20,12 @@ import { segment } from '../utils/pretty-id';
  * ColorScheme**, resolved to custom properties and written on `<html>` through the CSSOM.
  */
 
-/** Which World the document is painted for: one reached by route, or one behind a World Public Link. */
-export type WorldScope = { readonly worldId: string } | { readonly publicToken: string };
+/**
+ * Which World the document is painted for — always one reached by its own route. A non-member reading
+ * an Open World arrives signed in at `/w/:worldId` like anyone else (ADR-0084 retired the Public Link
+ * scope), so there is no token-scoped variant.
+ */
+export type WorldScope = { readonly worldId: string };
 
 /**
  * One layer of the chain: any subset of a Theme's fields. Partial Palettes, because the Instance
@@ -69,8 +73,8 @@ const CACHE_MAX = 8;
 
 const NOTHING: ThemeDeclarationSet = { light: {}, dark: {} };
 
-/** The two route families a World is reached through; a Public Link visitor never learns a World id. */
-const SCOPE_PATH = /^\/(public\/w|w)\/([^/]+)/;
+/** The `/w/:worldId` route a World is reached through — the only World scope since ADR-0084. */
+const SCOPE_PATH = /^\/w\/([^/]+)/;
 
 /**
  * The World scope a URL names, or `null` outside one — the base62 code alone (ADR-0042), so a rename
@@ -81,13 +85,13 @@ const SCOPE_PATH = /^\/(public\/w|w)\/([^/]+)/;
 export function worldThemeScope(pathname: string): string | null {
   const match = SCOPE_PATH.exec(pathname);
   if (!match) return null;
-  const [, route, seg] = match;
-  return `${route}/${route === 'w' ? seg.slice(seg.lastIndexOf('-') + 1) : seg}`;
+  const seg = match[1];
+  return `w/${seg.slice(seg.lastIndexOf('-') + 1)}`;
 }
 
 /** The same scope, named by what the app holds rather than by what the URL shows. */
 function scopeOf(scope: WorldScope): string {
-  return 'worldId' in scope ? `w/${segment(scope.worldId)}` : `public/w/${scope.publicToken}`;
+  return `w/${segment(scope.worldId)}`;
 }
 
 /** One layer's contribution to a ColorScheme, in application order — tier 1 first, opt-outs last. */

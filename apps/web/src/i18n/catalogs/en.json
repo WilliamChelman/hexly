@@ -711,13 +711,6 @@
     "runningError": "An import is already running for this world.",
     "removeError": "Couldn't remove that imported set. Please try again."
   },
-  "publicView": {
-    "tabTitle": "Shared — Hexly",
-    "banner": "You're viewing a read-only shared page.",
-    "worldEntities": "Pages in this world",
-    "notFound": "This link is no longer active.",
-    "notFoundBody": "The link may have been revoked, or the address is wrong."
-  },
   "settings": {
     "tabTitle": "Settings",
     "heading": "User Settings",

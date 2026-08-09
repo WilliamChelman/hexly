@@ -173,41 +173,9 @@ export const appRoutes: Route[] = [
     loadComponent: () => import('./pages/styleguide/styleguide.page').then((m) => m.StyleguidePage),
     title: 'styleguide.tabTitle',
   },
-  // Unauthenticated Public Link surface: token-scoped, read-only. Deliberately
-  // outside authGuard — possession of the token is the credential — but on the
-  // Collaboration cut list (ADR-0071): with the layer off no token can exist.
-  {
-    path: 'public/e/:token',
-    canActivate: [collaborationGuard],
-    data: { mode: 'entity' },
-    loadComponent: () => import('./pages/public/public-entity.page').then((m) => m.PublicEntityPage),
-    title: 'publicView.tabTitle',
-  },
-  {
-    path: 'public/w/:token',
-    canActivate: [collaborationGuard],
-    loadComponent: () => import('./pages/public/public-world.page').then((m) => m.PublicWorldPage),
-    title: 'publicView.tabTitle',
-  },
-  {
-    // `:entityId` (not `:id`) keeps the reused EntityPage's watchRoute from matching;
-    // PublicEntityPage marks the session externally driven and is the sole data source.
-    path: 'public/w/:token/e/:entityId',
-    canActivate: [collaborationGuard],
-    data: { mode: 'worldEntity' },
-    loadComponent: () => import('./pages/public/public-entity.page').then((m) => m.PublicEntityPage),
-    title: 'publicView.tabTitle',
-  },
-  {
-    // The Compendium page for the reader with no account: a Mount cascades read through this token's
-    // World, and a pack's terms must never sit behind a wall its content does not (ADR-0080). Hung off
-    // the token that got them here, since there is no World to hang it off.
-    path: 'public/w/:token/compendium/:compendiumId',
-    canActivate: [collaborationGuard],
-    loadComponent: () => import('./pages/compendium-page/compendium.page').then((m) => m.CompendiumPage),
-    title: 'compendium.page.tabTitle',
-    data: { documentTitleKey: 'compendium.page.tabTitleNamed' },
-  },
+  // ADR-0084 retired the anonymous `/public/**` surface with the Public Link: an outsider now reaches
+  // an `open` Entity or an Open World signed in, by its ordinary route, so there is no token route to
+  // register and every former `/public/**` URL falls to the catch-all below.
   // Unmatched URLs render the error page rather than bouncing to the Index, so a
   // wrong URL is visible, not papered over.
   {

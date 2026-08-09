@@ -2,14 +2,13 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, injec
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Observable, map } from 'rxjs';
+import { map } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { CompendiumSummary } from '@hexly/domain';
 import {
   ActiveWorld,
   AppShellStore,
   CompendiumsClient,
-  PublicClient,
   TitleService,
   idFromSegment,
   worldLibraryRoute,
@@ -26,12 +25,8 @@ interface TermRow {
 /**
  * The **Compendium page** (CONTEXT.md), `/w/:worldId/compendium/:compendiumId`: one installed
  * Compendium and the terms its content is published under, where that content is read rather than in
- * the plugin's source tree (ADR-0061).
- *
- * One page, two reads, told apart by the `:token` the route carries: a signed-in caller spends their
- * session on the Instance-wide pack, and the account-less reader a **Mount** cascaded to spends the
- * World Public Link that carried them here (ADR-0080, #410) — the same terms, reached by the standing
- * each one actually holds.
+ * the plugin's source tree (ADR-0061). Every reader is signed in — the anonymous token read retired
+ * with the Public Link (ADR-0084) — so the pack's terms are the Instance-wide read every caller shares.
  */
 @Component({
   selector: 'app-compendium-page',
@@ -102,7 +97,6 @@ interface TermRow {
 })
 export class CompendiumPage {
   private readonly compendiums = inject(CompendiumsClient);
-  private readonly publicLinks = inject(PublicClient);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly route = inject(ActivatedRoute);
   private readonly shell = inject(AppShellStore);
@@ -124,10 +118,7 @@ export class CompendiumPage {
       .filter((term): term is TermRow => !!term.value);
   });
 
-  /**
-   * Back to the **Library** that credited this pack, in the World it was reached from — absent for the
-   * anonymous reader a Mount cascaded read to (ADR-0080), who has no World to go back to.
-   */
+  /** Back to the **Library** that credited this pack, in the World it was reached from (ADR-0080). */
   protected readonly libraryRoute = computed(() => {
     const worldId = this.activeWorld.worldId();
     return worldId ? worldLibraryRoute(worldId, this.activeWorld.name() ?? undefined) : null;
@@ -142,25 +133,18 @@ export class CompendiumPage {
 
     this.route.paramMap
       .pipe(
-        map((params) => ({ token: params.get('token'), id: idFromSegment(params.get('compendiumId') ?? '') })),
+        map((params) => idFromSegment(params.get('compendiumId') ?? '')),
         takeUntilDestroyed(),
       )
-      .subscribe(({ token, id }) => this.load(token, id));
+      .subscribe((id) => this.load(id));
   }
 
-  /**
-   * The pack's terms, read by the standing this reader holds: a World Public Link token where the
-   * route carries one, the signed-in Instance-wide read otherwise (ADR-0080, #410).
-   */
-  private read(token: string | null, id: string): Observable<CompendiumSummary> {
-    return token ? this.publicLinks.worldCompendium(token, id) : this.compendiums.get(id);
-  }
-
-  private load(token: string | null, id: string): void {
+  private load(id: string): void {
     this._compendium.set(null);
     this.notFound.set(false);
     this.loadError.set(false);
-    this.read(token, id)
+    this.compendiums
+      .get(id)
       .pipe(this.shell.withLoading('subtle'))
       .subscribe({
         next: (installed) => this._compendium.set(installed),

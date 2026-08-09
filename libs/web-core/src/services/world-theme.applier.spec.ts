@@ -137,13 +137,11 @@ describe('the World scope a URL names (ADR-0076)', () => {
     expect(worldThemeScope(`/w/${segment(WORLD_ID, 'Renamed')}`)).toBe(`w/${segment(WORLD_ID)}`);
   });
 
-  it('scopes a World Public Link by its token — the visitor has no World id', () => {
-    expect(worldThemeScope('/public/w/tok3n/e/abc')).toBe('public/w/tok3n');
-  });
-
-  it('names no scope outside a World', () => {
+  it('names no scope outside a World — including the retired /public/** paths (ADR-0084)', () => {
     expect(worldThemeScope('/')).toBeNull();
     expect(worldThemeScope('/settings')).toBeNull();
+    // Former Public Link URLs now name no World scope: they are no route (ADR-0084).
+    expect(worldThemeScope('/public/w/tok3n/e/abc')).toBeNull();
     expect(worldThemeScope('/public/e/tok3n')).toBeNull();
   });
 });

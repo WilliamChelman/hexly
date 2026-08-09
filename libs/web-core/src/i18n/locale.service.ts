@@ -28,9 +28,9 @@ export function detectLocale(): Locale {
 }
 
 /**
- * Owns the active {@link Locale} for every actor — signed-in users and anonymous
- * public-link viewers alike — with no backend involvement (ADR-0014). On first visit it
- * follows the browser language; thereafter a remembered choice wins.
+ * Owns the active {@link Locale} with no backend involvement (ADR-0014): the choice is a device fact,
+ * resolved before and independently of any account. On first visit it follows the browser language;
+ * thereafter a remembered choice wins.
  */
 @Injectable({ providedIn: 'root' })
 export class LocaleService {

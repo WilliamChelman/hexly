@@ -11,7 +11,6 @@ import {
   InboundLinkCount,
   MemberRole,
   Mount,
-  PublicLink,
   UpdateUserDefinedTypeRequest,
   UpdateWorldFieldRequest,
   UserDefinedType,
@@ -75,11 +74,6 @@ export class MockWorldsClient {
   runImport = vi.fn<(id: string, importerId: string) => Observable<ImportRunSummary>>();
   importStatus = vi.fn<(id: string) => Observable<ImportRunSummary>>();
   removeImporter = vi.fn<(id: string, importerId: string) => Observable<void>>();
-  // Defaults to no active link so a spec mounting the Public Link control (#162) without
-  // caring about it still renders; override per test as needed.
-  link = vi.fn<(id: string) => Observable<PublicLink | null>>(() => of<PublicLink | null>(null));
-  mintLink = vi.fn<(id: string) => Observable<PublicLink>>();
-  revokeLink = vi.fn<(id: string) => Observable<void>>();
   // Defaults to no available types so a spec mounting the type-authoring panel (#191) without
   // caring about it still renders; override per test as needed.
   availableTypes = vi.fn<(id: string) => Observable<AvailableType[]>>(() => of<AvailableType[]>([]));

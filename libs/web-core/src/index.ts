@@ -29,7 +29,6 @@ export * from './services/live-follow';
 export * from './services/logger';
 export * from './services/nudge-bus.client';
 export * from './services/preferences-sync';
-export * from './services/public.client';
 export * from './services/session-renewal';
 export * from './services/shortcut.service';
 export * from './services/toaster.service';

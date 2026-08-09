@@ -114,8 +114,7 @@ export class EntityNameResolver {
 
   /**
    * Fetch summaries for one batch of ids — the only server dependency of the id→name
-   * resolution. Overridden by the Public Link page to read the token-scoped public surface
-   * instead of the session-guarded `/api/entities` (ADR-0037).
+   * resolution, and a `protected` seam a subclass may swap for a different read.
    */
   protected fetchByIds(ids: string[]): Observable<EntitySummary[]> {
     return this.client.list({ ids }).pipe(map((page) => page.items));

@@ -1,5 +1,5 @@
 import type { APIRequestContext, Page } from '@playwright/test';
-import { enterEntities, expect, preferencesPatched, segRe, test } from './fixtures';
+import { enterEntities, expect, preferencesPatched, segRe, setWorldOpen, signInGrantee, test } from './fixtures';
 // The app's own pretty-URL codec (ADR-0042), imported by file path for the reason `fixtures.ts` gives.
 import { idFromSegment, segment } from '../../../libs/web-core/src/utils/pretty-id';
 
@@ -180,7 +180,7 @@ test('the reader keeps their own ColorScheme inside a themed World, and gets tha
   await clearTheme(request, idFromSegment(worldSeg));
 });
 
-test('a Theme edit reaches a live-following reader, and an anonymous Public Link visitor sees it too', async ({
+test('a Theme edit reaches a live-following reader, and a signed-in non-member reading the Open World sees it too', async ({
   page,
   request,
   browser,
@@ -195,25 +195,15 @@ test('a Theme edit reaches a live-following reader, and an anonymous Public Link
   const violet = await storeTheme(request, worldId, VIOLET);
   await expect.poll(() => inlineOnRoot(page, '--palette-accent')).toBe(violet.light.accent);
 
-  // Mint the World Public Link and open it with no account at all.
-  await page.goto(`/w/${worldSeg}/settings`);
-  await page.getByTestId('settings-nav-sharing').click();
-  const minted = page.waitForResponse(
-    (r) => /\/api\/worlds\/[\w-]+\/link$/.test(r.url()) && r.request().method() === 'POST' && r.ok(),
-  );
-  await page.getByTestId('public-link-create').click();
-  await minted;
-  const url = await page.getByTestId('public-link-url').inputValue();
+  // Open the World (ADR-0084, the successor to the World Public Link), then open it as a second
+  // signed-in account that is not a member — reachable now that the World is Open.
+  await setWorldOpen(page, worldSeg, true);
+  const visitor = await signInGrantee(browser);
+  await visitor.goto(`/w/${worldSeg}`);
 
-  const anonContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
-  const visitor = await anonContext.newPage();
-  await visitor.goto(url);
-  await expect(visitor.getByTestId('public-banner')).toBeVisible();
-
-  // The Theme rides the unauthenticated read, so a visitor with no account is themed like a member.
+  // The Theme rides the ordinary World read, so a non-member is themed like a member.
   await expect.poll(() => inlineOnRoot(visitor, '--palette-accent')).toBe(violet.light.accent);
 
-  await anonContext.close();
+  await visitor.context().close();
   await clearTheme(request, worldId);
-  expect((await request.delete(`/api/worlds/${worldId}/link`)).ok()).toBeTruthy();
 });

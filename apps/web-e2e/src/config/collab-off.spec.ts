@@ -18,7 +18,7 @@ import { idFromSegment } from '../../../../libs/web-core/src/utils/pretty-id';
  * `features.collaboration: false` end-to-end via its own server (ADR-0071; server in
  * `playwright.config.ts`). The profile stays `server`: the flag cuts sharing, not authentication.
  * The account is Sole-User-shaped, so no absence below can be a role check's doing. Enabled
- * companions: `entity-grants.spec.ts` and `public-link.spec.ts`.
+ * companions: `entity-grants.spec.ts` and `visibility-open.spec.ts`.
  */
 
 test('Collaboration off: an Entity carries no sharing affordance, and the routes behind them 404', async ({
@@ -51,8 +51,6 @@ test('Collaboration off: an Entity carries no sharing affordance, and the routes
   // proves less. The dialog's own gate is covered in its unit spec.
   await expect(page.locator('app-owner-set')).toHaveCount(0);
   await expect(page.locator('app-grant-set')).toHaveCount(0);
-  await expect(page.locator('app-public-link')).toHaveCount(0);
-  await expect(page.getByTestId('public-link-create')).toHaveCount(0);
 
   await entitiesRailLink(page).click();
   await expect(page.getByTestId('facet-heading-type')).toBeVisible();
@@ -78,7 +76,9 @@ test('Collaboration off: World Settings keeps its schema and imports groups and 
   await expect(page.getByTestId('settings-nav-schema')).toBeVisible();
   await expect(page.getByTestId('settings-nav-imports')).toBeVisible();
   await expect(page.getByTestId('settings-nav-access')).toHaveCount(0);
+  // The sharing group is the Open-World toggle (ADR-0084), cut with the Collaboration layer.
   await expect(page.getByTestId('settings-nav-sharing')).toHaveCount(0);
+  await expect(page.locator('app-world-open')).toHaveCount(0);
   await expect(page.locator('app-world-types')).toBeVisible();
 
   // Both mount in the group Settings opens on when Collaboration is on, so their absence is the flag's.
@@ -90,13 +90,17 @@ test('Collaboration off: World Settings keeps its schema and imports groups and 
   await page.getByTestId('settings-nav-imports').click();
   await expect(page.getByTestId('importer-draw-steel.importer.monsters')).toHaveCount(0);
 
-  // Enforced too (#315), and no token route a link would hand out is a destination.
+  // Enforced too (#315): member management 404s with the layer off, and the retired Public Link
+  // routes (ADR-0084) 404 as a family — server-side and, on the web, as no route at all.
   const worldId = idFromSegment(worldSeg);
   expect((await request.get(`/api/worlds/${worldId}/members`)).status()).toBe(404);
   expect((await request.get(`/api/worlds/${worldId}/link`)).status()).toBe(404);
+  expect((await request.get(`/api/public/worlds/some-token`)).status()).toBe(404);
+  // The former `/public/**` URLs are no route now (ADR-0084): a signed-in caller lands on the error
+  // page rather than a shared read, the address left visible rather than papered over.
   for (const url of ['/public/w/some-token', '/public/e/some-token', '/public/w/some-token/e/some-entity']) {
     await page.goto(url);
-    await expect(page).toHaveURL(/\/worlds$/);
+    await expect(page.getByTestId('error-home')).toBeVisible();
   }
 });
 

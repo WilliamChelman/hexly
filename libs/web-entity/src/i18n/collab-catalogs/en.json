@@ -48,20 +48,6 @@
     "leave": "Leave",
     "leaveError": "Couldn't leave that world. Please try again."
   },
-  "publicLink": {
-    "worldHeading": "Public link",
-    "worldSubhead": "Anyone with this link can read this world's shared entities — no account needed.",
-    "entityHeading": "Public link",
-    "entitySubhead": "Anyone with this link can read this entity — no account needed. It works even while the entity is private.",
-    "create": "Create public link",
-    "copy": "Copy",
-    "revoke": "Revoke",
-    "copied": "Link copied to clipboard.",
-    "copyError": "Couldn't copy the link.",
-    "loadError": "Couldn't load the public link.",
-    "mintError": "Couldn't create the public link. Please try again.",
-    "revokeError": "Couldn't revoke the public link. Please try again."
-  },
   "entitySearchPicker": {
     "searchPlaceholder": "Search entities…",
     "empty": "No matching entities"
