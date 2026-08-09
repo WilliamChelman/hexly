@@ -16,6 +16,7 @@ import { EntitiesClient, WorldsClient, ActiveWorld } from '@hexly/web-core';
 import { MockEntitiesClient, MockWorldsClient } from '@hexly/web-core/testing';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
+import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { WorldDashboardPage } from './world-dashboard.page';
 
 function summary(id: string, name = id, type: EntityType = 'core.type.note', updatedAt = 1): EntitySummary {
@@ -70,6 +71,8 @@ describe('WorldDashboard', () => {
         providePluginContent(),
         providePluginHexmap(),
         provideRouter([]),
+        // The pin picker's box reads its Facet vocabulary off the registry, synchronously (ADR-0082).
+        provideEntityTypesTesting([]),
         { provide: EntitiesClient, useValue: entities },
         { provide: WorldsClient, useValue: worlds },
         {
@@ -163,8 +166,9 @@ describe('WorldDashboard', () => {
     // The picker searches via list({q}) — the recents stub is its option source here.
     ($(el, '[data-testid=pin-picker-option-e1]') as HTMLButtonElement).click();
 
-    // The picker is scoped to the active World so a pin can't be a foreign-World Entity.
-    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ q: '', worldId: 'w1' }));
+    // The picker is scoped to the active World so a pin can't be a foreign-World Entity. An empty box
+    // now names no `q` at all rather than a blank one (ADR-0082) — the same wire either way.
+    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1' }));
     // Appended to the existing set, sent wholesale.
     expect(worlds.setPins).toHaveBeenCalledWith('w1', ['p1', 'e1']);
     // The returned Detail re-pins the active World so the pins re-resolve.

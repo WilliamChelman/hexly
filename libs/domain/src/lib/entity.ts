@@ -235,6 +235,8 @@ export type EntityRead = z.infer<typeof entityReadSchema>;
  * `GET /entities` query params, all optional and composable. Facet params
  * (`type`/`tag`/`visibility`) repeat in the query string (`?tag=a&tag=b`) and
  * combine OR within a category, AND across categories, all AND-ed with `q`.
+ * Each has an `exclude*` twin carrying the same validation (ADR-0081): a row survives a category iff
+ * *(no includes, or it carries an included value)* AND *(it carries none of the excluded ones)*.
  * A malformed `limit` is a 400; an over-cap `limit` is clamped. `cursor` is only
  * shape-checked here — its decode is server-internal.
  */
@@ -254,6 +256,21 @@ export const entityListQuerySchema = z.object({
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
   visibility: z
+    .union([visibilitySchema, z.array(visibilitySchema)])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
+  // The excluding half of each category (ADR-0081): mirrors of the three above, same validation, so an
+  // unknown Entity Type or Visibility is a 400 either way round. A Field is excluded through `field`'s
+  // own `neq` op instead — that grammar already carries an operator, and one built to degrade.
+  excludeType: z
+    .union([entityTypeSchema, z.array(entityTypeSchema)])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
+  excludeTag: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
+  excludeVisibility: z
     .union([visibilitySchema, z.array(visibilitySchema)])
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
@@ -280,6 +297,12 @@ export const entityListQuerySchema = z.object({
   // own values) rather than redefining what the read is about. Nothing outside the scope can be
   // reached by naming it here: both predicates AND.
   container: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
+  // The Container facet's excluding half (ADR-0081) — a narrowing within the scope like `container`,
+  // never a way to reach outside it: the scope predicate stands whatever this says.
+  excludeContainer: z
     .union([z.string(), z.array(z.string())])
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),

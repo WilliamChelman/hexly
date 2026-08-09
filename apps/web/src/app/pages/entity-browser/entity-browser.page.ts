@@ -1,35 +1,22 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
+import { Subscription, finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityFacets, EntityPage, EntitySummary, EntityType, Visibility } from '@hexly/domain';
+import { EntityFacets, EntityPage, EntitySummary } from '@hexly/domain';
 import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, AppShellStore } from '@hexly/web-core';
-import { ButtonComponent, DialogService, EyebrowComponent, PageHeaderComponent } from '@hexly/web-ui';
+import {
+  ButtonComponent,
+  DialogService,
+  EyebrowComponent,
+  FacetMissComponent,
+  PageHeaderComponent,
+} from '@hexly/web-ui';
 import { NewEntityButtonComponent } from '../../entity-types/new-entity-button.component';
 import { DeleteEntityDialogComponent, DeleteEntityDialogData } from '../../entity-types/delete-entity-dialog.component';
 import { EntityCardComponent } from './components/entity-card.component';
 import { EntitySearchComponent } from './components/entity-search.component';
 import { EmptyStateComponent } from './components/empty-state.component';
-import {
-  ActiveFacets,
-  FacetRailComponent,
-  FacetToggle,
-  FieldRangeChange,
-  FieldSelection,
-  FieldValueToggle,
-} from './components/facet-rail.component';
-import { fieldTokens, fieldsFromTokens, pruneField } from './components/field-facet-url';
-
-const NO_FACETS: ActiveFacets = {
-  type: [],
-  tag: [],
-  visibility: [],
-  fields: {},
-  // Never filled here: the server offers the Container facet only where a read spans more than one
-  // Container, and the Entity Browser is scoped to one World — a Mounted one included (ADR-0080).
-  container: [],
-};
+import { FacetRailComponent } from './components/facet-rail.component';
+import { FACET_CATEGORIES, FacetTokenStore } from './components/facet-token-store';
 
 const NO_FACET_COUNTS: EntityFacets = {
   type: [],
@@ -41,9 +28,6 @@ const NO_FACET_COUNTS: EntityFacets = {
 // ponytail: bounded first page so a large vault loads fast; bump or make
 // configurable only if a real page size proves wrong in use.
 const PAGE_SIZE = 50;
-
-// Same 150ms the shared searchEntities helper uses for autocomplete.
-const SEARCH_DEBOUNCE_MS = 150;
 
 // ponytail: cap the per-session first-page cache so a marathon session of distinct
 // queries can't grow it without bound; oldest-out is plenty for backspace/retype.
@@ -65,9 +49,14 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
     EntityCardComponent,
     EntitySearchComponent,
     EmptyStateComponent,
+    FacetMissComponent,
     FacetRailComponent,
     NewEntityButtonComponent,
   ],
+  // The universal trio, and no Container: this browse is scoped to one World — a Mounted one included
+  // (ADR-0080) — so `$in:` has nothing to narrow and is reported as a miss (ADR-0082).
+  providers: [{ provide: FACET_CATEGORIES, useValue: ['type', 'tag', 'visibility'] }],
+  hostDirectives: [FacetTokenStore],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <app-page-header sticky>
@@ -81,16 +70,27 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
     </app-page-header>
 
     <main class="max-w-[72rem] mx-auto py-8 px-6">
-      <app-entity-search [value]="query()" (queryChange)="onSearch($event)" />
+      <!-- The box offers the whole vocabulary on the dollar (ADR-0082): keys off the registry, values
+           off the Facet read this page already runs. -->
+      <app-entity-search
+        [value]="filters.rawQuery()"
+        [keys]="filters.facetKeys()"
+        [facets]="facetCounts()"
+        (queryChange)="filters.onSearch($event)"
+      />
+      <!-- What the Tokens applied nothing for is *said*, never quietly searched for (ADR-0082). -->
+      <app-facet-miss class="-mt-6 mb-8 font-sans text-sm text-ink-faint" [parsed]="filters.parsedQuery()" />
       <div class="grid grid-cols-1 lg:grid-cols-[14rem_1fr] gap-8 items-start">
         <app-facet-rail
           [facetCounts]="facetCounts()"
-          [active]="activeFacets()"
-          [canClear]="hasFilters()"
-          (toggled)="toggleFacet($event)"
-          (fieldValueToggled)="toggleFieldValue($event)"
-          (fieldRangeChanged)="changeFieldRange($event)"
-          (clearAll)="clearAll()"
+          [active]="filters.activeFacets()"
+          [queryOwned]="filters.queryOwned()"
+          [canClear]="filters.hasFilters()"
+          [canExclude]="true"
+          (toggled)="filters.toggleFacet($event)"
+          (fieldValueToggled)="filters.toggleFieldValue($event)"
+          (fieldRangeChanged)="filters.changeFieldRange($event)"
+          (clearAll)="filters.clearAll()"
         />
         <div>
           @if (cards().length > 0) {
@@ -129,7 +129,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
               [title]="'entityBrowser.loadErrorTitle' | transloco"
               [hint]="'entityBrowser.loadErrorHint' | transloco"
             />
-          } @else if (loaded() && query()) {
+          } @else if (loaded() && filters.hasQuery()) {
             <app-empty-state
               testid="no-matches"
               [title]="'entityBrowser.noMatchTitle' | transloco"
@@ -150,12 +150,12 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
 export class EntityBrowserPage {
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly activeWorld = inject(ActiveWorld);
-  private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
   private readonly dialogs = inject(DialogService);
+  /** Both filter stores, `parse(text) ∪ railState` (ADR-0082) — the box, the rail, and their URL mirror. */
+  protected readonly filters = inject(FacetTokenStore);
 
   protected readonly worldId = this.activeWorld.worldId;
 
@@ -184,27 +184,7 @@ export class EntityBrowserPage {
   protected readonly loadError = signal(false);
   protected readonly renamingId = signal<string | null>(null);
 
-  /** Debounced full-text query; empty means the default last-edited view.
-   * Source of truth for the URL `q` mirror. */
-  protected readonly query = signal('');
-  private readonly typed = new Subject<string>();
-
-  /** Value-equal so the URL round-trip's echo (a fresh object, same values)
-   * doesn't re-trigger the fetch effect — one refetch per toggle. */
-  protected readonly activeFacets = signal<ActiveFacets>(NO_FACETS, {
-    equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
-  });
   protected readonly facetCounts = signal<EntityFacets>(NO_FACET_COUNTS);
-  protected readonly hasFilters = computed(() => {
-    const f = this.activeFacets();
-    return (
-      this.query() !== '' ||
-      f.type.length > 0 ||
-      f.tag.length > 0 ||
-      f.visibility.length > 0 ||
-      Object.keys(f.fields).length > 0
-    );
-  });
 
   /** In-flight Facet-count read, cancelled on refetch so a late one can't overwrite. */
   private facetsSub?: Subscription;
@@ -222,134 +202,23 @@ export class EntityBrowserPage {
   private readonly firstPageCache = new Map<string, { items: EntitySummary[]; nextCursor: string | null }>();
 
   constructor() {
-    // Seed query + Facets from the URL and follow back/forward. Subscribed before
-    // the fetch effect so the synchronous first emission lands before the first
-    // fetch — one request on load. The distinctUntilChanged absorbs the echo when
-    // a toggle's own navigate round-trips back, so there's no read/write loop.
-    this.route.queryParamMap
-      .pipe(
-        map((params) => ({
-          q: params.get('q') ?? '',
-          type: params.getAll('type'),
-          tag: params.getAll('tag'),
-          visibility: params.getAll('visibility'),
-          field: params.getAll('field'),
-        })),
-        distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
-        takeUntilDestroyed(),
-      )
-      .subscribe((f) => {
-        this.query.set(f.q);
-        this.activeFacets.set({
-          type: f.type,
-          tag: f.tag,
-          visibility: f.visibility,
-          fields: fieldsFromTokens(f.field),
-          container: [],
-        });
-      });
-
-    this.typed.pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed()).subscribe((raw) => {
-      const q = raw.trim();
-      this.query.set(q);
-      // Mirror to the URL: merge keeps the World scope, replaceUrl avoids a
-      // history entry per keystroke.
-      this.router.navigate([], {
-        relativeTo: this.route,
-        queryParams: { q: q || null },
-        queryParamsHandling: 'merge',
-        replaceUrl: true,
-      });
-    });
-
     // Refetch page one whenever the World, query, or Facets change — covers a
-    // param-only switch between Worlds (same component instance).
+    // param-only switch between Worlds (same component instance). The store seeds both
+    // filter stores from the URL in its own constructor, ahead of this effect, so the
+    // first fetch already carries them — one request on load.
     effect(() => {
-      this.query(); // tracked
-      this.activeFacets(); // tracked
+      this.filters.filterParams(); // tracked
       if (this.activeWorld.worldId()) this.fetchFirstPage();
-    });
-  }
-
-  protected onSearch(value: string): void {
-    this.typed.next(value);
-  }
-
-  protected toggleFacet({ category, value }: FacetToggle): void {
-    const current = this.activeFacets();
-    const values = current[category];
-    const next = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
-    this.applyFacets({ ...current, [category]: next });
-  }
-
-  /** Toggle one enum/list/string Field-facet value (eq membership, OR within the Field). */
-  protected toggleFieldValue({ key, value }: FieldValueToggle): void {
-    const current = this.activeFacets();
-    const sel = current.fields[key] ?? {};
-    const values = sel.values ?? [];
-    const nextValues = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
-    this.setFieldSelection(current, key, { ...sel, values: nextValues });
-  }
-
-  /** Set (or clear) one bound of a number/date Field range. */
-  protected changeFieldRange({ key, bound, value }: FieldRangeChange): void {
-    const current = this.activeFacets();
-    const sel = current.fields[key] ?? {};
-    this.setFieldSelection(current, key, {
-      ...sel,
-      [bound]: value || undefined,
-    });
-  }
-
-  /** Fold a Field selection back into the active facets, pruning it away once empty. */
-  private setFieldSelection(current: ActiveFacets, key: string, sel: FieldSelection): void {
-    const fields = { ...current.fields };
-    const pruned = pruneField(sel);
-    if (pruned) fields[key] = pruned;
-    else delete fields[key];
-    this.applyFacets({ ...current, fields });
-  }
-
-  /** Commit a new active-facet set: update the signal and mirror it to the URL. */
-  private applyFacets(updated: ActiveFacets): void {
-    this.activeFacets.set(updated);
-    this.mirrorToUrl(updated);
-  }
-
-  protected clearAll(): void {
-    this.query.set('');
-    this.activeFacets.set(NO_FACETS);
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: {
-        q: null,
-        type: null,
-        tag: null,
-        visibility: null,
-        field: null,
-      },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
-  }
-
-  private mirrorToUrl(facets: ActiveFacets): void {
-    const field = fieldTokens(facets.fields);
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: {
-        type: facets.type.length ? [...facets.type] : null,
-        tag: facets.tag.length ? [...facets.tag] : null,
-        visibility: facets.visibility.length ? [...facets.visibility] : null,
-        field: field.length ? field : null,
-      },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
     });
   }
 
   /** Fetch page one and replace the accumulated list — on load and after every create/rename/delete. */
   private fetchFirstPage(): void {
+    // A Facet key the registry cannot answer for yet: read now, these params would name no Field and
+    // browse the whole World, then correct themselves under the reader (ADR-0082). Read inside the
+    // effect above, so the read it holds is re-run the moment the Fields land — or fail, which degrades
+    // to no World Fields and settles the key as a miss.
+    if (this.filters.filtersPending()) return;
     const worldId = this.activeWorld.worldId();
     // Never fetch the whole owner list (every World) if the segment is somehow absent.
     if (!worldId) return;
@@ -357,7 +226,7 @@ export class EntityBrowserPage {
     this.fetchSub?.unsubscribe();
     this.loadMoreSub?.unsubscribe();
     this.loadingMore.set(false);
-    const params = this.activeFilterParams();
+    const params = this.filters.filterParams();
     const worldChanged = worldId !== this.shownWorldId;
     this.shownWorldId = worldId;
     const key = worldId + ' ' + JSON.stringify(params);
@@ -402,19 +271,6 @@ export class EntityBrowserPage {
     this.fetchFacetCounts(worldId, params);
   }
 
-  private activeFilterParams(): EntityFacetParams {
-    const q = this.query();
-    const f = this.activeFacets();
-    const field = fieldTokens(f.fields);
-    return {
-      ...(q ? { q } : {}),
-      ...(f.type.length ? { type: [...f.type] as EntityType[] } : {}),
-      ...(f.tag.length ? { tag: [...f.tag] } : {}),
-      ...(f.visibility.length ? { visibility: [...f.visibility] as Visibility[] } : {}),
-      ...(field.length ? { field } : {}),
-    };
-  }
-
   /** A failed read leaves the last-good counts on screen rather than blanking the rail. */
   private fetchFacetCounts(worldId: string, params: EntityFacetParams): void {
     this.facetsSub?.unsubscribe();
@@ -446,7 +302,7 @@ export class EntityBrowserPage {
         worldId: this.activeWorld.worldId() ?? undefined,
         rights: true,
         thumbnails: true,
-        ...this.activeFilterParams(),
+        ...this.filters.filterParams(),
       })
       .pipe(finalize(() => this.loadingMore.set(false)))
       .subscribe({

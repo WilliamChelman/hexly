@@ -9,6 +9,7 @@ import { CONTENT_EDITOR_TEST_CATALOGS } from '@hexly/plugin-content/testing';
 import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { IS_MAC_PLATFORM, ShortcutService } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { BOARD_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { BoardStore } from '../services/board-store';
 import { BoardCamera } from '../services/board-camera';
@@ -39,6 +40,8 @@ function pointerUp(init: PointerEventInit = {}): void {
 // A Text Block now renders the real Content editor for both faces (#268), so any test that mounts one
 // needs the editor's ambient deps — mirrors the TextBlock/ContentEditor harnesses.
 const contentEditorHarness = () => [
+  // The `@` mention inside the reused editor reads its Facet vocabulary off the registry (ADR-0082).
+  provideEntityTypesTesting([]),
   EntityNameResolver,
   provideHttpClient(),
   provideHttpClientTesting(),

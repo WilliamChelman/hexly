@@ -12,6 +12,7 @@ import { ContentEditorComponent } from '@hexly/plugin-content/editor';
 import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '@hexly/plugin-content/testing';
+import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { BOARD_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { BoardStore } from '../services/board-store';
 import { FakeEntitySession, provideBoardStoreTesting } from '../testing/entity-session.fake';
@@ -29,6 +30,8 @@ describe('TextBlockComponent', () => {
         ...provideBoardStoreTesting(),
         // The reused RichContent editor's ambient dependencies (mirrors the ContentEditor spec harness).
         EntityNameResolver,
+        // The `@` mention inside that editor reads its Facet vocabulary off the registry (ADR-0082).
+        provideEntityTypesTesting([]),
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),

@@ -106,6 +106,18 @@ describe('EntityNameResolver', () => {
     expect(items.map((e) => e.id)).toEqual(['n1']);
   });
 
+  it('sends the Facet Tokens the box named, the wire carrying the residual text (ADR-0082)', async () => {
+    const resolver = createResolver();
+    const client = TestBed.inject(EntitiesClient) as unknown as { list: (opts: EntityListParams) => unknown };
+    vi.spyOn(client, 'list').mockReturnValue(of({ items: [], nextCursor: null }));
+
+    await resolver.search('$type:core.type.npc gorb', 'w1', { q: 'gorb', type: ['core.type.npc'] });
+
+    expect(client.list).toHaveBeenCalledWith(
+      expect.objectContaining({ q: 'gorb', type: ['core.type.npc'], read: 'link-target', worldId: 'w1' }),
+    );
+  });
+
   it('repeats a query from cache — a take-first search never revalidates', async () => {
     const resolver = createResolver();
     const client = TestBed.inject(EntitiesClient) as unknown as { list: (opts: EntityListParams) => unknown };

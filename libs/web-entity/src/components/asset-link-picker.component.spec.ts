@@ -4,6 +4,8 @@ import { of, throwError } from 'rxjs';
 import { EntityDetail, EntityLinkValue, EntityPage, EntitySummary } from '@hexly/domain';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { UI_TEST_CATALOGS } from '@hexly/web-ui/testing';
+import { provideEntityTypesTesting } from '../testing/entity-types.fake';
 import { AssetLinkPickerComponent } from './asset-link-picker.component';
 import { COLLAB_TEST_CATALOGS, WEB_ENTITY_TEST_CATALOGS } from '../i18n/test-catalogs';
 
@@ -67,10 +69,12 @@ describe('AssetLinkPicker', () => {
       return of(page([asset('img-1', 'Castle'), asset('img-2', 'Forest')]));
     });
     await TestBed.configureTestingModule({
-      imports: [Host, provideTranslocoTesting(WEB_ENTITY_TEST_CATALOGS, COLLAB_TEST_CATALOGS)],
+      imports: [Host, provideTranslocoTesting(WEB_ENTITY_TEST_CATALOGS, COLLAB_TEST_CATALOGS, UI_TEST_CATALOGS)],
       providers: [
         { provide: EntitiesClient, useValue: entities },
         { provide: AssetsClient, useValue: assets },
+        // The box reads its Facet vocabulary off the registry, synchronously (ADR-0082).
+        provideEntityTypesTesting([]),
       ],
     }).compileComponents();
   });
@@ -222,5 +226,67 @@ describe('AssetLinkPicker', () => {
     expect(byId(el, 'asset-link-value')?.textContent).toContain('The Whisperwood');
     expect(byId(el, 'asset-link-open')).toBeNull();
     expect(byId(el, 'asset-link-clear')).toBeNull();
+  });
+
+  /**
+   * The token language, in the asset picker (ADR-0082): a Facet is named inline, values and counts come
+   * off the read this panel already runs, and with no rail here a filter is reversed by backspacing it.
+   * `$type` answers to nothing — the read is pinned to the asset type — and says so.
+   */
+  describe('the token language', () => {
+    beforeEach(() => {
+      entities.facets.mockImplementation(() =>
+        of({
+          type: [],
+          tag: [
+            { value: 'heraldry', count: 2 },
+            { value: 'draft', count: 1 },
+          ],
+          visibility: [],
+          fields: [],
+        }),
+      );
+    });
+
+    function open() {
+      const { fixture, el } = render();
+      (byId(el, 'asset-link-open') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      const box = byId(el, 'asset-link-search') as HTMLInputElement;
+      const type = (text: string) => {
+        box.value = text;
+        box.setSelectionRange(text.length, text.length);
+        box.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+      };
+      return { fixture, el, type };
+    }
+
+    it('narrows by a typed Facet under the pinned asset type, then gives it back on backspace', () => {
+      const { type } = open();
+
+      type('$tag:heraldry castle');
+      expect(entities.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ q: 'castle', tag: ['heraldry'], type: ['core.type.asset'] }),
+      );
+
+      type('castle');
+      expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'castle' }));
+      expect(entities.list.mock.lastCall?.[0]).not.toHaveProperty('tag');
+    });
+
+    it('offers values and counts off the read it already runs, and reports a key it cannot apply', () => {
+      const { el, type } = open();
+
+      type('$tag:');
+      const rows = Array.from(el.querySelectorAll('[role=option]')).map((row) =>
+        (row.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      );
+      expect(rows).toEqual(['heraldry2', 'draft1']);
+
+      type('$type:core.type.note');
+      expect(byId(el, 'asset-link-unknown-facet')?.textContent).toContain('type');
+      expect(entities.list).toHaveBeenLastCalledWith(expect.objectContaining({ type: ['core.type.asset'] }));
+    });
   });
 });

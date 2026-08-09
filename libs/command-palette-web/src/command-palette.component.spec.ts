@@ -1,5 +1,7 @@
 import { ShortcutService } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { UI_TEST_CATALOGS } from '@hexly/web-ui/testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
@@ -26,6 +28,33 @@ function render() {
   return fixture;
 }
 
+function inputEl(fixture: ReturnType<typeof render>): HTMLInputElement {
+  return fixture.nativeElement.querySelector('[data-testid="command-palette-input"]');
+}
+
+/** Type into the box as a caller would: the DOM value, the caret, then the event. */
+function typeAt(fixture: ReturnType<typeof render>, text: string): void {
+  const input = inputEl(fixture);
+  input.value = text;
+  input.setSelectionRange(text.length, text.length);
+  input.dispatchEvent(new Event('input'));
+  fixture.detectChanges();
+}
+
+/** The Facet suggestion rows alone — the result rows are options too, and are read separately. */
+function suggestions(fixture: ReturnType<typeof render>): string[] {
+  return Array.from(
+    fixture.nativeElement.querySelectorAll('[data-testid="command-palette-input-suggestions"] [role=option]'),
+  ).map((row) => ((row as HTMLElement).textContent ?? '').replace(/\s+/g, ' ').trim());
+}
+
+function press(fixture: ReturnType<typeof render>, key: string, keyCode?: number): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key, keyCode, bubbles: true, cancelable: true } as KeyboardEventInit);
+  inputEl(fixture).dispatchEvent(event);
+  fixture.detectChanges();
+  return event;
+}
+
 function dialogEl(fixture: ReturnType<typeof render>): HTMLDialogElement {
   return fixture.nativeElement.querySelector('dialog');
 }
@@ -33,7 +62,7 @@ function dialogEl(fixture: ReturnType<typeof render>): HTMLDialogElement {
 describe('CommandPalette', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [CommandPaletteComponent, provideTranslocoTesting(COMMAND_PALETTE_TEST_CATALOGS)],
+      imports: [CommandPaletteComponent, provideTranslocoTesting(COMMAND_PALETTE_TEST_CATALOGS, UI_TEST_CATALOGS)],
     });
   });
 
@@ -313,6 +342,170 @@ describe('CommandPalette', () => {
     // A real anchor with an href — so middle-click / Ctrl+click open a new tab.
     expect(option.tagName).toBe('A');
     expect(option.getAttribute('href')).toBe('/w/w1/entities/e1');
+  });
+
+  /**
+   * The Palette adopts the shared search box (ADR-0082), so a **Facet Token** narrows Quick Open the way
+   * it narrows every other Entity search. **Key typeahead only**: the Palette runs no Facet read of its
+   * own, so no value suggestion and no count appears here — what a token *means* is the Provider's, and
+   * is read on the wire in its own spec.
+   */
+  describe('Facet Tokens', () => {
+    /** A World-scoped Entity Provider as the Palette meets one: results, and a vocabulary it can apply. */
+    function entityProvider(commands: readonly Command[] = []): CommandProvider {
+      return {
+        prefix: '',
+        label: 'commandPalette.entities',
+        search: () => of(commands),
+        facetKeys: () => ({ reserved: ['type', 'tag'], fields: ['world.field.region'] }),
+      };
+    }
+
+    function open(provider: CommandProvider) {
+      TestBed.inject(CommandRegistry).register(provider);
+      const fixture = render();
+      dispatchCmdK();
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    it('reveals the whole vocabulary on `$`, World-defined Fields included', () => {
+      const fixture = open(entityProvider());
+
+      typeAt(fixture, '$');
+
+      // The Provider's own key set, resolved synchronously — Fields among them, the Palette having a
+      // World to be scoped to (ADR-0083).
+      expect(suggestions(fixture)).toEqual(['type', 'tag', 'world.field.region']);
+    });
+
+    it('offers no value suggestions and no counts — there is no Facet read here', () => {
+      const fixture = open(entityProvider());
+
+      typeAt(fixture, '$type:');
+
+      expect(suggestions(fixture)).toEqual([]);
+    });
+
+    it('offers nothing where no Provider names a vocabulary — the Palette outside a World', () => {
+      const fixture = open({ prefix: '', label: 'commandPalette.worlds', search: () => of([]) });
+
+      typeAt(fixture, '$');
+
+      expect(suggestions(fixture)).toEqual([]);
+    });
+
+    it('gives ↑↓ and Enter to the suggestion list while it is open, and to the results while it is shut', () => {
+      const runA = vi.fn();
+      const runB = vi.fn();
+      const fixture = open(
+        entityProvider([
+          { id: 'a', label: 'A', run: runA },
+          { id: 'b', label: 'B', run: runB },
+        ]),
+      );
+
+      typeAt(fixture, '$t');
+      press(fixture, 'ArrowDown', 40);
+      press(fixture, 'Enter');
+
+      // The list took both keys: the second key was completed, and no result was run under it.
+      expect(inputEl(fixture).value).toBe('$tag:');
+      expect(runA).not.toHaveBeenCalled();
+      expect(runB).not.toHaveBeenCalled();
+
+      // Shut, the same keys are the Palette's own, as they were before the box grew a list.
+      typeAt(fixture, 'ald');
+      press(fixture, 'ArrowDown', 40);
+      press(fixture, 'Enter');
+
+      expect(runB).toHaveBeenCalled();
+      expect(runA).not.toHaveBeenCalled();
+    });
+
+    it('dismisses the suggestions on Escape and leaves the Palette open', () => {
+      const fixture = open(entityProvider());
+      typeAt(fixture, '$');
+
+      const escape = press(fixture, 'Escape');
+
+      expect(suggestions(fixture)).toEqual([]);
+      // Defaulted away from the native <dialog> cancel, so dismissing a list never closes the overlay.
+      expect(escape.defaultPrevented).toBe(true);
+      expect(dialogEl(fixture).open).toBe(true);
+      // The box keeps what was typed; dismissing a list is not clearing a query.
+      expect(inputEl(fixture).value).toBe('$');
+    });
+
+    it('says a `$` name nothing here answers to, rather than searching for it as text', () => {
+      const fixture = open(entityProvider());
+
+      typeAt(fixture, 'orc $domain:material');
+
+      const notice = fixture.nativeElement.querySelector('[data-testid="command-palette-unknown-facet"]');
+      expect(notice?.textContent).toContain('domain');
+      expect(notice?.getAttribute('role')).toBe('status');
+    });
+
+    it('says nothing about a key the Providers do answer to', () => {
+      const fixture = open(entityProvider());
+
+      typeAt(fixture, '$tag:draft');
+
+      expect(fixture.nativeElement.querySelector('[data-testid="command-palette-unknown-facet"]')).toBeNull();
+    });
+
+    /**
+     * A Provider whose vocabulary is still loading — the Entity one, on a cold World (ADR-0082, #430).
+     * The Palette already defers the *search* until it can resolve the key; the banner used to run ahead
+     * of it and call the key unknown, then retract that when the response landed. The readiness arrives
+     * through the Provider, the same seam the key set does — the Palette depends on no registry of its own.
+     */
+    it('holds its miss report for a key a Provider cannot answer for yet, and states it once it can', () => {
+      const settled = signal(false);
+      const provider: CommandProvider = {
+        ...entityProvider(),
+        facetKeys: () => ({ reserved: ['type', 'tag'], fields: settled() ? ['world.field.region'] : [] }),
+        // Read inside the Palette's computed, so flipping it re-runs the report.
+        facetKeySettled: (key) => settled() || ['type', 'tag'].includes(key),
+      };
+      const fixture = open(provider);
+      const notice = () => fixture.nativeElement.querySelector('[data-testid="command-palette-unknown-facet"]');
+
+      typeAt(fixture, '$world.field.region:north');
+      expect(notice()).toBeNull();
+
+      // The Fields land, and this one is among them: still no miss, and now a resolved token.
+      settled.set(true);
+      fixture.detectChanges();
+      expect(notice()).toBeNull();
+    });
+
+    it('states the miss for a key the Provider settles without', () => {
+      const settled = signal(false);
+      const provider: CommandProvider = {
+        ...entityProvider(),
+        facetKeySettled: () => settled(),
+      };
+      const fixture = open(provider);
+      const notice = () => fixture.nativeElement.querySelector('[data-testid="command-palette-unknown-facet"]');
+
+      typeAt(fixture, 'orc $domain:material');
+      expect(notice()).toBeNull();
+
+      settled.set(true);
+      fixture.detectChanges();
+
+      expect(notice()?.textContent).toContain('domain');
+    });
+
+    it('keeps the box a plain text field, so Escape stays the overlay’s', () => {
+      const fixture = open(entityProvider());
+
+      // A search field clears itself on Escape in Blink and WebKit, eating the key the dialog cancels
+      // on. jsdom implements no such default, so the type is pinned here rather than left to a browser.
+      expect(inputEl(fixture).getAttribute('type')).toBe('text');
+    });
   });
 
   it('opens a routable command in a new tab on Ctrl+Enter, without running it in place', () => {

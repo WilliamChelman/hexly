@@ -1,10 +1,12 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityLinkValue, EntitySummary } from '@hexly/domain';
 import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_TOKEN } from '@hexly/plugin-asset';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
+import { FacetMissComponent, FacetSearchInputComponent } from '@hexly/web-ui';
 import { ContainerChipsComponent } from './container-chips.component';
-import { containerFacet, linkTargetRead } from './link-target-read';
+import { pickerFacetTokens } from './picker-facet-tokens';
+import { linkTargetFacets, linkTargetRead } from './link-target-read';
 
 /**
  * The **pick-or-upload** affordance the core entityLink control grows whenever a Field's `targetTypes`
@@ -22,7 +24,7 @@ import { containerFacet, linkTargetRead } from './link-target-read';
 @Component({
   selector: 'app-asset-link-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ContainerChipsComponent, TranslocoPipe],
+  imports: [ContainerChipsComponent, FacetMissComponent, FacetSearchInputComponent, TranslocoPipe],
   template: `
     <div class="flex flex-col gap-2" data-testid="asset-link-control">
       <!-- Current value: a preview tile + its last-known name, so a deleted/hidden target stays legible. -->
@@ -81,14 +83,22 @@ import { containerFacet, linkTargetRead } from './link-target-read';
               </p>
             }
 
-            <!-- Pick: search over the World's image Assets, rendered as preview tiles (picked by sight). -->
-            <input
-              type="search"
-              class="w-full rounded-md border border-line bg-surface-sunken px-2 py-1 text-sm"
-              data-testid="asset-link-search"
-              [attr.placeholder]="'fields.assetLink.search' | transloco"
+            <!-- Pick: search over the World's image Assets, rendered as preview tiles (picked by sight).
+                 The shared box (ADR-0082): the image Facets this read already counts — orientation, hue —
+                 are typeable here as Facet Tokens, and backspacing one reverses it. -->
+            <app-facet-search-input
+              testid="asset-link-search"
               [value]="query()"
-              (input)="query.set($any($event.target).value)"
+              [keys]="tokens.keys()"
+              [facets]="facets()"
+              [placeholder]="'fields.assetLink.search' | transloco"
+              (queryChange)="query.set($event)"
+            />
+            <!-- What the Tokens applied nothing for is *said*, never quietly searched for (ADR-0082). -->
+            <app-facet-miss
+              class="text-xs text-ink-faint"
+              [parsed]="tokens.parsed()"
+              testid="asset-link-unknown-facet"
             />
             <!-- The **Container** facet (ADR-0080): a World that Mounts a shelf is offered its art here
                  too, and these chips narrow to one shelf. Nothing Mounted, nothing to narrow, no chips. -->
@@ -158,16 +168,31 @@ export class AssetLinkPickerComponent {
   protected readonly currentThumb = signal<string | undefined>(undefined);
 
   /**
+   * What the box means (ADR-0082). `$type` is out of the vocabulary: this picker is pinned to the asset
+   * type, and the wire's `type` ORs, so a token there could only widen past the pin — a stated miss.
+   */
+  protected readonly tokens = pickerFacetTokens(
+    () => this.query(),
+    () => false,
+  );
+
+  /**
    * Designating a Thumbnail is pointing at an Entity, so this is a **link-target read** like every other
    * Entity Link Field picker's (ADR-0079) — which is what offers a mounted Shelf's art beside this World's
    * own (ADR-0080). Resolving the *current* value is not: that is an id lookup, through no scope at all.
    */
   protected readonly targets = linkTargetRead(
     () => this.worldId(),
-    () => ({ q: this.query().trim(), type: [CORE_ASSET_TYPE_ID], field: [IMAGE_KIND_FIELD_TOKEN] }),
+    () => {
+      // The residual text and the tokens' own filters, under the pinned type and image kind (ADR-0082).
+      const { field = [], ...narrowing } = this.tokens.narrowing();
+      return { ...narrowing, type: [CORE_ASSET_TYPE_ID], field: [IMAGE_KIND_FIELD_TOKEN, ...field] };
+    },
   );
+  /** The one Facet read behind both the chips and the box's value typeahead — no request per keystroke. */
+  protected readonly facets = linkTargetFacets(this.targets.params, () => this.picking());
   /** The **Container** facet's live values — this World and the ones it Mounts that still hold a match. */
-  protected readonly containers = containerFacet(this.targets.params, () => this.picking());
+  protected readonly containers = computed(() => this.facets()?.container ?? []);
 
   constructor() {
     // Resolve the current value's preview tile whenever the link changes (ADR-0066): one read by id with

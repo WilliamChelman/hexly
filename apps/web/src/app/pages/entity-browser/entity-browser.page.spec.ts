@@ -10,6 +10,7 @@ import { DialogRef, DialogService } from '@hexly/web-ui';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntityBrowserPage } from './entity-browser.page';
+import { TypeRegistry } from '../../entity-types/type-registry';
 
 describe('EntityBrowser', () => {
   let client: MockEntitiesClient;
@@ -899,6 +900,9 @@ describe('EntityBrowser', () => {
             tag: null,
             visibility: null,
             field: null,
+            excludeType: null,
+            excludeTag: null,
+            excludeVisibility: null,
           },
         }),
       );
@@ -941,6 +945,67 @@ describe('EntityBrowser', () => {
         worldId: 'w1',
         q: 'temple',
       });
+    });
+
+    /** Or the only way out of the empty grid the selection caused is Clear all (ADR-0081, #420). */
+    it('keeps a selected Tag listed at zero count when a Type shares no Entity with it (#420)', () => {
+      client.facets.mockReturnValue(
+        of({
+          type: [
+            { value: 'core.type.note', count: 3 },
+            { value: 'core.type.hex-map', count: 1 },
+          ],
+          tag: [{ value: 'deity', count: 2 }],
+          visibility: [],
+          fields: [],
+        }),
+      );
+      const fixture = renderWith([summary({ id: 'n1' })]);
+      const el = fixture.nativeElement as HTMLElement;
+
+      client.list.mockReturnValue(of({ items: [summary({ id: 'n1', types: ['core.type.note'] })], nextCursor: null }));
+      facet(el, 'facet-tag-deity')?.click();
+      fixture.detectChanges();
+
+      // Now a Type no `deity` Entity carries: the grid empties and the tag counts to zero, so the
+      // server stops sending it.
+      client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+      client.facets.mockReturnValue(
+        of({
+          type: [
+            { value: 'core.type.note', count: 3 },
+            { value: 'core.type.hex-map', count: 1 },
+          ],
+          tag: [],
+          visibility: [],
+          fields: [],
+        }),
+      );
+      facet(el, 'facet-type-core.type.hex-map')?.click();
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid=entity-title]')).toBeNull();
+
+      // Still rendered, still reading as active, showing its real count rather than a fabricated one.
+      const deity = facet(el, 'facet-tag-deity');
+      expect(deity).not.toBeNull();
+      expect(deity?.getAttribute('aria-pressed')).toBe('true');
+      expect(deity?.querySelector('span.tabular-nums')?.textContent?.trim()).toBe('0');
+
+      // And clicking it off recovers the grid — no Clear all needed.
+      client.list.mockReturnValue(
+        of({ items: [summary({ id: 'm1', types: ['core.type.hex-map'] })], nextCursor: null }),
+      );
+      deity?.click();
+      fixture.detectChanges();
+
+      expect(client.list).toHaveBeenLastCalledWith({
+        limit: 50,
+        worldId: 'w1',
+        rights: true,
+        thumbnails: true,
+        type: ['core.type.hex-map'],
+      });
+      expect(el.querySelector('[data-testid=entity-title]')).not.toBeNull();
     });
 
     describe('Field facets by presence (#188, #231)', () => {
@@ -1062,6 +1127,787 @@ describe('EntityBrowser', () => {
           thumbnails: true,
           type: ['test.type.beast'],
           field: ['alignment:eq:lawful-good'],
+        });
+      });
+    });
+
+    /**
+     * Exclusion reaches the reader (ADR-0081, #422): a second toggle per row, riding the `exclude*`
+     * params #421 put on the wire, with the two polarities releasing each other.
+     */
+    describe('Excluding a value (#422)', () => {
+      const withCounts = () =>
+        client.facets.mockReturnValue(
+          of({
+            type: [
+              { value: 'core.type.note', count: 3 },
+              { value: 'core.type.hex-map', count: 1 },
+            ],
+            tag: [
+              { value: 'draft', count: 2 },
+              { value: 'secret', count: 1 },
+            ],
+            visibility: [],
+            fields: [],
+          }),
+        );
+
+      /** Render with counts on screen and the next list read stubbed, ready for a toggle. */
+      function ready() {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'n1' })]);
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+        return { fixture, el: fixture.nativeElement as HTMLElement };
+      }
+
+      it('excluding a Tag sends excludeTag and mirrors it to the URL', () => {
+        const { fixture, el } = ready();
+
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          excludeTag: ['draft'],
+        });
+        // The counts drill down against the exclusion too, or the rail would annotate a list it disagrees with.
+        expect(client.facets).toHaveBeenLastCalledWith({ worldId: 'w1', excludeTag: ['draft'] });
+        expect(navigate).toHaveBeenLastCalledWith(
+          [],
+          expect.objectContaining({ queryParams: expect.objectContaining({ excludeTag: ['draft'] }) }),
+        );
+      });
+
+      it('clicking the exclude toggle again restores the excluded Entities', () => {
+        const { fixture, el } = ready();
+
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+        expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+        expect(navigate).toHaveBeenLastCalledWith(
+          [],
+          expect.objectContaining({ queryParams: expect.objectContaining({ excludeTag: null }) }),
+        );
+      });
+
+      /** Read Notes without Maps crowding them out. */
+      it('excludes an Entity Type the same way', () => {
+        const { fixture, el } = ready();
+
+        facet(el, 'facet-exclude-type-core.type.hex-map')?.click();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          excludeType: ['core.type.hex-map'],
+        });
+      });
+
+      it('accumulates exclusions — hide drafts and secrets in one browse', () => {
+        const { fixture, el } = ready();
+
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+        facet(el, 'facet-exclude-tag-secret')?.click();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          excludeTag: ['draft', 'secret'],
+        });
+      });
+
+      it('releases the exclusion when include is pressed, and the inclusion when exclude is', () => {
+        const { fixture, el } = ready();
+
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        // Include on an excluded value: the exclusion goes, the inclusion arrives — never both.
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          tag: ['draft'],
+        });
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+        expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('false');
+
+        // And back the other way.
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          excludeTag: ['draft'],
+        });
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('false');
+        expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+      });
+
+      it('excludes a Field value through the `field` param’s own `neq` op', () => {
+        client.facets.mockReturnValue(
+          of({
+            type: [],
+            tag: [],
+            visibility: [],
+            fields: [
+              {
+                key: 'alignment',
+                label: 'Alignment',
+                dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
+                values: [{ value: 'chaotic-evil', count: 1 }],
+              },
+            ],
+          }),
+        );
+        const fixture = renderWith([summary({ id: 'n1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        facet(el, 'facet-exclude-field-alignment-chaotic-evil')?.click();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          field: ['alignment:neq:chaotic-evil'],
+        });
+      });
+
+      /** A refresh, or a shared link, reproduces the browse. */
+      it('seeds exclusions from the URL into the first fetch and lights their controls', () => {
+        withCounts();
+        queryParams$.next(convertToParamMap({ excludeTag: ['draft', 'secret'], excludeType: 'core.type.hex-map' }));
+        client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
+        const fixture = TestBed.createComponent(EntityBrowserPage);
+        fixture.detectChanges();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          excludeTag: ['draft', 'secret'],
+          excludeType: ['core.type.hex-map'],
+        });
+        // One request on load — the seeded browse is the first one, not a correction of an empty one.
+        expect(client.list).toHaveBeenCalledTimes(1);
+        const el = fixture.nativeElement as HTMLElement;
+        expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+        expect(facet(el, 'facet-exclude-type-core.type.hex-map')?.getAttribute('aria-pressed')).toBe('true');
+      });
+
+      it('offers Clear all for an exclusion alone, and clears both polarities', () => {
+        const { fixture, el } = ready();
+
+        facet(el, 'facet-tag-secret')?.click();
+        fixture.detectChanges();
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+        expect(facet(el, 'facet-clear')).not.toBeNull();
+
+        facet(el, 'facet-clear')?.click();
+        fixture.detectChanges();
+
+        expect(navigate).toHaveBeenLastCalledWith(
+          [],
+          expect.objectContaining({
+            queryParams: {
+              q: null,
+              type: null,
+              tag: null,
+              visibility: null,
+              field: null,
+              excludeType: null,
+              excludeTag: null,
+              excludeVisibility: null,
+            },
+          }),
+        );
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+
+      /** Or the exclusion is a one-way door: the row is gone and there is nothing left to click off. */
+      it('keeps an excluded Tag listed once the drill-down stops counting it, still clickable off', () => {
+        const { fixture, el } = ready();
+
+        // The server drops `draft` from the counts (say a Type selection shares no Entity with it).
+        client.facets.mockReturnValue(
+          of({ type: [{ value: 'core.type.note', count: 3 }], tag: [], visibility: [], fields: [] }),
+        );
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        const excluded = facet(el, 'facet-exclude-tag-draft');
+        expect(excluded).not.toBeNull();
+        expect(excluded?.getAttribute('aria-pressed')).toBe('true');
+        expect(facet(el, 'facet-tag-draft')?.querySelector('span.tabular-nums')?.textContent?.trim()).toBe('0');
+
+        excluded?.click();
+        fixture.detectChanges();
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+    });
+
+    /**
+     * A Facet named inline rather than clicked (ADR-0082, #424). Two stores, one rule: filter state is
+     * `parse(text) ∪ railState`, the rail renders the union, and where both name a value the text wins.
+     * The grammar itself is the domain parser's spec; these are the browser's wiring and that rule.
+     */
+    describe('Facet Tokens (#424)', () => {
+      const withCounts = () =>
+        client.facets.mockReturnValue(
+          of({
+            type: [{ value: 'core.type.note', count: 3 }],
+            tag: [
+              { value: 'draft', count: 2 },
+              { value: 'fantasy', count: 1 },
+            ],
+            visibility: [],
+            fields: [],
+          }),
+        );
+
+      /** A facetable World Field, so `$test.field.cr:` resolves off the client registry, synchronously. */
+      const withWorldField = () =>
+        TestBed.inject(TypeRegistry).setWorldFields([
+          { id: 'test.field.cr', label: 'CR', dataType: { kind: 'number' }, required: false, facetable: true },
+        ]);
+
+      it('applies $type:npc, and leaves the box holding exactly what was typed', () => {
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$type:core.type.note');
+
+        // The token became a param; nothing of it reached the full-text `q`.
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          type: ['core.type.note'],
+        });
+        expect(searchBox(fixture.nativeElement).value).toBe('$type:core.type.note');
+        // The URL's `q` carries the raw string, so the link reproduces the box, not the residual.
+        expect(navigate).toHaveBeenCalledWith(
+          [],
+          expect.objectContaining({ queryParams: { q: '$type:core.type.note' } }),
+        );
+      });
+
+      it('reads a mixed box as both filters and a search', () => {
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, 'orc $tag:fantasy $type:core.type.note');
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          q: 'orc',
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          type: ['core.type.note'],
+          tag: ['fantasy'],
+        });
+      });
+
+      it('excludes with a leading dash, onto the same exclude params the rail uses', () => {
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '-$tag:draft');
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          excludeTag: ['draft'],
+        });
+      });
+
+      it('maps a comparison onto the `field` param’s bound, off a key the registry knows', () => {
+        withWorldField();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$test.field.cr:>=5');
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          field: ['test.field.cr:gte:5'],
+        });
+      });
+
+      it('says a $ name nothing answers to, and never searches for it', () => {
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, 'orc $domain:material');
+
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid=unknown-facet]')?.textContent).toContain('domain');
+        expect(client.list).toHaveBeenLastCalledWith({
+          q: 'orc',
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+        });
+      });
+
+      /**
+       * A token whose key resolves but that applies nothing vanishes from the text like any other, so
+       * an unreported one would browse everything as if the box were empty (ADR-0082).
+       */
+      it('says why a resolvable token still filtered nothing, one message per reason', () => {
+        withWorldField();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:');
+        expect(el.querySelector('[data-testid=unknown-facet-empty-value]')?.textContent).toContain('names no value');
+
+        search(fixture, '$tag:"sea of ');
+        expect(el.querySelector('[data-testid=unknown-facet-unterminated-quote]')?.textContent).toContain(
+          'quote still open',
+        );
+
+        // No negated bound on the wire (ADR-0081), and "not >= 5" is not "<= 5".
+        search(fixture, '-$test.field.cr:>=5');
+        expect(el.querySelector('[data-testid=unknown-facet-negated-bound]')?.textContent).toContain('range bound can');
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+        });
+      });
+
+      it('shows a typed value in the rail, lit, beside a clicked one', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        facet(el, 'facet-type-core.type.note')?.click();
+        fixture.detectChanges();
+        search(fixture, '$tag:fantasy');
+
+        // The union: the clicked Type and the typed Tag, both in force and both lit.
+        expect(facet(el, 'facet-tag-fantasy')?.getAttribute('aria-pressed')).toBe('true');
+        expect(facet(el, 'facet-type-core.type.note')?.getAttribute('aria-pressed')).toBe('true');
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          type: ['core.type.note'],
+          tag: ['fantasy'],
+        });
+      });
+
+      it('lets the text win a value the rail also names, dropping the rail’s entry', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        // Clicked as an exclusion, then typed as an inclusion: one value, one visual state.
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+        search(fixture, '$tag:draft');
+
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+        expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('false');
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          tag: ['draft'],
+        });
+      });
+
+      it('never writes the rail’s selections into the box, nor the box’s into the rail’s params', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:fantasy');
+        facet(el, 'facet-type-core.type.note')?.click();
+        fixture.detectChanges();
+
+        // Clicking left the box alone, and the rail's URL mirror carries no typed Tag.
+        expect(searchBox(el).value).toBe('$tag:fantasy');
+        expect(navigate).toHaveBeenLastCalledWith(
+          [],
+          expect.objectContaining({ queryParams: expect.objectContaining({ type: ['core.type.note'], tag: null }) }),
+        );
+      });
+
+      it('reproduces both stores from a shared link', () => {
+        withCounts();
+        queryParams$.next(convertToParamMap({ q: 'orc $tag:fantasy', type: 'core.type.note' }));
+        client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
+        const fixture = TestBed.createComponent(EntityBrowserPage);
+        fixture.detectChanges();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenCalledWith({
+          q: 'orc',
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          type: ['core.type.note'],
+          tag: ['fantasy'],
+        });
+        // One request on load, and the box holds the raw string the link carried.
+        expect(client.list).toHaveBeenCalledTimes(1);
+        expect(searchBox(fixture.nativeElement).value).toBe('orc $tag:fantasy');
+      });
+
+      it('counts a box of blanks as no query at all', () => {
+        withCounts();
+        const fixture = renderWith([]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '   ');
+
+        // Nothing is being searched for: the plain empty state, and nothing to clear.
+        expect(el.querySelector('[data-testid=empty]')).not.toBeNull();
+        expect(el.querySelector('[data-testid=no-matches]')).toBeNull();
+        expect(facet(el, 'facet-clear')).toBeNull();
+      });
+
+      it('clears a typed Facet with Clear all, box and all', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:fantasy');
+        facet(el, 'facet-clear')?.click();
+        fixture.detectChanges();
+
+        expect(searchBox(el).value).toBe('');
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+
+      /**
+       * A cold load on a shared link naming a **Field** key (ADR-0082, #430). The Fields read is still in
+       * flight, so the params this box means are not known yet: the page used to fetch without `field` —
+       * every Entity in the World — and correct itself when the response landed, narrowing under whoever
+       * was already reading. The read is held instead, and the hold ends on the response either way.
+       */
+      describe('a Facet key the registry cannot answer for yet', () => {
+        const crField = {
+          id: 'test.field.cr',
+          label: 'CR',
+          dataType: { kind: 'number' as const },
+          required: false,
+          facetable: true,
+        };
+
+        /** Entering a World: the loader has asked for its Fields and nothing has answered yet. */
+        const awaiting = () => {
+          const registry = TestBed.inject(TypeRegistry);
+          registry.setWorldFields([]);
+          registry.awaitWorldFields();
+          return registry;
+        };
+
+        const render = (q: string) => {
+          queryParams$.next(convertToParamMap({ q }));
+          client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+          const fixture = TestBed.createComponent(EntityBrowserPage);
+          fixture.detectChanges();
+          return fixture;
+        };
+
+        it('holds the first read, then makes it once — filtered — when the Fields land', () => {
+          const registry = awaiting();
+          const fixture = render('$test.field.cr:5');
+
+          // Nothing went out: not the list, not the Facet counts that would size the rail by it.
+          expect(client.list).not.toHaveBeenCalled();
+          expect(client.facets).not.toHaveBeenCalled();
+          // And nothing claims the World is empty while the read is held.
+          expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=empty]')).toBeNull();
+
+          registry.setWorldFields([crField]);
+          fixture.detectChanges();
+
+          expect(client.list).toHaveBeenCalledTimes(1);
+          expect(client.list).toHaveBeenCalledWith({
+            limit: 50,
+            worldId: 'w1',
+            rights: true,
+            thumbnails: true,
+            field: ['test.field.cr:eq:5'],
+          });
+        });
+
+        it('browses at once when the box names no Field key, whatever the Fields read is doing', () => {
+          awaiting();
+
+          render('orc $type:core.type.note');
+
+          // `$type` is decided by the reserved names the moment it is typed — no read widens it.
+          expect(client.list).toHaveBeenCalledTimes(1);
+          expect(client.list).toHaveBeenCalledWith({
+            q: 'orc',
+            limit: 50,
+            worldId: 'w1',
+            rights: true,
+            thumbnails: true,
+            type: ['core.type.note'],
+          });
+        });
+
+        it('browses at once on an empty box', () => {
+          awaiting();
+
+          render('');
+
+          expect(client.list).toHaveBeenCalledTimes(1);
+        });
+
+        /**
+         * The failure path the hold hangs on: a refused or broken Fields read degrades to *no* World
+         * Fields (see `world-fields-loader.spec.ts`), which settles the key — so the page browses, states
+         * the miss, and is never left at an empty grid waiting on a response that already came.
+         */
+        it('browses, and states the miss, when the Fields read answers without the key', () => {
+          const registry = awaiting();
+          const fixture = render('orc $test.field.cr:5');
+          expect(client.list).not.toHaveBeenCalled();
+
+          registry.setWorldFields([]); // what a failed read degrades to
+          fixture.detectChanges();
+
+          expect(client.list).toHaveBeenCalledTimes(1);
+          expect(client.list).toHaveBeenCalledWith({
+            q: 'orc',
+            limit: 50,
+            worldId: 'w1',
+            rights: true,
+            thumbnails: true,
+          });
+          const el = fixture.nativeElement as HTMLElement;
+          expect(el.querySelector('[data-testid=unknown-facet]')?.textContent).toContain('test.field.cr');
+        });
+      });
+    });
+
+    /**
+     * Everything applied is reversible where it was named (ADR-0082): a rail row the text owns renders
+     * as query-owned, and clicking it deletes *that* token from the box — the one rail→text write, and
+     * always a deletion.
+     */
+    describe('Clicking a typed value off (#425)', () => {
+      const withCounts = () =>
+        client.facets.mockReturnValue(
+          of({
+            type: [{ value: 'core.type.note', count: 3 }],
+            tag: [
+              { value: 'draft', count: 2 },
+              { value: 'fantasy', count: 1 },
+            ],
+            visibility: [],
+            fields: [
+              {
+                key: 'test.field.alignment',
+                label: 'Alignment',
+                dataType: { kind: 'enum' as const, options: ['lawful-good', 'chaotic-evil'] },
+                values: [{ value: 'lawful-good', count: 1 }],
+              },
+            ],
+          }),
+        );
+
+      /** The Field behind that facet, so `$test.field.alignment:` resolves off the client registry. */
+      const withWorldField = () =>
+        TestBed.inject(TypeRegistry).setWorldFields([
+          {
+            id: 'test.field.alignment',
+            label: 'Alignment',
+            dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
+            required: false,
+            facetable: true,
+          },
+        ]);
+
+      it('renders a typed value as query-owned, where a clicked one is not', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:draft');
+        facet(el, 'facet-type-core.type.note')?.click();
+        fixture.detectChanges();
+
+        expect(facet(el, 'facet-tag-draft')?.hasAttribute('data-query-owned')).toBe(true);
+        expect(facet(el, 'facet-type-core.type.note')?.hasAttribute('data-query-owned')).toBe(false);
+      });
+
+      it('takes that token out of the box and leaves every other word, tokens included', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, 'orc $tag:draft $tag:fantasy');
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+
+        // The second Tag token is another value of the same Facet, and is none of this click's business.
+        expect(searchBox(el).value).toBe('orc $tag:fantasy');
+        expect(client.list).toHaveBeenLastCalledWith({
+          q: 'orc',
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          tag: ['fantasy'],
+        });
+        // The URL's `q` follows the box, and the rail's own params are untouched: nothing was clicked in.
+        expect(navigate).toHaveBeenLastCalledWith(
+          [],
+          expect.objectContaining({ queryParams: { q: 'orc $tag:fantasy' } }),
+        );
+      });
+
+      it('takes out a token the text wrote as an exclusion', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '-$tag:draft');
+        expect(facet(el, 'facet-exclude-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        expect(searchBox(el).value).toBe('');
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+
+      /** Whichever half is pressed, a typed value is one state to release — the token goes, no rail
+       * entry takes its place, and the URL never grows a param nobody clicked. */
+      it('releases a typed inclusion from either of its controls, writing nothing into the rail', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:draft');
+        facet(el, 'facet-exclude-tag-draft')?.click();
+        fixture.detectChanges();
+
+        expect(searchBox(el).value).toBe('');
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+        expect(navigate).not.toHaveBeenCalledWith(
+          [],
+          expect.objectContaining({ queryParams: expect.objectContaining({ excludeTag: ['draft'] }) }),
+        );
+      });
+
+      it('takes out a Facet key’s token from its Field row', () => {
+        withWorldField();
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$test.field.alignment:lawful-good');
+        expect(facet(el, 'facet-field-test.field.alignment-lawful-good')?.hasAttribute('data-query-owned')).toBe(true);
+        facet(el, 'facet-field-test.field.alignment-lawful-good')?.click();
+        fixture.detectChanges();
+
+        expect(searchBox(el).value).toBe('');
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+
+      /** The click deletes the token, and only the token: a value the rail was already holding was
+       * merely masked by the text (ADR-0082), so it stays in force and one more click releases it. */
+      it('leaves a rail selection the text was masking in force, released by a second click', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+        search(fixture, '$tag:draft');
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+
+        // The box lost its token; the earlier click is still the rail's, and still lit.
+        expect(searchBox(el).value).toBe('');
+        expect(facet(el, 'facet-tag-draft')?.hasAttribute('data-query-owned')).toBe(false);
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('true');
+
+        facet(el, 'facet-tag-draft')?.click();
+        fixture.detectChanges();
+
+        expect(facet(el, 'facet-tag-draft')?.getAttribute('aria-pressed')).toBe('false');
+        expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true, thumbnails: true });
+      });
+
+      it('leaves a rail-sourced selection toggling as it always did, box untouched', () => {
+        withCounts();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+        client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+
+        search(fixture, '$tag:draft');
+        facet(el, 'facet-type-core.type.note')?.click();
+        fixture.detectChanges();
+        facet(el, 'facet-type-core.type.note')?.click();
+        fixture.detectChanges();
+
+        expect(facet(el, 'facet-type-core.type.note')?.getAttribute('aria-pressed')).toBe('false');
+        expect(searchBox(el).value).toBe('$tag:draft');
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          thumbnails: true,
+          tag: ['draft'],
         });
       });
     });

@@ -76,6 +76,10 @@ export class EntitiesController {
       type,
       tag,
       visibility,
+      excludeType,
+      excludeTag,
+      excludeVisibility,
+      excludeContainer,
       field,
       worldId,
       containerId,
@@ -98,6 +102,11 @@ export class EntitiesController {
       type,
       tags: tag,
       visibility,
+      // The excluding half of each category (ADR-0081) — a veto, resolved in the service beside the include.
+      excludeType,
+      excludeTag,
+      excludeVisibility,
+      excludeContainer,
       // A malformed `field` token is dropped, not 400'd, so a stale URL degrades to no-filter.
       fields: parseFieldFilters(field),
       containerIds: containerScope(worldId, containerId),
@@ -148,12 +157,33 @@ export class EntitiesController {
   facets(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityFacets {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { q, type, tag, visibility, field, worldId, containerId, container, read, includeHidden } = parsed.data;
+    const {
+      q,
+      type,
+      tag,
+      visibility,
+      excludeType,
+      excludeTag,
+      excludeVisibility,
+      excludeContainer,
+      field,
+      worldId,
+      containerId,
+      container,
+      read,
+      includeHidden,
+    } = parsed.data;
     return this.entities.facets(user.id, {
       q,
       type,
       tags: tag,
       visibility,
+      // Threaded like the includes; the drill-down that drops each category's own polarities is the
+      // service's (ADR-0081).
+      excludeType,
+      excludeTag,
+      excludeVisibility,
+      excludeContainer,
       fields: parseFieldFilters(field),
       containerIds: containerScope(worldId, containerId),
       container,

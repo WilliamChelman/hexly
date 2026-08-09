@@ -9,8 +9,14 @@ import {
   readAssetValue,
 } from '@hexly/plugin-asset';
 import { AssetsClient, EntitiesClient } from '@hexly/web-core';
-import { ContainerChipsComponent, linkTargetRead } from '@hexly/web-entity';
-import { ButtonComponent, DialogComponent, DialogRef, InputComponent } from '@hexly/web-ui';
+import { ContainerChipsComponent, linkTargetRead, pickerFacetTokens } from '@hexly/web-entity';
+import {
+  ButtonComponent,
+  DialogComponent,
+  DialogRef,
+  FacetMissComponent,
+  FacetSearchInputComponent,
+} from '@hexly/web-ui';
 
 /** What the picker is launched with: the World whose Assets it uploads into and searches. */
 export interface ImagePickerData {
@@ -47,7 +53,14 @@ const isPlaceable = (e: EntitySummary): e is PlaceableAsset => !!e.assetUrl;
 @Component({
   selector: 'app-board-image-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ContainerChipsComponent, DialogComponent, ButtonComponent, InputComponent, TranslocoPipe],
+  imports: [
+    ContainerChipsComponent,
+    DialogComponent,
+    ButtonComponent,
+    FacetMissComponent,
+    FacetSearchInputComponent,
+    TranslocoPipe,
+  ],
   template: `
     <app-dialog open align="top" [heading]="'board.imagePicker.title' | transloco" (closed)="cancel()">
       <div class="flex flex-col gap-4">
@@ -78,14 +91,18 @@ const isPlaceable = (e: EntitySummary): e is PlaceableAsset => !!e.assetUrl;
         <!-- Pick: the link-target read over this World's image Assets and any Mounted shelf's (ADR-0080). -->
         <div class="flex flex-col gap-2">
           <span class="text-sm text-ink-strong">{{ 'board.imagePicker.existing' | transloco }}</span>
-          <input
-            appInput
-            type="search"
-            data-testid="image-search"
-            [attr.placeholder]="'board.imagePicker.search' | transloco"
+          <!-- The shared box (ADR-0082): the image Facets below are typeable as Facet Tokens, off the
+               counts this dialog already reads, and a token is reversed by backspacing it. -->
+          <app-facet-search-input
+            testid="image-search"
             [value]="query()"
-            (input)="query.set($any($event.target).value)"
+            [keys]="tokens.keys()"
+            [facets]="facetCounts()"
+            [placeholder]="'board.imagePicker.search' | transloco"
+            (queryChange)="query.set($event)"
           />
+          <!-- What the Tokens applied nothing for is *said*, never quietly searched for (ADR-0082). -->
+          <app-facet-miss class="text-xs text-ink-faint" [parsed]="tokens.parsed()" testid="image-unknown-facet" />
 
           <!-- The **Container** facet: only where this World Mounts a shelf the read reached (ADR-0080). -->
           <app-container-chips testid="image" [containers]="containers()" [(selected)]="targets.container" />
@@ -177,23 +194,40 @@ export class BoardImagePickerComponent {
   protected readonly activeFacets = signal<Record<string, readonly string[]>>({});
 
   /**
+   * What the box means (ADR-0082). `$type` is out of the vocabulary: the read is pinned to the asset
+   * type, and the wire's `type` ORs, so a token there could only widen past the pin — a stated miss.
+   */
+  protected readonly tokens = pickerFacetTokens(
+    () => this.query(),
+    () => false,
+  );
+
+  /**
    * The one read behind the grid and its rail. A **link-target read** (ADR-0079) preset to the asset type
    * and image kind: the type pin is also what lifts the hidden-from-default-listing exclusion Assets carry
    * (ADR-0065), so they surface here exactly as they always have.
    */
   protected readonly targets = linkTargetRead(
     () => this.ref.data.worldId,
-    () => ({
-      q: this.query().trim() || undefined,
-      type: [CORE_ASSET_TYPE_ID],
-      field: [IMAGE_KIND_FIELD_TOKEN, ...this.fieldTokens()],
-    }),
+    () => {
+      // The residual text and the tokens' own filters, under the pinned type and image kind, beside the
+      // chips' selections — a typed Facet and a clicked one AND, as they do everywhere (ADR-0082).
+      const { field = [], ...narrowing } = this.tokens.narrowing();
+      return {
+        ...narrowing,
+        type: [CORE_ASSET_TYPE_ID],
+        field: [IMAGE_KIND_FIELD_TOKEN, ...field, ...this.fieldTokens()],
+      };
+    },
   );
 
   /** The matched image Assets, or null while the current search is in flight. */
   protected readonly assets = signal<PlaceableAsset[] | null>(null);
-  /** The live Facet counts; the pinned `kind` dimension is dropped — it is never a picker choice. */
-  private readonly facetCounts = signal<EntityFacets>(NO_FACETS);
+  /**
+   * The live Facet counts — the chips' values, and the box's value typeahead (ADR-0082), off the one
+   * read. The pinned `kind` dimension is dropped from the chips: it is never a picker choice.
+   */
+  protected readonly facetCounts = signal<EntityFacets>(NO_FACETS);
   protected readonly facetGroups = computed<readonly FieldFacet[]>(() =>
     this.facetCounts().fields.filter((f) => f.key !== ASSET_KIND_FACET_KEY),
   );

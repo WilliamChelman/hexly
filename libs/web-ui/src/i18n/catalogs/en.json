@@ -1,0 +1,9 @@
+{
+  "facetToken": {
+    "suggestionsLabel": "Filter suggestions",
+    "unknownFacet": "No Facet “{{keys}}” here.",
+    "emptyValue": "“{{keys}}” names no value, so it filters nothing.",
+    "unterminatedQuote": "“{{keys}}” has a quote still open, so it filters nothing yet.",
+    "negatedBound": "A range bound can't be excluded, so “{{keys}}” filters nothing."
+  }
+}

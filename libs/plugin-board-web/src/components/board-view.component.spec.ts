@@ -7,6 +7,7 @@ import { addElement, emptyBoardSurface } from '@hexly/plugin-board';
 import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '@hexly/plugin-content/testing';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { BOARD_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { BoardCamera } from '../services/board-camera';
 import { BoardStore } from '../services/board-store';
@@ -32,6 +33,8 @@ describe('BoardView', () => {
         // The armed Text Block mounts the reused Content editor; these are its ambient dependencies
         // (mirrors the ContentEditor/TextBlock spec harnesses).
         EntityNameResolver,
+        // The `@` mention inside that editor reads its Facet vocabulary off the registry (ADR-0082).
+        provideEntityTypesTesting([]),
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
