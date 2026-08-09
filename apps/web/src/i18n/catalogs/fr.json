@@ -655,6 +655,18 @@
     "note": "Ce n'est qu'une étiquette : l'index des mondes s'en sert pour les regrouper, et rien d'autre ne la lit nulle part. Une étagère garde ses membres, son tableau de bord, son thème, son lien public et sa place dans le sélecteur de mondes, exactement comme une campagne.",
     "saveError": "Impossible d'enregistrer. Veuillez réessayer."
   },
+  "worldOpen": {
+    "heading": "Ouvrir ce monde",
+    "subhead": "Permettre à toute personne connectée à cette instance de lire les entités partagées de ce monde via son lien, sans l'ajouter comme membre.",
+    "closed": "Fermé",
+    "open": "Ouvert",
+    "hint": {
+      "closed": "Seuls les membres atteignent ce monde.",
+      "open": "Toute personne connectée peut lire ses entités partagées."
+    },
+    "note": "Ouvrir change qui peut atteindre le monde, jamais où il est listé : il reste absent de l'index des mondes, du sélecteur et de l'ouverture rapide des autres, comme un monde monté. Les entités privées restent privées — être connecté ne les ouvre jamais. Seules les entités partagées deviennent lisibles, et seulement pour les comptes connectés.",
+    "saveError": "Impossible d'enregistrer. Veuillez réessayer."
+  },
   "mounts": {
     "heading": "Montages",
     "subhead": "Les conteneurs dont ce monde se sert. Monter élargit ce que ce monde peut désigner — ce qu'il contient reste intact, donc ses entités, ses décomptes et son explorateur ne changent pas. Vous pouvez monter les mondes que vous possédez, ainsi que tout compendium installé.",

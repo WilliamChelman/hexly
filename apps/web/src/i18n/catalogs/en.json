@@ -655,6 +655,18 @@
     "note": "It is a label and nothing more: the world index groups by it, and nothing else anywhere reads it. A shelf keeps its members, its dashboard, its theme, its public link and its place in the world switcher, exactly as a campaign does.",
     "saveError": "Couldn't save that. Please try again."
   },
+  "worldOpen": {
+    "heading": "Open this world",
+    "subhead": "Let anyone signed in to this instance read this world's shared entities by its link, without adding them as a member.",
+    "closed": "Closed",
+    "open": "Open",
+    "hint": {
+      "closed": "Only members reach this world.",
+      "open": "Anyone signed in can read its shared entities."
+    },
+    "note": "Open changes who can reach the world, never where it is listed: it stays out of others' world index, switcher and quick-open, just as a mounted world does. Private entities stay private — being signed in never opens them. Only shared entities become readable, and only to signed-in accounts.",
+    "saveError": "Couldn't save that. Please try again."
+  },
   "mounts": {
     "heading": "Mounts",
     "subhead": "The containers this world draws from. Mounting widens what this world can point at — what it holds is untouched, so its entities, counts and browser read exactly as before. You can mount worlds you own, and any installed compendium.",

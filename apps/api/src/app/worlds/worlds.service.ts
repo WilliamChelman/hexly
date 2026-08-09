@@ -69,6 +69,10 @@ export class WorldsService {
         // Campaign-or-Shelf rides the listing so the World Index can group by it (ADR-0080). It is
         // carried, never filtered on: the WHERE below is reachability and nothing else.
         kind: worlds.kind,
+        // The Open-World flag (ADR-0084) rides the summary too, so the Index can badge an Open World.
+        // Carried, never filtered on: `listFilter` is unchanged, so an Open World stays listed only
+        // where the caller has standing — its openness is not a listing disjunct.
+        open: worlds.open,
         createdAt: containers.createdAt,
         updatedAt: containers.updatedAt,
       })
@@ -132,6 +136,8 @@ export class WorldsService {
       // A new World is a campaign unless said otherwise (ADR-0080) — the column's own default,
       // echoed here rather than re-read.
       kind: DEFAULT_WORLD_KIND,
+      // A new World is closed (ADR-0084) — the `worlds.open` column default, echoed here.
+      open: false,
       // The creator is the sole initial Owner, so full Rights.
       owners: [ownerId],
       rights: worldRightsOf({ isOwner: true, canContribute: true }),
@@ -454,6 +460,9 @@ export class WorldsService {
       id: world.id,
       name: world.name,
       kind: world.kind,
+      // The Open-World flag (ADR-0084) rides the read for everyone who reaches the World — it is the
+      // audience-widening state, not a per-caller secret, and the settings toggle reflects it back.
+      open: world.open,
       owners,
       rights: worldRightsOf({ isOwner: !!meta?.isOwner, canContribute: !!meta?.canContribute }),
       entityCount,

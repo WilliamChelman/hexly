@@ -40,6 +40,7 @@ export class MockWorldsClient {
   setPins = vi.fn<(id: string, pinnedEntityIds: string[]) => Observable<WorldDetail>>();
   setTheme = vi.fn<(id: string, theme: WorldThemeInput | null) => Observable<WorldDetail>>();
   setKind = vi.fn<(id: string, kind: WorldKind) => Observable<WorldDetail>>();
+  setOpen = vi.fn<(id: string, open: boolean) => Observable<WorldDetail>>();
   // Defaults to nothing to copy from, so a spec mounting the Theme editor (#376) without caring
   // about it still renders; override per test as needed.
   themeSources = vi.fn<(id: string) => Observable<WorldThemeSource[]>>(() => of<WorldThemeSource[]>([]));

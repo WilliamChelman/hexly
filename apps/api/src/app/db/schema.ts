@@ -189,6 +189,11 @@ export const worlds = sqliteTable('worlds', {
   // The Owner-authored World Theme (ADR-0076), stored inline and patched wholesale like the pins.
   // Every value reached this column re-serialised from its own parse; NULL is no Theme.
   theme: text('theme', { mode: 'json' }).$type<WorldTheme>(),
+  // The Open-World flag (ADR-0084), the successor to the retired World Public Link: when set, the
+  // World's `shared` Entities read to any signed-in caller on the Instance, membership-independent.
+  // Reachability only — an Open World stays unlisted (absent from the World Index/Switcher/quick-open),
+  // exactly as a mounted World is. Owner-gated on the write; inert with Collaboration off.
+  open: integer('open', { mode: 'boolean' }).notNull().default(false),
 });
 
 /**

@@ -167,6 +167,16 @@ export class WorldsClient {
   }
 
   /**
+   * Mark the World Open, or close it again (ADR-0084) — the successor to the World Public Link. Open
+   * widens the World's `shared` Entities to any signed-in caller on the Instance; it never lists the
+   * World anywhere new. Owner-gated server-side (the PATCH refuses a non-Owner).
+   */
+  setOpen(id: string, open: boolean): Observable<WorldDetail> {
+    // Write-through, as {@link rename} — the re-flagged World fans out and this tab's echo dedups.
+    return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { open }).pipe(tap((d) => this.store.merge(d)));
+  }
+
+  /**
    * The Worlds whose Theme may be copied into this one (#376), Themes and all. Owner-gated
    * server-side, which is also where *which* Worlds qualify is decided.
    *

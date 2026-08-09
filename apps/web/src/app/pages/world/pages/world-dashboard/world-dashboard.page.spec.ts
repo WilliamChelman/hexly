@@ -44,6 +44,7 @@ function worldDetail(pinnedEntityIds: string[] = [], rights: WorldVerb[] = ['rea
     name: 'Aldermoor',
     owners: ['ada'],
     kind: 'campaign',
+    open: false,
     rights,
     entityCount: 0,
     pinnedEntityIds,

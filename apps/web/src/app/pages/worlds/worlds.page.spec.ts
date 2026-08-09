@@ -34,6 +34,7 @@ function world(id: string, name = id, ownerId = 'u1', kind: WorldKind = 'campaig
     name,
     owners: [ownerId],
     kind,
+    open: false,
     rights: owned ? ['read', 'manage'] : ['read'],
     createdAt: 1,
     updatedAt: 1,

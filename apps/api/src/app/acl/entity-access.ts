@@ -1,7 +1,7 @@
 import { EntityVerb, GrantRole } from '@hexly/domain';
 import { SQL, SQLWrapper, and, eq, getTableColumns, sql } from 'drizzle-orm';
 import { Db } from '../db/db';
-import { entities, entityGrants, entityLinks, worldLinks, worldMembers } from '../db/schema';
+import { entities, entityGrants, entityLinks, worldLinks, worldMembers, worlds } from '../db/schema';
 import { inACompendium } from '../worlds/compendiums';
 import { mountedIntoReachOf, mountedIntoWorld } from './mount-reach';
 import { isSuperadmin } from './owner-set';
@@ -39,6 +39,11 @@ function isWorldOwner(userId: string) {
   return sql`EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${entities.containerId} AND ${worldMembers.userId} = ${userId} AND ${worldMembers.role} = 'owner')`;
 }
 
+/** The Entity's World is **Open** (ADR-0084) — the `worlds.open` flag on the Entity's Container. */
+function inAnOpenWorld() {
+  return sql`EXISTS (SELECT 1 FROM ${worlds} WHERE ${worlds.id} = ${entities.containerId} AND ${worlds.open})`;
+}
+
 /**
  * The **listing** predicate: `owner ∨ grant(editor|viewer) ∨ (member ∧ shared) ∨ compendium-entry ∨
  * (mounted ∧ shared)`. What a browse/search/Palette enumerates. An Entity the caller can't read is
@@ -67,19 +72,26 @@ function canListEntity(userId: string, superadmin: boolean) {
 }
 
 /**
- * The **reachability** predicate: {@link canListEntity} `∨ open`. Whether the caller can read *a specific
- * Entity it already names* — a get-by-id, the References/link-index resolution (ADR-0046/0072), a live
- * follow (ADR-0044). ADR-0084's third rung: an `open` Entity reads to any signed-in caller on the Instance,
- * the same Instance-wide reach the compendium disjunct grants — membership-independent, so it consults
- * neither `worldMembers` nor the Mount cascade.
+ * The **reachability** predicate: {@link canListEntity} `∨ open ∨ (shared ∧ Open-World)`. Whether the
+ * caller can read *a specific Entity it already names* — a get-by-id, the References/link-index resolution
+ * (ADR-0046/0072), a live follow (ADR-0044). ADR-0084's two membership-independent disjuncts: an `open`
+ * Entity reads to any signed-in caller on the Instance, and a `shared` Entity in an **Open World** reads
+ * to that same audience — the successor to the World Public Link's `shared`-only reach. Both grant the
+ * same Instance-wide reach the compendium disjunct does, so both consult neither `worldMembers` nor the
+ * Mount cascade. `private` stays unreachable in an Open World: the second disjunct is `shared`-only, so
+ * Instance membership never pierces `private`.
  *
- * Split from {@link canListEntity} on purpose: reachability gains `open`, listing does not. So the disjunct
- * rides every surface that resolves a *named* Entity — never the enumeration WHERE — keeping an `open`
- * Entity reachable by id yet unlisted (ADR-0084's invariant).
+ * A mounted **Compendium**'s entries need no disjunct of their own: `inACompendium()` above already reaches
+ * every signed-in caller (Instance-wide, ADR-0079), a reach opening the World cannot regress.
+ *
+ * Split from {@link canListEntity} on purpose: reachability gains these disjuncts, listing does not. So they
+ * ride every surface that resolves a *named* Entity — never the enumeration WHERE — keeping an `open` Entity
+ * and an Open World's `shared` Entities reachable by id yet unlisted (ADR-0084's invariant).
  */
 function canReadEntity(userId: string, superadmin: boolean) {
   if (superadmin) return MATCH_ALL;
-  return sql`(${canListEntity(userId, superadmin)} OR ${entities.visibility} = 'open')`;
+  return sql`(${canListEntity(userId, superadmin)} OR ${entities.visibility} = 'open'
+    OR (${entities.visibility} = 'shared' AND ${inAnOpenWorld()}))`;
 }
 
 /**

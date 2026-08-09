@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { EntityVerb } from '@hexly/domain';
 import { createDb, Db } from '../db/db';
@@ -196,6 +197,18 @@ describe('entityAccess', () => {
       expect(reachable(eViewer)).toEqual([priv, open].sort());
       expect(reachable(wContrib)).toEqual([shared, open].sort());
       expect(reachable(stranger)).toEqual([open]); // reachable by id, unlisted
+    });
+
+    // The Open-World disjunct (ADR-0084): opening the *World* widens its `shared` Entities to any
+    // signed-in caller — the successor to the World Public Link's `shared`-only reach — while `private`
+    // stays unreachable (Instance membership never pierces `private`) and listing is untouched.
+    it("reachFilter resolves an Open World's shared Entities for a stranger, never its private ones", () => {
+      db.update(worlds).set({ open: true }).where(eq(worlds.id, worldId)).run();
+      const reachable = ids('reachFilter');
+      // A stranger now reaches shared (via the Open World) and open (its own rung), but not private.
+      expect(reachable(stranger)).toEqual([shared, open].sort());
+      // Listing is still untouched — an Open World's shared Entities stay unlisted for a non-member.
+      expect(ids('filter')(stranger)).toEqual([]);
     });
   });
 

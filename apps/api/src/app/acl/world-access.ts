@@ -35,8 +35,9 @@ function standingIn(userId: string, worldRef: SQLWrapper) {
 }
 
 /**
- * The World reachability rule (ADR-0024, ADR-0037, ADR-0080): standing in the World, OR **membership**
- * of a World that **Mounts** it. Unreachable is indistinguishable from nonexistent (ADR-0004).
+ * The World reachability rule (ADR-0024, ADR-0037, ADR-0080, ADR-0084): standing in the World, OR
+ * **membership** of a World that **Mounts** it, OR the World is **Open**. Unreachable is
+ * indistinguishable from nonexistent (ADR-0004).
  *
  * The second disjunct is ADR-0080's, and the first time reading a Container depends on another
  * Container's configuration: a World kept to be drawn from opens to whoever reads the campaigns
@@ -44,9 +45,16 @@ function standingIn(userId: string, worldRef: SQLWrapper) {
  * World-scoped (ADR-0028), so following a link into a Mount lands at the content's home. Read alone:
  * `owner` and `contributor` stay membership's, so a Mount never confers a write. Reachable is not
  * listed — {@link worldListFilter} is what the World Index reads.
+ *
+ * The third disjunct is ADR-0084's, the successor to the retired World Public Link: an Open World reads
+ * to any signed-in caller on the Instance, membership-independent. `worlds.open` is a column on the base
+ * table both call sites are rooted at (the reachability WHERE and {@link WorldAccess.decideMeta}'s
+ * projection), so it needs no correlated subquery — unlike the worldRef the first two disjuncts carry.
+ * Reachability only: {@link worldListFilter} stays unchanged, so an Open World is reachable by id/URL yet
+ * unlisted, the exact unlisted property the retired link had.
  */
 function reachableBy(userId: string, worldRef: SQLWrapper) {
-  return sql`(${standingIn(userId, worldRef)} OR ${mountedIntoReachOf(userId, worldRef)})`;
+  return sql`(${standingIn(userId, worldRef)} OR ${mountedIntoReachOf(userId, worldRef)} OR ${worlds.open})`;
 }
 
 /** The World management rule (ADR-0037): the caller holds the `owner` role. */
@@ -113,6 +121,7 @@ function selectWorld(db: Db) {
       kind: worlds.kind,
       pinnedEntityIds: worlds.pinnedEntityIds,
       theme: worlds.theme,
+      open: worlds.open,
     })
     .from(worlds)
     .innerJoin(containers, eq(containers.id, worlds.id));

@@ -6,9 +6,11 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import sharp from 'sharp';
 import request from 'supertest';
+import { eq } from 'drizzle-orm';
 import { CONTENT_FIELD_ID, tiptapContent } from '@hexly/plugin-content';
 import { updateWorldRequestSchema } from '@hexly/domain';
 import { DB, Db, createDb } from '../db/db';
+import { entities } from '../db/schema';
 import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
@@ -71,6 +73,8 @@ describe('Worlds endpoints', () => {
       owners: [expect.any(String)],
       // A new World is a campaign unless said otherwise (ADR-0080).
       kind: 'campaign',
+      // A new World is closed (ADR-0084) — Open is the Owner's later, deliberate act.
+      open: false,
       rights: ['read', 'create-entity', 'manage'],
       // No Home Entity is minted — the landing is a derived Dashboard (ADR-0043).
       entityCount: 0,
@@ -120,6 +124,8 @@ describe('Worlds endpoints', () => {
       owners: [expect.any(String)],
       // Campaign-or-Shelf rides the Summary so the World Index can group by it (ADR-0080).
       kind: 'campaign',
+      // The Open-World flag rides the Summary too (ADR-0084); closed for a fresh World.
+      open: false,
       rights: ['read', 'create-entity', 'manage'],
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
@@ -294,6 +300,83 @@ describe('Worlds endpoints', () => {
     await ada.delete('/worlds/does-not-exist').expect(404);
 
     await ada.get(`/worlds/${created.body.id}`).expect(200);
+  });
+
+  // The Open-World flag (ADR-0084, #434), the successor to the World Public Link: an Owner marks the
+  // whole World Open, and a signed-in non-member then reads its `shared` Entities by URL without being
+  // made a member — while its `private` Entities stay unreachable and the World stays unlisted.
+  describe('the Open-World flag (ADR-0084)', () => {
+    /** Flip an Entity's visibility directly, as the entities spec does — decoupled from set-visibility. */
+    function setVisibility(id: string, visibility: 'private' | 'shared' | 'open') {
+      db.update(entities).set({ visibility }).where(eq(entities.id, id)).run();
+    }
+
+    it('a new World is closed, and its Detail/Summary carry the flag', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      expect(created.body.open).toBe(false);
+      expect((await ada.get(`/worlds/${created.body.id}`).expect(200)).body.open).toBe(false);
+      expect((await ada.get('/worlds').expect(200)).body[0].open).toBe(false);
+    });
+
+    it('lets a non-member read the Open World’s shared Entities by id, never its private ones', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      const priv = await ada
+        .post('/entities')
+        .send({ name: 'Priv', types: ['core.type.note'], worldId: world.body.id })
+        .expect(201);
+      const shared = await ada
+        .post('/entities')
+        .send({ name: 'Shared', types: ['core.type.note'], worldId: world.body.id })
+        .expect(201);
+      setVisibility(shared.body.id, 'shared');
+
+      await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      // Closed: Bob reaches neither the World nor its Entities — unreachable ≡ missing.
+      await bob.get(`/worlds/${world.body.id}`).expect(404);
+      await bob.get(`/entities/${shared.body.id}`).expect(404);
+
+      // The flag rides the Owner-gated PATCH and echoes back on the Detail.
+      const opened = await ada.patch(`/worlds/${world.body.id}`).send({ open: true }).expect(200);
+      expect(opened.body.open).toBe(true);
+
+      // Open: Bob reaches the World and its shared Entity by URL, without a member row; private stays missing.
+      await bob.get(`/worlds/${world.body.id}`).expect(200);
+      await bob.get(`/entities/${shared.body.id}`).expect(200);
+      await bob.get(`/entities/${priv.body.id}`).expect(404);
+    });
+
+    it('keeps the Open World unlisted for a non-member (reachability, not listing)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      await ada.patch(`/worlds/${world.body.id}`).send({ open: true }).expect(200);
+
+      await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob', { roles: ['create-worlds'] });
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+      await bob.post('/worlds').send({ name: 'Bob’s World' }).expect(201);
+
+      // Bob's World Index is his own — the Open World he can reach by URL is absent from it.
+      const listed = (await bob.get('/worlds').expect(200)).body.map((w: { id: string }) => w.id);
+      expect(listed).not.toContain(world.body.id);
+    });
+
+    it('refuses the toggle for a non-Owner member and permits it for the Owner (the ownedBy gate)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+      const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      await ada.post(`/worlds/${world.body.id}/members`).send({ userId: bobId, role: 'contributor' }).expect(200);
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      // A Contributor reaches the World but cannot widen its audience.
+      await bob.patch(`/worlds/${world.body.id}`).send({ open: true }).expect(403);
+      expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.open).toBe(false);
+
+      // The Owner may flip it.
+      expect((await ada.patch(`/worlds/${world.body.id}`).send({ open: true }).expect(200)).body.open).toBe(true);
+    });
   });
 
   it('lets an Owner set the World’s Pinned Entities via PATCH, reflected on the Detail (#168)', async () => {

@@ -12,6 +12,7 @@ import { WorldImportsPanelComponent } from './components/world-imports-panel.com
 import { WorldMountsPanelComponent } from './components/world-mounts-panel.component';
 import { WorldThemePanelComponent } from './components/world-theme-panel.component';
 import { WorldKindPanelComponent } from './components/world-kind-panel.component';
+import { WorldOpenPanelComponent } from './components/world-open-panel.component';
 
 type Section = 'access' | 'kind' | 'schema' | 'mounts' | 'theme' | 'imports' | 'sharing';
 
@@ -50,6 +51,7 @@ interface SectionItem {
     WorldMountsPanelComponent,
     WorldThemePanelComponent,
     WorldKindPanelComponent,
+    WorldOpenPanelComponent,
   ],
   template: `
     @if (worldId(); as id) {
@@ -129,6 +131,13 @@ interface SectionItem {
                 <p class="detail-sub">{{ 'collab.publicLink.worldSubhead' | transloco }}</p>
               </header>
               <div class="pane" appPanel><app-public-link kind="world" [id]="id" /></div>
+              <!-- The Open-World toggle (ADR-0084), the successor to the World Public Link, is a World
+                   management power gated on the same manage right the Theme/Mounts panels are. -->
+              @if (canManage()) {
+                <h2 class="group-head">{{ 'worldOpen.heading' | transloco }}</h2>
+                <p class="detail-sub">{{ 'worldOpen.subhead' | transloco }}</p>
+                <div class="pane" appPanel><app-world-open [id]="id" /></div>
+              }
             }
           }
         </section>
@@ -182,11 +191,17 @@ export class WorldSettingsPage {
   private readonly activeWorld = inject(ActiveWorld);
   readonly worldId = this.activeWorld.worldId;
 
+  /**
+   * Whether the caller may manage the World (ADR-0039) — the right the Theme/Mounts/Kind panels and the
+   * Open-World toggle (ADR-0084) all gate on, so the page never shows a control the server would refuse.
+   */
+  readonly canManage = computed(() => !!this.activeWorld.world()?.rights?.includes('manage'));
+
   readonly items = computed<readonly SectionItem[]>(() => {
     const collaboration = this.clientConfig.isCollaborationEnabled();
     // A Theme is authored, not read: only a caller who may manage the World gets the editor (ADR-0039),
     // the same right the rail gates this whole page on.
-    const canManage = !!this.activeWorld.world()?.rights?.includes('manage');
+    const canManage = this.canManage();
     return [
       ...(collaboration
         ? [{ section: 'access' as const, icon: 'user' as const, label: 'collab.members.heading' }]

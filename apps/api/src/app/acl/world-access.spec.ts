@@ -289,6 +289,41 @@ describe('worldAccess', () => {
     });
   });
 
+  describe('the Open-World disjunct (ADR-0084) — reachable Instance-wide, still unlisted', () => {
+    /** Flip the World Open (the Owner-gated toggle's stored effect). */
+    function open(id: string): void {
+      db.update(worlds).set({ open: true }).where(eq(worlds.id, id)).run();
+    }
+
+    it('reaches an Open World for a stranger, yet never lists it (the retired-link property)', () => {
+      // A signed-in non-member reaches the Open World by id/URL — the successor to the World Public
+      // Link — but it stays absent from every "the Worlds you have" reading.
+      expect(reaches(stranger)).toEqual([]);
+      expect(lists(stranger)).toEqual([]);
+      open(worldId);
+      expect(reaches(stranger)).toEqual([worldId]);
+      expect(lists(stranger)).toEqual([]);
+    });
+
+    it('decideMeta reports an Open World reachable to a stranger, without membership or ownership', () => {
+      open(worldId);
+      expect(worldAccess(db, stranger).decideMeta(worldId)).toEqual({
+        reachable: true,
+        isMember: false,
+        isOwner: false,
+        canContribute: false,
+      });
+    });
+
+    it('leaves members and Owners exactly as they were — openness only widens the stranger case', () => {
+      open(worldId);
+      expect(reaches(viewer)).toEqual([worldId]);
+      expect(lists(viewer)).toEqual([worldId]);
+      expect(reaches(owner)).toEqual([worldId]);
+      expect(lists(owner)).toEqual([worldId]);
+    });
+  });
+
   /** What the caller may *read* — the Mount cascade included. */
   function reaches(userId: string): string[] {
     return db
