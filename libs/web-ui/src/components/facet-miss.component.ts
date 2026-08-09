@@ -17,22 +17,17 @@ interface FacetMissLine {
 }
 
 /**
- * What a box's **Facet Tokens** applied nothing for (ADR-0082) — a `$` name nothing answers to, and a
- * token whose key resolved but which filtered nothing anyway. Both are *said*: a token vanishes from the
- * text as it is lifted out, so an unreported one would browse everything as if the box were empty.
- *
- * Its own component rather than the search box's own row: the Command Palette parses the text *after*
- * its Provider prefix (`>$type:x` is a token there and not in the raw box), the `@` mention has no box
- * at all, and the six hosts place the report in six different chromes. The copy is web-ui's (ADR-0049),
- * so the six no longer keep six copies of it.
+ * What a box's **Facet Tokens** applied nothing for (ADR-0082) — an unknown `$` name, and a resolved key
+ * that filtered nothing. Both are said: a token vanishes as it is lifted out, so an unreported one would
+ * browse everything as if the box were empty. Its own component because the six hosts place the report in
+ * six chromes (and the mention picker has no box at all); the copy is web-ui's (ADR-0049).
  */
 @Component({
   selector: 'app-facet-miss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslocoPipe],
-  // A host styles this element — its spacing, its type scale — and those cascade into the lines. Laid
-  // out only when there is a miss to state: an always-present box would spend the host's margins on
-  // nothing. Inline, so no utility class ordering can outrank it.
+  // A host styles this element and those styles cascade into the lines; shown only when there is a miss
+  // to state, and inline so no utility class ordering can outrank it.
   host: { '[style.display]': "lines().length ? 'block' : 'none'" },
   template: `
     @for (line of lines(); track line.id) {

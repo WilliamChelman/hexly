@@ -337,18 +337,26 @@ function applyCategory(
  * token applied nothing, as {@link applyCategory} does.
  */
 function applyField(token: FacetToken, fields: FieldFilter[]): FacetTokenMissReason | undefined {
-  let miss: FacetTokenMissReason | undefined;
+  // A transient miss is a value still being typed (empty, quote still open); it is hushed as long as a
+  // sibling in the same token applies. A structural one — a negated bound — is unsayable however finished
+  // the box is, so it is surfaced even beside an applying sibling: `-$cr:>=5,3` filters by `neq 3` and
+  // still says the `>=5` went nowhere, rather than swallowing it (ADR-0081).
+  let transient: FacetTokenMissReason | undefined;
+  let structural: FacetTokenMissReason | undefined;
   let applied = false;
   for (const segment of token.segments) {
     // A quoted value is literal, so `">=5"` names a value rather than comparing to one.
     const written = segment.quoted ? undefined : comparisonOf(segment.value);
     const value = written?.value ?? segment.value;
-    // A range takes no polarity (ADR-0081): the wire has no negated bound, and "not >= 5" is not
-    // "<= 5", so an excluded comparison is reported rather than answered with a filter nobody asked for.
+    // A range takes no polarity (ADR-0081): the wire has no negated bound, and "not >= 5" is not "<= 5".
     const range = written !== undefined && written.op !== 'eq';
-    const reason = segmentMiss(segment, value) ?? (range && token.negated ? 'negated-bound' : undefined);
+    if (range && token.negated) {
+      structural ??= 'negated-bound';
+      continue;
+    }
+    const reason = segmentMiss(segment, value);
     if (reason) {
-      miss ??= reason;
+      transient ??= reason;
       continue;
     }
     // `=` writes the membership a bare value writes, so it still takes the token's polarity.
@@ -356,7 +364,7 @@ function applyField(token: FacetToken, fields: FieldFilter[]): FacetTokenMissRea
     applied = true;
     if (!hasFilter(fields, token.key, op, value)) fields.push({ key: token.key, op, value });
   }
-  return applied ? undefined : miss;
+  return structural ?? (applied ? undefined : transient);
 }
 
 /** Why one written value applies nothing: a quote still open, or nothing left once its comparison is read. */

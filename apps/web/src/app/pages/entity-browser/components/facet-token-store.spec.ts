@@ -105,6 +105,17 @@ describe('FacetTokenStore', () => {
     expect(store.queryOwned().categories?.tag).toEqual(['draft']);
   });
 
+  it('lets the exclusion win a value a shared URL names in both polarities', () => {
+    // A hand-edited or shared link can carry both spellings; the rail must resolve it as the parser
+    // does — the include drops, so one row lights one control, not two (ADR-0081).
+    queryParams$.next(convertToParamMap({ type: 'core.type.note', excludeType: 'core.type.note' }));
+    const store = trio();
+
+    expect(store.activeFacets().type).toEqual([]);
+    expect(store.activeFacets().excluded?.type).toEqual(['core.type.note']);
+    expect(store.filterParams()).toEqual({ excludeType: ['core.type.note'] });
+  });
+
   it('deletes exactly the clicked token from the box, leaving the rail store alone', () => {
     queryParams$.next(convertToParamMap({ tag: 'draft' }));
     const store = trio();

@@ -13,6 +13,7 @@ import { ListboxAnchor, placeListbox } from '../utils/listbox-placement';
   template: `
     <ul
       role="listbox"
+      [attr.id]="listboxId()"
       [attr.data-testid]="testid()"
       [attr.aria-label]="ariaLabel()"
       [attr.aria-activedescendant]="activeItemId()"
@@ -29,6 +30,8 @@ import { ListboxAnchor, placeListbox } from '../utils/listbox-placement';
 })
 export class ListboxComponent {
   readonly testid = input.required<string>();
+  /** The `<ul>`'s id, so a combobox can point `aria-controls` at this list while it stands open. */
+  readonly listboxId = input<string | null>(null);
   readonly ariaLabel = input.required<string | null>();
   readonly activeItemId = input.required<string | null>();
   /** The caret or field the box hangs off, in viewport coordinates. */

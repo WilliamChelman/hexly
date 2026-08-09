@@ -19,11 +19,10 @@ import { queryOwnedFacets, unionFacets } from './facet-token-union';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
- * The Facet categories one browse surface can narrow by — the Entity Browser's universal trio, the
- * Library's Containers, the Asset Browser's pair with its pinned Type left out. It is the one thing
- * the three surfaces genuinely differ in, so {@link FacetTokenStore} takes it and derives the rest:
- * the URL params it round-trips, what Clear all clears, and which reserved names the box offers on `$`
- * — a category this surface cannot narrow is a **stated miss**, never a silent filter (ADR-0082).
+ * The Facet categories one browse surface can narrow by — the one thing the three surfaces differ in, so
+ * {@link FacetTokenStore} derives the rest from it: the URL params, what Clear all clears, and the
+ * reserved names offered on `$`. A category a surface cannot narrow is a stated miss, not a silent
+ * filter (ADR-0082).
  */
 export const FACET_CATEGORIES = new InjectionToken<readonly FacetCategory[]>('FACET_CATEGORIES');
 
@@ -50,18 +49,15 @@ const sameValue = (a: ActiveFacets, b: ActiveFacets) => JSON.stringify(a) === JS
 const SEARCH_DEBOUNCE_MS = 150;
 
 /**
- * The **two stores** a browse surface filters by (ADR-0082), as a host directive: the **text store**
- * — the search box, parsed live — and the **rail store** — what was clicked. Filter state is
- * `parse(text) ∪ railState`, and where both name the same value the text wins and the rail's entry is
- * dropped, so a contradiction resolves visibly at the moment of typing.
+ * The **two stores** a browse surface filters by (ADR-0082), as a host directive: the text store (the
+ * box, parsed live) and the rail store (what was clicked). Filter state is `parse(text) ∪ railState`;
+ * where both name a value the text wins and the rail's entry drops, so a contradiction resolves at the
+ * moment of typing.
  *
- * Neither store writes into the other except to delete: {@link toggleFacet} on a row the text owns
- * takes *that* token out of the box ({@link removeFacetToken}) and leaves the rail alone, which is the
- * design's one rail→text write. Both stores mirror to the URL — the text to `q`, the rail to the
- * category params — so a browse survives a refresh and shares as a link.
- *
- * A page supplies its {@link FACET_CATEGORIES} and reads the result; everything else here is the same
- * on all three surfaces.
+ * Neither store writes the other except to delete: {@link toggleFacet} on a text-owned row removes that
+ * token ({@link removeFacetToken}) and leaves the rail alone — the design's one rail→text write. Both
+ * mirror to the URL (text to `q`, rail to the category params), so a browse survives a refresh and shares
+ * as a link. A page supplies its {@link FACET_CATEGORIES}; everything else is shared.
  */
 @Directive({})
 export class FacetTokenStore {
@@ -88,11 +84,9 @@ export class FacetTokenStore {
   private readonly typed = new Subject<string>();
 
   /**
-   * This surface's Facet vocabulary, from the client registry, synchronously — the reserved names of
-   * the categories it can narrow, plus every Facet key. The registry is the *only* source, the Facet
-   * read never widening it: a parser that changes its mind when a network read lands rewrites results
-   * while they are being read (ADR-0082). One set, read thrice: the parser resolves against it, the box
-   * offers it on `$`, and a rail click finds the token it deletes by it.
+   * This surface's Facet vocabulary, synchronously from the client registry — the categories' reserved
+   * names plus every Facet key. The registry is the only source, never widened by the Facet read: a
+   * parser that changed its mind on a network read would rewrite results as they are read (ADR-0082).
    */
   readonly facetKeys = computed<FacetKeySet>(() => ({
     reserved: this.categories.map((category) => TOKEN_NAME[category]),
@@ -100,11 +94,9 @@ export class FacetTokenStore {
   }));
   private readonly parsed = computed(() => parseFacetQuery(this.rawQuery(), this.facetKeys()));
   /**
-   * What the box means: its **Facet Tokens** as structured filters and the free text left over — with
-   * the **unsettled** keys held out of `unresolvedKeys`. A key the registry cannot answer for yet is
-   * *unresolved*, not unresolvable (ADR-0082), and every reader of that list treats it as the latter:
-   * stating a miss the Fields response is about to disprove is the same lie as filtering by it silently.
-   * The parser stays pure and knows nothing of it — the registry's readiness is the surface's business.
+   * What the box means, with keys the registry cannot answer for *yet* held out of `unresolvedKeys`: a
+   * key still unsettled is unresolved, not unresolvable (ADR-0082), so stating its miss now would be a
+   * lie the Fields response is about to disprove. The parser stays pure; readiness is the surface's business.
    */
   readonly parsedQuery = computed(() => {
     const parsed = this.parsed();
@@ -116,11 +108,9 @@ export class FacetTokenStore {
   /** The residual full-text query — what the wire's `q` carries, as against the URL's raw string. */
   readonly searchText = computed(() => this.parsedQuery().text);
   /**
-   * Whether the box leans on a Facet key the registry cannot answer for **yet** (ADR-0082): what this
-   * filters to is not known until the World's Fields land, so a surface **holds its read** rather than
-   * fetching every Entity and correcting itself once they do — a shared link that browses the whole
-   * World, then narrows under the reader. False as soon as the box names no such key: `$type:npc`
-   * resolves from the reserved names and browses instantly, whatever the Fields read is doing.
+   * Whether the box leans on a Facet key the registry cannot answer for *yet* (ADR-0082): what it filters
+   * to is unknown until the World's Fields land, so the surface holds its read rather than fetch every
+   * Entity and correct itself once they do. False as soon as no such key is named.
    */
   readonly filtersPending = computed(() => {
     const parsed = this.parsed();
@@ -250,10 +240,9 @@ export class FacetTokenStore {
   }
 
   /**
-   * The one rail→text write in the design, and always a deletion (ADR-0082): a click on a row the text
-   * owns takes the token that named it out of the box, whichever of the row's two controls was pressed.
-   * The rail store is left alone — a value it holds from an earlier click was only being masked by the
-   * text, and stays in force, one more click from release.
+   * The one rail→text write, always a deletion (ADR-0082): a click on a text-owned row removes the token
+   * that named it, whichever control was pressed. The rail store is left alone — a value it held from an
+   * earlier click was only masked by the text, and stays in force.
    */
   private dropToken(target: FacetTokenTarget): void {
     this.setQuery(removeFacetToken(this.rawQuery(), this.facetKeys(), target));
@@ -272,10 +261,9 @@ export class FacetTokenStore {
   }
 
   /**
-   * Whether the text already names this value, in either polarity — in which case the rail must not
-   * write it: the text owns it, the union would hide the rail's copy, and backspacing the token later
-   * would leave a filter nobody clicked. A click on such a row deletes the token instead
-   * ({@link dropToken}), which is where a typed Facet is reversed (ADR-0082).
+   * Whether the text already names this value, in either polarity — if so the rail must not write it, or
+   * backspacing the token later would leave a filter nobody clicked; a click deletes the token instead
+   * ({@link dropToken}), where a typed Facet is reversed (ADR-0082).
    */
   private namedInText(category: FacetCategory, value: string): boolean {
     const parsed = this.parsedQuery();
@@ -327,19 +315,28 @@ export class FacetTokenStore {
   }
 
   /**
-   * One rail store out of the URL's params — and, read empty, the cleared one. Both spellings come from
-   * here because the signal compares by JSON: a differently-ordered twin of the same state would read
-   * as a change and cost a second fetch on every URL echo.
+   * One rail store out of the URL's params — and, read empty, the cleared one. Key order is stable here
+   * because the signal compares by JSON, so a reordered twin would read as a change and cost a refetch.
    */
   private railStateFrom(rail: Readonly<Record<string, readonly string[]>>): ActiveFacets {
     const values = (name: string) => rail[name] ?? [];
+    const excluded = Object.fromEntries(
+      this.categories.map((category) => [category, values(EXCLUDE_PARAM[category])]),
+    ) as Partial<Record<FacetCategory, readonly string[]>>;
+    // A hand-edited or shared URL can name a value in both polarities; the parser drops the include so
+    // the exclusion wins (ADR-0081), and the rail must resolve the same, or both controls light on one
+    // row and the wire sends `type=a&excludeType=a` to an empty result set.
+    const included = (category: FacetCategory) => {
+      const vetoed = new Set(excluded[category] ?? []);
+      return values(category).filter((value) => !vetoed.has(value));
+    };
     return {
-      type: values('type'),
-      tag: values('tag'),
-      visibility: values('visibility'),
-      container: values('container'),
+      type: included('type'),
+      tag: included('tag'),
+      visibility: included('visibility'),
+      container: included('container'),
       fields: fieldsFromTokens(values('field')),
-      excluded: Object.fromEntries(this.categories.map((category) => [category, values(EXCLUDE_PARAM[category])])),
+      excluded,
     };
   }
 }

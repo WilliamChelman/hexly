@@ -312,9 +312,13 @@ describe('FacetSearchInput (ADR-0082)', () => {
     expect(box.getAttribute('aria-activedescendant')).toBe('palette-option-a');
 
     type('$type:');
+    // Both pointers move to the open suggestion list, so a screen reader resolves the active option
+    // in the container aria-controls names rather than in the consumer's shut one.
+    expect(box.getAttribute('aria-controls')).toBe('search-suggestions');
     expect(box.getAttribute('aria-activedescendant')).toBe('facet-suggestion-value-npc');
 
     press('Escape');
+    expect(box.getAttribute('aria-controls')).toBe('palette-listbox');
     expect(box.getAttribute('aria-activedescendant')).toBe('palette-option-a');
   });
 

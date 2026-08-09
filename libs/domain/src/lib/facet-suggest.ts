@@ -1,21 +1,17 @@
 /**
- * What a search box may **offer** where the caret stands (ADR-0082): `$` reveals the whole filter
- * vocabulary, and after the key's colon the same list offers that Facet's values with their counts.
- *
- * Two stages, two sources, and the difference is load-bearing: **keys resolve synchronously** off the
- * client registry, while the Facet read feeds **values and counts only**, so a late response can make a
- * filter easier to type but never changes what one means. The grammar stays in `facet-token.ts`; this
- * reads a token only as far as the caret, which the parser — reading whole tokens — cannot answer.
+ * What a search box offers at the caret (ADR-0082): `$` reveals the vocabulary, and after the colon the
+ * same list offers the Facet's values with counts. Keys resolve synchronously off the client registry;
+ * the Facet read feeds values and counts only, so a late response never changes what a filter means.
+ * Reads a token as far as the caret — which the whole-token parser in `facet-token.ts` cannot.
  */
 
 import { EntityFacets, FacetCount } from './entity';
 import { facetCategoryOf, FacetKeySet, RESERVED_FACET_NAMES, startsFacetToken } from './facet-token';
 
 /**
- * The token the caret stands in, as far as the caret: which half of the vocabulary is being typed, and
- * the slice `start`/`end` an accepted suggestion replaces — for a value opened with a quote, `start` is
- * the quote itself, so completing it replaces rather than nests. A `key` exists on the value stage
- * alone, which is why the two stages are separate shapes rather than one with an optional field.
+ * The token the caret stands in, read to the caret: which half is being typed, and the slice
+ * `start`/`end` a suggestion replaces. For a quoted value `start` is the quote, so completing it
+ * replaces rather than nests.
  */
 export type FacetSuggestContext = FacetKeyContext | FacetValueContext;
 
@@ -110,9 +106,9 @@ export function facetKeySuggestions(keys: FacetKeySet, prefix: string): readonly
 }
 
 /**
- * Whether this surface can apply `key` at all. The value stage is gated on it, so the Facet read never
+ * Whether this surface can apply `key` at all — the value stage is gated on it so the Facet read never
  * leaks a key into the vocabulary: `EntityFacets.fields` is surfaced by presence (#231) and can carry
- * keys this registry lacks, which would offer counted values for a key the surface reports as a miss.
+ * keys this registry lacks.
  */
 export function resolvesFacetKey(keys: FacetKeySet, key: string): boolean {
   return (keys.reserved ?? RESERVED_FACET_NAMES).includes(key) || (keys.fields ?? []).includes(key);
@@ -147,10 +143,9 @@ function rank<T>(items: readonly T[], prefix: string, textOf: (item: T) => strin
 }
 
 /**
- * The box with `choice` accepted where the caret stood, and where the caret lands after. A key gains
- * its colon, so the value stage opens straight after; a value is inserted **verbatim** — the case and
- * spacing it is stored in, quoted where the grammar needs it — because the parser does not case-fold,
- * and typeahead that did would disagree with the rail.
+ * The box with `choice` accepted where the caret stood, and where the caret lands after. A value is
+ * inserted verbatim, quoted where the grammar needs it: the parser does not case-fold, so a folded
+ * insert would disagree with the rail.
  */
 export function applyFacetSuggestion(
   raw: string,

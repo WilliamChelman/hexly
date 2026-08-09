@@ -9,13 +9,9 @@ const CATEGORIES = ['type', 'tag', 'visibility', 'container'] as const satisfies
 type RailValues = Partial<Record<FacetTokenCategory, readonly string[]>>;
 
 /**
- * The one filter state, `parse(text) ∪ railState` (ADR-0082). A typed Facet lives in the text and a
- * clicked one lives in the rail; this is where the two stores are read together — for the wire and for
- * the rail, which renders the union so every applied filter is visible in one place.
- *
- * Where both stores name the same value, **the text wins** and the rail's entry is dropped, so a
- * contradiction resolves visibly at the moment of typing rather than as a silent empty result set —
- * and each value keeps exactly one visual state.
+ * The one filter state, `parse(text) ∪ railState` (ADR-0082) — read together here for the wire and the
+ * rail. Where both stores name a value the text wins and the rail's entry drops, so a contradiction
+ * resolves at the moment of typing and each value keeps one visual state.
  */
 export function unionFacets(parsed: ParsedFacetQuery, rail: ActiveFacets): ActiveFacets {
   const merge = (typed: FacetTokenValues, clicked: RailValues): Record<FacetTokenCategory, readonly string[]> => {
@@ -36,9 +32,8 @@ export function unionFacets(parsed: ParsedFacetQuery, rail: ActiveFacets): Activ
 }
 
 /**
- * Which of the union's controls came from the text (ADR-0082) — either polarity, a value having one
- * visual state whichever way the box named it, and a **bound** counted per input rather than per Field:
- * `$cr:>=5` owns that Field's minimum and leaves its maximum the rail's to set.
+ * Which of the union's controls came from the text (ADR-0082), in either polarity — a bound counted per
+ * input, not per Field: `$cr:>=5` owns that Field's minimum and leaves its maximum the rail's to set.
  */
 export function queryOwnedFacets(parsed: ParsedFacetQuery): QueryOwnedFacets {
   const categories: Partial<Record<FacetTokenCategory, readonly string[]>> = {};

@@ -40,23 +40,18 @@ interface FacetSuggestion {
 }
 
 /**
- * The shared Entity search box (ADR-0082): the input, the two-stage **Facet Token** suggestion list,
- * and the keyboard that drives it, adopted by every surface that searches Entities.
+ * The shared Entity search box (ADR-0082): the input, the two-stage **Facet Token** suggestion list, and
+ * its keyboard, adopted by every surface that searches Entities.
  *
- * The two stages have two sources, and the difference is load-bearing: **keys** come off {@link keys},
- * read synchronously from the client registry, so `$` reveals the whole vocabulary whatever the network
- * is doing; **values** come off {@link facets}, the Facet read the surface already runs, so a suggestion
- * costs no request. A surface naming no keys and passing no read never opens the list, which is how the
- * box degrades to the plain one it replaces.
+ * The two stages have two sources: keys come off {@link keys}, read synchronously from the client
+ * registry, so `$` reveals the vocabulary whatever the network is doing; values come off {@link facets},
+ * the read the surface already runs, so a suggestion costs no request. Naming no keys and passing no read
+ * never opens the list — the box degrades to the plain one it replaces.
  *
- * Controlled: the consumer owns the text — its debounce, its URL mirror — and receives every keystroke,
- * the one an accepted suggestion writes included, through {@link queryChange}. Copy that names *this*
- * surface (placeholder, aria-label) is the consumer's, already translated; copy that names the **grammar**
- * is this lib's (ADR-0049), the six surfaces stating it identically. Its look is `appInput`'s (ADR-0007).
- *
- * It lives in `web-ui`, not with the Entity surfaces it was written for: it is a box, a listbox and a
- * keyboard, its only domain dependency being the pure parser. In `web-entity` it made the Command Palette
- * depend on a feature lib whose vocabulary it explicitly does not own (ADR-0032, ADR-0082).
+ * Controlled: the consumer owns the text and receives every keystroke, an accepted suggestion included,
+ * via {@link queryChange}. Grammar copy is this lib's (ADR-0049); surface copy (placeholder, aria-label)
+ * is the consumer's; the look is `appInput`'s (ADR-0007). Lives in `web-ui`, not the Entity surfaces it
+ * serves, so the Command Palette need not depend on a feature lib whose vocabulary it does not own (ADR-0032).
  */
 @Component({
   selector: 'app-facet-search-input',
@@ -76,7 +71,7 @@ interface FacetSuggestion {
       [attr.role]="expanded() ? 'combobox' : null"
       [attr.aria-expanded]="expanded() ? 'true' : null"
       [attr.aria-autocomplete]="expanded() ? 'list' : null"
-      [attr.aria-controls]="controls()"
+      [attr.aria-controls]="visible() ? suggestionsListId() : controls()"
       [attr.aria-activedescendant]="visible() ? activeItemId() : activeDescendant()"
       [value]="value()"
       (input)="onInput($any($event.target).value)"
@@ -87,6 +82,7 @@ interface FacetSuggestion {
     @if (visible()) {
       <app-listbox
         [testid]="testid() + '-suggestions'"
+        [listboxId]="suggestionsListId()"
         [ariaLabel]="'ui.facetToken.suggestionsLabel' | transloco"
         [activeItemId]="activeItemId()"
         [anchor]="anchor()!"
@@ -155,6 +151,8 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
   private context: FacetSuggestContext | null = null;
   /** A combobox while either list stands: this one's, or the consumer's, which outlives every close. */
   protected readonly expanded = computed(() => this.visible() || this.controls() !== null);
+  /** The suggestion list's id, so `aria-controls` points at it — not the consumer's list — while open. */
+  protected readonly suggestionsListId = computed(() => this.testid() + '-suggestions');
 
   /** Focus the box — the input is this component's, so a consumer that opens onto it asks for it here. */
   focus(): void {
@@ -167,10 +165,9 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
   }
 
   /**
-   * The list claims ↑↓/Enter/Escape **while it is open**, through this element-level handler, stopping
-   * them before ADR-0063's window dispatcher — the deliberate deviation ADR-0082 records. Closed, it
-   * consumes nothing and every key behaves as it did before the box gained a list. Escape dismisses the
-   * suggestions only: the default is prevented so the `<dialog>` a picker sits in stays open.
+   * The list claims ↑↓/Enter/Escape while open, before ADR-0063's window dispatcher — the deviation
+   * ADR-0082 records. Closed, it consumes nothing. Escape dismisses the suggestions only, its default
+   * prevented so the `<dialog>` a picker sits in stays open.
    */
   protected onBoxKeyDown(event: KeyboardEvent): void {
     // Tab keeps its native focus move; the shared list would otherwise accept on it and trap focus.
@@ -228,11 +225,7 @@ export class FacetSearchInputComponent extends ListboxController<FacetSuggestion
     }));
   }
 
-  /**
-   * Write the accepted suggestion into the box and hand the consumer the same keystroke typing it would
-   * have produced. The **stored value goes in verbatim** — case, spacing, and the quotes the grammar
-   * needs — because the parser does not case-fold, and a folded insert would disagree with the rail.
-   */
+  /** Write the accepted suggestion into the box and emit the keystroke typing it would have produced. */
   private accept(item: FacetSuggestion): void {
     const el = this.box().nativeElement;
     if (!this.context) return;

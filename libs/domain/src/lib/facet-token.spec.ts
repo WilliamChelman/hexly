@@ -155,6 +155,13 @@ describe('parseFacetQuery (ADR-0082)', () => {
     expect(parsed.inapplicableTokens).toEqual([{ key: 'challenge_rating', reason: 'negated-bound' }]);
   });
 
+  it('reports a negated bound even when a sibling value in the same token applies', () => {
+    const parsed = parseFacetQuery('-$challenge_rating:>=5,3', keys);
+
+    expect(parsed.fields).toEqual([{ key: 'challenge_rating', op: 'neq', value: '3' }]);
+    expect(parsed.inapplicableTokens).toEqual([{ key: 'challenge_rating', reason: 'negated-bound' }]);
+  });
+
   it('recognises $ only at a word boundary', () => {
     const parsed = parseFacetQuery('cost$tag:fantasy a-$type:npc', keys);
 
