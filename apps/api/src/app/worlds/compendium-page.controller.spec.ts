@@ -10,7 +10,6 @@ import { DB, Db, createDb } from '../db/db';
 import { EntitiesModule } from '../entities/entities.module';
 import { CompendiumWrites } from './compendium-writes';
 import { WorldsModule } from './worlds.module';
-import { PublicLinksModule } from '../acl/public-links.module';
 
 /**
  * The read behind the **Compendium page** (ADR-0061, #402), asserted at the HTTP seam: both facts that
@@ -30,7 +29,7 @@ describe('The Compendium page read', () => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
 
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule, AuthModule, WorldsModule, EntitiesModule, PublicLinksModule],
+      imports: [ConfigModule, AuthModule, WorldsModule, EntitiesModule],
     })
       .overrideProvider(DB)
       .useValue(db)
@@ -110,28 +109,6 @@ describe('The Compendium page read', () => {
     await request(app.getHttpServer()).get(`/compendiums/${monsters}`).expect(401);
     // The shelf itself stays signed-in too, so what an Instance has installed is never there to enumerate.
     await request(app.getHttpServer()).get('/compendiums').expect(401);
-  });
-
-  it('states the terms to the anonymous reader of a World that Mounts the pack', async () => {
-    // What #410 actually asks for: a **Mount** cascades read to anonymous World Public Link holders
-    // (ADR-0080), so a pack's terms must never sit behind a wall its content does not — and the token
-    // that carries the content is what carries the terms.
-    const ada = await signIn('ada@hexly.test');
-    await ada.post(`/worlds/${world}/mounts`).send({ containerId: monsters }).expect(200);
-    const token = (await ada.post(`/worlds/${world}/link`).expect(200)).body.token as string;
-
-    expect(
-      (await request(app.getHttpServer()).get(`/public/worlds/${token}/compendiums/${monsters}`).expect(200)).body,
-    ).toMatchObject({
-      name: 'Draw Steel: Monsters',
-      attribution: { license: 'Draw Steel Creator License' },
-    });
-    // Only what this World draws from: an installed pack it does not Mount is no more this reader's
-    // than an unmounted Container's content is.
-    await request(app.getHttpServer()).get(`/public/worlds/${token}/compendiums/${treasures}`).expect(404);
-    // And a revoked token reaches nothing at all.
-    await ada.delete(`/worlds/${world}/link`).expect(204);
-    await request(app.getHttpServer()).get(`/public/worlds/${token}/compendiums/${monsters}`).expect(404);
   });
 
   // ---- harness -------------------------------------------------------------

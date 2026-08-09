@@ -1,9 +1,9 @@
 import { EntityVerb, GrantRole } from '@hexly/domain';
-import { SQL, SQLWrapper, and, eq, getTableColumns, sql } from 'drizzle-orm';
+import { eq, getTableColumns, sql } from 'drizzle-orm';
 import { Db } from '../db/db';
-import { entities, entityGrants, entityLinks, worldLinks, worldMembers, worlds } from '../db/schema';
+import { entities, entityGrants, worldMembers, worlds } from '../db/schema';
 import { inACompendium } from '../worlds/compendiums';
-import { mountedIntoReachOf, mountedIntoWorld } from './mount-reach';
+import { mountedIntoReachOf } from './mount-reach';
 import { isSuperadmin } from './owner-set';
 
 /** The Superadmin bypass: every predicate short-circuits to match-all. */
@@ -137,46 +137,6 @@ export function entityRightsOf(a: {
   if (a.canWrite) rights.push('delete', 'set-visibility');
   if (a.isOwner) rights.push('manage');
   return rights;
-}
-
-/** The `shared` visibility predicate — the surface a Public Link exposes. */
-export const sharedVisibility = eq(entities.visibility, 'shared');
-
-/** An anonymous Public Link's Rights: read-only. */
-export const READ_ONLY_RIGHTS: readonly EntityVerb[] = ['read'];
-
-/**
- * What a **World Public Link** on `worldRef` reaches: that World's own `shared` Entities, plus what its
- * **Mounts** republish (ADR-0080) — the anonymous half of the cascade.
- *
- * Republished is what a mounted Container's ordinary readers read, which is why the second arm asks a
- * different question of each kind: a World's `shared` Entities, and *every* entry of a **Compendium**,
- * whose Instance-wide rule never consulted visibility (ADR-0079).
- */
-export function reachedByWorldLink(worldRef: SQLWrapper): SQL {
-  return sql`((${entities.containerId} = ${worldRef} AND ${sharedVisibility})
-    OR ((${sharedVisibility} OR ${inACompendium()}) AND ${mountedIntoWorld(worldRef, entities.containerId)}))`;
-}
-
-/**
- * Whether a Public Link *token* currently grants read of Entity `id`. A token reaches
- * an Entity via a per-entity link pointing at it (pierces `private`), or via a World
- * link that {@link reachedByWorldLink} answers for. A revoked token reaches nothing.
- */
-export function tokenReachesEntity(db: Db, token: string, id: string): boolean {
-  const direct = db
-    .select({ id: entityLinks.entityId })
-    .from(entityLinks)
-    .where(and(eq(entityLinks.id, token), eq(entityLinks.entityId, id)))
-    .get();
-  if (direct) return true;
-  const viaWorld = db
-    .select({ id: entities.id })
-    .from(worldLinks)
-    .innerJoin(entities, and(eq(entities.id, id), reachedByWorldLink(worldLinks.worldId)))
-    .where(eq(worldLinks.id, token))
-    .get();
-  return !!viaWorld;
 }
 
 /** A resolved single-row Entity decision: the full row plus the caller's standing. */

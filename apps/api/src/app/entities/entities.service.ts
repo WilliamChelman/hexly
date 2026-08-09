@@ -31,7 +31,6 @@ import {
   EntityGrant,
   GrantRole,
   isEntityLinkDataType,
-  PublicLink,
   entityLinkConstraints,
   SaveEntityRequest,
   stripReservedKeys,
@@ -43,17 +42,9 @@ import { and, asc, desc, eq, inArray, notInArray, or, sql, SQL } from 'drizzle-o
 import { alias } from 'drizzle-orm/sqlite-core';
 import { CORE_ASSET_TYPE_ID, IMAGE_KIND_FIELD_FILTER } from '@hexly/plugin-asset';
 import { AclSetResult, gate, isSuperadmin, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
-import {
-  EntityAccess,
-  entityAccess,
-  ownsEntity,
-  reachedByWorldLink,
-  READ_ONLY_RIGHTS,
-  sharedVisibility,
-} from '../acl/entity-access';
+import { EntityAccess, entityAccess, ownsEntity } from '../acl/entity-access';
 import { stillOwned } from '../acl/mount-reach';
 import { canCreateEntityFilter, worldAccess, worldOwnerFilter } from '../acl/world-access';
-import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
 import {
   assetIndex,
@@ -64,7 +55,6 @@ import {
   entityEdges,
   entityFieldFacets,
   entityGrants,
-  entityLinks,
   worlds,
 } from '../db/schema';
 import { isImageExt } from '../assets/assets.service';
@@ -76,14 +66,6 @@ import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
 import { edgeTargetContainerId } from './utils/asset-edge-target';
 import { linkedEntity } from './utils/linked-entity';
-
-/** Per-entity Public Link table for the shared get/mint/revoke helpers. */
-const ENTITY_LINK: PublicLinkTable = {
-  table: entityLinks,
-  id: entityLinks.id,
-  fk: entityLinks.entityId,
-  newRow: (token, entityId) => ({ id: token, entityId, createdAt: Date.now() }),
-};
 
 /** Reader-scoped paging + filtering options for {@link EntitiesService.list}. */
 export interface ListOptions {
@@ -1335,86 +1317,6 @@ export class EntitiesService {
         value: this.entityGrantsOf(id),
       }
     );
-  }
-
-  /** The Entity's Public Link (active token or null), for an Owner — same Owner-only gate as grants. */
-  getLink(userId: string, id: string): AclSetResult<PublicLink | null> {
-    const gate = this.gateOwnerManagement(userId, id);
-    if (gate) return gate;
-    return { status: 'ok', value: readPublicLink(this.db, ENTITY_LINK, id) };
-  }
-
-  /**
-   * Mint (or return the existing) Public Link: Owner-only, one active link per
-   * Entity — a re-mint returns the current token (rotate = revoke + re-mint). The
-   * token is an anonymous Viewer grant that pierces `private`.
-   */
-  mintLink(userId: string, id: string): AclSetResult<PublicLink> {
-    const gate = this.gateOwnerManagement(userId, id);
-    if (gate) return gate;
-    return { status: 'ok', value: mintPublicLink(this.db, ENTITY_LINK, id) };
-  }
-
-  /**
-   * Revoke the Public Link: Owner-only kill-switch — the token stops resolving
-   * immediately. Idempotent.
-   */
-  revokeLink(userId: string, id: string): AclSetResult<null> {
-    const gate = this.gateOwnerManagement(userId, id);
-    if (gate) return gate;
-    // Link revocation is sharing, so it is a `manage` write: the token row and the `seq` bump
-    // land in one transaction, and the nudge flushes after it. An anonymous token follower then
-    // resolves to `unavailable`; a still-authorized follower simply refetches.
-    this.writes.transact(() => {
-      revokePublicLink(this.db, ENTITY_LINK, id);
-      return this.writes.mutate(userId, id, { kind: 'manage' });
-    });
-    return { status: 'ok', value: null };
-  }
-
-  /**
-   * Resolve a Public Link token to its Entity, read-only. The token *is* an
-   * anonymous Viewer grant, so it pierces `private` — no visibility check. null
-   * when the token doesn't resolve (revoked or never minted).
-   */
-  loadByEntityLink(token: string): EntityDetail | null {
-    const link = this.db
-      .select({ entityId: entityLinks.entityId })
-      .from(entityLinks)
-      .where(eq(entityLinks.id, token))
-      .get();
-    if (!link) return null;
-    const row = this.db.select().from(entities).where(eq(entities.id, link.entityId)).get();
-    return row ? this.withAssetBytesState({ ...toDetail(row), rights: [...READ_ONLY_RIGHTS] }) : null;
-  }
-
-  /**
-   * The Entity with this id that a World Public Link on `worldId` reaches, read-only — that World's
-   * `shared` surface plus what its **Mounts** republish (ADR-0080). Anything else is null (404), so an
-   * unreached id stays indistinguishable from a missing one.
-   */
-  loadThroughWorldLink(worldId: string, id: string): EntityDetail | null {
-    const row = this.db
-      .select()
-      .from(entities)
-      .where(and(eq(entities.id, id), reachedByWorldLink(sql`${worldId}`)))
-      .get();
-    return row ? this.withAssetBytesState({ ...toDetail(row), rights: [...READ_ONLY_RIGHTS] }) : null;
-  }
-
-  /**
-   * Summaries of a World's `shared` Entities, ordered like {@link list}. The World's *own*, deliberately:
-   * a Mount widens what a World may point at, never what it holds (ADR-0080), so the public view lists
-   * exactly what the Entity Browser would.
-   */
-  listSharedByWorld(worldId: string): EntitySummary[] {
-    return this.db
-      .select()
-      .from(entities)
-      .where(and(eq(entities.containerId, worldId), sharedVisibility))
-      .orderBy(desc(entities.updatedAt), asc(entities.id))
-      .all()
-      .map(toSummary);
   }
 
   /**

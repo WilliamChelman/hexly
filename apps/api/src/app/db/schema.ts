@@ -344,40 +344,6 @@ export const worldFields = sqliteTable(
 );
 
 /**
- * A World Public Link: an unguessable token granting anonymous Viewer access to
- * all `shared` Entities in a World. `id` is the token.
- */
-export const worldLinks = sqliteTable(
-  'world_links',
-  {
-    id: text('id').primaryKey(),
-    worldId: text('world_id')
-      .notNull()
-      .references(() => worlds.id, { onDelete: 'cascade' }),
-    createdAt: integer('created_at').notNull(),
-  },
-  (table) => [index('idx_world_links_world_id').on(table.worldId)],
-);
-
-/**
- * A per-entity Public Link: an unguessable token granting anonymous read-only
- * access to one Entity. `id` is the token — an anonymous Viewer grant, so it
- * pierces `private` with no visibility check on the read. One active link per
- * Entity is enforced in the service. Deleting the Entity cascades.
- */
-export const entityLinks = sqliteTable(
-  'entity_links',
-  {
-    id: text('id').primaryKey(),
-    entityId: text('entity_id')
-      .notNull()
-      .references(() => entities.id, { onDelete: 'cascade' }),
-    createdAt: integer('created_at').notNull(),
-  },
-  (table) => [index('idx_entity_links_entity_id').on(table.entityId)],
-);
-
-/**
  * The derived **Asset dedup index** (ADR-0065): one row per Asset Entity, mapping the content `hash` of
  * the bytes its asset-ref wraps to the Entity that owns them. The `entityImportSource` pattern — an
  * **index, never a source of truth**: `EntityWrites` materialises it from the document at the write choke

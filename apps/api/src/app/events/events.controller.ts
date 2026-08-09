@@ -8,7 +8,6 @@ import {
   NotFoundException,
   Param,
   Put,
-  Query,
   Req,
   Sse,
   UnauthorizedException,
@@ -24,9 +23,8 @@ import { NudgeBus, Principal } from './nudge-bus';
  * The SSE nudge bus surface (ADR-0044). One multiplexed stream per tab: `GET /events` mints a
  * `connectionId`; `PUT /events/:connectionId/interest` declares the whole watched set.
  *
- * Deliberately *not* session-guarded: the principal is a session cookie **or** an anonymous Public
- * Link `?token=`. {@link resolvePrincipal} accepts either and 401s only when neither is present. A
- * token that grants nothing simply subscribes to nothing (silent).
+ * The principal is the session cookie only: ADR-0084 retired the anonymous Public Link path, so
+ * there is no `?token=` — {@link resolvePrincipal} 401s when the cookie is absent or invalid.
  */
 @Controller('events')
 export class EventsController {
@@ -35,25 +33,18 @@ export class EventsController {
     private readonly auth: AuthService,
   ) {}
 
-  /**
-   * The connection's principal. A `?token=` *wins* over any session cookie: a signed-in user
-   * opening a shared link follows as the link grants, not as their own (possibly nil) rights on
-   * that Entity, exactly as the unguarded `GET /public/…` routes behave. Absent a token, a valid
-   * session cookie → the user; neither → 401. The token isn't validated here — an unresolvable one
-   * opens a connection that can never subscribe, never a leak.
-   */
-  private async resolvePrincipal(req: Request, token?: string): Promise<Principal> {
-    if (token) return { kind: 'token', token };
+  /** The connection's principal: a valid session cookie → the user; otherwise 401 (ADR-0084). */
+  private async resolvePrincipal(req: Request): Promise<Principal> {
     const user = await this.auth.authenticate(req.cookies?.[SESSION_COOKIE]);
     if (user) return { kind: 'user', userId: user.id };
     throw new UnauthorizedException();
   }
 
   @Sse()
-  events(@Req() req: Request, @Query('token') token?: string): Observable<MessageEvent> {
+  events(@Req() req: Request): Observable<MessageEvent> {
     // Defer the whole stream on the async principal resolve, then emit the `ready` frame and the
     // live nudges. On unsubscribe (tab closed / dropped) reap the connection so the map can't leak.
-    return from(this.resolvePrincipal(req, token)).pipe(
+    return from(this.resolvePrincipal(req)).pipe(
       switchMap((principal) => {
         const { connectionId, stream } = this.bus.connect(principal);
         return concat(of<MessageEvent>({ type: 'ready', data: { connectionId } }), stream).pipe(
@@ -69,12 +60,11 @@ export class EventsController {
     @Req() req: Request,
     @Param('connectionId') connectionId: string,
     @Body() body: unknown,
-    @Query('token') token?: string,
   ): Promise<void> {
     // safeParse + 400 (house style): a raw ZodError would surface as a 500 leaking a stack.
     const parsed = interestSetSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    const principal = await this.resolvePrincipal(req, token);
+    const principal = await this.resolvePrincipal(req);
     const outcome = this.bus.setInterest(connectionId, principal, parsed.data.refs);
     // An unowned connectionId is a 403 (rejected, not applied); an unknown one is a 404. Both
     // are silent about the other's existence.

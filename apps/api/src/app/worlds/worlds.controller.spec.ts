@@ -532,7 +532,7 @@ describe('Worlds endpoints', () => {
      * respect but the World Index's grouping. If a read ever starts answering differently because a
      * World is a Shelf, this is where it shows.
      */
-    it('withholds nothing from a Shelf: it lists, reads, keeps members, a Public Link and a Graph', async () => {
+    it('withholds nothing from a Shelf: it lists, reads, keeps members and a Graph', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const shelf = await ada.post('/worlds').send({ name: 'The Art Shelf' }).expect(201);
       const campaign = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
@@ -546,13 +546,12 @@ describe('Worlds endpoints', () => {
       const listed = await ada.get('/worlds').expect(200);
       expect(listed.body.map((w: { id: string }) => w.id).sort()).toEqual([campaign.body.id, shelf.body.id].sort());
 
-      // Collaboration, sharing and the derived views are all still the Shelf's.
+      // Collaboration and the derived views are all still the Shelf's.
       const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
       await ada.post(`/worlds/${shelf.body.id}/members`).send({ userId: bobId, role: 'viewer' }).expect(200);
       expect((await ada.get(`/worlds/${shelf.body.id}/members`).expect(200)).body).toEqual([
         { userId: bobId, role: 'viewer' },
       ]);
-      expect((await ada.post(`/worlds/${shelf.body.id}/link`).expect(200)).body.token).toEqual(expect.any(String));
       expect((await ada.get(`/worlds/${shelf.body.id}/graph`).expect(200)).body.nodes).toHaveLength(1);
       // And its Entities answer the same World-scoped read a campaign's do.
       const entities = await ada.get(`/entities?worldId=${shelf.body.id}`).expect(200);

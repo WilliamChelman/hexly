@@ -13,7 +13,6 @@ import { EntitiesModule } from '../entities/entities.module';
 import { EntitiesService } from '../entities/entities.service';
 import { CompendiumWrites } from '../worlds/compendium-writes';
 import { WorldsModule } from '../worlds/worlds.module';
-import { PublicLinksModule } from './public-links.module';
 
 /**
  * A **Mount** cascades read (#410, ADR-0080): a mounted Container's content is readable by whoever can
@@ -53,7 +52,7 @@ describe('A Mount cascades read', () => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
 
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule, AuthModule, WorldsModule, EntitiesModule, PublicLinksModule],
+      imports: [ConfigModule, AuthModule, WorldsModule, EntitiesModule],
     })
       .overrideProvider(DB)
       .useValue(db)
@@ -186,44 +185,6 @@ describe('A Mount cascades read', () => {
     expect(await names(bob, `worldId=${campaign}`)).toEqual(['The Tavern']);
   });
 
-  it('serves mounted content to the anonymous reader a World Public Link was shared with', async () => {
-    const token = (await ada().post(`/worlds/${campaign}/link`).expect(200)).body.token as string;
-    await mount(campaign, shelf);
-    await mount(campaign, pack);
-
-    // The session shared with an account-less reader shows the shelf art the Board draws on rather than
-    // a hole where it was — and the pack's entries, whose Instance-wide rule never asked about
-    // visibility, come through the same one hop.
-    expect(
-      ((await anon().get(`/public/worlds/${token}/entities/${sunset}`).expect(200)).body as EntityDetail).name,
-    ).toBe('Sunset over Aldermoor');
-    await anon().get(`/public/worlds/${token}/entities/${goblin}`).expect(200);
-    // `private` is still `private`: a Public Link exposes a World's shared surface, and a Mount
-    // republishes exactly as much of the shelf's.
-    await anon().get(`/public/worlds/${token}/entities/${sketch}`).expect(404);
-
-    // A pack's terms must never sit behind a wall its content does not (ADR-0080), so the Compendium
-    // page opens to the same reader — through the token that names the Mounts, which is the whole of
-    // their standing. The pack's own id is an identifier, never the credential: ADR-0034's
-    // possession-is-the-token is content-addressed bytes on a static route and stops there.
-    expect((await anon().get(`/public/worlds/${token}/compendiums/${pack}`).expect(200)).body).toMatchObject({
-      name: 'Draw Steel: Monsters',
-      rev: '1.4.0',
-    });
-    await anon().get(`/compendiums/${pack}`).expect(401);
-    // A pack this World does not Mount is not this token's to state terms for.
-    const unmounted = app.get(CompendiumWrites).install('draw-steel.importer.treasures', { name: 'Homebrew' }, '0.9.0');
-    await anon().get(`/public/worlds/${token}/compendiums/${unmounted}`).expect(404);
-
-    // The World's public view still lists the World's own — a Mount changes what may be reached, never
-    // what a Container-scoped listing holds.
-    const view = (await anon().get(`/public/worlds/${token}`).expect(200)).body;
-    expect((view.entities as EntitySummary[]).map((e) => e.name)).toEqual(['The Tavern']);
-
-    await unmount(campaign, shelf);
-    await anon().get(`/public/worlds/${token}/entities/${sunset}`).expect(404);
-  });
-
   it('confers no write with the read it confers', async () => {
     const bob = await signIn('bob@hexly.test');
     await mount(campaign, shelf);
@@ -338,9 +299,6 @@ describe('A Mount cascades read', () => {
     await bob.get(`/entities/${sunset}`).expect(404);
     await bob.get(`/worlds/${shelf}`).expect(404);
     await dan.get(`/entities/${sunset}`).expect(404);
-    // A World Public Link Dan mints reaches no further than his own members do.
-    const token = (await dan.post(`/worlds/${campaign}/link`).expect(200)).body.token as string;
-    await anon().get(`/public/worlds/${token}/entities/${sunset}`).expect(404);
     expect(((await ada().get(`/entities/${sunset}`).expect(200)).body as EntityDetail).name).toBe(
       'Sunset over Aldermoor',
     );
@@ -359,11 +317,6 @@ describe('A Mount cascades read', () => {
   }
 
   type Agent = Awaited<ReturnType<typeof signIn>>;
-
-  /** The reader with no account — possession of a token is their whole credential. */
-  function anon() {
-    return request(app.getHttpServer());
-  }
 
   async function mintWorld(agent: Agent, name: string): Promise<string> {
     return (await agent.post('/worlds').send({ name }).expect(201)).body.id;

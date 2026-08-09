@@ -49,7 +49,6 @@ describe('createDb boot migration (ADR-0027)', () => {
         // The Compendium satellite beside `worlds` on the shared Container (ADR-0078, ADR-0079).
         'compendiums',
         'world_members',
-        'world_links',
         'entity_descriptors',
         // Entity-level grants (ADR-0037, #161) — the boot migration adds this.
         'entity_grants',

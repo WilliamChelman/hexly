@@ -5,7 +5,6 @@ import {
   EntityDetail,
   InboundLinkCount,
   MemberRole,
-  PublicLink,
   UpdateWorldRequest,
   WorldDetail,
   WorldMember,
@@ -16,22 +15,13 @@ import { and, asc, count, eq, inArray, isNotNull, ne } from 'drizzle-orm';
 import { AssetsService } from '../assets/assets.service';
 import { AssetMintService } from '../assets/asset-mint.service';
 import { AclSetResult, gate, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
-import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
 import { loadWorld, worldAccess, worldOwnerFilter, worldRightsOf } from '../acl/world-access';
-import { entityAccess, sharedVisibility } from '../acl/entity-access';
+import { entityAccess } from '../acl/entity-access';
 import { NudgeBus } from '../events/nudge-bus';
 import { ContainerLinksService } from './container-links.service';
 import { WorldWrites } from './world-writes';
-import { INITIAL_SEQ, containers, entities, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
-
-/** World Public Link table for the shared get/mint/revoke helpers. */
-const WORLD_LINK: PublicLinkTable = {
-  table: worldLinks,
-  id: worldLinks.id,
-  fk: worldLinks.worldId,
-  newRow: (token, worldId) => ({ id: token, worldId, createdAt: Date.now() }),
-};
+import { INITIAL_SEQ, containers, entities, WorldRow, worldMembers, worlds } from '../db/schema';
 
 /**
  * World persistence. A World is minted as just its row plus the creator's
@@ -356,51 +346,6 @@ export class WorldsService {
     const removed = this.writes.membership(id, (w) => w.removeMember(targetUserId, isLeave));
     if (!removed) return { status: 'not-found' };
     return { status: 'ok', value: this.worldMembers(id) };
-  }
-
-  /** The World's Public Link (active token or null), for an Owner — link administration is Owner-only. */
-  getLink(userId: string, id: string): AclSetResult<PublicLink | null> {
-    const gate = this.gateOwnerManagement(userId, id);
-    if (gate) return gate;
-    return { status: 'ok', value: readPublicLink(this.db, WORLD_LINK, id) };
-  }
-
-  /**
-   * Mint (or return the existing) World Public Link: Owner-only, one active link
-   * per World — a re-mint returns the current token (rotate = revoke + re-mint).
-   * The token grants anonymous Viewer over the World's `shared` Entities.
-   */
-  mintLink(userId: string, id: string): AclSetResult<PublicLink> {
-    const gate = this.gateOwnerManagement(userId, id);
-    if (gate) return gate;
-    return { status: 'ok', value: mintPublicLink(this.db, WORLD_LINK, id) };
-  }
-
-  /**
-   * Revoke the World Public Link: Owner-only kill-switch — the token stops
-   * resolving immediately. Idempotent.
-   */
-  revokeLink(userId: string, id: string): AclSetResult<null> {
-    const gate = this.gateOwnerManagement(userId, id);
-    if (gate) return gate;
-    revokePublicLink(this.db, WORLD_LINK, id);
-    // Revoke is eviction for a World-ref follower too (#178): the token now reaches no World, so
-    // emit the world-detail event to evict an anonymous open-Dashboard viewer to `unavailable`.
-    // An authorized cookie follower re-derives reachable and gets a harmless refresh nudge.
-    this.bus.emitWorldChange(id);
-    // Revoke is eviction: re-emit each of the World's `shared` Entities so the bus
-    // shapes every world-link follower to `unavailable`; a still-authorized follower
-    // computes newer-than-held false and no-ops it.
-    // ponytail: fans out over *all* the World's shared Entities, not just the followed ones — the
-    // bus keeps no per-World interest index. Fine on a small instance; add one if a huge shared
-    // World ever makes this loop hurt.
-    const shared = this.db
-      .select({ id: entities.id })
-      .from(entities)
-      .where(and(eq(entities.containerId, id), sharedVisibility))
-      .all();
-    for (const e of shared) this.bus.emitEntityChange(e.id);
-    return { status: 'ok', value: null };
   }
 
   /**

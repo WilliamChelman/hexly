@@ -1,7 +1,7 @@
 import { WorldVerb } from '@hexly/domain';
 import { and, eq, getTableColumns, inArray, sql, SQLWrapper } from 'drizzle-orm';
 import { Db } from '../db/db';
-import { containers, entities, entityGrants, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
+import { containers, entities, entityGrants, WorldRow, worldMembers, worlds } from '../db/schema';
 import { mountedIntoReachOf } from './mount-reach';
 import { isSuperadmin } from './owner-set';
 
@@ -133,21 +133,6 @@ function selectWorld(db: Db) {
  */
 export function loadWorld(db: Db, id: string): WorldRow | undefined {
   return selectWorld(db).where(eq(worlds.id, id)).get();
-}
-
-/**
- * Whether a World Public Link *token* currently reaches World `id` — the reachability seam the
- * nudge bus checks for a token principal (ADR-0044, #178). The token *is* the grant: a live
- * `world_links` row pointing at the World grants anonymous Dashboard reach; a revoked token (row
- * gone) reaches nothing (→ eviction).
- */
-export function tokenReachesWorld(db: Db, token: string, id: string): boolean {
-  const row = db
-    .select({ id: worldLinks.id })
-    .from(worldLinks)
-    .where(and(eq(worldLinks.id, token), eq(worldLinks.worldId, id)))
-    .get();
-  return !!row;
 }
 
 /**

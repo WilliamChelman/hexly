@@ -16,7 +16,7 @@ import {
 } from '@hexly/domain';
 import { CORE_THUMBNAIL_FIELD_ID } from '@hexly/plugin-asset';
 import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
-import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-access';
+import { EntityAccess, entityAccess } from '../acl/entity-access';
 import { DB, Db } from '../db/db';
 import {
   INITIAL_SEQ,
@@ -328,7 +328,7 @@ export class EntityWrites {
       const shared = this.db
         .select({ id: entities.id })
         .from(entities)
-        .where(and(eq(entities.containerId, worldId), sharedVisibility))
+        .where(and(eq(entities.containerId, worldId), eq(entities.visibility, 'shared')))
         .all();
       if (shared.length === 0) return;
       const ids = shared.map((e) => e.id);

@@ -30,7 +30,6 @@ import {
   ImportSummary,
   InboundLinkCount,
   Mount,
-  PublicLink,
   reorderMountsRequestSchema,
   setMemberRoleRequestSchema,
   updateUserDefinedTypeRequestSchema,
@@ -442,29 +441,5 @@ export class WorldsController {
   @UseGuards(CollaborationGuard)
   removeMember(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('userId') userId: string): WorldMember[] {
     return aclSetResponse(this.worlds.removeMember(user.id, id, userId), 'world');
-  }
-
-  // The World's Public Link (ADR-0037, #162), for an Owner: the active token or null.
-  @Get(':id/link')
-  @UseGuards(CollaborationGuard)
-  link(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink | null {
-    return aclSetResponse(this.worlds.getLink(user.id, id), 'world');
-  }
-
-  // Mint (or return the existing) World Public Link (ADR-0037, #162): World-Owner-only. One
-  // active link per World, so a re-mint returns the current token — idempotent, hence 200.
-  @Post(':id/link')
-  @HttpCode(200)
-  @UseGuards(CollaborationGuard)
-  mintLink(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink {
-    return aclSetResponse(this.worlds.mintLink(user.id, id), 'world');
-  }
-
-  // Revoke the World Public Link (ADR-0037, #162): World-Owner-only, the kill-switch.
-  @Delete(':id/link')
-  @HttpCode(204)
-  @UseGuards(CollaborationGuard)
-  revokeLink(@CurrentUser() user: AuthUser, @Param('id') id: string): void {
-    aclSetResponse(this.worlds.revokeLink(user.id, id), 'world');
   }
 }

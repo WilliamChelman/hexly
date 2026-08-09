@@ -3,22 +3,22 @@ import { Inject, Injectable, MessageEvent, OnModuleDestroy, OnModuleInit } from 
 import { Subject } from 'rxjs';
 import { eq } from 'drizzle-orm';
 import { InterestRef, NudgeDelta, NudgeEntry } from '@hexly/domain';
-import { entityAccess, tokenReachesEntity } from '../acl/entity-access';
-import { worldAccess, tokenReachesWorld } from '../acl/world-access';
+import { entityAccess } from '../acl/entity-access';
+import { worldAccess } from '../acl/world-access';
 import { containers, entities, worlds } from '../db/schema';
 import { DB, Db } from '../db/db';
 import { HEXLY_CONFIG, HexlyConfig } from '../config';
 
 /**
- * The principal that opened a connection: either a signed-in user (cookie) or an anonymous
- * **Public Link token** — the token *is* the grant, there is no anonymous user object.
- * Reachability resolves the same access seam for both ({@link canRead}).
+ * The principal that opened a connection: a signed-in user (session cookie). Since ADR-0084 retired
+ * the anonymous read path there is no token principal — no read is ever anonymous, so the bus only
+ * ever follows for a cookie-authenticated user ({@link canRead}).
  */
-export type Principal = { kind: 'user'; userId: string } | { kind: 'token'; token: string };
+export type Principal = { kind: 'user'; userId: string };
 
 /** A stable key identifying a principal, so per-emit shaping can memoize one entry per recipient. */
 function principalKey(p: Principal): string {
-  return p.kind === 'user' ? `user:${p.userId}` : `token:${p.token}`;
+  return `user:${p.userId}`;
 }
 
 /** Same principal (owns-the-connection check for the interest PUT). */
@@ -101,24 +101,20 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Whether a principal can *currently* read Entity `id`. A cookie principal resolves the ADR-0037
-   * rule via {@link entityAccess}; a token principal resolves the Public Link grant.
+   * Whether a principal can *currently* read Entity `id` — the ADR-0037/0084 rule via
+   * {@link entityAccess}, resolved against the cookie principal's live rights.
    */
   private canRead(principal: Principal, id: string): boolean {
-    return principal.kind === 'user'
-      ? !!entityAccess(this.db, principal.userId).decideMeta(id)?.canRead
-      : tokenReachesEntity(this.db, principal.token, id);
+    return !!entityAccess(this.db, principal.userId).decideMeta(id)?.canRead;
   }
 
   /**
-   * Whether a principal can *currently* reach World `id` — the World peer of {@link canRead}. A
-   * cookie principal resolves the same `reachableBy` rule the worlds-list read uses (member row OR
-   * any Entity grant inside the World); a token principal resolves its World Public Link grant.
+   * Whether a principal can *currently* reach World `id` — the World peer of {@link canRead}, the
+   * same `reachableBy` rule the worlds-list read uses (member row OR any Entity grant inside the
+   * World OR an Open World, ADR-0084).
    */
   private canReadWorld(principal: Principal, id: string): boolean {
-    return principal.kind === 'user'
-      ? !!worldAccess(this.db, principal.userId).decideMeta(id)?.reachable
-      : tokenReachesWorld(this.db, principal.token, id);
+    return !!worldAccess(this.db, principal.userId).decideMeta(id)?.reachable;
   }
 
   /** Reachability for either ref kind — the shared seam for subscribe-time filtering and shaping. */
