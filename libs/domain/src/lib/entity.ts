@@ -151,8 +151,13 @@ export const saveEntityRequestSchema = z.object({
 
 export type SaveEntityRequest = z.infer<typeof saveEntityRequestSchema>;
 
-/** Entity Visibility: `private` is owner-only; `shared` exposes the Entity to all World members. */
-export const visibilitySchema = z.enum(['private', 'shared']);
+/**
+ * Entity Visibility (CONTEXT.md → Entity Visibility): three rungs widening the audience, never onto
+ * the internet — `private` is owner-only, `shared` exposes the Entity to all World members, and `open`
+ * exposes it to any signed-in caller on the Instance (the reach a Compendium has by being Instance-wide,
+ * ADR-0084). `open` carries no behaviour yet; the enum widens so later reachability can build on it.
+ */
+export const visibilitySchema = z.enum(['private', 'shared', 'open']);
 
 /** CONTEXT.md → Entity Visibility. */
 export type Visibility = z.infer<typeof visibilitySchema>;
