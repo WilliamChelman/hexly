@@ -832,7 +832,7 @@ export class EntitiesService {
             sql`${edgeAsset.containerId} = ${edgeTargetContainerId}`,
           ),
         )
-        .leftJoin(entities, and(sql`${entities.id} = ${targetEntityId}`, access.filter))
+        .leftJoin(entities, and(sql`${entities.id} = ${targetEntityId}`, access.reachFilter))
         .leftJoin(ownAsset, eq(ownAsset.entityId, entities.id))
         .leftJoin(
           fieldKind,
@@ -919,7 +919,7 @@ export class EntitiesService {
           ...thumbnailColumns,
         })
         .from(entityEdges)
-        .innerJoin(entities, and(eq(entities.id, entityEdges.sourceEntityId), access.filter))
+        .innerJoin(entities, and(eq(entities.id, entityEdges.sourceEntityId), access.reachFilter))
         .innerJoin(containers, eq(containers.id, entities.containerId))
         .leftJoin(ownAsset, eq(ownAsset.entityId, entities.id))
         .leftJoin(

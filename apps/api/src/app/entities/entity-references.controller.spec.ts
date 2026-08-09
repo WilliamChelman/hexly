@@ -243,6 +243,35 @@ describe('Entity references', () => {
         },
       ]);
     });
+
+    /**
+     * ADR-0084: a signed-in non-member reaching an `open` target by id sees only the inbound References it
+     * can *itself* reach — an `open` source resolves, a `private` source stays hidden. `open` widens reach,
+     * never the access filter (ADR-0046/0072): the References read stays per-viewer access-filtered.
+     */
+    it('shows a non-member only the reachable References on an open target', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const bob = await signIn('bob@hexly.test'); // no membership or grant in Ada's World
+      const world = await makeWorld(ada);
+
+      const beacon = await makeEntity(ada, world, 'The Beacon');
+      await openUp(ada, beacon); // the target Bob reaches by id, though it lists nowhere for him
+      const openSource = await makeEntity(ada, world, 'Open Herald');
+      await openUp(ada, openSource);
+      const privSource = await makeEntity(ada, world, 'Sealed Order'); // stays private
+      await link(ada, openSource, [{ entityId: beacon }]);
+      await link(ada, privSource, [{ entityId: beacon }]);
+
+      // Bob reaches the open target (not a 404) and its inbound refs carry only the open source.
+      const { referencedBy } = await referencesOf(bob, beacon);
+      expect(referencedBy).toEqual([
+        {
+          descriptor: null,
+          decor: false,
+          source: { id: openSource, name: 'Open Herald', types: ['core.type.note'] },
+        },
+      ]);
+    });
   });
 
   /**
@@ -488,6 +517,11 @@ describe('Entity references', () => {
 
   async function share(owner: Agent, id: string): Promise<void> {
     await owner.patch(`/entities/${id}`).send({ visibility: 'shared' }).expect(200);
+  }
+
+  /** Flip `id` to `open` (ADR-0084) — Instance-wide reachable to any signed-in caller. */
+  async function openUp(owner: Agent, id: string): Promise<void> {
+    await owner.patch(`/entities/${id}`).send({ visibility: 'open' }).expect(200);
   }
 
   /** Save `id`'s RichContent as prose holding one `entityLink` per entry. */

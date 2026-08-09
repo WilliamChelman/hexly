@@ -40,9 +40,15 @@ function isWorldOwner(userId: string) {
 }
 
 /**
- * The read predicate: `owner ∨ grant(editor|viewer) ∨ (member ∧ shared) ∨ compendium-entry ∨
- * (mounted ∧ shared)`. An Entity the caller can't read is indistinguishable from a missing one, so
- * `private` never leaks existence. An entity-level grant pierces `private` for exactly that user.
+ * The **listing** predicate: `owner ∨ grant(editor|viewer) ∨ (member ∧ shared) ∨ compendium-entry ∨
+ * (mounted ∧ shared)`. What a browse/search/Palette enumerates. An Entity the caller can't read is
+ * indistinguishable from a missing one, so `private` never leaks existence. An entity-level grant
+ * pierces `private` for exactly that user.
+ *
+ * ADR-0084 leaves this **untouched**: `open` is deliberately absent. Listing stays World-and-Mounts-scoped
+ * — an `open` Entity is reachable Instance-wide by id (see {@link canReadEntity}) yet lists nowhere for a
+ * non-member, the unlisted property the retired Public Link had. Folding `open` in here would surface a
+ * foreign World's `open` Entities in a non-member's unscoped browse, which the invariant forbids.
  *
  * The compendium disjunct is the **Compendium**'s own reachability rule (ADR-0078/0079): Instance-wide
  * with no members, roles or public link means there is nothing per-caller to resolve, so being signed
@@ -54,10 +60,26 @@ function isWorldOwner(userId: string) {
  * **Compendium**: the disjunct before already reached every entry. Reachability only, both of them —
  * the **seal** and the ordinary write gates refuse as before.
  */
-function canReadEntity(userId: string, superadmin: boolean) {
+function canListEntity(userId: string, superadmin: boolean) {
   if (superadmin) return MATCH_ALL;
   return sql`(${hasGrant(userId, ['owner', 'editor', 'viewer'])} OR (${entities.visibility} = 'shared' AND ${isWorldMember(userId)}) OR ${inACompendium()}
     OR (${entities.visibility} = 'shared' AND ${mountedIntoReachOf(userId, entities.containerId)}))`;
+}
+
+/**
+ * The **reachability** predicate: {@link canListEntity} `∨ open`. Whether the caller can read *a specific
+ * Entity it already names* — a get-by-id, the References/link-index resolution (ADR-0046/0072), a live
+ * follow (ADR-0044). ADR-0084's third rung: an `open` Entity reads to any signed-in caller on the Instance,
+ * the same Instance-wide reach the compendium disjunct grants — membership-independent, so it consults
+ * neither `worldMembers` nor the Mount cascade.
+ *
+ * Split from {@link canListEntity} on purpose: reachability gains `open`, listing does not. So the disjunct
+ * rides every surface that resolves a *named* Entity — never the enumeration WHERE — keeping an `open`
+ * Entity reachable by id yet unlisted (ADR-0084's invariant).
+ */
+function canReadEntity(userId: string, superadmin: boolean) {
+  if (superadmin) return MATCH_ALL;
+  return sql`(${canListEntity(userId, superadmin)} OR ${entities.visibility} = 'open')`;
 }
 
 /**
@@ -162,8 +184,19 @@ export interface EntityDecision {
  * {@link writeFilter}/{@link editFilter} on the atomic UPDATE WHERE.
  */
 export interface EntityAccess {
-  /** Read predicate for a list/get WHERE (`owner ∨ grant ∨ (shared ∧ member)`). */
-  filter: ReturnType<typeof canReadEntity>;
+  /**
+   * **Listing** predicate for an enumeration WHERE — browse/search/Palette, facet counts, a World's own
+   * entity/pin lists, the graph (`owner ∨ grant ∨ (shared ∧ member) ∨ compendium ∨ (shared ∧ mounted)`).
+   * `open` is deliberately absent: listing stays scoped (ADR-0084). Use {@link reachFilter} to resolve a
+   * *named* Entity's readability.
+   */
+  filter: ReturnType<typeof canListEntity>;
+  /**
+   * **Reachability** predicate for resolving a *named* Entity — the References/link-index LEFT JOINs
+   * (ADR-0046/0072): {@link filter} `∨ open`. A non-member reaches an `open` link target by id, so it
+   * resolves here though it never lists.
+   */
+  reachFilter: ReturnType<typeof canReadEntity>;
   /** Management predicate for a delete / visibility UPDATE WHERE (`owner ∨ (shared ∧ world-owner)`). */
   writeFilter: ReturnType<typeof canWriteEntity>;
   /** Substance predicate for a save / name-patch UPDATE WHERE (`canWrite ∨ grant(editor)`). */
@@ -190,7 +223,8 @@ export interface EntityAccess {
 export function entityAccess(db: Db, userId: string): EntityAccess {
   const superadmin = isSuperadmin(db, userId);
   return {
-    filter: canReadEntity(userId, superadmin),
+    filter: canListEntity(userId, superadmin),
+    reachFilter: canReadEntity(userId, superadmin),
     writeFilter: canWriteEntity(userId, superadmin),
     editFilter: canEditSubstanceEntity(userId, superadmin),
     rightsColumns: {

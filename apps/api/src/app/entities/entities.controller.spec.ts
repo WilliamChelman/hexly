@@ -100,7 +100,7 @@ describe('Entities endpoints', () => {
   }
 
   /** Flip an existing row's visibility directly — decouples read-predicate tests from the mutation feature (ADR-0037, #160). */
-  function setVisibility(id: string, visibility: 'private' | 'shared') {
+  function setVisibility(id: string, visibility: 'private' | 'shared' | 'open') {
     db.update(entities).set({ visibility }).where(eq(entities.id, id)).run();
   }
 
@@ -303,6 +303,64 @@ describe('Entities endpoints', () => {
     expect(res.body.worldId).toBe(worldId);
     // Contributor becomes the created Entity's sole Owner (ADR-0037) — he can read it back.
     await bob.get(`/entities/${res.body.id}`).expect(200);
+  });
+
+  // ADR-0084 (#433): `open` is the third rung — a signed-in non-member reaches an open Entity by id,
+  // the same Instance-wide reach a Compendium has, while it stays unlisted for them (reachability, not listing).
+  describe('open reachability for a signed-in non-member (ADR-0084)', () => {
+    it('reads an open Entity by id but not a shared or private sibling in a World it is not in', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await seedUser('bob@hexly.test', 'correct horse', 'Bob');
+      const bob = await signIn('bob@hexly.test', 'correct horse');
+      const worldId = (await ada.get('/worlds').expect(200)).body[0].id;
+
+      // Ada authors three siblings in her World; Bob holds no membership or grant on any.
+      const priv = await ada
+        .post('/entities')
+        .send({ name: 'Priv', types: ['core.type.note'], worldId })
+        .expect(201);
+      const shared = await ada
+        .post('/entities')
+        .send({ name: 'Shared', types: ['core.type.note'], worldId })
+        .expect(201);
+      const opened = await ada
+        .post('/entities')
+        .send({ name: 'Opened', types: ['core.type.note'], worldId })
+        .expect(201);
+      setVisibility(shared.body.id, 'shared');
+      setVisibility(opened.body.id, 'open');
+
+      // Only the open one reaches the non-member; shared and private are indistinguishable from missing.
+      await bob.get(`/entities/${opened.body.id}`).expect(200);
+      await bob.get(`/entities/${shared.body.id}`).expect(404);
+      await bob.get(`/entities/${priv.body.id}`).expect(404);
+    });
+
+    it('does not surface the open Entity in the non-member’s browse or search (listing stays scoped)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await seedUserWithWorld('bob@hexly.test', 'correct horse', 'Bob');
+      const bob = await signIn('bob@hexly.test', 'correct horse');
+      const worldId = (await ada.get('/worlds').expect(200)).body[0].id;
+
+      const opened = await ada
+        .post('/entities')
+        .send({ name: 'Opened', types: ['core.type.note'], worldId })
+        .expect(201);
+      setVisibility(opened.body.id, 'open');
+      // Bob authors one in his own World, so his browse is non-empty for a real contrast.
+      await bob
+        .post('/entities')
+        .send({ name: 'Bob’s Note', types: ['core.type.note'] })
+        .expect(201);
+
+      const browse = await bob.get('/entities').expect(200);
+      const names = browse.body.items.map((e: { name: string }) => e.name);
+      expect(names).toContain('Bob’s Note');
+      expect(names).not.toContain('Opened');
+      // Nor by explicit search — reachability by id never promotes to a listing surface.
+      const search = await bob.get('/entities').query({ q: 'Opened' }).expect(200);
+      expect(search.body.items).toHaveLength(0);
+    });
   });
 
   it('defaults an un-scoped create to the caller’s own World, not one they only contribute to', async () => {

@@ -1625,7 +1625,7 @@ describe('EntityWrites', () => {
     id: string,
     worldId: string,
     ownerId: string,
-    visibility: 'private' | 'shared' = 'private',
+    visibility: 'private' | 'shared' | 'open' = 'private',
   ): void {
     const now = Date.now();
     db.insert(entities)

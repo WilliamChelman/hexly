@@ -72,33 +72,49 @@ test('the Command palette’s Create Note opens the Entity the dialog returns, a
   await expect(page).toHaveURL(/\/entities$/);
 });
 
-test('an owner toggles a note to shared and the Visibility facet reflects it', async ({ page }) => {
+test('an owner sets a note’s visibility rung and the Visibility facet reflects each one', async ({ page }) => {
   await enterEntities(page);
 
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const id = entityIdFromUrl(page);
 
-  // New notes default to private: the actions menu's Visibility item reads "not shared".
+  // New notes default to private: the three-way control reads the Private rung as checked (ADR-0084).
   await openEntityActions(page);
-  await expect(page.getByTestId('visibility-toggle')).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByTestId('visibility-set-private')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('visibility-set-shared')).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByTestId('visibility-set-open')).toHaveAttribute('aria-checked', 'false');
   await page.keyboard.press('Escape');
 
   // In the browser it counts under the Private facet, not Shared.
   await entitiesRailLink(page).click();
   await page.getByTestId('facet-visibility-private').click();
   await expect(page.getByTestId(`open-${id}`)).toBeVisible();
-  // Clear the filter, reopen, and reveal it from the actions menu: the item flips to shared.
+  // Clear the filter, reopen, and set it to Shared from the actions menu: the Shared rung reads checked.
   await page.getByTestId('facet-visibility-private').click();
   await page.getByTestId(`open-${id}`).click();
   await openEntityActions(page);
-  await page.getByTestId('visibility-toggle').click();
+  await page.getByTestId('visibility-set-shared').click();
   await openEntityActions(page);
-  await expect(page.getByTestId('visibility-toggle')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('visibility-set-shared')).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
 
   // The access-scoped Visibility facet now lists it under Shared instead.
   await entitiesRailLink(page).click();
   await page.getByTestId('facet-visibility-shared').click();
+  await expect(page.getByTestId(`open-${id}`)).toBeVisible();
+  await page.getByTestId('facet-visibility-shared').click();
+
+  // Set it to Open (ADR-0084): the $visibility:open facet now filters the browse to it.
+  await page.getByTestId(`open-${id}`).click();
+  await openEntityActions(page);
+  await page.getByTestId('visibility-set-open').click();
+  await openEntityActions(page);
+  await expect(page.getByTestId('visibility-set-open')).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+
+  await entitiesRailLink(page).click();
+  await page.getByTestId('facet-visibility-open').click();
   await expect(page.getByTestId(`open-${id}`)).toBeVisible();
 });
 

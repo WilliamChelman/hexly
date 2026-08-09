@@ -3,11 +3,14 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import {
   ButtonComponent,
   IconComponent,
+  MenuGroupDirective,
   MenuItemDirective,
   MenuItemCheckboxDirective,
+  MenuItemRadioDirective,
   MenuPanelDirective,
   MenuTriggerDirective,
 } from '@hexly/web-ui';
+import { Visibility } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { ActiveWorld, ClientConfigStore } from '@hexly/web-core';
 
@@ -29,6 +32,8 @@ import { ActiveWorld, ClientConfigStore } from '@hexly/web-core';
     MenuPanelDirective,
     MenuItemDirective,
     MenuItemCheckboxDirective,
+    MenuGroupDirective,
+    MenuItemRadioDirective,
     ButtonComponent,
     IconComponent,
     TranslocoPipe,
@@ -62,20 +67,22 @@ import { ActiveWorld, ClientConfigStore } from '@hexly/web-core';
         }
 
         @if (visibilityToggleable()) {
-          <!-- Visibility toggle (ADR-0037, #160): an Owner flips the Entity between
-             private and shared. A non-Owner's flip is refused server-side (403). -->
-          <button
-            type="button"
-            appMenuItemCheckbox
-            [checked]="shared()"
-            data-testid="visibility-toggle"
-            [attr.aria-label]="'editorShell.visibility.toggle' | transloco"
-            (triggered)="toggleVisibility()"
-          >
-            <span>{{
-              (shared() ? 'editorShell.visibility.shared' : 'editorShell.visibility.private') | transloco
-            }}</span>
-          </button>
+          <!-- Visibility control (ADR-0037/0084, #160/#433): an Owner sets the Entity's rung —
+             private, shared, or open (Instance-wide reachable). A radiogroup so exactly one stays
+             checked; a non-Owner's set is refused server-side (403). -->
+          <div appMenuGroup role="group" [attr.aria-label]="'editorShell.visibility.label' | transloco">
+            @for (option of visibilityOptions; track option) {
+              <button
+                type="button"
+                appMenuItemRadio
+                [checked]="visibility() === option"
+                [attr.data-testid]="'visibility-set-' + option"
+                (triggered)="setVisibility(option)"
+              >
+                <span>{{ 'editorShell.visibility.' + option | transloco }}</span>
+              </button>
+            }
+          </div>
         }
 
         @if (canPin()) {
@@ -137,8 +144,11 @@ export class EntityActionsMenuComponent {
     () => this.editable() && this.clientConfig.isCollaborationEnabled(),
   );
 
-  /** Whether the open Entity is `shared` (drives the toggle's checked state and label). */
-  protected readonly shared = computed(() => this.session.current()?.visibility === 'shared');
+  /** The three rungs, low to high (ADR-0084): each renders a radio row, the current one checked. */
+  protected readonly visibilityOptions: readonly Visibility[] = ['private', 'shared', 'open'];
+
+  /** The open Entity's current rung (drives which radio reads checked); `private` before one loads. */
+  protected readonly visibility = computed<Visibility>(() => this.session.current()?.visibility ?? 'private');
 
   /**
    * Whether the caller is a World Owner (`manage` Right on the active World, ADR-0039) — gates the
@@ -172,11 +182,13 @@ export class EntityActionsMenuComponent {
     );
   }
 
-  /** Flip the open Entity's Visibility (ADR-0037, #160); a rejected flip leaves state as the server has it. */
-  protected toggleVisibility(): void {
-    // Swallow like commit()'s rename: a rejected flip (e.g. a 403 from a writable-then-revoked
+  /** Set the open Entity's Visibility rung (ADR-0037/0084, #160/#433); a rejected set leaves state as the server has it. */
+  protected setVisibility(next: Visibility): void {
+    // Re-selecting the current rung is a no-op — nothing to send, and no spurious PATCH.
+    if (next === this.visibility()) return;
+    // Swallow like commit()'s rename: a rejected set (e.g. a 403 from a writable-then-revoked
     // race) is a graceful no-op — the checked state stays bound to the server's Visibility, so
     // there's nothing to revert — not an unhandled RxJS error.
-    this.session.setVisibility(this.shared() ? 'private' : 'shared').subscribe({ error: () => undefined });
+    this.session.setVisibility(next).subscribe({ error: () => undefined });
   }
 }

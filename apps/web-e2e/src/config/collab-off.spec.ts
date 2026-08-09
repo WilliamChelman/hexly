@@ -41,7 +41,10 @@ test('Collaboration off: an Entity carries no sharing affordance, and the routes
   await openEntityActions(page);
   await expect(page.getByTestId('edit-types')).toBeVisible();
   await expect(page.getByTestId('manage-owners')).toHaveCount(0);
-  await expect(page.getByTestId('visibility-toggle')).toHaveCount(0);
+  // The three-way Visibility control (ADR-0084) needs the Collaboration layer that reads the column.
+  await expect(page.getByTestId('visibility-set-private')).toHaveCount(0);
+  await expect(page.getByTestId('visibility-set-shared')).toHaveCount(0);
+  await expect(page.getByTestId('visibility-set-open')).toHaveCount(0);
   await page.keyboard.press('Escape');
 
   // Located by component, not by an inner testid: the sets share `add-select`, so a testid absence

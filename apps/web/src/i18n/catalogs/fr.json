@@ -106,6 +106,7 @@
       "clearAll": "Tout effacer",
       "private": "Privé",
       "shared": "Partagé",
+      "open": "Ouvert",
       "rangeMin": "{{field}} minimum",
       "rangeMax": "{{field}} maximum",
       "container": "Conteneur",
@@ -151,7 +152,8 @@
     "visibility": {
       "shared": "Partagé",
       "private": "Privé",
-      "toggle": "Changer la visibilité"
+      "open": "Ouvert",
+      "label": "Visibilité"
     },
     "view": {
       "switchLabel": "Changer de vue",
