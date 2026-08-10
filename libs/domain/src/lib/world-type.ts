@@ -7,6 +7,7 @@
 import * as z from 'zod';
 import { entityTypeSchema, nameSchema } from './entity';
 import { dedupedFieldIdsSchema, fieldRefsSchema } from './field-id';
+import { slugifySegment } from './slug';
 import { ViewPlacement, viewPlacementSchema } from './view-placement';
 
 /**
@@ -25,6 +26,25 @@ export const userDefinedTypeIdSchema = entityTypeSchema.refine(
 /** Build a `world.type.<segment>` id from an editable segment — the `type` kind segment is minted, never typed (see `kinded-id.ts`). */
 export function worldTypeIdFromSegment(segment: string): string {
   return `${USER_TYPE_NAMESPACE}.type.${segment}`;
+}
+
+/** Slug a raw label into the `world.`-less segment of a user-defined type id (ADR-0056); may return `''`. */
+export function slugifyTypeSegment(raw: string): string {
+  return slugifySegment(raw);
+}
+
+/**
+ * Derive the frozen, immutable `world.type.<slug>` id for a label minted inline (#438), disambiguating
+ * with a numeric suffix (`-2`, `-3`, …) on collision so a mint never reuses another type's key.
+ */
+export function deriveWorldTypeId(label: string, existingIds: Iterable<string> = []): string {
+  // A label with no Latin alphanumerics ("神", "❤️") slugs to '' and would mint an invalid id (#438);
+  // fall back to a stable generic base — the label is preserved verbatim, the slug is hidden.
+  const slug = slugifyTypeSegment(label) || 'type';
+  const taken = new Set(existingIds);
+  let candidate = worldTypeIdFromSegment(slug);
+  for (let n = 2; taken.has(candidate); n++) candidate = worldTypeIdFromSegment(`${slug}-${n}`);
+  return candidate;
 }
 
 /** The editable segment of a `world.type.<segment>` id — the inverse of {@link worldTypeIdFromSegment}, for form prefill. */

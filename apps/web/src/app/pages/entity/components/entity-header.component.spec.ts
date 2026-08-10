@@ -212,8 +212,7 @@ describe('EntityHeader', () => {
     expect(menuItem('visibility-set-private')).toBeNull();
     expect(menuItem('visibility-set-shared')).toBeNull();
     expect(menuItem('visibility-set-open')).toBeNull();
-    // Edit types and Pin are not sharing.
-    expect(menuItem('edit-types')).not.toBeNull();
+    // Pin is not sharing, so it survives Collaboration off (type management moved to the Details panel, #438).
     expect(menuItem('pin-toggle')).not.toBeNull();
     expect(fixture.debugElement.query(By.directive(OwnerSetComponent))).toBeNull();
   });

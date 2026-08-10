@@ -59,7 +59,8 @@ test('a pre-seeded dnd.type.monster opens on the generic Field View with its val
   await expect(page.getByTestId('dnd.view.stat-block')).toHaveCount(0);
   await expect(page.getByTestId('stat-block-view')).toHaveCount(0);
   await expect(page.getByTestId('details-view')).toBeVisible();
-  await expect(page.getByTestId('detail-type-dnd.type.monster')).toHaveText('dnd.type.monster');
+  // The type manager's chip lists the unregistered Type by its raw id (#438).
+  await expect(page.getByTestId('type-chip-dnd.type.monster')).toContainText('dnd.type.monster');
 
   // The values fall through to the plain-Entity-Document display, unhidden and readable.
   const plain = page.getByTestId('detail-plain');

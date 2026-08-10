@@ -25,6 +25,7 @@ export * from './lib/palette-preset';
 // Only the read-side notation helper: the canonicalisers are the write choke point's (ADR-0076), and a
 // caller reaching one outside the schema would be validating a Theme somewhere the server is not.
 export { colorTokenHex } from './lib/design-token-value';
+export * from './lib/slug';
 export * from './lib/world-field';
 export * from './lib/world-type';
 export * from './lib/plugin-type';

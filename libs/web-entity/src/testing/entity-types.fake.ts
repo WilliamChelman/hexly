@@ -1,6 +1,6 @@
 import { computed, inject, Provider, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { Field, isFacetableField } from '@hexly/domain';
+import { deriveWorldTypeId, EntityType, Field, isFacetableField } from '@hexly/domain';
 import { ENTITY_TYPES, EntityTypes } from '../models/entity-types';
 import { TypeDefinition, TypeLabels } from '../models/type-definition';
 
@@ -19,6 +19,14 @@ export class FakeEntityTypes implements EntityTypes {
   readonly all = this.definitions.asReadonly();
   /** Mirror the real registry: a System-managed Type (ADR-0068) is never user-creatable. */
   readonly creatable = computed(() => this.all().filter((def) => !def.systemManaged));
+
+  /** The Owner gate a spec flips through {@link setCanCreate}; false by default (a non-Owner). */
+  private readonly _canCreate = signal(false);
+  /** The labels {@link create} was called with, in order — for a spec to assert an inline mint fired. */
+  readonly created: string[] = [];
+
+  /** Opt-in reject for {@link create}, so a spec can drive the mint-failure UI (#438); happy path by default. */
+  private failCreate = false;
 
   /** The spec's registered Fields by id (ADR-0054) — what a type's `fieldRefs` and an attached `fieldIds` resolve against. */
   private readonly fieldsById: Map<string, Field>;
@@ -69,6 +77,35 @@ export class FakeEntityTypes implements EntityTypes {
       for (const id of def?.fieldRefs ?? []) consider(id);
     }
     return [...byId.values()];
+  }
+
+  canCreate(): boolean {
+    return this._canCreate();
+  }
+
+  /** Test helper: flip the Owner gate {@link canCreate} reads (#438). */
+  setCanCreate(canCreate: boolean): void {
+    this._canCreate.set(canCreate);
+  }
+
+  /** Test helper: make {@link create} reject, so a spec can exercise the inline mint-failure UI (#438). */
+  setCreateShouldFail(fail: boolean): void {
+    this.failCreate = fail;
+  }
+
+  /**
+   * Mirror the real registry's eager mint (#438): derive the id from the label (disambiguated against
+   * the current user-defined ids), register a bare type so its name resolves, and resolve to the id.
+   */
+  async create(label: string): Promise<string> {
+    // Reject before logging: a failed mint neither records nor registers, so a spec's `created`
+    // stays empty on the failure path (#438).
+    if (this.failCreate) throw new Error('create failed');
+    this.created.push(label);
+    const existing = this.all().map((def) => def.id);
+    const id = deriveWorldTypeId(label, existing) as EntityType;
+    this.definitions.update((defs) => [...defs, { id, icon: 'label', views: [], labelText: label, fieldRefs: [] }]);
+    return id;
   }
 
   get(type: string | null | undefined): TypeDefinition | undefined {

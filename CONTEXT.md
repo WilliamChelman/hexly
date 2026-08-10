@@ -422,7 +422,7 @@ One togglable unit within the **Dock** — contributed universally (References, 
 _Avoid_: Tab, pane, widget, side panel
 
 **Details panel**:
-The universal **Panel** holding an Entity's shape and substance in one place: its **Entity Types** (add/remove), its **Fields** (edited in place, attached/detached inline), and its untyped **Entity Document** keys (read-only). Management controls appear only for writers. The **Details View** — the fallback main content when an Entity affords no other View — renders the same at full width.
+The universal **Panel** holding an Entity's shape and substance in one place: its **Entity Types** (add/remove, and — for **World Owners** — mint a new **User-defined type** inline), its **Fields** (edited in place, attached/detached inline), and its untyped **Entity Document** keys (read-only). Management controls appear only for writers. The **Details View** — the fallback main content when an Entity affords no other View — renders the same at full width.
 _Avoid_: Fields panel (superseded), properties, metadata, sidebar
 
 ## Outline

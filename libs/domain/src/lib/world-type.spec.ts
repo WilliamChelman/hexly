@@ -1,9 +1,55 @@
 import {
   createUserDefinedTypeRequestSchema,
+  deriveWorldTypeId,
+  slugifyTypeSegment,
   updateUserDefinedTypeRequestSchema,
   userDefinedTypeIdSchema,
   userDefinedTypeSchema,
 } from './world-type';
+
+describe('slugifyTypeSegment', () => {
+  it('accent-folds, lowercases, and dash-collapses a raw label (ADR-0056)', () => {
+    expect(slugifyTypeSegment('Déïty')).toBe('deity');
+    expect(slugifyTypeSegment('  Hell Deity  ')).toBe('hell-deity');
+    expect(slugifyTypeSegment('Elder God!!')).toBe('elder-god');
+  });
+
+  it('is idempotent — a re-slug of a slug is the same slug', () => {
+    expect(slugifyTypeSegment(slugifyTypeSegment('Hell Deity'))).toBe('hell-deity');
+  });
+});
+
+describe('deriveWorldTypeId', () => {
+  it('derives a `world.type.<slug>` id from the label', () => {
+    expect(deriveWorldTypeId('Deity')).toBe('world.type.deity');
+    expect(deriveWorldTypeId('Hell Deity')).toBe('world.type.hell-deity');
+  });
+
+  it('disambiguates with a numeric suffix when the bare slug collides (immutable ids, #438)', () => {
+    // "Deity" typed twice: the second mint can't reuse the first's frozen id, so it takes `-2`.
+    expect(deriveWorldTypeId('Deity', ['world.type.deity'])).toBe('world.type.deity-2');
+    // …and climbs past every taken suffix rather than stopping at the first miss.
+    expect(deriveWorldTypeId('Deity', ['world.type.deity', 'world.type.deity-2'])).toBe('world.type.deity-3');
+  });
+
+  it('leaves the bare slug alone when nothing collides', () => {
+    expect(deriveWorldTypeId('Deity', ['world.type.hero'])).toBe('world.type.deity');
+  });
+
+  it('falls back to a generic base when the label has no Latin alphanumerics (#438)', () => {
+    // "神"/"❤️"/"???" slug to '' — the pure slug still returns '', but the id must stay valid.
+    expect(slugifyTypeSegment('神')).toBe('');
+    for (const label of ['神', '❤️', '???']) {
+      const id = deriveWorldTypeId(label);
+      expect(id).toBe('world.type.type');
+      expect(userDefinedTypeIdSchema.safeParse(id).success).toBe(true);
+    }
+  });
+
+  it('disambiguates the generic fallback like any other slug (#438)', () => {
+    expect(deriveWorldTypeId('神', ['world.type.type'])).toBe('world.type.type-2');
+  });
+});
 
 describe('userDefinedTypeIdSchema', () => {
   it('accepts a `world.`-namespaced id', () => {

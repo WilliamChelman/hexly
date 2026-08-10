@@ -212,10 +212,11 @@ describe('CreateEntityDialog', () => {
       } as EntityDetail),
     );
 
-    // Add the hexmap type through the embedded editor's picker.
-    const add: HTMLSelectElement = q(fixture, 'type-add');
-    add.value = 'core.type.hex-map';
-    add.dispatchEvent(new Event('change'));
+    // Add the hexmap type through the embedded manager's typeahead: focus opens the option list.
+    const add: HTMLInputElement = q(fixture, 'type-add');
+    add.dispatchEvent(new Event('focus'));
+    fixture.detectChanges();
+    (q(fixture, 'type-option-core.type.hex-map') as HTMLElement).click();
     fixture.detectChanges();
 
     (q(fixture, 'create-entity-submit') as HTMLButtonElement).click();

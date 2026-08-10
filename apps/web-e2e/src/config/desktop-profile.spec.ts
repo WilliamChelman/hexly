@@ -99,7 +99,8 @@ test('the Collaboration cut list is hidden here too, as the Desktop App pins it 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
   await openEntityActions(page);
-  await expect(page.getByTestId('edit-types')).toBeVisible();
+  // Type management moved to the Details panel (#438); the Pin toggle proves the menu is reachable.
+  await expect(page.getByTestId('pin-toggle')).toBeVisible();
   await expect(page.getByTestId('manage-owners')).toHaveCount(0);
   await expect(page.getByTestId('visibility-toggle')).toHaveCount(0);
   await page.keyboard.press('Escape');
