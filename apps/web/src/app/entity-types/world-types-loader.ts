@@ -1,6 +1,6 @@
 import { DestroyRef, Injectable, inject } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import { catchError, map, merge, of, Subject, switchMap } from 'rxjs';
+import { catchError, firstValueFrom, map, merge, of, Subject, switchMap } from 'rxjs';
 import { ActiveWorld, Logger, WorldsClient } from '@hexly/web-core';
 import { AvailableType, Field } from '@hexly/domain';
 import { TypeDefinition, userTypeViews } from '@hexly/web-entity';
@@ -24,6 +24,9 @@ export class WorldTypesLoader {
 
   /** Fires when the authoring surface changes the World's types, re-projecting without a World swap. */
   private readonly reload$ = new Subject<void>();
+
+  /** Fires once a projection settles, so {@link reloadAndSettle} can await the re-registration (#438). */
+  private readonly projected$ = new Subject<void>();
 
   constructor() {
     // Re-fetch on a World change *or* an explicit reload (a type authored/edited/deleted in settings).
@@ -50,12 +53,24 @@ export class WorldTypesLoader {
     this.reload$.next();
   }
 
+  /**
+   * Re-project and resolve once the new set is registered (#438). An inline mint must reload before the
+   * entity save references the new id (referential integrity), so the caller awaits this rather than the
+   * fire-and-forget {@link reload}. Subscribes before triggering, so the settling projection isn't missed.
+   */
+  async reloadAndSettle(): Promise<void> {
+    const settled = firstValueFrom(this.projected$);
+    this.reload$.next();
+    await settled;
+  }
+
   /** Swap the registered set: drop the previous World's types, register this World's user-defined ones. */
   private project(types: readonly AvailableType[]): void {
     for (const off of this.unregister) off();
     this.unregister = types
       .filter((type) => type.source === 'user')
       .map((type) => this.registry.register(toDefinition(type, (id) => this.registry.field(id))));
+    this.projected$.next();
   }
 }
 

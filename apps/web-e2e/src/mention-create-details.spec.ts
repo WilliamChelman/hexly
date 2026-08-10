@@ -89,8 +89,10 @@ test('the Types and Tags set in the dialog land on the created Entity', async ({
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
 
-  // The point of asking for the dialog: say what the thing is before it exists.
-  await page.getByTestId('type-add').selectOption('core.type.hex-map');
+  // The point of asking for the dialog: say what the thing is before it exists. The manager's typeahead
+  // opens on focus; pick the hexmap option.
+  await page.getByTestId('type-add').click();
+  await page.getByTestId('type-option-core.type.hex-map').click();
   await page.getByTestId('create-entity-tag-input').fill('rival');
   await page.getByTestId('create-entity-tag-input').press('Enter');
   await expect(page.getByTestId('create-tag-remove-rival')).toBeVisible();

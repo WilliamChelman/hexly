@@ -1,4 +1,5 @@
 import {
+  addType,
   attachField,
   authorWorldField,
   createEntity,
@@ -6,7 +7,6 @@ import {
   expect,
   openDetails,
   openEntity,
-  openEntityActions,
   test,
 } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
@@ -32,20 +32,16 @@ test('pickers never offer the System-managed asset type or asset-ref field', asy
   await createEntity(page, 'core.type.note');
   await openDetails(page);
 
-  // The Details panel's inline add-type picker offers ordinary types but never the System-managed asset type.
-  await expect(page.getByTestId('detail-type-add')).toBeVisible();
-  await expect(page.getByTestId('detail-type-add').locator('option[value="core.type.asset"]')).toHaveCount(0);
+  // The Details panel's inline add-type typeahead (#438) offers ordinary types but never the
+  // System-managed asset type. Focusing the combobox opens the option list.
+  await page.getByTestId('type-add').click();
+  await expect(page.getByTestId('type-add-menu')).toBeVisible();
+  await expect(page.getByTestId('type-option-core.type.asset')).toHaveCount(0);
 
   // The attach-field picker offers the reusable World Field but never the System-managed asset-ref Field.
   const fieldAdd = page.getByTestId('detail-field-add');
   await expect(fieldAdd.locator('option[value="world.field.origin"]')).toHaveCount(1);
   await expect(fieldAdd.locator('option[value="core.field.asset"]')).toHaveCount(0);
-
-  // The header's Edit-types dialog is the second add-type picker; it too must not offer the asset type.
-  await openEntityActions(page);
-  await page.getByTestId('edit-types').click();
-  await expect(page.getByTestId('type-add')).toBeVisible();
-  await expect(page.getByTestId('type-add').locator('option[value="core.type.asset"]')).toHaveCount(0);
 });
 
 test('the create menu never offers the System-managed asset type, and names types by their own copy', async ({
@@ -79,19 +75,19 @@ test("an Asset's Details panel lists its System-managed type and field affordanc
   await openEntity(page, asset.id);
   await openDetails(page);
 
-  // The panel honestly shows the Entity's shape: the asset type and the asset-ref Field are both listed.
-  await expect(page.getByTestId('detail-type-core.type.asset')).toBeVisible();
+  // The panel honestly shows the Entity's shape: the asset type (a manager chip) and the asset-ref Field.
+  await expect(page.getByTestId('type-chip-core.type.asset')).toBeVisible();
   await expect(page.getByTestId('detail-field-core.field.asset')).toBeVisible();
 
   // But neither carries an affordance: the system alone assigns/removes them (ADR-0068).
-  await expect(page.getByTestId('detail-type-remove-core.type.asset')).toHaveCount(0);
+  await expect(page.getByTestId('type-remove-core.type.asset')).toHaveCount(0);
   await expect(page.getByTestId('detail-field-detach-core.field.asset')).toHaveCount(0);
 
   // Add an ordinary second type: it is removable (a two-type set clears the last-type guard), yet the asset
   // type still shows no remove — proving the suppression is System-managed-specific, not the last-type rule.
-  await page.getByTestId('detail-type-add').selectOption('core.type.note');
-  await expect(page.getByTestId('detail-type-remove-core.type.note')).toBeVisible();
-  await expect(page.getByTestId('detail-type-remove-core.type.asset')).toHaveCount(0);
+  await addType(page, 'core.type.note');
+  await expect(page.getByTestId('type-remove-core.type.note')).toBeVisible();
+  await expect(page.getByTestId('type-remove-core.type.asset')).toHaveCount(0);
 
   // An ordinary attached Field keeps its detach × — the affordance-less rule is the marker's, not the panel's.
   await attachField(page, 'world.field.origin');

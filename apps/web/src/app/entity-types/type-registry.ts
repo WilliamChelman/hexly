@@ -1,6 +1,16 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, Injector, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
-import { EntityType, Field, facetCategoryOf, isFacetableField, isStructuredDataType } from '@hexly/domain';
+import {
+  CreateUserDefinedTypeRequest,
+  deriveWorldTypeId,
+  EntityType,
+  Field,
+  facetCategoryOf,
+  isFacetableField,
+  isStructuredDataType,
+} from '@hexly/domain';
+import { ActiveWorld, WorldsClient } from '@hexly/web-core';
 import {
   CORE_VIEW_DETAILS,
   EntityTypes,
@@ -14,6 +24,9 @@ import {
 } from '@hexly/web-entity';
 import { PluginRegistry } from './plugin-registry';
 import { ViewRegistry } from './view-registry';
+// Resolved lazily through the injector in `create()` (never injected as a field): the loader injects
+// this registry, so a field injection here would form a DI cycle. The import is type/token only.
+import { WorldTypesLoader } from './world-types-loader';
 
 /**
  * The pre-rename id of the Details View (ADR-0067), which user types persisted in their `views` list
@@ -41,6 +54,11 @@ export class TypeRegistry implements EntityTypes {
   private readonly views = inject(ViewRegistry);
   /** Owns the enablement predicate (`isTypeActive`) the reactive outputs filter through (ADR-0052, Seam 3). */
   private readonly plugins = inject(PluginRegistry);
+  /** The active World's id + Rights — the source of the {@link canCreate} Owner gate and the mint's scope. */
+  private readonly active = inject(ActiveWorld);
+  private readonly worlds = inject(WorldsClient);
+  /** Resolves {@link WorldTypesLoader} lazily in {@link create}: it injects *this*, so eager injection would cycle. */
+  private readonly injector = inject(Injector);
   private readonly definitions = signal<readonly TypeDefinition[]>([]);
 
   /**
@@ -70,6 +88,35 @@ export class TypeRegistry implements EntityTypes {
    * system alone mints. What every create surface (split button, palette command) offers.
    */
   readonly creatable = computed(() => this.all().filter((def) => !def.systemManaged));
+
+  /**
+   * Whether the caller may **mint** a user-defined type inline (#438) — the Owner gate, the `manage`
+   * right the active World's Detail carries (the same right World Settings → Types is gated on, ADR-0078).
+   * A non-Owner, or a surface with no World in scope, gets `false`.
+   */
+  canCreate(): boolean {
+    return !!this.active.world()?.rights?.includes('manage');
+  }
+
+  /**
+   * Eagerly mint a **bare** user-defined type from the typed `label` (#438): derive its immutable
+   * `world.type.<slug>` id (disambiguated against the existing user-defined ids), POST it Container-wide
+   * (empty Fields, no Views → the generic View), then reload the World types loader so it is registered
+   * client-side before the caller stages the id — referential integrity, since the entity save that
+   * follows references it. Returns the new id. Owner-gated: only call when {@link canCreate}.
+   */
+  async create(label: string): Promise<string> {
+    const worldId = this.active.worldId();
+    if (!worldId) throw new Error('Cannot create a type with no active World');
+    // Only user-defined ids can collide — a plugin id is in a reserved namespace it can never take.
+    const existing = this.definitions().map((def) => def.id);
+    const id = deriveWorldTypeId(label, existing);
+    await firstValueFrom(
+      this.worlds.createType(worldId, { id, label, fieldRefs: [] } satisfies CreateUserDefinedTypeRequest),
+    );
+    await this.injector.get(WorldTypesLoader).reloadAndSettle();
+    return id;
+  }
 
   constructor() {
     // Every code type is a bundled plugin's (ADR-0051); a disabled one drops from every output here.

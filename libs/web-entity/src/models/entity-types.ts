@@ -16,6 +16,20 @@ export interface EntityTypes {
    */
   readonly creatable: Signal<readonly TypeDefinition[]>;
   /**
+   * Whether the caller may **mint** a new user-defined type inline (#438) — the Owner gate, so a
+   * create surface shows its affordance without restating who governs Container-wide vocabulary. The
+   * concrete registry derives it from the active World's Rights; adding an *existing* type stays the
+   * separate entity-write gate ({@link EntitySession.writable}).
+   */
+  canCreate(): boolean;
+  /**
+   * Eagerly mint a bare user-defined type from the typed `label` (#438) — the id is derived from it
+   * (never surfaced), the type born with empty Fields and the generic View, growable later in World
+   * Settings. Resolves to the new type's id once it is registered client-side, so the caller can add
+   * it to an Entity's staged type set. Owner-gated: only call when {@link canCreate} is true.
+   */
+  create(label: string): Promise<string>;
+  /**
    * A type's **display name** — the noun every surface shows for it ("Note", "Hex Map", "Deity").
    * A user-defined type's is authored data, never a transloco key.
    */

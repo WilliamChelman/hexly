@@ -27,6 +27,36 @@ export function worldTypeIdFromSegment(segment: string): string {
   return `${USER_TYPE_NAMESPACE}.type.${segment}`;
 }
 
+/**
+ * Slug a raw label into the `world.`-less segment of a user-defined type id — the same accent-fold,
+ * lowercase, dash-collapse the Field side applies ({@link slugifyFieldSegment}, ADR-0056), so an inline
+ * mint (#438) derives the id an author would have typed. Its own copy so the API could derive it
+ * server-side; idempotent.
+ */
+export function slugifyTypeSegment(raw: string): string {
+  return raw
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip the combining diacritics NFD split off
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Derive the frozen `world.type.<slug>` id for a label minted inline from the Details panel (#438),
+ * disambiguating with a numeric suffix (`-2`, `-3`, …) when the bare slug collides with an existing
+ * user-defined id. The id is immutable (entities store it verbatim, no rename/migration), so a
+ * collision must resolve to a fresh key rather than silently reuse another type's. A plugin id can
+ * never collide — its namespace is reserved — so callers pass only the user-defined ids in play.
+ */
+export function deriveWorldTypeId(label: string, existingIds: Iterable<string> = []): string {
+  const slug = slugifyTypeSegment(label);
+  const taken = new Set(existingIds);
+  let candidate = worldTypeIdFromSegment(slug);
+  for (let n = 2; taken.has(candidate); n++) candidate = worldTypeIdFromSegment(`${slug}-${n}`);
+  return candidate;
+}
+
 /** The editable segment of a `world.type.<segment>` id — the inverse of {@link worldTypeIdFromSegment}, for form prefill. */
 export function worldTypeSegment(id: string): string {
   return id.slice(`${USER_TYPE_NAMESPACE}.type.`.length);

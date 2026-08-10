@@ -117,8 +117,8 @@ describe('DetailsPanel', () => {
     session.loadDetail(deityDetail({ 'world.field.domain': 'War', 'legacy.key': 'kept' }));
     const { el } = mount();
 
-    // The type, by its authored name.
-    expect(q(el, 'detail-type-world.type.deity')?.textContent).toContain('Deity');
+    // The type, by its authored name — rendered by the hosted entity type manager (#438).
+    expect(q(el, 'type-chip-world.type.deity')?.textContent).toContain('Deity');
     // Its declared Field, with an editable control holding the value.
     const domain = q(el, 'detail-field-world.field.domain');
     expect(domain).not.toBeNull();
@@ -140,28 +140,14 @@ describe('DetailsPanel', () => {
     expect(session.doc()['world.field.domain']).toBe('Wisdom');
   });
 
-  it('adds a Type inline, updating the Entity’s type set', () => {
-    session.loadDetail(deityDetail());
-    const { el, fixture } = mount();
-
-    const add = q(el, 'detail-type-add') as HTMLSelectElement;
-    add.value = HERO;
-    add.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-
-    expect(session.types()).toEqual([DEITY, HERO]);
-  });
-
-  it('removes a Type inline, but never the last one', () => {
+  it('hosts the entity type manager for type-set management (#438)', () => {
+    // Type add/remove/reorder and inline create live in the manager now (ADR-0067); the panel just
+    // hosts it. Its own behaviours are covered in entity-type-manager.component.spec.ts.
     session.loadDetail({ ...deityDetail(), types: [DEITY, HERO] });
-    const { el, fixture } = mount();
-
-    q(el, 'detail-type-remove-world.type.hero')?.click();
-    fixture.detectChanges();
-    expect(session.types()).toEqual([DEITY]);
-
-    // The lone remaining type offers no remove control.
-    expect(q(el, 'detail-type-remove-world.type.deity')).toBeNull();
+    const { el } = mount();
+    expect(el.querySelector('app-entity-type-manager')).not.toBeNull();
+    expect(q(el, 'type-chip-world.type.deity')).not.toBeNull();
+    expect(q(el, 'type-chip-world.type.hero')).not.toBeNull();
   });
 
   it('attaches a Field inline and detaches an attached one', () => {
@@ -259,9 +245,9 @@ describe('DetailsPanel', () => {
     expect(q(el, 'detail-field-incomplete-world.field.epithet')).not.toBeNull();
     // The Field control is disabled.
     expect(q(el, 'detail-field-world.field.domain')?.querySelector('input')?.disabled).toBe(true);
-    // No add/remove/attach/detach affordances.
-    expect(q(el, 'detail-type-add')).toBeNull();
-    expect(q(el, 'detail-type-remove-world.type.deity')).toBeNull();
+    // No add/remove/attach/detach affordances (the manager hides its type controls read-only too).
+    expect(q(el, 'type-add')).toBeNull();
+    expect(q(el, 'type-remove-world.type.deity')).toBeNull();
     expect(q(el, 'detail-field-add')).toBeNull();
     expect(q(el, 'detail-field-detach-world.field.motto')).toBeNull();
   });

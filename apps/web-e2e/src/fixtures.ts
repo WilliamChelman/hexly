@@ -492,15 +492,15 @@ export async function attachField(page: Page, fieldId: string): Promise<void> {
 }
 
 /**
- * Add `typeId` to the open Entity through the header's Edit-types dialog, minting the defaults its
- * Fields declare. Only for a type whose Fields are all optional: one declaring a *required* Field
- * prompts for it before the add commits, which a spec drives itself.
+ * Add `typeId` to the open Entity through the Details panel's inline type manager (#438, ADR-0067),
+ * minting the defaults its Fields declare. Only for a type whose Fields are all optional: one declaring
+ * a *required* Field prompts for it before the add commits, which a spec drives itself.
  */
 export async function addType(page: Page, typeId: string): Promise<void> {
-  await openEntityActions(page);
-  await page.getByTestId('edit-types').click();
-  await page.getByTestId('type-add').selectOption(typeId);
-  await page.getByTestId('types-close').click();
+  await openDetails(page);
+  await page.getByTestId('type-add').click(); // focus opens the typeahead option list
+  await page.getByTestId(`type-option-${typeId}`).click();
+  await expect(page.getByTestId(`type-chip-${typeId}`)).toBeVisible();
 }
 
 /** The summary a vault import returns off the wire (ADR-0033, ADR-0073). */

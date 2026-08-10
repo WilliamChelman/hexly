@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import {
   EntityDocument,
-  EntityType,
   Field,
   isEmptyFieldValue,
   isStructuredDataType,
@@ -13,6 +12,7 @@ import {
 import { EyebrowComponent, SelectComponent } from '@hexly/web-ui';
 import { ENTITY_SESSION } from '../models/entity-session';
 import { ENTITY_TYPES } from '../models/entity-types';
+import { EntityTypeManagerComponent } from './entity-type-manager.component';
 import { FieldControlComponent } from './field-control.component';
 
 /**
@@ -35,7 +35,7 @@ import { FieldControlComponent } from './field-control.component';
 @Component({
   selector: 'app-details-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EyebrowComponent, FieldControlComponent, SelectComponent, TranslocoPipe],
+  imports: [EntityTypeManagerComponent, EyebrowComponent, FieldControlComponent, SelectComponent, TranslocoPipe],
   host: {
     class: 'flex flex-col gap-1 p-3 overflow-y-auto bg-surface min-h-0 flex-1',
     'data-testid': 'details-panel',
@@ -43,43 +43,9 @@ import { FieldControlComponent } from './field-control.component';
   template: `
     <span appEyebrow mark class="mb-1">{{ 'fields.details.types' | transloco }}</span>
 
-    <div class="flex flex-wrap items-center gap-2">
-      @for (type of typeRows(); track type.id) {
-        <span
-          class="inline-flex items-center gap-1 rounded-full border border-line bg-surface-sunken px-2.5 py-0.5 text-xs text-ink"
-          [attr.data-testid]="'detail-type-' + type.id"
-        >
-          {{ type.label }}
-          <!-- Remove is edit-only, never the last type (every Entity keeps a primary, typesSchema.min(1)), and
-               never a System-managed type: the system alone assigns/removes it (ADR-0068), so it lists affordance-less. -->
-          @if (writable() && typeRows().length > 1 && !type.systemManaged) {
-            <button
-              type="button"
-              class="-mr-1 leading-none opacity-70 hover:opacity-100 cursor-pointer bg-transparent border-0 text-current"
-              [attr.aria-label]="'fields.details.removeType' | transloco: { type: type.label }"
-              [attr.data-testid]="'detail-type-remove-' + type.id"
-              (click)="removeType(type.id)"
-            >
-              &times;
-            </button>
-          }
-        </span>
-      }
-
-      @if (writable() && addableTypes().length > 0) {
-        <select
-          appSelect
-          data-testid="detail-type-add"
-          [attr.aria-label]="'fields.details.addType' | transloco"
-          (change)="onAddType($event)"
-        >
-          <option value="">{{ 'fields.details.addType' | transloco }}</option>
-          @for (type of addableTypes(); track type.id) {
-            <option [value]="type.id">{{ type.label }}</option>
-          }
-        </select>
-      }
-    </div>
+    <!-- Type-set management (add existing, reorder-to-set-primary, remove, and — for a World Owner —
+         mint a User-defined type inline) lives in the one reusable manager, hosted here (#438, ADR-0067). -->
+    <app-entity-type-manager />
 
     <span appEyebrow mark class="mt-3 mb-1">{{ 'fields.details.fields' | transloco }}</span>
 
@@ -173,27 +139,6 @@ export class DetailsPanelComponent {
   /** The open Entity's World, scoping an Entity-Link Field picker to same-World targets (#190). */
   protected readonly worldId = computed(() => this.session.current()?.worldId);
 
-  /**
-   * The live type set as labelled rows — a registered type by its name, an unknown/disabled one by its raw id.
-   * A System-managed type (ADR-0068) still lists here, but flagged so its remove × does not render.
-   */
-  protected readonly typeRows = computed(() => {
-    this.transloco.activeLang(); // re-resolve labels on a language switch
-    return this.session
-      .types()
-      .map((type) => ({ id: type, label: this.typeLabel(type), systemManaged: !!this.types.get(type)?.systemManaged }));
-  });
-
-  /** The types the registry calls creatable (ADR-0068) minus those already carried — the add picker's offer. */
-  protected readonly addableTypes = computed(() => {
-    this.transloco.activeLang();
-    const present = new Set(this.session.types());
-    return this.types
-      .creatable()
-      .filter((def) => !present.has(def.id))
-      .map((def) => ({ id: def.id, label: this.typeLabel(def.id) }));
-  });
-
   /** The open Entity's effective Field set (ADR-0054): its types' defaults unioned with its attached Fields. */
   private readonly effective = computed(() => this.types.effectiveFields(this.session.types(), this.session.fields()));
 
@@ -276,32 +221,11 @@ export class DetailsPanelComponent {
     });
   }
 
-  /** Add the picked type; the select resets so the same option can be re-picked. */
-  protected onAddType(event: Event): void {
-    const select = event.target as HTMLSelectElement;
-    const type = select.value as EntityType;
-    select.value = '';
-    if (type && !this.session.types().includes(type)) {
-      this.session.setTypes([...this.session.types(), type]);
-    }
-  }
-
-  /** Drop a type — the lens only; its document values persist (CONTEXT.md → Field). Never the last one. */
-  protected removeType(type: EntityType): void {
-    if (this.session.types().length <= 1) return;
-    this.session.setTypes(this.session.types().filter((t) => t !== type));
-  }
-
   protected onAttach(event: Event): void {
     const select = event.target as HTMLSelectElement;
     const id = select.value;
     select.value = '';
     if (id) this.session.attachField(id);
-  }
-
-  /** A friendly type label: a registered type's name; an unknown/disabled id (a missing Plugin) verbatim. */
-  private typeLabel(type: EntityType): string {
-    return this.types.get(type) ? this.types.name(type) : type;
   }
 
   /** A Field's display name: a plugin's translated `labelKey`, else its authored `label` (ADR-0014). */

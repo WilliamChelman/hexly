@@ -39,7 +39,7 @@ import { ActiveWorld, ClientConfigStore } from '@hexly/web-core';
     TranslocoPipe,
   ],
   template: `
-    @if (editable() || canPin() || shareable()) {
+    @if (visibilityToggleable() || canPin() || shareable()) {
       <button
         type="button"
         appButton
@@ -56,16 +56,8 @@ import { ActiveWorld, ClientConfigStore } from '@hexly/web-core';
 
     <ng-template #actionsMenu>
       <div appMenuPanel>
-        @if (editable()) {
-          <!-- Edit types (#189): add/remove/reorder the type set — substance, so any writer may. -->
-          <button type="button" appMenuItem data-testid="edit-types" (triggered)="editTypes.emit()">
-            <span class="flex items-center gap-2">
-              <app-icon name="label" [size]="16" />
-              {{ 'entityTypes.editTypes' | transloco }}
-            </span>
-          </button>
-        }
-
+        <!-- Type management (add/remove/reorder, inline mint) moved inline to the Details panel
+             (ADR-0067, #438) — the header's Edit-types item and its dialog are retired. -->
         @if (visibilityToggleable()) {
           <!-- Visibility control (ADR-0037/0084, #160/#433): an Owner sets the Entity's rung —
              private, shared, or open (Instance-wide reachable). A radiogroup so exactly one stays
@@ -123,9 +115,6 @@ export class EntityActionsMenuComponent {
 
   /** Open the owner/grant/link Share dialog — owned by the header, its dialog surface. */
   readonly share = output<void>();
-
-  /** Open the Edit-types dialog (#189) — likewise owned by the header. */
-  readonly editTypes = output<void>();
 
   /** Visibility and rename are gated on write access (ADR-0037): a read-only opener sees neither. */
   protected readonly editable = this.session.writable;

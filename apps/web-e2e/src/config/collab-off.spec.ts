@@ -37,9 +37,10 @@ test('Collaboration off: an Entity carries no sharing affordance, and the routes
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const id = entityIdFromUrl(page);
 
-  // The opener is the Sole User, so a Rights or Instance-Role check would read true here.
+  // The opener is the Sole User (World Owner), so the Pin toggle proves the menu is reachable; type
+  // management moved off it to the Details panel (ADR-0067, #438).
   await openEntityActions(page);
-  await expect(page.getByTestId('edit-types')).toBeVisible();
+  await expect(page.getByTestId('pin-toggle')).toBeVisible();
   await expect(page.getByTestId('manage-owners')).toHaveCount(0);
   // The three-way Visibility control (ADR-0084) needs the Collaboration layer that reads the column.
   await expect(page.getByTestId('visibility-set-private')).toHaveCount(0);

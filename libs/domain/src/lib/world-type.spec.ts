@@ -1,9 +1,41 @@
 import {
   createUserDefinedTypeRequestSchema,
+  deriveWorldTypeId,
+  slugifyTypeSegment,
   updateUserDefinedTypeRequestSchema,
   userDefinedTypeIdSchema,
   userDefinedTypeSchema,
 } from './world-type';
+
+describe('slugifyTypeSegment', () => {
+  it('accent-folds, lowercases, and dash-collapses a raw label (ADR-0056)', () => {
+    expect(slugifyTypeSegment('Déïty')).toBe('deity');
+    expect(slugifyTypeSegment('  Hell Deity  ')).toBe('hell-deity');
+    expect(slugifyTypeSegment('Elder God!!')).toBe('elder-god');
+  });
+
+  it('is idempotent — a re-slug of a slug is the same slug', () => {
+    expect(slugifyTypeSegment(slugifyTypeSegment('Hell Deity'))).toBe('hell-deity');
+  });
+});
+
+describe('deriveWorldTypeId', () => {
+  it('derives a `world.type.<slug>` id from the label', () => {
+    expect(deriveWorldTypeId('Deity')).toBe('world.type.deity');
+    expect(deriveWorldTypeId('Hell Deity')).toBe('world.type.hell-deity');
+  });
+
+  it('disambiguates with a numeric suffix when the bare slug collides (immutable ids, #438)', () => {
+    // "Deity" typed twice: the second mint can't reuse the first's frozen id, so it takes `-2`.
+    expect(deriveWorldTypeId('Deity', ['world.type.deity'])).toBe('world.type.deity-2');
+    // …and climbs past every taken suffix rather than stopping at the first miss.
+    expect(deriveWorldTypeId('Deity', ['world.type.deity', 'world.type.deity-2'])).toBe('world.type.deity-3');
+  });
+
+  it('leaves the bare slug alone when nothing collides', () => {
+    expect(deriveWorldTypeId('Deity', ['world.type.hero'])).toBe('world.type.deity');
+  });
+});
 
 describe('userDefinedTypeIdSchema', () => {
   it('accepts a `world.`-namespaced id', () => {

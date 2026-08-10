@@ -21,9 +21,14 @@ import {
   DialogRef,
 } from '@hexly/web-ui';
 import { TypeRegistry } from './type-registry';
-import { EntityTypesEditorComponent } from '../pages/entity/components/entity-types-editor.component';
 import { withTags } from '../pages/entity/components/tag-suggestions';
-import { FieldControlComponent } from '@hexly/web-entity';
+import {
+  ENTITY_TYPES,
+  EntityTypeManagerComponent,
+  FieldControlComponent,
+  LocalEntitySession,
+  provideLocalEntitySession,
+} from '@hexly/web-entity';
 
 /** What a create Command hands the dialog when it opens it: the seeded primary type (ADR-0048, #189). */
 export interface CreateEntityDialogData {
@@ -52,13 +57,17 @@ export type CreateEntityDialogResult = EntityDetail;
  * It **returns** the created Entity and navigates nowhere — routing is its caller's concern, and a
  * caller may seed the name and Tags and pin the World (ADR-0073).
  *
- * The Command seeds one primary type; the embedded {@link EntityTypesEditorComponent} lets the author pick
- * more (ADR-0048), and the picked types' `required` Fields are collected below as a prompt, not a gate —
- * only a *present* ill-typed value holds Create back (ADR-0074).
+ * The Command seeds one primary type; the embedded {@link EntityTypeManagerComponent} lets the author pick
+ * more (ADR-0048) over a pre-existence {@link LocalEntitySession}, and the picked types' `required` Fields
+ * are collected below as a prompt, not a gate — only a *present* ill-typed value holds Create back
+ * (ADR-0074). Inline type creation is off here (`allowCreate=false`): minting a type mid-Entity-creation
+ * is out of scope, and the manager's own prompt is off (`promptOnAdd=false`) since this form collects the
+ * required Fields itself, covering the seeded primary type the per-add prompt never sees (#189).
  */
 @Component({
   selector: 'app-create-entity-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [provideLocalEntitySession(), { provide: ENTITY_TYPES, useExisting: TypeRegistry }],
   imports: [
     ButtonComponent,
     ChipComponent,
@@ -66,7 +75,7 @@ export type CreateEntityDialogResult = EntityDetail;
     FieldComponent,
     InputComponent,
     TranslocoPipe,
-    EntityTypesEditorComponent,
+    EntityTypeManagerComponent,
     FieldControlComponent,
   ],
   template: `
@@ -100,15 +109,9 @@ export type CreateEntityDialogResult = EntityDetail;
       </label>
       <div class="flex flex-col gap-1.5">
         <span class="text-2xs uppercase tracking-wider text-ink-muted">{{ 'entityTypes.heading' | transloco }}</span>
-        <!-- promptOnAdd=false: added types go straight in and all required Fields are collected
-             below, so the seeded primary type the picker prompt never sees is covered too (#189). -->
-        <app-entity-types-editor
-          [types]="types()"
-          [metadata]="metadata()"
-          [promptOnAdd]="false"
-          (typesChange)="types.set($event)"
-          (metadataChange)="metadata.set($event)"
-        />
+        <!-- The one reusable manager over the pre-existence session: prompt off (this form collects the
+             required Fields below), create off (minting mid-creation is out of scope, #438). -->
+        <app-entity-type-manager [promptOnAdd]="false" [allowCreate]="false" />
       </div>
 
       <!-- Tags, set before the thing exists: a mention seeds the Instance's inline Tag here and the
@@ -200,6 +203,8 @@ export class CreateEntityDialogComponent {
   private readonly worldStore = inject(WorldStore);
   private readonly transloco = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
+  /** The pre-existence type set the embedded manager builds; the same instance the manager writes to. */
+  private readonly session = inject(LocalEntitySession);
 
   protected readonly worlds = this.worldStore.worlds;
   protected readonly name = signal(this.dialogRef.data.name ?? '');
@@ -212,13 +217,18 @@ export class CreateEntityDialogComponent {
   protected readonly worldId = signal<string | null>(
     this.dialogRef.data.worldId ?? this.activeWorld.worldId() ?? this.worldStore.worlds()[0]?.id ?? null,
   );
-  /** The working ordered type set the author builds through the embedded editor, seeded by the Command. */
-  protected readonly types = signal<readonly EntityType[]>([this.dialogRef.data.type]);
+  /** The working ordered type set the author builds through the embedded manager, seeded by the Command. */
+  protected readonly types = this.session.types;
   /** The EntityDocument collected for a picked type's required Fields, sent with the create. */
   protected readonly metadata = signal<EntityDocument>({});
 
   /** Whether the last create came back a failure — the dialog stays open on one, with what was typed. */
   protected readonly failed = signal(false);
+
+  constructor() {
+    // Seed the pre-existence session with the Command's primary type; the manager builds on it.
+    this.session.setTypes([this.dialogRef.data.type]);
+  }
 
   /** The union of Field schemas the picked types afford (primary first, deduped) — via the registry. */
   private readonly fields = computed(() => this.typeRegistry.resolveFields(this.types()));

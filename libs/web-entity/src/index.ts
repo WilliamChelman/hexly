@@ -7,6 +7,7 @@ export * from './models/detailed-entity-creator';
 export * from './models/embed';
 export * from './models/entity-session';
 export * from './models/entity-types';
+export * from './models/local-entity-session';
 export * from './models/panel-definition';
 export * from './models/plugin';
 export * from './models/type-definition';
