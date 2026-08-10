@@ -35,6 +35,20 @@ describe('deriveWorldTypeId', () => {
   it('leaves the bare slug alone when nothing collides', () => {
     expect(deriveWorldTypeId('Deity', ['world.type.hero'])).toBe('world.type.deity');
   });
+
+  it('falls back to a generic base when the label has no Latin alphanumerics (#438)', () => {
+    // "神"/"❤️"/"???" slug to '' — the pure slug still returns '', but the id must stay valid.
+    expect(slugifyTypeSegment('神')).toBe('');
+    for (const label of ['神', '❤️', '???']) {
+      const id = deriveWorldTypeId(label);
+      expect(id).toBe('world.type.type');
+      expect(userDefinedTypeIdSchema.safeParse(id).success).toBe(true);
+    }
+  });
+
+  it('disambiguates the generic fallback like any other slug (#438)', () => {
+    expect(deriveWorldTypeId('神', ['world.type.type'])).toBe('world.type.type-2');
+  });
 });
 
 describe('userDefinedTypeIdSchema', () => {

@@ -25,6 +25,9 @@ export class FakeEntityTypes implements EntityTypes {
   /** The labels {@link create} was called with, in order — for a spec to assert an inline mint fired. */
   readonly created: string[] = [];
 
+  /** Opt-in reject for {@link create}, so a spec can drive the mint-failure UI (#438); happy path by default. */
+  private failCreate = false;
+
   /** The spec's registered Fields by id (ADR-0054) — what a type's `fieldRefs` and an attached `fieldIds` resolve against. */
   private readonly fieldsById: Map<string, Field>;
 
@@ -85,11 +88,19 @@ export class FakeEntityTypes implements EntityTypes {
     this._canCreate.set(canCreate);
   }
 
+  /** Test helper: make {@link create} reject, so a spec can exercise the inline mint-failure UI (#438). */
+  setCreateShouldFail(fail: boolean): void {
+    this.failCreate = fail;
+  }
+
   /**
    * Mirror the real registry's eager mint (#438): derive the id from the label (disambiguated against
    * the current user-defined ids), register a bare type so its name resolves, and resolve to the id.
    */
   async create(label: string): Promise<string> {
+    // Reject before logging: a failed mint neither records nor registers, so a spec's `created`
+    // stays empty on the failure path (#438).
+    if (this.failCreate) throw new Error('create failed');
     this.created.push(label);
     const existing = this.all().map((def) => def.id);
     const id = deriveWorldTypeId(label, existing) as EntityType;

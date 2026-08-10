@@ -1,41 +1,37 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ListKeyManager } from '@angular/cdk/a11y';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityType, Field, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
+import {
+  EntityType,
+  Field,
+  NO_STRUCTURED_DATA_TYPES,
+  slugifyTypeSegment,
+  validateFields,
+  writeField,
+  writeFieldInPlace,
+} from '@hexly/domain';
 import { ButtonComponent, ChipComponent, ChipTone, IconName, InputComponent } from '@hexly/web-ui';
 import { ENTITY_SESSION } from '../models/entity-session';
 import { ENTITY_TYPES } from '../models/entity-types';
 import { typeTone } from '../models/type-tone';
 import { FieldControlComponent } from './field-control.component';
 
-/**
- * The normalization the exact-name reconciliation compares under (#438): trim, accent-fold, lowercase.
- * It folds accents to stay in step with the id slug ({@link slugifyTypeSegment}) — otherwise typing
- * "Déïty" would miss an existing "Deity" and mint `world.type.deity-2`, the visual duplicate US8 forbids.
- */
+/** Trim + accent-fold + lowercase for the combobox's fuzzy substring filter (#438). */
 function normalizeName(name: string): string {
   return name.trim().normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
+/** A combobox option in walk order: an existing creatable type, or the synthetic Create row (#438). */
+type ComboOption = { kind: 'type'; id: EntityType } | { kind: 'create' };
+
 /**
- * The one reusable **entity type manager** (#438): the ordered Entity Type set as chips — reorder to
- * set the primary (`types[0]`, ADR-0048), remove (write-gated, never the last, never a System-managed
- * type, ADR-0068) — and a typeahead combobox that fuzzy-filters the creatable types and, for a **World
- * Owner**, offers a **Create "<name>"** row that mints a new User-defined type inline.
- *
- * It reads and writes the live set through the {@link ENTITY_SESSION}/{@link ENTITY_TYPES} seams, so it
- * hosts unchanged on the Details panel (a live Entity) and on a pre-existence surface (the create dialog,
- * over a {@link LocalEntitySession}) — the single control ADR-0067's consolidation asked for, replacing
- * the retired header types-editor dialog.
- *
- * Adding a type whose `required` Fields the document leaves unfilled opens an inline prompt to collect
- * them — informing, never gating: both prompt buttons add the type (ADR-0074). A host that collects
- * those Fields in its own form (the create dialog) binds `promptOnAdd=false`.
- *
- * Inline create is Owner-gated ({@link ENTITY_TYPES.canCreate}) and eager: the Create row activates the
- * concrete registry's mint, which persists Container-wide, registers the type client-side, and returns
- * its id — added to the set, which rides the normal autosave. An **exact, normalized name match** across
- * every creatable type (plugin + user) adds/selects that existing type instead, never a duplicate; a
- * partial match never suppresses the Create row.
+ * The reusable entity type manager (#438): the ordered Entity Type set as chips — reorder to set the
+ * primary (ADR-0048), write-gated remove (never the last, never a System-managed type; ADR-0068) — plus a
+ * typeahead combobox that fuzzy-filters creatable types and, for a World Owner, mints a new one inline.
+ * Reads/writes the live set through {@link ENTITY_SESSION}/{@link ENTITY_TYPES} (ADR-0067), so it hosts on
+ * the Details panel and the create dialog alike. Adding a type with unfilled required Fields opens an
+ * inline prompt that informs, never gates (ADR-0074). An exact slug match reconciles to that existing type
+ * rather than mint a duplicate; a partial match never suppresses the Create row.
  */
 @Component({
   selector: 'app-entity-type-manager',
@@ -106,15 +102,17 @@ function normalizeName(name: string): string {
             autocomplete="off"
             [attr.aria-label]="'fields.details.addType' | transloco"
             [attr.aria-expanded]="menuOpen()"
+            [attr.aria-controls]="listboxId"
+            [attr.aria-activedescendant]="activeItemId()"
             [value]="query()"
             (input)="onQuery($event)"
             (focus)="focused.set(true)"
             (blur)="focused.set(false)"
-            (keydown.enter)="onEnter($event)"
-            (keydown.escape)="reset()"
+            (keydown)="onKeydown($event)"
           />
           @if (menuOpen()) {
             <ul
+              [id]="listboxId"
               role="listbox"
               data-testid="type-add-menu"
               class="absolute z-10 mt-1 max-h-64 min-w-full overflow-y-auto rounded-md border border-line bg-surface p-1 shadow-2"
@@ -123,6 +121,9 @@ function normalizeName(name: string): string {
                 <li
                   role="option"
                   class="cursor-pointer rounded-sm px-2 py-1 text-sm text-ink hover:bg-surface-sunken"
+                  [id]="optionId({ kind: 'type', id: option.id })"
+                  [class.bg-surface-sunken]="typeOptionActive(option.id)"
+                  [attr.aria-selected]="typeOptionActive(option.id)"
                   [attr.data-testid]="'type-option-' + option.id"
                   (mousedown)="$event.preventDefault()"
                   (click)="addType(option.id)"
@@ -134,6 +135,9 @@ function normalizeName(name: string): string {
                 <li
                   role="option"
                   class="cursor-pointer rounded-sm px-2 py-1 text-sm font-medium text-accent-strong hover:bg-surface-sunken"
+                  [id]="optionId({ kind: 'create' })"
+                  [class.bg-surface-sunken]="createOptionActive()"
+                  [attr.aria-selected]="createOptionActive()"
                   data-testid="type-create"
                   (mousedown)="$event.preventDefault()"
                   (click)="activateCreate()"
@@ -142,6 +146,11 @@ function normalizeName(name: string): string {
                 </li>
               }
             </ul>
+          }
+          @if (createFailed()) {
+            <p class="mt-1 text-2xs text-danger" role="alert" data-testid="type-create-error">
+              {{ 'fields.details.createError' | transloco }}
+            </p>
           }
         </div>
       }
@@ -221,6 +230,23 @@ export class EntityTypeManagerComponent {
   protected readonly focused = signal(false);
   protected readonly menuOpen = computed(() => this.focused() || this.query().trim().length > 0);
 
+  /** The listbox's stable DOM id, for the input's `aria-controls`. */
+  protected readonly listboxId = 'type-add-listbox';
+
+  /** The keyboard/ARIA highlight into {@link options}; clamped by {@link activeOption} to survive shrink. */
+  protected readonly activeIndex = signal(0);
+
+  /** A mint that rejected (network/validation) — surfaced inline so the combobox never fails silently (#438). */
+  protected readonly createFailed = signal(false);
+
+  constructor() {
+    // A new query invalidates the previous highlight — land back on the first option (mirrors the palette).
+    effect(() => {
+      this.query();
+      untracked(() => this.activeIndex.set(0));
+    });
+  }
+
   /** The type the prompt is collecting Fields for, or `null` when no prompt is open. */
   protected readonly pendingType = signal<EntityType | null>(null);
   protected readonly pendingFields = signal<readonly Field[]>([]);
@@ -261,6 +287,39 @@ export class EntityTypeManagerComponent {
     () => this.allowCreate() && this.types.canCreate() && this.query().trim().length > 0,
   );
 
+  /** Exactly what the list renders, in walk order: the filtered types, then the Create row when offered. */
+  protected readonly options = computed<readonly ComboOption[]>(() => {
+    const rows: ComboOption[] = this.filtered().map((option) => ({ kind: 'type', id: option.id }));
+    if (this.canCreateRow()) rows.push({ kind: 'create' });
+    return rows;
+  });
+
+  /** The highlighted option, clamped: a shrinking list must never leave Enter/aria pointing past the end. */
+  protected readonly activeOption = computed<ComboOption | null>(() => {
+    const options = this.options();
+    if (!options.length) return null;
+    return options[Math.min(this.activeIndex(), options.length - 1)];
+  });
+
+  protected readonly activeItemId = computed(() => {
+    const option = this.activeOption();
+    return option ? this.optionId(option) : null;
+  });
+
+  /** Stable per-option DOM id for the input's `aria-activedescendant`. */
+  protected optionId(option: ComboOption): string {
+    return option.kind === 'type' ? 'type-opt-' + option.id : 'type-opt-create';
+  }
+
+  protected typeOptionActive(id: EntityType): boolean {
+    const active = this.activeOption();
+    return active?.kind === 'type' && active.id === id;
+  }
+
+  protected createOptionActive(): boolean {
+    return this.activeOption()?.kind === 'create';
+  }
+
   /** The forward-only reading of the prompt's collected values. */
   private readonly pendingValidation = computed(() =>
     validateFields(this.pendingFields(), this.pendingMetadata(), NO_STRUCTURED_DATA_TYPES),
@@ -271,15 +330,38 @@ export class EntityTypeManagerComponent {
   protected readonly invalidPendingKeys = computed(() => new Set(this.pendingValidation().errors.map((e) => e.key)));
 
   protected onQuery(event: Event): void {
+    this.createFailed.set(false);
     this.query.set((event.target as HTMLInputElement).value);
   }
 
-  /** Enter picks the first filtered option if any, else mints through the Create row (#438). */
-  protected onEnter(event: Event): void {
-    event.preventDefault();
-    const first = this.filtered()[0];
-    if (first) this.addType(first.id);
-    else if (this.canCreateRow()) this.activateCreate();
+  /**
+   * The combobox's one keyboard: Enter acts on the *visible* highlight (so a partial match never silently
+   * wins over Create — the user sees and can arrow to the row Enter takes), Escape resets, and Arrow keys
+   * drive a transient wrap-around {@link ListKeyManager} seeded with the clamped index (mirrors the palette,
+   * without `withHomeAndEnd` so Home/End keep moving the caret).
+   */
+  protected onKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      this.reset();
+      return;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const option = this.activeOption();
+      if (!option) return;
+      if (option.kind === 'type') this.addType(option.id);
+      else this.activateCreate();
+      return;
+    }
+    const items = this.options();
+    if (!items.length) return;
+    const options = items.map(() => ({ getLabel: () => '' }));
+    const manager = new ListKeyManager(options).withWrap();
+    manager.setActiveItem(Math.min(this.activeIndex(), items.length - 1));
+    manager.onKeydown(event);
+    if (manager.activeItemIndex != null) {
+      this.activeIndex.set(manager.activeItemIndex);
+    }
   }
 
   /**
@@ -310,22 +392,30 @@ export class EntityTypeManagerComponent {
   }
 
   /**
-   * Activate the **Create** row: an **exact, normalized name match** across every creatable type
-   * (plugin + user) adds that existing type instead of minting a duplicate (#438); a fresh name mints
-   * bare, then adds the returned id. A bare type has no required Fields, so it never prompts.
+   * Activate the **Create** row: an existing creatable type whose label slugs to the same id reconciles to
+   * that type instead of minting a visual duplicate (US8, #438) — slug equality, not accent-fold alone, so
+   * "Fire God" folds onto "Fire-God"; a fresh name mints bare, then adds the returned id. On a rejected
+   * mint the query stays put so the author can retry, surfaced through {@link createFailed}.
    */
   protected async activateCreate(): Promise<void> {
+    this.createFailed.set(false);
     const label = this.query().trim();
-    if (!label) return;
-    const needle = normalizeName(label);
-    const exact = this.types.creatable().find((def) => normalizeName(this.typeLabel(def.id)) === needle);
-    if (exact) {
-      this.addType(exact.id);
-      return;
+    if (!this.types.canCreate() || !label) return;
+    const slug = slugifyTypeSegment(label);
+    if (slug) {
+      const exact = this.types.creatable().find((def) => slugifyTypeSegment(this.typeLabel(def.id)) === slug);
+      if (exact) {
+        this.addType(exact.id);
+        return;
+      }
     }
-    const id = (await this.types.create(label)) as EntityType;
-    if (!this.session.types().includes(id)) this.session.setTypes([...this.session.types(), id]);
-    this.reset();
+    try {
+      const id = (await this.types.create(label)) as EntityType;
+      if (!this.session.types().includes(id)) this.session.setTypes([...this.session.types(), id]);
+      this.reset();
+    } catch {
+      this.createFailed.set(true);
+    }
   }
 
   /** Swap a type up one place; reaching index 0 re-primaries it (ADR-0048). */
@@ -346,6 +436,8 @@ export class EntityTypeManagerComponent {
   /** Drop a type — the lens only; its document values persist (CONTEXT.md → Field). Never the last one. */
   protected removeType(type: EntityType): void {
     if (this.session.types().length <= 1) return;
+    // The System-managed guard is template-only; re-check here so no path but the system drops one (ADR-0068).
+    if (this.types.get(type)?.systemManaged) return;
     this.session.setTypes(this.session.types().filter((t) => t !== type));
   }
 
@@ -353,11 +445,17 @@ export class EntityTypeManagerComponent {
     this.pendingMetadata.update((meta) => writeField(meta, field, value));
   }
 
-  /** Commit the add carrying the prompt's collected values: write them, then the new set. */
+  /** Commit the add carrying the prompt's collected values: write only those Fields, then the new set. */
   protected confirmAdd(): void {
     const type = this.pendingType();
     if (!type || !this.pendingValid()) return;
-    this.writeMetadata(this.pendingMetadata());
+    const fields = this.pendingFields();
+    const values = this.pendingMetadata();
+    // Write only the prompt's Fields into the live draft — a snapshot-then-replace would clobber any
+    // concurrent autosave/collab edit to unrelated keys made between prompt-open and confirm (ADR-0051).
+    this.session.mutate((draft) => {
+      for (const field of fields) writeFieldInPlace(draft, field, values[field.id]);
+    });
     this.session.setTypes([...this.session.types(), type]);
     this.clearPending();
   }
@@ -373,14 +471,6 @@ export class EntityTypeManagerComponent {
   /** Dismiss the prompt, adding nothing — the picked type was the wrong one (#338). */
   protected cancelAdd(): void {
     this.clearPending();
-  }
-
-  /** Fold the prompt's collected Field values into the one Entity Document (ADR-0051). */
-  private writeMetadata(metadata: Record<string, unknown>): void {
-    this.session.mutate((draft) => {
-      for (const key of Object.keys(draft)) delete draft[key];
-      Object.assign(draft, metadata);
-    });
   }
 
   private clearPending(): void {

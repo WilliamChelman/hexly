@@ -14,6 +14,7 @@
 import * as z from 'zod';
 import { fieldSchema, fieldSchemaSchema } from './field';
 import { fieldIdSchema } from './field-id';
+import { slugifySegment } from './slug';
 
 /**
  * The namespace a World-defined Field id lives under (`world.field.element`). Reserved, so a World Owner can
@@ -38,18 +39,9 @@ export const worldFieldSchema = fieldSchema.extend({ id: userDefinedFieldIdSchem
 
 export type WorldField = z.infer<typeof worldFieldSchema>;
 
-/**
- * Slug a raw label segment into the `world.`-less portion of a World Field id (ADR-0056): accent-fold,
- * lowercase, dash-collapse to the {@link fieldIdSchema} shape. Its own copy, not the web's `slugify`, so
- * the API can derive the id server-side; idempotent, so the form's pre-slug and this re-slug agree.
- */
+/** Slug a raw label segment into the `world.`-less portion of a World Field id (ADR-0056); may return `''`. */
 export function slugifyFieldSegment(raw: string): string {
-  return raw
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // strip the combining diacritics NFD split off
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  return slugifySegment(raw);
 }
 
 /** Build the frozen `world.field.<segment>` id (== document key) from an editable segment (ADR-0056). */

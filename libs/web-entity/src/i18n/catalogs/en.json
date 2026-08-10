@@ -20,6 +20,7 @@
     "moveUp": "Move up: {{ type }}",
     "moveDown": "Move down: {{ type }}",
     "createType": "Create “{{ name }}”",
+    "createError": "Couldn’t create the type. Please try again.",
     "requiredHeading": "{{ type }} expects these fields — you can fill them in later:",
     "confirmAdd": "Add type",
     "addWithoutFields": "Add without them",

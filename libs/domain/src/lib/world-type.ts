@@ -7,6 +7,7 @@
 import * as z from 'zod';
 import { entityTypeSchema, nameSchema } from './entity';
 import { dedupedFieldIdsSchema, fieldRefsSchema } from './field-id';
+import { slugifySegment } from './slug';
 import { ViewPlacement, viewPlacementSchema } from './view-placement';
 
 /**
@@ -27,30 +28,19 @@ export function worldTypeIdFromSegment(segment: string): string {
   return `${USER_TYPE_NAMESPACE}.type.${segment}`;
 }
 
-/**
- * Slug a raw label into the `world.`-less segment of a user-defined type id — the same accent-fold,
- * lowercase, dash-collapse the Field side applies ({@link slugifyFieldSegment}, ADR-0056), so an inline
- * mint (#438) derives the id an author would have typed. Its own copy so the API could derive it
- * server-side; idempotent.
- */
+/** Slug a raw label into the `world.`-less segment of a user-defined type id (ADR-0056); may return `''`. */
 export function slugifyTypeSegment(raw: string): string {
-  return raw
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // strip the combining diacritics NFD split off
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  return slugifySegment(raw);
 }
 
 /**
- * Derive the frozen `world.type.<slug>` id for a label minted inline from the Details panel (#438),
- * disambiguating with a numeric suffix (`-2`, `-3`, …) when the bare slug collides with an existing
- * user-defined id. The id is immutable (entities store it verbatim, no rename/migration), so a
- * collision must resolve to a fresh key rather than silently reuse another type's. A plugin id can
- * never collide — its namespace is reserved — so callers pass only the user-defined ids in play.
+ * Derive the frozen, immutable `world.type.<slug>` id for a label minted inline (#438), disambiguating
+ * with a numeric suffix (`-2`, `-3`, …) on collision so a mint never reuses another type's key.
  */
 export function deriveWorldTypeId(label: string, existingIds: Iterable<string> = []): string {
-  const slug = slugifyTypeSegment(label);
+  // A label with no Latin alphanumerics ("神", "❤️") slugs to '' and would mint an invalid id (#438);
+  // fall back to a stable generic base — the label is preserved verbatim, the slug is hidden.
+  const slug = slugifyTypeSegment(label) || 'type';
   const taken = new Set(existingIds);
   let candidate = worldTypeIdFromSegment(slug);
   for (let n = 2; taken.has(candidate); n++) candidate = worldTypeIdFromSegment(`${slug}-${n}`);

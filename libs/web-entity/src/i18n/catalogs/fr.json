@@ -20,6 +20,7 @@
     "moveUp": "Monter : {{ type }}",
     "moveDown": "Descendre : {{ type }}",
     "createType": "Créer « {{ name }} »",
+    "createError": "Impossible de créer le type. Réessayez.",
     "requiredHeading": "{{ type }} attend ces champs — vous pourrez les remplir plus tard :",
     "confirmAdd": "Ajouter le type",
     "addWithoutFields": "Ajouter sans eux",
