@@ -285,7 +285,7 @@ export class EntitiesService {
       query.leftJoin(fieldAsset, eq(fieldAsset.entityId, fieldKind.entityId));
     }
     const rows = query
-      .where(and(access.filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined))
+      .where(and(access.listFilter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined))
       // With a query: best match first (bm25 ascending), id for a stable page boundary;
       // otherwise newest first. Weight order must match the FTS DDL: name, tags, content_text.
       // Two tiers ride ahead of relevance, tiers rather than bm25 penalties so the order is explainable
@@ -359,7 +359,7 @@ export class EntitiesService {
    */
   facets(readerId: string, opts: FacetOptions): EntityFacets {
     // Resolve the read filter (Superadmin bypass folded in) once, reuse it in every count.
-    const { filter } = entityAccess(this.db, readerId);
+    const { listFilter: filter } = entityAccess(this.db, readerId);
     // The same widening `list` applies (ADR-0080), resolved from the same signals: a rail must never
     // count what its list excludes, nor exclude what its list offers.
     opts = this.mountScope(readerId, opts);
@@ -1117,7 +1117,7 @@ export class EntitiesService {
   private linkTargetTypeErrors(userId: string, fields: readonly Field[], metadata: EntityDocument): FieldError[] {
     const constraints = entityLinkConstraints(fields, metadata);
     if (constraints.length === 0) return [];
-    const { filter } = entityAccess(this.db, userId);
+    const { listFilter: filter } = entityAccess(this.db, userId);
     const targetTypes = new Map(
       this.db
         .select({ id: entities.id, types: entities.types })

@@ -10,7 +10,7 @@ import {
   MenuPanelDirective,
   MenuTriggerDirective,
 } from '@hexly/web-ui';
-import { Visibility } from '@hexly/domain';
+import { Visibility, visibilitySchema } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { ActiveWorld, ClientConfigStore } from '@hexly/web-core';
 
@@ -144,8 +144,12 @@ export class EntityActionsMenuComponent {
     () => this.editable() && this.clientConfig.isCollaborationEnabled(),
   );
 
-  /** The three rungs, low to high (ADR-0084): each renders a radio row, the current one checked. */
-  protected readonly visibilityOptions: readonly Visibility[] = ['private', 'shared', 'open'];
+  /**
+   * The three rungs, low to high (ADR-0084): each renders a radio row, the current one checked.
+   * Derived from the domain schema so the rung set and its order stay the single source of truth;
+   * `visibilitySchema.options` already yields private → shared → open, the order the UI needs.
+   */
+  protected readonly visibilityOptions: readonly Visibility[] = visibilitySchema.options;
 
   /** The open Entity's current rung (drives which radio reads checked); `private` before one loads. */
   protected readonly visibility = computed<Visibility>(() => this.session.current()?.visibility ?? 'private');

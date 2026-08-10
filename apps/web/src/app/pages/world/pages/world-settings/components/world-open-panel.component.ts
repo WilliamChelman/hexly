@@ -63,6 +63,9 @@ export class WorldOpenPanelComponent {
   protected readonly selected = computed<boolean>(() => this.saving() ?? this.activeWorld.world()?.open ?? false);
 
   protected pick(open: boolean): void {
+    // A write is already in flight — ignore a click on the other card so a second, racing PATCH
+    // can't be issued; the pending answer settles the state (and the revert-on-error path).
+    if (this.saving() !== null) return;
     if (open === this.selected()) return;
     this.saving.set(open);
     this.worlds.setOpen(this.id(), open).subscribe({

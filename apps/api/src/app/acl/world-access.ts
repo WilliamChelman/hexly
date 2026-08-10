@@ -39,19 +39,12 @@ function standingIn(userId: string, worldRef: SQLWrapper) {
  * **membership** of a World that **Mounts** it, OR the World is **Open**. Unreachable is
  * indistinguishable from nonexistent (ADR-0004).
  *
- * The second disjunct is ADR-0080's, and the first time reading a Container depends on another
- * Container's configuration: a World kept to be drawn from opens to whoever reads the campaigns
- * drawing on it, which is what makes a mounted Entity's own page openable at all — Entity URLs are
- * World-scoped (ADR-0028), so following a link into a Mount lands at the content's home. Read alone:
- * `owner` and `contributor` stay membership's, so a Mount never confers a write. Reachable is not
- * listed — {@link worldListFilter} is what the World Index reads.
- *
- * The third disjunct is ADR-0084's, the successor to the retired World Public Link: an Open World reads
- * to any signed-in caller on the Instance, membership-independent. `worlds.open` is a column on the base
- * table both call sites are rooted at (the reachability WHERE and {@link WorldAccess.decideMeta}'s
- * projection), so it needs no correlated subquery — unlike the worldRef the first two disjuncts carry.
- * Reachability only: {@link worldListFilter} stays unchanged, so an Open World is reachable by id/URL yet
- * unlisted, the exact unlisted property the retired link had.
+ * The Mount disjunct (ADR-0080) opens a drawn-from World to whoever reads the campaigns mounting it, so a
+ * mounted Entity's own page is openable — Entity URLs are World-scoped (ADR-0028). Read alone: `owner` and
+ * `contributor` stay membership's, so a Mount never confers a write. The Open disjunct (ADR-0084) is the
+ * successor to the retired World Public Link — an Open World reads to any signed-in caller; `worlds.open`
+ * is a base-table column, so unlike the first two disjuncts it needs no correlated subquery. Reachability
+ * only: {@link worldListFilter} stays unchanged, so an Open World is reachable by id/URL yet unlisted.
  */
 function reachableBy(userId: string, worldRef: SQLWrapper) {
   return sql`(${standingIn(userId, worldRef)} OR ${mountedIntoReachOf(userId, worldRef)} OR ${worlds.open})`;

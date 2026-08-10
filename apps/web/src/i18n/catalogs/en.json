@@ -652,7 +652,7 @@
       "campaign": "A world you play in.",
       "shelf": "A world you draw from."
     },
-    "note": "It is a label and nothing more: the world index groups by it, and nothing else anywhere reads it. A shelf keeps its members, its dashboard, its theme, its public link and its place in the world switcher, exactly as a campaign does.",
+    "note": "It is a label and nothing more: the world index groups by it, and nothing else anywhere reads it. A shelf keeps its members, its dashboard, its theme and its place in the world switcher, exactly as a campaign does.",
     "saveError": "Couldn't save that. Please try again."
   },
   "worldOpen": {

@@ -120,6 +120,15 @@ describe('entityAccess', () => {
     it('gives a World Owner read only — the delegated curation power stops at shared', () => {
       expect(verbs(wOwner, open)).toEqual(['read']);
     });
+
+    // The management cliff (ADR-0084, intended footgun): opening an Entity strands it above the World
+    // Owner's delegated reach, which is `shared`-gated. So a World Owner cannot transition an `open`
+    // Entity back down to `shared`/`private` — `set-visibility` is the entity Owner's alone from here.
+    it('strands the World Owner above an open Entity — only the entity Owner can transition it back down', () => {
+      db.insert(entityGrants).values({ entityId: open, userId: eOwner, role: 'owner' }).run();
+      expect(verbs(wOwner, open)).not.toContain('set-visibility');
+      expect(verbs(eOwner, open)).toContain('set-visibility');
+    });
   });
 
   it('gives a Superadmin every verb at any visibility (repair bypass)', () => {
@@ -170,8 +179,8 @@ describe('entityAccess', () => {
     });
   });
 
-  describe('filter (listing predicate) vs reachFilter (reachability)', () => {
-    const ids = (predicate: 'filter' | 'reachFilter') => (u: string) =>
+  describe('listFilter (listing predicate) vs reachFilter (reachability)', () => {
+    const ids = (predicate: 'listFilter' | 'reachFilter') => (u: string) =>
       db
         .select({ id: entities.id })
         .from(entities)
@@ -183,8 +192,8 @@ describe('entityAccess', () => {
     // Listing stays untouched by ADR-0084: `open` is absent, so an open Entity lists nowhere for a
     // non-member — the unlisted property the retired Public Link had. A caller lists it only via another
     // standing (here: the entity Owner grant added below).
-    it('filter lists exactly the Entities the caller may enumerate — open is not a listing disjunct', () => {
-      const listable = ids('filter');
+    it('listFilter lists exactly the Entities the caller may enumerate — open is not a listing disjunct', () => {
+      const listable = ids('listFilter');
       expect(listable(eViewer)).toEqual([priv]); // viewer grant on private only
       expect(listable(wContrib)).toEqual([shared]); // member lists shared only
       expect(listable(superadmin)).toEqual([priv, shared, open].sort()); // repair sees all
@@ -208,7 +217,7 @@ describe('entityAccess', () => {
       // A stranger now reaches shared (via the Open World) and open (its own rung), but not private.
       expect(reachable(stranger)).toEqual([shared, open].sort());
       // Listing is still untouched — an Open World's shared Entities stay unlisted for a non-member.
-      expect(ids('filter')(stranger)).toEqual([]);
+      expect(ids('listFilter')(stranger)).toEqual([]);
     });
   });
 

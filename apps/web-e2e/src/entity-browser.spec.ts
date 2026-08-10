@@ -6,6 +6,7 @@ import {
   expect,
   openEntityActions,
   segRe,
+  setEntityVisibility,
   test,
 } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
@@ -116,6 +117,50 @@ test('an owner sets a note’s visibility rung and the Visibility facet reflects
   await entitiesRailLink(page).click();
   await page.getByTestId('facet-visibility-open').click();
   await expect(page.getByTestId(`open-${id}`)).toBeVisible();
+});
+
+/**
+ * The excluding half of the Visibility facet at the `open` rung (ADR-0081 × ADR-0084): the include path
+ * is proven above, so this is its `neq` twin — `facet-visibility-open`'s counterpart drops the open note
+ * rather than filtering to it, mirroring the Type exclusion journey. The mutual release (ADR-0081) makes
+ * the contradictory both-selected state unreachable here too.
+ */
+test('the rail excludes the Open visibility rung: the grid drops the open note, keeps the private one, include releases it', async ({
+  page,
+}) => {
+  await enterEntities(page);
+
+  // One note left private (the default), one flipped Open — the contrast the exclusion acts on.
+  await page.getByTestId('new-default-entity').click();
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  const privateId = entityIdFromUrl(page);
+  await entitiesRailLink(page).click();
+
+  await page.getByTestId('new-default-entity').click();
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  const openId = entityIdFromUrl(page);
+  await setEntityVisibility(page, 'open');
+  await entitiesRailLink(page).click();
+
+  await expect(page.getByTestId(`open-${privateId}`)).toBeVisible();
+  await expect(page.getByTestId(`open-${openId}`)).toBeVisible();
+
+  // Exclude the Open rung: the open note is vetoed, the private one stays, and the veto rides the URL.
+  await page.getByTestId('facet-exclude-visibility-open').click();
+  await expect(page.getByTestId(`open-${openId}`)).toHaveCount(0);
+  await expect(page.getByTestId(`open-${privateId}`)).toBeVisible();
+  await expect(page).toHaveURL(/excludeVisibility=open/);
+
+  // The exclusion rides the URL, so a refresh (and a shared link) reproduces the browse.
+  await page.reload();
+  await expect(page.getByTestId('facet-exclude-visibility-open')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId(`open-${openId}`)).toHaveCount(0);
+
+  // Pressing include releases the exclusion rather than sitting beside it (mutual release).
+  await page.getByTestId('facet-visibility-open').click();
+  await expect(page.getByTestId('facet-exclude-visibility-open')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId(`open-${openId}`)).toBeVisible();
+  await expect(page.getByTestId(`open-${privateId}`)).toHaveCount(0);
 });
 
 /**

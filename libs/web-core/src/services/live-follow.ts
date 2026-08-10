@@ -70,7 +70,7 @@ export function watchResource<T>({
 }
 
 /**
- * Whether a failed refetch means access is *gone* — 403 Forbidden (a revoked grant / Public Link)
+ * Whether a failed refetch means access is *gone* — 403 Forbidden (a revoked grant)
  * or 404 Not Found (deleted, or opaque-unreachable) — so the followed view should be evicted (#177).
  * A transient failure (5xx, network blip) is NOT access loss: it self-heals on the next nudge or
  * reconnect, so it must not blank a valid follow. Session expiry surfaces as **401** in this API

@@ -46,24 +46,16 @@ function inAnOpenWorld() {
 
 /**
  * The **listing** predicate: `owner ∨ grant(editor|viewer) ∨ (member ∧ shared) ∨ compendium-entry ∨
- * (mounted ∧ shared)`. What a browse/search/Palette enumerates. An Entity the caller can't read is
- * indistinguishable from a missing one, so `private` never leaks existence. An entity-level grant
- * pierces `private` for exactly that user.
+ * (mounted ∧ shared)`. What a browse/search/Palette enumerates; an unreadable Entity is indistinguishable
+ * from a missing one, so `private` never leaks existence, and an entity-level grant pierces `private`.
  *
- * ADR-0084 leaves this **untouched**: `open` is deliberately absent. Listing stays World-and-Mounts-scoped
- * — an `open` Entity is reachable Instance-wide by id (see {@link canReadEntity}) yet lists nowhere for a
- * non-member, the unlisted property the retired Public Link had. Folding `open` in here would surface a
- * foreign World's `open` Entities in a non-member's unscoped browse, which the invariant forbids.
+ * `open` is deliberately absent (ADR-0084): listing stays World-and-Mounts-scoped, so an `open` Entity is
+ * reachable Instance-wide by id (see {@link canReadEntity}) yet lists nowhere for a non-member — the
+ * unlisted property the retired Public Link had.
  *
- * The compendium disjunct is the **Compendium**'s own reachability rule (ADR-0078/0079): Instance-wide
- * with no members, roles or public link means there is nothing per-caller to resolve, so being signed
- * in is the standing. `worldMembers` cannot supply one — Collaboration stays World-only — and the
- * reconcile's incidental `owner` grant would reach exactly the user who ran the import.
- *
- * The last is the **Mount** cascade (ADR-0080), on the same `shared` line the member disjunct rides —
- * a Mount republishes what the mounted Container publishes, no more. It says nothing about a mounted
- * **Compendium**: the disjunct before already reached every entry. Reachability only, both of them —
- * the **seal** and the ordinary write gates refuse as before.
+ * The compendium disjunct is the Compendium's own Instance-wide reachability (ADR-0078/0079): no members
+ * or roles to resolve, so being signed in is the standing. The last is the Mount cascade (ADR-0080), on
+ * the same `shared` line — a Mount republishes only what the mounted Container publishes.
  */
 function canListEntity(userId: string, superadmin: boolean) {
   if (superadmin) return MATCH_ALL;
@@ -73,24 +65,19 @@ function canListEntity(userId: string, superadmin: boolean) {
 
 /**
  * The **reachability** predicate: {@link canListEntity} `∨ open ∨ (shared ∧ Open-World)`. Whether the
- * caller can read *a specific Entity it already names* — a get-by-id, the References/link-index resolution
+ * caller can read *a specific Entity it already names* — get-by-id, References/link-index resolution
  * (ADR-0046/0072), a live follow (ADR-0044). ADR-0084's two membership-independent disjuncts: an `open`
- * Entity reads to any signed-in caller on the Instance, and a `shared` Entity in an **Open World** reads
- * to that same audience — the successor to the World Public Link's `shared`-only reach. Both grant the
- * same Instance-wide reach the compendium disjunct does, so both consult neither `worldMembers` nor the
- * Mount cascade. `private` stays unreachable in an Open World: the second disjunct is `shared`-only, so
- * Instance membership never pierces `private`.
+ * Entity reads to any signed-in caller, and a `shared` Entity in an Open World reads to the same audience
+ * (the successor to the World Public Link's `shared`-only reach). `private` stays unreachable — the second
+ * disjunct is `shared`-only, so Instance membership never pierces it.
  *
- * A mounted **Compendium**'s entries need no disjunct of their own: `inACompendium()` above already reaches
- * every signed-in caller (Instance-wide, ADR-0079), a reach opening the World cannot regress.
- *
- * Split from {@link canListEntity} on purpose: reachability gains these disjuncts, listing does not. So they
- * ride every surface that resolves a *named* Entity — never the enumeration WHERE — keeping an `open` Entity
- * and an Open World's `shared` Entities reachable by id yet unlisted (ADR-0084's invariant).
+ * These disjuncts ride only surfaces that resolve a *named* Entity, never the enumeration WHERE — keeping
+ * `open` and an Open World's `shared` Entities reachable by id yet unlisted (ADR-0084's invariant).
  */
 function canReadEntity(userId: string, superadmin: boolean) {
   if (superadmin) return MATCH_ALL;
-  return sql`(${canListEntity(userId, superadmin)} OR ${entities.visibility} = 'open'
+  // superadmin short-circuited above, so listing delegates with it resolved to false.
+  return sql`(${canListEntity(userId, false)} OR ${entities.visibility} = 'open'
     OR (${entities.visibility} = 'shared' AND ${inAnOpenWorld()}))`;
 }
 
@@ -162,10 +149,10 @@ export interface EntityAccess {
    * `open` is deliberately absent: listing stays scoped (ADR-0084). Use {@link reachFilter} to resolve a
    * *named* Entity's readability.
    */
-  filter: ReturnType<typeof canListEntity>;
+  listFilter: ReturnType<typeof canListEntity>;
   /**
    * **Reachability** predicate for resolving a *named* Entity — the References/link-index LEFT JOINs
-   * (ADR-0046/0072): {@link filter} `∨ open`. A non-member reaches an `open` link target by id, so it
+   * (ADR-0046/0072): {@link listFilter} `∨ open`. A non-member reaches an `open` link target by id, so it
    * resolves here though it never lists.
    */
   reachFilter: ReturnType<typeof canReadEntity>;
@@ -195,7 +182,7 @@ export interface EntityAccess {
 export function entityAccess(db: Db, userId: string): EntityAccess {
   const superadmin = isSuperadmin(db, userId);
   return {
-    filter: canListEntity(userId, superadmin),
+    listFilter: canListEntity(userId, superadmin),
     reachFilter: canReadEntity(userId, superadmin),
     writeFilter: canWriteEntity(userId, superadmin),
     editFilter: canEditSubstanceEntity(userId, superadmin),

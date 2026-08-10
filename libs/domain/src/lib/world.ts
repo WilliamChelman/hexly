@@ -22,7 +22,7 @@ export const worldSchema = z.object({
 /**
  * What a World is kept for (ADR-0080): a `campaign` played in, or a **Shelf** drawn from — art,
  * tracks, a homebrew bestiary. A label and nothing more: the World Index groups by it and **no read
- * anywhere filters on it**, so a Shelf keeps its members, Dashboard, Theme, Public Link, Switcher
+ * anywhere filters on it**, so a Shelf keeps its members, Dashboard, Theme, Switcher
  * entry and Mounts exactly as a campaign does.
  */
 export const worldKindSchema = z.enum(['campaign', 'shelf']);

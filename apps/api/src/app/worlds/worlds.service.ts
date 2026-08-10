@@ -398,7 +398,7 @@ export class WorldsService {
       .where(
         meta?.isMember
           ? eq(entities.containerId, world.id)
-          : and(eq(entities.containerId, world.id), entityAccess(this.db, callerId).filter),
+          : and(eq(entities.containerId, world.id), entityAccess(this.db, callerId).listFilter),
       )
       .all();
     return {
@@ -436,7 +436,7 @@ export class WorldsService {
       this.db
         .select({ id: entities.id })
         .from(entities)
-        .where(and(inArray(entities.id, [...pins]), entityAccess(this.db, callerId).filter))
+        .where(and(inArray(entities.id, [...pins]), entityAccess(this.db, callerId).listFilter))
         .all()
         .map((r) => r.id),
     );

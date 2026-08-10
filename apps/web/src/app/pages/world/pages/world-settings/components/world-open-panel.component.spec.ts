@@ -68,6 +68,19 @@ describe('WorldOpenPanel', () => {
     expect(worlds.setOpen).not.toHaveBeenCalled();
   });
 
+  it('ignores a click on the other card while a write is in flight — no second, racing PATCH', () => {
+    // The first pick stays pending, so the panel is mid-write when the second click lands.
+    const pending = new Subject<WorldDetail>();
+    worlds.setOpen.mockReturnValue(pending);
+    const fixture = mount(false);
+
+    pick(fixture, 'open');
+    pick(fixture, 'closed');
+
+    expect(worlds.setOpen).toHaveBeenCalledTimes(1);
+    expect(worlds.setOpen).toHaveBeenCalledWith('w1', true);
+  });
+
   it('falls back to the stored flag and toasts when the write fails', () => {
     // A Subject, not `throwError`: the failure has to land on its own tick, as a round trip does,
     // or the optimistic pick and its rollback collapse into one and the radio is never re-rendered.

@@ -652,7 +652,7 @@
       "campaign": "Un monde où vous jouez.",
       "shelf": "Un monde où vous puisez."
     },
-    "note": "Ce n'est qu'une étiquette : l'index des mondes s'en sert pour les regrouper, et rien d'autre ne la lit nulle part. Une étagère garde ses membres, son tableau de bord, son thème, son lien public et sa place dans le sélecteur de mondes, exactement comme une campagne.",
+    "note": "Ce n'est qu'une étiquette : l'index des mondes s'en sert pour les regrouper, et rien d'autre ne la lit nulle part. Une étagère garde ses membres, son tableau de bord, son thème et sa place dans le sélecteur de mondes, exactement comme une campagne.",
     "saveError": "Impossible d'enregistrer. Veuillez réessayer."
   },
   "worldOpen": {

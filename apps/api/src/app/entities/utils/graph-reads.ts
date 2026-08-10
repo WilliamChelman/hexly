@@ -47,7 +47,7 @@ function graphNodes(db: Db, access: EntityAccess, worldId: string): WorldGraphNo
   return db
     .select({ id: entities.id, name: entities.name, types: entities.types })
     .from(entities)
-    .where(and(eq(entities.containerId, worldId), access.filter))
+    .where(and(eq(entities.containerId, worldId), access.listFilter))
     .orderBy(asc(entities.name), asc(entities.id))
     .all()
     .flatMap((row) => linkedEntity(row.id, row.name, row.types) ?? []);
@@ -117,7 +117,10 @@ function linkedTargets(db: Db, access: EntityAccess, worldId: string): TargetRow
       containerId: entities.containerId,
     })
     .from(entityEdges)
-    .innerJoin(entities, and(eq(entities.id, entityEdges.targetId), ne(entities.containerId, worldId), access.filter))
+    .innerJoin(
+      entities,
+      and(eq(entities.id, entityEdges.targetId), ne(entities.containerId, worldId), access.listFilter),
+    )
     .where(and(eq(entityEdges.containerId, worldId), eq(entityEdges.targetKind, 'entity')))
     .all();
 }
@@ -167,7 +170,7 @@ function assetGraphEdges(db: Db, access: EntityAccess, worldId: string): AssetEd
       assetIndex,
       and(eq(assetIndex.hash, entityEdges.targetId), sql`${assetIndex.containerId} = ${edgeTargetContainerId}`),
     )
-    .innerJoin(entities, and(eq(entities.id, assetIndex.entityId), access.filter))
+    .innerJoin(entities, and(eq(entities.id, assetIndex.entityId), access.listFilter))
     .where(and(eq(entityEdges.containerId, worldId), eq(entityEdges.targetKind, 'asset')))
     .orderBy(asc(entityEdges.sourceEntityId), asc(assetIndex.entityId), asc(entityEdges.descriptor))
     .all();

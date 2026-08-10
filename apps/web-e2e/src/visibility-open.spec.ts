@@ -57,6 +57,29 @@ test('an open Entity and an Open World read for a signed-in non-member by URL, a
   await visitor.goto(`/w/${worldSeg}/entities/${segment(sharedId)}`);
   await expect(visitor.getByTestId('note-content')).toContainText('burned at dawn');
 
+  // The `open` Entity was reachable by URL a moment ago, yet it lists nowhere for this non-member —
+  // reachability never promotes to a listing surface, the "open lists nowhere" invariant (ADR-0084),
+  // proven here end-to-end where the unit specs prove it at the query. In the Open World's own Entity
+  // Browser a non-member enumerates nothing: the plain empty state, not the open note's row.
+  await visitor.goto(`/w/${worldSeg}/entities`);
+  await expect(visitor.getByTestId('empty')).toBeVisible();
+  await expect(visitor.getByTestId(`open-${openId}`)).toHaveCount(0);
+
+  // Its own prose is a full-text match (ADR-0046), so a search that WOULD surface it if listing followed
+  // reachability instead reads "no matches" — the absence is the listing scope, not a missing index.
+  await visitor.getByTestId('entity-search').fill('lighthouse');
+  await expect(visitor.getByTestId('no-matches')).toBeVisible();
+  await expect(visitor.getByTestId(`open-${openId}`)).toHaveCount(0);
+  await visitor.getByTestId('entity-search').clear();
+
+  // ...and the Command Palette, now scoped to this World (ADR-0083), searches the same listing: the open
+  // note is no option of it either, though it opened by URL.
+  await visitor.keyboard.press('ControlOrMeta+KeyK');
+  await expect(visitor.getByTestId('command-palette-input')).toBeVisible();
+  await visitor.getByTestId('command-palette-input').fill('lighthouse');
+  await expect(visitor.getByTestId(`command-palette-option-${openId}`)).toHaveCount(0);
+  await visitor.keyboard.press('Escape');
+
   // Yet the Open World is listed nowhere for them. Not the World Index feed ("the Worlds you have"):
   const worlds = (await (await visitor.request.get('/api/worlds')).json()) as { id: string }[];
   expect(worlds.some((w) => w.id === worldId)).toBe(false);

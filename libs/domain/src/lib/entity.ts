@@ -155,7 +155,7 @@ export type SaveEntityRequest = z.infer<typeof saveEntityRequestSchema>;
  * Entity Visibility (CONTEXT.md → Entity Visibility): three rungs widening the audience, never onto
  * the internet — `private` is owner-only, `shared` exposes the Entity to all World members, and `open`
  * exposes it to any signed-in caller on the Instance (the reach a Compendium has by being Instance-wide,
- * ADR-0084). `open` carries no behaviour yet; the enum widens so later reachability can build on it.
+ * ADR-0084). `open` drives that Instance-wide reachability: it exposes the Entity to any signed-in caller on the Instance.
  */
 export const visibilitySchema = z.enum(['private', 'shared', 'open']);
 
@@ -166,7 +166,7 @@ export type Visibility = z.infer<typeof visibilitySchema>;
  * The closed set of actions a caller may exercise on an Entity (CONTEXT.md →
  * Rights): `read`, `edit` (substance — body/name/tags), `delete` and
  * `set-visibility` (the lifecycle gate — Owner or World Owner of a shared Entity),
- * `manage` (owners/grants/Public Link — Owner only).
+ * `manage` (owners/grants — Owner only).
  */
 export const entityVerbSchema = z.enum(['read', 'edit', 'delete', 'set-visibility', 'manage']);
 
@@ -460,7 +460,7 @@ export interface EntityDetail extends EntitySummary {
   readonly seq: number;
   /**
    * The caller's Rights, computed on read. Present and non-empty on the
-   * single-entity fetch and anonymous link reads; absent on create/save/patch
+   * single-entity fetch; absent on create/save/patch
    * responses — the client carries load-time Rights across in-place mutations.
    */
   readonly rights?: readonly EntityVerb[];
