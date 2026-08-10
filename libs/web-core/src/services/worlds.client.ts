@@ -13,7 +13,6 @@ import {
   InboundLinkCount,
   MemberRole,
   Mount,
-  PublicLink,
   UpdateUserDefinedTypeRequest,
   UpdateWorldFieldRequest,
   UserDefinedType,
@@ -164,6 +163,16 @@ export class WorldsClient {
   setKind(id: string, kind: WorldKind): Observable<WorldDetail> {
     // Write-through, as {@link rename} — the relabelled World fans out and this tab's echo dedups.
     return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { kind }).pipe(tap((d) => this.store.merge(d)));
+  }
+
+  /**
+   * Mark the World Open, or close it again (ADR-0084) — the successor to the World Public Link. Open
+   * widens the World's `shared` Entities to any signed-in caller on the Instance; it never lists the
+   * World anywhere new. Owner-gated server-side (the PATCH refuses a non-Owner).
+   */
+  setOpen(id: string, open: boolean): Observable<WorldDetail> {
+    // Write-through, as {@link rename} — the re-flagged World fans out and this tab's echo dedups.
+    return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { open }).pipe(tap((d) => this.store.merge(d)));
   }
 
   /**
@@ -324,20 +333,5 @@ export class WorldsClient {
   /** Remove an Importer's whole set from this World (no recreate); hand-authored Entities are left intact. Owner-only server-side. */
   removeImporter(id: string, importerId: string): Observable<void> {
     return this.http.delete<void>(`/api/worlds/${id}/importers/${importerId}`);
-  }
-
-  /** The World's Public Link — the active token or null. Owner-only server-side. */
-  link(id: string): Observable<PublicLink | null> {
-    return this.http.get<PublicLink | null>(`/api/worlds/${id}/link`);
-  }
-
-  /** Mint (or return the existing) World Public Link; idempotent (200). */
-  mintLink(id: string): Observable<PublicLink> {
-    return this.http.post<PublicLink>(`/api/worlds/${id}/link`, {});
-  }
-
-  /** Revoke the World Public Link — the kill-switch. */
-  revokeLink(id: string): Observable<void> {
-    return this.http.delete<void>(`/api/worlds/${id}/link`);
   }
 }

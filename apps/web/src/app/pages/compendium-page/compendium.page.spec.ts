@@ -11,14 +11,12 @@ import { CompendiumPage } from './compendium.page';
 
 /** Canonical ids: the route segment is decoded before the read, so a pretty slug would not survive. */
 const PACK_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee0001';
-const UNMOUNTED_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee0002';
-const TOKEN = 'tok-1';
+const MISSING_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee0002';
 
 /**
- * The **Compendium page** (#402, #410): one pack's terms, and — since ADR-0080's cascade reaches
- * anonymous **World Public Link** holders — the standing each reader spends to get them. That is the
- * whole of what this spec pins: a session buys the Instance-wide pack, a token buys only what its
- * World **Mounts**, and the page must ask with the one its reader actually holds.
+ * The **Compendium page** (#402): one pack's terms, read by the reader's session on the Instance-wide
+ * route. Every reader is signed in — the anonymous **World Public Link** read retired with the surface
+ * (ADR-0084) — so the page asks `/api/compendiums/:id` and nothing else.
  */
 describe('Compendium page', () => {
   let http: HttpTestingController;
@@ -49,8 +47,6 @@ describe('Compendium page', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  // The verify is load-bearing: a page asking the *other* route fails here even where its own read
-  // resolves — which is exactly the 401 an anonymous reader met on `/api/compendiums/:id`.
   afterEach(() => http.verify());
 
   /** Render at `params` and answer the one read it makes. */
@@ -63,7 +59,7 @@ describe('Compendium page', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('reads a signed-in reader’s pack from the Instance-wide route', () => {
+  it('reads the pack from the Instance-wide route, and links back to the Library that credited it', () => {
     TestBed.inject(ActiveWorld).set('w1');
     const el = render({ worldId: 'w1', compendiumId: PACK_ID }, (req) => {
       expect(req.request.url).toBe(`/api/compendiums/${PACK_ID}`);
@@ -71,31 +67,20 @@ describe('Compendium page', () => {
     });
 
     expect(el.querySelector('[data-testid=compendium-name]')?.textContent).toContain('Draw Steel: Monsters');
+    expect(el.querySelector('[data-testid=compendium-publisher]')?.textContent).toContain('MCDM Productions, LLC');
     // Back to the Library that credited it — they came from a World, and it is there to return to.
     expect(el.querySelector('[data-testid=compendium-back]')).not.toBeNull();
   });
 
-  it('reads an anonymous reader’s pack through the World Public Link that carried them', () => {
-    const el = render({ token: TOKEN, compendiumId: PACK_ID }, (req) => {
-      // The token is their whole standing: the session-guarded route answers them 401, and a pack's
-      // terms must never sit behind a wall its content does not (ADR-0080, #410).
-      expect(req.request.url).toBe(`/api/public/worlds/${TOKEN}/compendiums/${PACK_ID}`);
-      req.flush(pack);
+  it('says plainly that an id naming no reachable pack is not there', () => {
+    TestBed.inject(ActiveWorld).set('w1');
+    const el = render({ worldId: 'w1', compendiumId: MISSING_ID }, (req) => {
+      expect(req.request.url).toBe(`/api/compendiums/${MISSING_ID}`);
+      req.flush('Not found', { status: 404, statusText: 'Not Found' });
     });
 
-    expect(el.querySelector('[data-testid=compendium-name]')?.textContent).toContain('Draw Steel: Monsters');
-    expect(el.querySelector('[data-testid=compendium-publisher]')?.textContent).toContain('MCDM Productions, LLC');
-    // Nothing offers them a way into a World they have no standing in.
-    expect(el.querySelector('[data-testid=compendium-back]')).toBeNull();
-  });
-
-  it('says plainly that a pack the token’s World does not Mount is not there', () => {
-    const el = render({ token: TOKEN, compendiumId: UNMOUNTED_ID }, (req) =>
-      req.flush('Not found', { status: 404, statusText: 'Not Found' }),
-    );
-
-    // An unmounted Container reads as a pack that isn't there rather than as a failure — the id is an
-    // identifier on that route, never a credential.
+    // A 404 reads as a pack that isn't there rather than as a failure — a link kept after an operator
+    // removed the pack is the ordinary case, so it is said plainly, not toasted.
     expect(el.querySelector('[data-testid=compendium-not-found]')).not.toBeNull();
     expect(el.querySelector('[data-testid=load-error]')).toBeNull();
   });

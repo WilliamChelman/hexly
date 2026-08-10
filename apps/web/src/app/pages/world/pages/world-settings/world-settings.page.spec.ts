@@ -21,7 +21,7 @@ import {
   MockAuthClient,
   mockClientConfigStore,
 } from '@hexly/web-core/testing';
-import { OwnerSetComponent, MemberSetComponent, PublicLinkComponent } from '@hexly/web-entity';
+import { OwnerSetComponent, MemberSetComponent } from '@hexly/web-entity';
 import { WorldSettingsPage } from './world-settings.page';
 
 describe('WorldSettings', () => {
@@ -58,14 +58,17 @@ describe('WorldSettings', () => {
     expect(set.id()).toBe('w1');
   });
 
-  it('with Collaboration off carries no owner set, member set or World Public Link', () => {
+  it('with Collaboration off carries no owner set, member set or Open-World toggle', () => {
     collaboration.set(false);
+    // A manager, so only the Collaboration flag can drop the sharing group (ADR-0071, ADR-0084).
+    pin(['manage']);
     const fixture = TestBed.createComponent(WorldSettingsPage);
     fixture.detectChanges();
 
     expect(fixture.debugElement.query(By.directive(OwnerSetComponent))).toBeNull();
     expect(fixture.debugElement.query(By.directive(MemberSetComponent))).toBeNull();
-    expect(fixture.debugElement.query(By.directive(PublicLinkComponent))).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-sharing"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-world-open')).toBeNull();
   });
 
   it('with Collaboration off offers only the schema and imports sections, opening on schema', () => {
@@ -155,13 +158,26 @@ describe('WorldSettings', () => {
     expect(fixture.nativeElement.querySelector('app-world-theme')).not.toBeNull();
   });
 
+  it('offers the Open-World toggle to a caller who may manage the World, and to no one else (ADR-0084)', () => {
+    pin(['manage']);
+    const fixture = TestBed.createComponent(WorldSettingsPage);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-sharing"]')).not.toBeNull();
+
+    // The Open-World toggle is Owner-gated like the Theme beside it — a Contributor never sees it.
+    pin(['read', 'create-entity']);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-sharing"]')).toBeNull();
+  });
+
   it('opens the section the URL names, and puts the section picked from the rail into the URL', async () => {
     pin(['manage']);
     const router = TestBed.inject(Router);
     await router.navigate([], { queryParams: { section: 'sharing' } });
     const fixture = TestBed.createComponent(WorldSettingsPage);
     fixture.detectChanges();
-    expect(fixture.debugElement.query(By.directive(PublicLinkComponent))).not.toBeNull();
+    // The sharing group is now the Open-World toggle (ADR-0084), the Public Link's successor.
+    expect(fixture.nativeElement.querySelector('app-world-open')).not.toBeNull();
 
     fixture.nativeElement.querySelector('[data-testid="settings-nav-theme"]').click();
     await fixture.whenStable();

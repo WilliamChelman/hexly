@@ -202,10 +202,13 @@ describe('createEntityRequestSchema', () => {
 });
 
 describe('visibilitySchema', () => {
-  it('accepts the two Entity Visibility values and rejects the retired "public" (ADR-0024)', () => {
-    // Sharing is per-World now: an Entity is `private` (owner-only) or `shared` (all World members).
+  it('accepts the three Entity Visibility rungs and rejects the retired "public" (ADR-0024)', () => {
+    // Three rungs widening the audience (ADR-0084): `private` (owner-only), `shared` (all World
+    // members), `open` (any signed-in caller on the Instance). `public` stays banned — `open` is
+    // never the open internet.
     expect(visibilitySchema.parse('private')).toBe('private');
     expect(visibilitySchema.parse('shared')).toBe('shared');
+    expect(visibilitySchema.parse('open')).toBe('open');
     expect(() => visibilitySchema.parse('public')).toThrow();
   });
 });

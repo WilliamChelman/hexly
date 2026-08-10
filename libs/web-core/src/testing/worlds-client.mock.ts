@@ -11,7 +11,6 @@ import {
   InboundLinkCount,
   MemberRole,
   Mount,
-  PublicLink,
   UpdateUserDefinedTypeRequest,
   UpdateWorldFieldRequest,
   UserDefinedType,
@@ -40,6 +39,7 @@ export class MockWorldsClient {
   setPins = vi.fn<(id: string, pinnedEntityIds: string[]) => Observable<WorldDetail>>();
   setTheme = vi.fn<(id: string, theme: WorldThemeInput | null) => Observable<WorldDetail>>();
   setKind = vi.fn<(id: string, kind: WorldKind) => Observable<WorldDetail>>();
+  setOpen = vi.fn<(id: string, open: boolean) => Observable<WorldDetail>>();
   // Defaults to nothing to copy from, so a spec mounting the Theme editor (#376) without caring
   // about it still renders; override per test as needed.
   themeSources = vi.fn<(id: string) => Observable<WorldThemeSource[]>>(() => of<WorldThemeSource[]>([]));
@@ -74,11 +74,6 @@ export class MockWorldsClient {
   runImport = vi.fn<(id: string, importerId: string) => Observable<ImportRunSummary>>();
   importStatus = vi.fn<(id: string) => Observable<ImportRunSummary>>();
   removeImporter = vi.fn<(id: string, importerId: string) => Observable<void>>();
-  // Defaults to no active link so a spec mounting the Public Link control (#162) without
-  // caring about it still renders; override per test as needed.
-  link = vi.fn<(id: string) => Observable<PublicLink | null>>(() => of<PublicLink | null>(null));
-  mintLink = vi.fn<(id: string) => Observable<PublicLink>>();
-  revokeLink = vi.fn<(id: string) => Observable<void>>();
   // Defaults to no available types so a spec mounting the type-authoring panel (#191) without
   // caring about it still renders; override per test as needed.
   availableTypes = vi.fn<(id: string) => Observable<AvailableType[]>>(() => of<AvailableType[]>([]));

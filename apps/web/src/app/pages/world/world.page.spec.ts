@@ -14,6 +14,7 @@ function world(rights: WorldVerb[]): WorldDetail {
     name: 'Aldermoor',
     owners: ['u1'],
     kind: 'campaign',
+    open: false,
     rights,
     entityCount: 0,
     pinnedEntityIds: [],

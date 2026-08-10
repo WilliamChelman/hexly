@@ -43,6 +43,7 @@ function worldDetail(pinnedEntityIds: string[] = [], rights: WorldVerb[] = ['rea
     name: 'Aldermoor',
     owners: ['ada'],
     kind: 'campaign',
+    open: false,
     rights,
     entityCount: 1,
     pinnedEntityIds,
@@ -208,7 +209,9 @@ describe('EntityHeader', () => {
 
     openActions(fixture);
     expect(menuItem('manage-owners')).toBeNull();
-    expect(menuItem('visibility-toggle')).toBeNull();
+    expect(menuItem('visibility-set-private')).toBeNull();
+    expect(menuItem('visibility-set-shared')).toBeNull();
+    expect(menuItem('visibility-set-open')).toBeNull();
     // Edit types and Pin are not sharing.
     expect(menuItem('edit-types')).not.toBeNull();
     expect(menuItem('pin-toggle')).not.toBeNull();
@@ -275,30 +278,57 @@ describe('EntityHeader', () => {
     expect(entities.patch).not.toHaveBeenCalled();
   });
 
-  it('toggles the open entity’s visibility from the actions menu', () => {
+  it('sets the open entity’s visibility rung from the three-way control', () => {
     open(aldermoor); // private
     const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     openActions(fixture);
-    const toggle = menuItem('visibility-toggle')!;
-    expect(toggle).not.toBeNull();
-    // Reflects current visibility: private → unchecked.
-    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    // All three rungs render (ADR-0084, #433); the current one (private) reads checked.
+    expect(menuItem('visibility-set-private')!.getAttribute('aria-checked')).toBe('true');
+    expect(menuItem('visibility-set-shared')!.getAttribute('aria-checked')).toBe('false');
+    expect(menuItem('visibility-set-open')!.getAttribute('aria-checked')).toBe('false');
 
     entities.patch.mockReturnValue(of({ ...aldermoor, visibility: 'shared' }));
-    toggle.click();
+    menuItem('visibility-set-shared')!.click();
     fixture.detectChanges();
 
     expect(entities.patch).toHaveBeenCalledWith('m1', { visibility: 'shared' });
-    // Re-open the menu: the item now reads as shared (checked).
+    // Re-open the menu: the shared rung now reads checked.
     openActions(fixture);
-    expect(menuItem('visibility-toggle')!.getAttribute('aria-checked')).toBe('true');
+    expect(menuItem('visibility-set-shared')!.getAttribute('aria-checked')).toBe('true');
   });
 
-  // FIX #5: a rejected flip (e.g. a writable-then-revoked 403 race) must be a graceful
+  it('opens the entity to the whole Instance from the three-way control (ADR-0084)', () => {
+    open(aldermoor); // private
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
+    fixture.detectChanges();
+
+    entities.patch.mockReturnValue(of({ ...aldermoor, visibility: 'open' }));
+    openActions(fixture);
+    menuItem('visibility-set-open')!.click();
+    fixture.detectChanges();
+
+    expect(entities.patch).toHaveBeenCalledWith('m1', { visibility: 'open' });
+    openActions(fixture);
+    expect(menuItem('visibility-set-open')!.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('does not re-send when the current rung is re-selected', () => {
+    open(aldermoor); // private
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
+    fixture.detectChanges();
+
+    openActions(fixture);
+    menuItem('visibility-set-private')!.click();
+    fixture.detectChanges();
+
+    expect(entities.patch).not.toHaveBeenCalled();
+  });
+
+  // FIX #5: a rejected set (e.g. a writable-then-revoked 403 race) must be a graceful
   // no-op — handled like a failed rename — not an unhandled RxJS error on a macrotask.
-  it('handles a rejected visibility flip gracefully, without an unhandled error', () => {
+  it('handles a rejected visibility set gracefully, without an unhandled error', () => {
     vi.useFakeTimers();
     try {
       open(aldermoor); // private
@@ -307,23 +337,23 @@ describe('EntityHeader', () => {
 
       entities.patch.mockReturnValue(throwError(() => new Error('403')));
       openActions(fixture);
-      menuItem('visibility-toggle')!.click();
+      menuItem('visibility-set-shared')!.click();
       fixture.detectChanges();
 
       // A bare subscribe would report the rejection as an unhandled error on a timer;
       // the error handler makes it a no-op, so draining timers throws nothing.
       expect(() => vi.runOnlyPendingTimers()).not.toThrow();
-      // State stays as the server has it: still private (re-open to read the item).
+      // State stays as the server has it: still private (re-open to read the control).
       openActions(fixture);
-      expect(menuItem('visibility-toggle')!.getAttribute('aria-checked')).toBe('false');
+      expect(menuItem('visibility-set-private')!.getAttribute('aria-checked')).toBe('true');
     } finally {
       vi.useRealTimers();
     }
   });
 
   // A read-only World member (no edit Right, ADR-0039) sees the entity but can't edit it:
-  // the title is read-only and the owner-only visibility toggle is absent from the menu.
-  it('renders a read-only entity’s title non-editable, with no visibility toggle', () => {
+  // the title is read-only and the owner-only visibility control is absent from the menu.
+  it('renders a read-only entity’s title non-editable, with no visibility control', () => {
     open({ ...aldermoor, rights: ['read'] });
     const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
@@ -332,7 +362,7 @@ describe('EntityHeader', () => {
     expect(title.getAttribute('contenteditable')).toBeNull();
     expect(title.getAttribute('tabindex')).toBeNull();
     openActions(fixture);
-    expect(menuItem('visibility-toggle')).toBeNull();
+    expect(menuItem('visibility-set-shared')).toBeNull();
   });
 
   it('no longer carries app-level navigation — that lives in the rail (ADR-0022)', () => {

@@ -25,8 +25,8 @@ export const REFERENCES_PANEL: PanelDefinition = {
 /**
  * **Details**, the second universal Panel (ADR-0067) — present on every View: the Entity's Types,
  * declared Fields (edited in place), and untyped keys. Not write-gated: the panel is always readable,
- * gating each management affordance internally, so a read-only session keeps a read-only Details panel
- * (the Public Link page relies on this). Its body is deferred to stay off the eager surface.
+ * gating each management affordance internally, so a read-only session keeps a read-only Details panel.
+ * Its body is deferred to stay off the eager surface.
  */
 export const DETAILS_PANEL: PanelDefinition = {
   id: CORE_PANEL_DETAILS,
@@ -62,11 +62,9 @@ export type PanelFilter = (panel: PanelDefinition) => boolean;
 /**
  * The page's **Panel-availability filter** (ADR-0067): a predicate the Dock runs over the whole merged
  * set (universal ∪ the active View's) before write-gating, so a mount can suppress a Panel by identity
- * regardless of who contributed it. Defaults to offering everything; a Public Link page provides one
- * that drops the two link-index Panels — References and the Local Graph — since each needs a
- * `GET /entities/:id/…` read that answers an authenticated user an anonymous reader is not, while the
- * read-only Details panel stays, showing the same substance the fallback Details View already gives any
- * reader.
+ * regardless of who contributed it. Defaults to offering everything — the only value in use since the
+ * anonymous Public Link page that once narrowed it retired (ADR-0084); the seam stays for any future
+ * mount that needs to drop a Panel by identity.
  */
 export const PANEL_FILTER = new InjectionToken<PanelFilter>('hexly.dock.panelFilter', {
   factory: (): PanelFilter => () => true,

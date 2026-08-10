@@ -7,7 +7,6 @@ import { ConfigModule } from './config/config.module';
 import { DbModule } from './db/db.module';
 import { EntitiesModule } from './entities/entities.module';
 import { EventsModule } from './events/events.module';
-import { PublicLinksModule } from './acl/public-links.module';
 import { WorldsModule } from './worlds/worlds.module';
 import { HealthController } from './health.controller';
 import { TestModule } from './test/test.module';
@@ -32,7 +31,6 @@ export const e2eTestingEnabled =
     EntitiesModule,
     EventsModule,
     WorldsModule,
-    PublicLinksModule,
     AssetsModule,
     ...(e2eTestingEnabled ? [TestModule] : []),
   ],

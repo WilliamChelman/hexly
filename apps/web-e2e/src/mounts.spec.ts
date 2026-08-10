@@ -360,7 +360,7 @@ test('the Board Image picker offers a mounted shelf’s art, and what it places 
   await player.context().close();
 });
 
-test('a player of the campaign lands on the shelf Entity’s own page, and an anonymous reader on the pack’s', async ({
+test('a player of the campaign lands on the shelf Entity’s own page, and a signed-in reader on the pack’s', async ({
   page,
   browser,
 }) => {
@@ -409,18 +409,13 @@ test('a player of the campaign lands on the shelf Entity’s own page, and an an
   await player.goto(`/w/${shelf}/library`);
   await expect(player.getByTestId('members-only')).toBeVisible();
   await expect(player.getByTestId('load-error')).toHaveCount(0);
-  await player.context().close();
 
-  // And the reader with no account at all: the campaign's Public Link cascades to the pack it mounts,
-  // so the terms that pack publishes under open to them too (ADR-0080).
-  const token = (await (await page.request.post(`/api/worlds/${campaign}/link`)).json()).token as string;
-  const anonContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
-  const visitor = await anonContext.newPage();
-  await visitor.goto(`/public/w/${token}/compendium/${pack}`);
-  await expect(visitor.getByTestId('compendium-name')).toHaveText('Draw Steel: Monsters');
-  await expect(visitor.getByTestId('compendium-publisher')).toHaveText('MCDM Productions, LLC');
-  await expect(visitor.getByTestId('compendium-license')).toHaveText('Draw Steel Creator License');
-  // Nothing offers them a way into a World they have no standing in.
-  await expect(visitor.getByTestId('compendium-back')).toHaveCount(0);
-  await anonContext.close();
+  // And the pack's own terms reach a signed-in reader directly: a Compendium is Instance-wide, the
+  // same answer for every signed-in caller (ADR-0078), so the Mount cascade needs no anonymous path.
+  // ADR-0084 closed ADR-0080's redistribution hole by retiring the Public Link outright.
+  await player.goto(`/w/${campaign}/compendium/${pack}`);
+  await expect(player.getByTestId('compendium-name')).toHaveText('Draw Steel: Monsters');
+  await expect(player.getByTestId('compendium-publisher')).toHaveText('MCDM Productions, LLC');
+  await expect(player.getByTestId('compendium-license')).toHaveText('Draw Steel Creator License');
+  await player.context().close();
 });

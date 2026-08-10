@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { EntityVerb } from '@hexly/domain';
 import { createDb, Db } from '../db/db';
@@ -20,9 +21,11 @@ describe('entityAccess', () => {
   let wContrib: string; // World member (contributor), no entity grant
   let stranger: string; // no membership, no grant
   let superadmin: string;
-  // Two Entities: one private (proves grants pierce private), one shared (the curated surface).
+  // Three Entities: one private (proves grants pierce private), one shared (the curated surface),
+  // one open (ADR-0084 — Instance-wide reachable to any signed-in caller).
   let priv: string;
   let shared: string;
+  let open: string;
 
   beforeEach(() => {
     db = createDb(':memory:');
@@ -44,6 +47,7 @@ describe('entityAccess', () => {
 
     priv = seedEntity('private');
     shared = seedEntity('shared');
+    open = seedEntity('open');
 
     db.insert(entityGrants)
       .values([
@@ -97,6 +101,36 @@ describe('entityAccess', () => {
     });
   });
 
+  describe('on an open Entity (ADR-0084)', () => {
+    it('gives a signed-in non-member read only — open is Instance-wide reachable', () => {
+      expect(verbs(stranger, open)).toEqual(['read']);
+    });
+
+    it('gives a World member read only — open is the widest rung, members read it too', () => {
+      expect(verbs(wContrib, open)).toEqual(['read']);
+    });
+
+    it('gives the entity Owner every verb — the Owner still governs the open Entity', () => {
+      db.insert(entityGrants).values({ entityId: open, userId: eOwner, role: 'owner' }).run();
+      expect(verbs(eOwner, open)).toEqual(['read', 'edit', 'delete', 'set-visibility', 'manage']);
+    });
+
+    // The delegated World-Owner power is gated on `shared`, unchanged by #433: once an Entity is `open`
+    // (not `shared`), a World Owner holds read only — set-visibility back down is the entity Owner's alone.
+    it('gives a World Owner read only — the delegated curation power stops at shared', () => {
+      expect(verbs(wOwner, open)).toEqual(['read']);
+    });
+
+    // The management cliff (ADR-0084, intended footgun): opening an Entity strands it above the World
+    // Owner's delegated reach, which is `shared`-gated. So a World Owner cannot transition an `open`
+    // Entity back down to `shared`/`private` — `set-visibility` is the entity Owner's alone from here.
+    it('strands the World Owner above an open Entity — only the entity Owner can transition it back down', () => {
+      db.insert(entityGrants).values({ entityId: open, userId: eOwner, role: 'owner' }).run();
+      expect(verbs(wOwner, open)).not.toContain('set-visibility');
+      expect(verbs(eOwner, open)).toContain('set-visibility');
+    });
+  });
+
   it('gives a Superadmin every verb at any visibility (repair bypass)', () => {
     const all: EntityVerb[] = ['read', 'edit', 'delete', 'set-visibility', 'manage'];
     expect(verbs(superadmin, priv)).toEqual(all);
@@ -145,20 +179,45 @@ describe('entityAccess', () => {
     });
   });
 
-  describe('filter (read-scoped list predicate)', () => {
-    it('lists exactly the Entities the caller can read', () => {
-      const ids = (u: string) =>
-        db
-          .select({ id: entities.id })
-          .from(entities)
-          .where(entityAccess(db, u).filter)
-          .all()
-          .map((r) => r.id)
-          .sort();
-      expect(ids(eViewer)).toEqual([priv]); // viewer grant on private only
-      expect(ids(wContrib)).toEqual([shared]); // member reads shared only
-      expect(ids(superadmin)).toEqual([priv, shared].sort()); // repair sees all
-      expect(ids(stranger)).toEqual([]);
+  describe('listFilter (listing predicate) vs reachFilter (reachability)', () => {
+    const ids = (predicate: 'listFilter' | 'reachFilter') => (u: string) =>
+      db
+        .select({ id: entities.id })
+        .from(entities)
+        .where(entityAccess(db, u)[predicate])
+        .all()
+        .map((r) => r.id)
+        .sort();
+
+    // Listing stays untouched by ADR-0084: `open` is absent, so an open Entity lists nowhere for a
+    // non-member — the unlisted property the retired Public Link had. A caller lists it only via another
+    // standing (here: the entity Owner grant added below).
+    it('listFilter lists exactly the Entities the caller may enumerate — open is not a listing disjunct', () => {
+      const listable = ids('listFilter');
+      expect(listable(eViewer)).toEqual([priv]); // viewer grant on private only
+      expect(listable(wContrib)).toEqual([shared]); // member lists shared only
+      expect(listable(superadmin)).toEqual([priv, shared, open].sort()); // repair sees all
+      expect(listable(stranger)).toEqual([]); // a stranger lists nothing, not even the open Entity
+    });
+
+    // Reachability adds the open disjunct: a stranger reaches the open Entity by id though it lists nowhere.
+    it('reachFilter resolves the open Entity for everyone, over and above what lists', () => {
+      const reachable = ids('reachFilter');
+      expect(reachable(eViewer)).toEqual([priv, open].sort());
+      expect(reachable(wContrib)).toEqual([shared, open].sort());
+      expect(reachable(stranger)).toEqual([open]); // reachable by id, unlisted
+    });
+
+    // The Open-World disjunct (ADR-0084): opening the *World* widens its `shared` Entities to any
+    // signed-in caller — the successor to the World Public Link's `shared`-only reach — while `private`
+    // stays unreachable (Instance membership never pierces `private`) and listing is untouched.
+    it("reachFilter resolves an Open World's shared Entities for a stranger, never its private ones", () => {
+      db.update(worlds).set({ open: true }).where(eq(worlds.id, worldId)).run();
+      const reachable = ids('reachFilter');
+      // A stranger now reaches shared (via the Open World) and open (its own rung), but not private.
+      expect(reachable(stranger)).toEqual([shared, open].sort());
+      // Listing is still untouched — an Open World's shared Entities stay unlisted for a non-member.
+      expect(ids('listFilter')(stranger)).toEqual([]);
     });
   });
 
@@ -185,7 +244,7 @@ describe('entityAccess', () => {
     return id;
   }
 
-  function seedEntity(visibility: 'private' | 'shared'): string {
+  function seedEntity(visibility: 'private' | 'shared' | 'open'): string {
     const id = randomUUID();
     db.insert(entities)
       .values({

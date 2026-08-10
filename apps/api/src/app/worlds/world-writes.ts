@@ -92,7 +92,7 @@ export class WorldWrites {
    */
   update(
     row: WorldRow,
-    patch: { name?: string; pinnedEntityIds?: string[]; theme?: WorldTheme | null; kind?: WorldKind },
+    patch: { name?: string; pinnedEntityIds?: string[]; theme?: WorldTheme | null; kind?: WorldKind; open?: boolean },
   ): WorldRow {
     const next: WorldRow = {
       ...row,
@@ -100,12 +100,13 @@ export class WorldWrites {
       ...(patch.pinnedEntityIds !== undefined ? { pinnedEntityIds: patch.pinnedEntityIds } : {}),
       ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
       ...(patch.kind !== undefined ? { kind: patch.kind } : {}),
+      ...(patch.open !== undefined ? { open: patch.open } : {}),
       updatedAt: Date.now(),
       seq: row.seq + 1,
     };
     return this.transact(() => {
-      // Identity and freshness on the Container, pins, Theme and campaign-or-Shelf on the satellite
-      // (ADR-0078, ADR-0080).
+      // Identity and freshness on the Container, pins, Theme, campaign-or-Shelf and the Open-World
+      // flag on the satellite (ADR-0078, ADR-0080, ADR-0084).
       this.db
         .update(containers)
         .set({ name: next.name, updatedAt: next.updatedAt, seq: next.seq })
@@ -113,7 +114,7 @@ export class WorldWrites {
         .run();
       this.db
         .update(worlds)
-        .set({ pinnedEntityIds: next.pinnedEntityIds, theme: next.theme, kind: next.kind })
+        .set({ pinnedEntityIds: next.pinnedEntityIds, theme: next.theme, kind: next.kind, open: next.open })
         .where(eq(worlds.id, row.id))
         .run();
       // Rename, pin reorder and a Theme edit all ride this one world-detail nudge — a theme edit bumps

@@ -97,21 +97,13 @@ describe('NudgeBusClient', () => {
     await Promise.resolve(); // idle-close, no PUT
   });
 
-  it('carries ?token= on the stream and interest for an anonymous principal, and reverts on useToken(null)', async () => {
-    // Anonymous Public Link viewer (#175): the token rides the EventSource URL and the PUT.
-    client.useToken('abc');
+  it('opens the stream on the session cookie alone — no token principal (ADR-0084)', async () => {
+    // The anonymous Public Link token path retired with the surface: the stream is same-origin, so
+    // the cookie rides it automatically and neither the URL nor the interest PUT carries a `?token=`.
     client.follow(entity('X')).subscribe();
     await ready('c1');
-    expect(FakeEventSource.instances[0].url).toBe('/api/events?token=abc');
-    http.expectOne('/api/events/c1/interest?token=abc').flush(null);
-
-    // Reverting to the cookie principal (route leave) reopens the stream with no token, so the
-    // shared singleton bus can't stay pinned to a link on an authenticated page.
-    client.useToken(null);
-    expect(FakeEventSource.instances[0].closed).toBe(true);
-    await ready('c2');
-    expect(FakeEventSource.instances[1].url).toBe('/api/events');
-    http.expectOne('/api/events/c2/interest').flush(null);
+    expect(FakeEventSource.instances[0].url).toBe('/api/events');
+    http.expectOne('/api/events/c1/interest').flush(null);
   });
 
   it('re-declares the full interest set when the stream reconnects (fresh connectionId)', async () => {

@@ -14,8 +14,6 @@ import { AuthService } from '../auth/auth.service';
 import { pinDeployment } from '../config';
 import { DB, Db, createDb } from '../db/db';
 import { EntitiesService } from '../entities/entities.service';
-import { CompendiumWrites } from '../worlds/compendium-writes';
-import { WorldWrites } from '../worlds/world-writes';
 import { WorldsService } from '../worlds/worlds.service';
 import { CollaborationGuard } from './collaboration.guard';
 import { AclSetResult } from './owner-set';
@@ -33,9 +31,6 @@ const COLLABORATION_ROUTES = [
   'GET /entities/:id/grants',
   'POST /entities/:id/grants',
   'DELETE /entities/:id/grants/:userId',
-  'GET /entities/:id/link',
-  'POST /entities/:id/link',
-  'DELETE /entities/:id/link',
   'GET /worlds/:id/owners',
   'POST /worlds/:id/owners',
   'DELETE /worlds/:id/owners/:userId',
@@ -43,13 +38,6 @@ const COLLABORATION_ROUTES = [
   'POST /worlds/:id/members',
   'PATCH /worlds/:id/members/:userId',
   'DELETE /worlds/:id/members/:userId',
-  'GET /worlds/:id/link',
-  'POST /worlds/:id/link',
-  'DELETE /worlds/:id/link',
-  'GET /public/entities/:token',
-  'GET /public/worlds/:token',
-  'GET /public/worlds/:token/entities/:id',
-  'GET /public/worlds/:token/compendiums/:id',
   'GET /users',
   'POST /users',
   'POST /users/:id/password',
@@ -68,10 +56,6 @@ interface Fixtures {
   readonly other: string;
   readonly world: string;
   readonly entity: string;
-  /** An installed pack the World Mounts, so the public Compendium-page read has terms to answer with. */
-  readonly pack: string;
-  readonly worldToken: string;
-  readonly entityToken: string;
 }
 
 /**
@@ -84,12 +68,8 @@ function concretePath(pattern: string, f: Fixtures): string {
     .map((segment, i) => {
       if (!segment.startsWith(':')) return segment;
       if (segment === ':userId') return segments[i - 1] === 'owners' ? f.operator : f.other;
-      if (segment === ':token') return segments[i - 1] === 'entities' ? f.entityToken : f.worldToken;
-      if (segments[i - 1] === 'compendiums') return f.pack;
-      // Under the `/public` reader, `:id` is an Entity.
       switch (segments[1]) {
         case 'entities':
-        case 'public':
           return f.entity;
         case 'worlds':
           return f.world;
@@ -189,7 +169,7 @@ describe('Collaboration gate', () => {
 
   /**
    * An Instance that had Collaboration and turned it off, so every swept route is genuinely reachable and
-   * no 404 is the fixture's. Links and membership are minted through the services because their HTTP
+   * no 404 is the fixture's. Membership and grants are minted through the services because their HTTP
    * routes are the ones under test.
    */
   async function fixtures(): Promise<Fixtures> {
@@ -210,22 +190,12 @@ describe('Collaboration gate', () => {
         .send({ name: 'Lady Mara', types: ['core.type.note'], worldId: world })
         .expect(201)
     ).body.id;
-    // `shared`, so the World link's reader can reach it (ADR-0037).
-    await agent.patch(`/entities/${entity}`).send({ visibility: 'shared' }).expect(200);
 
     const worlds = app.get(WorldsService);
     unwrap(worlds.addMember(operator, world, other, 'contributor'));
     unwrap(app.get(EntitiesService).addGrant(operator, entity, other, 'viewer'));
-    const worldToken = unwrap(worlds.mintLink(operator, world)).token;
-    const entityToken = unwrap(app.get(EntitiesService).mintLink(operator, entity)).token;
-    // Installed and Mounted, so a pack's terms are reachable through the World link the way ADR-0080
-    // says they must be — the only standing the public Compendium read has.
-    const pack = app
-      .get(CompendiumWrites)
-      .install('draw-steel.importer.monsters', { name: 'Draw Steel: Monsters' }, '1.4.0');
-    app.get(WorldWrites).mount(world, pack);
 
-    return { agent, operator, other, world, entity, pack, worldToken, entityToken };
+    return { agent, operator, other, world, entity };
   }
 
   describe('with Collaboration off', () => {
@@ -250,7 +220,6 @@ describe('Collaboration gate', () => {
       const anonymous = request(app.getHttpServer());
       await anonymous.get('/users').expect(404);
       await anonymous.get('/users/directory').expect(404);
-      await anonymous.get(`/public/worlds/${f.worldToken}`).expect(404);
     });
 
     it('leaves the login endpoint alone — it is auth, not Collaboration', async () => {

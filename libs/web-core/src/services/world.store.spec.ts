@@ -16,6 +16,7 @@ function world(id: string, name = id): WorldSummary {
     name,
     owners: ['u1'],
     kind: 'campaign',
+    open: false,
     rights: ['read', 'manage'],
     createdAt: 1,
     updatedAt: 1,

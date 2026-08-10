@@ -1,7 +1,7 @@
 import { WorldVerb } from '@hexly/domain';
 import { and, eq, getTableColumns, inArray, sql, SQLWrapper } from 'drizzle-orm';
 import { Db } from '../db/db';
-import { containers, entities, entityGrants, WorldRow, worldLinks, worldMembers, worlds } from '../db/schema';
+import { containers, entities, entityGrants, WorldRow, worldMembers, worlds } from '../db/schema';
 import { mountedIntoReachOf } from './mount-reach';
 import { isSuperadmin } from './owner-set';
 
@@ -35,18 +35,19 @@ function standingIn(userId: string, worldRef: SQLWrapper) {
 }
 
 /**
- * The World reachability rule (ADR-0024, ADR-0037, ADR-0080): standing in the World, OR **membership**
- * of a World that **Mounts** it. Unreachable is indistinguishable from nonexistent (ADR-0004).
+ * The World reachability rule (ADR-0024, ADR-0037, ADR-0080, ADR-0084): standing in the World, OR
+ * **membership** of a World that **Mounts** it, OR the World is **Open**. Unreachable is
+ * indistinguishable from nonexistent (ADR-0004).
  *
- * The second disjunct is ADR-0080's, and the first time reading a Container depends on another
- * Container's configuration: a World kept to be drawn from opens to whoever reads the campaigns
- * drawing on it, which is what makes a mounted Entity's own page openable at all — Entity URLs are
- * World-scoped (ADR-0028), so following a link into a Mount lands at the content's home. Read alone:
- * `owner` and `contributor` stay membership's, so a Mount never confers a write. Reachable is not
- * listed — {@link worldListFilter} is what the World Index reads.
+ * The Mount disjunct (ADR-0080) opens a drawn-from World to whoever reads the campaigns mounting it, so a
+ * mounted Entity's own page is openable — Entity URLs are World-scoped (ADR-0028). Read alone: `owner` and
+ * `contributor` stay membership's, so a Mount never confers a write. The Open disjunct (ADR-0084) is the
+ * successor to the retired World Public Link — an Open World reads to any signed-in caller; `worlds.open`
+ * is a base-table column, so unlike the first two disjuncts it needs no correlated subquery. Reachability
+ * only: {@link worldListFilter} stays unchanged, so an Open World is reachable by id/URL yet unlisted.
  */
 function reachableBy(userId: string, worldRef: SQLWrapper) {
-  return sql`(${standingIn(userId, worldRef)} OR ${mountedIntoReachOf(userId, worldRef)})`;
+  return sql`(${standingIn(userId, worldRef)} OR ${mountedIntoReachOf(userId, worldRef)} OR ${worlds.open})`;
 }
 
 /** The World management rule (ADR-0037): the caller holds the `owner` role. */
@@ -113,6 +114,7 @@ function selectWorld(db: Db) {
       kind: worlds.kind,
       pinnedEntityIds: worlds.pinnedEntityIds,
       theme: worlds.theme,
+      open: worlds.open,
     })
     .from(worlds)
     .innerJoin(containers, eq(containers.id, worlds.id));
@@ -124,21 +126,6 @@ function selectWorld(db: Db) {
  */
 export function loadWorld(db: Db, id: string): WorldRow | undefined {
   return selectWorld(db).where(eq(worlds.id, id)).get();
-}
-
-/**
- * Whether a World Public Link *token* currently reaches World `id` — the reachability seam the
- * nudge bus checks for a token principal (ADR-0044, #178). The token *is* the grant: a live
- * `world_links` row pointing at the World grants anonymous Dashboard reach; a revoked token (row
- * gone) reaches nothing (→ eviction).
- */
-export function tokenReachesWorld(db: Db, token: string, id: string): boolean {
-  const row = db
-    .select({ id: worldLinks.id })
-    .from(worldLinks)
-    .where(and(eq(worldLinks.id, token), eq(worldLinks.worldId, id)))
-    .get();
-  return !!row;
 }
 
 /**

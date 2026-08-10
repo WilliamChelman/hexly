@@ -35,5 +35,4 @@ export * from './lib/importer';
 export * from './lib/compendium';
 export * from './lib/world-graph';
 export * from './lib/local-graph';
-export * from './lib/public-link';
 export * from './lib/nudge';

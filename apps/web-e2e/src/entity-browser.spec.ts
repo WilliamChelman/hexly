@@ -6,6 +6,7 @@ import {
   expect,
   openEntityActions,
   segRe,
+  setEntityVisibility,
   test,
 } from './fixtures';
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
@@ -72,34 +73,94 @@ test('the Command palette’s Create Note opens the Entity the dialog returns, a
   await expect(page).toHaveURL(/\/entities$/);
 });
 
-test('an owner toggles a note to shared and the Visibility facet reflects it', async ({ page }) => {
+test('an owner sets a note’s visibility rung and the Visibility facet reflects each one', async ({ page }) => {
   await enterEntities(page);
 
   await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const id = entityIdFromUrl(page);
 
-  // New notes default to private: the actions menu's Visibility item reads "not shared".
+  // New notes default to private: the three-way control reads the Private rung as checked (ADR-0084).
   await openEntityActions(page);
-  await expect(page.getByTestId('visibility-toggle')).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByTestId('visibility-set-private')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('visibility-set-shared')).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByTestId('visibility-set-open')).toHaveAttribute('aria-checked', 'false');
   await page.keyboard.press('Escape');
 
   // In the browser it counts under the Private facet, not Shared.
   await entitiesRailLink(page).click();
   await page.getByTestId('facet-visibility-private').click();
   await expect(page.getByTestId(`open-${id}`)).toBeVisible();
-  // Clear the filter, reopen, and reveal it from the actions menu: the item flips to shared.
+  // Clear the filter, reopen, and set it to Shared from the actions menu: the Shared rung reads checked.
   await page.getByTestId('facet-visibility-private').click();
   await page.getByTestId(`open-${id}`).click();
   await openEntityActions(page);
-  await page.getByTestId('visibility-toggle').click();
+  await page.getByTestId('visibility-set-shared').click();
   await openEntityActions(page);
-  await expect(page.getByTestId('visibility-toggle')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('visibility-set-shared')).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
 
   // The access-scoped Visibility facet now lists it under Shared instead.
   await entitiesRailLink(page).click();
   await page.getByTestId('facet-visibility-shared').click();
   await expect(page.getByTestId(`open-${id}`)).toBeVisible();
+  await page.getByTestId('facet-visibility-shared').click();
+
+  // Set it to Open (ADR-0084): the $visibility:open facet now filters the browse to it.
+  await page.getByTestId(`open-${id}`).click();
+  await openEntityActions(page);
+  await page.getByTestId('visibility-set-open').click();
+  await openEntityActions(page);
+  await expect(page.getByTestId('visibility-set-open')).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+
+  await entitiesRailLink(page).click();
+  await page.getByTestId('facet-visibility-open').click();
+  await expect(page.getByTestId(`open-${id}`)).toBeVisible();
+});
+
+/**
+ * The excluding half of the Visibility facet at the `open` rung (ADR-0081 × ADR-0084): the include path
+ * is proven above, so this is its `neq` twin — `facet-visibility-open`'s counterpart drops the open note
+ * rather than filtering to it, mirroring the Type exclusion journey. The mutual release (ADR-0081) makes
+ * the contradictory both-selected state unreachable here too.
+ */
+test('the rail excludes the Open visibility rung: the grid drops the open note, keeps the private one, include releases it', async ({
+  page,
+}) => {
+  await enterEntities(page);
+
+  // One note left private (the default), one flipped Open — the contrast the exclusion acts on.
+  await page.getByTestId('new-default-entity').click();
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  const privateId = entityIdFromUrl(page);
+  await entitiesRailLink(page).click();
+
+  await page.getByTestId('new-default-entity').click();
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  const openId = entityIdFromUrl(page);
+  await setEntityVisibility(page, 'open');
+  await entitiesRailLink(page).click();
+
+  await expect(page.getByTestId(`open-${privateId}`)).toBeVisible();
+  await expect(page.getByTestId(`open-${openId}`)).toBeVisible();
+
+  // Exclude the Open rung: the open note is vetoed, the private one stays, and the veto rides the URL.
+  await page.getByTestId('facet-exclude-visibility-open').click();
+  await expect(page.getByTestId(`open-${openId}`)).toHaveCount(0);
+  await expect(page.getByTestId(`open-${privateId}`)).toBeVisible();
+  await expect(page).toHaveURL(/excludeVisibility=open/);
+
+  // The exclusion rides the URL, so a refresh (and a shared link) reproduces the browse.
+  await page.reload();
+  await expect(page.getByTestId('facet-exclude-visibility-open')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId(`open-${openId}`)).toHaveCount(0);
+
+  // Pressing include releases the exclusion rather than sitting beside it (mutual release).
+  await page.getByTestId('facet-visibility-open').click();
+  await expect(page.getByTestId('facet-exclude-visibility-open')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId(`open-${openId}`)).toBeVisible();
+  await expect(page.getByTestId(`open-${privateId}`)).toHaveCount(0);
 });
 
 /**

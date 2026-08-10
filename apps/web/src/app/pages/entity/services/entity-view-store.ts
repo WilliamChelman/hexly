@@ -6,7 +6,7 @@ import { EntitySession } from './entity-session';
 /**
  * Holds which View the open Entity is showing (ADR-0048, *Views* amendment). Page-scoped and shared
  * with the {@link EntityHeader}; reads the open Entity's types off {@link EntitySession}, provided
- * above the page in both the routed and Public Link mounts.
+ * above the page on the route.
  *
  * A View is a {@link ViewInstance} — an id, plus the **Field of a Structured Data Type** it renders when it is a
  * Field's View rather than a Type's (ADR-0050). The selection is carried as that instance's

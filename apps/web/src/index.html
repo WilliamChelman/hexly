@@ -43,10 +43,10 @@
           );
         /* END GENERATED */
         try {
-          var route = /^\/(public\/w|w)\/([^/]+)/.exec(location.pathname);
+          var route = /^\/w\/([^/]+)/.exec(location.pathname);
           if (!route) return;
-          var seg = route[2];
-          var scope = route[1] + '/' + (route[1] === 'w' ? seg.slice(seg.lastIndexOf('-') + 1) : seg);
+          var seg = route[1];
+          var scope = 'w/' + seg.slice(seg.lastIndexOf('-') + 1);
           var cached = JSON.parse(localStorage.getItem('hexly-world-theme') || '[]');
           for (var i = 0; i < cached.length; i++) {
             if (cached[i].scope !== scope) continue;

@@ -1,9 +1,9 @@
 import { EntityVerb, GrantRole } from '@hexly/domain';
-import { SQL, SQLWrapper, and, eq, getTableColumns, sql } from 'drizzle-orm';
+import { eq, getTableColumns, sql } from 'drizzle-orm';
 import { Db } from '../db/db';
-import { entities, entityGrants, entityLinks, worldLinks, worldMembers } from '../db/schema';
+import { entities, entityGrants, worldMembers, worlds } from '../db/schema';
 import { inACompendium } from '../worlds/compendiums';
-import { mountedIntoReachOf, mountedIntoWorld } from './mount-reach';
+import { mountedIntoReachOf } from './mount-reach';
 import { isSuperadmin } from './owner-set';
 
 /** The Superadmin bypass: every predicate short-circuits to match-all. */
@@ -39,25 +39,46 @@ function isWorldOwner(userId: string) {
   return sql`EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${entities.containerId} AND ${worldMembers.userId} = ${userId} AND ${worldMembers.role} = 'owner')`;
 }
 
+/** The Entity's World is **Open** (ADR-0084) — the `worlds.open` flag on the Entity's Container. */
+function inAnOpenWorld() {
+  return sql`EXISTS (SELECT 1 FROM ${worlds} WHERE ${worlds.id} = ${entities.containerId} AND ${worlds.open})`;
+}
+
 /**
- * The read predicate: `owner ∨ grant(editor|viewer) ∨ (member ∧ shared) ∨ compendium-entry ∨
- * (mounted ∧ shared)`. An Entity the caller can't read is indistinguishable from a missing one, so
- * `private` never leaks existence. An entity-level grant pierces `private` for exactly that user.
+ * The **listing** predicate: `owner ∨ grant(editor|viewer) ∨ (member ∧ shared) ∨ compendium-entry ∨
+ * (mounted ∧ shared)`. What a browse/search/Palette enumerates; an unreadable Entity is indistinguishable
+ * from a missing one, so `private` never leaks existence, and an entity-level grant pierces `private`.
  *
- * The compendium disjunct is the **Compendium**'s own reachability rule (ADR-0078/0079): Instance-wide
- * with no members, roles or public link means there is nothing per-caller to resolve, so being signed
- * in is the standing. `worldMembers` cannot supply one — Collaboration stays World-only — and the
- * reconcile's incidental `owner` grant would reach exactly the user who ran the import.
+ * `open` is deliberately absent (ADR-0084): listing stays World-and-Mounts-scoped, so an `open` Entity is
+ * reachable Instance-wide by id (see {@link canReadEntity}) yet lists nowhere for a non-member — the
+ * unlisted property the retired Public Link had.
  *
- * The last is the **Mount** cascade (ADR-0080), on the same `shared` line the member disjunct rides —
- * a Mount republishes what the mounted Container publishes, no more. It says nothing about a mounted
- * **Compendium**: the disjunct before already reached every entry. Reachability only, both of them —
- * the **seal** and the ordinary write gates refuse as before.
+ * The compendium disjunct is the Compendium's own Instance-wide reachability (ADR-0078/0079): no members
+ * or roles to resolve, so being signed in is the standing. The last is the Mount cascade (ADR-0080), on
+ * the same `shared` line — a Mount republishes only what the mounted Container publishes.
  */
-function canReadEntity(userId: string, superadmin: boolean) {
+function canListEntity(userId: string, superadmin: boolean) {
   if (superadmin) return MATCH_ALL;
   return sql`(${hasGrant(userId, ['owner', 'editor', 'viewer'])} OR (${entities.visibility} = 'shared' AND ${isWorldMember(userId)}) OR ${inACompendium()}
     OR (${entities.visibility} = 'shared' AND ${mountedIntoReachOf(userId, entities.containerId)}))`;
+}
+
+/**
+ * The **reachability** predicate: {@link canListEntity} `∨ open ∨ (shared ∧ Open-World)`. Whether the
+ * caller can read *a specific Entity it already names* — get-by-id, References/link-index resolution
+ * (ADR-0046/0072), a live follow (ADR-0044). ADR-0084's two membership-independent disjuncts: an `open`
+ * Entity reads to any signed-in caller, and a `shared` Entity in an Open World reads to the same audience
+ * (the successor to the World Public Link's `shared`-only reach). `private` stays unreachable — the second
+ * disjunct is `shared`-only, so Instance membership never pierces it.
+ *
+ * These disjuncts ride only surfaces that resolve a *named* Entity, never the enumeration WHERE — keeping
+ * `open` and an Open World's `shared` Entities reachable by id yet unlisted (ADR-0084's invariant).
+ */
+function canReadEntity(userId: string, superadmin: boolean) {
+  if (superadmin) return MATCH_ALL;
+  // superadmin short-circuited above, so listing delegates with it resolved to false.
+  return sql`(${canListEntity(userId, false)} OR ${entities.visibility} = 'open'
+    OR (${entities.visibility} = 'shared' AND ${inAnOpenWorld()}))`;
 }
 
 /**
@@ -105,46 +126,6 @@ export function entityRightsOf(a: {
   return rights;
 }
 
-/** The `shared` visibility predicate — the surface a Public Link exposes. */
-export const sharedVisibility = eq(entities.visibility, 'shared');
-
-/** An anonymous Public Link's Rights: read-only. */
-export const READ_ONLY_RIGHTS: readonly EntityVerb[] = ['read'];
-
-/**
- * What a **World Public Link** on `worldRef` reaches: that World's own `shared` Entities, plus what its
- * **Mounts** republish (ADR-0080) — the anonymous half of the cascade.
- *
- * Republished is what a mounted Container's ordinary readers read, which is why the second arm asks a
- * different question of each kind: a World's `shared` Entities, and *every* entry of a **Compendium**,
- * whose Instance-wide rule never consulted visibility (ADR-0079).
- */
-export function reachedByWorldLink(worldRef: SQLWrapper): SQL {
-  return sql`((${entities.containerId} = ${worldRef} AND ${sharedVisibility})
-    OR ((${sharedVisibility} OR ${inACompendium()}) AND ${mountedIntoWorld(worldRef, entities.containerId)}))`;
-}
-
-/**
- * Whether a Public Link *token* currently grants read of Entity `id`. A token reaches
- * an Entity via a per-entity link pointing at it (pierces `private`), or via a World
- * link that {@link reachedByWorldLink} answers for. A revoked token reaches nothing.
- */
-export function tokenReachesEntity(db: Db, token: string, id: string): boolean {
-  const direct = db
-    .select({ id: entityLinks.entityId })
-    .from(entityLinks)
-    .where(and(eq(entityLinks.id, token), eq(entityLinks.entityId, id)))
-    .get();
-  if (direct) return true;
-  const viaWorld = db
-    .select({ id: entities.id })
-    .from(worldLinks)
-    .innerJoin(entities, and(eq(entities.id, id), reachedByWorldLink(worldLinks.worldId)))
-    .where(eq(worldLinks.id, token))
-    .get();
-  return !!viaWorld;
-}
-
 /** A resolved single-row Entity decision: the full row plus the caller's standing. */
 export interface EntityDecision {
   row: typeof entities.$inferSelect;
@@ -162,8 +143,19 @@ export interface EntityDecision {
  * {@link writeFilter}/{@link editFilter} on the atomic UPDATE WHERE.
  */
 export interface EntityAccess {
-  /** Read predicate for a list/get WHERE (`owner ∨ grant ∨ (shared ∧ member)`). */
-  filter: ReturnType<typeof canReadEntity>;
+  /**
+   * **Listing** predicate for an enumeration WHERE — browse/search/Palette, facet counts, a World's own
+   * entity/pin lists, the graph (`owner ∨ grant ∨ (shared ∧ member) ∨ compendium ∨ (shared ∧ mounted)`).
+   * `open` is deliberately absent: listing stays scoped (ADR-0084). Use {@link reachFilter} to resolve a
+   * *named* Entity's readability.
+   */
+  listFilter: ReturnType<typeof canListEntity>;
+  /**
+   * **Reachability** predicate for resolving a *named* Entity — the References/link-index LEFT JOINs
+   * (ADR-0046/0072): {@link listFilter} `∨ open`. A non-member reaches an `open` link target by id, so it
+   * resolves here though it never lists.
+   */
+  reachFilter: ReturnType<typeof canReadEntity>;
   /** Management predicate for a delete / visibility UPDATE WHERE (`owner ∨ (shared ∧ world-owner)`). */
   writeFilter: ReturnType<typeof canWriteEntity>;
   /** Substance predicate for a save / name-patch UPDATE WHERE (`canWrite ∨ grant(editor)`). */
@@ -190,7 +182,8 @@ export interface EntityAccess {
 export function entityAccess(db: Db, userId: string): EntityAccess {
   const superadmin = isSuperadmin(db, userId);
   return {
-    filter: canReadEntity(userId, superadmin),
+    listFilter: canListEntity(userId, superadmin),
+    reachFilter: canReadEntity(userId, superadmin),
     writeFilter: canWriteEntity(userId, superadmin),
     editFilter: canEditSubstanceEntity(userId, superadmin),
     rightsColumns: {

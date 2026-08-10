@@ -189,6 +189,11 @@ export const worlds = sqliteTable('worlds', {
   // The Owner-authored World Theme (ADR-0076), stored inline and patched wholesale like the pins.
   // Every value reached this column re-serialised from its own parse; NULL is no Theme.
   theme: text('theme', { mode: 'json' }).$type<WorldTheme>(),
+  // The Open-World flag (ADR-0084), the successor to the retired World Public Link: when set, the
+  // World's `shared` Entities read to any signed-in caller on the Instance, membership-independent.
+  // Reachability only — an Open World stays unlisted (absent from the World Index/Switcher/quick-open),
+  // exactly as a mounted World is. Owner-gated on the write; inert with Collaboration off.
+  open: integer('open', { mode: 'boolean' }).notNull().default(false),
 });
 
 /**
@@ -336,40 +341,6 @@ export const worldFields = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [primaryKey({ columns: [table.containerId, table.fieldId] })],
-);
-
-/**
- * A World Public Link: an unguessable token granting anonymous Viewer access to
- * all `shared` Entities in a World. `id` is the token.
- */
-export const worldLinks = sqliteTable(
-  'world_links',
-  {
-    id: text('id').primaryKey(),
-    worldId: text('world_id')
-      .notNull()
-      .references(() => worlds.id, { onDelete: 'cascade' }),
-    createdAt: integer('created_at').notNull(),
-  },
-  (table) => [index('idx_world_links_world_id').on(table.worldId)],
-);
-
-/**
- * A per-entity Public Link: an unguessable token granting anonymous read-only
- * access to one Entity. `id` is the token — an anonymous Viewer grant, so it
- * pierces `private` with no visibility check on the read. One active link per
- * Entity is enforced in the service. Deleting the Entity cascades.
- */
-export const entityLinks = sqliteTable(
-  'entity_links',
-  {
-    id: text('id').primaryKey(),
-    entityId: text('entity_id')
-      .notNull()
-      .references(() => entities.id, { onDelete: 'cascade' }),
-    createdAt: integer('created_at').notNull(),
-  },
-  (table) => [index('idx_entity_links_entity_id').on(table.entityId)],
 );
 
 /**

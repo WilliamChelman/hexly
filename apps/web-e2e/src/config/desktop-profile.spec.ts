@@ -105,7 +105,6 @@ test('the Collaboration cut list is hidden here too, as the Desktop App pins it 
   await page.keyboard.press('Escape');
   await expect(page.locator('app-owner-set')).toHaveCount(0);
   await expect(page.locator('app-grant-set')).toHaveCount(0);
-  await expect(page.locator('app-public-link')).toHaveCount(0);
 
   await entitiesRailLink(page).click();
   await expect(page.getByTestId('facet-heading-visibility')).toHaveCount(0);

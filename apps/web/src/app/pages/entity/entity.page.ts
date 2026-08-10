@@ -66,7 +66,7 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
     }
   `,
   // EntityViewStore is page-scoped: it reads the open Entity's types off the session, provided above
-  // the page in both the routed and Public Link mounts. EntityDock is page-scoped too (ADR-0067):
+  // the page on the route. EntityDock is page-scoped too (ADR-0067):
   // provided above the View outlet so the running View can claim the open slot. The content View's
   // own dock stores stay the View's (ADR-0051) — provided in `ContentView`, as the map's are in `MapView`.
   providers: [EntityViewStore, EntityDock],

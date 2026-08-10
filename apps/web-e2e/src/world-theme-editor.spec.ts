@@ -1,7 +1,7 @@
 import type { APIRequestContext, Page } from '@playwright/test';
 import { designToken, rasteriseColors } from '@hexly/web-styles';
 import { FONT_PAIRINGS, PALETTE_PRESETS, PALETTE_TOKENS, WorldThemeSchemeKey, colorTokenHex } from '@hexly/domain';
-import { enterEntities, expect, signInGrantee, test } from './fixtures';
+import { enterEntities, expect, setWorldOpen, signInGrantee, test } from './fixtures';
 import { TEST_GRANTEE } from './test-user';
 // The app's own pretty-URL codec (ADR-0042), imported by file path for the reason `fixtures.ts` gives.
 import { idFromSegment } from '../../../libs/web-core/src/utils/pretty-id';
@@ -371,7 +371,10 @@ test('an Owner picks a corner set and a font pairing, and the interface takes bo
   await clearTheme(page.request, worldId);
 });
 
-test('an anonymous Public Link visitor gets the corner set and the pairing too', async ({ page, browser }) => {
+test('a signed-in non-member reading the Open World gets the corner set and the pairing too', async ({
+  page,
+  browser,
+}) => {
   const worldSeg = await enterEntities(page);
   const worldId = idFromSegment(worldSeg);
   await openThemeEditor(page, worldSeg);
@@ -382,21 +385,14 @@ test('an anonymous Public Link visitor gets the corner set and the pairing too',
   await page.getByTestId('theme-font-codex').check();
   await saveTheme(page);
 
-  await page.getByTestId('settings-nav-sharing').click();
-  const minted = page.waitForResponse(
-    (r) => /\/api\/worlds\/[\w-]+\/link$/.test(r.url()) && r.request().method() === 'POST' && r.ok(),
-  );
-  await page.getByTestId('public-link-create').click();
-  await minted;
-  const url = await page.getByTestId('public-link-url').inputValue();
+  // Open the World (ADR-0084, the successor to the World Public Link), then read it as a second
+  // signed-in account that is not a member.
+  await setWorldOpen(page, worldSeg, true);
+  const visitor = await signInGrantee(browser);
+  await visitor.goto(`/w/${worldSeg}`);
 
-  const anonContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
-  const visitor = await anonContext.newPage();
-  await visitor.goto(url);
-  await expect(visitor.getByTestId('public-banner')).toBeVisible();
-
-  // Both ride the unauthenticated World read, as the Palette does (ADR-0076): a visitor with no
-  // account sees the World the Owner authored rather than half of it.
+  // Both ride the ordinary World read, as the Palette does (ADR-0076): a non-member sees the World the
+  // Owner authored rather than half of it.
   await expect.poll(() => inlineOnRoot(visitor, '--radius-md')).toBe('0px');
   await expect.poll(() => inlineOnRoot(visitor, '--font-display')).toBe(FONT_PAIRINGS.codex['--font-display']);
   expect(await elementsRoundedBy(visitor, ladder)).toEqual([]);
@@ -404,9 +400,8 @@ test('an anonymous Public Link visitor gets the corner set and the pairing too',
     firstFamily(FONT_PAIRINGS.codex['--font-body'] ?? ''),
   );
 
-  await anonContext.close();
+  await visitor.context().close();
   await clearTheme(page.request, worldId);
-  expect((await page.request.delete(`/api/worlds/${worldId}/link`)).ok()).toBeTruthy();
 });
 
 test('a Theme edit changes nothing about what Entities contain or who can read them', async ({ page, request }) => {

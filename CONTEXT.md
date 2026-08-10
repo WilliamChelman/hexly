@@ -121,7 +121,7 @@ _Avoid_: Origin, provenance record, external id, sync key
 ## Compendium
 
 **Compendium**:
-A **Container** of published reference material — one per pack, Instance-wide, installed and removed by the operator rather than authored in place, and carrying its own attribution (publisher, license, notice). Its Entities are **Sealed**, so it is used either by **Mounting** it, which lets a World point at its entries in place, or by **Adoption**, which copies one out to be changed (ADR-0079, ADR-0080). Reachable by **every signed-in caller**: Instance-wide with no members means being on this Instance _is_ the standing, so there is nothing per-caller to resolve — the one reachability rule **Collaboration** does not answer (ADR-0078) — and by anonymous readers of a **World Public Link** that Mounts it, which is why its **Compendium page** opens to them too.
+A **Container** of published reference material — one per pack, Instance-wide, installed and removed by the operator rather than authored in place, and carrying its own attribution (publisher, license, notice). Its Entities are **Sealed**, so it is used either by **Mounting** it, which lets a World point at its entries in place, or by **Adoption**, which copies one out to be changed (ADR-0079, ADR-0080). Reachable by **every signed-in caller**: Instance-wide with no members means being on this Instance _is_ the standing, so there is nothing per-caller to resolve — the one reachability rule **Collaboration** does not answer (ADR-0078). Its **Compendium page** opens to every signed-in caller for the same reason.
 _Avoid_: Library (that is the browse across a World's **Mounts**, not one pack), Shelf (a **World** kept for reference — authored, unsealed, no attribution), catalog, SRD, bestiary (one pack's subject, not the kind); pack (informal prose for the published artifact only — the thing Hexly holds is a Compendium, and the interface says so: ADR-0079's "**Pack** facet" ships as the **Compendium** facet)
 
 **Library**:
@@ -129,7 +129,7 @@ The durable surface at `/w/:worldId/library` listing every Entity in every **Con
 _Avoid_: Compendium browse (superseded — a pack is one Mount among several), Mount browse ("Mount" is the Owner's configuration word, not a reader's), pack browser, catalog; **Compendium page** (that states one pack's terms)
 
 **Compendium page**:
-One **Compendium**'s own page at `/w/:worldId/compendium/:compendiumId`, stating the terms its content is published under — publisher, license, notice, as its **Compendium Importer** declared them on install — beside the revision it is pinned at. Reached from the **Library** that credits it, and readable by anyone who can reach the pack's content — anonymous readers of a **World Public Link** included — because attribution belongs to whoever reads the content rather than to the operator who installed it, and terms must never sit behind a wall the content does not (ADR-0061, ADR-0079, ADR-0080). A term the pack did not record is absent, never an empty heading.
+One **Compendium**'s own page at `/w/:worldId/compendium/:compendiumId`, stating the terms its content is published under — publisher, license, notice, as its **Compendium Importer** declared them on install — beside the revision it is pinned at. Reached from the **Library** that credits it, and readable by anyone who can reach the pack's content — every signed-in caller, a Compendium being Instance-wide — because attribution belongs to whoever reads the content rather than to the operator who installed it, and terms must never sit behind a wall the content does not (ADR-0061, ADR-0079, ADR-0080). A term the pack did not record is absent, never an empty heading.
 _Avoid_: Library (that lists entries; this states terms), pack page, attribution panel, about page
 
 **Compendium Entry**:
@@ -223,7 +223,7 @@ _Avoid_: Label, note, sticky, caption, text box
 ## Containers
 
 **Container**:
-What an **Entity** belongs to — a named set of Entities carrying their own vocabulary (**User-defined types** and **Fields**), link edges, facets, and asset bytes. Two kinds: a **World** and a **Compendium**. An Entity belongs to exactly one, always: what crosses a Container boundary is an **Entity Link**, never an Entity. **Collaboration** is the World's alone; a Container as such has no members, roles, or public link (ADR-0078).
+What an **Entity** belongs to — a named set of Entities carrying their own vocabulary (**User-defined types** and **Fields**), link edges, facets, and asset bytes. Two kinds: a **World** and a **Compendium**. An Entity belongs to exactly one, always: what crosses a Container boundary is an **Entity Link**, never an Entity. **Collaboration** is the World's alone; a Container as such has no members, roles, or Collaboration of its own (ADR-0078).
 _Avoid_: Space, scope, bucket, namespace, workspace; World (one kind of Container, not the supertype)
 
 **World**:
@@ -267,7 +267,7 @@ The **World Graph** narrowed to one Entity's neighbourhood — every Entity with
 _Avoid_: Neighbourhood graph, ego graph, mini map, subgraph; local map (collides with Hex Map)
 
 **World Owner**:
-A user holding full control of a World — membership, roles, the public link, rename/delete, and full control over every `shared` Entity in it; no special access to others' `private` Entities. A symmetric set of one or more, all equal; the last cannot be removed.
+A user holding full control of a World — membership, roles, whether the World is **Open**, rename/delete, and full control over every `shared` Entity in it; no special access to others' `private` Entities. A symmetric set of one or more, all equal; the last cannot be removed.
 _Avoid_: Admin, GM (user vocabulary), co-owner
 
 **Contributor**:
@@ -275,12 +275,16 @@ A named user granted the ability to create Entities inside a World (becoming eac
 _Avoid_: Editor, member, player
 
 **World Viewer**:
-A named user (or public link holder) granted read-only access to all `shared` Entities in a World.
+A named user granted read-only access to all `shared` Entities in a World — the reach an **Open World** extends to every signed-in caller without a grant.
 _Avoid_: Reader, guest, spectator
 
-**World Public Link**:
-An unguessable, unlisted URL that grants World Viewer access without an account.
+**World Public Link** _(retired, ADR-0084)_:
+Was an unguessable URL granting anonymous **World Viewer** access. Retired with anonymous read; its job — let non-members read a World's `shared` Entities — is now an **Open World**.
 _Avoid_: Share link, invite link
+
+**Open World**:
+A World marked readable by any signed-in caller on the Instance over its `shared` Entities, no membership needed — the successor to the **World Public Link**, minus the anonymity (ADR-0084). Like every cross-World reach, it changes reachability, not listing: a non-member reaches an Open World by its URL and it stays absent from their World Index and Switcher, exactly as a Mounted World does (ADR-0080).
+_Avoid_: Public World, published World, listed World
 
 ## Sharing
 
@@ -289,8 +293,8 @@ The closed set of actions a given caller may perform on a specific Entity or Wor
 _Avoid_: Permissions, ACL, capabilities, grants (a grant is one input to Rights)
 
 **Entity Visibility**:
-A two-value field on every Entity: `private` (default — Owners and entity-level grants only) or `shared` (all World members). Private is absolute within the collaboration model; only a Superadmin, outside it, can reach a `private` Entity. Inert where **Collaboration** is off: nothing reads it, and every Entity keeps the default.
-_Avoid_: Published, public, visible
+A three-value field on every Entity: `private` (default — Owners and entity-level grants only), `shared` (all World members), or `open` (any signed-in caller on the Instance — the reach a **Compendium** has by being Instance-wide, ADR-0084). The rungs widen the audience, never onto the internet: `open` is everyone _with an account here_, never an anonymous reader, because Hexly has no anonymous read since the **Public Link** retired. `private` is absolute within the collaboration model; only a Superadmin, outside it, can reach a `private` Entity. `open` changes _reachability_, never _listing_ — a non-member reaches an `open` Entity by its id or URL and finds it in no browse, Palette, or search of theirs (ADR-0080, ADR-0083). Inert where **Collaboration** is off: nothing reads it, and every Entity keeps the default.
+_Avoid_: Published; public (implies the open internet — `open` is Instance-only); visible; everyone (names the audience, not the state)
 
 **Owner**:
 A user holding full control of an Entity — substance, lifecycle, exposure, and grant management. A symmetric set of one or more, all equal; at least one always.
@@ -304,8 +308,8 @@ _Avoid_: Collaborator, contributor
 A named user — World membership not required — granted read-only access to a specific Entity.
 _Avoid_: Reader, guest
 
-**Public Link**:
-An unguessable, unlisted URL granting read-only access to a specific Entity without an account — an anonymous Viewer grant, so it pierces `private`.
+**Public Link** _(retired, ADR-0084)_:
+Was an unguessable, unlisted URL granting account-less read to a specific Entity — an anonymous Viewer grant that pierced `private`. Retired with anonymous read entire: exposing one Entity to a specific outsider is now a named **Viewer** grant, which needs an account; exposing it to all accounts is `open` **Entity Visibility**. The anonymous pierce-`private` case has no successor, by design.
 _Avoid_: Share link, public URL, share token
 
 **Live-follow**:
@@ -502,7 +506,7 @@ Hexly packaged as a native application — an Electron shell hosting the API in 
 _Avoid_: Electron app, client, local mode, offline mode
 
 **Collaboration**:
-The sharing layer entire — World roles, entity grants, **Entity Visibility**, and Public Links — switched on or off per **Instance**. Off leaves a single **Sole User** owning everything, the sharing surfaces absent and their routes answering 404.
+The sharing layer entire — World roles, entity grants, and **Entity Visibility** (its `open` rung and the **Open World** flag included) — switched on or off per **Instance**. Off leaves a single **Sole User** owning everything, the sharing surfaces absent and their routes answering 404.
 _Avoid_: Sharing (one part of it), ACL, permissions, multiplayer
 
 **Sole User**:

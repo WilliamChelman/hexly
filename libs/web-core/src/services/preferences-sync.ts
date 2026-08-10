@@ -30,7 +30,7 @@ interface Snapshot {
  * Roaming happens at session (re)resolve — login or reload — not live: `/auth/me`
  * is read once per session, so two open sessions can differ until one reloads.
  *
- * While anonymous, nothing is sent (ADR-0014 local-only behaviour).
+ * While signed out, nothing is sent (ADR-0014 local-only behaviour).
  */
 @Injectable({ providedIn: 'root' })
 export class PreferencesSync {
@@ -40,7 +40,7 @@ export class PreferencesSync {
   private readonly auth = inject(AuthClient);
 
   /**
-   * The state last known to match the server, or `null` while anonymous.
+   * The state last known to match the server, or `null` while signed out.
    * Hydration is detected by a user-id change; a signal value differing from
    * this snapshot afterwards is a genuine user action to push.
    */

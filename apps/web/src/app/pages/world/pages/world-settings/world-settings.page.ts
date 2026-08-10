@@ -5,13 +5,14 @@ import { map, switchMap } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ActiveWorld, ClientConfigStore, TitleService } from '@hexly/web-core';
 import { EyebrowComponent, PanelComponent, IconComponent, IconName } from '@hexly/web-ui';
-import { OwnerSetComponent, MemberSetComponent, PublicLinkComponent } from '@hexly/web-entity';
+import { OwnerSetComponent, MemberSetComponent } from '@hexly/web-entity';
 import { WorldTypesPanelComponent } from './components/world-types-panel.component';
 import { WorldFieldsPanelComponent } from './components/world-fields-panel.component';
 import { WorldImportsPanelComponent } from './components/world-imports-panel.component';
 import { WorldMountsPanelComponent } from './components/world-mounts-panel.component';
 import { WorldThemePanelComponent } from './components/world-theme-panel.component';
 import { WorldKindPanelComponent } from './components/world-kind-panel.component';
+import { WorldOpenPanelComponent } from './components/world-open-panel.component';
 
 type Section = 'access' | 'kind' | 'schema' | 'mounts' | 'theme' | 'imports' | 'sharing';
 
@@ -43,13 +44,13 @@ interface SectionItem {
     IconComponent,
     OwnerSetComponent,
     MemberSetComponent,
-    PublicLinkComponent,
     WorldTypesPanelComponent,
     WorldFieldsPanelComponent,
     WorldImportsPanelComponent,
     WorldMountsPanelComponent,
     WorldThemePanelComponent,
     WorldKindPanelComponent,
+    WorldOpenPanelComponent,
   ],
   template: `
     @if (worldId(); as id) {
@@ -124,11 +125,14 @@ interface SectionItem {
               <div class="pane" appPanel><app-world-imports [id]="id" /></div>
             }
             @case ('sharing') {
+              <!-- The Open-World toggle (ADR-0084), the successor to the retired World Public Link: a
+                   World management power, gated in the rail on the same manage right the Theme/Mounts
+                   panels are and on the Collaboration layer (ADR-0071). -->
               <header class="detail-head">
-                <h1 class="detail-title">{{ 'collab.publicLink.worldHeading' | transloco }}</h1>
-                <p class="detail-sub">{{ 'collab.publicLink.worldSubhead' | transloco }}</p>
+                <h1 class="detail-title">{{ 'worldOpen.heading' | transloco }}</h1>
+                <p class="detail-sub">{{ 'worldOpen.subhead' | transloco }}</p>
               </header>
-              <div class="pane" appPanel><app-public-link kind="world" [id]="id" /></div>
+              <div class="pane" appPanel><app-world-open [id]="id" /></div>
             }
           }
         </section>
@@ -182,11 +186,17 @@ export class WorldSettingsPage {
   private readonly activeWorld = inject(ActiveWorld);
   readonly worldId = this.activeWorld.worldId;
 
+  /**
+   * Whether the caller may manage the World (ADR-0039) — the right the Theme/Mounts/Kind panels and the
+   * Open-World toggle (ADR-0084) all gate on, so the page never shows a control the server would refuse.
+   */
+  readonly canManage = computed(() => !!this.activeWorld.world()?.rights?.includes('manage'));
+
   readonly items = computed<readonly SectionItem[]>(() => {
     const collaboration = this.clientConfig.isCollaborationEnabled();
     // A Theme is authored, not read: only a caller who may manage the World gets the editor (ADR-0039),
     // the same right the rail gates this whole page on.
-    const canManage = !!this.activeWorld.world()?.rights?.includes('manage');
+    const canManage = this.canManage();
     return [
       ...(collaboration
         ? [{ section: 'access' as const, icon: 'user' as const, label: 'collab.members.heading' }]
@@ -200,8 +210,10 @@ export class WorldSettingsPage {
       ...(canManage ? [{ section: 'mounts' as const, icon: 'library' as const, label: 'mounts.heading' }] : []),
       ...(canManage ? [{ section: 'theme' as const, icon: 'palette' as const, label: 'worldTheme.heading' }] : []),
       { section: 'imports' as const, icon: 'download' as const, label: 'imports.heading' },
-      ...(collaboration
-        ? [{ section: 'sharing' as const, icon: 'share' as const, label: 'collab.publicLink.worldHeading' }]
+      // The Open-World toggle is the only sharing surface left (ADR-0084): Owner-gated like the Theme,
+      // and cut with the Collaboration layer (ADR-0071), so the group shows only for a manager with it on.
+      ...(collaboration && canManage
+        ? [{ section: 'sharing' as const, icon: 'share' as const, label: 'worldOpen.heading' }]
         : []),
     ];
   });

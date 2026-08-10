@@ -27,6 +27,7 @@ const ALDERMOOR: WorldDetail = {
   name: 'Aldermoor',
   owners: ['u1'],
   kind: 'campaign',
+  open: false,
   rights: ['read'],
   entityCount: 2,
   pinnedEntityIds: [],

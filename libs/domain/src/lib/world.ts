@@ -22,7 +22,7 @@ export const worldSchema = z.object({
 /**
  * What a World is kept for (ADR-0080): a `campaign` played in, or a **Shelf** drawn from — art,
  * tracks, a homebrew bestiary. A label and nothing more: the World Index groups by it and **no read
- * anywhere filters on it**, so a Shelf keeps its members, Dashboard, Theme, Public Link, Switcher
+ * anywhere filters on it**, so a Shelf keeps its members, Dashboard, Theme, Switcher
  * entry and Mounts exactly as a campaign does.
  */
 export const worldKindSchema = z.enum(['campaign', 'shelf']);
@@ -111,6 +111,10 @@ export const updateWorldRequestSchema = z.object({
   // Campaign-or-Shelf (ADR-0080). Rides the one Owner-curated patch because it is curation like the
   // name is — a label the World Index groups by, not a capability.
   kind: worldKindSchema.optional(),
+  // The Open-World flag (ADR-0084): widen the World's `shared` Entities to any signed-in caller, the
+  // successor to the retired World Public Link. Rides this one Owner-gated patch — the server refuses
+  // it for a non-Owner, so a Contributor or Viewer cannot widen the World's audience.
+  open: z.boolean().optional(),
 });
 
 export type UpdateWorldRequest = z.infer<typeof updateWorldRequestSchema>;
@@ -131,6 +135,13 @@ export interface WorldSummary {
    * ever read for. Always present — a World that was never labelled is a campaign.
    */
   readonly kind: WorldKind;
+  /**
+   * The Open-World flag (ADR-0084): when set, the World's `shared` Entities read to any signed-in
+   * caller on the Instance — the successor to the retired World Public Link. Reachability only, never
+   * listing: an Open World stays absent from a non-member's World Index, Switcher and quick-open,
+   * exactly as a mounted World is. Always present — a World that was never opened is closed.
+   */
+  readonly open: boolean;
   /**
    * The caller's Rights: always present and non-empty — a reachable World
    * carries at least `read`, an Owner also `manage`.

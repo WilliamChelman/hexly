@@ -13,7 +13,7 @@ export type DeploymentProfile = (typeof DEPLOYMENT_PROFILES)[number];
 export interface ClientConfig {
   /** This Instance's Deployment Profile (ADR-0071). */
   profile: DeploymentProfile;
-  /** Whether the Collaboration layer is on (ADR-0071): sharing, World roles, Visibility, Public Links. */
+  /** Whether the Collaboration layer is on (ADR-0071): sharing, World roles, and Visibility — its `open` rung and the Open World flag included (ADR-0084). */
   collaboration: boolean;
   /** Each bundled Plugin, keyed by `PLUGIN_ID`; every bundled Plugin has an entry whether or not `hexly.yml` names it. */
   plugins: Record<string, ClientPluginConfig>;

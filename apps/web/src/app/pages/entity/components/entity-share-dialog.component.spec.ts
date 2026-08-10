@@ -10,7 +10,7 @@ import {
   MockWorldsClient,
   mockClientConfigStore,
 } from '@hexly/web-core/testing';
-import { GrantSetComponent, OwnerSetComponent, PublicLinkComponent, ENTITY_SESSION } from '@hexly/web-entity';
+import { GrantSetComponent, OwnerSetComponent, ENTITY_SESSION } from '@hexly/web-entity';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { EntitySession } from '../services/entity-session';
@@ -53,12 +53,11 @@ describe('EntityShareDialog', () => {
     return fixture;
   }
 
-  it('mounts the owner set, the grant set and the Public Link for the open Entity', () => {
+  it('mounts the owner set and the grant set for the open Entity', () => {
     const fixture = render();
 
     expect(fixture.debugElement.query(By.directive(OwnerSetComponent))).not.toBeNull();
     expect(fixture.debugElement.query(By.directive(GrantSetComponent))).not.toBeNull();
-    expect(fixture.debugElement.query(By.directive(PublicLinkComponent))).not.toBeNull();
   });
 
   // The surface guards itself, so no host can mount it and nothing fetches an endpoint that now 404s
@@ -69,7 +68,6 @@ describe('EntityShareDialog', () => {
 
     expect(fixture.debugElement.query(By.directive(OwnerSetComponent))).toBeNull();
     expect(fixture.debugElement.query(By.directive(GrantSetComponent))).toBeNull();
-    expect(fixture.debugElement.query(By.directive(PublicLinkComponent))).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid=owners-close]')).toBeNull();
     expect(entities.owners).not.toHaveBeenCalled();
     expect(entities.grants).not.toHaveBeenCalled();

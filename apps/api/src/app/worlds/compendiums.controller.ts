@@ -9,11 +9,10 @@ import { compendiumById, listCompendiums } from './compendiums';
  * Compendium is not in a World, and the route says so.
  *
  * Session-guarded, both reads, and that *is* the Compendium's access rule: Instance-wide with no
- * members, no roles and no public link (ADR-0078), so there is nothing per-caller to resolve and being
- * on this Instance is the whole standing. ADR-0034's possession-is-the-token is content-addressed bytes
- * on a static route and stops there, so the pack's Container id is an identifier here, not a credential.
- * The account-less reader a **Mount** cascaded read to reaches a pack's terms by naming the World
- * Public Link that carries them, at `GET /public/worlds/:token/compendiums/:id` (ADR-0080, #410).
+ * members and no roles (ADR-0078), so there is nothing per-caller to resolve and being on this Instance
+ * is the whole standing. ADR-0034's possession-is-the-token is content-addressed bytes on a static route
+ * and stops there, so the pack's Container id is an identifier here, not a credential. A signed-in reader
+ * a **Mount** cascaded read to reaches a pack's terms on this same session-guarded route (ADR-0080/0084).
  *
  * Each row carries the pack's pinned `rev` and its attribution, which is where a pack's own page reads
  * its terms from (#402). The list itself is the operator's view of the shelf: a **Library** names its

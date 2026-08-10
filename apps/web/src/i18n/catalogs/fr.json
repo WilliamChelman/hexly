@@ -106,6 +106,7 @@
       "clearAll": "Tout effacer",
       "private": "Privé",
       "shared": "Partagé",
+      "open": "Ouvert",
       "rangeMin": "{{field}} minimum",
       "rangeMax": "{{field}} maximum",
       "container": "Conteneur",
@@ -151,7 +152,8 @@
     "visibility": {
       "shared": "Partagé",
       "private": "Privé",
-      "toggle": "Changer la visibilité"
+      "open": "Ouvert",
+      "label": "Visibilité"
     },
     "view": {
       "switchLabel": "Changer de vue",
@@ -650,7 +652,19 @@
       "campaign": "Un monde où vous jouez.",
       "shelf": "Un monde où vous puisez."
     },
-    "note": "Ce n'est qu'une étiquette : l'index des mondes s'en sert pour les regrouper, et rien d'autre ne la lit nulle part. Une étagère garde ses membres, son tableau de bord, son thème, son lien public et sa place dans le sélecteur de mondes, exactement comme une campagne.",
+    "note": "Ce n'est qu'une étiquette : l'index des mondes s'en sert pour les regrouper, et rien d'autre ne la lit nulle part. Une étagère garde ses membres, son tableau de bord, son thème et sa place dans le sélecteur de mondes, exactement comme une campagne.",
+    "saveError": "Impossible d'enregistrer. Veuillez réessayer."
+  },
+  "worldOpen": {
+    "heading": "Ouvrir ce monde",
+    "subhead": "Permettre à toute personne connectée à cette instance de lire les entités partagées de ce monde via son lien, sans l'ajouter comme membre.",
+    "closed": "Fermé",
+    "open": "Ouvert",
+    "hint": {
+      "closed": "Seuls les membres atteignent ce monde.",
+      "open": "Toute personne connectée peut lire ses entités partagées."
+    },
+    "note": "Ouvrir change qui peut atteindre le monde, jamais où il est listé : il reste absent de l'index des mondes, du sélecteur et de l'ouverture rapide des autres, comme un monde monté. Les entités privées restent privées — être connecté ne les ouvre jamais. Seules les entités partagées deviennent lisibles, et seulement pour les comptes connectés.",
     "saveError": "Impossible d'enregistrer. Veuillez réessayer."
   },
   "mounts": {
@@ -696,13 +710,6 @@
     "runError": "L'import ne s'est pas terminé. Veuillez réessayer.",
     "runningError": "Un import est déjà en cours pour ce monde.",
     "removeError": "Impossible de supprimer cet ensemble importé. Veuillez réessayer."
-  },
-  "publicView": {
-    "tabTitle": "Partagé — Hexly",
-    "banner": "Vous consultez une page partagée en lecture seule.",
-    "worldEntities": "Pages de ce monde",
-    "notFound": "Ce lien n’est plus actif.",
-    "notFoundBody": "Le lien a peut-être été révoqué, ou l’adresse est incorrecte."
   },
   "settings": {
     "tabTitle": "Paramètres",

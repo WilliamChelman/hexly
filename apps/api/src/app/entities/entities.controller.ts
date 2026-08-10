@@ -30,7 +30,6 @@ import {
   localGraphQuerySchema,
   parseFieldFilters,
   patchEntityRequestSchema,
-  PublicLink,
   saveEntityRequestSchema,
 } from '@hexly/domain';
 import { CollaborationGuard } from '../acl/collaboration.guard';
@@ -317,29 +316,5 @@ export class EntitiesController {
   @UseGuards(CollaborationGuard)
   removeGrant(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('userId') userId: string): EntityGrant[] {
     return aclSetResponse(this.entities.removeGrant(user.id, id, userId), 'entity');
-  }
-
-  // The Entity's per-entity Public Link (ADR-0037, #162), for an Owner: the active token or null.
-  @Get(':id/link')
-  @UseGuards(CollaborationGuard)
-  link(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink | null {
-    return aclSetResponse(this.entities.getLink(user.id, id), 'entity');
-  }
-
-  // Mint (or return the existing) per-entity Public Link (ADR-0037, #162): Owner-only. One
-  // active link per Entity, so a re-mint returns the current token — idempotent, hence 200.
-  @Post(':id/link')
-  @HttpCode(200)
-  @UseGuards(CollaborationGuard)
-  mintLink(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink {
-    return aclSetResponse(this.entities.mintLink(user.id, id), 'entity');
-  }
-
-  // Revoke the per-entity Public Link (ADR-0037, #162): Owner-only, the kill-switch.
-  @Delete(':id/link')
-  @HttpCode(204)
-  @UseGuards(CollaborationGuard)
-  revokeLink(@CurrentUser() user: AuthUser, @Param('id') id: string): void {
-    aclSetResponse(this.entities.revokeLink(user.id, id), 'entity');
   }
 }

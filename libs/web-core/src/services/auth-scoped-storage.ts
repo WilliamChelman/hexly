@@ -30,10 +30,9 @@ export interface AuthPreference<T extends string> {
  * preferences at a time, tagged in {@link SCOPE_KEY} with whose they are. When a
  * *different* authenticated user is confirmed, every prefixed key is wiped.
  *
- * The wipe waits for a real authenticated user: while the session is anonymous —
- * logged out, a public-link viewer, or the brief window before `/auth/me`
- * resolves on boot — nothing is touched, so a returning user's choices survive
- * reload.
+ * The wipe waits for a real authenticated user: while there is none — logged out,
+ * or the brief window before `/auth/me` resolves on boot — nothing is touched, so
+ * a returning user's choices survive reload.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthScopedStorage {

@@ -13,7 +13,6 @@ import {
   GrantRole,
   EntityDocument,
   LocalGraph,
-  PublicLink,
   Visibility,
 } from '@hexly/domain';
 import { NudgeBusClient } from './nudge-bus.client';
@@ -140,21 +139,6 @@ export class EntitiesClient {
   /** Revoke a grant; returns the updated set. */
   removeGrant(id: string, userId: string): Observable<EntityGrant[]> {
     return this.http.delete<EntityGrant[]>(`/api/entities/${id}/grants/${userId}`);
-  }
-
-  /** The Entity's per-entity Public Link — the active token or null. Owner-only server-side. */
-  link(id: string): Observable<PublicLink | null> {
-    return this.http.get<PublicLink | null>(`/api/entities/${id}/link`);
-  }
-
-  /** Mint (or return the existing) per-entity Public Link; idempotent (200). */
-  mintLink(id: string): Observable<PublicLink> {
-    return this.http.post<PublicLink>(`/api/entities/${id}/link`, {});
-  }
-
-  /** Revoke the per-entity Public Link — the kill-switch. */
-  revokeLink(id: string): Observable<void> {
-    return this.http.delete<void>(`/api/entities/${id}/link`);
   }
 
   /**
